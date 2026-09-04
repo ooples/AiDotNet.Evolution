@@ -40,6 +40,7 @@ public sealed partial class EvolutionEngine<TGenome>
             IslandHistories = _histories.Select(history => history.Entries
                 .Select(entry => ArchiveEntryDocument.From(entry, SerializeGenome)).ToList()).ToList(),
             SelectionState = (_selection as IOutcomeAwareEvolutionSelectionPolicy<TGenome>)?.CaptureState(),
+            VariationState = (_variation as ICheckpointableVariationOperator<TGenome>)?.CaptureState(),
             StatusCounts = _statusCounts.OrderBy(pair => pair.Key).Select(pair => new StatusCountDocument
             {
                 Status = pair.Key,
@@ -154,6 +155,20 @@ public sealed partial class EvolutionEngine<TGenome>
         {
             throw new InvalidDataException("The checkpoint contains state for a non-adaptive selection policy.");
         }
+
+        // A variation operator that remembers something between proposals has to be restored before the first
+        // proposal, or the resumed run proposes from a different state than the uninterrupted one did.
+        if (_variation is ICheckpointableVariationOperator<TGenome> statefulVariation)
+        {
+            if (state.VariationState is null)
+                throw new InvalidDataException("The checkpoint variation-operator state is missing.");
+            statefulVariation.RestoreState(state.VariationState);
+        }
+        else if (state.VariationState is not null)
+        {
+            throw new InvalidDataException("The checkpoint contains state for a stateless variation operator.");
+        }
+
         _statusCounts.Clear();
         foreach (StatusCountDocument count in state.StatusCounts ?? new List<StatusCountDocument>())
         {
@@ -565,6 +580,10 @@ public sealed partial class EvolutionEngine<TGenome>
         Append(builder, _selection is IOutcomeAwareEvolutionSelectionPolicy<TGenome> adaptiveSelection
             ? adaptiveSelection.CaptureState()
             : "stateless");
+        Append(builder, "variation");
+        Append(builder, _variation is ICheckpointableVariationOperator<TGenome> statefulVariation
+            ? statefulVariation.CaptureState()
+            : "stateless");
         Append(builder, "failures");
         Append(builder, _failures.Count);
         foreach (EvolutionDiagnostic failure in _failures) AppendDiagnostic(builder, failure);
@@ -761,6 +780,9 @@ public sealed partial class EvolutionEngine<TGenome>
         public List<EliteRecordDocument>? GlobalElites { get; set; }
         public List<List<ArchiveEntryDocument>>? IslandHistories { get; set; }
         public string? SelectionState { get; set; }
+
+        /// <summary>State of a variation operator that remembers something between proposals.</summary>
+        public string? VariationState { get; set; }
         public List<StatusCountDocument>? StatusCounts { get; set; }
         public List<string>? SeenGenomeIds { get; set; }
         public List<CacheDocument>? Cache { get; set; }
