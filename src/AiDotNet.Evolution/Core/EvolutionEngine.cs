@@ -183,7 +183,7 @@ public sealed partial class EvolutionEngine<TGenome>
             _histories[i] = new EvolutionIslandHistory<TGenome>(_options.HistorySize, _islands[0].Direction);
 
         string archiveDefinition = CanonicalArchiveDefinition(_islands[0]);
-        _configurationHash = EvolutionHash.Compute(_options.ToSemanticCanonicalString());
+        _configurationHash = _options.GetConfigurationHash();
         _compatibilityHash = EvolutionHash.Combine(new[]
         {
             EvolutionCheckpoint.CurrentSchemaVersion.ToString(CultureInfo.InvariantCulture),

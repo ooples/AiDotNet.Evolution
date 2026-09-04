@@ -99,7 +99,7 @@ public sealed class EvolutionTraceOptions
     /// <see cref="MaximumFlushEveryRecords"/>, <see cref="MaxBytes"/> or <see cref="MaxRecords"/> is not positive, or
     /// <see cref="ParentQualityCacheSize"/> is negative.
     /// </exception>
-    internal EvolutionTraceOptions SnapshotAndValidate()
+    public EvolutionTraceOptions SnapshotAndValidate()
     {
         if (!Enum.IsDefined(typeof(EvolutionTraceFormat), Format)) throw new ArgumentOutOfRangeException(nameof(Format));
         if (Enabled && string.IsNullOrWhiteSpace(Path))

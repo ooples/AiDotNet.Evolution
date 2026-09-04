@@ -3,8 +3,17 @@ using System.Text;
 
 namespace AiDotNet.Evolution;
 
-internal static class EvolutionHash
+/// <summary>Provides stable SHA-256 hashes for evolution identities and ordered configuration components.</summary>
+/// <remarks>
+/// The methods use UTF-8, lowercase hexadecimal output, invariant length prefixes, and no process-specific state,
+/// so callers in adapter packages can build identities that remain compatible with the evolution engine.
+/// </remarks>
+public static class EvolutionHash
 {
+    /// <summary>Computes the lowercase SHA-256 hash of a UTF-8 string.</summary>
+    /// <param name="value">The value to hash.</param>
+    /// <returns>A 64-character lowercase hexadecimal digest.</returns>
+    /// <exception cref="ArgumentNullException"><paramref name="value"/> is <c>null</c>.</exception>
     public static string Compute(string value)
     {
         if (value is null) throw new ArgumentNullException(nameof(value));
@@ -17,6 +26,15 @@ internal static class EvolutionHash
         }
     }
 
+    /// <summary>Computes an unambiguous hash of an ordered sequence of string components.</summary>
+    /// <param name="values">The ordered components to combine.</param>
+    /// <returns>A 64-character lowercase hexadecimal digest.</returns>
+    /// <exception cref="ArgumentNullException"><paramref name="values"/> is <c>null</c>.</exception>
+    /// <exception cref="ArgumentException">A component is <c>null</c>.</exception>
+    /// <remarks>
+    /// Each component is length-prefixed before hashing, so different boundaries such as
+    /// <c>["ab", "c"]</c> and <c>["a", "bc"]</c> cannot collide merely through concatenation.
+    /// </remarks>
     public static string Combine(IEnumerable<string> values)
     {
         if (values is null) throw new ArgumentNullException(nameof(values));

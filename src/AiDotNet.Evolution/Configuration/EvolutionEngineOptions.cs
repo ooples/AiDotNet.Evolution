@@ -482,7 +482,14 @@ public sealed class EvolutionEngineOptions
         Artifacts = new EvolutionArtifactOptions { Enabled = true }
     };
 
-    internal EvolutionEngineOptions SnapshotAndValidate()
+    /// <summary>Validates every option and returns an independent, normalized copy.</summary>
+    /// <returns>
+    /// A defensive snapshot whose nested option objects are also copied, so later mutation of this instance cannot
+    /// affect a configured engine or an adapter that retains the returned value.
+    /// </returns>
+    /// <exception cref="ArgumentException">An option or nested option has an invalid value or combination.</exception>
+    /// <exception cref="ArgumentOutOfRangeException">A numeric, duration, flags, or enum value is outside its supported range.</exception>
+    public EvolutionEngineOptions SnapshotAndValidate()
     {
         Guard.NotNullOrWhiteSpace(RunId);
         if (MaxEvaluationAttempts < 0) throw new ArgumentOutOfRangeException(nameof(MaxEvaluationAttempts));
@@ -551,6 +558,19 @@ public sealed class EvolutionEngineOptions
         snapshot.OutputDirectory = outputDirectory;
         snapshot.QualityDescriptorName = QualityDescriptorName?.Trim();
         return snapshot;
+    }
+
+    /// <summary>Computes the stable hash of every option that changes the meaning of a search.</summary>
+    /// <returns>A lowercase SHA-256 digest suitable for configuration comparison and adapter identities.</returns>
+    /// <remarks>
+    /// Budget and location options are intentionally excluded, so raising a completed run's limits or moving its
+    /// output directory does not make its checkpoint incompatible. The options are validated and normalized before
+    /// hashing; invalid configurations throw the same exceptions as <see cref="SnapshotAndValidate"/>.
+    /// </remarks>
+    public string GetConfigurationHash()
+    {
+        EvolutionEngineOptions snapshot = SnapshotAndValidate();
+        return EvolutionHash.Compute(snapshot.ToSemanticCanonicalString());
     }
 
     /// <summary>Copies every option without validating any of them.</summary>
