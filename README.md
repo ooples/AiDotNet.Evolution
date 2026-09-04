@@ -20,6 +20,21 @@ Evaluation caches inside the engine are run-local memoization keyed by canonical
 owned by consumers—such as a GPU kernel autotune cache—remain separate because their keys also need hardware, driver,
 compiler, and correctness-policy fingerprints.
 
+## Integration boundaries
+
+The engine intentionally knows nothing about models, prompts, compilers, or hardware. Integrations keep those domain
+objects in their owning repository and implement the typed contracts above:
+
+- AiDotNet uses it for MAP-Elites AutoML and program evolution. Facade builders, model materialization, LLM clients,
+  prompt templates, and sandboxed execution stay in AiDotNet.
+- AiDotNet.Tensors uses it for offline, startup, and background kernel search. Device benchmarks, correctness oracles,
+  launch configurations, hardware fingerprints, and deployment caches stay in AiDotNet.Tensors.
+- Compiler schedule search, fusion-policy search, quantization-policy search, optimizer selection, feature selection,
+  architecture search, and prompt/program search can share the engine without sharing domain-specific genomes.
+
+Finite choices should be represented by enums or other validated value types inside a genome. Strings remain
+appropriate for extensible identifiers, version hashes, metric names, and serialized payloads at an explicit boundary.
+
 ## Development
 
 See [CONTRIBUTING.md](CONTRIBUTING.md) for local validation and
