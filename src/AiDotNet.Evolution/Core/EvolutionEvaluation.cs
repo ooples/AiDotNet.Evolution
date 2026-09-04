@@ -150,4 +150,36 @@ public sealed class EvolutionEvaluation
     public string EvaluatorVersionHash { get; }
     /// <summary>Gets the engine configuration hash.</summary>
     public string ConfigurationHash { get; }
+
+    /// <summary>Returns a copy carrying different descriptor values and nothing else changed.</summary>
+    /// <param name="descriptors">The replacement descriptor values.</param>
+    /// <returns>A new evaluation identical to this one apart from its descriptors.</returns>
+    /// <exception cref="ArgumentNullException"><paramref name="descriptors"/> is <see langword="null"/>.</exception>
+    /// <exception cref="ArgumentException">A descriptor name is blank or a value is not finite.</exception>
+    /// <remarks>
+    /// Descriptors say where a candidate belongs. A relative descriptor can change without the candidate changing,
+    /// so remeasurement produces an immutable copy while preserving every field that identifies the measurement.
+    /// </remarks>
+    public EvolutionEvaluation WithDescriptors(IReadOnlyDictionary<string, double> descriptors)
+    {
+        Guard.NotNull(descriptors);
+        return new EvolutionEvaluation(
+            EvaluationId,
+            GenomeId,
+            Status,
+            Quality,
+            Direction,
+            descriptors,
+            Objectives,
+            ConstraintViolations,
+            Cost,
+            Lineage,
+            CacheStatus,
+            Diagnostics,
+            TaskVersionHash,
+            EvaluatorVersionHash,
+            ConfigurationHash,
+            Metrics,
+            Artifacts);
+    }
 }

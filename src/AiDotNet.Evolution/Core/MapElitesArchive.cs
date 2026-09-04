@@ -335,6 +335,72 @@ public sealed class MapElitesArchive<TGenome> : IGrowableEvolutionArchive<TGenom
         foreach (EvolutionArchiveEntry<TGenome> entry in _cells.Values) PromoteIfBest(entry);
     }
 
+    /// <summary>Re-measures every elite against a new descriptor reading and re-files the whole archive.</summary>
+    /// <param name="measure">
+    /// Produces replacement descriptor values for one elite; returning <see langword="null"/> keeps its existing
+    /// values. The callback must not mutate this archive.
+    /// </param>
+    /// <returns>How many elites remain after deterministic collision resolution.</returns>
+    /// <remarks>
+    /// The operation is transactional. All callbacks and replacement evaluations are completed first, a separate
+    /// archive is grown and populated, and the live grid is changed only after staging succeeds. An exception therefore
+    /// leaves bounds, cells, best entry, cached entries, and version unchanged.
+    /// </remarks>
+    public int Remeasure(Func<TGenome, IReadOnlyDictionary<string, double>?> measure)
+    {
+        Guard.NotNull(measure);
+        if (_cells.Count == 0) return 0;
+
+        EvolutionArchiveEntry<TGenome>[] ordered = _cells.Values
+            .OrderBy(item => item.Cell.StableKey, StringComparer.Ordinal)
+            .ToArray();
+        var replacements = new EvolutionEvaluation?[ordered.Length];
+
+        // Invoke arbitrary caller code before touching even a staging grid. This validates every replacement through
+        // EvolutionEvaluation's constructor and guarantees callback failure has no observable archive side effect.
+        for (int index = 0; index < ordered.Length; index++)
+        {
+            IReadOnlyDictionary<string, double>? values =
+                measure(ordered[index].Candidate.CanonicalGenome.Genome);
+            if (values is not null) replacements[index] = ordered[index].Evaluation.WithDescriptors(values);
+        }
+
+        var staged = new MapElitesArchive<TGenome>(
+            _descriptors,
+            Direction,
+            _capacityFollowsGrid ? 0 : _capacity,
+            _maximumGridCells);
+
+        // Settle the final grid before filing anything. An unplaceable replacement keeps the old descriptors, but all
+        // entries are keyed against the same final bounds after every successful growth has been considered.
+        for (int index = 0; index < ordered.Length; index++)
+        {
+            EvolutionEvaluation? replacement = replacements[index];
+            if (replacement is null) continue;
+            staged.GrowToFit(replacement.Descriptors);
+            if (staged.TryCreateKey(replacement.Descriptors) is null) replacements[index] = null;
+        }
+
+        for (int index = 0; index < ordered.Length; index++)
+        {
+            EvolutionArchiveEntry<TGenome> prior = ordered[index];
+            EvolutionEvaluation evaluation = replacements[index] ?? prior.Evaluation;
+            EvolutionArchiveInsertionResult outcome = staged.TryAdd(prior.Candidate, evaluation);
+            if (outcome == EvolutionArchiveInsertionResult.Rejected)
+                throw new InvalidOperationException("A previously archived elite could not be staged after remeasurement.");
+        }
+
+        for (int axis = 0; axis < _descriptors.Length; axis++)
+            _descriptors[axis] = staged._descriptors[axis];
+        TotalGridCells = staged.TotalGridCells;
+        _cells.Clear();
+        foreach (KeyValuePair<string, EvolutionArchiveEntry<TGenome>> cell in staged._cells)
+            _cells.Add(cell.Key, cell.Value);
+        _best = staged._best;
+        Version++;
+        return _cells.Count;
+    }
+
     /// <summary>Computes the cell for descriptor values without modifying the archive.</summary>
     /// <param name="descriptors">The named descriptor values.</param>
     /// <returns>The cell, or <c>null</c> when a value is missing or rejected.</returns>
