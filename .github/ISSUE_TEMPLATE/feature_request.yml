@@ -1,0 +1,24 @@
+name: Feature request
+description: Propose a reusable engine capability or typed integration contract
+title: "feat: "
+body:
+  - type: textarea
+    id: problem
+    attributes:
+      label: Problem
+      description: Explain the reusable problem independently of any one consumer repository.
+    validations:
+      required: true
+  - type: textarea
+    id: contract
+    attributes:
+      label: Proposed typed contract
+      description: Identify genome, evaluator, variation, archive, cache, and compatibility implications.
+    validations:
+      required: true
+  - type: textarea
+    id: alternatives
+    attributes:
+      label: Alternatives and performance impact
+    validations:
+      required: true

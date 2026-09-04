@@ -1,0 +1,155 @@
+name: Build and Test
+
+on:
+  push:
+    branches: [main]
+  pull_request:
+    branches: [main]
+
+concurrency:
+  group: ${{ github.workflow }}-${{ github.ref }}
+  cancel-in-progress: true
+
+permissions:
+  contents: read
+
+env:
+  DOTNET_SKIP_FIRST_TIME_EXPERIENCE: true
+  DOTNET_CLI_TELEMETRY_OPTOUT: true
+  DOTNET_NOLOGO: true
+
+jobs:
+  modern:
+    name: Build, test, coverage, and format
+    if: "${{ !(github.event_name == 'push' && startsWith(github.event.head_commit.message, 'chore(main): release')) && !startsWith(github.head_ref, 'release-please--') }}"
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    steps:
+      - uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # v4
+        with:
+          fetch-depth: 0
+      - uses: actions/setup-dotnet@67a3573c9a986a3f9c594539f4ab511d57bb3ce9 # v4
+        with:
+          dotnet-version: '10.0.x'
+          dotnet-quality: preview
+      - name: Restore
+        run: dotnet restore AiDotNet.Evolution.slnx
+      - name: Verify formatting
+        run: dotnet format AiDotNet.Evolution.slnx --no-restore --verify-no-changes
+      - name: Build all package target frameworks
+        run: dotnet build src/AiDotNet.Evolution/AiDotNet.Evolution.csproj --configuration Release --no-restore
+      - name: Test net10.0 with coverage
+        run: >
+          dotnet test tests/AiDotNet.Evolution.Tests/AiDotNet.Evolution.Tests.csproj
+          --configuration Release --framework net10.0 --no-restore --verbosity normal
+          --blame-hang --blame-hang-timeout 120s --blame-crash
+          --collect:"XPlat Code Coverage" --results-directory ./coverage
+          --
+          DataCollectionRunSettings.DataCollectors.DataCollector.Configuration.Format=cobertura
+      - name: Test net8.0
+        run: >
+          dotnet test tests/AiDotNet.Evolution.Tests/AiDotNet.Evolution.Tests.csproj
+          --configuration Release --framework net8.0 --no-restore --verbosity normal
+          --blame-hang --blame-hang-timeout 120s --blame-crash
+      - name: Enforce coverage ratchet
+        shell: pwsh
+        run: |
+          $report = Get-ChildItem -Path coverage -Recurse -Filter coverage.cobertura.xml | Select-Object -First 1
+          if ($null -eq $report) { throw 'No Cobertura report was produced.' }
+          ./eng/Test-Coverage.ps1 -CoverageFile $report.FullName -BaselineFile coverage-baseline.json
+      - name: Upload coverage and crash diagnostics
+        if: always()
+        uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02 # v4
+        with:
+          name: coverage-and-diagnostics
+          path: |
+            coverage/**/coverage.cobertura.xml
+            coverage/**/*.dmp
+            coverage/**/Sequence_*.xml
+          if-no-files-found: warn
+      - name: Upload coverage to Codecov
+        if: always()
+        uses: codecov/codecov-action@b9fd7d16f6d7d1b5d2bec1a2887e65ceed900238 # v4
+        with:
+          files: ./coverage/**/coverage.cobertura.xml
+          disable_search: true
+          flags: unittests
+          fail_ci_if_error: false
+          verbose: true
+        env:
+          CODECOV_TOKEN: ${{ secrets.CODECOV_TOKEN }}
+
+  legacy:
+    name: Build and test net471
+    if: "${{ !(github.event_name == 'push' && startsWith(github.event.head_commit.message, 'chore(main): release')) && !startsWith(github.head_ref, 'release-please--') }}"
+    runs-on: windows-latest
+    timeout-minutes: 15
+    steps:
+      - uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # v4
+      - uses: actions/setup-dotnet@67a3573c9a986a3f9c594539f4ab511d57bb3ce9 # v4
+        with:
+          dotnet-version: '10.0.x'
+          dotnet-quality: preview
+      - run: dotnet restore AiDotNet.Evolution.slnx
+      - run: dotnet build tests/AiDotNet.Evolution.Tests/AiDotNet.Evolution.Tests.csproj --configuration Release --framework net471 --no-restore
+      - run: dotnet test tests/AiDotNet.Evolution.Tests/AiDotNet.Evolution.Tests.csproj --configuration Release --framework net471 --no-build --verbosity normal --blame-hang --blame-hang-timeout 120s --blame-crash
+
+  package:
+    name: Pack and validate NuGet
+    needs: [modern, legacy]
+    if: "${{ always() && !startsWith(github.head_ref, 'release-please--') && !(github.event_name == 'push' && startsWith(github.event.head_commit.message, 'chore(main): release')) && needs.modern.result == 'success' && needs.legacy.result == 'success' }}"
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    steps:
+      - uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # v4
+        with:
+          fetch-depth: 0
+      - uses: actions/setup-dotnet@67a3573c9a986a3f9c594539f4ab511d57bb3ce9 # v4
+        with:
+          dotnet-version: '10.0.x'
+          dotnet-quality: preview
+      - run: dotnet restore src/AiDotNet.Evolution/AiDotNet.Evolution.csproj
+      - run: dotnet pack src/AiDotNet.Evolution/AiDotNet.Evolution.csproj --configuration Release --no-restore --output artifacts
+      - name: Validate package contents and dependency boundary
+        shell: pwsh
+        run: |
+          [xml] $project = Get-Content -LiteralPath src/AiDotNet.Evolution/AiDotNet.Evolution.csproj -Raw
+          $version = [string] $project.Project.PropertyGroup.Version
+          if ([string]::IsNullOrWhiteSpace($version)) { throw 'The package project has no Version.' }
+          ./eng/Test-Package.ps1 -PackagePath "artifacts/AiDotNet.Evolution.$version.nupkg" -ExpectedVersion $version
+      - uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02 # v4
+        with:
+          name: packages
+          path: |
+            artifacts/*.nupkg
+            artifacts/*.snupkg
+          if-no-files-found: error
+
+  ci-gate:
+    name: CI Gate
+    needs: [modern, legacy, package]
+    if: "${{ always() && !startsWith(github.head_ref, 'release-please--') && !(github.event_name == 'push' && startsWith(github.event.head_commit.message, 'chore(main): release')) }}"
+    runs-on: ubuntu-latest
+    timeout-minutes: 5
+    steps:
+      - name: Evaluate required jobs
+        env:
+          MODERN_RESULT: ${{ needs.modern.result }}
+          LEGACY_RESULT: ${{ needs.legacy.result }}
+          PACKAGE_RESULT: ${{ needs.package.result }}
+        shell: bash
+        run: |
+          set -euo pipefail
+          failed=0
+          for result in \
+            "modern:$MODERN_RESULT" \
+            "legacy:$LEGACY_RESULT" \
+            "package:$PACKAGE_RESULT"; do
+            job="${result%%:*}"
+            conclusion="${result#*:}"
+            if [ "$conclusion" != success ]; then
+              echo "::error::Required job '$job' concluded '$conclusion'."
+              failed=1
+            fi
+          done
+          exit "$failed"
