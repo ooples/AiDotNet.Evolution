@@ -14,8 +14,7 @@ concurrency:
   cancel-in-progress: true
 
 # contents: read is used for exactly one thing — reading release-please-config.json from the base
-# branch. The job makes no API calls and reports through core.info / core.setFailed, so no other
-# scope (notably pull-requests) is granted.
+# branch through the GitHub API. No other scope (notably pull-requests) is granted.
 permissions:
   contents: read
 
@@ -28,34 +27,70 @@ jobs:
     # nothing — and one keyed on the branch name would be a bypass, since any contributor can
     # open a PR from a branch named release-please--anything to skip a required check.
     steps:
-      - name: Read accepted types from release-please config
-        uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # v4
-        with:
-          # Base branch, NOT the PR head: the config is the authority on what this check accepts,
-          # so a PR must not be able to widen the rules it is being judged by.
-          ref: ${{ github.base_ref }}
-          sparse-checkout: release-please-config.json
-          sparse-checkout-cone-mode: false
-          persist-credentials: false
-
       - name: Check conventional-commit format
         uses: actions/github-script@3a2844b7e9c422d3c10d287c895573f7108da1b3 # v7
         with:
           script: |
-            const fs = require('fs');
-
             // Derived from release-please-config.json rather than duplicated here. A second
             // hand-maintained list drifts silently, and both directions are damaging: a type
             // release-please handles gets rejected, or a type it ignores is accepted and quietly
             // produces no release.
-            let sections;
-            try {
-              const config = JSON.parse(fs.readFileSync('release-please-config.json', 'utf8'));
-              sections = config['changelog-sections'];
-            } catch (error) {
-              core.setFailed(`Could not read release-please-config.json: ${error.message}`);
-              return;
+            async function readReleaseConfig(ref) {
+              const response = await github.rest.repos.getContent({
+                owner: context.repo.owner,
+                repo: context.repo.repo,
+                path: 'release-please-config.json',
+                ref
+              });
+              if (Array.isArray(response.data) || response.data.type !== 'file') {
+                throw new Error(`release-please-config.json at ${ref} is not a file.`);
+              }
+              return JSON.parse(Buffer.from(response.data.content, 'base64').toString('utf8'));
             }
+
+            let config;
+            try {
+              // Base branch, NOT the PR head: the config is the authority on what this check
+              // accepts, so a normal PR cannot widen the rules it is being judged by.
+              config = await readReleaseConfig(context.payload.pull_request.base.sha);
+            } catch (error) {
+              if (error.status !== 404) {
+                core.setFailed(`Could not read the base release-please-config.json: ${error.message}`);
+                return;
+              }
+
+              // The repository's first PR starts from an intentionally empty bootstrap commit,
+              // so no trusted base config exists yet. Permit the head config only for that exact
+              // state. A missing config on any non-empty base is an error, never a bypass.
+              const baseCommit = await github.rest.git.getCommit({
+                owner: context.repo.owner,
+                repo: context.repo.repo,
+                commit_sha: context.payload.pull_request.base.sha
+              });
+              const baseTree = await github.rest.git.getTree({
+                owner: context.repo.owner,
+                repo: context.repo.repo,
+                tree_sha: baseCommit.data.tree.sha,
+                recursive: 'true'
+              });
+              if (baseTree.data.truncated || baseTree.data.tree.some(entry => entry.type === 'blob')) {
+                core.setFailed(
+                  'release-please-config.json is absent from a non-empty base branch; refusing ' +
+                  'to let the PR define the title policy used to validate itself.'
+                );
+                return;
+              }
+
+              core.warning('Empty bootstrap base detected; validating against the initial head config.');
+              try {
+                config = await readReleaseConfig(context.payload.pull_request.head.sha);
+              } catch (headError) {
+                core.setFailed(`Could not read the bootstrap release-please-config.json: ${headError.message}`);
+                return;
+              }
+            }
+
+            const sections = config['changelog-sections'];
 
             if (!Array.isArray(sections) || sections.length === 0) {
               core.setFailed(
