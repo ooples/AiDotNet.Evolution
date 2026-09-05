@@ -73,4 +73,37 @@ finally {
     $archive.Dispose()
 }
 
+$repositoryRoot = (Resolve-Path -LiteralPath (Join-Path $PSScriptRoot '..')).Path
+$releaseConfigPath = Join-Path $repositoryRoot 'release-please-config.json'
+$releaseManifestPath = Join-Path $repositoryRoot '.release-please-manifest.json'
+$releaseConfig = Get-Content -LiteralPath $releaseConfigPath -Raw | ConvertFrom-Json
+$releaseManifest = Get-Content -LiteralPath $releaseManifestPath -Raw | ConvertFrom-Json
+$packageConfig = $releaseConfig.packages.PSObject.Properties['.'].Value
+$releasedVersion = $releaseManifest.PSObject.Properties['.']
+
+if ($null -eq $packageConfig) {
+    throw "release-please-config.json does not configure the repository-root package."
+}
+
+if ($null -eq $releasedVersion) {
+    $initialVersion = [string] $packageConfig.PSObject.Properties['initial-version'].Value
+    if ($initialVersion -ne $ExpectedVersion) {
+        throw "Bootstrap release version '$initialVersion' does not match package version '$ExpectedVersion'."
+    }
+}
+else {
+    $manifestVersion = [string] $releasedVersion.Value
+    if ($manifestVersion -ne $ExpectedVersion) {
+        throw "Released manifest version '$manifestVersion' does not match package version '$ExpectedVersion'."
+    }
+
+    $matchingTag = git -C $repositoryRoot tag --list -- "v$manifestVersion"
+    if ($LASTEXITCODE -ne 0) {
+        throw 'Unable to inspect repository release tags.'
+    }
+    if ([string]::IsNullOrWhiteSpace(($matchingTag | Out-String))) {
+        throw "Manifest claims version '$manifestVersion' was released, but tag 'v$manifestVersion' does not exist."
+    }
+}
+
 Write-Host "Validated $resolvedPackage"

@@ -43,6 +43,11 @@ the reusable automated-release workflow directly. The publish workflow validates
 target frameworks, validates the package boundary, optionally signs packages, creates a provenance attestation,
 publishes to NuGet, and attaches both package files to the GitHub release.
 
+The initial release is bootstrapped with an empty `.release-please-manifest.json` and the package-level
+`initial-version` in `release-please-config.json`. Manifest values describe versions that have already been released;
+the package validation fails if a populated manifest has no matching Git tag, preventing downstream projects from
+pinning a version the release workflow will skip.
+
 The direct reusable-workflow call is intentional: it does not rely on a second GitHub event being emitted by a bot
 token, so the release still publishes when release-please has to fall back to `GITHUB_TOKEN`. The manual dispatch path
 accepts only an already-existing `v<semver>` tag and runs the identical pipeline.
