@@ -91,10 +91,12 @@ jobs:
           dotnet-version: '10.0.x'
           dotnet-quality: preview
       - run: dotnet restore src/AiDotNet.Evolution/AiDotNet.Evolution.csproj
+      - name: Build every package target on this runner
+        run: dotnet build src/AiDotNet.Evolution/AiDotNet.Evolution.csproj --configuration Release --no-restore
       - name: Pack exact tag version
         run: >
           dotnet pack src/AiDotNet.Evolution/AiDotNet.Evolution.csproj
-          --configuration Release --no-restore --output out
+          --configuration Release --no-build --no-restore --output out
           -p:PackageVersion=${{ needs.validate.outputs.version }}
       - name: Validate package contents and dependency boundary
         shell: pwsh

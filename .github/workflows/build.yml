@@ -109,7 +109,9 @@ jobs:
           dotnet-version: '10.0.x'
           dotnet-quality: preview
       - run: dotnet restore src/AiDotNet.Evolution/AiDotNet.Evolution.csproj
-      - run: dotnet pack src/AiDotNet.Evolution/AiDotNet.Evolution.csproj --configuration Release --no-restore --output artifacts
+      - name: Build every package target on this runner
+        run: dotnet build src/AiDotNet.Evolution/AiDotNet.Evolution.csproj --configuration Release --no-restore
+      - run: dotnet pack src/AiDotNet.Evolution/AiDotNet.Evolution.csproj --configuration Release --no-build --no-restore --output artifacts
       - name: Validate package contents and dependency boundary
         shell: pwsh
         run: |
