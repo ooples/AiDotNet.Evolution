@@ -466,7 +466,7 @@ public sealed partial class EvolutionEngine<TGenome>
         {
             throw;
         }
-        catch (Exception)
+        catch (Exception exception) when (EvolutionExceptionPolicy.IsRecoverable(exception))
         {
             // Observer failures are deliberately isolated from deterministic engine state.
         }

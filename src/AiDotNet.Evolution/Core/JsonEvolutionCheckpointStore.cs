@@ -113,7 +113,7 @@ public sealed class JsonEvolutionCheckpointStore : IEvolutionCheckpointStore
     private void Persist(EvolutionCheckpoint checkpoint, CancellationToken cancellationToken)
     {
         string directory = Path.GetDirectoryName(_path) ?? ".";
-        string tempPath = Path.Combine(directory, $".{Path.GetFileName(_path)}.{Guid.NewGuid():N}.tmp");
+        string tempPath = EvolutionPath.Join(directory, $".{Path.GetFileName(_path)}.{Guid.NewGuid():N}.tmp");
         string json = JsonSerializer.Serialize(CheckpointDocument.From(checkpoint), EvolutionJson.Indented);
         byte[] payload = new UTF8Encoding(encoderShouldEmitUTF8Identifier: false).GetBytes(json);
         if (payload.LongLength > _maxCheckpointBytes)
@@ -142,7 +142,14 @@ public sealed class JsonEvolutionCheckpointStore : IEvolutionCheckpointStore
             if (File.Exists(tempPath))
             {
                 try { File.Delete(tempPath); }
-                catch (IOException) { }
+                catch (IOException)
+                {
+                    // Atomic-write cleanup is best effort; a later save can remove an abandoned temporary file.
+                }
+                catch (UnauthorizedAccessException)
+                {
+                    // Do not replace the primary save failure with a cleanup failure from a locked-down directory.
+                }
             }
         }
     }

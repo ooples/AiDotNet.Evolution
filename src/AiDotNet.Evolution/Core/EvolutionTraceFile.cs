@@ -64,28 +64,21 @@ public static class EvolutionTraceFile
         if (!string.IsNullOrEmpty(directory)) Directory.CreateDirectory(directory);
 
         using (var file = new FileStream(fullPath, FileMode.Create, FileAccess.Write, FileShare.Read))
+        using (Stream target = compress ? new GZipStream(file, CompressionMode.Compress, leaveOpen: true) : file)
         {
-            Stream target = compress ? new GZipStream(file, CompressionMode.Compress, leaveOpen: true) : file;
-            try
+            using var writer = new StreamWriter(target, TraceEncoding, 4096, leaveOpen: true);
+            bool first = true;
+            if (format == EvolutionTraceFormat.Json) writer.Write(JsonHeader(summary?.RunId));
+            foreach (EvolutionTraceRecord record in records)
             {
-                using var writer = new StreamWriter(target, TraceEncoding, 4096, leaveOpen: true);
-                bool first = true;
-                if (format == EvolutionTraceFormat.Json) writer.Write(JsonHeader(summary?.RunId));
-                foreach (EvolutionTraceRecord record in records)
-                {
-                    if (record is null) throw new ArgumentException("A trace cannot contain null records.", nameof(records));
-                    if (format == EvolutionTraceFormat.Json && !first) writer.Write(",\n");
-                    writer.Write(SerializeRecord(record));
-                    if (format == EvolutionTraceFormat.JsonLines) writer.Write("\n");
-                    first = false;
-                }
-                if (format == EvolutionTraceFormat.Json) writer.Write(JsonFooter(summary));
-                writer.Flush();
+                if (record is null) throw new ArgumentException("A trace cannot contain null records.", nameof(records));
+                if (format == EvolutionTraceFormat.Json && !first) writer.Write(",\n");
+                writer.Write(SerializeRecord(record));
+                if (format == EvolutionTraceFormat.JsonLines) writer.Write("\n");
+                first = false;
             }
-            finally
-            {
-                if (compress) target.Dispose();
-            }
+            if (format == EvolutionTraceFormat.Json) writer.Write(JsonFooter(summary));
+            writer.Flush();
         }
 
         if (summary is not null) WriteSummary(EvolutionOutputLayout.SummaryPathFor(fullPath), summary);
@@ -194,7 +187,7 @@ public static class EvolutionTraceFile
         string fullPath = Path.GetFullPath(summaryPath);
         string directory = Path.GetDirectoryName(fullPath) ?? ".";
         Directory.CreateDirectory(directory);
-        string tempPath = Path.Combine(directory,
+        string tempPath = EvolutionPath.Join(directory,
             string.Format(CultureInfo.InvariantCulture, ".{0}.{1:N}.tmp", Path.GetFileName(fullPath), Guid.NewGuid()));
         byte[] payload = TraceEncoding.GetBytes(SummaryToJson(summary).ToJsonString(EvolutionJson.Indented));
         try
@@ -212,7 +205,14 @@ public static class EvolutionTraceFile
             if (File.Exists(tempPath))
             {
                 try { File.Delete(tempPath); }
-                catch (IOException) { }
+                catch (IOException)
+                {
+                    // Atomic-write cleanup is best effort; a later write can remove an abandoned temporary file.
+                }
+                catch (UnauthorizedAccessException)
+                {
+                    // Do not replace the primary write failure with a cleanup failure from a locked-down directory.
+                }
             }
         }
     }
@@ -227,7 +227,7 @@ public static class EvolutionTraceFile
         var builder = new StringBuilder();
         builder.Append("{\n  \"schemaVersion\": ")
             .Append(EvolutionTraceRecord.CurrentSchemaVersion.ToString(CultureInfo.InvariantCulture))
-            .Append(",\n  \"format\": \"").Append(EvolutionTraceFormat.Json.ToString()).Append('"');
+            .Append(",\n  \"format\": \"").Append(nameof(EvolutionTraceFormat.Json)).Append('"');
         if (runId is not null && !string.IsNullOrWhiteSpace(runId))
             builder.Append(",\n  \"runId\": ").Append(JsonSerializer.Serialize(runId, EvolutionJson.Compact));
         builder.Append(",\n  \"").Append(RecordsPropertyName).Append("\": [\n");
@@ -446,36 +446,29 @@ public static class EvolutionTraceFile
         int secondByte = file.ReadByte();
         file.Seek(0, SeekOrigin.Begin);
         bool compressed = firstByte == 0x1F && secondByte == 0x8B;
-        Stream decoded = compressed ? new GZipStream(file, CompressionMode.Decompress, leaveOpen: true) : file;
-        try
+        using Stream decoded = compressed ? new GZipStream(file, CompressionMode.Decompress, leaveOpen: true) : file;
+        using var reader = new StreamReader(decoded, Encoding.UTF8, detectEncodingFromByteOrderMarks: true);
+        string? firstLine = ReadLineSafely(reader);
+        if (firstLine is null) yield break;
+
+        if (!IsRecordLine(firstLine))
         {
-            using var reader = new StreamReader(decoded, Encoding.UTF8, detectEncodingFromByteOrderMarks: true);
-            string? firstLine = ReadLineSafely(reader);
-            if (firstLine is null) yield break;
-
-            if (!IsRecordLine(firstLine))
-            {
-                var documentRecords = new List<EvolutionTraceRecord>();
-                ParseJsonDocument(firstLine + "\n" + ReadToEndSafely(reader), documentRecords);
-                foreach (EvolutionTraceRecord record in documentRecords) yield return record;
-                yield break;
-            }
-
-            string? line = firstLine;
-            while (line is not null)
-            {
-                if (line.Trim().Length > 0)
-                {
-                    EvolutionTraceRecord? record = TryParseLine(line);
-                    if (record is null) yield break;
-                    yield return record;
-                }
-                line = ReadLineSafely(reader);
-            }
+            var documentRecords = new List<EvolutionTraceRecord>();
+            ParseJsonDocument(firstLine + "\n" + ReadToEndSafely(reader), documentRecords);
+            foreach (EvolutionTraceRecord record in documentRecords) yield return record;
+            yield break;
         }
-        finally
+
+        string? line = firstLine;
+        while (line is not null)
         {
-            if (compressed) decoded.Dispose();
+            if (line.Trim().Length > 0)
+            {
+                EvolutionTraceRecord? record = TryParseLine(line);
+                if (record is null) yield break;
+                yield return record;
+            }
+            line = ReadLineSafely(reader);
         }
     }
 

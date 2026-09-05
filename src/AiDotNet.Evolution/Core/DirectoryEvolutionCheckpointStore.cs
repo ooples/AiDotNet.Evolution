@@ -81,7 +81,7 @@ public sealed class DirectoryEvolutionCheckpointStore : IEvolutionCheckpointStor
         EvolutionCheckpointRetentionOptions? retention = null, long maxCheckpointBytes = 64L * 1024L * 1024L)
     {
         var layout = new EvolutionOutputLayout(outputDirectory, runId);
-        return new DirectoryEvolutionCheckpointStore(Path.Combine(layout.CheckpointsDirectory, layout.Stem),
+        return new DirectoryEvolutionCheckpointStore(EvolutionPath.Join(layout.CheckpointsDirectory, layout.Stem),
             retention, maxCheckpointBytes);
     }
 
@@ -257,8 +257,8 @@ public sealed class DirectoryEvolutionCheckpointStore : IEvolutionCheckpointStor
 
     private void Persist(EvolutionCheckpoint checkpoint, CancellationToken cancellationToken)
     {
-        string targetPath = Path.Combine(_directory, FileNameFor(checkpoint.Sequence));
-        string tempPath = Path.Combine(_directory,
+        string targetPath = EvolutionPath.Join(_directory, FileNameFor(checkpoint.Sequence));
+        string tempPath = EvolutionPath.Join(_directory,
             $".{FileNameFor(checkpoint.Sequence)}.{Guid.NewGuid():N}.tmp");
         string json = JsonSerializer.Serialize(SnapshotDocument.From(checkpoint), EvolutionJson.Indented);
         byte[] payload = new UTF8Encoding(encoderShouldEmitUTF8Identifier: false).GetBytes(json);
@@ -288,7 +288,14 @@ public sealed class DirectoryEvolutionCheckpointStore : IEvolutionCheckpointStor
             if (File.Exists(tempPath))
             {
                 try { File.Delete(tempPath); }
-                catch (IOException) { }
+                catch (IOException)
+                {
+                    // Atomic-write cleanup is best effort; a later save can remove an abandoned temporary file.
+                }
+                catch (UnauthorizedAccessException)
+                {
+                    // Do not replace the primary save failure with a cleanup failure from a locked-down directory.
+                }
             }
         }
     }

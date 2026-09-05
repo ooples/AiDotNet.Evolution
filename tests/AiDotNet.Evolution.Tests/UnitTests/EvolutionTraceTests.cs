@@ -420,6 +420,17 @@ public sealed class EvolutionTraceTests
     }
 
     [Fact]
+    public void PathJoinNeverLetsARootedChildDiscardTheConfiguredRoot()
+    {
+        using var directory = new TemporaryDirectory();
+        string rootedChild = Path.DirectorySeparatorChar + "nested";
+
+        string joined = EvolutionPath.Join(directory.Path, rootedChild);
+
+        Assert.Equal(directory.Path + rootedChild, joined);
+    }
+
+    [Fact]
     public async Task CheckpointStoreForAnOutputDirectoryResumesFromItsDerivedPath()
     {
         using var directory = new TemporaryDirectory();

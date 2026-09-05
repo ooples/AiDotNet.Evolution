@@ -64,13 +64,13 @@ public sealed class EvolutionOutputLayout
     public string Stem { get; }
 
     /// <summary>Gets the directory checkpoints are written to.</summary>
-    public string CheckpointsDirectory => Path.Combine(Root, CheckpointsFolderName);
+    public string CheckpointsDirectory => EvolutionPath.Join(Root, CheckpointsFolderName);
 
     /// <summary>Gets the directory traces are written to.</summary>
-    public string TracesDirectory => Path.Combine(Root, TracesFolderName);
+    public string TracesDirectory => EvolutionPath.Join(Root, TracesFolderName);
 
     /// <summary>Gets the path <see cref="JsonEvolutionCheckpointStore"/> should be pointed at for this run.</summary>
-    public string CheckpointPath => Path.Combine(CheckpointsDirectory, Stem + ".checkpoint.json");
+    public string CheckpointPath => EvolutionPath.Join(CheckpointsDirectory, Stem + ".checkpoint.json");
 
     /// <summary>Returns the trace path for one format and compression setting.</summary>
     /// <param name="format">The on-disk layout the trace will be written in.</param>
@@ -82,7 +82,7 @@ public sealed class EvolutionOutputLayout
         if (!Enum.IsDefined(typeof(EvolutionTraceFormat), format)) throw new ArgumentOutOfRangeException(nameof(format));
         string extension = format == EvolutionTraceFormat.Json ? ".trace.json" : ".trace.jsonl";
         if (compress) extension += ".gz";
-        return Path.Combine(TracesDirectory, Stem + extension);
+        return EvolutionPath.Join(TracesDirectory, Stem + extension);
     }
 
     /// <summary>Returns the sidecar metadata path that accompanies a trace file.</summary>
@@ -109,8 +109,7 @@ public sealed class EvolutionOutputLayout
         bool replaced = false;
         foreach (char character in trimmed)
         {
-            if ((character >= 'a' && character <= 'z') || (character >= 'A' && character <= 'Z') ||
-                (character >= '0' && character <= '9') || character == '.' || character == '_' || character == '-')
+            if (IsStemCharacter(character))
             {
                 builder.Append(character);
                 continue;
@@ -128,6 +127,12 @@ public sealed class EvolutionOutputLayout
         if (!replaced) return stem;
         return stem + "-" + EvolutionHash.Compute(trimmed).Substring(0, 12);
     }
+
+    private static bool IsStemCharacter(char character) =>
+        (character >= 'a' && character <= 'z') ||
+        (character >= 'A' && character <= 'Z') ||
+        (character >= '0' && character <= '9') ||
+        character is '.' or '_' or '-';
 
     private static string ResolveDirectory(string outputDirectory, string parameterName)
     {

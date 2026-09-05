@@ -65,7 +65,7 @@ public sealed partial class EvolutionEngine<TGenome>
         {
             throw;
         }
-        catch (Exception)
+        catch (Exception exception) when (EvolutionExceptionPolicy.IsRecoverable(exception))
         {
             return new PreparedProposal(CreatePreEvaluationFailure(evaluationId, island, lineage, "variation_failure"));
         }
@@ -152,7 +152,7 @@ public sealed partial class EvolutionEngine<TGenome>
         {
             throw;
         }
-        catch (Exception)
+        catch (Exception exception) when (EvolutionExceptionPolicy.IsRecoverable(exception))
         {
             return CreatePreEvaluationFailure(evaluationId, island, lineage, "canonicalization_failure");
         }
@@ -334,7 +334,7 @@ public sealed partial class EvolutionEngine<TGenome>
             {
                 return new EvolutionTaskResult(EvolutionEvaluationStatus.Canceled);
             }
-            catch (Exception exception)
+            catch (Exception exception) when (EvolutionExceptionPolicy.IsRecoverable(exception))
             {
                 return EvaluatorException(exception, stage, item.AttemptCount);
             }
@@ -368,7 +368,7 @@ public sealed partial class EvolutionEngine<TGenome>
             {
                 return TimedOut(stage, item.AttemptCount, timeout, abandoned: false);
             }
-            catch (Exception exception)
+            catch (Exception exception) when (EvolutionExceptionPolicy.IsRecoverable(exception))
             {
                 return EvaluatorException(exception, stage, item.AttemptCount);
             }

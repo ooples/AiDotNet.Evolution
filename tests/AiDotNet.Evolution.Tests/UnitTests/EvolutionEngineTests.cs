@@ -133,6 +133,49 @@ public sealed class EvolutionEngineTests
         Assert.Equal(baseline.Counters.StatusCounts, observed.Counters.StatusCounts);
     }
 
+    [Theory]
+    [InlineData(FatalTaskStage.Canonicalization)]
+    [InlineData(FatalTaskStage.Evaluation)]
+    public async Task FatalTaskFailuresAreNeverConvertedIntoCandidateFailures(FatalTaskStage stage)
+    {
+        var engine = new EvolutionEngine<TestGenome>(new FatalEvolutionTask(stage), new IncrementVariation(),
+            _ => TestArchive(), Options(2, 1, 1));
+
+        await Assert.ThrowsAsync<OutOfMemoryException>(() =>
+            engine.RunAsync(new[] { new TestGenome(1) }));
+    }
+
+    [Fact]
+    public async Task FatalVariationFailuresAreNeverConvertedIntoCandidateFailures()
+    {
+        var engine = new EvolutionEngine<TestGenome>(new SyntheticEvolutionTask(), new FatalVariation(),
+            _ => TestArchive(), Options(2, 1, 1));
+
+        await Assert.ThrowsAsync<OutOfMemoryException>(() =>
+            engine.RunAsync(new[] { new TestGenome(1) }));
+    }
+
+    [Fact]
+    public async Task FatalObserverFailuresAreNeverIsolatedFromTheCaller()
+    {
+        var engine = new EvolutionEngine<TestGenome>(new SyntheticEvolutionTask(), new IncrementVariation(),
+            _ => TestArchive(), Options(1, 1, 1), observer: new FatalObserver());
+
+        await Assert.ThrowsAsync<OutOfMemoryException>(() =>
+            engine.RunAsync(new[] { new TestGenome(1) }));
+    }
+
+    [Fact]
+    public void AggregateFailuresAreRecoverableOnlyWhenEveryNestedFailureIsRecoverable()
+    {
+        Assert.True(EvolutionExceptionPolicy.IsRecoverable(
+            new AggregateException(new InvalidOperationException(), new ArgumentException())));
+        Assert.False(EvolutionExceptionPolicy.IsRecoverable(
+            new AggregateException(new InvalidOperationException(), new OutOfMemoryException())));
+        Assert.False(EvolutionExceptionPolicy.IsRecoverable(
+            new TypeInitializationException("Synthetic.Type", new OutOfMemoryException())));
+    }
+
     [Fact]
     public async Task ZeroEvaluationBudgetDoesNotDispatchSeeds()
     {
@@ -389,4 +432,54 @@ public sealed class EvolutionEngineTests
     {
         new EvolutionDescriptorDefinition("x", 0, 100, 10, EvolutionOutOfRangePolicy.Clamp)
     });
+
+    public enum FatalTaskStage
+    {
+        Canonicalization,
+        Evaluation
+    }
+
+    private sealed class FatalEvolutionTask : IEvolutionTask<TestGenome>
+    {
+        private readonly FatalTaskStage _stage;
+
+        public FatalEvolutionTask(FatalTaskStage stage) => _stage = stage;
+
+        public string Id => "fatal";
+        public string VersionHash => "fatal-task-v1";
+        public string EvaluatorVersionHash => "fatal-evaluator-v1";
+
+        public ValueTask<EvolutionCanonicalGenome<TestGenome>> CanonicalizeAsync(TestGenome genome,
+            CancellationToken cancellationToken = default)
+        {
+            if (_stage == FatalTaskStage.Canonicalization) throw new OutOfMemoryException("synthetic fatal failure");
+            return new ValueTask<EvolutionCanonicalGenome<TestGenome>>(
+                new EvolutionCanonicalGenome<TestGenome>(genome, genome.Value.ToString(CultureInfo.InvariantCulture)));
+        }
+
+        public ValueTask<EvolutionTaskResult> EvaluateAsync(EvolutionCandidate<TestGenome> candidate,
+            EvolutionEvaluationContext context, CancellationToken cancellationToken = default)
+        {
+            if (_stage == FatalTaskStage.Evaluation) throw new OutOfMemoryException("synthetic fatal failure");
+            return new ValueTask<EvolutionTaskResult>(EvolutionTaskResult.Completed(candidate.CanonicalGenome.Genome.Value,
+                new Dictionary<string, double> { ["x"] = candidate.CanonicalGenome.Genome.Value }));
+        }
+    }
+
+    private sealed class FatalVariation : IVariationOperator<TestGenome>
+    {
+        public string Id => "fatal";
+        public string VersionHash => "fatal-variation-v1";
+
+        public ValueTask<TestGenome> ProposeAsync(EvolutionVariationContext<TestGenome> context,
+            CancellationToken cancellationToken = default) =>
+            throw new OutOfMemoryException("synthetic fatal failure");
+    }
+
+    private sealed class FatalObserver : IEvolutionObserver<TestGenome>
+    {
+        public ValueTask OnEventAsync(EvolutionEvent<TestGenome> evolutionEvent,
+            CancellationToken cancellationToken = default) =>
+            throw new OutOfMemoryException("synthetic fatal failure");
+    }
 }

@@ -508,7 +508,7 @@ public sealed partial class EvolutionEngine<TGenome>
         {
             genome = genomeCodec.Deserialize(document.GenomePayload);
         }
-        catch (Exception exception) when (exception is not OutOfMemoryException and not StackOverflowException)
+        catch (Exception exception) when (EvolutionExceptionPolicy.IsRecoverable(exception))
         {
             throw new InvalidDataException(
                 $"The genome codec could not read the payload of '{document.GenomeId}'.", exception);

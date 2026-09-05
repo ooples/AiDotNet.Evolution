@@ -35,7 +35,7 @@ public sealed partial class EvolutionEngine<TGenome>
     {
         var state = new ContinuousState(seeds, seedIndex, _options.ResolveInFlightWindow());
 
-        var semaphore = new SemaphoreSlim(_options.MaxDegreeOfParallelism, _options.MaxDegreeOfParallelism);
+        using var semaphore = new SemaphoreSlim(_options.MaxDegreeOfParallelism, _options.MaxDegreeOfParallelism);
         try
         {
             while (true)
@@ -109,7 +109,6 @@ public sealed partial class EvolutionEngine<TGenome>
             // semaphore while any of them is still running would fault a task nobody is waiting on. Every run that
             // reaches its time limit takes this path, so it is not an exotic one.
             await DrainRunningAsync(state).ConfigureAwait(false);
-            semaphore.Dispose();
         }
     }
 
@@ -122,7 +121,7 @@ public sealed partial class EvolutionEngine<TGenome>
             await Task.WhenAll(state.Running.Values).ConfigureAwait(false);
         }
 #pragma warning disable CA1031
-        catch (Exception)
+        catch (Exception exception) when (EvolutionExceptionPolicy.IsRecoverable(exception))
 #pragma warning restore CA1031
         {
             // Whatever these tasks were doing, the run is already ending and their outcomes are discarded by the
@@ -174,6 +173,7 @@ public sealed partial class EvolutionEngine<TGenome>
         while (state.InFlight.Count < state.Window && state.Stop is null && !state.DrainingForCheckpoint &&
                await FillOneAsync(state, semaphore, runTimer, cancellationToken).ConfigureAwait(false))
         {
+            // FillOneAsync performs the admission; the loop continues until the window or a run limit stops it.
         }
     }
 

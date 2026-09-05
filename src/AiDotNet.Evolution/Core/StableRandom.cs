@@ -35,7 +35,7 @@ public sealed class StableRandom
 {
     private const ulong Multiplier = 6364136223846793005UL;
     private ulong _state;
-    private ulong _increment;
+    private readonly ulong _increment;
 
     /// <summary>Gets the versioned algorithm identifier stored in checkpoints.</summary>
     public const string AlgorithmId = "pcg-xsh-rr-32-v1";
