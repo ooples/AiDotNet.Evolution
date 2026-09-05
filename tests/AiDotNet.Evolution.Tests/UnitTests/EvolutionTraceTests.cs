@@ -7,6 +7,13 @@ namespace AiDotNet.Evolution.Tests;
 public sealed class EvolutionTraceTests
 {
     [Fact]
+    public void SharedJsonOptionsAreSelfContainedAndDoNotDependOnPriorSerializerUse()
+    {
+        Assert.NotNull(EvolutionJson.Compact.TypeInfoResolver);
+        Assert.NotNull(EvolutionJson.Indented.TypeInfoResolver);
+    }
+
+    [Fact]
     public void FullyPopulatedRecordSurvivesAJsonLinesRoundTrip()
     {
         using var directory = new TemporaryDirectory();
