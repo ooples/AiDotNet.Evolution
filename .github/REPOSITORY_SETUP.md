@@ -7,7 +7,7 @@ repository is created.
 
 | Secret | Purpose |
 | --- | --- |
-| `AUTOFIX_PAT` | Lets release-please open and update a release PR whose checks run normally. Use a fine-grained token limited to this repository with Contents and Pull requests read/write access. |
+| `AUTOFIX_PAT` | Lets release-please open and update a release PR whose checks run normally. Use a fine-grained token limited to this repository with Contents, Pull requests, and Issues read/write access. |
 | `NUGET_API_KEY` | Publishes `AiDotNet.Evolution` and its symbol package to nuget.org. Scope the key to this package ID. |
 | `SONAR_TOKEN` | Authenticates the `ooples_AiDotNet.Evolution` SonarCloud project. |
 

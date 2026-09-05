@@ -90,8 +90,10 @@ public sealed class EvolutionCheckpointReadingTests
         Assert.Throws<InvalidDataException>(() =>
             EvolutionEngine<TestGenome>.ReadCheckpoint(corrupt, new TestGenomeCodec()));
 
+#pragma warning disable CS8625 // Exercise the public null guard without a null-forgiving operator.
         Assert.Throws<ArgumentNullException>(() =>
-            EvolutionEngine<TestGenome>.ReadCheckpoint(checkpoint, null!));
+            EvolutionEngine<TestGenome>.ReadCheckpoint(checkpoint, null));
+#pragma warning restore CS8625
     }
 
     private static TestGenome[] Seeds(int count) =>

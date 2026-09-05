@@ -53,9 +53,8 @@ public sealed class EvolutionAuditRegressionTests
         await ReadableEngine(store).RunAsync(new[] { new TestGenome(1), new TestGenome(2) });
         EvolutionCheckpoint written = Assert.IsType<EvolutionCheckpoint>(await store.LoadLatestAsync("audit-run"));
         JsonObject payload = Assert.IsType<JsonObject>(JsonNode.Parse(written.Payload));
-        JsonNode? schemaNode = payload["SchemaVersion"];
-        Assert.NotNull(schemaNode);
-        int documentSchemaVersion = schemaNode!.GetValue<int>();
+        JsonValue schemaNode = Assert.IsAssignableFrom<JsonValue>(payload["SchemaVersion"]);
+        int documentSchemaVersion = schemaNode.GetValue<int>();
         payload["SchemaVersion"] = documentSchemaVersion - 1;
         string oldPayload = payload.ToJsonString();
 
