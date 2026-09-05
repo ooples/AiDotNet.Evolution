@@ -67,13 +67,10 @@ jobs:
                 repo: context.repo.repo,
                 commit_sha: context.payload.pull_request.base.sha
               });
-              const baseTree = await github.rest.git.getTree({
-                owner: context.repo.owner,
-                repo: context.repo.repo,
-                tree_sha: baseCommit.data.tree.sha,
-                recursive: 'true'
-              });
-              if (baseTree.data.truncated || baseTree.data.tree.some(entry => entry.type === 'blob')) {
+              // Git's SHA-1 object ID for an empty tree is canonical. GitHub exposes it on the
+              // commit even though its Trees endpoint returns 404 when asked for that object.
+              const emptyTreeSha = '4b825dc642cb6eb9a060e54bf8d69288fbee4904';
+              if (baseCommit.data.tree.sha !== emptyTreeSha) {
                 core.setFailed(
                   'release-please-config.json is absent from a non-empty base branch; refusing ' +
                   'to let the PR define the title policy used to validate itself.'
