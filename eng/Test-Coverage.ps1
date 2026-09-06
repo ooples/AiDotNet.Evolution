@@ -45,10 +45,10 @@ function Get-BoundedNumber {
     return $number
 }
 
-$baselineLine = Get-BoundedNumber $baseline.line 'baseline.line' 0 100
-$baselineBranch = Get-BoundedNumber $baseline.branch 'baseline.branch' 0 100
-$reportLine = Get-BoundedNumber $coverage.coverage.'line-rate' 'coverage line-rate' 0 1
-$reportBranch = Get-BoundedNumber $coverage.coverage.'branch-rate' 'coverage branch-rate' 0 1
+$baselineLine = Get-BoundedNumber -Value $baseline.line -Name 'baseline.line' -Minimum 0 -Maximum 100
+$baselineBranch = Get-BoundedNumber -Value $baseline.branch -Name 'baseline.branch' -Minimum 0 -Maximum 100
+$reportLine = Get-BoundedNumber -Value $coverage.coverage.'line-rate' -Name 'coverage line-rate' -Minimum 0 -Maximum 1
+$reportBranch = Get-BoundedNumber -Value $coverage.coverage.'branch-rate' -Name 'coverage branch-rate' -Minimum 0 -Maximum 1
 if ([double]::IsNaN($Tolerance) -or [double]::IsInfinity($Tolerance) -or $Tolerance -lt 0) {
     throw 'Tolerance must be finite and non-negative.'
 }

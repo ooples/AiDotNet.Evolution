@@ -32,4 +32,25 @@ public static class EvolutionCollectionLimits
 
     /// <summary>Maximum records materialized into one trace read result.</summary>
     public const int MaximumTraceRecords = 1_000_000;
+
+    /// <summary>Maximum uncompressed UTF-8 bytes one trace may retain.</summary>
+    public const long MaximumTraceBytes = 1024L * 1024L * 1024L;
+
+    /// <summary>Maximum parent qualities retained by a trace observer.</summary>
+    public const int MaximumParentQualityCacheEntries = 1_000_000;
+
+    /// <summary>Maximum UTF-8 bytes retained for one evaluator artifact.</summary>
+    public const int MaximumArtifactBytes = 4 * 1024 * 1024;
+
+    /// <summary>Maximum aggregate UTF-8 artifact bytes retained for one evaluation.</summary>
+    public const int MaximumArtifactBytesPerEvaluation = 16 * 1024 * 1024;
+
+    /// <summary>Maximum aggregate artifact bytes awaiting delivery across candidates.</summary>
+    public const long MaximumPendingArtifactBytes = 256L * 1024L * 1024L;
+
+    /// <summary>Maximum encoded bytes accepted for one checkpoint document or engine payload.</summary>
+    public const long MaximumCheckpointBytes = 256L * 1024L * 1024L;
+
+    /// <summary>Maximum snapshot files a directory checkpoint store will inspect in one operation.</summary>
+    public const int MaximumCheckpointFiles = 4096;
 }

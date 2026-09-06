@@ -59,8 +59,8 @@ public sealed class EvolutionArtifactOptions
     /// <summary>Validates every value and returns an independent copy.</summary>
     /// <returns>A defensive copy that later mutation of this instance cannot affect.</returns>
     /// <exception cref="ArgumentOutOfRangeException">
-    /// A bound is not positive, or <see cref="MaxArtifactsPerEvaluation"/> exceeds
-    /// <see cref="EvolutionTaskResult.MaximumArtifacts"/>.
+    /// A bound is not positive, an individual or aggregate byte bound exceeds the package limits, or
+    /// <see cref="MaxArtifactsPerEvaluation"/> exceeds <see cref="EvolutionTaskResult.MaximumArtifacts"/>.
     /// </exception>
     internal EvolutionArtifactOptions SnapshotAndValidate()
     {
@@ -68,11 +68,23 @@ public sealed class EvolutionArtifactOptions
         Guard.Positive(MaxArtifactsPerEvaluation);
         Guard.Positive(MaxBytesPerEvaluation);
         Guard.Positive(MaxPendingCandidates);
+        if (MaxArtifactBytes > EvolutionCollectionLimits.MaximumArtifactBytes)
+            throw new ArgumentOutOfRangeException(nameof(MaxArtifactBytes),
+                $"One artifact may retain at most {EvolutionCollectionLimits.MaximumArtifactBytes} bytes.");
         if (MaxArtifactsPerEvaluation > EvolutionTaskResult.MaximumArtifacts)
             throw new ArgumentOutOfRangeException(nameof(MaxArtifactsPerEvaluation),
                 $"At most {EvolutionTaskResult.MaximumArtifacts} artifacts may be attached to one evaluation.");
+        if (MaxBytesPerEvaluation > EvolutionCollectionLimits.MaximumArtifactBytesPerEvaluation)
+            throw new ArgumentOutOfRangeException(nameof(MaxBytesPerEvaluation),
+                $"One evaluation may retain at most " +
+                $"{EvolutionCollectionLimits.MaximumArtifactBytesPerEvaluation} artifact bytes.");
         if (MaxPendingCandidates > EvolutionCollectionLimits.MaximumResultEntries)
             throw new ArgumentOutOfRangeException(nameof(MaxPendingCandidates));
+        long pendingBytes = (long)MaxPendingCandidates * MaxBytesPerEvaluation;
+        if (pendingBytes > EvolutionCollectionLimits.MaximumPendingArtifactBytes)
+            throw new ArgumentOutOfRangeException(nameof(MaxPendingCandidates),
+                $"Pending artifacts may retain at most {EvolutionCollectionLimits.MaximumPendingArtifactBytes} " +
+                "aggregate bytes; reduce the pending-candidate or per-evaluation bound.");
 
         return new EvolutionArtifactOptions
         {

@@ -22,16 +22,18 @@ namespace AiDotNet.Evolution;
 public sealed class EvolutionCanonicalGenome<TGenome>
 {
     /// <summary>Initializes a canonical genome.</summary>
-    /// <param name="genome">An immutable genome snapshot.</param>
+    /// <param name="genome">A genome to snapshot at the retention boundary.</param>
     /// <param name="id">A stable identity for its semantics rather than its incidental representation.</param>
     /// <exception cref="ArgumentNullException"><paramref name="genome"/> or <paramref name="id"/> is <c>null</c>.</exception>
-    /// <exception cref="ArgumentException"><paramref name="id"/> is empty or white space.</exception>
+    /// <exception cref="ArgumentException">
+    /// <paramref name="id"/> is empty or white space, or <paramref name="genome"/> cannot produce an independently
+    /// owned immutable snapshot.
+    /// </exception>
     public EvolutionCanonicalGenome(TGenome genome, string id)
     {
         if (genome is null) throw new ArgumentNullException(nameof(genome));
-        EvolutionGenomeContract<TGenome>.Require(nameof(genome));
         Guard.NotNullOrWhiteSpace(id);
-        Genome = genome;
+        Genome = EvolutionGenomeContract<TGenome>.CaptureOwned(genome, nameof(genome));
         Id = id.Trim();
     }
 

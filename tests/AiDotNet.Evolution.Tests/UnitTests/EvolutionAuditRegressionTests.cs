@@ -36,6 +36,24 @@ public sealed class EvolutionAuditRegressionTests
     }
 
     [Fact]
+    public void GrowthDoesNotWidenOneAxisWhenAnotherGrowAxisIsMissing()
+    {
+        var archive = new MapElitesArchive<TestGenome>(new[]
+        {
+            new EvolutionDescriptorDefinition("x", 0, 1, 5, EvolutionOutOfRangePolicy.Grow),
+            new EvolutionDescriptorDefinition("y", 0, 1, 5, EvolutionOutOfRangePolicy.Grow)
+        });
+
+        Assert.Equal(EvolutionArchiveInsertionResult.Rejected,
+            Add(archive, 1, "a", 1, x: 5.0, y: 0, includeY: false));
+
+        Assert.Equal(25, archive.TotalGridCells);
+        Assert.Equal(1.0, archive.Descriptors[0].Maximum, 12);
+        Assert.Equal(0, archive.Version);
+        Assert.Empty(archive.Entries);
+    }
+
+    [Fact]
     public void MultiAxisGrowthIsAtomicWhenTheCombinedGridWouldExceedItsLimit()
     {
         var archive = new MapElitesArchive<TestGenome>(new[]
@@ -91,6 +109,27 @@ public sealed class EvolutionAuditRegressionTests
         var declaredImmutable = new EvolutionCanonicalGenome<DeclaredImmutableValueGenome>(
             new DeclaredImmutableValueGenome(new[] { 1 }), "declared-immutable-value");
         Assert.Equal(1, declaredImmutable.Genome.GetValue(0));
+    }
+
+    [Fact]
+    public void ACanonicalGenomeOwnsARecursiveSnapshotRatherThanTheCallersCollections()
+    {
+        int[] callerValues = { 1, 2 };
+        var supplied = new DeclaredImmutableValueGenome(callerValues);
+
+        var canonical = new EvolutionCanonicalGenome<DeclaredImmutableValueGenome>(supplied, "owned");
+        callerValues[0] = 99;
+        supplied.SetValueForTest(1, 88);
+
+        Assert.Equal(1, canonical.Genome.GetValue(0));
+        Assert.Equal(2, canonical.Genome.GetValue(1));
+    }
+
+    [Fact]
+    public void AReferenceGenomeCannotClaimOwnershipByReturningItself()
+    {
+        Assert.Throws<ArgumentException>(() =>
+            new EvolutionCanonicalGenome<DishonestSnapshotGenome>(new DishonestSnapshotGenome(), "dishonest"));
     }
 
     [Fact]
@@ -158,14 +197,22 @@ public sealed class EvolutionAuditRegressionTests
     }, EvolutionOptimizationDirection.Maximize, capacity);
 
     private static EvolutionArchiveInsertionResult Add(
-        MapElitesArchive<TestGenome> archive, long id, string genomeId, double quality, double x, double y)
+        MapElitesArchive<TestGenome> archive,
+        long id,
+        string genomeId,
+        double quality,
+        double x,
+        double y,
+        bool includeY = true)
     {
         var lineage = new EvolutionLineage(null, null, "test", null, 0, 0, (ulong)id);
         var candidate = new EvolutionCandidate<TestGenome>(id,
             new EvolutionCanonicalGenome<TestGenome>(new TestGenome((int)id), genomeId), lineage);
+        var descriptors = new Dictionary<string, double>(StringComparer.Ordinal) { ["x"] = x };
+        if (includeY) descriptors["y"] = y;
         var evaluation = new EvolutionEvaluation(id, genomeId, EvolutionEvaluationStatus.Completed, quality,
             EvolutionOptimizationDirection.Maximize,
-            new Dictionary<string, double>(StringComparer.Ordinal) { ["x"] = x, ["y"] = y },
+            descriptors,
             Array.Empty<double>(), Array.Empty<double>(), new EvolutionEvaluationCost(TimeSpan.Zero, 1, 0), lineage,
             EvolutionCacheStatus.Miss, Array.Empty<EvolutionDiagnostic>(), "task", "eval", "config");
         return archive.TryAdd(candidate, evaluation);
@@ -201,13 +248,22 @@ public sealed class EvolutionAuditRegressionTests
         internal int[] Values { get; }
     }
 
-    private readonly struct DeclaredImmutableValueGenome : IImmutableEvolutionGenome
+    private readonly struct DeclaredImmutableValueGenome : IImmutableEvolutionGenome<DeclaredImmutableValueGenome>
     {
         private readonly int[] _values;
 
         internal DeclaredImmutableValueGenome(int[] values) => _values = values.ToArray();
 
         internal int GetValue(int index) => _values[index];
+
+        internal void SetValueForTest(int index, int value) => _values[index] = value;
+
+        public DeclaredImmutableValueGenome CreateOwnedSnapshot() => new(_values);
+    }
+
+    private sealed class DishonestSnapshotGenome : IImmutableEvolutionGenome<DishonestSnapshotGenome>
+    {
+        public DishonestSnapshotGenome CreateOwnedSnapshot() => this;
     }
 
     private sealed class IndexOnlyReadOnlyList<T> : IReadOnlyList<T>

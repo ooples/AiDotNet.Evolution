@@ -6,6 +6,16 @@ namespace AiDotNet.Evolution.Tests;
 public sealed class EvolutionCheckpointStoreTests
 {
     [Fact]
+    public void JsonStoreRejectsCheckpointLimitsAboveThePackageCeiling()
+    {
+        using var directory = new TemporaryDirectory();
+
+        Assert.Throws<ArgumentOutOfRangeException>(() => new JsonEvolutionCheckpointStore(
+            Path.Combine(directory.Path, "checkpoint.json"),
+            EvolutionCollectionLimits.MaximumCheckpointBytes + 1));
+    }
+
+    [Fact]
     public async Task InMemoryStoreRejectsRollbackAndReturnsDefensiveCopies()
     {
         var store = new InMemoryEvolutionCheckpointStore();

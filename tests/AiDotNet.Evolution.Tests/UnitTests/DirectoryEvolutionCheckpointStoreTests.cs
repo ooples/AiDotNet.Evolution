@@ -81,6 +81,39 @@ public sealed class DirectoryEvolutionCheckpointStoreTests
     }
 
     [Fact]
+    public async Task ListingRetainsOnlyTheRequestedNewestSnapshots()
+    {
+        using var directory = new TemporaryDirectory();
+        var store = new DirectoryEvolutionCheckpointStore(directory.Path, Retention(keepLast: 5, keepBest: 5));
+        for (int sequence = 1; sequence <= 5; sequence++)
+            await store.SaveAsync(Checkpoint(sequence, "payload-" + sequence, sequence));
+
+        IReadOnlyList<EvolutionCheckpointDescriptor> listed = store.ListCheckpoints("run", maximumCount: 2);
+
+        Assert.Equal(new long[] { 5, 4 }, listed.Select(item => item.Sequence).ToArray());
+    }
+
+    [Fact]
+    public async Task SnapshotDiscoveryRefusesToScanPastThePackageLimit()
+    {
+        using var directory = new TemporaryDirectory();
+        for (int sequence = 0; sequence <= EvolutionCollectionLimits.MaximumCheckpointFiles; sequence++)
+        {
+            File.WriteAllText(
+                Path.Combine(directory.Path, DirectoryEvolutionCheckpointStore.FileNameFor(sequence)),
+                string.Empty);
+        }
+        var store = new DirectoryEvolutionCheckpointStore(directory.Path);
+
+        Assert.Throws<InvalidDataException>(() => store.ListCheckpoints("run"));
+        await Assert.ThrowsAsync<InvalidDataException>(() => store.LoadLatestAsync("run"));
+        await Assert.ThrowsAsync<InvalidDataException>(() => store.SaveAsync(Checkpoint(
+            EvolutionCollectionLimits.MaximumCheckpointFiles + 1L,
+            "new",
+            1)));
+    }
+
+    [Fact]
     public async Task RetentionNeverDeletesTheBestSnapshotEvenWhenTheBestQuotaIsZero()
     {
         using var directory = new TemporaryDirectory();
@@ -178,9 +211,21 @@ public sealed class DirectoryEvolutionCheckpointStoreTests
         Assert.Throws<ArgumentOutOfRangeException>(() =>
             new DirectoryEvolutionCheckpointStore(directory.Path, maxCheckpointBytes: 0));
         Assert.Throws<ArgumentOutOfRangeException>(() =>
+            new DirectoryEvolutionCheckpointStore(
+                directory.Path,
+                maxCheckpointBytes: EvolutionCollectionLimits.MaximumCheckpointBytes + 1));
+        Assert.Throws<ArgumentOutOfRangeException>(() =>
             new DirectoryEvolutionCheckpointStore(directory.Path, Retention(keepLast: 0, keepBest: 1)));
         Assert.Throws<ArgumentOutOfRangeException>(() =>
             new DirectoryEvolutionCheckpointStore(directory.Path, Retention(keepLast: 1, keepBest: -1)));
+        Assert.Throws<ArgumentOutOfRangeException>(() =>
+            new DirectoryEvolutionCheckpointStore(directory.Path,
+                Retention(keepLast: EvolutionCollectionLimits.MaximumCheckpointFiles + 1, keepBest: 1)));
+        Assert.Throws<ArgumentOutOfRangeException>(() =>
+            new DirectoryEvolutionCheckpointStore(directory.Path,
+                Retention(keepLast: 1, keepBest: EvolutionCollectionLimits.MaximumCheckpointFiles + 1)));
+        var store = new DirectoryEvolutionCheckpointStore(directory.Path);
+        Assert.Throws<ArgumentOutOfRangeException>(() => store.ListCheckpoints("run", maximumCount: 0));
         Assert.Throws<ArgumentOutOfRangeException>(() => DirectoryEvolutionCheckpointStore.FileNameFor(-1));
     }
 

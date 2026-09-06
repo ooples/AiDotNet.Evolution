@@ -3,10 +3,12 @@ using AiDotNet.Evolution;
 
 namespace AiDotNet.Evolution.Tests;
 
-internal sealed class TestGenome : IImmutableEvolutionGenome
+internal sealed class TestGenome : IImmutableEvolutionGenome<TestGenome>
 {
     public TestGenome(int value) => Value = value;
     public int Value { get; }
+
+    public TestGenome CreateOwnedSnapshot() => new(Value);
 }
 
 internal sealed class TestGenomeCodec : IEvolutionGenomeCodec<TestGenome>

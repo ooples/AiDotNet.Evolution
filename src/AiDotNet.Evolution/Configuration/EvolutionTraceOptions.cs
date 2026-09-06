@@ -102,8 +102,8 @@ public sealed class EvolutionTraceOptions
     /// <exception cref="ArgumentException"><see cref="Enabled"/> is set without a non-blank <see cref="Path"/>.</exception>
     /// <exception cref="ArgumentOutOfRangeException">
     /// <see cref="Format"/> is undefined, <see cref="FlushEveryRecords"/> is outside one to
-    /// <see cref="MaximumFlushEveryRecords"/>, <see cref="MaxBytes"/> or <see cref="MaxRecords"/> is not positive, or
-    /// <see cref="MaxTrackedMetrics"/> is not positive, or <see cref="ParentQualityCacheSize"/> is negative.
+    /// <see cref="MaximumFlushEveryRecords"/>, or a configured byte, record, metric, or cache bound is outside the
+    /// package limits.
     /// </exception>
     public EvolutionTraceOptions SnapshotAndValidate()
     {
@@ -115,11 +115,21 @@ public sealed class EvolutionTraceOptions
         if (FlushEveryRecords < 1 || FlushEveryRecords > MaximumFlushEveryRecords)
             throw new ArgumentOutOfRangeException(nameof(FlushEveryRecords),
                 $"The flush interval must be between 1 and {MaximumFlushEveryRecords} records.");
-        if (MaxBytes <= 0) throw new ArgumentOutOfRangeException(nameof(MaxBytes));
-        if (MaxRecords <= 0) throw new ArgumentOutOfRangeException(nameof(MaxRecords));
+        if (MaxBytes <= 0 || MaxBytes > EvolutionCollectionLimits.MaximumTraceBytes)
+            throw new ArgumentOutOfRangeException(nameof(MaxBytes),
+                $"Trace bytes must be between 1 and {EvolutionCollectionLimits.MaximumTraceBytes}.");
+        if (MaxRecords <= 0 || MaxRecords > EvolutionCollectionLimits.MaximumTraceRecords)
+            throw new ArgumentOutOfRangeException(nameof(MaxRecords),
+                $"Trace records must be between 1 and {EvolutionCollectionLimits.MaximumTraceRecords}.");
         if (MaxTrackedMetrics <= 0 || MaxTrackedMetrics > MaximumTrackedMetricCount)
             throw new ArgumentOutOfRangeException(nameof(MaxTrackedMetrics));
-        if (ParentQualityCacheSize < 0) throw new ArgumentOutOfRangeException(nameof(ParentQualityCacheSize));
+        if (ParentQualityCacheSize < 0 ||
+            ParentQualityCacheSize > EvolutionCollectionLimits.MaximumParentQualityCacheEntries)
+        {
+            throw new ArgumentOutOfRangeException(nameof(ParentQualityCacheSize),
+                $"The parent-quality cache may contain at most " +
+                $"{EvolutionCollectionLimits.MaximumParentQualityCacheEntries} entries.");
+        }
 
         return new EvolutionTraceOptions
         {

@@ -1,4 +1,5 @@
 using AiDotNet.Evolution;
+using System.Text.Json.Nodes;
 using Xunit;
 
 namespace AiDotNet.Evolution.Tests;
@@ -96,6 +97,35 @@ public sealed class EvolutionCheckpointReadingTests
 #pragma warning restore CS8625
     }
 
+    [Fact]
+    public async Task OversizedCheckpointCollectionsAreRejectedBeforeAnyGenomeIsDecoded()
+    {
+        var store = new InMemoryEvolutionCheckpointStore();
+        await Engine(store).RunAsync(Seeds(4));
+        EvolutionCheckpoint checkpoint = Assert.IsType<EvolutionCheckpoint>(await store.LoadLatestAsync("read-run"));
+        JsonObject payload = Assert.IsType<JsonObject>(JsonNode.Parse(checkpoint.Payload));
+        JsonArray islands = Assert.IsType<JsonArray>(payload["Islands"]);
+        while (islands.Count <= EvolutionCollectionLimits.MaximumResultIslands)
+        {
+            islands.Add(new JsonObject
+            {
+                ["Version"] = 0,
+                ["Entries"] = new JsonArray(),
+                ["Descriptors"] = new JsonArray()
+            });
+        }
+        var oversized = new EvolutionCheckpoint(
+            checkpoint.RunId,
+            checkpoint.Sequence,
+            checkpoint.CompatibilityHash,
+            payload.ToJsonString());
+        var codec = new CountingGenomeCodec();
+
+        Assert.Throws<InvalidDataException>(() =>
+            EvolutionEngine<TestGenome>.ReadCheckpoint(oversized, codec));
+        Assert.Equal(0, codec.DeserializeCalls);
+    }
+
     private static TestGenome[] Seeds(int count) =>
         Enumerable.Range(1, count).Select(value => new TestGenome(value)).ToArray();
 
@@ -127,5 +157,19 @@ public sealed class EvolutionCheckpointReadingTests
         public string VersionHash => "refusing-v1";
         public string Serialize(TestGenome genome) => string.Empty;
         public TestGenome Deserialize(string payload) => throw new FormatException("unreadable payload");
+    }
+
+    private sealed class CountingGenomeCodec : IEvolutionGenomeCodec<TestGenome>
+    {
+        public int DeserializeCalls { get; private set; }
+        public string Id => "counting";
+        public string VersionHash => "counting-v1";
+        public string Serialize(TestGenome genome) => genome.Value.ToString(System.Globalization.CultureInfo.InvariantCulture);
+
+        public TestGenome Deserialize(string payload)
+        {
+            DeserializeCalls++;
+            return new TestGenome(int.Parse(payload, System.Globalization.CultureInfo.InvariantCulture));
+        }
     }
 }

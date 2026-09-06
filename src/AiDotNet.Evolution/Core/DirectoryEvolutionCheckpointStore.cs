@@ -56,14 +56,16 @@ public sealed class DirectoryEvolutionCheckpointStore : IEvolutionCheckpointStor
     /// <exception cref="ArgumentNullException"><paramref name="directory"/> is <c>null</c>.</exception>
     /// <exception cref="ArgumentException"><paramref name="directory"/> is empty or white space.</exception>
     /// <exception cref="ArgumentOutOfRangeException">
-    /// <paramref name="maxCheckpointBytes"/> is not positive, or the retention quotas are out of range.
+    /// <paramref name="maxCheckpointBytes"/> or a retention quota is outside the package limits.
     /// </exception>
     public DirectoryEvolutionCheckpointStore(string directory,
         EvolutionCheckpointRetentionOptions? retention = null,
         long maxCheckpointBytes = 64L * 1024L * 1024L)
     {
         Guard.NotNullOrWhiteSpace(directory);
-        if (maxCheckpointBytes <= 0) throw new ArgumentOutOfRangeException(nameof(maxCheckpointBytes));
+        if (maxCheckpointBytes <= 0 || maxCheckpointBytes > EvolutionCollectionLimits.MaximumCheckpointBytes)
+            throw new ArgumentOutOfRangeException(nameof(maxCheckpointBytes),
+                $"Checkpoint bytes must be between 1 and {EvolutionCollectionLimits.MaximumCheckpointBytes}.");
         _directory = Path.GetFullPath(directory.Trim());
         _writeLockPath = EvolutionPath.Join(_directory, ".checkpoint-writer.lock");
         _maxCheckpointBytes = maxCheckpointBytes;
@@ -80,7 +82,9 @@ public sealed class DirectoryEvolutionCheckpointStore : IEvolutionCheckpointStor
     /// <returns>A store writing under <see cref="EvolutionOutputLayout.CheckpointsDirectory"/> in a folder named for the run.</returns>
     /// <exception cref="ArgumentNullException">An argument is <c>null</c>.</exception>
     /// <exception cref="ArgumentException">An argument is empty or white space, or the directory is not a valid path.</exception>
-    /// <exception cref="ArgumentOutOfRangeException"><paramref name="maxCheckpointBytes"/> or a retention quota is out of range.</exception>
+    /// <exception cref="ArgumentOutOfRangeException">
+    /// <paramref name="maxCheckpointBytes"/> or a retention quota is outside the package limits.
+    /// </exception>
     public static DirectoryEvolutionCheckpointStore ForOutputDirectory(string outputDirectory, string runId,
         EvolutionCheckpointRetentionOptions? retention = null, long maxCheckpointBytes = 64L * 1024L * 1024L)
     {
@@ -109,6 +113,13 @@ public sealed class DirectoryEvolutionCheckpointStore : IEvolutionCheckpointStor
                 ValidateSuccessor(existing, checkpoint);
                 if (checkpoint.Sequence == existing.Sequence) return Task.CompletedTask;
             }
+            if (!HasAvailableSnapshotSlot())
+            {
+                ApplyRetention(checkpoint.RunId, preloaded);
+                if (!HasAvailableSnapshotSlot())
+                    throw new InvalidDataException(
+                        "The checkpoint directory is at its package file limit and retention could not free a slot.");
+            }
             Persist(checkpoint, cancellationToken);
             preloaded[FileNameFor(checkpoint.Sequence)] = checkpoint;
             ApplyRetention(checkpoint.RunId, preloaded);
@@ -128,21 +139,31 @@ public sealed class DirectoryEvolutionCheckpointStore : IEvolutionCheckpointStor
         }
     }
 
-    /// <summary>Lists every snapshot in the directory, newest first, reporting envelope metadata rather than payloads.</summary>
+    /// <summary>Lists a bounded number of snapshots in the directory, newest first.</summary>
     /// <param name="runId">
     /// The run whose snapshots are listed. A snapshot belonging to a different run is reported with
     /// <see cref="EvolutionCheckpointDescriptor.IsValid"/> clear, exactly like an unreadable one.
     /// </param>
-    /// <returns>One descriptor per snapshot file, ordered by descending sequence.</returns>
+    /// <param name="maximumCount">
+    /// The maximum number of newest descriptors to return. The directory scan itself is also capped at
+    /// <see cref="EvolutionCollectionLimits.MaximumCheckpointFiles"/> matching files.
+    /// </param>
+    /// <returns>Up to <paramref name="maximumCount"/> descriptors, ordered by descending sequence.</returns>
     /// <exception cref="ArgumentNullException"><paramref name="runId"/> is <c>null</c>.</exception>
     /// <exception cref="ArgumentException"><paramref name="runId"/> is empty or white space.</exception>
-    public IReadOnlyList<EvolutionCheckpointDescriptor> ListCheckpoints(string runId)
+    /// <exception cref="ArgumentOutOfRangeException"><paramref name="maximumCount"/> is outside the package limits.</exception>
+    /// <exception cref="InvalidDataException">The directory contains more snapshot files than the package will inspect.</exception>
+    public IReadOnlyList<EvolutionCheckpointDescriptor> ListCheckpoints(
+        string runId,
+        int maximumCount = EvolutionCollectionLimits.MaximumCheckpointFiles)
     {
         Guard.NotNullOrWhiteSpace(runId);
+        if (maximumCount < 1 || maximumCount > EvolutionCollectionLimits.MaximumCheckpointFiles)
+            throw new ArgumentOutOfRangeException(nameof(maximumCount));
         lock (_gate)
         {
-            var descriptors = new List<EvolutionCheckpointDescriptor>();
-            foreach (SnapshotFile snapshot in EnumerateSnapshots())
+            var descriptors = new List<EvolutionCheckpointDescriptor>(maximumCount);
+            foreach (SnapshotFile snapshot in EnumerateSnapshots(maximumCount))
             {
                 long size;
                 try
@@ -171,7 +192,7 @@ public sealed class DirectoryEvolutionCheckpointStore : IEvolutionCheckpointStor
         string runId,
         IDictionary<string, EvolutionCheckpoint>? loaded = null)
     {
-        foreach (SnapshotFile snapshot in EnumerateSnapshots())
+        foreach (SnapshotFile snapshot in EnumerateSnapshots(EvolutionCollectionLimits.MaximumCheckpointFiles))
         {
             EvolutionCheckpoint? checkpoint = TryLoad(snapshot.Path, runId);
             if (checkpoint is not null)
@@ -183,13 +204,19 @@ public sealed class DirectoryEvolutionCheckpointStore : IEvolutionCheckpointStor
         return null;
     }
 
-    /// <summary>Enumerates the snapshot files in the directory ordered by descending sequence.</summary>
-    private List<SnapshotFile> EnumerateSnapshots()
+    /// <summary>Streams discovery while retaining only the newest requested snapshots.</summary>
+    private IReadOnlyList<SnapshotFile> EnumerateSnapshots(int maximumRetained)
     {
-        var snapshots = new List<SnapshotFile>();
-        if (!Directory.Exists(_directory)) return snapshots;
-        foreach (string path in Directory.GetFiles(_directory, FileNamePrefix + "*" + FileNameExtension))
+        if (!Directory.Exists(_directory)) return Array.Empty<SnapshotFile>();
+        var snapshots = new SortedSet<SnapshotFile>(SnapshotAscendingComparer);
+        int discovered = 0;
+        foreach (string path in Directory.EnumerateFiles(_directory, FileNamePrefix + "*" + FileNameExtension))
         {
+            discovered++;
+            if (discovered > EvolutionCollectionLimits.MaximumCheckpointFiles)
+                throw new InvalidDataException(
+                    $"A checkpoint directory may contain at most " +
+                    $"{EvolutionCollectionLimits.MaximumCheckpointFiles} matching snapshot files.");
             string fileName = Path.GetFileName(path);
             if (!fileName.StartsWith(FileNamePrefix, StringComparison.Ordinal) ||
                 !fileName.EndsWith(FileNameExtension, StringComparison.Ordinal) ||
@@ -205,13 +232,28 @@ public sealed class DirectoryEvolutionCheckpointStore : IEvolutionCheckpointStor
                 continue;
             }
             snapshots.Add(new SnapshotFile(sequence, fileName, path));
+            if (snapshots.Count > maximumRetained)
+            {
+                SnapshotFile? oldest = snapshots.Min;
+                if (oldest is not null) snapshots.Remove(oldest);
+            }
         }
-        snapshots.Sort(static (first, second) =>
+        return snapshots.Reverse().ToArray();
+    }
+
+    /// <summary>Checks for one free snapshot slot without materializing any paths.</summary>
+    private bool HasAvailableSnapshotSlot()
+    {
+        if (!Directory.Exists(_directory)) return true;
+        int count = 0;
+        foreach (string unused in Directory.EnumerateFiles(
+            _directory,
+            FileNamePrefix + "*" + FileNameExtension))
         {
-            int bySequence = second.Sequence.CompareTo(first.Sequence);
-            return bySequence != 0 ? bySequence : string.CompareOrdinal(first.FileName, second.FileName);
-        });
-        return snapshots;
+            count++;
+            if (count >= EvolutionCollectionLimits.MaximumCheckpointFiles) return false;
+        }
+        return true;
     }
 
     /// <summary>Deletes the snapshots that fall outside both retention quotas.</summary>
@@ -224,7 +266,8 @@ public sealed class DirectoryEvolutionCheckpointStore : IEvolutionCheckpointStor
         string runId,
         IReadOnlyDictionary<string, EvolutionCheckpoint>? preloaded = null)
     {
-        List<SnapshotFile> snapshots = EnumerateSnapshots();
+        IReadOnlyList<SnapshotFile> snapshots =
+            EnumerateSnapshots(EvolutionCollectionLimits.MaximumCheckpointFiles);
         var loaded = new List<KeyValuePair<SnapshotFile, EvolutionCheckpoint>>();
         var protectedNames = new HashSet<string>(StringComparer.Ordinal);
         foreach (SnapshotFile snapshot in snapshots)
@@ -427,6 +470,13 @@ public sealed class DirectoryEvolutionCheckpointStore : IEvolutionCheckpointStor
         public string FileName { get; }
         public string Path { get; }
     }
+
+    private static readonly IComparer<SnapshotFile> SnapshotAscendingComparer =
+        Comparer<SnapshotFile>.Create(static (first, second) =>
+        {
+            int bySequence = first.Sequence.CompareTo(second.Sequence);
+            return bySequence != 0 ? bySequence : string.CompareOrdinal(first.FileName, second.FileName);
+        });
 
     /// <summary>Serialization shape of one on-disk snapshot, with a checksum over its own fields.</summary>
     private sealed class SnapshotDocument

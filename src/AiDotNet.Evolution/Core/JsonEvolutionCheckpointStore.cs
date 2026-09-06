@@ -39,11 +39,15 @@ public sealed class JsonEvolutionCheckpointStore : IEvolutionCheckpointStore
     /// <param name="maxCheckpointBytes">Maximum encoded JSON size accepted for one checkpoint.</param>
     /// <exception cref="ArgumentNullException"><paramref name="filePath"/> is <c>null</c>.</exception>
     /// <exception cref="ArgumentException"><paramref name="filePath"/> is empty or white space.</exception>
-    /// <exception cref="ArgumentOutOfRangeException"><paramref name="maxCheckpointBytes"/> is not positive.</exception>
+    /// <exception cref="ArgumentOutOfRangeException">
+    /// <paramref name="maxCheckpointBytes"/> is not positive or exceeds the package checkpoint limit.
+    /// </exception>
     public JsonEvolutionCheckpointStore(string filePath, long maxCheckpointBytes = 64L * 1024L * 1024L)
     {
         Guard.NotNullOrWhiteSpace(filePath);
-        if (maxCheckpointBytes <= 0) throw new ArgumentOutOfRangeException(nameof(maxCheckpointBytes));
+        if (maxCheckpointBytes <= 0 || maxCheckpointBytes > EvolutionCollectionLimits.MaximumCheckpointBytes)
+            throw new ArgumentOutOfRangeException(nameof(maxCheckpointBytes),
+                $"Checkpoint bytes must be between 1 and {EvolutionCollectionLimits.MaximumCheckpointBytes}.");
         _path = Path.GetFullPath(filePath);
         _previousPath = _path + ".previous";
         _lockPath = _path + ".lock";
@@ -59,7 +63,9 @@ public sealed class JsonEvolutionCheckpointStore : IEvolutionCheckpointStore
     /// <returns>A store writing to <see cref="EvolutionOutputLayout.CheckpointPath"/> with the same atomic pattern.</returns>
     /// <exception cref="ArgumentNullException">An argument is <c>null</c>.</exception>
     /// <exception cref="ArgumentException">An argument is empty or white space, or the directory is not a valid path.</exception>
-    /// <exception cref="ArgumentOutOfRangeException"><paramref name="maxCheckpointBytes"/> is not positive.</exception>
+    /// <exception cref="ArgumentOutOfRangeException">
+    /// <paramref name="maxCheckpointBytes"/> is not positive or exceeds the package checkpoint limit.
+    /// </exception>
     /// <remarks>
     /// Two runs under one output directory get separate checkpoint files because the file name is derived from the
     /// run identifier, and the same run resumed later finds its own file without being told the path.

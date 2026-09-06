@@ -291,9 +291,13 @@ public sealed class MapElitesArchive<TGenome> :
         // quietly lowers coverage and, with a capacity that follows the grid, changes what the archive holds.
         foreach (EvolutionDescriptorDefinition definition in _descriptors)
         {
-            if (definition.OutOfRangePolicy == EvolutionOutOfRangePolicy.Grow) continue;
-            if (!descriptors.TryGetValue(definition.Name, out double other) || !definition.TryGetBin(other, out _))
-                return null;
+            if (!descriptors.TryGetValue(definition.Name, out double value)) return null;
+            if (definition.OutOfRangePolicy == EvolutionOutOfRangePolicy.Grow)
+            {
+                if (!EvolutionDescriptorDefinition.IsFinite(value)) return null;
+                continue;
+            }
+            if (!definition.TryGetBin(value, out _)) return null;
         }
 
         var proposed = (EvolutionDescriptorDefinition[])_descriptors.Clone();

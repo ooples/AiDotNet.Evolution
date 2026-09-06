@@ -64,4 +64,39 @@ public sealed class EvolutionPublicContractTests
         Assert.Equal("  evolution.jsonl  ", source.Path);
         Assert.Equal("evolution.jsonl", snapshot.Path);
     }
+
+    [Fact]
+    public void TraceRetentionCannotExceedPackageLevelResourceLimits()
+    {
+        Assert.Throws<ArgumentOutOfRangeException>(() => new EvolutionTraceOptions
+        {
+            MaxRecords = EvolutionCollectionLimits.MaximumTraceRecords + 1L
+        }.SnapshotAndValidate());
+        Assert.Throws<ArgumentOutOfRangeException>(() => new EvolutionTraceOptions
+        {
+            MaxBytes = EvolutionCollectionLimits.MaximumTraceBytes + 1
+        }.SnapshotAndValidate());
+        Assert.Throws<ArgumentOutOfRangeException>(() => new EvolutionTraceOptions
+        {
+            ParentQualityCacheSize = EvolutionCollectionLimits.MaximumParentQualityCacheEntries + 1
+        }.SnapshotAndValidate());
+    }
+
+    [Fact]
+    public void ArtifactRetentionCannotExceedIndividualOrAggregatePackageLimits()
+    {
+        Assert.Throws<ArgumentOutOfRangeException>(() => new EvolutionArtifactOptions
+        {
+            MaxArtifactBytes = EvolutionCollectionLimits.MaximumArtifactBytes + 1
+        }.SnapshotAndValidate());
+        Assert.Throws<ArgumentOutOfRangeException>(() => new EvolutionArtifactOptions
+        {
+            MaxBytesPerEvaluation = EvolutionCollectionLimits.MaximumArtifactBytesPerEvaluation + 1
+        }.SnapshotAndValidate());
+        Assert.Throws<ArgumentOutOfRangeException>(() => new EvolutionArtifactOptions
+        {
+            MaxBytesPerEvaluation = EvolutionCollectionLimits.MaximumArtifactBytesPerEvaluation,
+            MaxPendingCandidates = 17
+        }.SnapshotAndValidate());
+    }
 }

@@ -70,7 +70,15 @@ public sealed partial class EvolutionEngine<TGenome>
                 }).ToList(),
             Islands = _islands.Select(archive => ArchiveDocument.From(archive, SerializeGenome)).ToList()
         };
-        _safePayload = JsonSerializer.Serialize(document, EvolutionJson.Compact);
+        string payload = JsonSerializer.Serialize(document, EvolutionJson.Compact);
+        if (payload.Length > EvolutionCollectionLimits.MaximumCheckpointBytes ||
+            Encoding.UTF8.GetByteCount(payload) > EvolutionCollectionLimits.MaximumCheckpointBytes)
+        {
+            throw new InvalidDataException(
+                $"The evolution engine state exceeds the " +
+                $"{EvolutionCollectionLimits.MaximumCheckpointBytes}-byte package limit.");
+        }
+        _safePayload = payload;
         _safeSequence++;
     }
 
@@ -95,17 +103,8 @@ public sealed partial class EvolutionEngine<TGenome>
         if (!string.Equals(checkpoint.CompatibilityHash, _compatibilityHash, StringComparison.Ordinal))
             throw new InvalidDataException(DescribeIncompatibility(checkpoint));
 
-        EngineStateDocument? state;
-        try
-        {
-            state = JsonSerializer.Deserialize<EngineStateDocument>(checkpoint.Payload, EvolutionJson.Compact);
-        }
-        catch (JsonException exception)
-        {
-            throw new InvalidDataException("The evolution engine state payload is invalid.", exception);
-        }
-        if (state is null || state.SchemaVersion != EngineStateSchemaVersion)
-            throw new InvalidDataException("The evolution engine state schema is invalid.");
+        EngineStateDocument state = ReadStateDocument(checkpoint);
+        ValidateConfiguredCheckpointBounds(state);
 
         string[] checkpointSeedPayloads = state.SeedPayloads?.ToArray()
             ?? throw new InvalidDataException("The checkpoint seed list is missing.");
@@ -308,6 +307,11 @@ public sealed partial class EvolutionEngine<TGenome>
     {
         const string general =
             "The evolution checkpoint is incompatible with the current task or engine configuration.";
+        if (checkpoint.Payload.Length > EvolutionCollectionLimits.MaximumCheckpointBytes ||
+            Encoding.UTF8.GetByteCount(checkpoint.Payload) > EvolutionCollectionLimits.MaximumCheckpointBytes)
+        {
+            return general;
+        }
         EngineStateDocument? state;
         try
         {
@@ -494,6 +498,59 @@ public sealed partial class EvolutionEngine<TGenome>
         Guard.NotNull(genomeCodec);
         checkpoint.Validate();
 
+        EngineStateDocument state = ReadStateDocument(checkpoint);
+
+        var entries = new List<EvolutionCheckpointEntry<TGenome>>();
+        List<ArchiveDocument> islands = state.Islands ??
+            throw new InvalidDataException("Checkpoint islands are missing.");
+        for (int island = 0; island < islands.Count; island++)
+        {
+            ArchiveDocument archive = islands[island] ??
+                throw new InvalidDataException("A checkpoint island archive is missing.");
+            foreach (ArchiveEntryDocument document in archive.Entries ?? new List<ArchiveEntryDocument>())
+            {
+                if (document is null) throw new InvalidDataException("A checkpoint archive entry is missing.");
+                entries.Add(new EvolutionCheckpointEntry<TGenome>(island,
+                    EvolutionCheckpointEntrySource.IslandArchive, ReadArchiveEntry(document, genomeCodec)));
+            }
+        }
+
+        foreach (EliteRecordDocument record in state.GlobalElites ?? new List<EliteRecordDocument>())
+        {
+            // A negative island is corrupt data, and relabelling it as island 0 would hand the reader a record that
+            // looks fine. Resume rejects the same value, and so does this.
+            if (record is null || record.Entry is null || record.Island < 0 || record.Island >= islands.Count)
+                throw new InvalidDataException("A checkpoint global elite record is invalid.");
+            entries.Add(new EvolutionCheckpointEntry<TGenome>(record.Island,
+                EvolutionCheckpointEntrySource.GlobalElite, ReadArchiveEntry(record.Entry, genomeCodec)));
+        }
+
+        List<List<ArchiveEntryDocument>> histories = state.IslandHistories ?? new List<List<ArchiveEntryDocument>>();
+        for (int island = 0; island < histories.Count; island++)
+        {
+            foreach (ArchiveEntryDocument document in histories[island] ?? new List<ArchiveEntryDocument>())
+            {
+                if (document is null) throw new InvalidDataException("A checkpoint island history entry is missing.");
+                entries.Add(new EvolutionCheckpointEntry<TGenome>(island,
+                    EvolutionCheckpointEntrySource.IslandHistory, ReadArchiveEntry(document, genomeCodec)));
+            }
+        }
+
+        return new EvolutionCheckpointContents<TGenome>(
+            checkpoint.RunId, checkpoint.Sequence, checkpoint.CompatibilityHash, entries);
+    }
+
+    /// <summary>Deserializes and bounds an engine-state document before any task codec is invoked.</summary>
+    private static EngineStateDocument ReadStateDocument(EvolutionCheckpoint checkpoint)
+    {
+        if (checkpoint.Payload.Length > EvolutionCollectionLimits.MaximumCheckpointBytes ||
+            Encoding.UTF8.GetByteCount(checkpoint.Payload) > EvolutionCollectionLimits.MaximumCheckpointBytes)
+        {
+            throw new InvalidDataException(
+                $"The evolution engine state exceeds the " +
+                $"{EvolutionCollectionLimits.MaximumCheckpointBytes}-byte package limit.");
+        }
+
         EngineStateDocument? state;
         try
         {
@@ -511,40 +568,123 @@ public sealed partial class EvolutionEngine<TGenome>
             throw new InvalidDataException(
                 "The evolution engine state schema is invalid; the checkpoint was written by a different engine version.");
 
-        var entries = new List<EvolutionCheckpointEntry<TGenome>>();
+        ValidatePackageCheckpointBounds(state);
+        return state;
+    }
+
+    /// <summary>Applies package-wide collection limits before any genome payload is decoded.</summary>
+    private static void ValidatePackageCheckpointBounds(EngineStateDocument state)
+    {
         List<ArchiveDocument> islands = state.Islands ??
             throw new InvalidDataException("Checkpoint islands are missing.");
+        if (islands.Count > EvolutionCollectionLimits.MaximumResultIslands)
+            throw new InvalidDataException("The checkpoint contains too many island archives.");
+
+        int totalEntries = 0;
         for (int island = 0; island < islands.Count; island++)
         {
-            foreach (ArchiveEntryDocument document in islands[island].Entries ?? new List<ArchiveEntryDocument>())
-            {
-                entries.Add(new EvolutionCheckpointEntry<TGenome>(island,
-                    EvolutionCheckpointEntrySource.IslandArchive, ReadArchiveEntry(document, genomeCodec)));
-            }
+            ArchiveDocument archive = islands[island] ??
+                throw new InvalidDataException("A checkpoint island archive is missing.");
+            if (archive.Descriptors is null)
+                throw new InvalidDataException("Checkpoint archive descriptors are missing.");
+            if (archive.Descriptors.Count > EvolutionCollectionLimits.MaximumArchiveDimensions)
+                throw new InvalidDataException("A checkpoint island contains too many descriptor dimensions.");
+            if (archive.Descriptors.Any(descriptor => descriptor is null))
+                throw new InvalidDataException("A checkpoint descriptor definition is missing.");
+            if (archive.Entries is not null && archive.Entries.Any(entry => entry is null))
+                throw new InvalidDataException("A checkpoint archive entry is missing.");
+            totalEntries = AddCheckpointEntryCount(
+                totalEntries,
+                archive.Entries?.Count ?? 0,
+                "island archive");
         }
 
-        foreach (EliteRecordDocument record in state.GlobalElites ?? new List<EliteRecordDocument>())
+        if (state.GlobalElites is not null && state.GlobalElites.Any(record =>
+            record is null || record.Entry is null || record.Island < 0 || record.Island >= islands.Count))
         {
-            // A negative island is corrupt data, and relabelling it as island 0 would hand the reader a record that
-            // looks fine. Resume rejects the same value, and so does this.
-            if (record.Entry is null || record.Island < 0)
-                throw new InvalidDataException("A checkpoint global elite record is invalid.");
-            entries.Add(new EvolutionCheckpointEntry<TGenome>(record.Island,
-                EvolutionCheckpointEntrySource.GlobalElite, ReadArchiveEntry(record.Entry, genomeCodec)));
+            throw new InvalidDataException("A checkpoint global elite record is invalid.");
         }
+        totalEntries = AddCheckpointEntryCount(
+            totalEntries,
+            state.GlobalElites?.Count ?? 0,
+            "global elite index");
 
         List<List<ArchiveEntryDocument>> histories = state.IslandHistories ?? new List<List<ArchiveEntryDocument>>();
+        if (histories.Count > EvolutionCollectionLimits.MaximumResultIslands || histories.Count > islands.Count)
+            throw new InvalidDataException("The checkpoint contains too many island histories.");
         for (int island = 0; island < histories.Count; island++)
         {
-            foreach (ArchiveEntryDocument document in histories[island] ?? new List<ArchiveEntryDocument>())
-            {
-                entries.Add(new EvolutionCheckpointEntry<TGenome>(island,
-                    EvolutionCheckpointEntrySource.IslandHistory, ReadArchiveEntry(document, genomeCodec)));
-            }
+            if (histories[island] is not null && histories[island].Any(entry => entry is null))
+                throw new InvalidDataException("A checkpoint island history entry is missing.");
+            totalEntries = AddCheckpointEntryCount(
+                totalEntries,
+                histories[island]?.Count ?? 0,
+                "island history");
         }
 
-        return new EvolutionCheckpointContents<TGenome>(
-            checkpoint.RunId, checkpoint.Sequence, checkpoint.CompatibilityHash, entries);
+        if ((state.SeedPayloads?.Count ?? 0) > EvolutionCollectionLimits.MaximumResultEntries ||
+            (state.SeenGenomeIds?.Count ?? 0) > EvolutionCollectionLimits.MaximumResultEntries ||
+            (state.Cache?.Count ?? 0) > EvolutionCollectionLimits.MaximumResultEntries ||
+            (state.Failures?.Count ?? 0) > EvolutionCollectionLimits.MaximumResultEntries ||
+            (state.PendingArtifacts?.Count ?? 0) > EvolutionCollectionLimits.MaximumResultEntries)
+        {
+            throw new InvalidDataException("A checkpoint auxiliary collection exceeds the package limit.");
+        }
+        if (state.SeedPayloads is not null && state.SeedPayloads.Any(string.IsNullOrWhiteSpace))
+            throw new InvalidDataException("The checkpoint seed list contains an invalid payload.");
+    }
+
+    private static int AddCheckpointEntryCount(int total, int count, string source)
+    {
+        if (count > EvolutionCollectionLimits.MaximumResultEntries ||
+            total > EvolutionCollectionLimits.MaximumResultEntries - count)
+        {
+            throw new InvalidDataException(
+                $"The checkpoint {source} exceeds the aggregate candidate-entry limit.");
+        }
+        return total + count;
+    }
+
+    /// <summary>Applies engine-configuration limits before resume decodes seeds or retained candidates.</summary>
+    private void ValidateConfiguredCheckpointBounds(EngineStateDocument state)
+    {
+        List<ArchiveDocument> islands = state.Islands ??
+            throw new InvalidDataException("Checkpoint islands are missing.");
+        if (islands.Count != _islands.Length)
+            throw new InvalidDataException("Checkpoint island count is incompatible.");
+        if ((state.GlobalElites?.Count ?? 0) > _options.GlobalEliteCount)
+            throw new InvalidDataException("The checkpoint global elite index exceeds the configured capacity.");
+
+        List<List<ArchiveEntryDocument>> histories = state.IslandHistories ?? new List<List<ArchiveEntryDocument>>();
+        if (histories.Count != _histories.Length)
+            throw new InvalidDataException("Checkpoint island history count is incompatible.");
+        foreach (List<ArchiveEntryDocument>? history in histories)
+        {
+            if ((history?.Count ?? 0) > _options.HistorySize)
+                throw new InvalidDataException("A checkpoint island history exceeds the configured capacity.");
+        }
+
+        List<PendingArtifactDocument> pending = state.PendingArtifacts ?? new List<PendingArtifactDocument>();
+        if (pending.Count > _options.Artifacts.MaxPendingCandidates)
+            throw new InvalidDataException("The checkpoint pending-artifact queue exceeds its configured capacity.");
+        foreach (PendingArtifactDocument document in pending)
+        {
+            if (document is null) throw new InvalidDataException("A checkpoint pending-artifact entry is missing.");
+            List<ArtifactDocument> artifacts = document.Artifacts ?? new List<ArtifactDocument>();
+            if (artifacts.Count > _options.Artifacts.MaxArtifactsPerEvaluation)
+                throw new InvalidDataException("A checkpoint pending-artifact entry exceeds its configured artifact bound.");
+            long totalBytes = 0;
+            foreach (ArtifactDocument artifact in artifacts)
+            {
+                if (artifact is null) throw new InvalidDataException("A checkpoint artifact is missing.");
+                int artifactBytes = Encoding.UTF8.GetByteCount(artifact.Text ?? string.Empty);
+                if (artifactBytes > _options.Artifacts.MaxArtifactBytes)
+                    throw new InvalidDataException("A checkpoint artifact exceeds its configured byte bound.");
+                totalBytes += artifactBytes;
+                if (totalBytes > _options.Artifacts.MaxBytesPerEvaluation)
+                    throw new InvalidDataException("Checkpoint artifacts exceed the configured per-evaluation byte bound.");
+            }
+        }
     }
 
     /// <summary>Rebuilds one archive entry from its document using a caller-supplied codec.</summary>
