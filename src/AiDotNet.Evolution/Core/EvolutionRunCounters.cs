@@ -39,12 +39,29 @@ public sealed class EvolutionRunCounters
         if (completedEvaluations < 0) throw new ArgumentOutOfRangeException(nameof(completedEvaluations));
         if (abandonedEvaluations < 0) throw new ArgumentOutOfRangeException(nameof(abandonedEvaluations));
         if (statusCounts is null) throw new ArgumentNullException(nameof(statusCounts));
+        if (statusCounts.Count > Enum.GetValues(typeof(EvolutionEvaluationStatus)).Length)
+            throw new ArgumentException("Status counts contain more entries than there are terminal statuses.", nameof(statusCounts));
+        var copied = new Dictionary<EvolutionEvaluationStatus, long>();
+        int visited = 0;
+        foreach (KeyValuePair<EvolutionEvaluationStatus, long> entry in statusCounts)
+        {
+            if (visited == Enum.GetValues(typeof(EvolutionEvaluationStatus)).Length)
+                throw new ArgumentException("Status counts contain more entries than there are terminal statuses.", nameof(statusCounts));
+            visited++;
+            if (!Enum.IsDefined(typeof(EvolutionEvaluationStatus), entry.Key))
+                throw new ArgumentOutOfRangeException(nameof(statusCounts), "Status counts contain an undefined status.");
+            if (entry.Value < 0)
+                throw new ArgumentOutOfRangeException(nameof(statusCounts), "Status counts cannot be negative.");
+            if (copied.ContainsKey(entry.Key))
+                throw new ArgumentException("Status counts repeat a terminal status.", nameof(statusCounts));
+            copied.Add(entry.Key, entry.Value);
+        }
         Proposals = proposals;
         EvaluationAttempts = evaluationAttempts;
         CompletedEvaluations = completedEvaluations;
         AbandonedEvaluations = abandonedEvaluations;
         _statusCounts = new System.Collections.ObjectModel.ReadOnlyDictionary<EvolutionEvaluationStatus, long>(
-            statusCounts.ToDictionary(item => item.Key, item => item.Value));
+            copied);
     }
 
     /// <summary>Gets all proposals, including duplicates and validation failures.</summary>

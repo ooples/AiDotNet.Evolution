@@ -68,14 +68,20 @@ public static class EvolutionTraceFile
         {
             using var writer = new StreamWriter(target, TraceEncoding, 4096, leaveOpen: true);
             bool first = true;
+            int count = 0;
             if (format == EvolutionTraceFormat.Json) writer.Write(JsonHeader(summary?.RunId));
             foreach (EvolutionTraceRecord record in records)
             {
+                if (count == EvolutionCollectionLimits.MaximumTraceRecords)
+                    throw new ArgumentException(
+                        $"A trace may contain at most {EvolutionCollectionLimits.MaximumTraceRecords} records.",
+                        nameof(records));
                 if (record is null) throw new ArgumentException("A trace cannot contain null records.", nameof(records));
                 if (format == EvolutionTraceFormat.Json && !first) writer.Write(",\n");
                 writer.Write(SerializeRecord(record));
                 if (format == EvolutionTraceFormat.JsonLines) writer.Write("\n");
                 first = false;
+                count++;
             }
             if (format == EvolutionTraceFormat.Json) writer.Write(JsonFooter(summary));
             writer.Flush();
@@ -175,7 +181,7 @@ public static class EvolutionTraceFile
             return document is null ? null : SummaryFromJson(document);
         }
         catch (Exception exception) when (exception is JsonException or IOException or FormatException or
-            ArgumentException or OverflowException or InvalidDataException)
+            ArgumentException or OverflowException or InvalidDataException or InvalidOperationException)
         {
             return null;
         }
@@ -340,7 +346,7 @@ public static class EvolutionTraceFile
             };
         }
         catch (Exception exception) when (exception is ArgumentException or FormatException or OverflowException or
-            InvalidCastException or JsonException)
+            InvalidCastException or InvalidOperationException or JsonException)
         {
             throw new InvalidDataException("The evolution trace record is not valid.", exception);
         }
@@ -460,13 +466,16 @@ public static class EvolutionTraceFile
         }
 
         string? line = firstLine;
+        int count = 0;
         while (line is not null)
         {
             if (line.Trim().Length > 0)
             {
+                if (count == EvolutionCollectionLimits.MaximumTraceRecords) yield break;
                 EvolutionTraceRecord? record = TryParseLine(line);
                 if (record is null) yield break;
                 yield return record;
+                count++;
             }
             line = ReadLineSafely(reader);
         }
@@ -571,6 +580,7 @@ public static class EvolutionTraceFile
         foreach (string line in EnumerateLines(content))
         {
             if (line.Trim().Length == 0) continue;
+            if (records.Count == EvolutionCollectionLimits.MaximumTraceRecords) return false;
             EvolutionTraceRecord? record = TryParseLine(line);
             if (record is null) return false;
             records.Add(record);
@@ -594,6 +604,7 @@ public static class EvolutionTraceFile
                 if (!reader.Read() || reader.TokenType != JsonTokenType.StartArray) return false;
                 while (reader.Read() && reader.TokenType != JsonTokenType.EndArray)
                 {
+                    if (records.Count == EvolutionCollectionLimits.MaximumTraceRecords) return false;
                     if (reader.TokenType != JsonTokenType.StartObject) return false;
                     using JsonDocument document = JsonDocument.ParseValue(ref reader);
                     JsonObject? record = JsonNode.Parse(document.RootElement.GetRawText()) as JsonObject;

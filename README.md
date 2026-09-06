@@ -15,6 +15,10 @@ The initial package version is `0.1.0-preview.1` and targets .NET 10, .NET 8, an
   points rather than mode strings.
 - `IEvolutionArchive<TGenome>` controls quality/diversity retention. `MapElitesArchive<TGenome>` is provided.
 - `IEvolutionGenomeCodec<TGenome>` enables checkpoint/resume without imposing a serializer on genome types.
+- Reference-typed genomes implement `IImmutableEvolutionGenome`; strings and value types with entirely value-based
+  fields satisfy the boundary directly. A value type holding an arbitrary reference must also implement the marker,
+  because copying the value does not copy the referenced object. The marker promises that all reachable state is
+  immutable, including nested collections, so archives, migration, and checkpoints need no hot-path cloning.
 
 Evaluation caches inside the engine are run-local memoization keyed by canonical genome identity. Deployment caches
 owned by consumers—such as a GPU kernel autotune cache—remain separate because their keys also need hardware, driver,

@@ -31,6 +31,7 @@ public sealed class EvolutionIslandHistory<TGenome>
 {
     private readonly Dictionary<string, EvolutionArchiveEntry<TGenome>> _entries = new(StringComparer.Ordinal);
     private readonly int _capacity;
+    private IReadOnlyList<EvolutionArchiveEntry<TGenome>>? _ordered;
 
     /// <summary>Initializes an empty history.</summary>
     /// <param name="capacity">The maximum number of retained entries; zero disables the history.</param>
@@ -40,7 +41,8 @@ public sealed class EvolutionIslandHistory<TGenome>
     /// </exception>
     public EvolutionIslandHistory(int capacity, EvolutionOptimizationDirection direction)
     {
-        if (capacity < 0) throw new ArgumentOutOfRangeException(nameof(capacity));
+        if (capacity < 0 || capacity > EvolutionCollectionLimits.MaximumResultEntries)
+            throw new ArgumentOutOfRangeException(nameof(capacity));
         if (!Enum.IsDefined(typeof(EvolutionOptimizationDirection), direction)) throw new ArgumentOutOfRangeException(nameof(direction));
         _capacity = capacity;
         Direction = direction;
@@ -56,8 +58,21 @@ public sealed class EvolutionIslandHistory<TGenome>
     public int Count => _entries.Count;
 
     /// <summary>Gets every retained entry in best-first order.</summary>
-    public IReadOnlyList<EvolutionArchiveEntry<TGenome>> Entries =>
-        _entries.Values.OrderBy(entry => entry, EvolutionEntryOrdering.BestFirst<TGenome>(Direction)).ToArray();
+    /// <remarks>Materialized once and cached until the history changes.</remarks>
+    public IReadOnlyList<EvolutionArchiveEntry<TGenome>> Entries
+    {
+        get
+        {
+            if (_ordered is null)
+            {
+                EvolutionArchiveEntry<TGenome>[] ordered = _entries.Values
+                    .OrderBy(entry => entry, EvolutionEntryOrdering.BestFirst<TGenome>(Direction))
+                    .ToArray();
+                _ordered = Array.AsReadOnly(ordered);
+            }
+            return _ordered;
+        }
+    }
 
     /// <summary>Returns whether a canonical genome identifier is currently retained.</summary>
     /// <param name="genomeId">The canonical genome identifier to look for.</param>
@@ -85,15 +100,24 @@ public sealed class EvolutionIslandHistory<TGenome>
         Guard.NotNull(cellOwnerGenomeIds);
         if (_capacity == 0) return Array.Empty<EvolutionArchiveEntry<TGenome>>();
         string addedId = entry.Evaluation.GenomeId;
-        if (!_entries.ContainsKey(addedId)) _entries.Add(addedId, entry);
+        if (!_entries.ContainsKey(addedId))
+        {
+            _entries.Add(addedId, entry);
+            _ordered = null;
+        }
 
         var evicted = new List<EvolutionArchiveEntry<TGenome>>();
-        var owners = new HashSet<string>(cellOwnerGenomeIds, StringComparer.Ordinal);
+        string[] ownerIds = EvolutionCollection.ToBoundedArray(
+            cellOwnerGenomeIds,
+            EvolutionCollectionLimits.MaximumResultEntries,
+            nameof(cellOwnerGenomeIds));
+        var owners = new HashSet<string>(ownerIds, StringComparer.Ordinal);
         while (_entries.Count > _capacity)
         {
             EvolutionArchiveEntry<TGenome>? victim = SelectVictim(owners, addedId, protectedGenomeId);
             if (victim is null) break;
             _entries.Remove(victim.Evaluation.GenomeId);
+            _ordered = null;
             evicted.Add(victim);
         }
         return evicted.AsReadOnly();
@@ -118,6 +142,7 @@ public sealed class EvolutionIslandHistory<TGenome>
                 throw new InvalidDataException("The checkpoint island history repeats a genome identifier.");
             _entries.Add(entry.Evaluation.GenomeId, entry);
         }
+        _ordered = null;
     }
 
     private EvolutionArchiveEntry<TGenome>? SelectVictim(HashSet<string> owners, string addedId, string? protectedGenomeId)

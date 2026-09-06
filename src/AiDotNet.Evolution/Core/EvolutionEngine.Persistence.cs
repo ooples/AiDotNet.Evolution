@@ -6,8 +6,8 @@ namespace AiDotNet.Evolution;
 
 public sealed partial class EvolutionEngine<TGenome>
 {
-    // 5 added per-island descriptor ranges so a Grow axis's widened grid survives a resume.
-    private const int EngineStateSchemaVersion = 5;
+    // 6 added the incremental early-stopping archive aggregate so QD-score arithmetic resumes bit-for-bit.
+    private const int EngineStateSchemaVersion = 6;
     private string? _safePayload;
     private long _safeSequence;
 
@@ -54,6 +54,11 @@ public sealed partial class EvolutionEngine<TGenome>
             }).ToList(),
             Failures = _failures.Select(DiagnosticDocument.From).ToList(),
             EarlyStoppingBest = _earlyStoppingBest,
+            EarlyStoppingArchiveMetric = UsesIncrementalEarlyStoppingArchiveMetric() &&
+                _earlyStoppingArchiveValueCount > 0
+                    ? _earlyStoppingArchiveMetric
+                    : (double?)null,
+            EarlyStoppingArchiveValueCount = _earlyStoppingArchiveValueCount,
             EvaluationsSinceImprovement = _evaluationsSinceImprovement,
             AbandonedEvaluations = Interlocked.Read(ref _abandonedEvaluations),
             PendingArtifacts = _pendingArtifactOrder
@@ -129,7 +134,7 @@ public sealed partial class EvolutionEngine<TGenome>
         if (state.BatchesSinceMigration < 0) throw new InvalidDataException("The checkpoint migration counter is invalid.");
         // Budgets are deliberately not compared: a raised limit continues the run, and a limit lowered below what the
         // run already spent restores the counters and stops immediately with the matching budget stop reason.
-        if (state.NextEvaluationId != state.Proposals || state.CompletedEvaluations > state.Proposals ||
+        if (state.NextEvaluationId < state.Proposals || state.CompletedEvaluations > state.Proposals ||
             state.SeedIndex > state.Proposals)
             throw new InvalidDataException("Checkpoint counters violate engine identity invariants.");
         if ((state.SeenGenomeIds?.Count ?? 0) > state.Proposals || (state.Cache?.Count ?? 0) > state.Proposals)
@@ -215,7 +220,8 @@ public sealed partial class EvolutionEngine<TGenome>
                 throw new InvalidOperationException("Resume requires checkpointable archive implementations.");
             ArchiveDocument archiveDocument = archiveDocuments[island];
             if (archiveDocument.Version < 0) throw new InvalidDataException("Checkpoint archive version is invalid.");
-            RestoreArchiveDescriptors(restorable, archiveDocument);
+            IReadOnlyList<EvolutionDescriptorDefinition> restoredDescriptors =
+                ReadArchiveDescriptors(restorable, archiveDocument);
             var entries = new List<EvolutionArchiveEntry<TGenome>>();
             var islandGenomeIds = new HashSet<string>(StringComparer.Ordinal);
             foreach (ArchiveEntryDocument entryDocument in archiveDocument.Entries ?? new List<ArchiveEntryDocument>())
@@ -238,9 +244,10 @@ public sealed partial class EvolutionEngine<TGenome>
                         $"{island}; each genome may hold at most one cell.");
                 entries.Add(entry);
             }
-            restorable.Restore(entries, archiveDocument.Version);
+            restorable.Restore(entries, restoredDescriptors, archiveDocument.Version);
         }
 
+        RestoreEarlyStoppingArchiveMetric(state);
         RestoreGlobalElites(state);
         RestoreIslandHistories(state);
         _safeSequence = checkpoint.Sequence;
@@ -259,9 +266,12 @@ public sealed partial class EvolutionEngine<TGenome>
     /// key order rather than commit order. Ranges identical to the configured ones need no growable archive, so runs
     /// with fixed descriptors are unaffected.
     /// </remarks>
-    private void RestoreArchiveDescriptors(ICheckpointableEvolutionArchive<TGenome> archive, ArchiveDocument document)
+    private IReadOnlyList<EvolutionDescriptorDefinition> ReadArchiveDescriptors(
+        ICheckpointableEvolutionArchive<TGenome> archive,
+        ArchiveDocument document)
     {
-        if (document.Descriptors is null) return;
+        if (document.Descriptors is null)
+            throw new InvalidDataException("Checkpoint archive descriptors are missing.");
 
         EvolutionDescriptorDefinition[] restored = document.Descriptors
             .Select(descriptor => descriptor is null
@@ -275,14 +285,14 @@ public sealed partial class EvolutionEngine<TGenome>
         {
             unchanged = string.Equals(restored[i].ToCanonicalString(), live[i].ToCanonicalString(), StringComparison.Ordinal);
         }
-        if (unchanged) return;
+        if (unchanged) return restored;
 
-        if (archive is not IGrowableEvolutionArchive<TGenome> growable)
+        if (archive is not IGrowableEvolutionArchive<TGenome>)
             throw new InvalidDataException(
                 "The checkpoint recorded widened descriptor ranges, but the archive does not support restoring them. " +
                 "Resume requires an archive implementing IGrowableEvolutionArchive when any descriptor can grow.");
 
-        growable.RestoreDescriptorBounds(restored);
+        return restored;
     }
 
     /// <summary>
@@ -347,6 +357,47 @@ public sealed partial class EvolutionEngine<TGenome>
         _earlyStoppingBest = state.EarlyStoppingBest;
         _evaluationsSinceImprovement = state.EvaluationsSinceImprovement;
         Interlocked.Exchange(ref _abandonedEvaluations, state.AbandonedEvaluations);
+    }
+
+    /// <summary>Restores and validates archive-derived early-stopping state after every island has been replayed.</summary>
+    private void RestoreEarlyStoppingArchiveMetric(EngineStateDocument state)
+    {
+        if (state.EarlyStoppingArchiveValueCount < 0 ||
+            state.EarlyStoppingArchiveMetric.HasValue &&
+            !EvolutionDescriptorDefinition.IsFinite(state.EarlyStoppingArchiveMetric.Value))
+        {
+            throw new InvalidDataException("The checkpoint early-stopping archive aggregate is invalid.");
+        }
+
+        if (!UsesIncrementalEarlyStoppingArchiveMetric())
+        {
+            if (state.EarlyStoppingArchiveValueCount != 0 || state.EarlyStoppingArchiveMetric.HasValue)
+                throw new InvalidDataException("The checkpoint contains an inactive early-stopping archive aggregate.");
+            RebuildEarlyStoppingArchiveMetric();
+            return;
+        }
+
+        RebuildEarlyStoppingArchiveMetric();
+        if (_earlyStoppingArchiveValueCount != state.EarlyStoppingArchiveValueCount ||
+            (_earlyStoppingArchiveValueCount == 0) != !state.EarlyStoppingArchiveMetric.HasValue)
+        {
+            throw new InvalidDataException("The checkpoint early-stopping archive aggregate does not match its archives.");
+        }
+        if (_earlyStoppingArchiveValueCount == 0) return;
+        double restoredMetric = state.EarlyStoppingArchiveMetric
+            ?? throw new InvalidDataException("The checkpoint early-stopping archive metric is missing.");
+
+        if (_options.EarlyStopping.MetricName is not null)
+        {
+            if (_earlyStoppingArchiveMetric != restoredMetric)
+                throw new InvalidDataException("The checkpoint named-metric aggregate does not match its archives.");
+            _earlyStoppingArchiveMetric = restoredMetric;
+            return;
+        }
+
+        // QD score is accumulated in deterministic commit order. Retain the exact persisted bits rather than changing
+        // them by replaying archive entries in cell order; the entry count above still proves the state is complete.
+        _earlyStoppingArchiveMetric = restoredMetric;
     }
 
     private void RestorePendingArtifacts(EngineStateDocument state)
@@ -461,7 +512,8 @@ public sealed partial class EvolutionEngine<TGenome>
                 "The evolution engine state schema is invalid; the checkpoint was written by a different engine version.");
 
         var entries = new List<EvolutionCheckpointEntry<TGenome>>();
-        List<ArchiveDocument> islands = state.Islands ?? new List<ArchiveDocument>();
+        List<ArchiveDocument> islands = state.Islands ??
+            throw new InvalidDataException("Checkpoint islands are missing.");
         for (int island = 0; island < islands.Count; island++)
         {
             foreach (ArchiveEntryDocument document in islands[island].Entries ?? new List<ArchiveEntryDocument>())
@@ -594,6 +646,10 @@ public sealed partial class EvolutionEngine<TGenome>
             Append(builder, island);
             Append(builder, _islands[island].Version);
             Append(builder, _islandGenerations[island]);
+            Append(builder, "descriptors");
+            Append(builder, _islands[island].Descriptors.Count);
+            foreach (EvolutionDescriptorDefinition descriptor in _islands[island].Descriptors)
+                Append(builder, descriptor.ToCanonicalString());
             Append(builder, _islands[island].Entries.Count);
             foreach (EvolutionArchiveEntry<TGenome> entry in _islands[island].Entries.OrderBy(item => item.Cell.StableKey, StringComparer.Ordinal))
             {
@@ -628,7 +684,12 @@ public sealed partial class EvolutionEngine<TGenome>
         }
         // Abandonment depends on wall-clock timing, so its counter is reported but deliberately never hashed.
         Append(builder, "early-stopping");
-        Append(builder, _earlyStoppingBest?.ToString("R", CultureInfo.InvariantCulture) ?? "none");
+        Append(builder, EvolutionHash.EncodeNullableDouble(_earlyStoppingBest));
+        Append(builder, EvolutionHash.EncodeNullableDouble(
+            UsesIncrementalEarlyStoppingArchiveMetric() && _earlyStoppingArchiveValueCount > 0
+                ? _earlyStoppingArchiveMetric
+                : (double?)null));
+        Append(builder, _earlyStoppingArchiveValueCount);
         Append(builder, _evaluationsSinceImprovement);
         Append(builder, "pending-artifacts");
         Append(builder, _pendingArtifactOrder.Count);
@@ -644,16 +705,16 @@ public sealed partial class EvolutionEngine<TGenome>
     private static void AppendTaskResult(StringBuilder builder, EvolutionTaskResult result)
     {
         Append(builder, (int)result.Status);
-        Append(builder, result.Quality?.ToString("R", CultureInfo.InvariantCulture) ?? "none");
+        Append(builder, EvolutionHash.EncodeNullableDouble(result.Quality));
         Append(builder, (int)result.Direction);
         AppendNamedValues(builder, result.Descriptors);
         Append(builder, "objectives");
         Append(builder, result.Objectives.Count);
-        foreach (double objective in result.Objectives) Append(builder, objective.ToString("R", CultureInfo.InvariantCulture));
+        foreach (double objective in result.Objectives) Append(builder, EvolutionHash.EncodeDouble(objective));
         Append(builder, "violations");
         Append(builder, result.ConstraintViolations.Count);
-        foreach (double violation in result.ConstraintViolations) Append(builder, violation.ToString("R", CultureInfo.InvariantCulture));
-        Append(builder, result.CostUnits.ToString("R", CultureInfo.InvariantCulture));
+        foreach (double violation in result.ConstraintViolations) Append(builder, EvolutionHash.EncodeDouble(violation));
+        Append(builder, EvolutionHash.EncodeDouble(result.CostUnits));
         AppendDiagnostics(builder, result.Diagnostics);
         Append(builder, "metrics");
         AppendNamedValues(builder, result.Metrics);
@@ -665,21 +726,21 @@ public sealed partial class EvolutionEngine<TGenome>
         Append(builder, evaluation.EvaluationId);
         Append(builder, evaluation.GenomeId);
         Append(builder, (int)evaluation.Status);
-        Append(builder, evaluation.Quality?.ToString("R", CultureInfo.InvariantCulture) ?? "none");
+        Append(builder, EvolutionHash.EncodeNullableDouble(evaluation.Quality));
         Append(builder, (int)evaluation.Direction);
         AppendNamedValues(builder, evaluation.Descriptors);
         Append(builder, "objectives");
         Append(builder, evaluation.Objectives.Count);
-        foreach (double objective in evaluation.Objectives) Append(builder, objective.ToString("R", CultureInfo.InvariantCulture));
+        foreach (double objective in evaluation.Objectives) Append(builder, EvolutionHash.EncodeDouble(objective));
         Append(builder, "violations");
         Append(builder, evaluation.ConstraintViolations.Count);
-        foreach (double violation in evaluation.ConstraintViolations) Append(builder, violation.ToString("R", CultureInfo.InvariantCulture));
+        foreach (double violation in evaluation.ConstraintViolations) Append(builder, EvolutionHash.EncodeDouble(violation));
         Append(builder, evaluation.Cost.AttemptCount);
-        Append(builder, evaluation.Cost.CostUnits.ToString("R", CultureInfo.InvariantCulture));
+        Append(builder, EvolutionHash.EncodeDouble(evaluation.Cost.CostUnits));
         Append(builder, "stage-costs");
         Append(builder, evaluation.Cost.StageCostUnits.Count);
         foreach (double stageCost in evaluation.Cost.StageCostUnits)
-            Append(builder, stageCost.ToString("R", CultureInfo.InvariantCulture));
+            Append(builder, EvolutionHash.EncodeDouble(stageCost));
         Append(builder, evaluation.Cost.RejectedStage?.ToString(CultureInfo.InvariantCulture) ?? "none");
         Append(builder, (int)evaluation.CacheStatus);
         AppendDiagnostics(builder, evaluation.Diagnostics);
@@ -710,7 +771,7 @@ public sealed partial class EvolutionEngine<TGenome>
         foreach (KeyValuePair<string, double> value in values.OrderBy(pair => pair.Key, StringComparer.Ordinal))
         {
             Append(builder, value.Key);
-            Append(builder, value.Value.ToString("R", CultureInfo.InvariantCulture));
+            Append(builder, EvolutionHash.EncodeDouble(value.Value));
         }
     }
 
@@ -788,6 +849,8 @@ public sealed partial class EvolutionEngine<TGenome>
         public List<CacheDocument>? Cache { get; set; }
         public List<DiagnosticDocument>? Failures { get; set; }
         public double? EarlyStoppingBest { get; set; }
+        public double? EarlyStoppingArchiveMetric { get; set; }
+        public long EarlyStoppingArchiveValueCount { get; set; }
         public long EvaluationsSinceImprovement { get; set; }
         public long AbandonedEvaluations { get; set; }
         public List<PendingArtifactDocument>? PendingArtifacts { get; set; }

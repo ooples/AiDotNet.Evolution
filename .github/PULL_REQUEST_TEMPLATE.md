@@ -1,4 +1,4 @@
-## Summary
+# Summary
 
 Describe the behavior and public API affected by this change.
 

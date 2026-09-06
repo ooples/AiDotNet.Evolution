@@ -55,34 +55,79 @@ public sealed class EvolutionRunResult<TGenome>
         IReadOnlyList<EvolutionDiagnostic>? retainedFailures = null,
         IReadOnlyDictionary<string, IReadOnlyList<EvolutionArtifact>>? pendingArtifacts = null)
     {
+        if (!Enum.IsDefined(typeof(EvolutionStopReason), stopReason))
+            throw new ArgumentOutOfRangeException(nameof(stopReason));
         StopReason = stopReason;
         if (islands is null) throw new ArgumentNullException(nameof(islands));
-        Islands = Array.AsReadOnly(islands.Select(archive =>
-            (IEvolutionArchiveView<TGenome>)new EvolutionArchiveSnapshot<TGenome>(archive)).ToArray());
+        IEvolutionArchiveView<TGenome>[] islandSources = EvolutionCollection.CopyBounded(
+            islands,
+            EvolutionCollectionLimits.MaximumResultIslands,
+            nameof(islands));
+        var islandCopies = new IEvolutionArchiveView<TGenome>[islandSources.Length];
+        for (int index = 0; index < islandSources.Length; index++)
+        {
+            IEvolutionArchiveView<TGenome> archive = islandSources[index]
+                ?? throw new ArgumentException("Island archives cannot contain null entries.", nameof(islands));
+            islandCopies[index] = new EvolutionArchiveSnapshot<TGenome>(archive);
+        }
+        Islands = Array.AsReadOnly(islandCopies);
         Counters = counters ?? throw new ArgumentNullException(nameof(counters));
-        StateHash = stateHash ?? throw new ArgumentNullException(nameof(stateHash));
-        EvolutionEliteRecord<TGenome>[] elites = globalElites?.ToArray() ?? Array.Empty<EvolutionEliteRecord<TGenome>>();
+        Guard.NotNullOrWhiteSpace(stateHash);
+        StateHash = stateHash.Trim();
+        EvolutionEliteRecord<TGenome>[] elites = globalElites is null
+            ? Array.Empty<EvolutionEliteRecord<TGenome>>()
+            : EvolutionCollection.CopyBounded(
+                globalElites,
+                EvolutionCollectionLimits.MaximumResultEntries,
+                nameof(globalElites));
         if (elites.Any(record => record is null))
             throw new ArgumentException("The global elite index cannot contain null records.", nameof(globalElites));
         GlobalElites = Array.AsReadOnly(elites);
-        EvolutionIslandStatus[] statuses = islandStatuses?.ToArray() ?? Array.Empty<EvolutionIslandStatus>();
+        EvolutionIslandStatus[] statuses = islandStatuses is null
+            ? Array.Empty<EvolutionIslandStatus>()
+            : EvolutionCollection.CopyBounded(
+                islandStatuses,
+                EvolutionCollectionLimits.MaximumResultIslands,
+                nameof(islandStatuses));
         if (statuses.Any(status => status is null))
             throw new ArgumentException("Island statuses cannot contain null entries.", nameof(islandStatuses));
         if (statuses.Length != 0 && statuses.Length != Islands.Count)
             throw new ArgumentException("Island statuses must cover every island.", nameof(islandStatuses));
         IslandStatuses = Array.AsReadOnly(statuses);
-        EvolutionDiagnostic[] failures = retainedFailures?.ToArray() ?? Array.Empty<EvolutionDiagnostic>();
+        EvolutionDiagnostic[] failures = retainedFailures is null
+            ? Array.Empty<EvolutionDiagnostic>()
+            : EvolutionCollection.CopyBounded(
+                retainedFailures,
+                EvolutionCollectionLimits.MaximumResultEntries,
+                nameof(retainedFailures));
         if (failures.Any(diagnostic => diagnostic is null))
             throw new ArgumentException("Retained failures cannot contain null diagnostics.", nameof(retainedFailures));
         RetainedFailures = Array.AsReadOnly(failures);
         var pending = new Dictionary<string, IReadOnlyList<EvolutionArtifact>>(StringComparer.Ordinal);
         if (pendingArtifacts is not null)
         {
+            if (pendingArtifacts.Count > EvolutionCollectionLimits.MaximumResultEntries)
+                throw new ArgumentException("The pending artifact result exceeds the package safety bound.", nameof(pendingArtifacts));
+            int visited = 0;
             foreach (KeyValuePair<string, IReadOnlyList<EvolutionArtifact>> entry in pendingArtifacts)
             {
+                if (visited == EvolutionCollectionLimits.MaximumResultEntries)
+                    throw new ArgumentException("The pending artifact result exceeds the package safety bound.", nameof(pendingArtifacts));
+                visited++;
                 if (string.IsNullOrWhiteSpace(entry.Key) || entry.Value is null)
                     throw new ArgumentException("Pending artifacts require a genome identifier and a list.", nameof(pendingArtifacts));
-                pending[entry.Key] = Array.AsReadOnly(entry.Value.ToArray());
+                EvolutionArtifact[] artifactCopy = EvolutionCollection.CopyBounded(
+                    entry.Value,
+                    EvolutionTaskResult.MaximumArtifacts,
+                    nameof(pendingArtifacts));
+                if (artifactCopy.Any(artifact => artifact is null))
+                    throw new ArgumentException("Pending artifact lists cannot contain null entries.", nameof(pendingArtifacts));
+                string genomeId = entry.Key.Trim();
+                if (pending.ContainsKey(genomeId))
+                    throw new ArgumentException(
+                        "Pending artifacts repeat a genome identifier after trimming.",
+                        nameof(pendingArtifacts));
+                pending.Add(genomeId, Array.AsReadOnly(artifactCopy));
             }
         }
         PendingArtifacts = new System.Collections.ObjectModel.ReadOnlyDictionary<string, IReadOnlyList<EvolutionArtifact>>(pending);
@@ -109,7 +154,7 @@ public sealed class EvolutionRunResult<TGenome>
 
     /// <summary>Gets the retained failure diagnostics, oldest first and bounded by <c>MaxRetainedFailures</c>.</summary>
     /// <remarks>
-    /// Includes evaluator failures and the <c>descriptor_missing:&lt;name&gt;</c> diagnostic the engine raises when a
+    /// Includes evaluator failures and the <c>descriptor_missing</c> diagnostic the engine raises when a
     /// completed evaluation omits a configured archive descriptor and would otherwise be rejected silently.
     /// </remarks>
     public IReadOnlyList<EvolutionDiagnostic> RetainedFailures { get; }

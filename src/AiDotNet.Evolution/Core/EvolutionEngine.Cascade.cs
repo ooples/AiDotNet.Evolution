@@ -4,9 +4,6 @@ namespace AiDotNet.Evolution;
 
 public sealed partial class EvolutionEngine<TGenome>
 {
-    /// <summary>The largest diagnostic count one merged cascade result may carry, matching the task-result bound.</summary>
-    private const int MaximumCascadeDiagnostics = 64;
-
     /// <summary>The upper bound applied to a computed retry delay so a misconfigured backoff cannot stall a run.</summary>
     private static readonly TimeSpan MaximumRetryDelay = TimeSpan.FromMinutes(1);
 
@@ -28,6 +25,8 @@ public sealed partial class EvolutionEngine<TGenome>
         var metrics = new Dictionary<string, double>(StringComparer.Ordinal);
         var artifacts = new List<EvolutionArtifact>();
         var diagnostics = new List<EvolutionDiagnostic>();
+        IReadOnlyList<double> objectives = Array.Empty<double>();
+        IReadOnlyList<double> constraintViolations = Array.Empty<double>();
         double totalCost = 0;
         double quality = 0;
         EvolutionOptimizationDirection direction = _islands[0].Direction;
@@ -62,6 +61,8 @@ public sealed partial class EvolutionEngine<TGenome>
 
             quality = stageResult.Quality ?? 0;
             direction = stageResult.Direction;
+            objectives = stageResult.Objectives;
+            constraintViolations = stageResult.ConstraintViolations;
             if (stageIndex == stageCount - 1) break;
 
             double threshold = _options.Cascade.Thresholds[stageIndex];
@@ -80,7 +81,7 @@ public sealed partial class EvolutionEngine<TGenome>
 
         item.CascadeRejectedStage = null;
         return new EvolutionTaskResult(EvolutionEvaluationStatus.Completed, quality, direction, descriptors,
-            Array.Empty<double>(), Array.Empty<double>(), totalCost, diagnostics, metrics, BoundArtifacts(artifacts));
+            objectives, constraintViolations, totalCost, diagnostics, metrics, BoundArtifacts(artifacts));
     }
 
     /// <summary>Returns whether a stage's quality clears its gate in the stage's own optimization direction.</summary>
@@ -109,14 +110,14 @@ public sealed partial class EvolutionEngine<TGenome>
     /// <summary>Appends a diagnostic, replacing the last slot with a truncation marker once the public bound is reached.</summary>
     private static void AddCascadeDiagnostic(List<EvolutionDiagnostic> diagnostics, EvolutionDiagnostic diagnostic)
     {
-        if (diagnostics.Count < MaximumCascadeDiagnostics)
+        if (diagnostics.Count < EvolutionTaskResult.MaximumDiagnostics)
         {
             diagnostics.Add(diagnostic);
             return;
         }
-        if (diagnostics[MaximumCascadeDiagnostics - 1].Code != "diagnostics_truncated")
+        if (diagnostics[EvolutionTaskResult.MaximumDiagnostics - 1].Code != "diagnostics_truncated")
         {
-            diagnostics[MaximumCascadeDiagnostics - 1] = new EvolutionDiagnostic(
+            diagnostics[EvolutionTaskResult.MaximumDiagnostics - 1] = new EvolutionDiagnostic(
                 "diagnostics_truncated", "Additional cascade diagnostics were omitted to preserve the public bound.");
         }
     }
@@ -289,8 +290,9 @@ public sealed partial class EvolutionEngine<TGenome>
         _evaluationsSinceImprovement >= _options.EarlyStopping.PatienceEvaluations;
 
     /// <summary>
-    /// Computes the configured early-stopping metric across every island, normalized so that a larger value is always
-    /// better, including under minimization.
+    /// Reads the configured early-stopping metric, normalized so that a larger value is always better. Archive-wide
+    /// quality sums and named-metric extrema are maintained from exact insertion deltas, so this method is O(islands)
+    /// for coverage and O(1) for every other metric.
     /// </summary>
     private double? CurrentEarlyStoppingMetric()
     {
@@ -299,31 +301,14 @@ public sealed partial class EvolutionEngine<TGenome>
         // A named evaluator metric wins over the three built-in views of the search, because a run often plateaus
         // on something only the evaluator can see. Absent from every evaluation, it yields null and the run simply
         // never stops early, which is safer than treating "not reported" as "no progress".
-        if (_options.EarlyStopping.MetricName is { } watched)
+        if (_options.EarlyStopping.MetricName is not null)
         {
             // A named evaluator metric has its own direction, which has nothing to do with the archive's. Taking the
             // sign from the archive would negate a validation accuracy in a loss-minimising run, so a metric climbing
             // steadily would read as one falling steadily and stop the run exactly when it was working.
-            bool metricIsLowerBetter = _options.EarlyStopping.MetricIsLowerBetter;
-            double best = 0;
-            bool any = false;
-            foreach (IEvolutionArchive<TGenome> archive in _islands)
-            {
-                foreach (EvolutionArchiveEntry<TGenome> entry in archive.Entries)
-                {
-                    if (!entry.Evaluation.Metrics.TryGetValue(watched, out double value)) continue;
-                    if (!EvolutionDescriptorDefinition.IsFinite(value)) continue;
-
-                    double normalized = metricIsLowerBetter ? -value : value;
-                    if (!any || normalized > best)
-                    {
-                        best = normalized;
-                        any = true;
-                    }
-                }
-            }
-
-            return any ? best : (double?)null;
+            return _earlyStoppingArchiveValueCount == 0
+                ? (double?)null
+                : _earlyStoppingArchiveMetric;
         }
 
         switch (_options.EarlyStopping.Metric)
@@ -341,28 +326,146 @@ public sealed partial class EvolutionEngine<TGenome>
                     return total == 0 ? null : occupied / (double)total;
                 }
             case EvolutionEarlyStoppingMetric.QdScore:
-                {
-                    double score = 0;
-                    bool any = false;
-                    foreach (IEvolutionArchive<TGenome> archive in _islands)
-                    {
-                        foreach (EvolutionArchiveEntry<TGenome> entry in archive.Entries)
-                        {
-                            if (!entry.Evaluation.Quality.HasValue) continue;
-                            any = true;
-                            double contribution = maximize ? entry.Evaluation.Quality.Value : -entry.Evaluation.Quality.Value;
-                            if (contribution > double.MaxValue - score) return double.MaxValue;
-                            score += contribution;
-                        }
-                    }
-                    return any ? score : (double?)null;
-                }
+                return _earlyStoppingArchiveValueCount == 0
+                    ? (double?)null
+                    : _earlyStoppingArchiveMetric;
             default:
                 {
                     double? best = BestQualityAcrossIslands();
                     return best.HasValue ? (maximize ? best.Value : -best.Value) : (double?)null;
                 }
         }
+    }
+
+    /// <summary>Applies one built-in archive's exact delta to the active early-stopping aggregate.</summary>
+    private void ApplyEarlyStoppingArchiveMutation(EvolutionArchiveMutation<TGenome> mutation)
+    {
+        if (!UsesIncrementalEarlyStoppingArchiveMetric()) return;
+
+        // A saturated floating-point sum has discarded magnitude. Reconstructing from the already-mutated archive is
+        // the only correct way to discover whether a removal brought it back into range.
+        if (_options.EarlyStopping.MetricName is null &&
+            (_earlyStoppingArchiveMetric == double.MaxValue ||
+             _earlyStoppingArchiveMetric == -double.MaxValue))
+        {
+            RebuildEarlyStoppingArchiveMetric();
+            return;
+        }
+
+        foreach (EvolutionArchiveEntry<TGenome> removed in mutation.Removed)
+        {
+            if (!RemoveEarlyStoppingArchiveValue(removed.Evaluation))
+            {
+                RebuildEarlyStoppingArchiveMetric();
+                return;
+            }
+        }
+        if (mutation.Added is not null) AddEarlyStoppingArchiveValue(mutation.Added.Evaluation);
+    }
+
+    /// <summary>Rebuilds derived aggregate indexes for a custom archive or a checkpoint restore.</summary>
+    private void RebuildEarlyStoppingArchiveMetric()
+    {
+        _earlyStoppingArchiveMetric = 0;
+        _earlyStoppingArchiveValueCount = 0;
+        _earlyStoppingMetricValues?.Clear();
+        _earlyStoppingMetricValueCounts?.Clear();
+        if (!UsesIncrementalEarlyStoppingArchiveMetric()) return;
+
+        foreach (IEvolutionArchive<TGenome> archive in _islands)
+            foreach (EvolutionArchiveEntry<TGenome> entry in archive.Entries)
+                AddEarlyStoppingArchiveValue(entry.Evaluation);
+    }
+
+    private bool UsesIncrementalEarlyStoppingArchiveMetric() =>
+        _options.EarlyStopping.PatienceEvaluations > 0 &&
+        (_options.EarlyStopping.MetricName is not null ||
+         _options.EarlyStopping.Metric == EvolutionEarlyStoppingMetric.QdScore);
+
+    /// <summary>Adds one archived evaluation to the configured aggregate.</summary>
+    private void AddEarlyStoppingArchiveValue(EvolutionEvaluation evaluation)
+    {
+        if (_options.EarlyStopping.MetricName is { } watched)
+        {
+            if (!evaluation.Metrics.TryGetValue(watched, out double value) ||
+                !EvolutionDescriptorDefinition.IsFinite(value))
+            {
+                return;
+            }
+            double normalized = _options.EarlyStopping.MetricIsLowerBetter ? -value : value;
+            if (normalized == 0) normalized = 0;
+            SortedSet<double> values = _earlyStoppingMetricValues
+                ?? throw new InvalidOperationException("The named-metric aggregate was not initialized.");
+            Dictionary<double, long> counts = _earlyStoppingMetricValueCounts
+                ?? throw new InvalidOperationException("The named-metric counts were not initialized.");
+            counts.TryGetValue(normalized, out long count);
+            counts[normalized] = checked(count + 1);
+            values.Add(normalized);
+            _earlyStoppingArchiveValueCount = checked(_earlyStoppingArchiveValueCount + 1);
+            _earlyStoppingArchiveMetric = values.Max;
+            return;
+        }
+
+        if (!evaluation.Quality.HasValue) return;
+        bool maximize = _islands[0].Direction == EvolutionOptimizationDirection.Maximize;
+        double contribution = maximize ? evaluation.Quality.Value : -evaluation.Quality.Value;
+        if (contribution == 0) contribution = 0;
+        _earlyStoppingArchiveMetric = SaturatingAdd(_earlyStoppingArchiveMetric, contribution);
+        _earlyStoppingArchiveValueCount = checked(_earlyStoppingArchiveValueCount + 1);
+    }
+
+    /// <summary>Removes one displaced evaluation, returning false if a custom delta violated aggregate ownership.</summary>
+    private bool RemoveEarlyStoppingArchiveValue(EvolutionEvaluation evaluation)
+    {
+        if (_options.EarlyStopping.MetricName is { } watched)
+        {
+            if (!evaluation.Metrics.TryGetValue(watched, out double value) ||
+                !EvolutionDescriptorDefinition.IsFinite(value))
+            {
+                return true;
+            }
+            double normalized = _options.EarlyStopping.MetricIsLowerBetter ? -value : value;
+            if (normalized == 0) normalized = 0;
+            SortedSet<double> values = _earlyStoppingMetricValues
+                ?? throw new InvalidOperationException("The named-metric aggregate was not initialized.");
+            Dictionary<double, long> counts = _earlyStoppingMetricValueCounts
+                ?? throw new InvalidOperationException("The named-metric counts were not initialized.");
+            if (!counts.TryGetValue(normalized, out long count) || count <= 0 ||
+                _earlyStoppingArchiveValueCount <= 0)
+            {
+                return false;
+            }
+            if (count == 1)
+            {
+                counts.Remove(normalized);
+                values.Remove(normalized);
+            }
+            else
+            {
+                counts[normalized] = count - 1;
+            }
+            _earlyStoppingArchiveValueCount--;
+            _earlyStoppingArchiveMetric = values.Count == 0 ? 0 : values.Max;
+            return true;
+        }
+
+        if (!evaluation.Quality.HasValue) return true;
+        if (_earlyStoppingArchiveValueCount <= 0) return false;
+        bool maximize = _islands[0].Direction == EvolutionOptimizationDirection.Maximize;
+        double contribution = maximize ? evaluation.Quality.Value : -evaluation.Quality.Value;
+        if (contribution == 0) contribution = 0;
+        _earlyStoppingArchiveMetric = SaturatingAdd(_earlyStoppingArchiveMetric, -contribution);
+        _earlyStoppingArchiveValueCount--;
+        if (_earlyStoppingArchiveValueCount == 0) _earlyStoppingArchiveMetric = 0;
+        return true;
+    }
+
+    private static double SaturatingAdd(double left, double right)
+    {
+        double sum = left + right;
+        if (double.IsPositiveInfinity(sum)) return double.MaxValue;
+        if (double.IsNegativeInfinity(sum)) return -double.MaxValue;
+        return sum;
     }
 
     /// <summary>Returns the deterministic pause applied before a retry round, or zero when backoff is disabled.</summary>

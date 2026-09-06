@@ -39,6 +39,9 @@ public sealed class EvolutionTraceOptions
     /// <summary>The largest value <see cref="FlushEveryRecords"/> may take.</summary>
     public const int MaximumFlushEveryRecords = 100_000;
 
+    /// <summary>The largest number of distinct metric names retained by a live trace summary.</summary>
+    public const int MaximumTrackedMetricCount = 4096;
+
     /// <summary>Gets or sets whether the observer writes anything at all; <c>false</c>, the default, disables tracing.</summary>
     public bool Enabled { get; set; }
 
@@ -74,6 +77,9 @@ public sealed class EvolutionTraceOptions
     /// <summary>Gets or sets the maximum number of records written; the default is one million.</summary>
     public long MaxRecords { get; set; } = 1_000_000L;
 
+    /// <summary>Gets or sets the maximum number of distinct metric names retained in live delta summaries.</summary>
+    public int MaxTrackedMetrics { get; set; } = 1024;
+
     /// <summary>Gets or sets whether behaviour descriptors and the archive cell are recorded.</summary>
     public bool IncludeDescriptors { get; set; } = true;
 
@@ -97,7 +103,7 @@ public sealed class EvolutionTraceOptions
     /// <exception cref="ArgumentOutOfRangeException">
     /// <see cref="Format"/> is undefined, <see cref="FlushEveryRecords"/> is outside one to
     /// <see cref="MaximumFlushEveryRecords"/>, <see cref="MaxBytes"/> or <see cref="MaxRecords"/> is not positive, or
-    /// <see cref="ParentQualityCacheSize"/> is negative.
+    /// <see cref="MaxTrackedMetrics"/> is not positive, or <see cref="ParentQualityCacheSize"/> is negative.
     /// </exception>
     public EvolutionTraceOptions SnapshotAndValidate()
     {
@@ -111,6 +117,8 @@ public sealed class EvolutionTraceOptions
                 $"The flush interval must be between 1 and {MaximumFlushEveryRecords} records.");
         if (MaxBytes <= 0) throw new ArgumentOutOfRangeException(nameof(MaxBytes));
         if (MaxRecords <= 0) throw new ArgumentOutOfRangeException(nameof(MaxRecords));
+        if (MaxTrackedMetrics <= 0 || MaxTrackedMetrics > MaximumTrackedMetricCount)
+            throw new ArgumentOutOfRangeException(nameof(MaxTrackedMetrics));
         if (ParentQualityCacheSize < 0) throw new ArgumentOutOfRangeException(nameof(ParentQualityCacheSize));
 
         return new EvolutionTraceOptions
@@ -122,6 +130,7 @@ public sealed class EvolutionTraceOptions
             FlushEveryRecords = FlushEveryRecords,
             MaxBytes = MaxBytes,
             MaxRecords = MaxRecords,
+            MaxTrackedMetrics = MaxTrackedMetrics,
             IncludeDescriptors = IncludeDescriptors,
             IncludeLineage = IncludeLineage,
             IncludeDiagnostics = IncludeDiagnostics,
@@ -144,6 +153,7 @@ public sealed class EvolutionTraceOptions
         FlushEveryRecords.ToString(CultureInfo.InvariantCulture),
         MaxBytes.ToString(CultureInfo.InvariantCulture),
         MaxRecords.ToString(CultureInfo.InvariantCulture),
+        MaxTrackedMetrics.ToString(CultureInfo.InvariantCulture),
         IncludeDescriptors ? "descriptors" : "no-descriptors",
         IncludeLineage ? "lineage" : "no-lineage",
         IncludeDiagnostics ? "diagnostics" : "no-diagnostics",

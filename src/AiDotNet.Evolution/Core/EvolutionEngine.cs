@@ -74,6 +74,10 @@ public sealed partial class EvolutionEngine<TGenome>
     private readonly string _configurationHash;
     private readonly string _compatibilityHash;
     private double? _earlyStoppingBest;
+    private double _earlyStoppingArchiveMetric;
+    private long _earlyStoppingArchiveValueCount;
+    private readonly SortedSet<double>? _earlyStoppingMetricValues;
+    private readonly Dictionary<double, long>? _earlyStoppingMetricValueCounts;
     private long _evaluationsSinceImprovement;
     private long _abandonedEvaluations;
     private long _nextEvaluationId;
@@ -138,6 +142,12 @@ public sealed partial class EvolutionEngine<TGenome>
         ValidateComponent(variation.Id, variation.VersionHash, nameof(variation));
 
         _options = options.SnapshotAndValidate();
+        if (_options.EarlyStopping.PatienceEvaluations > 0 &&
+            _options.EarlyStopping.MetricName is not null)
+        {
+            _earlyStoppingMetricValues = new SortedSet<double>();
+            _earlyStoppingMetricValueCounts = new Dictionary<double, long>();
+        }
         _task = task;
         _variation = variation;
         _selection = selection ?? CreateSelectionPolicy(_options);
@@ -352,6 +362,7 @@ public sealed partial class EvolutionEngine<TGenome>
 
             BatchTransaction transaction = CaptureBatchTransaction();
             var batch = new List<WorkItem>(Math.Min(_options.ProposalBatchSize, 1024));
+            int evaluationsRequired = 0;
             try
             {
                 while (batch.Count < _options.ProposalBatchSize)
@@ -372,8 +383,12 @@ public sealed partial class EvolutionEngine<TGenome>
                         if (prepared is null) break;
                     }
 
-                    if (prepared is not null) batch.Add(prepared.Item);
-                    if (_evaluationAttempts + batch.Count(item => item.RequiresEvaluation) >= _options.MaxEvaluationAttempts)
+                    if (prepared is not null)
+                    {
+                        batch.Add(prepared.Item);
+                        if (prepared.Item.RequiresEvaluation) evaluationsRequired++;
+                    }
+                    if (_evaluationAttempts + evaluationsRequired >= _options.MaxEvaluationAttempts)
                         break;
                 }
 
@@ -441,6 +456,8 @@ public sealed partial class EvolutionEngine<TGenome>
         {
             while (enumerator.MoveNext())
             {
+                if (result.Count >= EvolutionCollectionLimits.MaximumResultEntries)
+                    throw new ArgumentException("Initial seed count exceeds the package safety bound.", nameof(initialGenomes));
                 if (!_options.Resume && result.Count >= _options.MaxProposals)
                     throw new ArgumentException("Initial seed count exceeds MaxProposals.", nameof(initialGenomes));
                 if (enumerator.Current is null) throw new ArgumentException("Initial genomes cannot contain null values.", nameof(initialGenomes));
@@ -592,6 +609,8 @@ public sealed partial class EvolutionEngine<TGenome>
         public long[] IslandGenerations { get; set; } = Array.Empty<long>();
         public EvolutionDiagnostic[] Failures { get; set; } = Array.Empty<EvolutionDiagnostic>();
         public double? EarlyStoppingBest { get; set; }
+        public double EarlyStoppingArchiveMetric { get; set; }
+        public long EarlyStoppingArchiveValueCount { get; set; }
         public long EvaluationsSinceImprovement { get; set; }
         public List<string> PendingArtifactOrder { get; set; } = new();
         public Dictionary<string, EvolutionArtifact[]> PendingArtifacts { get; set; } = new(StringComparer.Ordinal);
@@ -608,6 +627,8 @@ public sealed partial class EvolutionEngine<TGenome>
         IslandGenerations = (long[])_islandGenerations.Clone(),
         Failures = _failures.ToArray(),
         EarlyStoppingBest = _earlyStoppingBest,
+        EarlyStoppingArchiveMetric = _earlyStoppingArchiveMetric,
+        EarlyStoppingArchiveValueCount = _earlyStoppingArchiveValueCount,
         EvaluationsSinceImprovement = _evaluationsSinceImprovement,
         PendingArtifactOrder = new List<string>(_pendingArtifactOrder),
         PendingArtifacts = new Dictionary<string, EvolutionArtifact[]>(_pendingArtifacts, StringComparer.Ordinal)
@@ -627,6 +648,8 @@ public sealed partial class EvolutionEngine<TGenome>
         _failures.Clear();
         foreach (EvolutionDiagnostic failure in transaction.Failures) _failures.Enqueue(failure);
         _earlyStoppingBest = transaction.EarlyStoppingBest;
+        _earlyStoppingArchiveMetric = transaction.EarlyStoppingArchiveMetric;
+        _earlyStoppingArchiveValueCount = transaction.EarlyStoppingArchiveValueCount;
         _evaluationsSinceImprovement = transaction.EvaluationsSinceImprovement;
         _pendingArtifactOrder.Clear();
         _pendingArtifactOrder.AddRange(transaction.PendingArtifactOrder);

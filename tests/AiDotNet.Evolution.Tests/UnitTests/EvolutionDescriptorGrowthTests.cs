@@ -119,8 +119,7 @@ public sealed class EvolutionDescriptorGrowthTests
         Add(grown, 3, "c", 3, 1.5);
 
         MapElitesArchive<TestGenome> restored = GrowingArchive();
-        restored.RestoreDescriptorBounds(grown.Descriptors);
-        restored.Restore(grown.Entries.ToArray(), grown.Version);
+        restored.Restore(grown.Entries.ToArray(), grown.Descriptors, grown.Version);
 
         Assert.Equal(grown.TotalGridCells, restored.TotalGridCells);
         Assert.Equal(grown.Version, restored.Version);

@@ -142,18 +142,26 @@ public sealed partial class EvolutionEngine<TGenome>
     /// </remarks>
     private void RollbackInFlight(ContinuousState state)
     {
+        long? lowestInFlightId = null;
         foreach (WorkItem item in state.InFlight)
         {
+            lowestInFlightId = lowestInFlightId.HasValue
+                ? Math.Min(lowestInFlightId.Value, item.EvaluationId)
+                : item.EvaluationId;
             if (item.AddedToSeen && item.Candidate is not null) _seen.Remove(item.Candidate.CanonicalGenome.Id);
             _evaluationAttempts -= item.ChargedAttempts;
             _proposals--;
-            _nextEvaluationId--;
             if (item.IsSeed) continue;
 
             _generation--;
             if (item.Island >= 0 && item.Island < _islandGenerations.Length) _islandGenerations[item.Island]--;
         }
 
+        // Deterministic dispatch commits in identifier order, so every rolled-back id is above every committed id and
+        // the contiguous suffix can be reused. Completion-ordered dispatch may already have committed higher ids;
+        // retaining its allocation cursor prevents those identities and their random streams from being reused.
+        if (_options.ExecutionMode == EvolutionExecutionMode.Deterministic && lowestInFlightId.HasValue)
+            _nextEvaluationId = lowestInFlightId.Value;
         state.InFlight.Clear();
     }
 
@@ -246,12 +254,14 @@ public sealed partial class EvolutionEngine<TGenome>
         foreach (WorkItem item in ordered)
             if (state.Running.ContainsKey(item.EvaluationId)) perIsland[item.Island]++;
 
-        bool first = true;
+        long? oldestPendingId = ordered
+            .Where(item => item.RequiresEvaluation && !state.Running.ContainsKey(item.EvaluationId))
+            .Select(item => (long?)item.EvaluationId)
+            .FirstOrDefault();
         foreach (WorkItem item in ordered)
         {
-            bool isOldest = first;
-            first = false;
             if (!item.RequiresEvaluation || state.Running.ContainsKey(item.EvaluationId)) continue;
+            bool isOldest = oldestPendingId == item.EvaluationId;
 
             if (_evaluationAttempts >= _options.MaxEvaluationAttempts)
             {

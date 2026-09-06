@@ -77,7 +77,7 @@ public sealed class TopologyMigrationPolicy<TGenome> : IMigrationPolicy<TGenome>
         {
             "topology-best-v1",
             ((int)topology).ToString(CultureInfo.InvariantCulture),
-            migrationRate.ToString("R", CultureInfo.InvariantCulture),
+            EvolutionHash.EncodeDouble(migrationRate),
             preventRepeatedMigration ? "no-remigration" : "remigration"
         });
     }
@@ -165,9 +165,12 @@ public sealed class TopologyMigrationPolicy<TGenome> : IMigrationPolicy<TGenome>
                 for (int destination = 0; destination < islandCount; destination++)
                     AddDestination(destinations, destination, source);
                 break;
-            default:
+            case EvolutionMigrationTopology.Ring:
                 AddDestination(destinations, (source + 1) % islandCount, source);
                 break;
+            default:
+                throw new ArgumentOutOfRangeException(nameof(topology),
+                    "The topology is defined but not handled by this policy.");
         }
         destinations.Sort();
         return destinations;
@@ -203,12 +206,9 @@ public sealed class TopologyMigrationPolicy<TGenome> : IMigrationPolicy<TGenome>
             : archive.Entries;
         EvolutionArchiveEntry<TGenome>[] candidates = eligible.ToArray();
         if (candidates.Length == 0) return Array.Empty<EvolutionArchiveEntry<TGenome>>();
-        IOrderedEnumerable<EvolutionArchiveEntry<TGenome>> ordered =
-            archive.Direction == EvolutionOptimizationDirection.Maximize
-                ? candidates.OrderByDescending(entry => entry.Evaluation.Quality)
-                    .ThenBy(entry => entry.Evaluation.GenomeId, StringComparer.Ordinal)
-                : candidates.OrderBy(entry => entry.Evaluation.Quality)
-                    .ThenBy(entry => entry.Evaluation.GenomeId, StringComparer.Ordinal);
+        IOrderedEnumerable<EvolutionArchiveEntry<TGenome>> ordered = candidates.OrderBy(
+            entry => entry,
+            EvolutionEntryOrdering.BestFirst<TGenome>(archive.Direction));
         return ordered.Take(ResolveMigrantCount(candidates.Length, migrantsPerIsland, MigrationRate));
     }
 

@@ -41,11 +41,8 @@ public sealed class DoubleEvolutionSelectionPolicy<TGenome> : ISelectionPolicy<T
         if (inspirationCount < 0) throw new ArgumentOutOfRangeException(nameof(inspirationCount));
         EvolutionArchiveEntry<TGenome>? parent = archive.Sample(random);
         if (parent is null) return null;
-        IOrderedEnumerable<EvolutionArchiveEntry<TGenome>> ranked = archive.Direction == EvolutionOptimizationDirection.Maximize
-            ? archive.Entries.OrderByDescending(entry => entry.Evaluation.Quality)
-            : archive.Entries.OrderBy(entry => entry.Evaluation.Quality);
-        EvolutionArchiveEntry<TGenome>[] inspirations = ranked
-            .ThenBy(entry => entry.Evaluation.GenomeId, StringComparer.Ordinal)
+        EvolutionArchiveEntry<TGenome>[] inspirations = archive.Entries
+            .OrderBy(entry => entry, EvolutionEntryOrdering.BestFirst<TGenome>(archive.Direction))
             .Where(entry => entry.Evaluation.GenomeId != parent.Evaluation.GenomeId)
             .Take(inspirationCount)
             .ToArray();

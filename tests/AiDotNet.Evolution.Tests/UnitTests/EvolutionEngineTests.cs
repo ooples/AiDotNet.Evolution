@@ -263,7 +263,7 @@ public sealed class EvolutionEngineTests
         EvolutionCheckpoint original = Assert.IsType<EvolutionCheckpoint>(
             await originalStore.LoadLatestAsync(initialOptions.RunId));
         JsonObject payload = Assert.IsType<JsonObject>(JsonNode.Parse(original.Payload));
-        payload["NextEvaluationId"] = original.Sequence + 100;
+        payload["NextEvaluationId"] = 0;
 
         var corruptStore = new InMemoryEvolutionCheckpointStore();
         await corruptStore.SaveAsync(new EvolutionCheckpoint(original.RunId, original.Sequence,

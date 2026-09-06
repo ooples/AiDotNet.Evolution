@@ -37,7 +37,9 @@ namespace AiDotNet.Evolution;
 /// restoration, so a checkpoint is only restored into an archive with identical semantics.
 /// </para>
 /// </remarks>
-public sealed class MapElitesArchive<TGenome> : IGrowableEvolutionArchive<TGenome>
+public sealed class MapElitesArchive<TGenome> :
+    IGrowableEvolutionArchive<TGenome>,
+    IEvolutionArchiveMutationSource<TGenome>
 {
     private readonly EvolutionDescriptorDefinition[] _descriptors;
     private readonly EvolutionDescriptorDefinition[] _configuredDescriptors;
@@ -76,7 +78,10 @@ public sealed class MapElitesArchive<TGenome> : IGrowableEvolutionArchive<TGenom
         if (capacity < 0) throw new ArgumentOutOfRangeException(nameof(capacity));
         if (maximumGridCells <= 0) throw new ArgumentOutOfRangeException(nameof(maximumGridCells));
 
-        _descriptors = descriptors.ToArray();
+        _descriptors = EvolutionCollection.ToBoundedArray(
+            descriptors,
+            EvolutionCollectionLimits.MaximumArchiveDimensions,
+            nameof(descriptors));
         if (_descriptors.Length == 0) throw new ArgumentException("At least one descriptor is required.", nameof(descriptors));
         if (_descriptors.Any(item => item is null)) throw new ArgumentException("Descriptors cannot contain null entries.", nameof(descriptors));
         if (_descriptors.Select(item => item.Name).Distinct(StringComparer.Ordinal).Count() != _descriptors.Length)
@@ -176,6 +181,16 @@ public sealed class MapElitesArchive<TGenome> : IGrowableEvolutionArchive<TGenom
 
     /// <inheritdoc/>
     public EvolutionArchiveInsertionResult TryAdd(EvolutionCandidate<TGenome> candidate, EvolutionEvaluation evaluation)
+        => TryAddWithMutation(candidate, evaluation).Result;
+
+    /// <summary>Attempts insertion and reports the exact aggregate delta to the owning engine.</summary>
+    EvolutionArchiveMutation<TGenome> IEvolutionArchiveMutationSource<TGenome>.TryAddWithMutation(
+        EvolutionCandidate<TGenome> candidate,
+        EvolutionEvaluation evaluation) => TryAddWithMutation(candidate, evaluation);
+
+    private EvolutionArchiveMutation<TGenome> TryAddWithMutation(
+        EvolutionCandidate<TGenome> candidate,
+        EvolutionEvaluation evaluation)
     {
         Guard.NotNull(candidate);
         Guard.NotNull(evaluation);
@@ -183,24 +198,26 @@ public sealed class MapElitesArchive<TGenome> : IGrowableEvolutionArchive<TGenom
             evaluation.Direction != Direction || candidate.EvaluationId != evaluation.EvaluationId ||
             candidate.CanonicalGenome.Id != evaluation.GenomeId)
         {
-            return EvolutionArchiveInsertionResult.Rejected;
+            return Mutation(EvolutionArchiveInsertionResult.Rejected);
         }
 
         // A Grow axis reports a value outside its range as unbinnable, which is the archive's cue to widen rather
         // than discard. Growth happens before keying so the candidate and every incumbent share one grid.
-        GrowToFit(evaluation.Descriptors);
+        List<EvolutionArchiveEntry<TGenome>>? removed = GrowToFit(evaluation.Descriptors);
 
         EvolutionCellKey? key = TryCreateKey(evaluation.Descriptors);
-        if (key is null) return EvolutionArchiveInsertionResult.Rejected;
+        if (key is null) return Mutation(EvolutionArchiveInsertionResult.Rejected, removed: removed);
 
         var candidateEntry = new EvolutionArchiveEntry<TGenome>(key, candidate, evaluation);
         if (_cells.TryGetValue(key.StableKey, out EvolutionArchiveEntry<TGenome>? incumbent))
         {
-            if (Comparer.Compare(candidateEntry, incumbent) >= 0) return EvolutionArchiveInsertionResult.NotImproved;
+            if (Comparer.Compare(candidateEntry, incumbent) >= 0)
+                return Mutation(EvolutionArchiveInsertionResult.NotImproved, removed: removed);
             _cells[key.StableKey] = candidateEntry;
+            AddRemoved(ref removed, incumbent);
             PromoteIfBest(candidateEntry);
             Version++;
-            return EvolutionArchiveInsertionResult.Replaced;
+            return Mutation(EvolutionArchiveInsertionResult.Replaced, candidateEntry, removed);
         }
 
         if (_cells.Count < Capacity)
@@ -208,17 +225,35 @@ public sealed class MapElitesArchive<TGenome> : IGrowableEvolutionArchive<TGenom
             _cells.Add(key.StableKey, candidateEntry);
             PromoteIfBest(candidateEntry);
             Version++;
-            return EvolutionArchiveInsertionResult.Inserted;
+            return Mutation(EvolutionArchiveInsertionResult.Inserted, candidateEntry, removed);
         }
 
-        EvolutionArchiveEntry<TGenome> worst = _cells.Values.OrderByDescending(entry => entry, Comparer).First();
-        if (Comparer.Compare(candidateEntry, worst) >= 0) return EvolutionArchiveInsertionResult.NotImproved;
+        EvolutionArchiveEntry<TGenome> worst = _cells.Values.First();
+        foreach (EvolutionArchiveEntry<TGenome> entry in _cells.Values)
+            if (Comparer.Compare(entry, worst) > 0) worst = entry;
+        if (Comparer.Compare(candidateEntry, worst) >= 0)
+            return Mutation(EvolutionArchiveInsertionResult.NotImproved, removed: removed);
         _cells.Remove(worst.Cell.StableKey);
         _cells.Add(key.StableKey, candidateEntry);
+        AddRemoved(ref removed, worst);
         if (ReferenceEquals(_best, worst)) _best = null;
         PromoteIfBest(candidateEntry);
         Version++;
-        return EvolutionArchiveInsertionResult.InsertedWithEviction;
+        return Mutation(EvolutionArchiveInsertionResult.InsertedWithEviction, candidateEntry, removed);
+    }
+
+    private static EvolutionArchiveMutation<TGenome> Mutation(
+        EvolutionArchiveInsertionResult result,
+        EvolutionArchiveEntry<TGenome>? added = null,
+        IReadOnlyList<EvolutionArchiveEntry<TGenome>>? removed = null) =>
+        new(result, added, removed ?? Array.Empty<EvolutionArchiveEntry<TGenome>>());
+
+    private static void AddRemoved(
+        ref List<EvolutionArchiveEntry<TGenome>>? removed,
+        EvolutionArchiveEntry<TGenome> entry)
+    {
+        removed ??= new List<EvolutionArchiveEntry<TGenome>>();
+        removed.Add(entry);
     }
 
     /// <inheritdoc/>
@@ -233,7 +268,8 @@ public sealed class MapElitesArchive<TGenome> : IGrowableEvolutionArchive<TGenom
     {
         Guard.NotNull(random);
         if (_cells.Count == 0) return null;
-        return _cells.Values.ElementAt(random.NextInt(_cells.Count));
+        IReadOnlyList<EvolutionArchiveEntry<TGenome>> entries = Entries;
+        return entries[random.NextInt(entries.Count)];
     }
 
     /// <summary>Widens any Grow axis that cannot bin the supplied values, then rebins existing entries.</summary>
@@ -246,9 +282,9 @@ public sealed class MapElitesArchive<TGenome> : IGrowableEvolutionArchive<TGenom
     /// indices. Growth that would breach the grid safety limit is declined, in which case the candidate is simply not
     /// archived, exactly as Reject would have behaved.
     /// </remarks>
-    private void GrowToFit(IReadOnlyDictionary<string, double> descriptors)
+    private List<EvolutionArchiveEntry<TGenome>>? GrowToFit(IReadOnlyDictionary<string, double> descriptors)
     {
-        if (!_hasGrowAxis) return;
+        if (!_hasGrowAxis) return null;
 
         // Nothing is widened for a candidate that cannot be archived anyway. Growing first and discovering a second
         // axis rejects it would leave the grid permanently larger for a candidate that never entered it, which
@@ -257,10 +293,11 @@ public sealed class MapElitesArchive<TGenome> : IGrowableEvolutionArchive<TGenom
         {
             if (definition.OutOfRangePolicy == EvolutionOutOfRangePolicy.Grow) continue;
             if (!descriptors.TryGetValue(definition.Name, out double other) || !definition.TryGetBin(other, out _))
-                return;
+                return null;
         }
 
-        bool grew = false;
+        var proposed = (EvolutionDescriptorDefinition[])_descriptors.Clone();
+        int growthCount = 0;
 
         for (int axis = 0; axis < _descriptors.Length; axis++)
         {
@@ -279,24 +316,30 @@ public sealed class MapElitesArchive<TGenome> : IGrowableEvolutionArchive<TGenom
             // has to be able to bin the value before it is adopted.
             if (!widened.TryGetBinIgnoringPolicy(value, out _)) continue;
 
-            long projected = 1;
-            bool safe = true;
-            for (int i = 0; i < _descriptors.Length && safe; i++)
-            {
-                long bins = i == axis ? widened.EffectiveBinCount : _descriptors[i].EffectiveBinCount;
-                if (bins != 0 && projected > _maximumGridCells / bins) safe = false;
-                else projected *= bins;
-            }
-
-            if (!safe) continue;
-
-            _descriptors[axis] = widened;
-            TotalGridCells = projected;
-            grew = true;
-            Version++;
+            proposed[axis] = widened;
+            growthCount++;
         }
 
-        if (grew) RebinEntries();
+        if (growthCount == 0) return null;
+
+        long projected = 1;
+        foreach (EvolutionDescriptorDefinition definition in proposed)
+        {
+            long bins = definition.EffectiveBinCount;
+            if (bins != 0 && projected > _maximumGridCells / bins)
+            {
+                // Growth is one transaction. A candidate that cannot fit all widened axes must not permanently
+                // change a subset of them or re-key incumbents it never competes with.
+                return null;
+            }
+            projected *= bins;
+        }
+
+        long grownVersion = checked(Version + growthCount);
+        Array.Copy(proposed, _descriptors, proposed.Length);
+        TotalGridCells = projected;
+        Version = grownVersion;
+        return RebinEntries();
     }
 
     /// <summary>Recomputes every entry's cell against the current descriptor definitions.</summary>
@@ -306,9 +349,9 @@ public sealed class MapElitesArchive<TGenome> : IGrowableEvolutionArchive<TGenom
     /// one cell, which is resolved the same way an ordinary insertion would resolve it, by keeping the better of the
     /// two under the archive's total ordering, so the outcome does not depend on iteration order.
     /// </remarks>
-    private void RebinEntries()
+    private List<EvolutionArchiveEntry<TGenome>>? RebinEntries()
     {
-        if (_cells.Count == 0) return;
+        if (_cells.Count == 0) return null;
 
         var rebinned = new List<EvolutionArchiveEntry<TGenome>>(_cells.Count);
         foreach (EvolutionArchiveEntry<TGenome> entry in _cells.Values)
@@ -320,25 +363,30 @@ public sealed class MapElitesArchive<TGenome> : IGrowableEvolutionArchive<TGenom
         }
 
         _cells.Clear();
+        List<EvolutionArchiveEntry<TGenome>>? removed = null;
         foreach (EvolutionArchiveEntry<TGenome> entry in rebinned)
         {
             if (_cells.TryGetValue(entry.Cell.StableKey, out EvolutionArchiveEntry<TGenome>? incumbent) &&
                 Comparer.Compare(entry, incumbent) >= 0)
             {
+                AddRemoved(ref removed, entry);
                 continue;
             }
+            if (incumbent is not null) AddRemoved(ref removed, incumbent);
             _cells[entry.Cell.StableKey] = entry;
         }
 
         // The retained entries are new objects, so the cached best reference has to be rebuilt rather than kept.
         _best = null;
         foreach (EvolutionArchiveEntry<TGenome> entry in _cells.Values) PromoteIfBest(entry);
+        return removed;
     }
 
     /// <summary>Re-measures every elite against a new descriptor reading and re-files the whole archive.</summary>
     /// <param name="measure">
     /// Produces replacement descriptor values for one elite; returning <see langword="null"/> keeps its existing
-    /// values. The callback must not mutate this archive.
+    /// values. The callback must not mutate this archive or the genome it receives. All archive genomes satisfy the
+    /// immutable-genome contract, so the callback may safely inspect but never alter their reachable state.
     /// </param>
     /// <returns>How many elites remain after deterministic collision resolution.</returns>
     /// <remarks>
@@ -418,23 +466,53 @@ public sealed class MapElitesArchive<TGenome> : IGrowableEvolutionArchive<TGenom
     }
 
     /// <inheritdoc/>
-    public void Restore(IReadOnlyList<EvolutionArchiveEntry<TGenome>> entries, long version)
+    public void Restore(
+        IReadOnlyList<EvolutionArchiveEntry<TGenome>> entries,
+        IReadOnlyList<EvolutionDescriptorDefinition> descriptors,
+        long version)
     {
         Guard.NotNull(entries);
+        Guard.NotNull(descriptors);
         if (_cells.Count != 0 || Version != 0) throw new InvalidOperationException("Only an empty archive can be restored.");
-        foreach (EvolutionArchiveEntry<TGenome> entry in entries.OrderBy(item => item.Cell.StableKey, StringComparer.Ordinal))
+        EvolutionArchiveEntry<TGenome>[] entrySnapshot = EvolutionCollection.CopyBounded(
+            entries,
+            EvolutionCollectionLimits.MaximumResultEntries,
+            nameof(entries));
+        EvolutionDescriptorDefinition[] descriptorSnapshot = EvolutionCollection.CopyBounded(
+            descriptors,
+            EvolutionCollectionLimits.MaximumArchiveDimensions,
+            nameof(descriptors));
+        if (version < entrySnapshot.Length) throw new ArgumentOutOfRangeException(nameof(version));
+
+        // Restore into an isolated archive first. A corrupt checkpoint must not leave this instance partly populated
+        // or with adopted bounds after throwing, because callers may safely fall back to an older snapshot.
+        var staged = new MapElitesArchive<TGenome>(
+            _configuredDescriptors,
+            Direction,
+            _capacityFollowsGrid ? 0 : _capacity,
+            _maximumGridCells);
+        staged.RestoreDescriptorBounds(descriptorSnapshot);
+        foreach (EvolutionArchiveEntry<TGenome> entry in entrySnapshot.OrderBy(item => item.Cell.StableKey, StringComparer.Ordinal))
         {
             // Only a plain insertion is legal during a restore. An eviction would mean the checkpoint holds more
             // elites than this archive's capacity allows, and silently dropping one of them would resume a run that
             // is quietly missing part of what it had found.
-            EvolutionArchiveInsertionResult result = TryAdd(entry.Candidate, entry.Evaluation);
+            EvolutionArchiveInsertionResult result = staged.TryAdd(entry.Candidate, entry.Evaluation);
             if (result != EvolutionArchiveInsertionResult.Inserted)
                 throw new InvalidDataException(
                     "The archive checkpoint contains an invalid or conflicting elite, or more elites than the " +
                     "configured capacity holds.");
         }
-        if (version < Version) throw new ArgumentOutOfRangeException(nameof(version));
+        if (version < staged.Version) throw new ArgumentOutOfRangeException(nameof(version));
+
+        Array.Copy(staged._descriptors, _descriptors, _descriptors.Length);
+        TotalGridCells = staged.TotalGridCells;
+        foreach (KeyValuePair<string, EvolutionArchiveEntry<TGenome>> cell in staged._cells)
+            _cells.Add(cell.Key, cell.Value);
+        _best = staged._best;
         Version = version;
+        _entries = null;
+        _entriesVersion = -1;
     }
 
     /// <inheritdoc/>

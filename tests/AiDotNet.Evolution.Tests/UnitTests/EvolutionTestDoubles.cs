@@ -3,7 +3,7 @@ using AiDotNet.Evolution;
 
 namespace AiDotNet.Evolution.Tests;
 
-internal sealed class TestGenome
+internal sealed class TestGenome : IImmutableEvolutionGenome
 {
     public TestGenome(int value) => Value = value;
     public int Value { get; }

@@ -71,6 +71,8 @@ public sealed class EvolutionArtifactOptions
         if (MaxArtifactsPerEvaluation > EvolutionTaskResult.MaximumArtifacts)
             throw new ArgumentOutOfRangeException(nameof(MaxArtifactsPerEvaluation),
                 $"At most {EvolutionTaskResult.MaximumArtifacts} artifacts may be attached to one evaluation.");
+        if (MaxPendingCandidates > EvolutionCollectionLimits.MaximumResultEntries)
+            throw new ArgumentOutOfRangeException(nameof(MaxPendingCandidates));
 
         return new EvolutionArtifactOptions
         {

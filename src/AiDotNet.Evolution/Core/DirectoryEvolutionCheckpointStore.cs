@@ -22,7 +22,9 @@ namespace AiDotNet.Evolution;
 /// failed, so a damaged file is visible instead of silently missing. After each successful save, retention deletes the
 /// snapshots outside both configured quotas; it never deletes the newest valid snapshot, the best-quality one, or any
 /// file it could not read. Both the listing and retention verify each remaining snapshot, so their cost is one read per
-/// retained file and retention is what keeps that number small.
+/// retained file and retention is what keeps that number small. Saves acquire a lock file for the complete
+/// read-validate-write-retain transaction, so separate store instances and processes cannot assign or replace the same
+/// sequence concurrently. Readers remain lock-free because completed snapshots are published atomically.
 /// </para>
 /// <para><b>For Beginners:</b> This is where a long evolutionary search saves its progress so it can be resumed later.
 /// Unlike a single save file that is overwritten each time, this store keeps a numbered history in a folder, so you can
@@ -43,6 +45,7 @@ public sealed class DirectoryEvolutionCheckpointStore : IEvolutionCheckpointStor
 
     private readonly object _gate = new();
     private readonly string _directory;
+    private readonly string _writeLockPath;
     private readonly long _maxCheckpointBytes;
     private readonly EvolutionCheckpointRetentionOptions _retention;
 
@@ -62,6 +65,7 @@ public sealed class DirectoryEvolutionCheckpointStore : IEvolutionCheckpointStor
         Guard.NotNullOrWhiteSpace(directory);
         if (maxCheckpointBytes <= 0) throw new ArgumentOutOfRangeException(nameof(maxCheckpointBytes));
         _directory = Path.GetFullPath(directory.Trim());
+        _writeLockPath = EvolutionPath.Join(_directory, ".checkpoint-writer.lock");
         _maxCheckpointBytes = maxCheckpointBytes;
         _retention = (retention ?? new EvolutionCheckpointRetentionOptions()).SnapshotAndValidate();
         Directory.CreateDirectory(_directory);
@@ -97,14 +101,17 @@ public sealed class DirectoryEvolutionCheckpointStore : IEvolutionCheckpointStor
         lock (_gate)
         {
             cancellationToken.ThrowIfCancellationRequested();
-            EvolutionCheckpoint? existing = LoadNewestValid(checkpoint.RunId);
+            using FileStream writeLock = AcquireWriteLock(cancellationToken);
+            var preloaded = new Dictionary<string, EvolutionCheckpoint>(StringComparer.Ordinal);
+            EvolutionCheckpoint? existing = LoadNewestValid(checkpoint.RunId, preloaded);
             if (existing is not null)
             {
                 ValidateSuccessor(existing, checkpoint);
                 if (checkpoint.Sequence == existing.Sequence) return Task.CompletedTask;
             }
             Persist(checkpoint, cancellationToken);
-            ApplyRetention(checkpoint.RunId);
+            preloaded[FileNameFor(checkpoint.Sequence)] = checkpoint;
+            ApplyRetention(checkpoint.RunId, preloaded);
         }
         return Task.CompletedTask;
     }
@@ -146,6 +153,10 @@ public sealed class DirectoryEvolutionCheckpointStore : IEvolutionCheckpointStor
                 {
                     size = 0;
                 }
+                catch (UnauthorizedAccessException)
+                {
+                    size = 0;
+                }
                 EvolutionCheckpoint? checkpoint = TryLoad(snapshot.Path, runId);
                 descriptors.Add(checkpoint is null
                     ? new EvolutionCheckpointDescriptor(snapshot.Sequence, snapshot.FileName, size, isValid: false)
@@ -156,12 +167,18 @@ public sealed class DirectoryEvolutionCheckpointStore : IEvolutionCheckpointStor
         }
     }
 
-    private EvolutionCheckpoint? LoadNewestValid(string runId)
+    private EvolutionCheckpoint? LoadNewestValid(
+        string runId,
+        IDictionary<string, EvolutionCheckpoint>? loaded = null)
     {
         foreach (SnapshotFile snapshot in EnumerateSnapshots())
         {
             EvolutionCheckpoint? checkpoint = TryLoad(snapshot.Path, runId);
-            if (checkpoint is not null) return checkpoint;
+            if (checkpoint is not null)
+            {
+                loaded?.Add(snapshot.FileName, checkpoint);
+                return checkpoint;
+            }
         }
         return null;
     }
@@ -174,6 +191,12 @@ public sealed class DirectoryEvolutionCheckpointStore : IEvolutionCheckpointStor
         foreach (string path in Directory.GetFiles(_directory, FileNamePrefix + "*" + FileNameExtension))
         {
             string fileName = Path.GetFileName(path);
+            if (!fileName.StartsWith(FileNamePrefix, StringComparison.Ordinal) ||
+                !fileName.EndsWith(FileNameExtension, StringComparison.Ordinal) ||
+                fileName.Length <= FileNamePrefix.Length + FileNameExtension.Length)
+            {
+                continue;
+            }
             string digits = fileName.Substring(FileNamePrefix.Length,
                 fileName.Length - FileNamePrefix.Length - FileNameExtension.Length);
             if (digits.Length == 0 || !long.TryParse(digits, NumberStyles.None, CultureInfo.InvariantCulture,
@@ -197,14 +220,19 @@ public sealed class DirectoryEvolutionCheckpointStore : IEvolutionCheckpointStor
     /// single best-quality one, so no quota combination can remove either. Unreadable files are protected too: they
     /// cost almost nothing and are the evidence that something went wrong.
     /// </remarks>
-    private void ApplyRetention(string runId)
+    private void ApplyRetention(
+        string runId,
+        IReadOnlyDictionary<string, EvolutionCheckpoint>? preloaded = null)
     {
         List<SnapshotFile> snapshots = EnumerateSnapshots();
         var loaded = new List<KeyValuePair<SnapshotFile, EvolutionCheckpoint>>();
         var protectedNames = new HashSet<string>(StringComparer.Ordinal);
         foreach (SnapshotFile snapshot in snapshots)
         {
-            EvolutionCheckpoint? checkpoint = TryLoad(snapshot.Path, runId);
+            EvolutionCheckpoint? checkpoint = preloaded is not null &&
+                preloaded.TryGetValue(snapshot.FileName, out EvolutionCheckpoint? cached)
+                    ? cached
+                    : TryLoad(snapshot.Path, runId);
             if (checkpoint is null)
             {
                 protectedNames.Add(snapshot.FileName);
@@ -348,6 +376,28 @@ public sealed class DirectoryEvolutionCheckpointStore : IEvolutionCheckpointStor
         {
             return null;
         }
+        catch (UnauthorizedAccessException)
+        {
+            return null;
+        }
+    }
+
+    /// <summary>Serializes the read-validate-write transaction across store instances and processes.</summary>
+    private FileStream AcquireWriteLock(CancellationToken cancellationToken)
+    {
+        while (true)
+        {
+            cancellationToken.ThrowIfCancellationRequested();
+            try
+            {
+                return new FileStream(_writeLockPath, FileMode.OpenOrCreate, FileAccess.ReadWrite, FileShare.None);
+            }
+            catch (IOException)
+            {
+                cancellationToken.ThrowIfCancellationRequested();
+                Thread.Sleep(10);
+            }
+        }
     }
 
     private static void ValidateSuccessor(EvolutionCheckpoint existing, EvolutionCheckpoint checkpoint)
@@ -431,7 +481,7 @@ public sealed class DirectoryEvolutionCheckpointStore : IEvolutionCheckpointStor
             CompatibilityHash,
             Payload,
             Checksum,
-            Quality?.ToString("R", CultureInfo.InvariantCulture) ?? "none",
+            EvolutionHash.EncodeNullableDouble(Quality),
             ((int)QualityDirection).ToString(CultureInfo.InvariantCulture)
         });
     }

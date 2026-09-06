@@ -58,7 +58,12 @@ public sealed class EvolutionEvaluationCost
         if (attemptCount < 0) throw new ArgumentOutOfRangeException(nameof(attemptCount));
         if (!EvolutionDescriptorDefinition.IsFinite(costUnits) || costUnits < 0) throw new ArgumentOutOfRangeException(nameof(costUnits));
         if (rejectedStage.HasValue && rejectedStage.Value < 0) throw new ArgumentOutOfRangeException(nameof(rejectedStage));
-        double[] stageCosts = stageCostUnits?.ToArray() ?? Array.Empty<double>();
+        double[] stageCosts = stageCostUnits is null
+            ? Array.Empty<double>()
+            : EvolutionCollection.CopyBounded(
+                stageCostUnits,
+                EvolutionCollectionLimits.MaximumCascadeStages,
+                nameof(stageCostUnits));
         foreach (double stageCost in stageCosts)
             if (!EvolutionDescriptorDefinition.IsFinite(stageCost) || stageCost < 0)
                 throw new ArgumentOutOfRangeException(nameof(stageCostUnits));
@@ -72,7 +77,10 @@ public sealed class EvolutionEvaluationCost
     /// <summary>Gets wall-clock evaluator time.</summary>
     public TimeSpan Elapsed { get; }
 
-    /// <summary>Gets the one-based attempt count for this canonical candidate.</summary>
+    /// <summary>
+    /// Gets the number of evaluation attempts for this canonical candidate; zero when no evaluator call was made,
+    /// such as a cache hit or a candidate that failed before dispatch.
+    /// </summary>
     public int AttemptCount { get; }
 
     /// <summary>Gets task-defined resource units.</summary>

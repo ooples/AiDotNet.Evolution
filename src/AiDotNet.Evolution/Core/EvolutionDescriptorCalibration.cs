@@ -15,19 +15,39 @@ public static class EvolutionDescriptorCalibration
         EvolutionDescriptorCalibrationOptions? options = null)
     {
         Guard.NotNull(observations);
+        if (observations.Count > EvolutionCollectionLimits.MaximumResultEntries)
+            throw new ArgumentException("The observation set exceeds the package safety bound.", nameof(observations));
         EvolutionDescriptorCalibrationOptions settings =
             (options ?? new EvolutionDescriptorCalibrationOptions()).Clone();
         settings.Validate();
 
-        for (int index = 0; index < observations.Count; index++)
+        IReadOnlyDictionary<string, double>[] observationSources = EvolutionCollection.CopyBounded(
+            observations,
+            EvolutionCollectionLimits.MaximumResultEntries,
+            nameof(observations));
+        var snapshotObservations = new IReadOnlyDictionary<string, double>[observationSources.Length];
+        for (int index = 0; index < observationSources.Length; index++)
         {
-            if (observations[index] is null)
+            IReadOnlyDictionary<string, double> observation = observationSources[index];
+            if (observation is null)
                 throw new ArgumentException("An observation cannot be null.", nameof(observations));
+            KeyValuePair<string, double>[] pairs = EvolutionCollection.ToBoundedArray(
+                observation,
+                EvolutionTaskResult.MaximumNamedValues,
+                nameof(observations));
+            var snapshot = new Dictionary<string, double>(pairs.Length, StringComparer.Ordinal);
+            foreach (KeyValuePair<string, double> pair in pairs)
+            {
+                if (pair.Key is null || snapshot.ContainsKey(pair.Key))
+                    throw new ArgumentException("An observation contains an invalid or repeated name.", nameof(observations));
+                snapshot.Add(pair.Key, pair.Value);
+            }
+            snapshotObservations[index] = snapshot;
         }
 
-        IReadOnlyList<string> axes = names is null ? DiscoverNames(observations) : ValidateNames(names);
+        IReadOnlyList<string> axes = names is null ? DiscoverNames(snapshotObservations) : ValidateNames(names);
         var definitions = new List<EvolutionDescriptorDefinition>(axes.Count);
-        foreach (string axis in axes) definitions.Add(Calibrate(axis, observations, settings));
+        foreach (string axis in axes) definitions.Add(Calibrate(axis, snapshotObservations, settings));
         return definitions;
     }
 
@@ -47,12 +67,18 @@ public static class EvolutionDescriptorCalibration
         Guard.NotNull(task);
         Guard.NotNull(seeds);
         if (seeds.Count == 0) throw new ArgumentException("At least one seed is required.", nameof(seeds));
+        if (seeds.Count > EvolutionCollectionLimits.MaximumResultEntries)
+            throw new ArgumentException("The seed set exceeds the package safety bound.", nameof(seeds));
 
-        var observations = new List<IReadOnlyDictionary<string, double>>(seeds.Count);
-        for (int index = 0; index < seeds.Count; index++)
+        TGenome[] seedSnapshot = EvolutionCollection.CopyBounded(
+            seeds,
+            EvolutionCollectionLimits.MaximumResultEntries,
+            nameof(seeds));
+        var observations = new List<IReadOnlyDictionary<string, double>>(seedSnapshot.Length);
+        for (int index = 0; index < seedSnapshot.Length; index++)
         {
             cancellationToken.ThrowIfCancellationRequested();
-            if (seeds[index] is not { } genome) throw new ArgumentException("A seed cannot be null.", nameof(seeds));
+            if (seedSnapshot[index] is not { } genome) throw new ArgumentException("A seed cannot be null.", nameof(seeds));
 
             EvolutionCanonicalGenome<TGenome> canonical = await task
                 .CanonicalizeAsync(genome, cancellationToken).ConfigureAwait(false);
@@ -80,7 +106,13 @@ public static class EvolutionDescriptorCalibration
             foreach (KeyValuePair<string, double> pair in observation)
             {
                 if (!string.IsNullOrWhiteSpace(pair.Key) && EvolutionDescriptorDefinition.IsFinite(pair.Value))
-                    names.Add(pair.Key);
+                {
+                    names.Add(pair.Key.Trim());
+                    if (names.Count > EvolutionCollectionLimits.MaximumArchiveDimensions)
+                        throw new ArgumentException(
+                            $"Calibration may discover at most {EvolutionCollectionLimits.MaximumArchiveDimensions} descriptors.",
+                            nameof(observations));
+                }
             }
         }
 
@@ -98,10 +130,18 @@ public static class EvolutionDescriptorCalibration
     private static IReadOnlyList<string> ValidateNames(IReadOnlyList<string> names)
     {
         if (names.Count == 0) throw new ArgumentException("At least one descriptor name is required.", nameof(names));
+        if (names.Count > EvolutionCollectionLimits.MaximumArchiveDimensions)
+            throw new ArgumentException(
+                $"Calibration may define at most {EvolutionCollectionLimits.MaximumArchiveDimensions} descriptors.",
+                nameof(names));
 
+        string[] snapshot = EvolutionCollection.CopyBounded(
+            names,
+            EvolutionCollectionLimits.MaximumArchiveDimensions,
+            nameof(names));
         var seen = new HashSet<string>(StringComparer.Ordinal);
-        var axes = new List<string>(names.Count);
-        foreach (string name in names)
+        var axes = new List<string>(snapshot.Length);
+        foreach (string name in snapshot)
         {
             if (name is not { } text || text.Trim().Length == 0)
                 throw new ArgumentException("A descriptor name cannot be empty or white space.", nameof(names));
@@ -124,8 +164,19 @@ public static class EvolutionDescriptorCalibration
 
         foreach (IReadOnlyDictionary<string, double> observation in observations)
         {
-            if (!observation.TryGetValue(name, out double value) ||
-                !EvolutionDescriptorDefinition.IsFinite(value)) continue;
+            bool found = false;
+            double value = 0;
+            foreach (KeyValuePair<string, double> pair in observation)
+            {
+                if (!string.Equals(pair.Key.Trim(), name, StringComparison.Ordinal)) continue;
+                if (found)
+                    throw new ArgumentException(
+                        "An observation contains duplicate descriptor names after trimming.",
+                        nameof(observations));
+                found = true;
+                value = pair.Value;
+            }
+            if (!found || !EvolutionDescriptorDefinition.IsFinite(value)) continue;
             if (!observed)
             {
                 minimum = value;
@@ -176,7 +227,7 @@ public static class EvolutionDescriptorCalibration
             throw new ArgumentException(
                 "Descriptor '" + name + "' reported one value that no span can be centred on. Define this axis by " +
                 "hand, or report values on a smaller scale.",
-                nameof(value));
+                "observations");
         }
 
         return new EvolutionDescriptorDefinition(name, minimum, maximum, options.BinCount, options.OutOfRangePolicy);

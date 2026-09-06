@@ -20,7 +20,8 @@ together; when present, release packages are signed and verified before publicat
 1. Create the SonarCloud project with key `ooples_AiDotNet.Evolution`, then add its token as `SONAR_TOKEN`.
 2. Install/enable CodeRabbit for the repository.
 3. Enable Dependabot alerts, security updates, private vulnerability reporting, and GitHub Actions provenance.
-4. Allow GitHub Actions to create and approve pull requests so release-please can maintain its release PR.
+4. Allow GitHub Actions to create pull requests so release-please can maintain its release PR. Do not allow workflow
+   tokens to approve pull requests; require an independent human approval through the effective branch-protection rules.
 
 ## Main-branch rules
 

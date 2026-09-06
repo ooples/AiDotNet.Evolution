@@ -123,21 +123,24 @@ public sealed class EvolutionDescriptorDefinition
 
     /// <summary>Bins a value as if the range contained it, whatever the out-of-range policy says.</summary>
     /// <param name="value">The value to bin.</param>
-    /// <param name="bin">The resulting zero-based bin when the value is inside the range.</param>
+    /// <param name="interiorBin">
+    /// The resulting zero-based interior bin. This does not include the +1 offset that
+    /// <see cref="TryGetBin"/> applies when overflow bins are enabled.
+    /// </param>
     /// <returns><c>true</c> when the value is finite and inside the range.</returns>
     /// <remarks>
     /// Used by a growing archive to check that a widened definition really accepts the value it was widened for,
     /// before adopting it. <see cref="TryGetBin"/> cannot answer that question, because under
     /// <see cref="EvolutionOutOfRangePolicy.Grow"/> it deliberately reports every out-of-range value as unbinnable.
     /// </remarks>
-    internal bool TryGetBinIgnoringPolicy(double value, out int bin)
+    internal bool TryGetBinIgnoringPolicy(double value, out int interiorBin)
     {
-        bin = -1;
+        interiorBin = -1;
         if (!IsFinite(value) || value < Minimum || value > Maximum) return false;
 
         double normalized = (value - Minimum) / (Maximum - Minimum);
         int interior = value == Maximum ? BinCount - 1 : (int)(normalized * BinCount);
-        bin = Math.Max(0, Math.Min(BinCount - 1, interior));
+        interiorBin = Math.Max(0, Math.Min(BinCount - 1, interior));
         return true;
     }
 
@@ -191,8 +194,8 @@ public sealed class EvolutionDescriptorDefinition
     public string ToCanonicalString() => string.Join("|", new[]
     {
         Name.Length.ToString(CultureInfo.InvariantCulture) + ":" + Name,
-        Minimum.ToString("R", CultureInfo.InvariantCulture),
-        Maximum.ToString("R", CultureInfo.InvariantCulture),
+        EvolutionHash.EncodeDouble(Minimum),
+        EvolutionHash.EncodeDouble(Maximum),
         BinCount.ToString(CultureInfo.InvariantCulture),
         ((int)OutOfRangePolicy).ToString(CultureInfo.InvariantCulture)
     });

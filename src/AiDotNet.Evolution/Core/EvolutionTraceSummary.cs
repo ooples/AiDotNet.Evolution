@@ -50,6 +50,8 @@ public sealed class EvolutionTraceSummary
     private readonly long _cacheHits;
     private readonly double _totalCostUnits;
     private readonly TimeSpan _totalElapsed;
+    private readonly double? _bestQualityDelta;
+    private readonly double? _worstQualityDelta;
 
     /// <summary>Initializes a summary for one trace file.</summary>
     /// <param name="runId">The non-blank run identifier the trace belongs to.</param>
@@ -154,10 +156,18 @@ public sealed class EvolutionTraceSummary
     public double CacheHitRate => _recordsWritten == 0 ? 0 : (double)_cacheHits / _recordsWritten;
 
     /// <summary>Gets the best quality delta observed, in the run's optimization direction, or <c>null</c> when none was.</summary>
-    public double? BestQualityDelta { get; init; }
+    public double? BestQualityDelta
+    {
+        get => _bestQualityDelta;
+        init => _bestQualityDelta = FiniteOptionalDelta(value);
+    }
 
     /// <summary>Gets the worst quality delta observed, in the run's optimization direction, or <c>null</c> when none was.</summary>
-    public double? WorstQualityDelta { get; init; }
+    public double? WorstQualityDelta
+    {
+        get => _worstQualityDelta;
+        init => _worstQualityDelta = FiniteOptionalDelta(value);
+    }
 
     /// <summary>Gets the sum of every metric delta observed, keyed by metric name.</summary>
     public IReadOnlyDictionary<string, double> TotalMetricDeltas
@@ -189,15 +199,26 @@ public sealed class EvolutionTraceSummary
             var copy = new Dictionary<EvolutionEvaluationStatus, long>();
             if (value is not null)
             {
-                foreach (KeyValuePair<EvolutionEvaluationStatus, long> pair in value.OrderBy(item => (int)item.Key))
+                if (value.Count > Enum.GetValues(typeof(EvolutionEvaluationStatus)).Length)
+                    throw new ArgumentException("Status counts exceed the number of terminal statuses.", nameof(value));
+                int visited = 0;
+                foreach (KeyValuePair<EvolutionEvaluationStatus, long> pair in value)
                 {
+                    if (visited == Enum.GetValues(typeof(EvolutionEvaluationStatus)).Length)
+                        throw new ArgumentException("Status counts exceed the number of terminal statuses.", nameof(value));
+                    visited++;
                     if (!Enum.IsDefined(typeof(EvolutionEvaluationStatus), pair.Key))
                         throw new ArgumentOutOfRangeException(nameof(value), "Status counts contain an undefined status.");
                     if (pair.Value < 0) throw new ArgumentOutOfRangeException(nameof(value), "Status counts cannot be negative.");
-                    copy[pair.Key] = pair.Value;
+                    if (copy.ContainsKey(pair.Key))
+                        throw new ArgumentException("Status counts repeat a terminal status.", nameof(value));
+                    copy.Add(pair.Key, pair.Value);
                 }
             }
-            _statusCounts = new ReadOnlyDictionary<EvolutionEvaluationStatus, long>(copy);
+            var ordered = new Dictionary<EvolutionEvaluationStatus, long>();
+            foreach (KeyValuePair<EvolutionEvaluationStatus, long> pair in copy.OrderBy(item => (int)item.Key))
+                ordered.Add(pair.Key, pair.Value);
+            _statusCounts = new ReadOnlyDictionary<EvolutionEvaluationStatus, long>(ordered);
         }
     }
 
@@ -235,18 +256,37 @@ public sealed class EvolutionTraceSummary
         return value;
     }
 
+    private static double? FiniteOptionalDelta(double? value)
+    {
+        if (value.HasValue && !EvolutionDescriptorDefinition.IsFinite(value.Value))
+            throw new ArgumentOutOfRangeException(nameof(value), "Trace quality deltas must be finite.");
+        return value;
+    }
+
     private static ReadOnlyDictionary<string, double> CopyDeltas(IReadOnlyDictionary<string, double>? values)
     {
         var copy = new Dictionary<string, double>(StringComparer.Ordinal);
         if (values is null) return new ReadOnlyDictionary<string, double>(copy);
-        foreach (KeyValuePair<string, double> pair in values.OrderBy(item => item.Key, StringComparer.Ordinal))
+        if (values.Count > EvolutionTraceOptions.MaximumTrackedMetricCount)
+            throw new ArgumentException("Metric deltas exceed the trace summary safety bound.", nameof(values));
+        int visited = 0;
+        foreach (KeyValuePair<string, double> pair in values)
         {
+            if (visited == EvolutionTraceOptions.MaximumTrackedMetricCount)
+                throw new ArgumentException("Metric deltas exceed the trace summary safety bound.", nameof(values));
+            visited++;
             if (string.IsNullOrWhiteSpace(pair.Key))
                 throw new ArgumentException("Metric names cannot be empty or white space.", nameof(values));
             if (!EvolutionDescriptorDefinition.IsFinite(pair.Value))
                 throw new ArgumentException("Metric deltas must be finite.", nameof(values));
-            copy[pair.Key.Trim()] = pair.Value;
+            string key = pair.Key.Trim();
+            if (copy.ContainsKey(key))
+                throw new ArgumentException("Metric names must be unique after trimming.", nameof(values));
+            copy.Add(key, pair.Value);
         }
-        return new ReadOnlyDictionary<string, double>(copy);
+        var ordered = new Dictionary<string, double>(copy.Count, StringComparer.Ordinal);
+        foreach (KeyValuePair<string, double> pair in copy.OrderBy(item => item.Key, StringComparer.Ordinal))
+            ordered.Add(pair.Key, pair.Value);
+        return new ReadOnlyDictionary<string, double>(ordered);
     }
 }

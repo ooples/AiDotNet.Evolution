@@ -165,7 +165,7 @@ public sealed class EvolutionOptionClassificationTests
         if (type == typeof(EvolutionSelectionOptions))
             return new EvolutionSelectionOptions { TopInspirationCount = 5 };
         if (type == typeof(EvolutionCascadeOptions))
-            return new EvolutionCascadeOptions { ChargeRejectedStagesToBudget = true };
+            return new EvolutionCascadeOptions { Enabled = true, ChargeRejectedStagesToBudget = true };
         if (type == typeof(EvolutionArtifactOptions))
             return new EvolutionArtifactOptions { MaxArtifactBytes = 4_096 };
         if (type == typeof(EvolutionEarlyStoppingOptions))

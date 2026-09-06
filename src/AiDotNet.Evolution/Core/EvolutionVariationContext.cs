@@ -47,13 +47,28 @@ public sealed class EvolutionVariationContext<TGenome>
     {
         Archive = archive;
         Parent = parent ?? throw new ArgumentNullException(nameof(parent));
-        Inspirations = inspirations ?? throw new ArgumentNullException(nameof(inspirations));
+        if (inspirations is null) throw new ArgumentNullException(nameof(inspirations));
+        EvolutionArchiveEntry<TGenome>[] inspirationCopy = EvolutionCollection.CopyBounded(
+            inspirations,
+            EvolutionCollectionLimits.MaximumLineageIdentities,
+            nameof(inspirations));
+        if (inspirationCopy.Any(entry => entry is null))
+            throw new ArgumentException("Inspirations cannot contain null entries.", nameof(inspirations));
+        Inspirations = Array.AsReadOnly(inspirationCopy);
         Random = random ?? throw new ArgumentNullException(nameof(random));
         if (generation < 0) throw new ArgumentOutOfRangeException(nameof(generation));
         if (island < 0) throw new ArgumentOutOfRangeException(nameof(island));
         Generation = generation;
         Island = island;
-        ParentArtifacts = parentArtifacts ?? Array.Empty<EvolutionArtifact>();
+        EvolutionArtifact[] artifactCopy = parentArtifacts is null
+            ? Array.Empty<EvolutionArtifact>()
+            : EvolutionCollection.CopyBounded(
+                parentArtifacts,
+                EvolutionTaskResult.MaximumArtifacts,
+                nameof(parentArtifacts));
+        if (artifactCopy.Any(artifact => artifact is null))
+            throw new ArgumentException("Parent artifacts cannot contain null entries.", nameof(parentArtifacts));
+        ParentArtifacts = Array.AsReadOnly(artifactCopy);
     }
 
     /// <summary>Gets the selected parent.</summary>

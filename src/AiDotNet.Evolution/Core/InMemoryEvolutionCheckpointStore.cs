@@ -28,6 +28,26 @@ public sealed class InMemoryEvolutionCheckpointStore : IEvolutionCheckpointStore
 {
     private readonly object _gate = new();
     private readonly Dictionary<string, EvolutionCheckpoint> _checkpoints = new(StringComparer.Ordinal);
+    private readonly int _capacity;
+
+    /// <summary>Initializes a bounded in-memory store.</summary>
+    /// <param name="capacity">Maximum number of distinct run identifiers retained at once.</param>
+    /// <exception cref="ArgumentOutOfRangeException"><paramref name="capacity"/> is not positive.</exception>
+    public InMemoryEvolutionCheckpointStore(int capacity = 1024)
+    {
+        if (capacity <= 0) throw new ArgumentOutOfRangeException(nameof(capacity));
+        _capacity = capacity;
+    }
+
+    /// <summary>Gets the maximum number of distinct runs this store retains.</summary>
+    public int Capacity => _capacity;
+
+    /// <summary>Removes one run so its capacity can be reused after the run is complete.</summary>
+    public bool Remove(string runId)
+    {
+        Guard.NotNullOrWhiteSpace(runId);
+        lock (_gate) return _checkpoints.Remove(runId.Trim());
+    }
 
     /// <inheritdoc/>
     public Task SaveAsync(EvolutionCheckpoint checkpoint, CancellationToken cancellationToken = default)
@@ -41,6 +61,11 @@ public sealed class InMemoryEvolutionCheckpointStore : IEvolutionCheckpointStore
             {
                 ValidateSuccessor(existing, checkpoint);
                 if (checkpoint.Sequence == existing.Sequence) return Task.CompletedTask;
+            }
+            else if (_checkpoints.Count >= _capacity)
+            {
+                throw new InvalidOperationException(
+                    "The in-memory checkpoint store is at capacity. Remove a completed run before adding another.");
             }
             _checkpoints[checkpoint.RunId] = checkpoint.Clone();
         }

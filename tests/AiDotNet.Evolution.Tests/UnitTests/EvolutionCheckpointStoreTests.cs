@@ -90,7 +90,7 @@ public sealed class EvolutionCheckpointStoreTests
     }
 
     [Fact]
-    public async Task JsonStoreRefusesToOverwriteCorruptPrimary()
+    public async Task JsonStoreRecoversFromACorruptPrimaryDuringSave()
     {
         using var directory = new TemporaryDirectory();
         string path = Path.Combine(directory.Path, "checkpoint.json");
@@ -98,9 +98,11 @@ public sealed class EvolutionCheckpointStoreTests
         await store.SaveAsync(new EvolutionCheckpoint("run", 1, "compat", "one"));
         File.WriteAllText(path, "{corrupt");
 
-        await Assert.ThrowsAsync<InvalidDataException>(() =>
-            store.SaveAsync(new EvolutionCheckpoint("run", 2, "compat", "two")));
-        Assert.Equal("{corrupt", File.ReadAllText(path));
+        await store.SaveAsync(new EvolutionCheckpoint("run", 2, "compat", "two"));
+
+        EvolutionCheckpoint recovered = Assert.IsType<EvolutionCheckpoint>(await store.LoadLatestAsync("run"));
+        Assert.Equal(2, recovered.Sequence);
+        Assert.Equal("two", recovered.Payload);
     }
 
     [Fact]

@@ -40,7 +40,16 @@ public sealed class EvolutionCellKey : IEquatable<EvolutionCellKey>, IComparable
     public EvolutionCellKey(IEnumerable<int> bins)
     {
         Guard.NotNull(bins);
-        _bins = bins.ToArray();
+        var bounded = new List<int>(EvolutionCollectionLimits.MaximumArchiveDimensions);
+        foreach (int value in bins)
+        {
+            if (bounded.Count == EvolutionCollectionLimits.MaximumArchiveDimensions)
+                throw new ArgumentException(
+                    $"A cell key may contain at most {EvolutionCollectionLimits.MaximumArchiveDimensions} dimensions.",
+                    nameof(bins));
+            bounded.Add(value);
+        }
+        _bins = bounded.ToArray();
         if (_bins.Length == 0) throw new ArgumentException("A cell key requires at least one bin.", nameof(bins));
         if (_bins.Any(value => value < 0)) throw new ArgumentOutOfRangeException(nameof(bins));
         _view = Array.AsReadOnly(_bins);

@@ -67,6 +67,8 @@ public sealed partial class EvolutionEngine<TGenome>
         }
         catch (Exception exception) when (EvolutionExceptionPolicy.IsRecoverable(exception))
         {
+            if (parentArtifacts.Count > 0)
+                QueueArtifactsForDelivery(selection.Parent.Evaluation.GenomeId, parentArtifacts);
             return new PreparedProposal(CreatePreEvaluationFailure(evaluationId, island, lineage, "variation_failure"));
         }
 
@@ -436,7 +438,7 @@ public sealed partial class EvolutionEngine<TGenome>
                 _completedEvaluations++;
                 if (item.Candidate is not null)
                 {
-                    insertion = _islands[item.Island].TryAdd(item.Candidate, evaluation);
+                    insertion = AddToArchive(item.Island, item.Candidate, evaluation);
                     if (_options.EnableEvaluationCache && item.CacheStatus != EvolutionCacheStatus.Hit)
                         _cache[item.Candidate.CanonicalGenome.Id] = WithoutArtifacts(result);
                     RecordCompletedEvaluation(item.Island, item.Candidate, evaluation);
@@ -487,8 +489,13 @@ public sealed partial class EvolutionEngine<TGenome>
         {
             foreach (EvolutionDescriptorDefinition descriptor in archive.Descriptors)
                 if (!evaluation.Descriptors.ContainsKey(descriptor.Name))
-                    RetainFailure(new EvolutionDiagnostic("descriptor_missing:" + descriptor.Name,
-                        "A completed evaluation omitted a configured archive descriptor and could not be placed in a cell."));
+                    RetainFailure(new EvolutionDiagnostic("descriptor_missing",
+                        "A completed evaluation omitted a configured archive descriptor and could not be placed in a cell.",
+                        isRedacted: false,
+                        data: new Dictionary<string, string>(StringComparer.Ordinal)
+                        {
+                            ["descriptor"] = Truncate(descriptor.Name, EvolutionDiagnostic.MaximumDataValueLength)
+                        }));
             return;
         }
 
@@ -560,7 +567,7 @@ public sealed partial class EvolutionEngine<TGenome>
     /// configured topology; this constant is the backstop that keeps a buggy policy from flooding the archives on a run
     /// configured with a very large island count.
     /// </remarks>
-    private const int MaximumMigrationTransfers = 65_536;
+    private const int MaximumMigrationTransfers = EvolutionCollectionLimits.MaximumMigrationTransfers;
 
     /// <summary>
     /// Runs the migration policy when the interval is due, validates every transfer against its source island and the
@@ -607,7 +614,7 @@ public sealed partial class EvolutionEngine<TGenome>
         {
             EvolutionArchiveEntry<TGenome> migrant = CreateMigrantEntry(migration);
             EvolutionArchiveInsertionResult insertion =
-                _islands[migration.DestinationIsland].TryAdd(migrant.Candidate, migrant.Evaluation);
+                AddToArchive(migration.DestinationIsland, migrant.Candidate, migrant.Evaluation);
             if (insertion == EvolutionArchiveInsertionResult.Inserted ||
                 insertion == EvolutionArchiveInsertionResult.Replaced ||
                 insertion == EvolutionArchiveInsertionResult.InsertedWithEviction)
@@ -625,7 +632,8 @@ public sealed partial class EvolutionEngine<TGenome>
     /// </summary>
     /// <remarks>
     /// The bound is two-sided. No ordered island pair may carry more than <c>MigrantsPerIsland</c> transfers, so no
-    /// single destination can be swamped whatever the topology, and the round as a whole may not exceed the ordered
+    /// single source can swamp one destination whatever the topology. A destination may receive the allowance from
+    /// several sources, and the round as a whole may not exceed the ordered
     /// island pairs times that per-pair bound, capped by <see cref="MaximumMigrationTransfers"/>. This replaces the
     /// earlier per-source-island bound, which a star or fully connected topology necessarily exceeds because one source
     /// legitimately feeds every other island.
@@ -641,8 +649,31 @@ public sealed partial class EvolutionEngine<TGenome>
             item => (long)item.SourceIsland * _islands.Length + item.DestinationIsland))
         {
             if (pair.Count() > _options.MigrantsPerIsland)
-                throw new InvalidOperationException("The migration policy exceeded the per-destination transfer bound.");
+                throw new InvalidOperationException("The migration policy exceeded the per-island-pair transfer bound.");
         }
+    }
+
+    private static string Truncate(string value, int maximumLength) =>
+        value.Length <= maximumLength ? value : value.Substring(0, maximumLength);
+
+    /// <summary>Inserts through an exact-delta path when available and keeps early-stopping aggregates synchronized.</summary>
+    private EvolutionArchiveInsertionResult AddToArchive(
+        int island,
+        EvolutionCandidate<TGenome> candidate,
+        EvolutionEvaluation evaluation)
+    {
+        IEvolutionArchive<TGenome> archive = _islands[island];
+        if (archive is IEvolutionArchiveMutationSource<TGenome> mutationSource)
+        {
+            EvolutionArchiveMutation<TGenome> mutation =
+                mutationSource.TryAddWithMutation(candidate, evaluation);
+            ApplyEarlyStoppingArchiveMutation(mutation);
+            return mutation.Result;
+        }
+
+        EvolutionArchiveInsertionResult result = archive.TryAdd(candidate, evaluation);
+        RebuildEarlyStoppingArchiveMetric();
+        return result;
     }
 
     /// <summary>Copies one elite for its destination island, marking the copy with the island it came from.</summary>
@@ -748,16 +779,15 @@ public sealed partial class EvolutionEngine<TGenome>
     /// <summary>Appends a diagnostic, replacing the last slot with a truncation marker once the public bound is reached.</summary>
     private static void AddAttemptDiagnostic(WorkItem item, EvolutionDiagnostic diagnostic)
     {
-        const int maximumDiagnostics = 64;
-        if (item.AttemptDiagnostics.Count < maximumDiagnostics)
+        if (item.AttemptDiagnostics.Count < EvolutionTaskResult.MaximumDiagnostics)
         {
             item.AttemptDiagnostics.Add(diagnostic);
             return;
         }
 
-        if (item.AttemptDiagnostics[maximumDiagnostics - 1].Code != "diagnostics_truncated")
+        if (item.AttemptDiagnostics[EvolutionTaskResult.MaximumDiagnostics - 1].Code != "diagnostics_truncated")
         {
-            item.AttemptDiagnostics[maximumDiagnostics - 1] = new EvolutionDiagnostic(
+            item.AttemptDiagnostics[EvolutionTaskResult.MaximumDiagnostics - 1] = new EvolutionDiagnostic(
                 "diagnostics_truncated", "Additional retry diagnostics were omitted to preserve the public bound.");
         }
     }

@@ -61,11 +61,25 @@ public sealed class EvolutionCascadeOptions
     {
         Guard.NotNull(Thresholds);
         Guard.NotNull(StageTimeouts);
-        double[] thresholds = Thresholds.ToArray();
+        if (Thresholds.Count >= EvolutionCollectionLimits.MaximumCascadeStages)
+            throw new ArgumentException(
+                $"A cascade may contain at most {EvolutionCollectionLimits.MaximumCascadeStages} stages.",
+                nameof(Thresholds));
+        if (StageTimeouts.Count > EvolutionCollectionLimits.MaximumCascadeStages)
+            throw new ArgumentException(
+                $"A cascade may contain at most {EvolutionCollectionLimits.MaximumCascadeStages} stage timeouts.",
+                nameof(StageTimeouts));
+        double[] thresholds = EvolutionCollection.ToBoundedArray(
+            Thresholds,
+            EvolutionCollectionLimits.MaximumCascadeStages - 1,
+            nameof(Thresholds));
         foreach (double threshold in thresholds)
             if (!EvolutionDescriptorDefinition.IsFinite(threshold))
                 throw new ArgumentOutOfRangeException(nameof(Thresholds), "Cascade thresholds must be finite.");
-        TimeSpan[] timeouts = StageTimeouts.ToArray();
+        TimeSpan[] timeouts = EvolutionCollection.ToBoundedArray(
+            StageTimeouts,
+            EvolutionCollectionLimits.MaximumCascadeStages,
+            nameof(StageTimeouts));
         foreach (TimeSpan timeout in timeouts)
             if (timeout <= TimeSpan.Zero || timeout.TotalMilliseconds > int.MaxValue)
                 throw new ArgumentOutOfRangeException(nameof(StageTimeouts),
@@ -113,11 +127,13 @@ public sealed class EvolutionCascadeOptions
 
     /// <summary>Returns a stable, culture-independent representation suitable for compatibility hashes.</summary>
     /// <returns>The canonical text form of every value that changes cascade behaviour.</returns>
-    internal string ToCanonicalString() => string.Join("|", new[]
-    {
-        Enabled ? "cascade" : "no-cascade",
-        ChargeRejectedStagesToBudget ? "charge-rejected" : "refund-rejected",
-        string.Join(",", Thresholds.Select(value => value.ToString("R", CultureInfo.InvariantCulture))),
-        string.Join(",", StageTimeouts.Select(value => value.Ticks.ToString(CultureInfo.InvariantCulture)))
-    });
+    internal string ToCanonicalString() => !Enabled
+        ? "no-cascade"
+        : string.Join("|", new[]
+        {
+            "cascade",
+            ChargeRejectedStagesToBudget ? "charge-rejected" : "refund-rejected",
+            string.Join(",", Thresholds.Select(EvolutionHash.EncodeDouble)),
+            string.Join(",", StageTimeouts.Select(value => value.Ticks.ToString(CultureInfo.InvariantCulture)))
+        });
 }

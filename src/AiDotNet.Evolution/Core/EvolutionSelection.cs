@@ -37,7 +37,14 @@ public sealed class EvolutionSelection<TGenome>
     public EvolutionSelection(EvolutionArchiveEntry<TGenome> parent, IReadOnlyList<EvolutionArchiveEntry<TGenome>> inspirations)
     {
         Parent = parent ?? throw new ArgumentNullException(nameof(parent));
-        Inspirations = inspirations ?? throw new ArgumentNullException(nameof(inspirations));
+        if (inspirations is null) throw new ArgumentNullException(nameof(inspirations));
+        EvolutionArchiveEntry<TGenome>[] copy = EvolutionCollection.CopyBounded(
+            inspirations,
+            EvolutionCollectionLimits.MaximumLineageIdentities,
+            nameof(inspirations));
+        if (copy.Any(entry => entry is null))
+            throw new ArgumentException("Inspirations cannot contain null entries.", nameof(inspirations));
+        Inspirations = Array.AsReadOnly(copy);
     }
 
     /// <summary>Gets the selected parent.</summary>

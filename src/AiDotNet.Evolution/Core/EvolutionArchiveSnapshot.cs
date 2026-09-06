@@ -46,8 +46,14 @@ public sealed class EvolutionArchiveSnapshot<TGenome> : IEvolutionArchiveView<TG
             throw new ArgumentException("Archive definition hashes cannot be empty.", nameof(source));
         if (!Enum.IsDefined(typeof(EvolutionOptimizationDirection), source.Direction) || source.Version < 0)
             throw new ArgumentException("The archive view has invalid metadata.", nameof(source));
-        EvolutionDescriptorDefinition[] descriptors = source.Descriptors.ToArray();
-        EvolutionArchiveEntry<TGenome>[] unorderedEntries = source.Entries.ToArray();
+        EvolutionDescriptorDefinition[] descriptors = EvolutionCollection.CopyBounded(
+            source.Descriptors,
+            EvolutionCollectionLimits.MaximumArchiveDimensions,
+            nameof(source));
+        EvolutionArchiveEntry<TGenome>[] unorderedEntries = EvolutionCollection.CopyBounded(
+            source.Entries,
+            EvolutionCollectionLimits.MaximumResultEntries,
+            nameof(source));
         if (descriptors.Any(descriptor => descriptor is null) || unorderedEntries.Any(entry => entry is null))
             throw new ArgumentException("Archive views cannot contain null values.", nameof(source));
         EvolutionArchiveEntry<TGenome>[] entries = unorderedEntries
@@ -65,11 +71,7 @@ public sealed class EvolutionArchiveSnapshot<TGenome> : IEvolutionArchiveView<TG
         DefinitionHash = source.DefinitionHash.Trim();
         Direction = source.Direction;
         Version = source.Version;
-        Best = Direction == EvolutionOptimizationDirection.Maximize
-            ? entries.OrderByDescending(entry => entry.Evaluation.Quality)
-                .ThenBy(entry => entry.Evaluation.GenomeId, StringComparer.Ordinal).FirstOrDefault()
-            : entries.OrderBy(entry => entry.Evaluation.Quality)
-                .ThenBy(entry => entry.Evaluation.GenomeId, StringComparer.Ordinal).FirstOrDefault();
+        Best = entries.OrderBy(entry => entry, EvolutionEntryOrdering.BestFirst<TGenome>(Direction)).FirstOrDefault();
     }
 
     /// <inheritdoc/>

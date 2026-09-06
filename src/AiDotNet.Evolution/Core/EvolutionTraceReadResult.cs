@@ -40,7 +40,10 @@ public sealed class EvolutionTraceReadResult
     {
         Guard.NotNull(records);
         if (!Enum.IsDefined(typeof(EvolutionTraceFormat), format)) throw new ArgumentOutOfRangeException(nameof(format));
-        EvolutionTraceRecord[] copy = records.ToArray();
+        EvolutionTraceRecord[] copy = EvolutionCollection.ToBoundedArray(
+            records,
+            EvolutionCollectionLimits.MaximumTraceRecords,
+            nameof(records));
         foreach (EvolutionTraceRecord record in copy)
             if (record is null) throw new ArgumentException("A trace read result cannot contain null records.", nameof(records));
         _records = Array.AsReadOnly(copy);

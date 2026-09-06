@@ -30,6 +30,15 @@ public sealed class EvolutionTaskResult
     /// <summary>The largest number of artifacts one result may carry before the engine's own budgets apply.</summary>
     public const int MaximumArtifacts = 64;
 
+    /// <summary>The largest number of diagnostics one result may carry.</summary>
+    public const int MaximumDiagnostics = 64;
+
+    /// <summary>The largest number of descriptor or metric entries one result may carry.</summary>
+    public const int MaximumNamedValues = 256;
+
+    /// <summary>The largest number of objective or constraint-violation values one result may carry.</summary>
+    public const int MaximumVectorValues = 256;
+
     private readonly ReadOnlyDictionary<string, double> _descriptors;
     private readonly ReadOnlyDictionary<string, double> _metrics;
     private readonly ReadOnlyCollection<double> _objectives;
@@ -86,12 +95,12 @@ public sealed class EvolutionTaskResult
 
         double[] objectiveCopy = CopyFinite(objectives, nameof(objectives), nonnegative: false);
         double[] violationCopy = CopyFinite(constraintViolations, nameof(constraintViolations), nonnegative: true);
-        EvolutionDiagnostic[] diagnosticCopy = diagnostics?.ToArray() ?? Array.Empty<EvolutionDiagnostic>();
-        if (diagnosticCopy.Length > 64) throw new ArgumentException("At most 64 diagnostics may be attached to one result.", nameof(diagnostics));
+        EvolutionDiagnostic[] diagnosticCopy = ToBoundedArray(
+            diagnostics,
+            MaximumDiagnostics,
+            nameof(diagnostics));
         if (diagnosticCopy.Any(item => item is null)) throw new ArgumentException("Diagnostics cannot contain null entries.", nameof(diagnostics));
-        EvolutionArtifact[] artifactCopy = artifacts?.ToArray() ?? Array.Empty<EvolutionArtifact>();
-        if (artifactCopy.Length > MaximumArtifacts)
-            throw new ArgumentException($"At most {MaximumArtifacts} artifacts may be attached to one result.", nameof(artifacts));
+        EvolutionArtifact[] artifactCopy = ToBoundedArray(artifacts, MaximumArtifacts, nameof(artifacts));
         if (artifactCopy.Any(item => item is null)) throw new ArgumentException("Artifacts cannot contain null entries.", nameof(artifacts));
 
         Status = status;
@@ -166,7 +175,11 @@ public sealed class EvolutionTaskResult
     {
         var copy = new Dictionary<string, double>(StringComparer.Ordinal);
         if (values is null) return copy;
-        foreach (KeyValuePair<string, double> value in values)
+        KeyValuePair<string, double>[] snapshot = EvolutionCollection.ToBoundedArray(
+            values,
+            MaximumNamedValues,
+            parameterName);
+        foreach (KeyValuePair<string, double> value in snapshot)
         {
             Guard.NotNullOrWhiteSpace(value.Key);
             if (!EvolutionDescriptorDefinition.IsFinite(value.Value))
@@ -180,9 +193,27 @@ public sealed class EvolutionTaskResult
 
     private static double[] CopyFinite(IEnumerable<double>? values, string parameterName, bool nonnegative)
     {
-        double[] result = values?.ToArray() ?? Array.Empty<double>();
+        double[] result = ToBoundedArray(values, MaximumVectorValues, parameterName);
         if (result.Any(value => !EvolutionDescriptorDefinition.IsFinite(value) || (nonnegative && value < 0)))
             throw new ArgumentOutOfRangeException(parameterName);
         return result;
+    }
+
+    private static T[] ToBoundedArray<T>(IEnumerable<T>? values, int maximum, string parameterName)
+    {
+        if (values is null) return Array.Empty<T>();
+        if (values is ICollection<T> collection && collection.Count > maximum)
+            throw new ArgumentException($"At most {maximum} values may be attached to one result.", parameterName);
+        if (values is IReadOnlyCollection<T> readOnlyCollection && readOnlyCollection.Count > maximum)
+            throw new ArgumentException($"At most {maximum} values may be attached to one result.", parameterName);
+
+        var result = new List<T>(Math.Min(maximum, values is ICollection<T> known ? known.Count : 4));
+        foreach (T value in values)
+        {
+            if (result.Count == maximum)
+                throw new ArgumentException($"At most {maximum} values may be attached to one result.", parameterName);
+            result.Add(value);
+        }
+        return result.ToArray();
     }
 }

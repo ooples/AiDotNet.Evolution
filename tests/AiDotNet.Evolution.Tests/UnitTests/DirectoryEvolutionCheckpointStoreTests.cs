@@ -152,6 +152,25 @@ public sealed class DirectoryEvolutionCheckpointStoreTests
     }
 
     [Fact]
+    public async Task SeparateStoreInstancesSerializeTheWholeSaveTransaction()
+    {
+        using var directory = new TemporaryDirectory();
+        var store = new DirectoryEvolutionCheckpointStore(directory.Path);
+        string lockPath = Path.Combine(directory.Path, ".checkpoint-writer.lock");
+
+        using (var heldByAnotherInstance =
+               new FileStream(lockPath, FileMode.OpenOrCreate, FileAccess.ReadWrite, FileShare.None))
+        using (var cancellation = new CancellationTokenSource(TimeSpan.FromMilliseconds(100)))
+        {
+            await Assert.ThrowsAnyAsync<OperationCanceledException>(() =>
+                Task.Run(() => store.SaveAsync(Checkpoint(1, "blocked", 1), cancellation.Token)));
+        }
+
+        await store.SaveAsync(Checkpoint(1, "saved", 1));
+        Assert.Equal("saved", (await store.LoadLatestAsync("run"))?.Payload);
+    }
+
+    [Fact]
     public void InvalidConstructionArgumentsAreRejected()
     {
         using var directory = new TemporaryDirectory();

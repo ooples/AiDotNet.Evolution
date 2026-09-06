@@ -12,12 +12,9 @@ reviews:
   commit_status: true
   collapse_walkthrough: false
   changed_files_summary: true
-  # The bootstrap PR exceeds CodeRabbit's 100-file review ceiling. Keep every behavioral implementation and CI/release
-  # file in scope; the excluded contracts, enums, compatibility shims, and tests are compiler- and CI-enforced.
+  # The bootstrap PR exceeds CodeRabbit's 100-file review ceiling. Keep public contracts, finite choices, tests,
+  # behavioral implementation, and CI/release files in scope; exclude only compatibility shims and issue templates.
   path_filters:
-    - "!tests/**"
-    - "!src/AiDotNet.Evolution/Enums/**"
-    - "!src/AiDotNet.Evolution/Interfaces/**"
     - "!src/AiDotNet.Evolution/Polyfills/**"
     - "!.github/ISSUE_TEMPLATE/**"
   path_instructions:

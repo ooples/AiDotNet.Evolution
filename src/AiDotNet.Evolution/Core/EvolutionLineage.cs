@@ -109,9 +109,17 @@ public sealed class EvolutionLineage
     private static string[] CopyIds(IEnumerable<string>? values, string parameterName)
     {
         if (values is null) return Array.Empty<string>();
-        string[] result = values.ToArray();
-        if (result.Any(string.IsNullOrWhiteSpace))
-            throw new ArgumentException("Identity collections cannot contain empty values.", parameterName);
-        return result.Select(value => value.Trim()).ToArray();
+        var result = new List<string>(EvolutionCollectionLimits.MaximumLineageIdentities);
+        foreach (string value in values)
+        {
+            if (result.Count == EvolutionCollectionLimits.MaximumLineageIdentities)
+                throw new ArgumentException(
+                    $"A lineage may contain at most {EvolutionCollectionLimits.MaximumLineageIdentities} identities.",
+                    parameterName);
+            if (string.IsNullOrWhiteSpace(value))
+                throw new ArgumentException("Identity collections cannot contain empty values.", parameterName);
+            result.Add(value.Trim());
+        }
+        return result.ToArray();
     }
 }

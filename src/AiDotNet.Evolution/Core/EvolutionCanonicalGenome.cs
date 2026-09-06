@@ -29,6 +29,7 @@ public sealed class EvolutionCanonicalGenome<TGenome>
     public EvolutionCanonicalGenome(TGenome genome, string id)
     {
         if (genome is null) throw new ArgumentNullException(nameof(genome));
+        EvolutionGenomeContract<TGenome>.Require(nameof(genome));
         Guard.NotNullOrWhiteSpace(id);
         Genome = genome;
         Id = id.Trim();

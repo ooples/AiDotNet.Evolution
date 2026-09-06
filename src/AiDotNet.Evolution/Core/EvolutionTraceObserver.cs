@@ -107,7 +107,12 @@ public sealed class EvolutionTraceObserver<TGenome> : IEvolutionObserver<TGenome
         Guard.NotNullOrWhiteSpace(runId);
         _options = options.SnapshotAndValidate();
         _runId = runId.Trim();
-        EvolutionDescriptorDefinition[] copy = descriptors?.ToArray() ?? Array.Empty<EvolutionDescriptorDefinition>();
+        EvolutionDescriptorDefinition[] copy = descriptors is null
+            ? Array.Empty<EvolutionDescriptorDefinition>()
+            : EvolutionCollection.CopyBounded(
+                descriptors,
+                EvolutionCollectionLimits.MaximumArchiveDimensions,
+                nameof(descriptors));
         foreach (EvolutionDescriptorDefinition descriptor in copy)
             if (descriptor is null)
                 throw new ArgumentException("Descriptor definitions cannot contain null values.", nameof(descriptors));
@@ -329,6 +334,12 @@ public sealed class EvolutionTraceObserver<TGenome> : IEvolutionObserver<TGenome
 
         foreach (KeyValuePair<string, double> pair in record.MetricDeltas)
         {
+            if (!_totalMetricDeltas.ContainsKey(pair.Key) &&
+                _totalMetricDeltas.Count >= _options.MaxTrackedMetrics)
+            {
+                _truncated = true;
+                continue;
+            }
             _totalMetricDeltas.TryGetValue(pair.Key, out double total);
             _totalMetricDeltas[pair.Key] = SaturatingAdd(total, pair.Value);
             _bestMetricDeltas[pair.Key] = _bestMetricDeltas.TryGetValue(pair.Key, out double best)
@@ -347,6 +358,7 @@ public sealed class EvolutionTraceObserver<TGenome> : IEvolutionObserver<TGenome
         {
             EnsureOpen();
             StreamWriter writer = _writer ?? throw new InvalidOperationException("The trace writer is not open.");
+            long flushed = 0;
             foreach (string line in _buffer)
             {
                 if (_options.Format == EvolutionTraceFormat.Json)
@@ -360,11 +372,12 @@ public sealed class EvolutionTraceObserver<TGenome> : IEvolutionObserver<TGenome
                     writer.Write('\n');
                 }
                 _wroteAnyRecord = true;
-                _recordsWritten++;
+                flushed++;
             }
             writer.Flush();
             _compression?.Flush();
             _file?.Flush();
+            _recordsWritten += flushed;
             _bytesWritten += _pendingBytes;
         }
         catch (Exception exception) when (IsRecoverable(exception))

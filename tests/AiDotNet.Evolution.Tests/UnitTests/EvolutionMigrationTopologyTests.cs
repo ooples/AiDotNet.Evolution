@@ -180,7 +180,7 @@ public sealed class EvolutionMigrationTopologyTests
         InvalidOperationException failure = await Assert.ThrowsAsync<InvalidOperationException>(
             () => engine.RunAsync(Seeds(4)));
 
-        Assert.Contains("per-destination", failure.Message, StringComparison.Ordinal);
+        Assert.Contains("per-island-pair", failure.Message, StringComparison.Ordinal);
     }
 
     [Fact]

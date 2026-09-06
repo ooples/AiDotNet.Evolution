@@ -32,6 +32,7 @@ public sealed class EvolutionGlobalEliteIndex<TGenome>
     private readonly SortedSet<EvolutionEliteRecord<TGenome>> _records;
     private readonly HashSet<string> _genomeIds = new(StringComparer.Ordinal);
     private readonly int _capacity;
+    private IReadOnlyList<EvolutionEliteRecord<TGenome>>? _ordered;
 
     /// <summary>Initializes an empty index.</summary>
     /// <param name="capacity">The maximum number of retained records; zero disables the index.</param>
@@ -41,7 +42,8 @@ public sealed class EvolutionGlobalEliteIndex<TGenome>
     /// </exception>
     public EvolutionGlobalEliteIndex(int capacity, EvolutionOptimizationDirection direction)
     {
-        if (capacity < 0) throw new ArgumentOutOfRangeException(nameof(capacity));
+        if (capacity < 0 || capacity > EvolutionCollectionLimits.MaximumResultEntries)
+            throw new ArgumentOutOfRangeException(nameof(capacity));
         if (!Enum.IsDefined(typeof(EvolutionOptimizationDirection), direction)) throw new ArgumentOutOfRangeException(nameof(direction));
         _capacity = capacity;
         Direction = direction;
@@ -58,7 +60,8 @@ public sealed class EvolutionGlobalEliteIndex<TGenome>
     public int Count => _records.Count;
 
     /// <summary>Gets every retained record in best-first order.</summary>
-    public IReadOnlyList<EvolutionEliteRecord<TGenome>> Entries => _records.ToArray();
+    public IReadOnlyList<EvolutionEliteRecord<TGenome>> Entries =>
+        _ordered ??= Array.AsReadOnly(_records.ToArray());
 
     /// <summary>Offers a completed evaluation to the index.</summary>
     /// <param name="record">The candidate record, carrying its island and archive entry.</param>
@@ -70,6 +73,7 @@ public sealed class EvolutionGlobalEliteIndex<TGenome>
         if (_capacity == 0) return false;
         if (!_genomeIds.Add(record.Entry.Evaluation.GenomeId)) return false;
         _records.Add(record);
+        _ordered = null;
         if (_records.Count <= _capacity) return true;
 
         EvolutionEliteRecord<TGenome> worst = _records.Max ?? record;
@@ -107,6 +111,7 @@ public sealed class EvolutionGlobalEliteIndex<TGenome>
                 throw new InvalidDataException("The checkpoint elite index repeats a genome identifier.");
             _records.Add(record);
         }
+        _ordered = null;
     }
 
     private sealed class RecordComparer : IComparer<EvolutionEliteRecord<TGenome>>

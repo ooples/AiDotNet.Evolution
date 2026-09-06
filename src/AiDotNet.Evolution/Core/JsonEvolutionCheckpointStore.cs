@@ -31,6 +31,7 @@ public sealed class JsonEvolutionCheckpointStore : IEvolutionCheckpointStore
     private readonly object _gate = new();
     private readonly string _path;
     private readonly string _previousPath;
+    private readonly string _lockPath;
     private readonly long _maxCheckpointBytes;
 
     /// <summary>Initializes a file-backed store.</summary>
@@ -45,6 +46,7 @@ public sealed class JsonEvolutionCheckpointStore : IEvolutionCheckpointStore
         if (maxCheckpointBytes <= 0) throw new ArgumentOutOfRangeException(nameof(maxCheckpointBytes));
         _path = Path.GetFullPath(filePath);
         _previousPath = _path + ".previous";
+        _lockPath = _path + ".lock";
         _maxCheckpointBytes = maxCheckpointBytes;
         string? directory = Path.GetDirectoryName(_path);
         if (!string.IsNullOrEmpty(directory)) Directory.CreateDirectory(directory);
@@ -75,14 +77,25 @@ public sealed class JsonEvolutionCheckpointStore : IEvolutionCheckpointStore
         lock (_gate)
         {
             cancellationToken.ThrowIfCancellationRequested();
-            EvolutionCheckpoint? existing = TryLoad(_path, checkpoint.RunId);
+            using FileStream writeLock = AcquireWriteLock(cancellationToken);
+            bool corruptPrimary = false;
+            EvolutionCheckpoint? existing;
+            try
+            {
+                existing = TryLoad(_path, checkpoint.RunId);
+            }
+            catch (InvalidDataException)
+            {
+                corruptPrimary = true;
+                existing = null;
+            }
             if (existing is null) existing = TryLoad(_previousPath, checkpoint.RunId);
             if (existing is not null)
             {
                 ValidateSuccessor(existing, checkpoint);
                 if (checkpoint.Sequence == existing.Sequence) return Task.CompletedTask;
             }
-            Persist(checkpoint, cancellationToken);
+            Persist(checkpoint, corruptPrimary, cancellationToken);
         }
         return Task.CompletedTask;
     }
@@ -110,16 +123,18 @@ public sealed class JsonEvolutionCheckpointStore : IEvolutionCheckpointStore
         }
     }
 
-    private void Persist(EvolutionCheckpoint checkpoint, CancellationToken cancellationToken)
+    private void Persist(EvolutionCheckpoint checkpoint, bool corruptPrimary, CancellationToken cancellationToken)
     {
         string directory = Path.GetDirectoryName(_path) ?? ".";
-        string tempPath = EvolutionPath.Join(directory, $".{Path.GetFileName(_path)}.{Guid.NewGuid():N}.tmp");
+        string tempPath = EvolutionPath.Join(directory,
+            $".{Path.GetFileName(_path)}.{checkpoint.Sequence.ToString(System.Globalization.CultureInfo.InvariantCulture)}.tmp");
         string json = JsonSerializer.Serialize(CheckpointDocument.From(checkpoint), EvolutionJson.Indented);
         byte[] payload = new UTF8Encoding(encoderShouldEmitUTF8Identifier: false).GetBytes(json);
         if (payload.LongLength > _maxCheckpointBytes)
             throw new InvalidDataException($"The evolution checkpoint exceeds the {_maxCheckpointBytes}-byte limit.");
         try
         {
+            if (File.Exists(tempPath)) File.Delete(tempPath);
             using (var stream = new FileStream(tempPath, FileMode.CreateNew, FileAccess.Write, FileShare.None))
             {
                 cancellationToken.ThrowIfCancellationRequested();
@@ -128,6 +143,7 @@ public sealed class JsonEvolutionCheckpointStore : IEvolutionCheckpointStore
             }
 
             cancellationToken.ThrowIfCancellationRequested();
+            if (corruptPrimary && File.Exists(_path)) File.Delete(_path);
             if (File.Exists(_path))
             {
                 File.Replace(tempPath, _path, _previousPath, ignoreMetadataErrors: true);
@@ -150,6 +166,23 @@ public sealed class JsonEvolutionCheckpointStore : IEvolutionCheckpointStore
                 {
                     // Do not replace the primary save failure with a cleanup failure from a locked-down directory.
                 }
+            }
+        }
+    }
+
+    private FileStream AcquireWriteLock(CancellationToken cancellationToken)
+    {
+        while (true)
+        {
+            cancellationToken.ThrowIfCancellationRequested();
+            try
+            {
+                return new FileStream(_lockPath, FileMode.OpenOrCreate, FileAccess.ReadWrite, FileShare.None);
+            }
+            catch (IOException)
+            {
+                cancellationToken.ThrowIfCancellationRequested();
+                Thread.Sleep(10);
             }
         }
     }
@@ -254,7 +287,7 @@ public sealed class JsonEvolutionCheckpointStore : IEvolutionCheckpointStore
             CompatibilityHash,
             Payload,
             Checksum,
-            Quality?.ToString("R", System.Globalization.CultureInfo.InvariantCulture) ?? "none",
+            EvolutionHash.EncodeNullableDouble(Quality),
             ((int)QualityDirection).ToString(System.Globalization.CultureInfo.InvariantCulture)
         });
 

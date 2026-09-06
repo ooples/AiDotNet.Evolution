@@ -224,6 +224,106 @@ public sealed class EvolutionEvaluationParityTests
     }
 
     [Fact]
+    public async Task IncrementalQdScoreSubtractsAnEvictedNegativeElite()
+    {
+        var options = new EvolutionEngineOptions
+        {
+            RunId = "qd-eviction",
+            Seed = 17,
+            MaxEvaluationAttempts = 3,
+            MaxProposals = 3,
+            MaxGenerations = 3,
+            ProposalBatchSize = 1,
+            MaxDegreeOfParallelism = 1,
+            IslandCount = 1,
+            MigrationInterval = 0,
+            MigrantsPerIsland = 1,
+            Dispatch = EvolutionDispatchMode.Continuous,
+            EarlyStopping = new EvolutionEarlyStoppingOptions
+            {
+                Metric = EvolutionEarlyStoppingMetric.QdScore,
+                PatienceEvaluations = 2,
+                MinimumImprovement = 0.001
+            }
+        };
+        var engine = new EvolutionEngine<TestGenome>(
+            new NegativeQualityTask(),
+            new IncrementVariation(),
+            _ => new MapElitesArchive<TestGenome>(new[]
+            {
+                new EvolutionDescriptorDefinition("x", 0, 3, 3, EvolutionOutOfRangePolicy.Clamp)
+            }, capacity: 2),
+            options);
+
+        EvolutionRunResult<TestGenome> result = await engine.RunAsync(
+            new[] { new TestGenome(1), new TestGenome(2), new TestGenome(3) });
+
+        // -100 and -1 fill the two cells. Quality 0 then evicts -100, taking QD score from -101 to -1. If the
+        // removed contribution is not applied, patience expires here instead of observing the improvement.
+        Assert.Equal(EvolutionStopReason.EvaluationBudgetReached, result.StopReason);
+        Assert.Equal(new[] { "2", "3" }, result.Islands[0].Entries
+            .Select(entry => entry.Evaluation.GenomeId)
+            .OrderBy(id => id, StringComparer.Ordinal));
+    }
+
+    [Fact]
+    public async Task NamedEarlyStoppingMetricTracksReplacementAndItsOwnDirectionIncrementally()
+    {
+        EvolutionEngineOptions options = Options(maxAttempts: 6, batchSize: 1);
+        options.MaxProposals = 6;
+        options.MaxGenerations = 6;
+        options.EarlyStopping = new EvolutionEarlyStoppingOptions
+        {
+            MetricName = "latency",
+            MetricIsLowerBetter = true,
+            PatienceEvaluations = 2,
+            MinimumImprovement = 0.001
+        };
+        var engine = new EvolutionEngine<TestGenome>(
+            new ImprovingNamedMetricTask(),
+            new IncrementVariation(),
+            _ => new MapElitesArchive<TestGenome>(new[]
+            {
+                new EvolutionDescriptorDefinition("x", 0, 6, 6, EvolutionOutOfRangePolicy.Clamp)
+            }, capacity: 2),
+            options);
+
+        EvolutionRunResult<TestGenome> result = await engine.RunAsync(Seeds(6));
+
+        Assert.Equal(EvolutionStopReason.EvaluationBudgetReached, result.StopReason);
+        Assert.Equal(new[] { "5", "6" }, result.Islands[0].Entries
+            .Select(entry => entry.Evaluation.GenomeId)
+            .OrderBy(id => id, StringComparer.Ordinal));
+    }
+
+    [Fact]
+    public async Task QdScoreSaturatesWithoutLosingArchiveMutationAccounting()
+    {
+        EvolutionEngineOptions options = Options(maxAttempts: 3, batchSize: 1);
+        options.MaxProposals = 3;
+        options.MaxGenerations = 3;
+        options.EarlyStopping = new EvolutionEarlyStoppingOptions
+        {
+            Metric = EvolutionEarlyStoppingMetric.QdScore,
+            PatienceEvaluations = 10,
+            MinimumImprovement = 0.001
+        };
+        var engine = new EvolutionEngine<TestGenome>(
+            new MaximumQualityTask(),
+            new IncrementVariation(),
+            _ => new MapElitesArchive<TestGenome>(new[]
+            {
+                new EvolutionDescriptorDefinition("x", 0, 3, 3, EvolutionOutOfRangePolicy.Clamp)
+            }),
+            options);
+
+        EvolutionRunResult<TestGenome> result = await engine.RunAsync(Seeds(3));
+
+        Assert.Equal(EvolutionStopReason.EvaluationBudgetReached, result.StopReason);
+        Assert.Equal(3, result.Islands[0].Count);
+    }
+
+    [Fact]
     public async Task ArtifactsAreRetainedSanitizedAndDeliveredToTheNextProposalExactlyOnce()
     {
         var variation = new ArtifactRecordingVariation();
@@ -536,6 +636,99 @@ public sealed class EvolutionEvaluationParityTests
         options.CheckpointInterval = 1;
         options.EarlyStopping.PatienceEvaluations = 4;
         return options;
+    }
+
+    private sealed class NegativeQualityTask : IEvolutionTask<TestGenome>
+    {
+        public string Id => "negative-quality";
+        public string VersionHash => "negative-quality-task-v1";
+        public string EvaluatorVersionHash => "negative-quality-evaluator-v1";
+
+        public ValueTask<EvolutionCanonicalGenome<TestGenome>> CanonicalizeAsync(
+            TestGenome genome,
+            CancellationToken cancellationToken = default)
+        {
+            cancellationToken.ThrowIfCancellationRequested();
+            return new ValueTask<EvolutionCanonicalGenome<TestGenome>>(
+                new EvolutionCanonicalGenome<TestGenome>(
+                    new TestGenome(genome.Value),
+                    genome.Value.ToString(System.Globalization.CultureInfo.InvariantCulture)));
+        }
+
+        public ValueTask<EvolutionTaskResult> EvaluateAsync(
+            EvolutionCandidate<TestGenome> candidate,
+            EvolutionEvaluationContext context,
+            CancellationToken cancellationToken = default)
+        {
+            cancellationToken.ThrowIfCancellationRequested();
+            int value = candidate.CanonicalGenome.Genome.Value;
+            double quality = value == 1 ? -100 : value == 2 ? -1 : 0;
+            return new ValueTask<EvolutionTaskResult>(EvolutionTaskResult.Completed(
+                quality,
+                new Dictionary<string, double>(StringComparer.Ordinal) { ["x"] = value - 1 }));
+        }
+    }
+
+    private sealed class ImprovingNamedMetricTask : IEvolutionTask<TestGenome>
+    {
+        public string Id => "improving-named-metric";
+        public string VersionHash => "improving-named-metric-task-v1";
+        public string EvaluatorVersionHash => "improving-named-metric-evaluator-v1";
+
+        public ValueTask<EvolutionCanonicalGenome<TestGenome>> CanonicalizeAsync(
+            TestGenome genome,
+            CancellationToken cancellationToken = default)
+        {
+            cancellationToken.ThrowIfCancellationRequested();
+            return new ValueTask<EvolutionCanonicalGenome<TestGenome>>(
+                new EvolutionCanonicalGenome<TestGenome>(
+                    new TestGenome(genome.Value),
+                    genome.Value.ToString(System.Globalization.CultureInfo.InvariantCulture)));
+        }
+
+        public ValueTask<EvolutionTaskResult> EvaluateAsync(
+            EvolutionCandidate<TestGenome> candidate,
+            EvolutionEvaluationContext context,
+            CancellationToken cancellationToken = default)
+        {
+            cancellationToken.ThrowIfCancellationRequested();
+            int value = candidate.CanonicalGenome.Genome.Value;
+            return new ValueTask<EvolutionTaskResult>(new EvolutionTaskResult(
+                EvolutionEvaluationStatus.Completed,
+                value,
+                descriptors: new Dictionary<string, double>(StringComparer.Ordinal) { ["x"] = value - 1 },
+                metrics: new Dictionary<string, double>(StringComparer.Ordinal) { ["latency"] = 100 - value }));
+        }
+    }
+
+    private sealed class MaximumQualityTask : IEvolutionTask<TestGenome>
+    {
+        public string Id => "maximum-quality";
+        public string VersionHash => "maximum-quality-task-v1";
+        public string EvaluatorVersionHash => "maximum-quality-evaluator-v1";
+
+        public ValueTask<EvolutionCanonicalGenome<TestGenome>> CanonicalizeAsync(
+            TestGenome genome,
+            CancellationToken cancellationToken = default)
+        {
+            cancellationToken.ThrowIfCancellationRequested();
+            return new ValueTask<EvolutionCanonicalGenome<TestGenome>>(
+                new EvolutionCanonicalGenome<TestGenome>(
+                    new TestGenome(genome.Value),
+                    genome.Value.ToString(System.Globalization.CultureInfo.InvariantCulture)));
+        }
+
+        public ValueTask<EvolutionTaskResult> EvaluateAsync(
+            EvolutionCandidate<TestGenome> candidate,
+            EvolutionEvaluationContext context,
+            CancellationToken cancellationToken = default)
+        {
+            cancellationToken.ThrowIfCancellationRequested();
+            int value = candidate.CanonicalGenome.Genome.Value;
+            return new ValueTask<EvolutionTaskResult>(EvolutionTaskResult.Completed(
+                double.MaxValue,
+                new Dictionary<string, double>(StringComparer.Ordinal) { ["x"] = value - 1 }));
+        }
     }
 
     private static EvolutionEngineOptions ResumableArtifactOptions()

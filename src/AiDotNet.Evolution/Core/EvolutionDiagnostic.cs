@@ -83,11 +83,13 @@ public sealed class EvolutionDiagnostic
 
     private static Dictionary<string, string> CopyData(IReadOnlyDictionary<string, string>? data)
     {
-        var copy = new Dictionary<string, string>(StringComparer.Ordinal);
-        if (data is null) return copy;
-        if (data.Count > MaximumDataEntries)
-            throw new ArgumentException($"A diagnostic may carry at most {MaximumDataEntries} structured entries.", nameof(data));
-        foreach (KeyValuePair<string, string> entry in data)
+        if (data is null) return new Dictionary<string, string>(StringComparer.Ordinal);
+        KeyValuePair<string, string>[] snapshot = EvolutionCollection.ToBoundedArray(
+            data,
+            MaximumDataEntries,
+            nameof(data));
+        var validated = new Dictionary<string, string>(StringComparer.Ordinal);
+        foreach (KeyValuePair<string, string> entry in snapshot)
         {
             Guard.NotNullOrWhiteSpace(entry.Key);
             if (entry.Value is null) throw new ArgumentException("Diagnostic data values cannot be null.", nameof(data));
@@ -96,9 +98,12 @@ public sealed class EvolutionDiagnostic
             if (entry.Value.Length > MaximumDataValueLength)
                 throw new ArgumentException($"Diagnostic data values cannot exceed {MaximumDataValueLength} characters.", nameof(data));
             string key = entry.Key.Trim();
-            if (copy.ContainsKey(key)) throw new ArgumentException("Diagnostic data keys must be unique.", nameof(data));
-            copy.Add(key, entry.Value);
+            if (validated.ContainsKey(key)) throw new ArgumentException("Diagnostic data keys must be unique.", nameof(data));
+            validated.Add(key, entry.Value);
         }
+        var copy = new Dictionary<string, string>(validated.Count, StringComparer.Ordinal);
+        foreach (string key in validated.Keys.OrderBy(item => item, StringComparer.Ordinal))
+            copy.Add(key, validated[key]);
         return copy;
     }
 }

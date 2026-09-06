@@ -51,6 +51,7 @@ public sealed class EvolutionTraceRecord
     private readonly ReadOnlyCollection<EvolutionDiagnostic> _diagnostics =
         Array.AsReadOnly(Array.Empty<EvolutionDiagnostic>());
     private readonly double? _quality;
+    private readonly EvolutionArchiveInsertionResult? _insertionResult;
     private readonly double? _parentQuality;
     private readonly double? _qualityDelta;
     private readonly double _costUnits;
@@ -176,7 +177,16 @@ public sealed class EvolutionTraceRecord
     }
 
     /// <summary>Gets the archive insertion outcome, or <c>null</c> when no insertion was attempted.</summary>
-    public EvolutionArchiveInsertionResult? InsertionResult { get; init; }
+    public EvolutionArchiveInsertionResult? InsertionResult
+    {
+        get => _insertionResult;
+        init
+        {
+            if (value.HasValue && !Enum.IsDefined(typeof(EvolutionArchiveInsertionResult), value.Value))
+                throw new ArgumentOutOfRangeException(nameof(value), "The insertion result is undefined.");
+            _insertionResult = value;
+        }
+    }
 
     /// <summary>Gets the archive cell the candidate mapped to, or <c>null</c> when it mapped to none.</summary>
     /// <remarks>
@@ -354,7 +364,10 @@ public sealed class EvolutionTraceRecord
         IReadOnlyList<EvolutionDiagnostic>? values, string parameterName)
     {
         if (values is null) return Array.AsReadOnly(Array.Empty<EvolutionDiagnostic>());
-        EvolutionDiagnostic[] copy = values.ToArray();
+        EvolutionDiagnostic[] copy = EvolutionCollection.CopyBounded(
+            values,
+            EvolutionTaskResult.MaximumDiagnostics,
+            parameterName);
         foreach (EvolutionDiagnostic diagnostic in copy)
             if (diagnostic is null)
                 throw new ArgumentException("Trace diagnostics cannot contain null values.", parameterName);
@@ -374,8 +387,18 @@ public sealed class EvolutionTraceRecord
     {
         var copy = new Dictionary<string, double>(StringComparer.Ordinal);
         if (values is null) return new ReadOnlyDictionary<string, double>(copy);
-        foreach (KeyValuePair<string, double> pair in values.OrderBy(item => item.Key, StringComparer.Ordinal))
+        if (values.Count > EvolutionTaskResult.MaximumNamedValues)
+            throw new ArgumentException(
+                $"Trace values may contain at most {EvolutionTaskResult.MaximumNamedValues} entries.",
+                parameterName);
+        int visited = 0;
+        foreach (KeyValuePair<string, double> pair in values)
         {
+            if (visited == EvolutionTaskResult.MaximumNamedValues)
+                throw new ArgumentException(
+                    $"Trace values may contain at most {EvolutionTaskResult.MaximumNamedValues} entries.",
+                    parameterName);
+            visited++;
             if (string.IsNullOrWhiteSpace(pair.Key))
                 throw new ArgumentException("Trace value names cannot be empty or white space.", parameterName);
             if (!EvolutionDescriptorDefinition.IsFinite(pair.Value))
@@ -384,16 +407,23 @@ public sealed class EvolutionTraceRecord
             if (copy.ContainsKey(key)) throw new ArgumentException("Trace value names must be unique.", parameterName);
             copy.Add(key, pair.Value);
         }
-        return new ReadOnlyDictionary<string, double>(copy);
+        var ordered = new Dictionary<string, double>(copy.Count, StringComparer.Ordinal);
+        foreach (KeyValuePair<string, double> pair in copy.OrderBy(item => item.Key, StringComparer.Ordinal))
+            ordered.Add(pair.Key, pair.Value);
+        return new ReadOnlyDictionary<string, double>(ordered);
     }
 
     private static ReadOnlyCollection<string> CopyIdentities(IReadOnlyList<string>? values, string parameterName)
     {
         if (values is null) return Array.AsReadOnly(Array.Empty<string>());
-        string[] copy = values.ToArray();
+        string[] copy = EvolutionCollection.CopyBounded(
+            values,
+            EvolutionCollectionLimits.MaximumLineageIdentities,
+            parameterName);
         foreach (string value in copy)
             if (string.IsNullOrWhiteSpace(value))
                 throw new ArgumentException("Trace identities cannot be empty or white space.", parameterName);
-        return Array.AsReadOnly(copy.Select(value => value.Trim()).ToArray());
+        for (int index = 0; index < copy.Length; index++) copy[index] = copy[index].Trim();
+        return Array.AsReadOnly(copy);
     }
 }

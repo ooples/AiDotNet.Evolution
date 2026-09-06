@@ -1,3 +1,4 @@
+using System.Collections;
 using System.Text.Json.Nodes;
 using AiDotNet.Evolution;
 using Xunit;
@@ -35,6 +36,24 @@ public sealed class EvolutionAuditRegressionTests
     }
 
     [Fact]
+    public void MultiAxisGrowthIsAtomicWhenTheCombinedGridWouldExceedItsLimit()
+    {
+        var archive = new MapElitesArchive<TestGenome>(new[]
+        {
+            new EvolutionDescriptorDefinition("x", 0, 2, 2, EvolutionOutOfRangePolicy.Grow),
+            new EvolutionDescriptorDefinition("y", 0, 2, 2, EvolutionOutOfRangePolicy.Grow)
+        }, maximumGridCells: 50);
+
+        Assert.Equal(EvolutionArchiveInsertionResult.Rejected, Add(archive, 1, "a", 1, x: 9, y: 9));
+
+        Assert.Equal(4, archive.TotalGridCells);
+        Assert.Equal(2, archive.Descriptors[0].Maximum);
+        Assert.Equal(2, archive.Descriptors[1].Maximum);
+        Assert.Equal(0, archive.Version);
+        Assert.Empty(archive.Entries);
+    }
+
+    [Fact]
     public void ARestoreRefusesACheckpointHoldingMoreElitesThanTheArchiveCanKeep()
     {
         MapElitesArchive<TestGenome> full = Archive(capacity: 0);
@@ -43,7 +62,62 @@ public sealed class EvolutionAuditRegressionTests
         Add(full, 3, "c", 3, 0.9, 0);
 
         MapElitesArchive<TestGenome> tooSmall = Archive(capacity: 2);
-        Assert.Throws<InvalidDataException>(() => tooSmall.Restore(full.Entries.ToArray(), full.Version));
+        Assert.Throws<InvalidDataException>(() =>
+            tooSmall.Restore(full.Entries.ToArray(), full.Descriptors, full.Version));
+        Assert.Empty(tooSmall.Entries);
+        Assert.Equal(0, tooSmall.Version);
+    }
+
+    [Fact]
+    public void AReferenceGenomeMustDeclareTheImmutableOwnershipContract()
+    {
+        Assert.Throws<ArgumentException>(() =>
+            new EvolutionCanonicalGenome<MutableGenome>(new MutableGenome(), "mutable"));
+
+        var immutable = new EvolutionCanonicalGenome<TestGenome>(new TestGenome(1), "immutable");
+        Assert.Equal(1, immutable.Genome.Value);
+    }
+
+    [Fact]
+    public void AValueGenomeCannotHideAMutableReferenceFromTheOwnershipContract()
+    {
+        Assert.Throws<ArgumentException>(() =>
+            new EvolutionCanonicalGenome<MutableValueGenome>(
+                new MutableValueGenome(new[] { 1 }), "mutable-value"));
+
+        var primitive = new EvolutionCanonicalGenome<int>(1, "primitive");
+        Assert.Equal(1, primitive.Genome);
+
+        var declaredImmutable = new EvolutionCanonicalGenome<DeclaredImmutableValueGenome>(
+            new DeclaredImmutableValueGenome(new[] { 1 }), "declared-immutable-value");
+        Assert.Equal(1, declaredImmutable.Genome.GetValue(0));
+    }
+
+    [Fact]
+    public void ArchiveRestoreSnapshotsReadOnlyListsByIndex()
+    {
+        MapElitesArchive<TestGenome> source = Archive(capacity: 0);
+        Add(source, 1, "a", 1, 0.1, 0.2);
+        var restored = Archive(capacity: 0);
+
+        restored.Restore(
+            new IndexOnlyReadOnlyList<EvolutionArchiveEntry<TestGenome>>(source.Entries),
+            new IndexOnlyReadOnlyList<EvolutionDescriptorDefinition>(source.Descriptors),
+            source.Version);
+
+        Assert.Single(restored.Entries);
+        Assert.Equal(source.Entries[0].Evaluation.GenomeId, restored.Entries[0].Evaluation.GenomeId);
+    }
+
+    [Fact]
+    public void CollectionBoundsDoNotTrustADishonestReportedCount()
+    {
+        KeyValuePair<string, string>[] entries = Enumerable.Range(0, EvolutionDiagnostic.MaximumDataEntries + 1)
+            .Select(index => new KeyValuePair<string, string>("key-" + index, "value"))
+            .ToArray();
+        var dishonest = new DishonestReadOnlyDictionary(entries);
+
+        Assert.Throws<ArgumentException>(() => new EvolutionDiagnostic("bounded", "bounded", data: dishonest));
     }
 
     [Fact]
@@ -105,4 +179,69 @@ public sealed class EvolutionAuditRegressionTests
             MigrantsPerIsland = 1,
             CheckpointInterval = 0
         }, checkpointStore: store, genomeCodec: new TestGenomeCodec());
+
+    private sealed class MutableGenome
+    {
+        public int Value { get; set; }
+    }
+
+    private readonly struct MutableValueGenome
+    {
+        internal MutableValueGenome(int[] values) => Values = values;
+
+        internal int[] Values { get; }
+    }
+
+    private readonly struct DeclaredImmutableValueGenome : IImmutableEvolutionGenome
+    {
+        private readonly int[] _values;
+
+        internal DeclaredImmutableValueGenome(int[] values) => _values = values.ToArray();
+
+        internal int GetValue(int index) => _values[index];
+    }
+
+    private sealed class IndexOnlyReadOnlyList<T> : IReadOnlyList<T>
+    {
+        private readonly T[] _items;
+
+        internal IndexOnlyReadOnlyList(IEnumerable<T> items) => _items = items.ToArray();
+
+        public int Count => _items.Length;
+
+        public T this[int index] => _items[index];
+
+        public IEnumerator<T> GetEnumerator() =>
+            throw new InvalidOperationException("The collection must be copied through its indexed contract.");
+
+        IEnumerator IEnumerable.GetEnumerator() => GetEnumerator();
+    }
+
+    private sealed class DishonestReadOnlyDictionary : IReadOnlyDictionary<string, string>
+    {
+        private readonly KeyValuePair<string, string>[] _entries;
+
+        internal DishonestReadOnlyDictionary(KeyValuePair<string, string>[] entries) => _entries = entries;
+
+        public int Count => 0;
+
+        public IEnumerable<string> Keys => _entries.Select(entry => entry.Key);
+
+        public IEnumerable<string> Values => _entries.Select(entry => entry.Value);
+
+        public string this[string key] => throw new KeyNotFoundException(key);
+
+        public bool ContainsKey(string key) => false;
+
+        public bool TryGetValue(string key, out string value)
+        {
+            value = string.Empty;
+            return false;
+        }
+
+        public IEnumerator<KeyValuePair<string, string>> GetEnumerator() =>
+            ((IEnumerable<KeyValuePair<string, string>>)_entries).GetEnumerator();
+
+        IEnumerator IEnumerable.GetEnumerator() => GetEnumerator();
+    }
 }

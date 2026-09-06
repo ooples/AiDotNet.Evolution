@@ -101,9 +101,9 @@ public sealed class EvolutionEarlyStoppingOptions
     internal string ToCanonicalString() => string.Join("|", new[]
     {
         PatienceEvaluations.ToString(CultureInfo.InvariantCulture),
-        MinimumImprovement.ToString("R", CultureInfo.InvariantCulture),
+        EvolutionHash.EncodeDouble(MinimumImprovement),
         ((int)Metric).ToString(CultureInfo.InvariantCulture),
-        MetricName ?? "built-in",
+        EvolutionHash.EncodeNullable(MetricName),
         MetricIsLowerBetter ? "lower-better" : "higher-better"
     });
 }

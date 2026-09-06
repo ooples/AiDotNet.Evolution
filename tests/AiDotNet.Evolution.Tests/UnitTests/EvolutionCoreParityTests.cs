@@ -414,7 +414,11 @@ public sealed class EvolutionCoreParityTests
         EvolutionRunResult<TestGenome> result = await ScoreEngine(options).RunAsync(Seeds(3));
 
         Assert.Empty(result.Islands[0].Entries);
-        Assert.Contains(result.RetainedFailures, diagnostic => diagnostic.Code == "descriptor_missing:score");
+        EvolutionDiagnostic[] missing = result.RetainedFailures
+            .Where(diagnostic => diagnostic.Code == "descriptor_missing")
+            .ToArray();
+        Assert.Equal(3, missing.Length);
+        Assert.All(missing, diagnostic => Assert.Equal("score", diagnostic.Data["descriptor"]));
         Assert.Equal(3, result.Counters.StatusCounts[EvolutionEvaluationStatus.Completed]);
     }
 

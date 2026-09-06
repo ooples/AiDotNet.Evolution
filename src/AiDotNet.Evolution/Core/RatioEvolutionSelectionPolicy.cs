@@ -69,7 +69,13 @@ public sealed class RatioEvolutionSelectionPolicy<TGenome> : IEliteIndexAwareEvo
     {
         Guard.NotNull(elites);
         if (island < 0) throw new ArgumentOutOfRangeException(nameof(island));
-        _globalElites = elites;
+        EvolutionEliteRecord<TGenome>[] snapshot = EvolutionCollection.CopyBounded(
+            elites,
+            EvolutionCollectionLimits.MaximumResultEntries,
+            nameof(elites));
+        if (snapshot.Any(item => item is null))
+            throw new ArgumentException("The elite index cannot contain null records.", nameof(elites));
+        _globalElites = Array.AsReadOnly(snapshot);
     }
 
     /// <inheritdoc/>
@@ -107,7 +113,11 @@ public sealed class RatioEvolutionSelectionPolicy<TGenome> : IEliteIndexAwareEvo
         EvolutionArchiveEntry<TGenome>[] pool = Array.Empty<EvolutionArchiveEntry<TGenome>>();
         if (_options.ExploitationSource == EvolutionExploitationSource.GlobalTopK && _globalElites.Count > 0)
         {
-            pool = _globalElites.Take(_options.ExploitationEliteCount).Select(record => record.Entry).ToArray();
+            pool = _globalElites
+                .Select(record => record.Entry)
+                .OrderBy(entry => entry, EvolutionEntryOrdering.BestFirst<TGenome>(archive.Direction))
+                .Take(_options.ExploitationEliteCount)
+                .ToArray();
         }
         if (pool.Length == 0)
         {
@@ -173,6 +183,8 @@ public sealed class RatioEvolutionSelectionPolicy<TGenome> : IEliteIndexAwareEvo
         if (selected.Count >= inspirationCount) return;
         EvolutionArchiveEntry<TGenome>[] remaining = entries
             .Where(entry => !chosen.Contains(entry.Evaluation.GenomeId))
+            .GroupBy(entry => entry.Evaluation.GenomeId, StringComparer.Ordinal)
+            .Select(group => group.OrderBy(entry => entry.Cell.StableKey, StringComparer.Ordinal).First())
             .OrderBy(entry => entry.Cell.StableKey, StringComparer.Ordinal)
             .ToArray();
         int take = Math.Min(inspirationCount - selected.Count, remaining.Length);
@@ -182,8 +194,7 @@ public sealed class RatioEvolutionSelectionPolicy<TGenome> : IEliteIndexAwareEvo
             EvolutionArchiveEntry<TGenome> swap = remaining[i];
             remaining[i] = remaining[index];
             remaining[index] = swap;
-            chosen.Add(remaining[i].Evaluation.GenomeId);
-            selected.Add(remaining[i]);
+            if (chosen.Add(remaining[i].Evaluation.GenomeId)) selected.Add(remaining[i]);
         }
     }
 

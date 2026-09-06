@@ -68,8 +68,14 @@ public sealed class EvolutionSelectionOptions
         if (!Enum.IsDefined(typeof(EvolutionExploitationSource), ExploitationSource))
             throw new ArgumentOutOfRangeException(nameof(ExploitationSource));
         Guard.Positive(ExploitationEliteCount);
+        if (ExploitationEliteCount > EvolutionCollectionLimits.MaximumResultEntries)
+            throw new ArgumentOutOfRangeException(nameof(ExploitationEliteCount));
         if (TopInspirationCount < 0) throw new ArgumentOutOfRangeException(nameof(TopInspirationCount));
+        if (TopInspirationCount > EvolutionCollectionLimits.MaximumLineageIdentities)
+            throw new ArgumentOutOfRangeException(nameof(TopInspirationCount));
         if (DiverseInspirationCount < 0) throw new ArgumentOutOfRangeException(nameof(DiverseInspirationCount));
+        if (DiverseInspirationCount > EvolutionCollectionLimits.MaximumLineageIdentities)
+            throw new ArgumentOutOfRangeException(nameof(DiverseInspirationCount));
 
         return new EvolutionSelectionOptions
         {
@@ -88,9 +94,9 @@ public sealed class EvolutionSelectionOptions
     /// <returns>The canonical text form of every value that changes selection behaviour.</returns>
     internal string ToCanonicalString() => string.Join("|", new[]
     {
-        ExplorationRatio.ToString("R", CultureInfo.InvariantCulture),
-        ExploitationRatio.ToString("R", CultureInfo.InvariantCulture),
-        EliteRatio.ToString("R", CultureInfo.InvariantCulture),
+        EvolutionHash.EncodeDouble(ExplorationRatio),
+        EvolutionHash.EncodeDouble(ExploitationRatio),
+        EvolutionHash.EncodeDouble(EliteRatio),
         ((int)ExploitationSource).ToString(CultureInfo.InvariantCulture),
         ExploitationEliteCount.ToString(CultureInfo.InvariantCulture),
         TopInspirationCount.ToString(CultureInfo.InvariantCulture),

@@ -25,6 +25,7 @@ public sealed class EvolutionCheckpointContents<TGenome>
 {
     private readonly ReadOnlyCollection<EvolutionCheckpointEntry<TGenome>> _entries;
     private readonly Dictionary<string, EvolutionCheckpointEntry<TGenome>> _byGenomeId;
+    private readonly ReadOnlyCollection<EvolutionCheckpointEntry<TGenome>> _distinct;
 
     /// <summary>Initializes the contents of one checkpoint.</summary>
     /// <param name="runId">The run the checkpoint belongs to.</param>
@@ -37,22 +38,32 @@ public sealed class EvolutionCheckpointContents<TGenome>
         IReadOnlyList<EvolutionCheckpointEntry<TGenome>> entries)
     {
         Guard.NotNullOrWhiteSpace(runId);
-        Guard.NotNull(compatibilityHash);
+        Guard.NotNullOrWhiteSpace(compatibilityHash);
         Guard.NotNull(entries);
-        EvolutionCheckpointEntry<TGenome>[] copied = entries.ToArray();
+        if (sequence < 0) throw new ArgumentOutOfRangeException(nameof(sequence));
+        EvolutionCheckpointEntry<TGenome>[] copied = EvolutionCollection.CopyBounded(
+            entries,
+            EvolutionCollectionLimits.MaximumResultEntries,
+            nameof(entries));
         if (copied.Any(entry => entry is null))
             throw new ArgumentException("Checkpoint entries cannot contain nulls.", nameof(entries));
 
-        RunId = runId;
+        RunId = runId.Trim();
         Sequence = sequence;
-        CompatibilityHash = compatibilityHash;
+        CompatibilityHash = compatibilityHash.Trim();
         _entries = Array.AsReadOnly(copied);
 
         // One candidate can be saved in several places at once, so the index keeps the most authoritative: a current
         // elite outranks a global-index copy, which outranks a runner-up kept in the history.
         _byGenomeId = new Dictionary<string, EvolutionCheckpointEntry<TGenome>>(StringComparer.Ordinal);
+        var distinct = new List<EvolutionCheckpointEntry<TGenome>>();
         foreach (EvolutionCheckpointEntry<TGenome> entry in copied.OrderBy(entry => (int)entry.Source))
-            if (!_byGenomeId.ContainsKey(entry.GenomeId)) _byGenomeId[entry.GenomeId] = entry;
+        {
+            if (_byGenomeId.ContainsKey(entry.GenomeId)) continue;
+            _byGenomeId[entry.GenomeId] = entry;
+            distinct.Add(entry);
+        }
+        _distinct = Array.AsReadOnly(distinct.ToArray());
     }
 
     /// <summary>Gets the run the checkpoint belongs to.</summary>
@@ -68,7 +79,7 @@ public sealed class EvolutionCheckpointContents<TGenome>
     public IReadOnlyList<EvolutionCheckpointEntry<TGenome>> Entries => _entries;
 
     /// <summary>Gets the distinct candidates by canonical identity, each from its most authoritative source.</summary>
-    public IReadOnlyCollection<EvolutionCheckpointEntry<TGenome>> DistinctCandidates => _byGenomeId.Values;
+    public IReadOnlyCollection<EvolutionCheckpointEntry<TGenome>> DistinctCandidates => _distinct;
 
     /// <summary>Finds one candidate by canonical identity.</summary>
     /// <param name="genomeId">The identity to look for.</param>

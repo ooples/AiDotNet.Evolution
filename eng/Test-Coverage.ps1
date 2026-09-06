@@ -19,10 +19,44 @@ if (-not (Test-Path -LiteralPath $BaselineFile -PathType Leaf)) {
 
 [xml] $coverage = Get-Content -LiteralPath $CoverageFile -Raw
 $baseline = Get-Content -LiteralPath $BaselineFile -Raw | ConvertFrom-Json
-$line = [double] $coverage.coverage.'line-rate' * 100.0
-$branch = [double] $coverage.coverage.'branch-rate' * 100.0
-$minimumLine = [double] $baseline.line - $Tolerance
-$minimumBranch = [double] $baseline.branch - $Tolerance
+
+function Get-BoundedNumber {
+    param(
+        [object] $Value,
+        [string] $Name,
+        [double] $Minimum,
+        [double] $Maximum
+    )
+
+    [double] $number = 0
+    if ($null -eq $Value -or
+        -not [double]::TryParse(
+            [string] $Value,
+            [Globalization.NumberStyles]::Float,
+            [Globalization.CultureInfo]::InvariantCulture,
+            [ref] $number) -or
+        [double]::IsNaN($number) -or
+        [double]::IsInfinity($number) -or
+        $number -lt $Minimum -or
+        $number -gt $Maximum) {
+        throw "$Name must be a finite number in [$Minimum, $Maximum]."
+    }
+
+    return $number
+}
+
+$baselineLine = Get-BoundedNumber $baseline.line 'baseline.line' 0 100
+$baselineBranch = Get-BoundedNumber $baseline.branch 'baseline.branch' 0 100
+$reportLine = Get-BoundedNumber $coverage.coverage.'line-rate' 'coverage line-rate' 0 1
+$reportBranch = Get-BoundedNumber $coverage.coverage.'branch-rate' 'coverage branch-rate' 0 1
+if ([double]::IsNaN($Tolerance) -or [double]::IsInfinity($Tolerance) -or $Tolerance -lt 0) {
+    throw 'Tolerance must be finite and non-negative.'
+}
+
+$line = $reportLine * 100.0
+$branch = $reportBranch * 100.0
+$minimumLine = $baselineLine - $Tolerance
+$minimumBranch = $baselineBranch - $Tolerance
 
 Write-Host ("Line coverage:   {0:N2}% (minimum {1:N2}%)" -f $line, $minimumLine)
 Write-Host ("Branch coverage: {0:N2}% (minimum {1:N2}%)" -f $branch, $minimumBranch)

@@ -496,11 +496,19 @@ public sealed class EvolutionEngineOptions
         if (MaxProposals < 0) throw new ArgumentOutOfRangeException(nameof(MaxProposals));
         if (MaxGenerations < 0) throw new ArgumentOutOfRangeException(nameof(MaxGenerations));
         Guard.Positive(ProposalBatchSize);
+        if (ProposalBatchSize > EvolutionCollectionLimits.MaximumResultEntries)
+            throw new ArgumentOutOfRangeException(nameof(ProposalBatchSize));
         Guard.Positive(MaxDegreeOfParallelism);
+        if (MaxDegreeOfParallelism > EvolutionCollectionLimits.MaximumResultEntries)
+            throw new ArgumentOutOfRangeException(nameof(MaxDegreeOfParallelism));
         if (!Enum.IsDefined(typeof(EvolutionExecutionMode), ExecutionMode)) throw new ArgumentOutOfRangeException(nameof(ExecutionMode));
         if (!Enum.IsDefined(typeof(EvolutionDispatchMode), Dispatch)) throw new ArgumentOutOfRangeException(nameof(Dispatch));
         if (MaxInFlight < 0) throw new ArgumentOutOfRangeException(nameof(MaxInFlight));
+        if (MaxInFlight > EvolutionCollectionLimits.MaximumResultEntries)
+            throw new ArgumentOutOfRangeException(nameof(MaxInFlight));
         if (MaxInFlightPerIsland < 0) throw new ArgumentOutOfRangeException(nameof(MaxInFlightPerIsland));
+        if (MaxInFlightPerIsland > EvolutionCollectionLimits.MaximumResultEntries)
+            throw new ArgumentOutOfRangeException(nameof(MaxInFlightPerIsland));
         if (!Enum.IsDefined(typeof(EvolutionFailurePolicy), FailurePolicy)) throw new ArgumentOutOfRangeException(nameof(FailurePolicy));
         if (MaxRetries < 0) throw new ArgumentOutOfRangeException(nameof(MaxRetries));
         ValidateDuration(EvaluationTimeout, nameof(EvaluationTimeout));
@@ -518,10 +526,19 @@ public sealed class EvolutionEngineOptions
             throw new ArgumentOutOfRangeException(nameof(TargetQuality), "The target quality must be finite.");
         if (CheckpointInterval < 0) throw new ArgumentOutOfRangeException(nameof(CheckpointInterval));
         Guard.Positive(IslandCount);
+        if (IslandCount > EvolutionCollectionLimits.MaximumIslands)
+            throw new ArgumentOutOfRangeException(nameof(IslandCount),
+                $"An engine may contain at most {EvolutionCollectionLimits.MaximumIslands} islands.");
         if (MigrationInterval < 0) throw new ArgumentOutOfRangeException(nameof(MigrationInterval));
         Guard.Positive(MigrantsPerIsland);
+        if (MigrantsPerIsland > EvolutionCollectionLimits.MaximumMigrationTransfers)
+            throw new ArgumentOutOfRangeException(nameof(MigrantsPerIsland));
         if (InspirationCount < 0) throw new ArgumentOutOfRangeException(nameof(InspirationCount));
+        if (InspirationCount > EvolutionCollectionLimits.MaximumLineageIdentities)
+            throw new ArgumentOutOfRangeException(nameof(InspirationCount));
         Guard.Positive(MaxRetainedFailures);
+        if (MaxRetainedFailures > EvolutionCollectionLimits.MaximumResultEntries)
+            throw new ArgumentOutOfRangeException(nameof(MaxRetainedFailures));
         if (!Enum.IsDefined(typeof(EvolutionIslandAssignmentStrategy), IslandAssignment))
             throw new ArgumentOutOfRangeException(nameof(IslandAssignment));
         if (!Enum.IsDefined(typeof(EvolutionMigrationTrigger), MigrationTrigger))
@@ -534,7 +551,11 @@ public sealed class EvolutionEngineOptions
             throw new ArgumentOutOfRangeException(nameof(MigrationRate),
                 "The migration rate must be a finite fraction between zero and one.");
         if (GlobalEliteCount < 0) throw new ArgumentOutOfRangeException(nameof(GlobalEliteCount));
+        if (GlobalEliteCount > EvolutionCollectionLimits.MaximumResultEntries)
+            throw new ArgumentOutOfRangeException(nameof(GlobalEliteCount));
         if (HistorySize < 0) throw new ArgumentOutOfRangeException(nameof(HistorySize));
+        if (HistorySize > EvolutionCollectionLimits.MaximumResultEntries)
+            throw new ArgumentOutOfRangeException(nameof(HistorySize));
         if (!IsFinite(NoveltyDistanceThreshold) || NoveltyDistanceThreshold < 0)
             throw new ArgumentOutOfRangeException(nameof(NoveltyDistanceThreshold));
         if (QualityDescriptorName is not null && string.IsNullOrWhiteSpace(QualityDescriptorName))
@@ -667,7 +688,7 @@ public sealed class EvolutionEngineOptions
         Field("migration-interval", MigrationInterval.ToString(CultureInfo.InvariantCulture)),
         Field("migrants-per-island", MigrantsPerIsland.ToString(CultureInfo.InvariantCulture)),
         Field("migration-topology", ((int)MigrationTopology).ToString(CultureInfo.InvariantCulture)),
-        Field("migration-rate", MigrationRate.ToString("R", CultureInfo.InvariantCulture)),
+        Field("migration-rate", EvolutionHash.EncodeDouble(MigrationRate)),
         Field("prevent-repeated-migration", PreventRepeatedMigration ? "once" : "repeatable"),
         Field("inspiration-count", InspirationCount.ToString(CultureInfo.InvariantCulture)),
         Field("max-retained-failures", MaxRetainedFailures.ToString(CultureInfo.InvariantCulture)),
@@ -675,8 +696,8 @@ public sealed class EvolutionEngineOptions
         Field("migration-trigger", ((int)MigrationTrigger).ToString(CultureInfo.InvariantCulture)),
         Field("global-elite-count", GlobalEliteCount.ToString(CultureInfo.InvariantCulture)),
         Field("history-size", HistorySize.ToString(CultureInfo.InvariantCulture)),
-        Field("novelty-distance-threshold", NoveltyDistanceThreshold.ToString("R", CultureInfo.InvariantCulture)),
-        Field("quality-descriptor", QualityDescriptorName ?? "none"),
+        Field("novelty-distance-threshold", EvolutionHash.EncodeDouble(NoveltyDistanceThreshold)),
+        Field("quality-descriptor", EvolutionHash.EncodeNullable(QualityDescriptorName)),
         Field("selection", Selection is null ? "default-selection" : Selection.ToCanonicalString()),
         Field("cascade", Cascade is null ? "default-cascade" : Cascade.ToCanonicalString()),
         Field("artifacts", Artifacts is null ? "default-artifacts" : Artifacts.ToCanonicalString()),
@@ -684,8 +705,8 @@ public sealed class EvolutionEngineOptions
         Field("evaluation-grace-period", EvaluationGracePeriod?.Ticks.ToString(CultureInfo.InvariantCulture) ?? "none"),
         Field("retry-on", ((int)RetryOn).ToString(CultureInfo.InvariantCulture)),
         Field("retry-base-delay", RetryBaseDelay.Ticks.ToString(CultureInfo.InvariantCulture)),
-        Field("retry-backoff-multiplier", RetryBackoffMultiplier.ToString("R", CultureInfo.InvariantCulture)),
-        Field("target-quality", TargetQuality?.ToString("R", CultureInfo.InvariantCulture) ?? "none")
+        Field("retry-backoff-multiplier", EvolutionHash.EncodeDouble(RetryBackoffMultiplier)),
+        Field("target-quality", EvolutionHash.EncodeNullableDouble(TargetQuality))
     };
 
     /// <summary>Lists every option that only bounds or locates a run, as ordered name/value pairs.</summary>

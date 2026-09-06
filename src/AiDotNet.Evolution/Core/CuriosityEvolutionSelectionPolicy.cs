@@ -62,19 +62,31 @@ public sealed class CuriosityEvolutionSelectionPolicy<TGenome> : IOutcomeAwareEv
         Guard.NotNull(archive);
         Guard.NotNull(random);
         if (inspirationCount < 0) throw new ArgumentOutOfRangeException(nameof(inspirationCount));
-        EvolutionArchiveEntry<TGenome>[] entries = archive.Entries.ToArray();
+        EvolutionArchiveEntry<TGenome>[] entries = archive.Entries
+            .GroupBy(entry => entry.Evaluation.GenomeId, StringComparer.Ordinal)
+            .Select(group => group.OrderBy(
+                entry => entry,
+                EvolutionEntryOrdering.BestFirst<TGenome>(archive.Direction)).First())
+            .ToArray();
         if (entries.Length == 0) return null;
 
         lock (_gate)
         {
             EvolutionArchiveEntry<TGenome> parent = WeightedSample(entries, random);
-            var remaining = entries.Where(entry => entry.Evaluation.GenomeId != parent.Evaluation.GenomeId).ToList();
+            var remaining = entries.Where(
+                entry => !string.Equals(
+                    entry.Evaluation.GenomeId,
+                    parent.Evaluation.GenomeId,
+                    StringComparison.Ordinal)).ToList();
             var inspirations = new List<EvolutionArchiveEntry<TGenome>>();
             while (inspirations.Count < inspirationCount && remaining.Count > 0)
             {
                 EvolutionArchiveEntry<TGenome> selected = WeightedSample(remaining.ToArray(), random);
                 inspirations.Add(selected);
-                remaining.Remove(selected);
+                remaining.RemoveAll(entry => string.Equals(
+                    entry.Evaluation.GenomeId,
+                    selected.Evaluation.GenomeId,
+                    StringComparison.Ordinal));
             }
             return new EvolutionSelection<TGenome>(parent, inspirations.AsReadOnly());
         }

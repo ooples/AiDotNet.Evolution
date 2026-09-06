@@ -10,8 +10,8 @@ namespace AiDotNet.Evolution;
 /// constructed with. That widened grid is state, and a resumed run has to start from it: rebinning the checkpointed
 /// elites against the original narrow ranges would reject them. The engine therefore reads
 /// <see cref="IEvolutionArchiveView{TGenome}.Descriptors"/> when it writes a checkpoint and calls
-/// <see cref="RestoreDescriptorBounds"/> before <see cref="ICheckpointableEvolutionArchive{TGenome}.Restore"/> when it
-/// reads one back, which also removes any dependence on the order in which the restored entries happen to be replayed.
+/// passes those bounds to <see cref="ICheckpointableEvolutionArchive{TGenome}.Restore"/> when it reads one back. Restore
+/// must adopt them before replay, which removes any dependence on the order in which entries happen to be replayed.
 /// </para>
 /// <para>
 /// Implementations must accept only descriptors that keep the archive's identity: the same count, the same names in the

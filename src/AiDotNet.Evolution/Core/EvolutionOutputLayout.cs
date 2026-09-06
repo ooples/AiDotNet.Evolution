@@ -34,6 +34,9 @@ namespace AiDotNet.Evolution;
 /// </remarks>
 public sealed class EvolutionOutputLayout
 {
+    private const string StemCharacters =
+        "ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz0123456789._-";
+
     /// <summary>The subdirectory of <see cref="Root"/> that holds checkpoints.</summary>
     public const string CheckpointsFolderName = "checkpoints";
 
@@ -128,13 +131,7 @@ public sealed class EvolutionOutputLayout
         return stem + "-" + EvolutionHash.Compute(trimmed).Substring(0, 12);
     }
 
-    private static bool IsStemCharacter(char character)
-    {
-        if (character >= 'a' && character <= 'z') return true;
-        if (character >= 'A' && character <= 'Z') return true;
-        if (character >= '0' && character <= '9') return true;
-        return character is '.' or '_' or '-';
-    }
+    private static bool IsStemCharacter(char character) => StemCharacters.IndexOf(character) >= 0;
 
     private static string ResolveDirectory(string outputDirectory, string parameterName)
     {
