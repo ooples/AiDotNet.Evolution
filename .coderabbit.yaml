@@ -1,0 +1,27 @@
+# yaml-language-server: $schema=https://coderabbit.ai/integrations/schema.v2.json
+language: en-US
+tone_instructions: "Be thorough and adversarial. Treat correctness, determinism, package-boundary, and compatibility regressions as blocking."
+early_access: true
+enable_free_tier: true
+
+reviews:
+  profile: assertive
+  request_changes_workflow: true
+  high_level_summary: true
+  review_status: true
+  commit_status: true
+  collapse_walkthrough: false
+  changed_files_summary: true
+  # The bootstrap PR exceeds CodeRabbit's 100-file review ceiling. Keep public contracts, finite choices, tests,
+  # behavioral implementation, and CI/release files in scope; exclude only compatibility shims and issue templates.
+  path_filters:
+    - "!src/AiDotNet.Evolution/Polyfills/**"
+    - "!.github/ISSUE_TEMPLATE/**"
+  path_instructions:
+    - path: "src/**"
+      instructions: |
+        Flag nondeterministic ambient randomness, mutable genome assumptions, stringly typed finite choices,
+        unbounded collections, weakened checkpoint validation, and dependencies on AiDotNet or AiDotNet.Tensors
+        as blocking. Public API changes must account for all three target frameworks and serialized compatibility.
+chat:
+  auto_reply: true
