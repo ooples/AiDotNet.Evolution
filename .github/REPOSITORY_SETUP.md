@@ -8,12 +8,29 @@ repository is created.
 | Secret | Purpose |
 | --- | --- |
 | `AUTOFIX_PAT` | Lets release-please open and update a release PR whose checks run normally. Use a fine-grained token limited to this repository with Contents, Pull requests, and Issues read/write access. |
-| `NUGET_API_KEY` | Publishes `AiDotNet.Evolution` and its symbol package to nuget.org. Scope the key to this package ID. |
 | `SONAR_TOKEN` | Authenticates the `ooples_AiDotNet.Evolution` SonarCloud project. |
 
 `GITHUB_TOKEN` is supplied automatically. `CODECOV_TOKEN` is optional for a public repository because coverage upload
 is non-blocking. `CODE_SIGNING_CERT_BASE64` and `CODE_SIGNING_CERT_PASSWORD` are optional, but must be configured
 together; when present, release packages are signed and verified before publication.
+
+## NuGet trusted publishing
+
+NuGet publication uses GitHub OIDC and does not require a stored API key. Configure a trusted-publishing policy for
+the `ooples` NuGet account with these values:
+
+| Setting | Value |
+| --- | --- |
+| Repository owner | `ooples` |
+| Repository | `AiDotNet.Evolution` |
+| Workflow file | `automated-release.yml` |
+| Environment | Empty |
+| Package glob | `AiDotNet.Evolution` |
+| Scopes | Push new packages and package versions |
+
+Enter only the workflow filename in NuGet, not the `.github/workflows/` path. The publish job requests a single-use
+OIDC token immediately before publication and exchanges it for a short-lived NuGet API key through `NuGet/login`.
+The workflow never stores a long-lived NuGet credential.
 
 ## Repository services
 
@@ -51,4 +68,6 @@ pinning a version the release workflow will skip.
 
 The direct reusable-workflow call is intentional: it does not rely on a second GitHub event being emitted by a bot
 token, so the release still publishes when release-please has to fall back to `GITHUB_TOKEN`. The manual dispatch path
-accepts only an already-existing `v<semver>` tag and runs the identical pipeline.
+accepts only an already-existing `v<semver>` tag and runs the identical pipeline. Because NuGet validates the workflow
+that contains the trusted-publishing login step, its policy must name the reusable `automated-release.yml` workflow,
+not the calling `release-please.yml` workflow.
