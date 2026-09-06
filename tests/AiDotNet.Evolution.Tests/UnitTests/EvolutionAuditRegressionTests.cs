@@ -189,6 +189,35 @@ public sealed class EvolutionAuditRegressionTests
     }
 
     [Theory]
+    [InlineData(RequiredCheckpointCollection.IslandArchiveEntries)]
+    [InlineData(RequiredCheckpointCollection.GlobalElites)]
+    [InlineData(RequiredCheckpointCollection.IslandHistories)]
+    [InlineData(RequiredCheckpointCollection.IslandHistoryEntries)]
+    public async Task CurrentSchemaRequiresEveryRetainedEntryCollection(
+        RequiredCheckpointCollection collection)
+    {
+        var sourceStore = new InMemoryEvolutionCheckpointStore();
+        TestGenome[] seeds = { new TestGenome(1), new TestGenome(2) };
+        await ReadableEngine(sourceStore).RunAsync(seeds);
+        EvolutionCheckpoint original = Assert.IsType<EvolutionCheckpoint>(
+            await sourceStore.LoadLatestAsync("audit-run"));
+        JsonObject payload = Assert.IsType<JsonObject>(JsonNode.Parse(original.Payload));
+        string expectedMessage = NullRetainedCollection(payload, collection);
+        var corrupt = new EvolutionCheckpoint(
+            original.RunId, original.Sequence, original.CompatibilityHash, payload.ToJsonString());
+
+        InvalidDataException readFailure = Assert.Throws<InvalidDataException>(() =>
+            EvolutionEngine<TestGenome>.ReadCheckpoint(corrupt, new TestGenomeCodec()));
+        Assert.Contains(expectedMessage, readFailure.Message, StringComparison.OrdinalIgnoreCase);
+
+        var corruptStore = new InMemoryEvolutionCheckpointStore();
+        await corruptStore.SaveAsync(corrupt);
+        InvalidDataException resumeFailure = await Assert.ThrowsAsync<InvalidDataException>(() =>
+            ReadableEngine(corruptStore, resume: true).RunAsync(seeds));
+        Assert.Contains(expectedMessage, resumeFailure.Message, StringComparison.OrdinalIgnoreCase);
+    }
+
+    [Theory]
     [MemberData(nameof(BoundedCheckpointArrayProperties))]
     public void StreamingCheckpointPreflightBoundsEveryRetainedNestedArray(
         string propertyName,
@@ -244,6 +273,32 @@ public sealed class EvolutionAuditRegressionTests
         "{\"" + propertyName + "\":{" +
         string.Join(",", Enumerable.Range(0, count).Select(index => "\"k" + index + "\":0")) + "}}";
 
+    private static string NullRetainedCollection(
+        JsonObject payload,
+        RequiredCheckpointCollection collection)
+    {
+        switch (collection)
+        {
+            case RequiredCheckpointCollection.IslandArchiveEntries:
+                JsonArray islands = Assert.IsType<JsonArray>(payload["Islands"]);
+                JsonObject archive = Assert.IsType<JsonObject>(islands[0]);
+                archive["Entries"] = null;
+                return "archive entries";
+            case RequiredCheckpointCollection.GlobalElites:
+                payload["GlobalElites"] = null;
+                return "global elites";
+            case RequiredCheckpointCollection.IslandHistories:
+                payload["IslandHistories"] = null;
+                return "island histories";
+            case RequiredCheckpointCollection.IslandHistoryEntries:
+                JsonArray histories = Assert.IsType<JsonArray>(payload["IslandHistories"]);
+                histories[0] = null;
+                return "island history";
+            default:
+                throw new ArgumentOutOfRangeException(nameof(collection));
+        }
+    }
+
     private static string Hash(EvolutionEarlyStoppingOptions stopping) =>
         new EvolutionEngineOptions { EarlyStopping = stopping }.GetConfigurationHash();
 
@@ -275,7 +330,9 @@ public sealed class EvolutionAuditRegressionTests
         return archive.TryAdd(candidate, evaluation);
     }
 
-    private static EvolutionEngine<TestGenome> ReadableEngine(IEvolutionCheckpointStore store) => new(
+    private static EvolutionEngine<TestGenome> ReadableEngine(
+        IEvolutionCheckpointStore store,
+        bool resume = false) => new(
         new SyntheticEvolutionTask(), new IncrementVariation(), _ => new MapElitesArchive<TestGenome>(new[]
         {
             new EvolutionDescriptorDefinition("x", 0, 100, 10, EvolutionOutOfRangePolicy.Clamp)
@@ -290,8 +347,17 @@ public sealed class EvolutionAuditRegressionTests
             IslandCount = 1,
             MigrationInterval = 0,
             MigrantsPerIsland = 1,
-            CheckpointInterval = 0
+            CheckpointInterval = 0,
+            Resume = resume
         }, checkpointStore: store, genomeCodec: new TestGenomeCodec());
+
+    public enum RequiredCheckpointCollection
+    {
+        IslandArchiveEntries,
+        GlobalElites,
+        IslandHistories,
+        IslandHistoryEntries
+    }
 
     private sealed class MutableGenome
     {

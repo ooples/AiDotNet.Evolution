@@ -605,50 +605,48 @@ public sealed partial class EvolutionEngine<TGenome>
                 throw new InvalidDataException("A checkpoint island contains too many descriptor dimensions.");
             if (archive.Descriptors.Any(descriptor => descriptor is null))
                 throw new InvalidDataException("A checkpoint descriptor definition is missing.");
-            if (archive.Entries is not null)
-            {
-                if (archive.Entries.Any(entry => entry is null))
-                    throw new InvalidDataException("A checkpoint archive entry is missing.");
-                foreach (ArchiveEntryDocument entry in archive.Entries)
-                    ValidateArchiveEntryBounds(entry);
-            }
+            List<ArchiveEntryDocument> archiveEntries = archive.Entries ??
+                throw new InvalidDataException("Checkpoint archive entries are missing.");
+            if (archiveEntries.Any(entry => entry is null))
+                throw new InvalidDataException("A checkpoint archive entry is missing.");
+            foreach (ArchiveEntryDocument entry in archiveEntries)
+                ValidateArchiveEntryBounds(entry);
             totalEntries = AddCheckpointEntryCount(
                 totalEntries,
-                archive.Entries?.Count ?? 0,
+                archiveEntries.Count,
                 "island archive");
         }
 
-        if (state.GlobalElites is not null && state.GlobalElites.Any(record =>
+        List<EliteRecordDocument> globalElites = state.GlobalElites ??
+            throw new InvalidDataException("Checkpoint global elites are missing.");
+        if (globalElites.Any(record =>
             record is null || record.Entry is null || record.Island < 0 || record.Island >= islands.Count))
         {
             throw new InvalidDataException("A checkpoint global elite record is invalid.");
         }
         totalEntries = AddCheckpointEntryCount(
             totalEntries,
-            state.GlobalElites?.Count ?? 0,
+            globalElites.Count,
             "global elite index");
-        if (state.GlobalElites is not null)
-        {
-            foreach (EliteRecordDocument record in state.GlobalElites)
-                ValidateArchiveEntryBounds(record.Entry ??
-                    throw new InvalidDataException("A checkpoint global elite entry is missing."));
-        }
+        foreach (EliteRecordDocument record in globalElites)
+            ValidateArchiveEntryBounds(record.Entry ??
+                throw new InvalidDataException("A checkpoint global elite entry is missing."));
 
-        List<List<ArchiveEntryDocument>> histories = state.IslandHistories ?? new List<List<ArchiveEntryDocument>>();
+        List<List<ArchiveEntryDocument>> histories = state.IslandHistories ??
+            throw new InvalidDataException("Checkpoint island histories are missing.");
         if (histories.Count > EvolutionCollectionLimits.MaximumResultIslands || histories.Count > islands.Count)
             throw new InvalidDataException("The checkpoint contains too many island histories.");
         for (int island = 0; island < histories.Count; island++)
         {
-            if (histories[island] is not null)
-            {
-                if (histories[island].Any(entry => entry is null))
-                    throw new InvalidDataException("A checkpoint island history entry is missing.");
-                foreach (ArchiveEntryDocument entry in histories[island])
-                    ValidateArchiveEntryBounds(entry);
-            }
+            List<ArchiveEntryDocument> history = histories[island] ??
+                throw new InvalidDataException("A checkpoint island history is missing.");
+            if (history.Any(entry => entry is null))
+                throw new InvalidDataException("A checkpoint island history entry is missing.");
+            foreach (ArchiveEntryDocument entry in history)
+                ValidateArchiveEntryBounds(entry);
             totalEntries = AddCheckpointEntryCount(
                 totalEntries,
-                histories[island]?.Count ?? 0,
+                history.Count,
                 "island history");
         }
 
@@ -696,13 +694,11 @@ public sealed partial class EvolutionEngine<TGenome>
     {
         if ((entry.CellBins?.Length ?? 0) > EvolutionCollectionLimits.MaximumArchiveDimensions)
             throw new InvalidDataException("A checkpoint cell contains too many descriptor dimensions.");
-        if (entry.Lineage is not null)
+        if (entry.Lineage is not null &&
+            ((entry.Lineage.ParentIds?.Count ?? 0) > EvolutionCollectionLimits.MaximumLineageIdentities ||
+             (entry.Lineage.InspirationIds?.Count ?? 0) > EvolutionCollectionLimits.MaximumLineageIdentities))
         {
-            if ((entry.Lineage.ParentIds?.Count ?? 0) > EvolutionCollectionLimits.MaximumLineageIdentities ||
-                (entry.Lineage.InspirationIds?.Count ?? 0) > EvolutionCollectionLimits.MaximumLineageIdentities)
-            {
-                throw new InvalidDataException("A checkpoint lineage contains too many identities.");
-            }
+            throw new InvalidDataException("A checkpoint lineage contains too many identities.");
         }
         if (entry.Evaluation is not null) ValidateEvaluationBounds(entry.Evaluation);
     }
