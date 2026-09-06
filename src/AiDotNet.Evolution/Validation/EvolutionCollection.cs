@@ -10,15 +10,11 @@ internal static class EvolutionCollection
         int knownCount = 4;
         if (values is ICollection<T> collection)
         {
-            if (collection.Count < 0) throw NegativeCount(parameterName);
-            if (collection.Count > maximum) throw TooMany(maximum, parameterName);
-            knownCount = collection.Count;
+            knownCount = ValidateReportedCount(collection.Count, maximum, parameterName);
         }
         else if (values is IReadOnlyCollection<T> readOnly)
         {
-            if (readOnly.Count < 0) throw NegativeCount(parameterName);
-            if (readOnly.Count > maximum) throw TooMany(maximum, parameterName);
-            knownCount = readOnly.Count;
+            knownCount = ValidateReportedCount(readOnly.Count, maximum, parameterName);
         }
 
         var result = new List<T>(Math.Min(maximum, knownCount));
@@ -34,11 +30,17 @@ internal static class EvolutionCollection
     {
         Guard.NotNull(values);
         if (maximum < 0) throw new ArgumentOutOfRangeException(nameof(maximum));
-        if (values.Count < 0) throw NegativeCount(parameterName);
-        if (values.Count > maximum) throw TooMany(maximum, parameterName);
-        var result = new T[values.Count];
+        int count = ValidateReportedCount(values.Count, maximum, parameterName);
+        var result = new T[count];
         for (int index = 0; index < result.Length; index++) result[index] = values[index];
         return result;
+    }
+
+    private static int ValidateReportedCount(int count, int maximum, string parameterName)
+    {
+        if ((uint)count <= (uint)maximum) return count;
+        if (count > maximum) throw TooMany(maximum, parameterName);
+        throw NegativeCount(parameterName);
     }
 
     private static ArgumentException TooMany(int maximum, string parameterName) =>

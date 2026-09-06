@@ -121,6 +121,15 @@ public sealed class EvolutionAuditRegressionTests
     }
 
     [Fact]
+    public void CollectionBoundsRejectANegativeReportedCount()
+    {
+        var dishonest = new NegativeCountReadOnlyList<int>();
+
+        Assert.Throws<ArgumentException>(() =>
+            EvolutionCollection.CopyBounded(dishonest, maximum: 1, parameterName: "values"));
+    }
+
+    [Fact]
     public async Task ReadingACheckpointFromADifferentEngineVersionIsRefused()
     {
         var store = new InMemoryEvolutionCheckpointStore();
@@ -241,6 +250,17 @@ public sealed class EvolutionAuditRegressionTests
 
         public IEnumerator<KeyValuePair<string, string>> GetEnumerator() =>
             ((IEnumerable<KeyValuePair<string, string>>)_entries).GetEnumerator();
+
+        IEnumerator IEnumerable.GetEnumerator() => GetEnumerator();
+    }
+
+    private sealed class NegativeCountReadOnlyList<T> : IReadOnlyList<T>
+    {
+        public int Count => -1;
+
+        public T this[int index] => throw new ArgumentOutOfRangeException(nameof(index));
+
+        public IEnumerator<T> GetEnumerator() => Enumerable.Empty<T>().GetEnumerator();
 
         IEnumerator IEnumerable.GetEnumerator() => GetEnumerator();
     }
