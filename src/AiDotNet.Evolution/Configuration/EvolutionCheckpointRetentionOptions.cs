@@ -39,7 +39,8 @@ public sealed class EvolutionCheckpointRetentionOptions
     /// <summary>Validates the values and returns an independent copy the store can hold.</summary>
     /// <returns>A validated copy that later edits to this instance cannot affect.</returns>
     /// <exception cref="ArgumentOutOfRangeException">
-    /// A quota is negative, <see cref="KeepLast"/> is zero, or a quota exceeds the package file limit.
+    /// A quota is negative, <see cref="KeepLast"/> is zero, or the protected quota leaves no room for the next
+    /// atomic snapshot under the package file limit.
     /// </exception>
     internal EvolutionCheckpointRetentionOptions SnapshotAndValidate()
     {
@@ -53,6 +54,11 @@ public sealed class EvolutionCheckpointRetentionOptions
         if (KeepBest > EvolutionCollectionLimits.MaximumCheckpointFiles)
             throw new ArgumentOutOfRangeException(nameof(KeepBest), KeepBest,
                 $"At most {EvolutionCollectionLimits.MaximumCheckpointFiles} best checkpoints may be retained.");
+        long protectedQuota = (long)KeepLast + Math.Max(KeepBest, 1);
+        if (protectedQuota >= EvolutionCollectionLimits.MaximumCheckpointFiles)
+            throw new ArgumentOutOfRangeException(nameof(KeepBest), KeepBest,
+                $"The recent and best checkpoint quotas must protect fewer than " +
+                $"{EvolutionCollectionLimits.MaximumCheckpointFiles} files so the next snapshot has a free slot.");
         return new EvolutionCheckpointRetentionOptions { KeepLast = KeepLast, KeepBest = KeepBest };
     }
 

@@ -1,4 +1,5 @@
 using System.Collections;
+using System.Text;
 using System.Text.Json.Nodes;
 using AiDotNet.Evolution;
 using Xunit;
@@ -186,6 +187,62 @@ public sealed class EvolutionAuditRegressionTests
         Assert.Throws<InvalidDataException>(() =>
             EvolutionEngine<TestGenome>.ReadCheckpoint(older, new TestGenomeCodec()));
     }
+
+    [Theory]
+    [MemberData(nameof(BoundedCheckpointArrayProperties))]
+    public void StreamingCheckpointPreflightBoundsEveryRetainedNestedArray(
+        string propertyName,
+        int maximum)
+    {
+        EvolutionCheckpointJsonPreflight.Validate(Encoding.UTF8.GetBytes(
+            JsonArrayDocument(propertyName, maximum)));
+
+        Assert.Throws<InvalidDataException>(() =>
+            EvolutionCheckpointJsonPreflight.Validate(Encoding.UTF8.GetBytes(
+                JsonArrayDocument(propertyName, maximum + 1))));
+    }
+
+    [Theory]
+    [InlineData("Descriptors", EvolutionTaskResult.MaximumNamedValues)]
+    [InlineData("Metrics", EvolutionTaskResult.MaximumNamedValues)]
+    [InlineData("Data", EvolutionDiagnostic.MaximumDataEntries)]
+    public void StreamingCheckpointPreflightBoundsRetainedDictionaries(
+        string propertyName,
+        int maximum)
+    {
+        EvolutionCheckpointJsonPreflight.Validate(Encoding.UTF8.GetBytes(
+            JsonObjectDocument(propertyName, maximum)));
+
+        Assert.Throws<InvalidDataException>(() =>
+            EvolutionCheckpointJsonPreflight.Validate(Encoding.UTF8.GetBytes(
+                JsonObjectDocument(propertyName, maximum + 1))));
+    }
+
+    public static IEnumerable<object[]> BoundedCheckpointArrayProperties()
+    {
+        yield return new object[] { "SemanticOptions", EvolutionCollectionLimits.MaximumHashComponents };
+        yield return new object[] { "BudgetOptions", EvolutionCollectionLimits.MaximumHashComponents };
+        yield return new object[] { "IslandGenerations", EvolutionCollectionLimits.MaximumResultIslands };
+        yield return new object[] { "IslandHistories", EvolutionCollectionLimits.MaximumResultIslands };
+        yield return new object[] { "Islands", EvolutionCollectionLimits.MaximumResultIslands };
+        yield return new object[] { "Descriptors", EvolutionCollectionLimits.MaximumArchiveDimensions };
+        yield return new object[] { "CellBins", EvolutionCollectionLimits.MaximumArchiveDimensions };
+        yield return new object[] { "ParentIds", EvolutionCollectionLimits.MaximumLineageIdentities };
+        yield return new object[] { "InspirationIds", EvolutionCollectionLimits.MaximumLineageIdentities };
+        yield return new object[] { "Objectives", EvolutionTaskResult.MaximumVectorValues };
+        yield return new object[] { "ConstraintViolations", EvolutionTaskResult.MaximumVectorValues };
+        yield return new object[] { "StageCostUnits", EvolutionCollectionLimits.MaximumCascadeStages };
+        yield return new object[] { "Diagnostics", EvolutionTaskResult.MaximumDiagnostics };
+        yield return new object[] { "Artifacts", EvolutionTaskResult.MaximumArtifacts };
+    }
+
+    private static string JsonArrayDocument(string propertyName, int count) =>
+        "{\"" + propertyName + "\":[" +
+        string.Join(",", Enumerable.Repeat("0", count)) + "]}";
+
+    private static string JsonObjectDocument(string propertyName, int count) =>
+        "{\"" + propertyName + "\":{" +
+        string.Join(",", Enumerable.Range(0, count).Select(index => "\"k" + index + "\":0")) + "}}";
 
     private static string Hash(EvolutionEarlyStoppingOptions stopping) =>
         new EvolutionEngineOptions { EarlyStopping = stopping }.GetConfigurationHash();

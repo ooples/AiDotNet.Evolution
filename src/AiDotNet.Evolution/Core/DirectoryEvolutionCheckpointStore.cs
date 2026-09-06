@@ -246,12 +246,14 @@ public sealed class DirectoryEvolutionCheckpointStore : IEvolutionCheckpointStor
     {
         if (!Directory.Exists(_directory)) return true;
         int count = 0;
-        foreach (string unused in Directory.EnumerateFiles(
-            _directory,
-            FileNamePrefix + "*" + FileNameExtension))
+        using (IEnumerator<string> paths = Directory.EnumerateFiles(
+            _directory, FileNamePrefix + "*" + FileNameExtension).GetEnumerator())
         {
-            count++;
-            if (count >= EvolutionCollectionLimits.MaximumCheckpointFiles) return false;
+            while (paths.MoveNext())
+            {
+                count++;
+                if (count >= EvolutionCollectionLimits.MaximumCheckpointFiles) return false;
+            }
         }
         return true;
     }

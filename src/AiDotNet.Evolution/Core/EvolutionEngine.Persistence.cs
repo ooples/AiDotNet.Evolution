@@ -307,17 +307,14 @@ public sealed partial class EvolutionEngine<TGenome>
     {
         const string general =
             "The evolution checkpoint is incompatible with the current task or engine configuration.";
-        if (checkpoint.Payload.Length > EvolutionCollectionLimits.MaximumCheckpointBytes ||
-            Encoding.UTF8.GetByteCount(checkpoint.Payload) > EvolutionCollectionLimits.MaximumCheckpointBytes)
-        {
-            return general;
-        }
         EngineStateDocument? state;
         try
         {
-            state = JsonSerializer.Deserialize<EngineStateDocument>(checkpoint.Payload, EvolutionJson.Compact);
+            byte[] payloadBytes = GetCheckpointPayloadBytes(checkpoint);
+            EvolutionCheckpointJsonPreflight.Validate(payloadBytes);
+            state = JsonSerializer.Deserialize<EngineStateDocument>(payloadBytes, EvolutionJson.Compact);
         }
-        catch (JsonException)
+        catch (Exception exception) when (exception is JsonException or InvalidDataException)
         {
             return general;
         }
@@ -543,18 +540,13 @@ public sealed partial class EvolutionEngine<TGenome>
     /// <summary>Deserializes and bounds an engine-state document before any task codec is invoked.</summary>
     private static EngineStateDocument ReadStateDocument(EvolutionCheckpoint checkpoint)
     {
-        if (checkpoint.Payload.Length > EvolutionCollectionLimits.MaximumCheckpointBytes ||
-            Encoding.UTF8.GetByteCount(checkpoint.Payload) > EvolutionCollectionLimits.MaximumCheckpointBytes)
-        {
-            throw new InvalidDataException(
-                $"The evolution engine state exceeds the " +
-                $"{EvolutionCollectionLimits.MaximumCheckpointBytes}-byte package limit.");
-        }
+        byte[] payloadBytes = GetCheckpointPayloadBytes(checkpoint);
+        EvolutionCheckpointJsonPreflight.Validate(payloadBytes);
 
         EngineStateDocument? state;
         try
         {
-            state = JsonSerializer.Deserialize<EngineStateDocument>(checkpoint.Payload, EvolutionJson.Compact);
+            state = JsonSerializer.Deserialize<EngineStateDocument>(payloadBytes, EvolutionJson.Compact);
         }
         catch (JsonException exception)
         {
@@ -572,9 +564,31 @@ public sealed partial class EvolutionEngine<TGenome>
         return state;
     }
 
+    private static byte[] GetCheckpointPayloadBytes(EvolutionCheckpoint checkpoint)
+    {
+        if (checkpoint.Payload.Length > EvolutionCollectionLimits.MaximumCheckpointBytes)
+            throw new InvalidDataException(
+                $"The evolution engine state exceeds the " +
+                $"{EvolutionCollectionLimits.MaximumCheckpointBytes}-byte package limit.");
+        int byteCount = Encoding.UTF8.GetByteCount(checkpoint.Payload);
+        if (byteCount > EvolutionCollectionLimits.MaximumCheckpointBytes)
+            throw new InvalidDataException(
+                $"The evolution engine state exceeds the " +
+                $"{EvolutionCollectionLimits.MaximumCheckpointBytes}-byte package limit.");
+        return Encoding.UTF8.GetBytes(checkpoint.Payload);
+    }
+
     /// <summary>Applies package-wide collection limits before any genome payload is decoded.</summary>
     private static void ValidatePackageCheckpointBounds(EngineStateDocument state)
     {
+        if ((state.SemanticOptions?.Count ?? 0) > EvolutionCollectionLimits.MaximumHashComponents ||
+            (state.BudgetOptions?.Count ?? 0) > EvolutionCollectionLimits.MaximumHashComponents)
+        {
+            throw new InvalidDataException("The checkpoint option collection exceeds the package limit.");
+        }
+        if ((state.IslandGenerations?.Count ?? 0) > EvolutionCollectionLimits.MaximumResultIslands)
+            throw new InvalidDataException("The checkpoint contains too many island generations.");
+
         List<ArchiveDocument> islands = state.Islands ??
             throw new InvalidDataException("Checkpoint islands are missing.");
         if (islands.Count > EvolutionCollectionLimits.MaximumResultIslands)
@@ -591,8 +605,13 @@ public sealed partial class EvolutionEngine<TGenome>
                 throw new InvalidDataException("A checkpoint island contains too many descriptor dimensions.");
             if (archive.Descriptors.Any(descriptor => descriptor is null))
                 throw new InvalidDataException("A checkpoint descriptor definition is missing.");
-            if (archive.Entries is not null && archive.Entries.Any(entry => entry is null))
-                throw new InvalidDataException("A checkpoint archive entry is missing.");
+            if (archive.Entries is not null)
+            {
+                if (archive.Entries.Any(entry => entry is null))
+                    throw new InvalidDataException("A checkpoint archive entry is missing.");
+                foreach (ArchiveEntryDocument entry in archive.Entries)
+                    ValidateArchiveEntryBounds(entry);
+            }
             totalEntries = AddCheckpointEntryCount(
                 totalEntries,
                 archive.Entries?.Count ?? 0,
@@ -608,14 +627,25 @@ public sealed partial class EvolutionEngine<TGenome>
             totalEntries,
             state.GlobalElites?.Count ?? 0,
             "global elite index");
+        if (state.GlobalElites is not null)
+        {
+            foreach (EliteRecordDocument record in state.GlobalElites)
+                ValidateArchiveEntryBounds(record.Entry ??
+                    throw new InvalidDataException("A checkpoint global elite entry is missing."));
+        }
 
         List<List<ArchiveEntryDocument>> histories = state.IslandHistories ?? new List<List<ArchiveEntryDocument>>();
         if (histories.Count > EvolutionCollectionLimits.MaximumResultIslands || histories.Count > islands.Count)
             throw new InvalidDataException("The checkpoint contains too many island histories.");
         for (int island = 0; island < histories.Count; island++)
         {
-            if (histories[island] is not null && histories[island].Any(entry => entry is null))
-                throw new InvalidDataException("A checkpoint island history entry is missing.");
+            if (histories[island] is not null)
+            {
+                if (histories[island].Any(entry => entry is null))
+                    throw new InvalidDataException("A checkpoint island history entry is missing.");
+                foreach (ArchiveEntryDocument entry in histories[island])
+                    ValidateArchiveEntryBounds(entry);
+            }
             totalEntries = AddCheckpointEntryCount(
                 totalEntries,
                 histories[island]?.Count ?? 0,
@@ -626,12 +656,109 @@ public sealed partial class EvolutionEngine<TGenome>
             (state.SeenGenomeIds?.Count ?? 0) > EvolutionCollectionLimits.MaximumResultEntries ||
             (state.Cache?.Count ?? 0) > EvolutionCollectionLimits.MaximumResultEntries ||
             (state.Failures?.Count ?? 0) > EvolutionCollectionLimits.MaximumResultEntries ||
-            (state.PendingArtifacts?.Count ?? 0) > EvolutionCollectionLimits.MaximumResultEntries)
+            (state.PendingArtifacts?.Count ?? 0) > EvolutionCollectionLimits.MaximumResultEntries ||
+            (state.StatusCounts?.Count ?? 0) > EvolutionCollectionLimits.MaximumResultEntries)
         {
             throw new InvalidDataException("A checkpoint auxiliary collection exceeds the package limit.");
         }
         if (state.SeedPayloads is not null && state.SeedPayloads.Any(string.IsNullOrWhiteSpace))
             throw new InvalidDataException("The checkpoint seed list contains an invalid payload.");
+
+        if (state.Cache is not null)
+        {
+            foreach (CacheDocument cache in state.Cache)
+            {
+                if (cache is null || cache.Result is null)
+                    throw new InvalidDataException("A checkpoint cache entry is incomplete.");
+                ValidateTaskResultBounds(cache.Result);
+            }
+        }
+        if (state.Failures is not null)
+        {
+            foreach (DiagnosticDocument diagnostic in state.Failures)
+                ValidateDiagnosticBounds(diagnostic);
+        }
+        if (state.PendingArtifacts is not null)
+        {
+            foreach (PendingArtifactDocument pending in state.PendingArtifacts)
+            {
+                if (pending is null)
+                    throw new InvalidDataException("A checkpoint pending-artifact entry is missing.");
+                if ((pending.Artifacts?.Count ?? 0) > EvolutionTaskResult.MaximumArtifacts)
+                    throw new InvalidDataException("A checkpoint contains too many pending artifacts.");
+                if (pending.Artifacts is not null && pending.Artifacts.Any(artifact => artifact is null))
+                    throw new InvalidDataException("A checkpoint pending artifact is missing.");
+            }
+        }
+    }
+
+    private static void ValidateArchiveEntryBounds(ArchiveEntryDocument entry)
+    {
+        if ((entry.CellBins?.Length ?? 0) > EvolutionCollectionLimits.MaximumArchiveDimensions)
+            throw new InvalidDataException("A checkpoint cell contains too many descriptor dimensions.");
+        if (entry.Lineage is not null)
+        {
+            if ((entry.Lineage.ParentIds?.Count ?? 0) > EvolutionCollectionLimits.MaximumLineageIdentities ||
+                (entry.Lineage.InspirationIds?.Count ?? 0) > EvolutionCollectionLimits.MaximumLineageIdentities)
+            {
+                throw new InvalidDataException("A checkpoint lineage contains too many identities.");
+            }
+        }
+        if (entry.Evaluation is not null) ValidateEvaluationBounds(entry.Evaluation);
+    }
+
+    private static void ValidateEvaluationBounds(EvaluationDocument evaluation)
+    {
+        ValidateResultCollections(
+            evaluation.Descriptors,
+            evaluation.Objectives,
+            evaluation.ConstraintViolations,
+            evaluation.Diagnostics,
+            evaluation.Metrics);
+        if ((evaluation.StageCostUnits?.Count ?? 0) > EvolutionCollectionLimits.MaximumCascadeStages)
+            throw new InvalidDataException("A checkpoint evaluation contains too many cascade stages.");
+        if ((evaluation.Artifacts?.Count ?? 0) > EvolutionTaskResult.MaximumArtifacts)
+            throw new InvalidDataException("A checkpoint evaluation contains too many artifacts.");
+        if (evaluation.Artifacts is not null && evaluation.Artifacts.Any(artifact => artifact is null))
+            throw new InvalidDataException("A checkpoint evaluation artifact is missing.");
+    }
+
+    private static void ValidateTaskResultBounds(TaskResultDocument result) =>
+        ValidateResultCollections(
+            result.Descriptors,
+            result.Objectives,
+            result.ConstraintViolations,
+            result.Diagnostics,
+            result.Metrics);
+
+    private static void ValidateResultCollections(
+        IReadOnlyDictionary<string, double>? descriptors,
+        IReadOnlyCollection<double>? objectives,
+        IReadOnlyCollection<double>? constraintViolations,
+        IReadOnlyCollection<DiagnosticDocument>? diagnostics,
+        IReadOnlyDictionary<string, double>? metrics)
+    {
+        if ((descriptors?.Count ?? 0) > EvolutionTaskResult.MaximumNamedValues ||
+            (metrics?.Count ?? 0) > EvolutionTaskResult.MaximumNamedValues ||
+            (objectives?.Count ?? 0) > EvolutionTaskResult.MaximumVectorValues ||
+            (constraintViolations?.Count ?? 0) > EvolutionTaskResult.MaximumVectorValues ||
+            (diagnostics?.Count ?? 0) > EvolutionTaskResult.MaximumDiagnostics)
+        {
+            throw new InvalidDataException("A checkpoint evaluation collection exceeds its package limit.");
+        }
+        if (diagnostics is not null)
+        {
+            foreach (DiagnosticDocument diagnostic in diagnostics)
+                ValidateDiagnosticBounds(diagnostic);
+        }
+    }
+
+    private static void ValidateDiagnosticBounds(DiagnosticDocument diagnostic)
+    {
+        if (diagnostic is null)
+            throw new InvalidDataException("A checkpoint diagnostic is missing.");
+        if ((diagnostic.Data?.Count ?? 0) > EvolutionDiagnostic.MaximumDataEntries)
+            throw new InvalidDataException("A checkpoint diagnostic contains too much structured data.");
     }
 
     private static int AddCheckpointEntryCount(int total, int count, string source)

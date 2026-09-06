@@ -224,6 +224,11 @@ public sealed class DirectoryEvolutionCheckpointStoreTests
         Assert.Throws<ArgumentOutOfRangeException>(() =>
             new DirectoryEvolutionCheckpointStore(directory.Path,
                 Retention(keepLast: 1, keepBest: EvolutionCollectionLimits.MaximumCheckpointFiles + 1)));
+        Assert.Throws<ArgumentOutOfRangeException>(() =>
+            new DirectoryEvolutionCheckpointStore(directory.Path,
+                Retention(
+                    keepLast: EvolutionCollectionLimits.MaximumCheckpointFiles - 1,
+                    keepBest: 1)));
         var store = new DirectoryEvolutionCheckpointStore(directory.Path);
         Assert.Throws<ArgumentOutOfRangeException>(() => store.ListCheckpoints("run", maximumCount: 0));
         Assert.Throws<ArgumentOutOfRangeException>(() => DirectoryEvolutionCheckpointStore.FileNameFor(-1));
