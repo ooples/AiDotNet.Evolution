@@ -1,0 +1,126 @@
+name: Lint PR Title (Conventional Commits)
+
+# Squash-merge uses the PR title as the commit subject, and release-please only reacts to
+# conventional-commit subjects. This check fails a PR whose title is not a valid conventional
+# commit, so non-conventional subjects (which silently disable release-please) can't reach main.
+# Mark this check "required" in branch protection for it to block merges.
+
+on:
+  pull_request:
+    types: [opened, edited, reopened, synchronize]
+
+concurrency:
+  group: pr-title-lint-${{ github.event.pull_request.number }}
+  cancel-in-progress: true
+
+# contents: read is used for exactly one thing — reading release-please-config.json from the base
+# branch through the GitHub API. No other scope (notably pull-requests) is granted.
+permissions:
+  contents: read
+
+jobs:
+  lint-title:
+    name: Validate PR title
+    runs-on: ubuntu-latest
+    # Deliberately no release-please exemption. Its default PR title is "chore(main): release
+    # 1.2.3", already a valid conventional commit that passes this lint, so an exemption buys
+    # nothing — and one keyed on the branch name would be a bypass, since any contributor can
+    # open a PR from a branch named release-please--anything to skip a required check.
+    steps:
+      - name: Check conventional-commit format
+        uses: actions/github-script@3a2844b7e9c422d3c10d287c895573f7108da1b3 # v7
+        with:
+          script: |
+            // Derived from release-please-config.json rather than duplicated here. A second
+            // hand-maintained list drifts silently, and both directions are damaging: a type
+            // release-please handles gets rejected, or a type it ignores is accepted and quietly
+            // produces no release.
+            async function readReleaseConfig(ref) {
+              const response = await github.rest.repos.getContent({
+                owner: context.repo.owner,
+                repo: context.repo.repo,
+                path: 'release-please-config.json',
+                ref
+              });
+              if (Array.isArray(response.data) || response.data.type !== 'file') {
+                throw new Error(`release-please-config.json at ${ref} is not a file.`);
+              }
+              return JSON.parse(Buffer.from(response.data.content, 'base64').toString('utf8'));
+            }
+
+            let config;
+            try {
+              // Base branch, NOT the PR head: the config is the authority on what this check
+              // accepts, so a normal PR cannot widen the rules it is being judged by.
+              config = await readReleaseConfig(context.payload.pull_request.base.sha);
+            } catch (error) {
+              if (error.status !== 404) {
+                core.setFailed(`Could not read the base release-please-config.json: ${error.message}`);
+                return;
+              }
+
+              // The repository's first PR starts from an intentionally empty bootstrap commit,
+              // so no trusted base config exists yet. Permit the head config only for that exact
+              // state. A missing config on any non-empty base is an error, never a bypass.
+              const baseCommit = await github.rest.git.getCommit({
+                owner: context.repo.owner,
+                repo: context.repo.repo,
+                commit_sha: context.payload.pull_request.base.sha
+              });
+              // Git's SHA-1 object ID for an empty tree is canonical. GitHub exposes it on the
+              // commit even though its Trees endpoint returns 404 when asked for that object.
+              const emptyTreeSha = '4b825dc642cb6eb9a060e54bf8d69288fbee4904';
+              if (baseCommit.data.tree.sha !== emptyTreeSha) {
+                core.setFailed(
+                  'release-please-config.json is absent from a non-empty base branch; refusing ' +
+                  'to let the PR define the title policy used to validate itself.'
+                );
+                return;
+              }
+
+              core.warning('Empty bootstrap base detected; validating against the initial head config.');
+              try {
+                config = await readReleaseConfig(context.payload.pull_request.head.sha);
+              } catch (headError) {
+                core.setFailed(`Could not read the bootstrap release-please-config.json: ${headError.message}`);
+                return;
+              }
+            }
+
+            const sections = config['changelog-sections'];
+
+            if (!Array.isArray(sections) || sections.length === 0) {
+              core.setFailed(
+                'release-please-config.json has no changelog-sections, so the set of valid commit ' +
+                'types is unknown. Refusing to pass the title rather than accept anything.'
+              );
+              return;
+            }
+
+            const types = sections.map(s => s && s.type).filter(Boolean);
+            if (types.length === 0) {
+              core.setFailed('release-please-config.json changelog-sections contain no types.');
+              return;
+            }
+
+            const title = context.payload.pull_request.title || '';
+            const escaped = types.map(t => t.replace(/[.*+?^${}()|[\]\\]/g, '\\$&'));
+            const pattern = new RegExp('^(' + escaped.join('|') + ')(\\([^)]+\\))?!?: .+');
+            if (pattern.test(title)) {
+              core.info(`PR title OK: ${title}`);
+              return;
+            }
+
+            // "hidden" sections are the ones release-please keeps out of the changelog and that
+            // therefore do not cut a release.
+            const releasing = sections.filter(s => s && s.type && !s.hidden).map(s => s.type);
+            core.setFailed(
+              `PR title is not a Conventional Commit: "${title}"\n\n` +
+              `Squash-merge uses the PR title as the commit subject, and release-please only cuts a\n` +
+              `release when it sees a conventional subject — a non-conventional title silently stops\n` +
+              `release PRs from being created.\n\n` +
+              `Use: <type>(optional-scope): <description>\n` +
+              `  Allowed types: ${types.join(', ')}\n` +
+              `  Trigger a release: ${releasing.join(', ')}  (others do not)\n` +
+              `  Examples: "feat(gpu): add paged attention", "fix(ci): repair release workflow"`
+            );
