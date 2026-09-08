@@ -30,7 +30,11 @@ the `ooples` NuGet account with these values:
 
 Enter only the workflow filename in NuGet, not the `.github/workflows/` path. The publish job requests a single-use
 OIDC token immediately before publication and exchanges it for a short-lived NuGet API key through `NuGet/login`.
-The workflow never stores a long-lived NuGet credential.
+The workflow never stores a long-lived NuGet credential. Package provenance runs through the separately named
+`attest-release.yml` reusable workflow. NuGet validates GitHub's `job_workflow_ref` claim, so that workflow's OIDC
+token cannot satisfy the trusted-publishing policy for `automated-release.yml`; only the publish job in the trusted
+workflow can obtain a NuGet credential. Verified package artifacts are immutable and retained for 30 days so a
+publication outage can be retried without rebuilding different package bytes.
 
 ## Repository services
 
