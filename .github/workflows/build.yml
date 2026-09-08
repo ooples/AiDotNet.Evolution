@@ -38,7 +38,7 @@ jobs:
         run: dotnet format AiDotNet.Evolution.slnx --no-restore --verify-no-changes
       - name: Verify release workflow security contract
         shell: pwsh
-        run: ./eng/Test-ReleaseWorkflow.ps1
+        run: ./eng/Test-ReleaseWorkflow.ps1 -NoRestore
       - name: Build all package target frameworks
         run: dotnet build src/AiDotNet.Evolution/AiDotNet.Evolution.csproj --configuration Release --no-restore
       - name: Test net10.0 with coverage
