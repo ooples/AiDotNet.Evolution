@@ -30,7 +30,7 @@ jobs:
           dotnet-version: '10.0.x'
           dotnet-quality: preview
       # A Dependabot-triggered run reads secrets from the repository's DEPENDABOT secret
-      # store, not the Actions store, so SONAR_TOKEN arrives empty on every dependency PR
+      # store, not the Actions store, so SONAR_TOKEN is empty when it is not configured there
       # and the analysis below threw. 'SonarCloud Analysis' is a REQUIRED check, so that
       # throw blocked every Dependabot PR permanently for a configuration reason rather
       # than anything wrong with the change. Skip only the analysis on those runs; restore,
