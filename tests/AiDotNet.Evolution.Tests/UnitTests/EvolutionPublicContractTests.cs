@@ -80,6 +80,10 @@ public sealed class EvolutionPublicContractTests
         {
             ParentQualityCacheSize = EvolutionCollectionLimits.MaximumParentQualityCacheEntries + 1
         }.SnapshotAndValidate());
+        Assert.Throws<ArgumentOutOfRangeException>(() => new EvolutionTraceOptions
+        {
+            ParentQualityCacheSize = -1
+        }.SnapshotAndValidate());
     }
 
     [Fact]

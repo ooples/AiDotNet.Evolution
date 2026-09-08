@@ -112,7 +112,17 @@ public sealed class EvolutionDescriptorCalibrationTests
         Assert.Throws<ArgumentOutOfRangeException>(() =>
             new EvolutionDescriptorCalibrationOptions { Padding = -1 }.Validate());
         Assert.Throws<ArgumentOutOfRangeException>(() =>
+            new EvolutionDescriptorCalibrationOptions { Padding = double.NaN }.Validate());
+        Assert.Throws<ArgumentOutOfRangeException>(() =>
+            new EvolutionDescriptorCalibrationOptions { Padding = double.PositiveInfinity }.Validate());
+        Assert.Throws<ArgumentOutOfRangeException>(() =>
+            new EvolutionDescriptorCalibrationOptions { Padding = 101 }.Validate());
+        Assert.Throws<ArgumentOutOfRangeException>(() =>
             new EvolutionDescriptorCalibrationOptions { DegenerateSpan = 0 }.Validate());
+        Assert.Throws<ArgumentOutOfRangeException>(() =>
+            new EvolutionDescriptorCalibrationOptions { DegenerateSpan = double.NaN }.Validate());
+        Assert.Throws<ArgumentOutOfRangeException>(() =>
+            new EvolutionDescriptorCalibrationOptions { DegenerateSpan = double.PositiveInfinity }.Validate());
         Assert.Throws<ArgumentOutOfRangeException>(() =>
             new EvolutionDescriptorCalibrationOptions
             {
