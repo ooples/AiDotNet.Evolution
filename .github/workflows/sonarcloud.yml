@@ -29,9 +29,39 @@ jobs:
         with:
           dotnet-version: '10.0.x'
           dotnet-quality: preview
+      # A Dependabot-triggered run reads secrets from the repository's DEPENDABOT secret
+      # store, not the Actions store, so SONAR_TOKEN is empty when it is not configured there
+      # and the analysis below threw. 'SonarCloud Analysis' is a REQUIRED check, so that
+      # throw blocked every Dependabot PR permanently for a configuration reason rather
+      # than anything wrong with the change. Skip only the analysis on those runs; restore,
+      # build and test still execute below, so dependency PRs keep real validation.
+      #
+      # A missing token on any OTHER run is still a hard failure: that is genuine
+      # misconfiguration and must not silently downgrade to "no analysis".
+      - name: Determine whether SonarCloud analysis can run
+        id: sonar_guard
+        env:
+          SONAR_TOKEN: ${{ secrets.SONAR_TOKEN }}
+          RUN_ACTOR: ${{ github.actor }}
+        shell: pwsh
+        run: |
+          $hasToken = -not [string]::IsNullOrWhiteSpace($env:SONAR_TOKEN)
+          $isDependabot = $env:RUN_ACTOR -eq 'dependabot[bot]'
+          if ($hasToken) {
+            'enabled=true' | Out-File -FilePath $env:GITHUB_OUTPUT -Append -Encoding utf8
+          }
+          elseif ($isDependabot) {
+            Write-Host '::notice::SONAR_TOKEN is not exposed to Dependabot runs (Dependabot reads its own secret store), so SonarCloud analysis is skipped for this dependency PR. Build and tests still run. To restore analysis here, add SONAR_TOKEN under Settings > Secrets and variables > Dependabot.'
+            'enabled=false' | Out-File -FilePath $env:GITHUB_OUTPUT -Append -Encoding utf8
+          }
+          else {
+            throw 'SONAR_TOKEN is not configured for AiDotNet.Evolution.'
+          }
       - name: Install scanner
+        if: steps.sonar_guard.outputs.enabled == 'true'
         run: dotnet tool install --global dotnet-sonarscanner --version 11.3.0
       - name: Begin analysis
+        if: steps.sonar_guard.outputs.enabled == 'true'
         env:
           SONAR_TOKEN: ${{ secrets.SONAR_TOKEN }}
           PR_NUMBER: ${{ github.event.pull_request.number }}
@@ -39,9 +69,6 @@ jobs:
           PR_BASE: ${{ github.base_ref }}
         shell: pwsh
         run: |
-          if ([string]::IsNullOrWhiteSpace($env:SONAR_TOKEN)) {
-            throw 'SONAR_TOKEN is not configured for AiDotNet.Evolution.'
-          }
           $arguments = @(
             '/k:ooples_AiDotNet.Evolution',
             '/o:ooples',
@@ -68,6 +95,7 @@ jobs:
           --
           DataCollectionRunSettings.DataCollectors.DataCollector.Configuration.Format=opencover
       - name: End analysis
+        if: steps.sonar_guard.outputs.enabled == 'true'
         env:
           SONAR_TOKEN: ${{ secrets.SONAR_TOKEN }}
         run: dotnet-sonarscanner end /d:sonar.token="$SONAR_TOKEN"
