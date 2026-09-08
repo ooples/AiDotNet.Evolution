@@ -98,6 +98,14 @@ public sealed class EvolutionMigrationTopologyTests
         EvolutionEngineOptions badRate = Options(4, 4, islandCount: 2);
         badRate.MigrationRate = -0.5;
         Assert.Throws<ArgumentOutOfRangeException>(() => Engine(new SyntheticEvolutionTask(), badRate));
+
+        EvolutionEngineOptions nonFiniteRate = Options(4, 4, islandCount: 2);
+        nonFiniteRate.MigrationRate = double.NaN;
+        Assert.Throws<ArgumentOutOfRangeException>(() => Engine(new SyntheticEvolutionTask(), nonFiniteRate));
+
+        EvolutionEngineOptions excessiveRate = Options(4, 4, islandCount: 2);
+        excessiveRate.MigrationRate = 1.5;
+        Assert.Throws<ArgumentOutOfRangeException>(() => Engine(new SyntheticEvolutionTask(), excessiveRate));
     }
 
     [Fact]

@@ -72,17 +72,27 @@ public sealed class MapElitesArchiveTests
     }
 
     [Fact]
-    public void InvalidEvaluationDoesNotEnterArchive()
+    public void InvalidEvaluationsDoNotEnterArchive()
     {
         MapElitesArchive<TestGenome> archive = Archive();
         (EvolutionCandidate<TestGenome> candidate, EvolutionEvaluation evaluation) = Create(1, "a", 1, 0.2);
-        var failed = new EvolutionEvaluation(1, "a", EvolutionEvaluationStatus.Failed, null,
-            EvolutionOptimizationDirection.Maximize, new Dictionary<string, double>(), Array.Empty<double>(),
-            Array.Empty<double>(), new EvolutionEvaluationCost(TimeSpan.Zero, 1, 0), evaluation.Lineage,
-            EvolutionCacheStatus.NotChecked, Array.Empty<EvolutionDiagnostic>(), "task", "eval", "config");
+        EvolutionEvaluation[] invalidEvaluations =
+        {
+            Invalid(EvolutionEvaluationStatus.Failed, null, EvolutionOptimizationDirection.Maximize, 1, "a"),
+            Invalid(EvolutionEvaluationStatus.Completed, 1, EvolutionOptimizationDirection.Minimize, 1, "a"),
+            Invalid(EvolutionEvaluationStatus.Completed, 1, EvolutionOptimizationDirection.Maximize, 2, "a"),
+            Invalid(EvolutionEvaluationStatus.Completed, 1, EvolutionOptimizationDirection.Maximize, 1, "other")
+        };
 
-        Assert.Equal(EvolutionArchiveInsertionResult.Rejected, archive.TryAdd(candidate, failed));
+        foreach (EvolutionEvaluation invalid in invalidEvaluations)
+            Assert.Equal(EvolutionArchiveInsertionResult.Rejected, archive.TryAdd(candidate, invalid));
         Assert.Empty(archive.Entries);
+
+        EvolutionEvaluation Invalid(EvolutionEvaluationStatus status, double? quality,
+            EvolutionOptimizationDirection direction, long evaluationId, string genomeId) => new(
+            evaluationId, genomeId, status, quality, direction, evaluation.Descriptors, Array.Empty<double>(),
+            Array.Empty<double>(), evaluation.Cost, evaluation.Lineage, EvolutionCacheStatus.NotChecked,
+            Array.Empty<EvolutionDiagnostic>(), "task", "eval", "config");
     }
 
     internal static MapElitesArchive<TestGenome> Archive(

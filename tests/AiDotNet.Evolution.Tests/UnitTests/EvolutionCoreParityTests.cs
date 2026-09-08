@@ -14,6 +14,10 @@ public sealed class EvolutionCoreParityTests
         Assert.Throws<ArgumentException>(() => new RatioEvolutionSelectionPolicy<TestGenome>(options));
         Assert.Throws<ArgumentOutOfRangeException>(() => new RatioEvolutionSelectionPolicy<TestGenome>(
             new EvolutionSelectionOptions { ExplorationRatio = -1, ExploitationRatio = 1, EliteRatio = 1 }));
+        Assert.Throws<ArgumentOutOfRangeException>(() => new RatioEvolutionSelectionPolicy<TestGenome>(
+            new EvolutionSelectionOptions { ExplorationRatio = double.NaN, ExploitationRatio = 1, EliteRatio = 0 }));
+        Assert.Throws<ArgumentOutOfRangeException>(() => new RatioEvolutionSelectionPolicy<TestGenome>(
+            new EvolutionSelectionOptions { ExplorationRatio = 2, ExploitationRatio = 0, EliteRatio = 0 }));
     }
 
     [Fact]

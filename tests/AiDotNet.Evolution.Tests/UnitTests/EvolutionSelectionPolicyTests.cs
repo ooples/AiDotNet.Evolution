@@ -6,6 +6,18 @@ namespace AiDotNet.Evolution.Tests;
 public sealed class EvolutionSelectionPolicyTests
 {
     [Fact]
+    public void DoubleSelectionReturnsNullForAnEmptyArchive()
+    {
+        var archive = new MapElitesArchive<TestGenome>(new[]
+        {
+            new EvolutionDescriptorDefinition("x", 0, 4, 4)
+        });
+        var policy = new DoubleEvolutionSelectionPolicy<TestGenome>();
+
+        Assert.Null(policy.Select(archive, new StableRandom(3), inspirationCount: 3));
+    }
+
+    [Fact]
     public void DoubleSelectionUsesDistinctQualityRankedInspirations()
     {
         var archive = new MapElitesArchive<TestGenome>(new[]
