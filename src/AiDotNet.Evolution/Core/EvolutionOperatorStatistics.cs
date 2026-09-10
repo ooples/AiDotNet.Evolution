@@ -17,7 +17,7 @@ public sealed class EvolutionOperatorStatistics
     public long Proposals { get; }
     /// <summary>Gets the number of terminal outcomes committed for this operator.</summary>
     public long Outcomes { get; }
-    /// <summary>Gets accumulated bounded, cost-normalized archive-success reward.</summary>
+    /// <summary>Gets accumulated bounded, cost-normalized reward under the portfolio's declared policy.</summary>
     public double RewardSum { get; }
     /// <summary>Gets reward per committed outcome, or zero before the first outcome.</summary>
     public double MeanReward => Outcomes == 0 ? 0 : RewardSum / Outcomes;

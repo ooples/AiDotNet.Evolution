@@ -10,6 +10,9 @@ Implementation is continuing across the core and companion PRs. **The roadmap is
 - `AdaptiveVariationPortfolio<TGenome>` attributes outcomes to child operators, maintains bounded archive-success
   rewards divided by evaluator cost, explores with epsilon-greedy selection, exposes statistics and checkpoints
   both its learning and stateful children. This reward is not marginal scalar gain or total LLM cost.
+- The opt-in [operator-credit extension](OPERATOR_CREDIT.md) adds proposal-time parent improvement, explicit gain/cost
+  scales, proposal-plus-evaluator receipts, backend checkpoints and typed terminal child/configuration attribution.
+  Uninstrumented consumer stages are still not automatically included in credit or accounting.
 - The numeric development harness compares six methods on four objectives with identical initial populations,
   matched evaluator-call caps, complete failure accounting and machine-readable best-so-far traces.
 - CI checks harness accounting and exact same-platform replay. It does not require the new method to win these
@@ -61,7 +64,7 @@ Durable evaluation identities and leases must be developed against its eventual 
 | US-05 resource ledger | Partial | Generic ledger, stage helper and evaluator/cascade adapter implemented; consumer model/compiler/setup integrations and deterministic concurrent admission remain. |
 | US-06 noisy evaluation | Partial | Fresh bounded replicate runner, per-sample costs, finite-look uncertainty and separate confirmation identities implemented; archive resampling policy, cascade-rejection audit and representative noisy comparisons remain. |
 | US-07 ablations | Partial | Same-operator uniform/adaptive allocation is available; representative island, migration, novelty and dispatch ablations remain. |
-| US-08 adaptive operators | Partial | Marginal-gain reward options, end-to-end cost credit, realistic benchmark validation. |
+| US-08 adaptive operators | Partial | Parent-improvement/archive-success policies, proposal-plus-evaluator credit and typed attribution implemented; full consumer-stage integration and representative held-out comparisons before default promotion remain. |
 | US-09 Pareto pipeline | Not implemented | Feasibility, objective definitions, archive/snapshot/selection/stopping/migration semantics together. |
 | US-10 engine performance | Partial | BenchmarkDotNet engine/archive/checkpoint suite and fixture validation implemented; controlled repeated baselines, peak memory, dimension/island scaling and regression thresholds remain. |
 | US-11 application examples | Not implemented | End-to-end program, AutoML, kernel and external-session examples. |
@@ -83,6 +86,12 @@ Durable evaluation identities and leases must be developed against its eventual 
 
 ## Validation evidence
 
+- Explicit operator credit: 478 core tests pass on each of net10.0, net8.0 and net471, including 21 new gain/cost cases.
+  Fresh modern coverage is 91.35% line / 76.77% branch; the unchanged ratchet passes. Tests cover pending parent/cost
+  restoration, whole-engine boundary resume, unknown/missing receipts, cancellation, concurrent-use rejection, fixed-scale
+  numeric extremes and lower-cost preference with retained exploration. The original constructor's binary signature and
+  default checkpoint representation are preserved. The example passes 24 paired runs / six methods with exact replay,
+  static controls, measured-only winners and all-stage synthetic cost reconciliation. No realistic-price or quality win is claimed.
 - Evaluator receipt hardening: six new cases bring the core suite to 457 passing tests on each target framework.
   Four regressions first failed: a positive cost rounding to zero, lost engine-visible unrepresentable cost, a nested
   budget exception mislabeled as preflight denial, and a declared maximum overrun remaining promotable. The adapter
