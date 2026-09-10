@@ -26,7 +26,8 @@ for every evaluator call, including initialization; failed or incomplete runs re
 
 ## Companion work and integration boundaries
 
-[AiDotNet companion PR #2148](https://github.com/ooples/AiDotNet/pull/2148): an explicit correctness-before-fitness evaluator and preservation of metrics/artifacts during
+[AiDotNet companion PR #2148](https://github.com/ooples/AiDotNet/pull/2148): an explicit correctness-before-fitness gate configured through
+`AiModelBuilder.ConfigureProgramCorrectness`, with the evaluator kept internal, and preservation of metrics/artifacts during
 program descriptor merging. The latter changes future repair feedback, so the program-task semantic version is bumped.
 The existing [package migration PR #2092](https://github.com/ooples/AiDotNet/pull/2092) is independent and must be
 reconciled before treating the new core portfolio as available through AiDotNet's facade. No copied engine changes
@@ -82,11 +83,14 @@ Durable evaluation identities and leases must be developed against its eventual 
   match, costs reconcile, and best-so-far curves are monotonic. This is an accounting/replay smoke test, not a
   statistically powered quality comparison.
 - Tensors: 22 targeted autotuning tests pass on net10.0, including three new deployment deactivation tests.
-- AiDotNet companion: 1,006 UnitTests.Evolution tests pass on net10.0, including 15 new gate/metadata tests.
+- AiDotNet companion: 1,028 tests pass on net10.0 (1,006 UnitTests.Evolution tests and 22 facade integration tests),
+  including 15 new gate/metadata tests and three new facade checks.
 - [Development pilot](benchmarks/NUMERIC_PILOT.md): 200 runs / 51,200 calls, no failures. Adaptation beats the
   same-operator uniform control on median loss here, but hill climbing beats both on every task's median loss.
   Adaptation remains opt-in; this is not representative or statistically confirmed superiority.
-- Hosted CI is queued/pending, and draft PRs have not received independent review. No merge-readiness claim.
+- Hosted CI is queued/pending. AiDotNet's automated review requested facade integration; the follow-up hides the
+  implementation and adds builder-level tests. Current-head approval is still pending. All PRs remain drafts;
+  no merge-readiness claim.
 
 ## Experiment access policy
 
