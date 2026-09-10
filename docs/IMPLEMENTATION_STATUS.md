@@ -63,7 +63,7 @@ Durable evaluation identities and leases must be developed against its eventual 
 | US-07 ablations | Partial | Same-operator uniform/adaptive allocation is available; representative island, migration, novelty and dispatch ablations remain. |
 | US-08 adaptive operators | Partial | Marginal-gain reward options, end-to-end cost credit, realistic benchmark validation. |
 | US-09 Pareto pipeline | Not implemented | Feasibility, objective definitions, archive/snapshot/selection/stopping/migration semantics together. |
-| US-10 engine performance | Not implemented | BenchmarkDotNet throughput/allocation/scaling suite and regression thresholds. |
+| US-10 engine performance | Partial | BenchmarkDotNet engine/archive/checkpoint suite and fixture validation implemented; controlled repeated baselines, peak memory, dimension/island scaling and regression thresholds remain. |
 | US-11 application examples | Not implemented | End-to-end program, AutoML, kernel and external-session examples. |
 | US-12 quality release gates | Partial | Representative measured quality thresholds, confidence and release artifacts. |
 | US-13 typed search spaces | Implemented | Mixed/conditional domains, owned canonical genomes, operators/refinement, checkpointed diagonal CMA and pinned simpler-baseline comparison; no universal-quality claim. |
@@ -90,6 +90,9 @@ Durable evaluation identities and leases must be developed against its eventual 
 - Harness: six-method smoke passes 48 runs / 1,536 calls per replay. Repeated JSON is byte-identical, paired starting populations
   match, costs reconcile, and best-so-far curves are monotonic. This is an accounting/replay smoke test, not a
   statistically powered quality comparison.
+- Performance fixture smoke verifies 16 engine configurations, three occupied archive sizes and three real checkpoint
+  sizes, including unchanged state on restore. BenchmarkDotNet Dry runs completed nine archive and 32 engine cases;
+  these are execution checks under local development load, not timing baselines or speedup evidence.
 - Tensors: 22 targeted autotuning tests pass on net10.0, including three new deployment deactivation tests.
 - AiDotNet companion: 1,028 tests pass on net10.0 (1,006 UnitTests.Evolution tests and 22 facade integration tests),
   including 15 new gate/metadata tests and three new facade checks.

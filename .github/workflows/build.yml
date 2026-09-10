@@ -62,6 +62,8 @@ jobs:
       - name: Verify typed search example
         shell: pwsh
         run: ./eng/Test-TypedSearch.ps1
+      - name: Verify performance fixture contracts
+        run: dotnet run --project benchmarks/AiDotNet.Evolution.Performance -c Release -- --smoke
       - name: Enforce coverage ratchet
         shell: pwsh
         run: |

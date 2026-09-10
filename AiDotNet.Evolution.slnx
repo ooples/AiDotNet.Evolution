@@ -1,5 +1,6 @@
 <Solution>
   <Folder Name="/benchmarks/">
+    <Project Path="benchmarks/AiDotNet.Evolution.Performance/AiDotNet.Evolution.Performance.csproj" />
     <Project Path="benchmarks/AiDotNet.Evolution.Quality/AiDotNet.Evolution.Quality.csproj" />
   </Folder>
   <Folder Name="/examples/">
