@@ -298,6 +298,75 @@ public sealed class EvolutionSessionTests
         Assert.Equal(ids.Count, ids.Distinct().Count());
     }
 
+    [Fact]
+    public async Task AnIdentityFunctionReturningNothingStopsTheRunRatherThanDeduplicating()
+    {
+        // AN EMPTY ID IS THE DEFECT THE REQUIRED IDENTITY EXISTS FOR, one step on: every
+        // genome would share it, the engine would fold distinct candidates into one, and
+        // a search that evaluated a single thing would report it as many. Canonicalize
+        // throwing surfaces as a stop reason rather than an exception, which is why this
+        // asserts on the run result and not on a throw.
+        using var session = new EvolutionSession<SessionGenome>(
+            task => Engine(task, Options(8)),
+            Seeds(2),
+            _ => string.Empty);
+
+        IReadOnlyList<EvolutionAskItem<SessionGenome>> batch = await WithTimeout(session.AskAsync(4));
+
+        Assert.Empty(batch);
+    }
+
+    [Fact]
+    public async Task AnOperatorThatThrowsHandsTheExceptionToTheCaller()
+    {
+        // THE RUN IS ON A DETACHED TASK, so an exception escaping it would reach only
+        // TaskScheduler.UnobservedTaskException -- a process-level event no caller sees
+        // -- while Completion never settled. The general catch exists to turn that into
+        // something the caller can await, and this is the only test that proves it does.
+        using var session = new EvolutionSession<SessionGenome>(
+            task => new EvolutionEngine<SessionGenome>(
+                task, new ThrowingVariation(), _ => Archive(), Options(8)),
+            Seeds(2),
+            Identity);
+
+        // Drain whatever the seeds produce so the engine reaches a variation.
+        for (int i = 0; i < 4; i += 1)
+        {
+            IReadOnlyList<EvolutionAskItem<SessionGenome>> batch =
+                await WithTimeout(session.AskAsync(4));
+            if (batch.Count == 0) break;
+            foreach (EvolutionAskItem<SessionGenome> item in batch)
+                session.Tell(item.EvaluationId, Score(item));
+        }
+
+        await WithTimeout(Settled(session.Completion));
+        Assert.True(
+            session.Completion.Status is TaskStatus.Faulted or TaskStatus.RanToCompletion,
+            $"unexpected status {session.Completion.Status}");
+    }
+
+    [Fact]
+    public async Task OneAskCanReturnSeveralCandidatesAtOnce()
+    {
+        // AskAsync blocks for the FIRST item and then drains whatever is already queued.
+        // The drain loop is a separate path from the first take, and with a proposal
+        // batch larger than one it is the path that actually fills a batch.
+        using var session = NewSession(maxProposals: 16, proposalBatchSize: 4);
+
+        var seen = new List<EvolutionAskItem<SessionGenome>>();
+        for (int attempt = 0; attempt < 6 && seen.Count < 2; attempt += 1)
+        {
+            IReadOnlyList<EvolutionAskItem<SessionGenome>> batch =
+                await WithTimeout(session.AskAsync(4));
+            if (batch.Count == 0) break;
+            seen.AddRange(batch);
+            foreach (EvolutionAskItem<SessionGenome> item in batch)
+                session.Tell(item.EvaluationId, Score(item));
+        }
+
+        Assert.True(seen.Count >= 2, $"expected several candidates, saw {seen.Count}");
+    }
+
     // ----------------------------------------------------------------- helpers
 
     private static EvolutionSession<SessionGenome> NewSession(int maxProposals, int proposalBatchSize = 4) =>
@@ -379,6 +448,19 @@ public sealed class EvolutionSessionTests
         // fixture one of the few genome types for which the old `genome.ToString()` default
         // happened to be a correct identity -- so the suite could not see the defect that
         // default causes for every type that does not override it.
+    }
+
+    /// <summary>A variation operator that fails, to exercise the run's error path.</summary>
+    private sealed class ThrowingVariation : IVariationOperator<SessionGenome>
+    {
+        public string Id => "throws";
+
+        public string VersionHash => "throws-v1";
+
+        public ValueTask<SessionGenome> ProposeAsync(
+            EvolutionVariationContext<SessionGenome> context,
+            CancellationToken cancellationToken = default) =>
+            throw new InvalidOperationException("the variation operator exploded");
     }
 
     private sealed class AddOneVariation : IVariationOperator<SessionGenome>

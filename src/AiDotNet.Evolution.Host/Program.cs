@@ -38,6 +38,19 @@ internal static class Program
         };
         var stdin = new StreamReader(Console.OpenStandardInput(), new UTF8Encoding(false));
 
+        return await ServeAsync(stdin, stdout).ConfigureAwait(false);
+    }
+
+    /// <summary>Reads frames from one stream and answers on the other until it ends.</summary>
+    /// <remarks>
+    /// SEPARATED FROM Main SO THE FRAMING CAN BE TESTED. Everything interesting here --
+    /// an oversized frame answered and skipped, a malformed one echoing the id it could
+    /// recover, blank lines ignored, `close` ending the loop -- was reachable only by
+    /// spawning the binary, which no in-process test can observe. Main now does nothing
+    /// but choose the encoding and hand over the streams.
+    /// </remarks>
+    internal static async Task<int> ServeAsync(TextReader stdin, TextWriter stdout)
+    {
         var frames = new FrameReader(stdin);
 
         HostSession? session = null;
@@ -58,7 +71,11 @@ internal static class Program
                     }).ConfigureAwait(false);
                     continue;
                 }
-                if (line.Length == 0) continue;
+                // WHITESPACE COUNTS AS BLANK. Skipping empty lines but answering a line
+                // of spaces with "malformed JSON" is an inconsistency a client can trip
+                // over for no reason -- a CR-only line already arrives here empty and is
+                // skipped, so padding should behave the same way.
+                if (line.Trim().Length == 0) continue;
 
                 Request? request = Protocol.ParseRequest(line, out string? parseError, out long id);
                 if (request is null)
@@ -83,7 +100,9 @@ internal static class Program
         return 0;
     }
 
-    private static async Task<Response> Handle(
+    // Internal so the dispatch can be tested without pipes. Main's loop is framing;
+    // this is the protocol, and every branch below is an error path a client can reach.
+    internal static async Task<Response> Handle(
         Request request,
         HostSession? session,
         Action<HostSession?> setSession)
