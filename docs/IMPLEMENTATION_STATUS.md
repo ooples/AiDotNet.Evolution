@@ -83,11 +83,17 @@ Durable evaluation identities and leases must be developed against its eventual 
 
 ## Validation evidence
 
+- CodeQL follow-up: eight arithmetic/complexity findings are addressed in `3cb89477`; 438 tests still pass on all
+  three frameworks and all 240 numeric run records remain unchanged. Fresh net10.0 coverage after the guard refactor
+  is 90.86% line / 76.38% branch; the unchanged ratchet passes. Hosted rescan confirmation remains pending.
 - Surrogate selection: 438 core tests pass on each of net10.0, net8.0 and net471, including 20 surrogate contract cases.
   Fresh net10.0 coverage is 90.89% line / 76.42% branch, above the unchanged ratchet minimum. Model failures retain
   actual/unknown charges; nested backend budget denials are not mislabeled as pre-dispatch denials. The numeric
   example validates interpolation, detached training data, fitted identities and weak-model/domain fallback.
   Its 12-run replay smoke verifies all-stage synthetic charges, measured-only winners and 155 actual acquisitions.
+  The [pinned surrogate example pilot](benchmarks/SURROGATE_EXAMPLE_PILOT.md) retains 60 runs / 7,380 true evaluations /
+  7,651.135264 synthetic work units, with zero failures and exact replay. Learned acquisition improves smooth-fixture
+  median loss but worsens rippled-fixture median loss; it remains optional and is not a calibrated production backend.
   See [surrogate selection](SURROGATE_SELECTION.md) for explicit-input/checkpoint and heuristic-uncertainty boundaries.
 - External baseline: eight integration tests cover all four shared objectives, exact initialization/replay, real SciPy
   calls, valid early convergence, errors and hard caps. The smoke completes eight external runs / 256 calls twice,
