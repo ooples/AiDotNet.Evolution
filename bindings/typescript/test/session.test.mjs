@@ -85,7 +85,9 @@ test('a host that dies mid-ask fails the pending request rather than hanging', a
   // Without the exit handler failing every waiter, this await never settles: the promise
   // is pending on a process that no longer exists.
   await assert.rejects(() => session.ask(4), /exited unexpectedly \(code 4/);
-  await session.close();
+  // And closing a session whose host is already gone REPORTS that rather than returning
+  // an empty summary, which would read as "the run finished and found nothing".
+  await assert.rejects(() => session.close(), /exited unexpectedly \(code 4/);
 });
 
 test('an unparseable line is ignored and the real response still arrives', async () => {
@@ -105,7 +107,7 @@ test('every request after the host dies fails immediately', async () => {
   const started = Date.now();
   await assert.rejects(() => session.ask(1), /exited unexpectedly/);
   assert.ok(Date.now() - started < 1000, 'a known-dead host is failed without waiting');
-  await session.close();
+  await assert.rejects(() => session.close(), /exited unexpectedly/);
 });
 
 test('evolve drives the loop and returns the summary', async () => {
@@ -140,4 +142,58 @@ test('closing a session actually terminates the host process', async () => {
   await session.close();
   await waitForExit(pid);
   assert.equal(alive(pid), false, 'the child outlives close() otherwise');
+});
+
+test('a host that dies before answering close is reported, not reported as empty', async () => {
+  const session = await openSession(withMode('ok'));
+  // Kill the host out from under the session, so close() can never be answered.
+  process.kill(session.pid, 'SIGKILL');
+  await waitForExit(session.pid);
+
+  // The failure mode this guards: returning { best: null, stopReason: null } here says
+  // "the run finished and found nothing", which is a different and much worse claim than
+  // "nobody answered".
+  await assert.rejects(() => session.close(), (error) => {
+    assert.ok(error instanceof EvolutionError);
+    assert.match(error.message, /exited/);
+    return true;
+  });
+});
+
+test('evolve rejects rather than resolving empty when close is never answered', async () => {
+  // THE EXACT SHAPE OF THE BUG: every ask and tell succeeds, the run reaches its end
+  // normally, and only the close goes unanswered. Swallowing that made evolve resolve
+  // with { best: null, stopReason: null } -- a completed search that found nothing.
+  await assert.rejects(
+    () =>
+      evolve(withMode('die-on-close'), (candidates) =>
+        candidates.map((c) => ({ evaluationId: c.evaluationId, quality: 1 }))
+      ),
+    /exited while closing \(code 5/
+  );
+});
+
+test('an evaluator error survives a failing close', async () => {
+  // BOTH FAIL HERE, and only one of them says what went wrong. Closing in a `finally`
+  // would let the teardown failure replace the evaluator error that caused it.
+  await assert.rejects(
+    () =>
+      evolve(withMode('ok'), () => {
+        throw new Error('the evaluator exploded');
+      }),
+    /the evaluator exploded/
+  );
+});
+
+test('a request that is never answered kills the host instead of leaking it', async () => {
+  // silent-on-ask never replies, so only the timeout can end this.
+  const session = await openSession(withMode('silent-on-ask', { requestTimeoutMs: 300 }));
+  const { pid } = session;
+
+  await assert.rejects(() => session.ask(1), /did not answer 'ask' within 300ms/);
+
+  // Without the kill the child stays alive with nobody holding a reference to it, and
+  // repeated failed opens leak one host process each.
+  await waitForExit(pid);
+  assert.equal(alive(pid), false, 'the host outlives a timeout otherwise');
 });

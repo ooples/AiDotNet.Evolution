@@ -176,10 +176,18 @@ public sealed class EvolutionSession<TGenome> : IDisposable
     /// </remarks>
     public void RequestStop()
     {
+        // CLOSED FIRST, THEN DRAINED, and the order is the whole correctness argument.
+        // Draining first leaves a window in which EvaluateAsync has already passed its
+        // `_closed` check and enqueues afterwards: nothing then settles that completion,
+        // the engine stays inside the current batch, and Completion never finishes. The
+        // second half of the fix is the re-check in EvaluateAsync -- closing first
+        // narrows the window, the re-check closes it.
+        //
+        // Releasing anyone blocked in AskAsync is the other reason to cancel here: no
+        // further candidates are coming.
+        if (!_closed.IsCancellationRequested) _closed.Cancel();
         _engine.RequestStop();
         FailOutstanding("stop_requested", "The session was asked to stop before this candidate was told.");
-        // Release anyone blocked in AskAsync: no further candidates are coming.
-        if (!_closed.IsCancellationRequested) _closed.Cancel();
     }
 
     /// <summary>Ends the run immediately, discarding whatever the current batch held.</summary>
@@ -203,6 +211,24 @@ public sealed class EvolutionSession<TGenome> : IDisposable
     /// never commits, the stop flag is never observed, and `Completion` never settles.
     /// Found by driving a real run from the host binary and watching `close` hang.
     /// </remarks>
+    /// <summary>Dequeues the next evaluation that still needs a result.</summary>
+    /// <remarks>
+    /// A queued evaluation can already carry a result: a stop settles it in place rather
+    /// than removing it, because removing it would race the enqueue that put it there.
+    /// Skipping those here is what keeps that safe.
+    /// </remarks>
+    private bool TryTakeLive(out PendingEvaluation? pending)
+    {
+        while (_queue.TryDequeue(out PendingEvaluation? candidate))
+        {
+            if (candidate.Completion.Task.IsCompleted) continue;
+            pending = candidate;
+            return true;
+        }
+        pending = null;
+        return false;
+    }
+
     private void FailOutstanding(string code, string message)
     {
         EvolutionTaskResult failure = EvolutionTaskResult.Failed(code, message);
@@ -252,9 +278,13 @@ public sealed class EvolutionSession<TGenome> : IDisposable
             return batch;
         }
 
-        if (_queue.TryDequeue(out PendingEvaluation? first))
+        // ALREADY-SETTLED ENTRIES ARE SKIPPED, not handed out. A stop can settle a
+        // queued evaluation without removing it -- see the double-check in
+        // EvaluateAsync -- and offering the caller a candidate whose result is already
+        // recorded would have them do work that Tell then refuses.
+        if (TryTakeLive(out PendingEvaluation? first))
         {
-            _outstanding[first.Candidate.EvaluationId] = first;
+            _outstanding[first!.Candidate.EvaluationId] = first;
             batch.Add(new EvolutionAskItem<TGenome>(first.Candidate, first.Context));
         }
 
@@ -262,14 +292,14 @@ public sealed class EvolutionSession<TGenome> : IDisposable
         // in step with the queue.
         while (batch.Count < wanted && _available.Wait(0))
         {
-            if (!_queue.TryDequeue(out PendingEvaluation? next))
+            if (!TryTakeLive(out PendingEvaluation? next))
             {
                 // Permit taken with nothing behind it: hand it back rather than
                 // losing a wakeup a concurrent writer is about to need.
                 _available.Release();
                 break;
             }
-            _outstanding[next.Candidate.EvaluationId] = next;
+            _outstanding[next!.Candidate.EvaluationId] = next;
             batch.Add(new EvolutionAskItem<TGenome>(next.Candidate, next.Context));
         }
 
@@ -450,6 +480,19 @@ public sealed class EvolutionSession<TGenome> : IDisposable
 
             _session._queue.Enqueue(pending);
             _session._available.Release();
+
+            // CHECKED AGAIN, AFTER ENQUEUEING. The check above can pass a moment before
+            // a concurrent RequestStop drains the queue, in which case this candidate
+            // lands in a queue nobody will drain again and awaits a completion nobody
+            // will supply -- the engine then sits in the current batch forever and both
+            // Completion and a host's FinishAsync hang. Settling it here is safe because
+            // TrySetResult is idempotent: if the drain did see it, this does nothing.
+            if (_session._closed.IsCancellationRequested)
+            {
+                pending.Completion.TrySetResult(EvolutionTaskResult.Failed(
+                    "session_closed",
+                    "The evolution session stopped accepting evaluations while this one was being queued."));
+            }
 
             using CancellationTokenRegistration registration = cancellationToken.Register(
                 static state => ((TaskCompletionSource<EvolutionTaskResult>)state!).TrySetResult(

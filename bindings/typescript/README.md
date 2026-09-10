@@ -3,7 +3,10 @@
 Quality-diversity evolutionary search for TypeScript, running the
 [AiDotNet.Evolution](https://github.com/ooples/AiDotNet.Evolution) engine.
 
-No .NET installation required: the package ships a NativeAOT binary for your platform.
+No .NET installation required: the package ships a NativeAOT binary for the supported
+platforms -- **win-x64**, **linux-x64** and **osx-arm64**. Anywhere else (osx-x64,
+linux-arm64, and the rest) there is no published binary, and you build the host
+yourself -- see [Building the host yourself](#building-the-host-yourself).
 
 ```bash
 npm install @aidotnet/evolution

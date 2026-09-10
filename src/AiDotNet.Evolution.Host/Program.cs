@@ -38,18 +38,33 @@ internal static class Program
         };
         var stdin = new StreamReader(Console.OpenStandardInput(), new UTF8Encoding(false));
 
+        var frames = new FrameReader(stdin);
+
         HostSession? session = null;
         try
         {
-            string? line;
-            while ((line = await stdin.ReadLineAsync().ConfigureAwait(false)) is not null)
+            while (true)
             {
+                (string? line, bool overlong) = await frames.NextAsync().ConfigureAwait(false);
+                if (line is null) break;
+                if (overlong)
+                {
+                    // The rest of that frame was discarded, so there is no id to echo and
+                    // no way to resynchronise except by saying so and reading on.
+                    await Write(stdout, new Response
+                    {
+                        Ok = false,
+                        Error = $"frame exceeds the {ProtocolLimits.MaxFrameChars} character limit and was discarded",
+                    }).ConfigureAwait(false);
+                    continue;
+                }
                 if (line.Length == 0) continue;
 
-                Request? request = Protocol.ParseRequest(line, out string? parseError);
+                Request? request = Protocol.ParseRequest(line, out string? parseError, out long id);
                 if (request is null)
                 {
-                    await Write(stdout, new Response { Ok = false, Error = parseError }).ConfigureAwait(false);
+                    await Write(stdout, new Response { Ok = false, Error = parseError, Id = id })
+                        .ConfigureAwait(false);
                     continue;
                 }
 
@@ -57,7 +72,7 @@ internal static class Program
                 response.Id = request.Id;
                 await Write(stdout, response).ConfigureAwait(false);
 
-                if (string.Equals(request.Op, "close", StringComparison.Ordinal)) break;
+                if (Protocol.ParseOp(request.Op) == Protocol.Op.Close) break;
             }
         }
         finally
@@ -75,12 +90,15 @@ internal static class Program
     {
         try
         {
-            switch (request.Op)
+            // MAPPED TO AN ENUM, so the compiler checks this switch rather than a string
+            // comparison chain. An op that names nothing is refused here, with the op
+            // quoted, instead of reaching the client as a JSON parse failure.
+            switch (Protocol.ParseOp(request.Op))
             {
-                case "ping":
+                case Protocol.Op.Ping:
                     return new Response { Ok = true, Version = Version };
 
-                case "open":
+                case Protocol.Op.Open:
                     if (session is not null)
                         return Fail("a run is already open on this process");
                     if (request.Config is null)
@@ -91,21 +109,23 @@ internal static class Program
                 // Ask and close have bodies rather than expressions, and the .editorconfig
                 // indents a braced case block twice. They are methods instead: the same code,
                 // without the switch growing an extra level of indentation.
-                case "ask":
+                case Protocol.Op.Ask:
                     return session is null
                         ? Fail("no run is open")
                         : await Ask(request, session).ConfigureAwait(false);
 
-                case "tell":
+                case Protocol.Op.Tell:
                     if (session is null) return Fail("no run is open");
                     if (request.Results is null) return Fail("tell needs 'results'");
+                    if (request.Results.Count > ProtocolLimits.MaxResults)
+                        return Fail($"tell carries {request.Results.Count} results, more than the {ProtocolLimits.MaxResults} limit");
                     return new Response { Ok = true, Accepted = session.Tell(request.Results) };
 
-                case "status":
+                case Protocol.Op.Status:
                     if (session is null) return Fail("no run is open");
                     return new Response { Ok = true, Complete = session.IsComplete };
 
-                case "close":
+                case Protocol.Op.Close:
                     if (session is null) return new Response { Ok = true };
                     return await Close(session, setSession).ConfigureAwait(false);
 
@@ -151,4 +171,87 @@ internal static class Program
 
     private static Task Write(TextWriter stdout, Response response) =>
         stdout.WriteLineAsync(Protocol.Serialize(response));
+}
+
+/// <summary>Reads newline-terminated frames, refusing to assemble an oversized one.</summary>
+/// <remarks>
+/// <para>
+/// NOT <c>ReadLineAsync</c>, which grows a string until it finds a newline. A peer that
+/// never sends one -- a bug, a wedged client, a hostile one -- walks this process out of
+/// memory, and all anyone sees is that the host died. Here the frame is abandoned at the
+/// limit and the remainder skipped, so the connection resynchronises on the next newline
+/// and the client is told why.
+/// </para>
+/// <para>
+/// CHUNKED, NOT CHARACTER BY CHARACTER. Awaiting one character at a time is correct and
+/// unusably slow at the sizes this limit permits: 16 million awaits to reject one frame
+/// turns the memory bound into a CPU bound. Reading blocks and scanning them keeps the
+/// leftover in a buffer between calls, which is the only state this needs.
+/// </para>
+/// </remarks>
+internal sealed class FrameReader
+{
+    private const int ChunkChars = 8192;
+
+    private readonly TextReader _reader;
+    private readonly char[] _chunk = new char[ChunkChars];
+    private readonly StringBuilder _frame = new();
+
+    private int _length;
+    private int _offset;
+    private bool _overlong;
+
+    internal FrameReader(TextReader reader) => _reader = reader;
+
+    /// <summary>The next frame, or a null line at end of input.</summary>
+    internal async Task<(string? Line, bool Overlong)> NextAsync()
+    {
+        while (true)
+        {
+            if (_offset >= _length)
+            {
+                _length = await _reader.ReadAsync(_chunk, 0, ChunkChars).ConfigureAwait(false);
+                _offset = 0;
+                if (_length == 0)
+                {
+                    // End of input. A frame without a trailing newline is still a frame.
+                    if (_frame.Length == 0 && !_overlong) return (null, false);
+                    return Take();
+                }
+            }
+
+            for (; _offset < _length; _offset += 1)
+            {
+                char c = _chunk[_offset];
+                if (c == '\n')
+                {
+                    _offset += 1;
+                    return Take();
+                }
+                // A lone CR before the LF is dropped: a client on Windows may send CRLF,
+                // and the payload is JSON, where trailing whitespace is insignificant.
+                if (c == '\r') continue;
+                if (_overlong) continue;
+
+                if (_frame.Length >= ProtocolLimits.MaxFrameChars)
+                {
+                    // Released now rather than at the newline: the point of the limit is
+                    // not to be holding this much.
+                    _frame.Clear();
+                    _overlong = true;
+                    continue;
+                }
+                _frame.Append(c);
+            }
+        }
+    }
+
+    private (string? Line, bool Overlong) Take()
+    {
+        string line = _overlong ? string.Empty : _frame.ToString();
+        bool overlong = _overlong;
+        _frame.Clear();
+        _overlong = false;
+        return (line, overlong);
+    }
 }

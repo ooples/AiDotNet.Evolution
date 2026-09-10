@@ -61,10 +61,10 @@ internal sealed class ParameterSpace
         if (parameters is null || parameters.Count == 0)
             throw new ArgumentException("A parameter space needs at least one parameter.", nameof(parameters));
 
-        var names = new HashSet<string>(StringComparer.Ordinal);
+        _names = new HashSet<string>(StringComparer.Ordinal);
         foreach (ParameterDefinition parameter in parameters)
         {
-            if (!names.Add(parameter.Name))
+            if (!_names.Add(parameter.Name))
             {
                 throw new ArgumentException(
                     $"Parameter '{parameter.Name}' is declared more than once; identities would collide.",
@@ -73,6 +73,9 @@ internal sealed class ParameterSpace
         }
         Parameters = parameters;
     }
+
+    /// <summary>Declared names, kept so a seed can be checked against them.</summary>
+    private readonly HashSet<string> _names;
 
     /// <summary>Order is significant: it fixes the layout of every genome and identity.</summary>
     internal IReadOnlyList<ParameterDefinition> Parameters { get; }
@@ -94,8 +97,26 @@ internal sealed class ParameterSpace
     }
 
     /// <summary>Builds a genome from a name/value map, defaulting anything absent to the midpoint.</summary>
+    /// <remarks>
+    /// AN UNKNOWN NAME IS AN ERROR, not something to ignore. Absent names default to the
+    /// midpoint, so a client that misspells one gets a seed at the midpoint of that
+    /// parameter rather than where it asked -- a different starting point, a different
+    /// search, and an <c>ok: true</c> saying it all went fine. The typo never appears in
+    /// the results, which is precisely why it has to be caught here.
+    /// </remarks>
+    /// <exception cref="ArgumentException">A name in <paramref name="values"/> is not declared.</exception>
     internal ParameterGenome Create(IReadOnlyDictionary<string, double> values)
     {
+        foreach (string name in values.Keys)
+        {
+            if (!_names.Contains(name))
+            {
+                throw new ArgumentException(
+                    $"Seed name '{name}' is not a declared parameter. Declared: {Describe()}.",
+                    nameof(values));
+            }
+        }
+
         var raw = new double[Parameters.Count];
         for (int i = 0; i < Parameters.Count; i += 1)
         {

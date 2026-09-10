@@ -53,7 +53,15 @@ export interface RunConfig {
   readonly descriptors: readonly DescriptorSpec[];
   /** Starting points. Defaults to one genome at the midpoint of every range. */
   readonly seeds?: readonly Record<string, number>[];
-  /** Anything derived from this is reproducible; the same seed replays the same search. */
+  /**
+   * Anything derived from this is reproducible; the same seed replays the same search.
+   *
+   * A NON-NEGATIVE SAFE INTEGER. The host holds it as a 64-bit unsigned value, but it
+   * arrives through `JSON.stringify`, and a JavaScript number above
+   * `Number.MAX_SAFE_INTEGER` is rounded on the way -- 9007199254740993 is sent as
+   * 9007199254740992. Two seeds a caller believes are different would then produce the
+   * same run, so anything unrepresentable is rejected rather than quietly rounded.
+   */
   readonly seed?: number;
   readonly maxProposals?: number;
   /**
@@ -66,6 +74,14 @@ export interface RunConfig {
   readonly maxGenerations?: number;
   readonly batchSize?: number;
   readonly direction?: 'maximize' | 'minimize';
+  /**
+   * How long any single request may take before the session is considered wedged.
+   *
+   * Defaults to two minutes. A timeout is FATAL to the session, not to the one request:
+   * a host that stopped answering has no reason to start again, and leaving it alive
+   * would leak a process nobody holds a reference to.
+   */
+  readonly requestTimeoutMs?: number;
   /** Path to the host binary, when not using the bundled one. */
   readonly hostPath?: string;
   /**
@@ -119,7 +135,42 @@ interface Response {
 }
 
 /** How long any single request may take before the session is considered wedged. */
-const REQUEST_TIMEOUT_MS = 120_000;
+const DEFAULT_REQUEST_TIMEOUT_MS = 120_000;
+
+/**
+ * Rejects configuration that cannot survive the wire.
+ *
+ * BEFORE THE PROCESS IS SPAWNED, so a bad value costs nothing and the message names the
+ * field rather than surfacing as a host-side parse error with no context.
+ */
+function validate(config: RunConfig): void {
+  const counts: readonly (readonly [string, number | undefined])[] = [
+    ['seed', config.seed],
+    ['maxProposals', config.maxProposals],
+    ['maxEvaluations', config.maxEvaluations],
+    ['maxGenerations', config.maxGenerations],
+    ['batchSize', config.batchSize],
+    ['requestTimeoutMs', config.requestTimeoutMs],
+  ];
+  for (const [name, value] of counts) {
+    if (value === undefined) continue;
+    if (!Number.isSafeInteger(value) || value < 0) {
+      // Number.isSafeInteger is the exact test: it is false for a non-integer, for a
+      // non-finite value, and for anything JSON.stringify would round on the way out.
+      throw new EvolutionError(
+        `${name} must be a non-negative integer no larger than ${Number.MAX_SAFE_INTEGER}, ` +
+          `not ${value}. Larger values are rounded by JSON, so two seeds you believe are ` +
+          `different would produce the same run.`
+      );
+    }
+  }
+  if (config.parameters.length === 0) {
+    throw new EvolutionError('config.parameters must declare at least one parameter');
+  }
+  if (config.descriptors.length === 0) {
+    throw new EvolutionError('config.descriptors must declare at least one descriptor');
+  }
+}
 
 export class EvolutionError extends Error {
   constructor(message: string) {
@@ -146,9 +197,11 @@ export class EvolutionSession {
   #closed = false;
   #exitError: Error | null = null;
   #stderr = '';
+  readonly #timeoutMs: number;
 
-  private constructor(child: ChildProcessWithoutNullStreams) {
+  private constructor(child: ChildProcessWithoutNullStreams, timeoutMs: number) {
     this.#child = child;
+    this.#timeoutMs = timeoutMs;
     this.#lines = createInterface({ input: child.stdout });
 
     // STDERR MUST BE DRAINED even though the protocol never uses it. A piped stream nobody
@@ -177,17 +230,6 @@ export class EvolutionSession {
       waiter.resolve(response);
     });
 
-    // A CHILD THAT DIES MUST FAIL EVERY WAITER, or `await ask()` never settles and the
-    // caller's loop hangs on a process that no longer exists.
-    const die = (reason: string): void => {
-      this.#exitError ??= new EvolutionError(reason);
-      for (const [, waiter] of this.#pending) {
-        clearTimeout(waiter.timer);
-        waiter.reject(this.#exitError);
-      }
-      this.#pending.clear();
-    };
-
     // AN EXIT ALWAYS FAILS THE WAITERS, including during close. Skipping them while closing
     // looks reasonable and is not: a host that crashes while answering `close` leaves that
     // request pending, and the caller then blocks for the full request timeout on a process
@@ -200,12 +242,38 @@ export class EvolutionSession {
     child.on('close', (code, signal) => {
       const tail = this.#stderr.trim();
       const how = this.#closed ? 'while closing' : 'unexpectedly';
-      die(
+      this.#die(
         `the evolution host exited ${how} (code ${code ?? 'null'}, signal ${signal ?? 'none'})` +
           (tail ? `: ${tail}` : '')
       );
     });
-    child.on('error', (error) => die(`the evolution host failed to start: ${error.message}`));
+    child.on('error', (error) =>
+      this.#die(`the evolution host failed to start: ${error.message}`)
+    );
+  }
+
+  /**
+   * Puts the session permanently into a failed state and fails every waiter.
+   *
+   * A CHILD THAT IS GONE MUST FAIL EVERY WAITER, or `await ask()` never settles and the
+   * caller's loop hangs on a process that no longer exists. The first reason wins: a
+   * timeout that then kills the child should be reported as the timeout, not as the exit
+   * it caused.
+   */
+  #die(reason: string): void {
+    this.#exitError ??= new EvolutionError(reason);
+    for (const [, waiter] of this.#pending) {
+      clearTimeout(waiter.timer);
+      waiter.reject(this.#exitError);
+    }
+    this.#pending.clear();
+  }
+
+  /** Tears down the child and the reader. Safe to call more than once. */
+  #teardown(): void {
+    this.#child.stdin.end();
+    this.#lines.close();
+    if (this.#child.exitCode === null && this.#child.signalCode === null) this.#child.kill();
   }
 
   /** The host process id, or undefined if it never started. For diagnostics and tests. */
@@ -215,10 +283,14 @@ export class EvolutionSession {
 
   /** Starts the host process and opens a run. */
   static async open(config: RunConfig): Promise<EvolutionSession> {
+    validate(config);
     const binary = config.hostPath ?? resolveHostBinary();
     const args = config.hostPath ? [...(config.hostArgs ?? [])] : [];
     const child = spawn(binary, args, { stdio: ['pipe', 'pipe', 'pipe'] });
-    const session = new EvolutionSession(child);
+    const session = new EvolutionSession(
+      child,
+      config.requestTimeoutMs ?? DEFAULT_REQUEST_TIMEOUT_MS
+    );
 
     const response = await session.#send('open', {
       config: {
@@ -234,7 +306,10 @@ export class EvolutionSession {
       },
     });
     if (!response.ok) {
-      session.#child.kill();
+      // Marked closed as well as torn down: a caller who catches this and calls `close()`
+      // anyway must not then wait out a request timeout on a process already gone.
+      session.#closed = true;
+      session.#teardown();
       throw new EvolutionError(response.error ?? 'the host refused to open the run');
     }
     return session;
@@ -264,25 +339,34 @@ export class EvolutionSession {
    * Stops the run, returning the best genome found.
    *
    * GRACEFUL: the current batch commits and the archive is kept, which is why this is where
-   * the result comes from. Safe to call more than once.
+   * the result comes from. Safe to call more than once; the second call is a no-op.
+   *
+   * THROWS when the host cannot confirm the stop -- because it died, or never answered.
+   * Returning an empty summary there would say "the run finished and found nothing",
+   * which is a different and much worse claim. Call it in a `catch` rather than a
+   * `finally` if you have your own error to preserve; {@link evolve} does exactly that.
+   *
+   * @throws {EvolutionError} The host did not answer the stop request.
    */
   async close(): Promise<RunSummary> {
     if (this.#closed) return { best: null, stopReason: null };
     this.#closed = true;
 
-    let summary: RunSummary = { best: null, stopReason: null };
+    let response: Response;
     try {
-      const response = await this.#send('close', {});
-      summary = { best: response.best ?? null, stopReason: response.stopReason ?? null };
-    } catch {
-      // Already gone. There is nothing to report and nothing to fix.
+      response = await this.#send('close', {});
+    } catch (error) {
+      // A FAILED CLOSE IS NOT AN EMPTY RESULT. Swallowing it here returned
+      // `{best: null, stopReason: null}` from a host that died before answering, so
+      // `evolve()` resolved successfully with no confirmed result -- a search reported as
+      // having found nothing when in truth nobody ever asked. The child is still torn
+      // down; the caller still hears about it.
+      this.#teardown();
+      throw error;
     }
 
-    this.#child.stdin.end();
-    this.#lines.close();
-    // The host exits on `close`; this is the backstop for one that does not.
-    if (this.#child.exitCode === null) this.#child.kill();
-    return summary;
+    this.#teardown();
+    return { best: response.best ?? null, stopReason: response.stopReason ?? null };
   }
 
   #send(op: string, extra: Record<string, unknown>): Promise<Response> {
@@ -291,9 +375,15 @@ export class EvolutionSession {
     const id = this.#nextId++;
     return new Promise<Response>((resolve, reject) => {
       const timer = setTimeout(() => {
-        this.#pending.delete(id);
-        reject(new EvolutionError(`the evolution host did not answer '${op}' within ${REQUEST_TIMEOUT_MS}ms`));
-      }, REQUEST_TIMEOUT_MS);
+        // A TIMEOUT KILLS THE SESSION, it does not just fail one request. Removing the
+        // waiter alone leaves the child alive with nobody holding a reference that could
+        // close it -- and a timed-out `open` rejects before the session is ever returned,
+        // so repeated failed opens leak one host process each.
+        this.#die(
+          `the evolution host did not answer '${op}' within ${this.#timeoutMs}ms`
+        );
+        this.#teardown();
+      }, this.#timeoutMs);
       // Unref'd so a pending request cannot by itself keep the process alive.
       timer.unref?.();
 
@@ -330,10 +420,16 @@ export async function evolve(
       await session.tell(await evaluate(batch));
     }
     return await session.close();
-  } finally {
-    // close() is idempotent, and this is what guarantees the child dies if `evaluate`
-    // threw partway through.
-    await session.close();
+  } catch (error) {
+    // THE FIRST ERROR WINS. `close()` now propagates its own failures, so closing in a
+    // `finally` would let a teardown failure replace the evaluator error that caused it
+    // -- and the evaluator error is the one that says what actually went wrong. The
+    // close still happens, so the child cannot outlive a thrown evaluator; its failure
+    // is simply not allowed to speak over the first one.
+    //
+    // close() is idempotent, so this is a no-op when the throw came from close() itself.
+    await session.close().catch(() => undefined);
+    throw error;
   }
 }
 

@@ -213,10 +213,12 @@ public sealed class EvolutionSessionTests
         session.Abort();
 
         await WithTimeout(Settled(session.Completion));
-        // `IsCompletedSuccessfully` does not exist on net471's Task<T>; Status does.
-        Assert.True(
-            session.Completion.Status is TaskStatus.Canceled or TaskStatus.RanToCompletion,
-            $"unexpected status {session.Completion.Status}");
+        // CANCELED, NOT MERELY SETTLED. Accepting RanToCompletion here would pass against
+        // an Abort that returned a run result -- which is exactly the behaviour that
+        // distinguishes it from RequestStop, and therefore the only thing worth asserting.
+        // The unresolved evaluations hold the engine inside EvaluateBatchAsync, where
+        // cancellation is observed before any normal result can be produced.
+        Assert.Equal(TaskStatus.Canceled, session.Completion.Status);
     }
 
     [Fact]

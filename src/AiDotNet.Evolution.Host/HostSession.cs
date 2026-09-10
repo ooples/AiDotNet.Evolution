@@ -11,7 +11,6 @@ internal sealed class HostSession : IDisposable
     private readonly EvolutionSession<ParameterGenome> _session;
     private readonly ParameterSpace _space;
     private readonly EvolutionOptimizationDirection _direction;
-    private readonly Dictionary<long, ParameterGenome> _asked = new();
     private readonly List<string> _descriptorNames;
 
     private HostSession(
@@ -36,6 +35,16 @@ internal sealed class HostSession : IDisposable
             throw new ArgumentException("config.parameters must declare at least one parameter.");
         if (config.Descriptors.Count == 0)
             throw new ArgumentException("config.descriptors must declare at least one descriptor.");
+
+        // BOUNDED BEFORE ANYTHING IS ALLOCATED FROM THEM. One well-formed frame declaring
+        // a million parameters is small on the wire and large in the heap, and the
+        // descriptor grid is worse than linear: every dimension multiplies the cell count.
+        if (config.Parameters.Count > ProtocolLimits.MaxDimensions)
+            throw new ArgumentException($"config.parameters declares {config.Parameters.Count} parameters, more than the {ProtocolLimits.MaxDimensions} limit.");
+        if (config.Descriptors.Count > ProtocolLimits.MaxDimensions)
+            throw new ArgumentException($"config.descriptors declares {config.Descriptors.Count} descriptors, more than the {ProtocolLimits.MaxDimensions} limit.");
+        if (config.Seeds is { Count: > ProtocolLimits.MaxSeeds })
+            throw new ArgumentException($"config.seeds carries {config.Seeds.Count} seeds, more than the {ProtocolLimits.MaxSeeds} limit.");
 
         var definitions = new List<ParameterDefinition>(config.Parameters.Count);
         foreach (ParameterConfig parameter in config.Parameters)
@@ -133,7 +142,6 @@ internal sealed class HostSession : IDisposable
         foreach (EvolutionAskItem<ParameterGenome> item in batch)
         {
             ParameterGenome genome = item.Candidate.CanonicalGenome.Genome;
-            _asked[item.EvaluationId] = genome;
             candidates.Add(new Candidate
             {
                 EvaluationId = item.EvaluationId,
@@ -161,11 +169,12 @@ internal sealed class HostSession : IDisposable
                     "evaluation_failed",
                     result.Reason ?? "the client reported no usable quality");
 
-            if (_session.Tell(result.EvaluationId, outcome))
-            {
-                accepted += 1;
-                _asked.Remove(result.EvaluationId);
-            }
+            // NOTHING IS REMEMBERED PER ASK. A dictionary of asked genomes used to be
+            // kept here and only ever written to: the session already owns the
+            // outstanding set, so this was a second copy that nobody read and that only
+            // an accepted tell would shrink. A client that asked and never told grew it
+            // for the life of the run.
+            if (_session.Tell(result.EvaluationId, outcome)) accepted += 1;
         }
         return accepted;
     }

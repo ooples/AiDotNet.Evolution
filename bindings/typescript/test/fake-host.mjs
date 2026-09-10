@@ -13,9 +13,19 @@ import { createInterface } from 'node:readline';
 
 const mode = process.argv[2] ?? 'ok';
 
+/**
+ * Exits only once the write has reached the pipe.
+ *
+ * `process.exit()` does not wait. A write to a pipe is asynchronous, so exiting straight
+ * after one can discard it -- and the tests that read these diagnostics, or the close
+ * response, would then fail intermittently for a reason unrelated to what they test.
+ */
+const writeThenExit = (stream, text, code) => {
+  stream.write(text, () => process.exit(code));
+};
+
 if (mode === 'die-on-start') {
-  process.stderr.write('fake host refusing to start\n');
-  process.exit(3);
+  writeThenExit(process.stderr, 'fake host refusing to start\n', 3);
 }
 
 const say = (value) => process.stdout.write(`${JSON.stringify(value)}\n`);
@@ -37,8 +47,8 @@ createInterface({ input: process.stdin }).on('line', (line) => {
 
     case 'ask': {
       if (mode === 'die-on-ask') {
-        process.stderr.write('fake host died during ask\n');
-        process.exit(4);
+        writeThenExit(process.stderr, 'fake host died during ask\n', 4);
+        return;
       }
       if (mode === 'garbage-before-ask') {
         // Not JSON at all. A client that lets this reach JSON.parse unguarded throws
@@ -63,13 +73,21 @@ createInterface({ input: process.stdin }).on('line', (line) => {
       return;
 
     case 'close':
+      if (mode === 'die-on-close') {
+        // Exits WITHOUT replying. The client cannot tell "stopped cleanly with no
+        // result" from "never answered" unless close reports the difference.
+        writeThenExit(process.stderr, 'fake host died during close\n', 5);
+        return;
+      }
       say({
         id: request.id,
         ok: true,
         best: { evaluationId: 1, parameters: { x: 0 }, quality: 1 },
         stopReason: 'Fake',
       });
-      process.exit(0);
+      // The close RESPONSE is the one write the client cannot do without, so the exit
+      // waits behind an empty write queued after it.
+      process.stdout.write('', () => process.exit(0));
       return;
 
     default:

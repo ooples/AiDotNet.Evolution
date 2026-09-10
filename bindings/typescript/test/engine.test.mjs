@@ -53,19 +53,52 @@ test('a real run converges on the optimum of a quadratic', { skip }, async () =>
 });
 
 test('the same seed replays the same search', { skip }, async () => {
-  const run = () =>
-    evolve({ ...CONFIG, maxProposals: 80, maxEvaluations: 80 }, (candidates) =>
-      candidates.map((candidate) => ({
-        evaluationId: candidate.evaluationId,
-        quality: quality(candidate.parameters),
-        descriptors: candidate.parameters,
-      }))
+  // THE WHOLE TRAJECTORY, not just where it ended up. Two searches that visit entirely
+  // different candidates can still converge on the same optimum of a smooth function --
+  // so comparing `best` alone passes against a regression that changed which candidates
+  // were proposed, which is exactly what a seed is supposed to pin.
+  const run = async () => {
+    const seen = [];
+    const summary = await evolve(
+      { ...CONFIG, maxProposals: 80, maxEvaluations: 80 },
+      (candidates) => {
+        seen.push(candidates.map((c) => ({ id: c.evaluationId, at: c.parameters })));
+        return candidates.map((candidate) => ({
+          evaluationId: candidate.evaluationId,
+          quality: quality(candidate.parameters),
+          descriptors: candidate.parameters,
+        }));
+      }
     );
+    return { seen, summary };
+  };
 
   const first = await run();
   const second = await run();
-  assert.deepEqual(second.best?.parameters, first.best?.parameters);
-  assert.equal(second.best?.quality, first.best?.quality);
+
+  assert.ok(first.seen.length > 1, 'a replay test needs more than one batch to compare');
+  assert.deepEqual(second.seen, first.seen, 'the candidate sequence diverged');
+  assert.deepEqual(second.summary.best?.parameters, first.summary.best?.parameters);
+  assert.equal(second.summary.best?.quality, first.summary.best?.quality);
+});
+
+test('a different seed produces a different search', { skip }, async () => {
+  // The control for the test above: if every seed produced the same sequence, comparing
+  // two runs of one seed would prove nothing at all.
+  const run = async (seed) => {
+    const seen = [];
+    await evolve({ ...CONFIG, seed, maxProposals: 80, maxEvaluations: 80 }, (candidates) => {
+      seen.push(candidates.map((c) => c.parameters));
+      return candidates.map((candidate) => ({
+        evaluationId: candidate.evaluationId,
+        quality: quality(candidate.parameters),
+        descriptors: candidate.parameters,
+      }));
+    });
+    return seen;
+  };
+
+  assert.notDeepEqual(await run(20260910), await run(20260911));
 });
 
 test('a failed evaluation is not scored zero', { skip }, async () => {

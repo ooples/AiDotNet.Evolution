@@ -34,7 +34,7 @@ jobs:
     # it invokes the platform linker, so each runtime identifier has to be built on a
     # runner of that platform. That is also why the binding's own tests run here rather
     # than in a separate job -- this is the only place a binary for this platform exists.
-    name: ${{ matrix.rid }}
+    name: ${{ matrix.rid }} (node ${{ matrix.node }})
     runs-on: ${{ matrix.runner }}
     timeout-minutes: 25
     strategy:
@@ -43,10 +43,21 @@ jobs:
         include:
           - rid: win-x64
             runner: windows-latest
+            node: '22'
           - rid: linux-x64
             runner: ubuntu-latest
+            node: '22'
           - rid: osx-arm64
             runner: macos-14
+            node: '22'
+          # THE DECLARED MINIMUM, TESTED. package.json says node >= 18.17.0, and a
+          # matrix that only ever ran 22 would let a syntax or API regression reach
+          # every supported user while CI stayed green. One platform is enough for
+          # this: the binding is plain JavaScript, and what differs between Node
+          # versions is the runtime, not the operating system.
+          - rid: linux-x64
+            runner: ubuntu-latest
+            node: '18.17.0'
     steps:
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
 
@@ -56,7 +67,7 @@ jobs:
 
       - uses: actions/setup-node@49933ea5288caeca8642d1e84afbd3f7d6820020 # v4
         with:
-          node-version: '22'
+          node-version: ${{ matrix.node }}
 
       # The AOT compiler links with the platform toolchain, which is present on the
       # Windows and macOS images but needs the objcopy/ld pieces installed on Ubuntu.
@@ -94,11 +105,17 @@ jobs:
             exit 1
           fi
 
+      # ONLY THE PRIMARY NODE VERSION PUBLISHES. Two jobs now build linux-x64, and
+      # uploading from both would collide on the artifact name -- the extra job exists
+      # to test the declared Node minimum, not to produce a second copy of the same
+      # binary.
       - name: Package the platform binary
+        if: matrix.node == '22'
         working-directory: bindings/typescript
         run: npm run package -- ${{ matrix.rid }}
 
       - uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02 # v4
+        if: matrix.node == '22'
         with:
           name: evolution-host-${{ matrix.rid }}
           path: bindings/typescript/packages/${{ matrix.rid }}

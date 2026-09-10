@@ -68,7 +68,70 @@ internal sealed class ParameterVariation : IVariationOperator<ParameterGenome>
             values[index] = parent.Values[index] + Gaussian(random) * Sigma * range;
         }
 
-        return new ValueTask<ParameterGenome>(space.Create(values));
+        return new ValueTask<ParameterGenome>(EnsureDifferent(space.Create(values), parent, random));
+    }
+
+    /// <summary>Guarantees the proposal is not its own parent.</summary>
+    /// <remarks>
+    /// <para>
+    /// TOUCHING A VALUE IS NOT THE SAME AS CHANGING IT. <see cref="ParameterSpace.Create"/>
+    /// clamps to the bounds and snaps to the step, so a Gaussian step smaller than half a
+    /// step, or one that overshoots a bound the parent already sits on, normalises straight
+    /// back to the parent's value -- and every dimension doing that yields the parent's
+    /// canonical id. The `touchedAny` guard above cannot see this: it knows a value was
+    /// perturbed, not that the perturbation survived.
+    /// </para>
+    /// <para>
+    /// The engine notices the duplicate and never spends an evaluation on it, so nothing is
+    /// scored twice. What it does spend is a PROPOSAL, and a run whose budget is proposals
+    /// simply searches less. So one dimension is moved to the nearest genuinely different
+    /// representable value: up a step, or down one where up is out of range.
+    /// </para>
+    /// <para>
+    /// Starting from a random dimension rather than the first keeps the forced move from
+    /// always landing on the same axis, which would bias the search along it.
+    /// </para>
+    /// </remarks>
+    // Internal rather than private so it can be tested directly: building an
+    // EvolutionVariationContext by hand means constructing four engine DTOs, and a test
+    // that fragile would break on unrelated signature changes without ever failing for
+    // the reason it exists.
+    internal static ParameterGenome EnsureDifferent(
+        ParameterGenome child,
+        ParameterGenome parent,
+        StableRandom random)
+    {
+        if (!string.Equals(child.CanonicalId(), parent.CanonicalId(), StringComparison.Ordinal))
+            return child;
+
+        ParameterSpace space = child.Space;
+        int count = space.Parameters.Count;
+        int start = Math.Min(count - 1, (int)(random.NextDouble() * count));
+
+        for (int n = 0; n < count; n += 1)
+        {
+            int i = (start + n) % count;
+            ParameterDefinition parameter = space.Parameters[i];
+            double current = child.Values[i];
+
+            foreach (double moved in new[]
+            {
+                parameter.Normalize(current + parameter.Step),
+                parameter.Normalize(current - parameter.Step),
+            })
+            {
+                if (moved == current) continue;
+                var values = new double[count];
+                for (int j = 0; j < count; j += 1) values[j] = child.Values[j];
+                values[i] = moved;
+                return space.Create(values);
+            }
+        }
+
+        // Every dimension is a single representable point, so there is no neighbour to
+        // propose. Returning the parent's twin is honest; the engine folds it as a
+        // duplicate.
+        return child;
     }
 
     /// <summary>

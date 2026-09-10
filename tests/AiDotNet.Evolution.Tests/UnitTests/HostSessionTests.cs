@@ -1,4 +1,5 @@
 #if !NET471
+using System.Runtime.CompilerServices;
 using AiDotNet.Evolution;
 using AiDotNet.Evolution.Host;
 using Xunit;
@@ -39,6 +40,21 @@ public sealed class HostSessionTests
     private static double Loss(IReadOnlyDictionary<string, double> parameters) =>
         Math.Pow(parameters["x"] - 3.0, 2) + Math.Pow(parameters["y"] + 1.0, 2);
 
+    /// <summary>Fails the test rather than letting an await hang the run.</summary>
+    /// <remarks>
+    /// EVERY AWAIT HERE IS BOUNDED, because the failure mode of this class of bug is a
+    /// HANG rather than a wrong answer: a result the session rejects leaves its evaluation
+    /// unresolved, the engine stays inside the batch, and the next AskAsync waits forever.
+    /// Unbounded, that surfaces as CI's watchdog killing the job with no assertion and no
+    /// clue; bounded, it surfaces as this message.
+    /// </remarks>
+    private static async Task<T> WithTimeout<T>(Task<T> task, [CallerArgumentExpression("task")] string? what = null)
+    {
+        Task finished = await Task.WhenAny(task, Task.Delay(TimeSpan.FromSeconds(30)));
+        Assert.True(ReferenceEquals(finished, task), $"'{what}' did not complete within 30s");
+        return await task;
+    }
+
     private static async Task<(Candidate? Best, string? StopReason, int Evaluated)> RunAsync(RunConfig config)
     {
         using var session = HostSession.Open(config);
@@ -47,7 +63,7 @@ public sealed class HostSessionTests
 
         while (true)
         {
-            List<Candidate> batch = await session.AskAsync(config.BatchSize, CancellationToken.None);
+            List<Candidate> batch = await WithTimeout(session.AskAsync(config.BatchSize, CancellationToken.None));
             if (batch.Count == 0) break;
             evaluated += batch.Count;
 
@@ -62,10 +78,13 @@ public sealed class HostSessionTests
                     Descriptors = new Dictionary<string, double>(candidate.Parameters, StringComparer.Ordinal),
                 });
             }
-            session.Tell(results);
+            // ASSERTED, NOT IGNORED. Tell returns how many ids were actually outstanding;
+            // a rejected one leaves its evaluation unresolved, and the hang that follows
+            // happens somewhere else entirely. This reports it where it is caused.
+            Assert.Equal(results.Count, session.Tell(results));
         }
 
-        (Candidate? best, string? stopReason) = await session.FinishAsync();
+        (Candidate? best, string? stopReason) = await WithTimeout(session.FinishAsync());
         return (best, stopReason, evaluated);
     }
 
@@ -133,6 +152,68 @@ public sealed class HostSessionTests
     }
 
     [Fact]
+    public void AMisspelledSeedNameIsRejected()
+    {
+        // THE TYPO NEVER APPEARS IN THE RESULTS, which is why it has to be caught here.
+        // An absent name defaults to the midpoint of its range, so a client that wrote
+        // "learningRate" for "learning_rate" gets a seed somewhere it never asked for,
+        // a different search, and `ok: true` saying it all went fine.
+        RunConfig config = Quadratic("maximize");
+        config.Seeds = new List<Dictionary<string, double>>
+        {
+            new(StringComparer.Ordinal) { ["x"] = 1.0, ["z"] = 2.0 },
+        };
+
+        ArgumentException error = Assert.Throws<ArgumentException>(() => HostSession.Open(config));
+        Assert.Contains("'z'", error.Message, StringComparison.Ordinal);
+    }
+
+    [Fact]
+    public void ASeedNamingOnlySomeParametersIsFine()
+    {
+        // The complement of the test above: silence about a DECLARED parameter is a
+        // request for its midpoint, and rejecting that would make partial seeds unusable.
+        RunConfig config = Quadratic("maximize");
+        config.Seeds = new List<Dictionary<string, double>>
+        {
+            new(StringComparer.Ordinal) { ["x"] = 1.0 },
+        };
+
+        using HostSession session = HostSession.Open(config);
+        Assert.False(session.IsComplete);
+    }
+
+    [Fact]
+    public void MoreDimensionsThanTheLimitAreRefused()
+    {
+        // One well-formed frame declaring a million parameters is small on the wire and
+        // large in the heap, and the descriptor grid is worse than linear.
+        RunConfig config = Quadratic("maximize");
+        config.Parameters = new List<ParameterConfig>();
+        for (int i = 0; i <= ProtocolLimits.MaxDimensions; i += 1)
+        {
+            config.Parameters.Add(new ParameterConfig { Name = $"p{i}", Min = 0, Max = 1 });
+        }
+
+        ArgumentException error = Assert.Throws<ArgumentException>(() => HostSession.Open(config));
+        Assert.Contains(ProtocolLimits.MaxDimensions.ToString(System.Globalization.CultureInfo.InvariantCulture),
+            error.Message, StringComparison.Ordinal);
+    }
+
+    [Fact]
+    public void MoreSeedsThanTheLimitAreRefused()
+    {
+        RunConfig config = Quadratic("maximize");
+        config.Seeds = new List<Dictionary<string, double>>();
+        for (int i = 0; i <= ProtocolLimits.MaxSeeds; i += 1)
+        {
+            config.Seeds.Add(new Dictionary<string, double>(StringComparer.Ordinal) { ["x"] = 0 });
+        }
+
+        Assert.Throws<ArgumentException>(() => HostSession.Open(config));
+    }
+
+    [Fact]
     public async Task AFailedEvaluationIsNotScoredZero()
     {
         // A failure reported as quality zero would enter the archive as a genuinely poor
@@ -144,16 +225,17 @@ public sealed class HostSessionTests
         using var session = HostSession.Open(config);
         while (true)
         {
-            List<Candidate> batch = await session.AskAsync(8, CancellationToken.None);
+            List<Candidate> batch = await WithTimeout(session.AskAsync(8, CancellationToken.None));
             if (batch.Count == 0) break;
-            session.Tell(batch.ConvertAll(candidate => new TellResult
+            List<TellResult> results = batch.ConvertAll(candidate => new TellResult
             {
                 EvaluationId = candidate.EvaluationId,
                 Reason = "the build did not compile",
-            }));
+            });
+            Assert.Equal(results.Count, session.Tell(results));
         }
 
-        (Candidate? best, _) = await session.FinishAsync();
+        (Candidate? best, _) = await WithTimeout(session.FinishAsync());
         Assert.Null(best);
     }
 }
