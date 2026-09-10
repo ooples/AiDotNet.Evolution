@@ -65,6 +65,9 @@ jobs:
       - name: Verify replication accounting and confirmation
         shell: pwsh
         run: ./eng/Test-Replication.ps1
+      - name: Verify surrogate backend and measured-only selection
+        shell: pwsh
+        run: ./eng/Test-SurrogateSearch.ps1
       - name: Verify performance fixture contracts
         run: dotnet run --project benchmarks/AiDotNet.Evolution.Performance -c Release -- --smoke
       - name: Verify paired analysis contracts

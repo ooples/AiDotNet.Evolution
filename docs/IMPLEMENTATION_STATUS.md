@@ -67,7 +67,7 @@ Durable evaluation identities and leases must be developed against its eventual 
 | US-11 application examples | Not implemented | End-to-end program, AutoML, kernel and external-session examples. |
 | US-12 quality release gates | Partial | Representative measured quality thresholds, confidence and release artifacts. |
 | US-13 typed search spaces | Implemented | Mixed/conditional domains, owned canonical genomes, operators/refinement, checkpointed diagonal CMA and pinned simpler-baseline comparison; no universal-quality claim. |
-| US-14 surrogate assistance | Not implemented | Uncertainty-aware ranking, exploration and evaluated-only archive admission. |
+| US-14 surrogate assistance | Partial | Cost-metered acquisition, exploration/fallback contracts and a numeric KNN example implemented; production calibration/backends, representative expensive/noisy evidence and durable observation integration remain. |
 | US-15 multi-fidelity | Not implemented | Fidelity/replicate identities, promotions, resource accounting and resumable scheduler. |
 | US-16 adaptive islands | Not implemented | Resource allocation, heterogeneous policies and checkpointed restarts. |
 | US-17 compiler-guided edits | Partial, companion | Exact source identity and preserved feedback implemented; syntax-aware C# edits, bounded repair, isolation, dependency fingerprints and multi-file evolution remain. |
@@ -83,6 +83,12 @@ Durable evaluation identities and leases must be developed against its eventual 
 
 ## Validation evidence
 
+- Surrogate selection: 438 core tests pass on each of net10.0, net8.0 and net471, including 20 surrogate contract cases.
+  Fresh net10.0 coverage is 90.89% line / 76.42% branch, above the unchanged ratchet minimum. Model failures retain
+  actual/unknown charges; nested backend budget denials are not mislabeled as pre-dispatch denials. The numeric
+  example validates interpolation, detached training data, fitted identities and weak-model/domain fallback.
+  Its 12-run replay smoke verifies all-stage synthetic charges, measured-only winners and 155 actual acquisitions.
+  See [surrogate selection](SURROGATE_SELECTION.md) for explicit-input/checkpoint and heuristic-uncertainty boundaries.
 - External baseline: eight integration tests cover all four shared objectives, exact initialization/replay, real SciPy
   calls, valid early convergence, errors and hard caps. The smoke completes eight external runs / 256 calls twice,
   with byte-identical merged 56-run evidence. The analyzer now passes 17 tests and preserves valid under-budget
