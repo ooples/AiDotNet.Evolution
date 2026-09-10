@@ -594,8 +594,9 @@ public sealed class EvolutionEngineOptions
         return EvolutionHash.Compute(snapshot.ToSemanticCanonicalString());
     }
 
-    /// <summary>Copies every option without validating any of them.</summary>
+    /// <summary>Copies every option, validating the nested subsystems as it goes.</summary>
     /// <returns>An independent instance carrying the same values, with each nested subsystem deep-copied.</returns>
+    /// <exception cref="ArgumentOutOfRangeException">A nested subsystem holds an invalid value.</exception>
     /// <remarks>
     /// <para>This is the single place that enumerates the options, so a new one cannot be forgotten by a second
     /// hand-maintained copy elsewhere. <see cref="SnapshotAndValidate"/> builds on it and then substitutes the
@@ -609,6 +610,12 @@ public sealed class EvolutionEngineOptions
     /// are for it to hand-maintain a second copy - the exact defect described above, which dropped 19 of
     /// 41 options last time - or to lose the options silently. Any consumer composing engine options
     /// from its own configuration needs this, so it belongs in the contract.</para>
+    /// <para><b>The scalar options are copied as-is; the nested subsystems are validated.</b> Cascade,
+    /// Artifacts, EarlyStopping and Selection are copied through their own
+    /// <c>SnapshotAndValidate</c>, so copying an options object holding an invalid nested value throws
+    /// rather than propagating it. That is deliberate - <see cref="SnapshotAndValidate"/> builds on this
+    /// method and must not be able to hand the engine a subsystem it would reject - but it does mean Copy
+    /// is not a pure clone, and a caller copying user-supplied configuration should expect to handle it.</para>
     /// </remarks>
     public EvolutionEngineOptions Copy()
     {
