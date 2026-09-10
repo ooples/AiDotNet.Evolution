@@ -19,7 +19,6 @@
   },
   "files": [
     "dist",
-    "bin",
     "README.md"
   ],
   "engines": {

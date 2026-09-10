@@ -68,6 +68,10 @@ export function resolveHostBinary(): string {
   const tried: string[] = [];
 
   if (platform) {
+    // A LOCAL BUILD, not something the published package carries. `npm run host` puts a
+    // binary here, and it is deliberately absent from the package's `files`: shipping all
+    // three platforms in one tarball would make every install download ~18MB to use 6MB
+    // of it, which is why the per-platform packages below exist at all.
     const bundled = join(packageRoot(), 'bin', platform, EXECUTABLE);
     if (existsSync(bundled)) return bundled;
     tried.push(bundled);
