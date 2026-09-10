@@ -92,6 +92,9 @@ Durable evaluation identities and leases must be developed against its eventual 
   numeric extremes and lower-cost preference with retained exploration. The original constructor's binary signature and
   default checkpoint representation are preserved. The example passes 24 paired runs / six methods with exact replay,
   static controls, measured-only winners and all-stage synthetic cost reconciliation. No realistic-price or quality win is claimed.
+  The [pinned credit pilot](benchmarks/OPERATOR_CREDIT_PILOT.md) retains 120 runs / 11,597 true evaluations / 15,300.20
+  synthetic units with zero failures and exact replay. Static small-step has the lowest smooth-fixture median; adding
+  proposal costs worsens both adaptive policies' rippled-fixture medians. These are useful controls, not a default-promotion result.
 - Evaluator receipt hardening: six new cases bring the core suite to 457 passing tests on each target framework.
   Four regressions first failed: a positive cost rounding to zero, lost engine-visible unrepresentable cost, a nested
   budget exception mislabeled as preflight denial, and a declared maximum overrun remaining promotable. The adapter
