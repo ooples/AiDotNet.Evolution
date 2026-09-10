@@ -39,9 +39,12 @@ for every evaluator call, including initialization; failed or incomplete runs re
 [AiDotNet companion PR #2148](https://github.com/ooples/AiDotNet/pull/2148): an explicit correctness-before-fitness gate configured through
 `AiModelBuilder.ConfigureProgramCorrectness`, with the evaluator kept internal, and preservation of metrics/artifacts during
 program descriptor merging. The latter changes future repair feedback, so the program-task semantic version is bumped.
-The existing [package migration PR #2092](https://github.com/ooples/AiDotNet/pull/2092) is independent and must be
-reconciled before treating the new core portfolio as available through AiDotNet's facade. No copied engine changes
-are introduced by this companion.
+The companion now includes exact-source protected-edit enforcement across proposal formats and complete configured
+proposal-option hashing (variation v5). The existing [package migration PR #2092](https://github.com/ooples/AiDotNet/pull/2092)
+at `104a2a41` was integrated into the companion feature branch in `f317ed04`; neither that PR nor `master` was merged
+or modified. This removes the copied engine and enables local validation against the standalone core. The published
+`0.1.0-preview.1` NuGet artifact exists but identifies baseline `f0f282cf`, not the new roadmap APIs; a newer artifact
+is required before claiming those APIs work through the normal package path.
 
 [AiDotNet.Tensors companion PR #1024](https://github.com/ooples/AiDotNet.Tensors/pull/1024): compare-and-deactivate of an observed kernel deployment, enabling built-in fallback
 without allowing stale runtime evidence to remove a newer snapshot. This adds to the validated promotion machinery
@@ -73,7 +76,7 @@ Durable evaluation identities and leases must be developed against its eventual 
 | US-14 surrogate assistance | Partial | Cost-metered acquisition, exploration/fallback contracts and a numeric KNN example implemented; production calibration/backends, representative expensive/noisy evidence and durable observation integration remain. |
 | US-15 multi-fidelity | Partial | Bounded successive-halving bracket, exploration, fidelity/replicate identities, incremental state handoff and fresh full confirmation implemented; real learning-workload integration, durable bracket resume and representative comparisons remain. |
 | US-16 adaptive islands | Not implemented | Resource allocation, heterogeneous policies and checkpointed restarts. |
-| US-17 compiler-guided edits | Partial, companion | Exact source identity and preserved feedback implemented; syntax-aware C# edits, bounded repair, isolation, dependency fingerprints and multi-file evolution remain. |
+| US-17 compiler-guided edits | Partial, companion | Exact source identity, protected edit boundaries, complete configured proposal hashing and preserved feedback implemented; syntax-aware C# edits, compiler-guided repair, isolation, dependency fingerprints and multi-file evolution remain. |
 | US-18 reusable experience | Not implemented | Provenance-backed retrieval, lessons and calibrated semantic novelty. |
 | US-19 model/prompt routing | Not implemented | Consumer routing policy, end-to-end costs, replay and fixed-routing comparisons. |
 | US-20 proposal concurrency | Not implemented | Immutable proposal contexts, bounded scheduling and deterministic policy. |
@@ -151,15 +154,27 @@ Durable evaluation identities and leases must be developed against its eventual 
   sizes, including unchanged state on restore. BenchmarkDotNet Dry runs completed nine archive, 32 engine and nine checkpoint cases;
   these are execution checks under local development load, not timing baselines or speedup evidence.
 - Tensors: 22 targeted autotuning tests pass on net10.0, including three new deployment deactivation tests.
-- AiDotNet companion: 1,042 tests pass separately on net10.0 and net8.0 (1,020 UnitTests.Evolution tests and 22 facade integration tests),
+- AiDotNet companion, earlier v4 evidence: 1,042 tests pass separately on net10.0 and net8.0 (1,020 UnitTests.Evolution tests and 22 facade integration tests),
   including 15 new gate/metadata tests, three facade checks, 12 source-identity/proposal/output tests and two malformed-source
   retry tests. Six identity regressions first failed against the old library. Earlier scoped coverage passed the 1,040-test selection: the correctness
   decorator, genome codec and new Unicode validation method have 100% line/branch coverage. The `ProgramGenome` class
   has 98.24% line / 91.66% branch coverage. These are not whole-repository coverage figures. Final local net10/net8
   builds disabled diagnostic analyzers and used unchanged dependency assemblies; they do not establish full analyzer
   or net471 compatibility. The earlier compiler exit -1 has no established root cause. Interface/checkpoint migration
-  notes and bounded malformed-source retry handling address the latest review; CodeRabbit approved current head
+  notes and bounded malformed-source retry handling addressed that review; CodeRabbit approved the then-current head
   `75aa6b1d` on September 10. This is not Copilot review or hosted build completion.
+- AiDotNet variation v5 at `ddd80160b`: 1,082 authored Evolution/facade tests pass separately on net10.0 and net8.0,
+  including 40 new cases. Ten regressions first failed against `75aa6b1d`: nine compatibility hashes and one protected
+  full rewrite. The new boundary helper has 100% line/branch coverage; fenced extraction has 99.1% line/92.72% branch
+  coverage. A focused local harness compiles the existing test sources against the actual built library, with matching
+  production/test DLL hashes. These pre-migration counts include duplicate core tests subsequently removed by #2092;
+  they must not be compared directly to post-migration consumer-only counts. Diagnostic analyzers were disabled;
+  whole-repository/hosted/current-head review validation remains separate.
+- AiDotNet package integration at `f317ed04` with the ownership-assertion follow-up: 857 selected consumer tests pass
+  separately on net10.0 and net8.0 against core `6d9aeb2`, including real MAP-Elites AutoML, facade and YAML tests.
+  One regression assertion was corrected to require the engine-owned parent snapshot, not caller reference identity.
+  This is local project-path validation; the published preview still points to `f0f282cf`. The detailed migration
+  evidence and DLL hashes are in the companion's `docs/evolution-package-integration.md`.
 - [Paired analysis](benchmarks/analysis-d62d5cb/report.md): 14 Python contract tests pass. Retrospective reporting retains every scheduled run, marks unknown
   work and incomplete curves, and resamples paired seeds within tasks. The pinned CMA-versus-hill-climbing adjusted
   utility-difference interval crosses zero; the pilot is not evidence for promoting CMA as a universal default.
