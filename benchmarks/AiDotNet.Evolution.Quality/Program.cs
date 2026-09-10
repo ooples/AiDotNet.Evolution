@@ -10,6 +10,7 @@ internal static class Program
     private static async Task<int> Main(string[] args)
     {
         if (args.Length > 0 && args[0] == "--archive-partition") return await ArchivePartitionPilot.RunAsync(args.Skip(1).ToArray());
+        if (args.Length > 0 && args[0] == "--numeric-service") return NumericObjectiveService.Run(args.Skip(1).ToArray());
         int methodCount = Enum.GetValues<QualityMethod>().Length;
         int taskCount = Enum.GetValues<QualityTask>().Length;
         if (args.Length != 4 || !int.TryParse(args[0], out int seeds) || seeds is < 1 or > 1000 ||
@@ -79,8 +80,7 @@ internal static class QualityExperiment
         var ledger = new EvolutionResourceLedger($"{taskKind}-{method}-{seed}", new EvolutionResources(
             new Dictionary<string, decimal> { ["cost_units"] = budget, ["proposal_calls"] = budget * 4 }),
             retainedReceiptLimit: 64, maximumOperations: Math.Min(1_000_000, budget * 5));
-        var initialRandom = StableRandom.CreateStream(seed, 123);
-        NumericGenome[] seeds = Enumerable.Range(0, InitialPopulation).Select(_ => RandomGenome(initialRandom)).ToArray();
+        NumericGenome[] seeds = InitialUnits(seed).Select(values => new NumericGenome(ToCoordinates(values))).ToArray();
         string initialHash = EvolutionHash.Combine(seeds.Select(genome => genome.Identity));
         var task = new NumericTask(taskKind);
         var observer = new Progress();
@@ -149,12 +149,32 @@ internal static class QualityExperiment
     private static NumericGenome RandomGenome(StableRandom random) =>
         new(Enumerable.Range(0, Dimensions).Select(_ => -5 + 10 * random.NextDouble()));
 
+    internal static double[][] InitialUnits(ulong seed)
+    {
+        var random = StableRandom.CreateStream(seed, 123);
+        return Enumerable.Range(0, InitialPopulation).Select(_ =>
+            Enumerable.Range(0, Dimensions).Select(_ => random.NextDouble()).ToArray()).ToArray();
+    }
+
+    internal static double[] ToCoordinates(IEnumerable<double> units) => units.Select(value => -5 + 10 * value).ToArray();
+    internal static string GenomeIdentity(IEnumerable<double> coordinates) =>
+        EvolutionHash.Combine(coordinates.Select(value => value.ToString("R", CultureInfo.InvariantCulture)));
+
+    internal static double Loss(QualityTask kind, IReadOnlyList<double> x) => x.Select((value, index) => kind switch
+    {
+        QualityTask.Sphere => value * value,
+        QualityTask.ShiftedQuadratic => Math.Pow(value - (index % 2 == 0 ? 0.75 : -0.25), 2),
+        QualityTask.AnisotropicQuadratic => (index + 1) * (index + 1) * value * value,
+        QualityTask.RippledQuadratic => value * value + 10 * (1 - Math.Cos(2 * Math.PI * value)),
+        _ => throw new ArgumentOutOfRangeException(nameof(kind))
+    }).Sum();
+
     private sealed class NumericGenome : IImmutableEvolutionGenome<NumericGenome>
     {
         internal NumericGenome(IEnumerable<double> coordinates)
         {
             Coordinates = Array.AsReadOnly(coordinates.ToArray());
-            Identity = EvolutionHash.Combine(Coordinates.Select(value => value.ToString("R", CultureInfo.InvariantCulture)));
+            Identity = GenomeIdentity(Coordinates);
         }
         internal IReadOnlyList<double> Coordinates { get; }
         internal string Identity { get; }
@@ -175,14 +195,7 @@ internal static class QualityExperiment
             cancellationToken.ThrowIfCancellationRequested();
             Calls++;
             IReadOnlyList<double> x = candidate.CanonicalGenome.Genome.Coordinates;
-            double loss = x.Select((value, index) => kind switch
-            {
-                QualityTask.Sphere => value * value,
-                QualityTask.ShiftedQuadratic => Math.Pow(value - (index % 2 == 0 ? 0.75 : -0.25), 2),
-                QualityTask.AnisotropicQuadratic => (index + 1) * (index + 1) * value * value,
-                QualityTask.RippledQuadratic => value * value + 10 * (1 - Math.Cos(2 * Math.PI * value)),
-                _ => throw new ArgumentOutOfRangeException(nameof(kind))
-            }).Sum();
+            double loss = Loss(kind, x);
             return new ValueTask<EvolutionTaskResult>(EvolutionTaskResult.Completed(-loss,
                 new Dictionary<string, double> { ["coordinate-0"] = x[0], ["coordinate-1"] = x[1] }, costUnits: 1));
         }

@@ -101,6 +101,23 @@ jobs:
         env:
           CODECOV_TOKEN: ${{ secrets.CODECOV_TOKEN }}
 
+  external-baseline:
+    name: External numeric baseline contracts
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+      - uses: actions/setup-dotnet@a98b56852c35b8e3190ac28c8c2271da59106c68 # v6.0.0
+        with:
+          dotnet-version: '10.0.x'
+      - name: Install isolated baseline dependencies
+        run: |
+          python3 -m venv .local/external-env
+          .local/external-env/bin/python -m pip install -r benchmarks/external/requirements.txt
+      - name: Verify shared evaluator and matched baseline
+        shell: pwsh
+        run: ./eng/Test-ExternalBaseline.ps1 -Python .local/external-env/bin/python
+
   legacy:
     name: Build and test net471
     if: "${{ !(github.event_name == 'push' && startsWith(github.event.head_commit.message, 'chore(main): release')) && !startsWith(github.head_ref, 'release-please--') }}"

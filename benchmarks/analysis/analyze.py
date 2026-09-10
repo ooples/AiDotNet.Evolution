@@ -39,7 +39,7 @@ def validate_plan(plan):
     require(isinstance(plan, dict) and set(plan) == fields, "Missing or unknown plan field.")
     require(integer(plan["SchemaVersion"], 1, 1) and plan["Purpose"] == "retrospective-development", "Only retrospective development analysis is supported.")
     require(isinstance(plan["SourceRevision"], str) and re.fullmatch(r"[0-9a-f]{40}", plan["SourceRevision"]), "Pin the complete source revision.")
-    require(plan["Protocol"] == "numeric-development-v3-diagonal-cma", "Unsupported experiment protocol.")
+    require(plan["Protocol"] in ("numeric-development-v3-diagonal-cma", "numeric-development-v4-external"), "Unsupported experiment protocol.")
     require(isinstance(plan["Tasks"], list) and all(isinstance(t, dict) and set(t) == {"Name", "Scale"} for t in plan["Tasks"]), "Invalid tasks.")
     require(names([t["Name"] for t in plan["Tasks"]], 256) and all(finite(t["Scale"]) and 1e-12 <= t["Scale"] <= 1e12 for t in plan["Tasks"]), "Invalid task names or scales.")
     require(names(plan["Methods"], 16) and names(plan["Comparators"], 15), "Invalid methods/comparators.")
@@ -106,6 +106,10 @@ def analyze(campaign, plan):
             and campaign.get("InitialPopulation") == 8 and campaign.get("Dimensions") == 8, "Invalid numeric campaign metadata.")
     tasks, methods = [t["Name"] for t in plan["Tasks"]], plan["Methods"]
     require(campaign.get("TaskCount") == len(tasks), "Fixed task plan mismatch.")
+    external_protocol = plan["Protocol"] == "numeric-development-v4-external"
+    if external_protocol:
+        require(type(campaign.get("WorkingTreeSmoke")) is bool and isinstance(campaign.get("EvaluatorBinarySha256"), str)
+                and re.fullmatch(r"[0-9a-f]{64}", campaign["EvaluatorBinarySha256"]), "Missing external binary/smoke provenance.")
     raw_runs = campaign.get("Runs")
     require(isinstance(raw_runs, list) and len(raw_runs) <= len(tasks) * len(methods) * plan["SeedCount"], "Invalid campaign run count.")
     indexed = {}
@@ -141,8 +145,23 @@ def analyze(campaign, plan):
                             and all(finite(v) for v in resources["Reserved"].values())
                             and integer(resources.get("Unknown"), 0, 10_000_000)
                             and type(resources.get("MaximumViolated")) is bool, "Invalid work counters.")
+                    external = external_protocol and method == "ScipyDifferentialEvolutionMatched8"
+                    converged = external and run.get("StopReason") == "converged"
+                    calls = run["EvaluatorCalls"]
+                    within_budget = 8 <= calls <= plan["Budget"] if converged else calls == plan["Budget"]
+                    terminal_valid = not external_protocol or run.get("StopReason") == "evaluation-cap" or converged
+                    external_valid = True
+                    if external:
+                        manifest = run.get("EvaluatorManifest") or {}
+                        external_valid = (all(integer(run.get(key), 8, plan["Budget"]) and run[key] == calls
+                                              for key in ("IndependentEvaluatorCalls", "ControllerDispatches", "OptimizerNfev"))
+                                          and run.get("UnknownWork") is False and isinstance(manifest, dict)
+                                          and manifest.get("AssemblySha256") == campaign["EvaluatorBinarySha256"]
+                                          and manifest.get("InitialPopulationHash") == run.get("InitialPopulationHash")
+                                          and manifest.get("Task") == task and manifest.get("Seed") == seed
+                                          and manifest.get("Budget") == plan["Budget"])
                     valid = (run.get("Status") == "completed" and finite(run.get("FinalLoss"))
-                             and run["EvaluatorCalls"] == plan["Budget"] and resources["Spent"].get("cost_units") == plan["Budget"]
+                             and within_budget and terminal_valid and external_valid and resources["Spent"].get("cost_units") == calls
                              and resources["Spent"].get("proposal_calls") == run["Proposals"] - campaign["InitialPopulation"]
                              and all(v == 0 for v in resources["Reserved"].values()) and resources.get("Unknown") == 0
                              and resources.get("MaximumViolated") is False)
@@ -153,6 +172,11 @@ def analyze(campaign, plan):
                                ReportedStatus=run.get("Status"), Utility=utility, FinalLoss=run.get("FinalLoss") if finite(run.get("FinalLoss")) else None,
                                EvaluatorCalls=run["EvaluatorCalls"], Resources={k: v for k, v in resources.items() if k != "Receipts"},
                                TrajectoryComplete=complete, Curve=curve)
+                    if external_protocol:
+                        row.update(StopReason=run.get("StopReason"), Error=run.get("Error"),
+                                   TerminalCarryForward=bool(valid and converged and calls < plan["Budget"]))
+                    if external:
+                        row.update({key: run.get(key) for key in ("IndependentEvaluatorCalls", "ControllerDispatches", "OptimizerNfev", "UnknownWork")})
                 rows.append(row)
                 by_key[key] = row
                 group.append(row)
@@ -169,7 +193,7 @@ def analyze(campaign, plan):
                 known = []
                 for row in group:
                     points = [p for p in row["Curve"] if p["CostUnits"] <= at]
-                    if row["TrajectoryComplete"] and points and row["Curve"][-1]["CostUnits"] >= at:
+                    if row["TrajectoryComplete"] and points and (row["Curve"][-1]["CostUnits"] >= at or row.get("TerminalCarryForward", False)):
                         known.append(points[-1]["BestLoss"])
                 progress.append(dict(Task=task, Method=method, CostUnits=at, KnownRuns=len(known), MissingRuns=len(group) - len(known),
                                      MedianLossKnownOnly=statistics.median(known) if known else None))
@@ -191,6 +215,7 @@ def analyze(campaign, plan):
                 ConfidenceLevel=plan["ConfidenceLevel"], ResampleTasks=plan["ResampleTasks"], BootstrapSamples=plan["BootstrapSamples"],
                 IntervalMethod="paired percentile bootstrap; nominal Bonferroni tails across aggregate comparisons",
                 Caveats=["Retrospective development analysis; no preregistration, power guarantee, release gate or competitor superiority claim.",
+                         "Protocol-v4 external convergence is valid below the cap; its final measured incumbent carries forward without invented measurements.",
                          "Timing samples and trajectory points are not independent search runs.",
                          "Intervals are approximate; small or degenerate samples can understate uncertainty.",
                          "Completed-only losses and known-only curves are descriptive, not failure-inclusive comparison endpoints.",

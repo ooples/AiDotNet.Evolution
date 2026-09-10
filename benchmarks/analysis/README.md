@@ -1,7 +1,7 @@
 # Paired, failure-aware development analysis
 
 This dependency-free Python tool adds experiment reporting without adding statistics dependencies to the core
-package. It accepts the full numeric protocol-v3 trace and an explicit, fixed analysis specification.
+package. It accepts the full numeric protocol-v3 trace or protocol-v4 external comparison and an explicit, fixed analysis specification.
 
 ```powershell
 python -m unittest discover -s benchmarks/analysis -v
@@ -39,6 +39,11 @@ missing run. Completed-only loss medians and known-only progress curves are labe
 not substitute for the failure-inclusive endpoint. Reports retain aggregate budget-indexed progress and each run's
 trajectory completeness/point count; unaggregated points stay in the input identified by SHA-256. Input/plan and bootstrap work are bounded; the recorded Python
 version and bootstrap seed support same-environment replay.
+
+For the [external baseline](../external/README.md), valid convergence can stop below the cap: optimizer/controller/C#
+counts and binary/initialization identities must agree. Its final measured incumbent carries forward for progress
+at later budgets without adding measurements or cost. Other early stops fail. Full-cap core runs retain their
+existing validation. Reports preserve external counter disagreement and unknown work instead of rewarding a failed run.
 
 ## What this does not establish
 

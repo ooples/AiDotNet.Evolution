@@ -55,7 +55,7 @@ Durable evaluation identities and leases must be developed against its eventual 
 | Story | State | Work still required |
 | --- | --- | --- |
 | US-01 representative suites | Partial | Real program/kernel/AutoML tasks, AlgoTune subset, sealed task partitions. |
-| US-02 fair baselines | Partial | Matched OpenEvolve and other external adapters; stronger numeric baselines; consistent model access. |
+| US-02 fair baselines | Partial | Matched-population SciPy differential evolution now uses the shared C# evaluator and independent counters; native-default/tuned controls, OpenEvolve and consistent model access remain. |
 | US-03 correctness gates | Partial, companion | Trusted sandbox/reference integrations and held-out validation; wrapper alone is not proof of correctness. |
 | US-04 statistical evidence | Partial | Paired task/run analysis, failure-inclusive effects/intervals and trace checks implemented; prospective sample-size/power design and representative confirmation remain. |
 | US-05 resource ledger | Partial | Generic ledger, stage helper and evaluator/cascade adapter implemented; consumer model/compiler/setup integrations and deterministic concurrent admission remain. |
@@ -83,6 +83,11 @@ Durable evaluation identities and leases must be developed against its eventual 
 
 ## Validation evidence
 
+- External baseline: eight integration tests cover all four shared objectives, exact initialization/replay, real SciPy
+  calls, valid early convergence, errors and hard caps. The smoke completes eight external runs / 256 calls twice,
+  with byte-identical merged 56-run evidence. The analyzer now passes 17 tests and preserves valid under-budget
+  convergence without invented measurements or costs. This is a controlled eight-member population, not SciPy native
+  defaults or a competitive win. See [external baseline protocol](../benchmarks/external/README.md).
 - Fresh replication extension: 418 core tests pass on each of net10.0, net8.0 and net471, including 22 replication cases.
   Fresh net10.0 coverage is 90.77% line / 76.23% branch. The deterministic example verifies 64 fresh dispatches/charges,
   distinct search/confirmation identities and exact replay. Numerical regressions cover wide support, tiny variance,
@@ -112,7 +117,8 @@ Durable evaluation identities and leases must be developed against its eventual 
   has 98.24% line / 91.66% branch coverage. These are not whole-repository coverage figures. Final local net10/net8
   builds disabled diagnostic analyzers and used unchanged dependency assemblies; they do not establish full analyzer
   or net471 compatibility. The earlier compiler exit -1 has no established root cause. Interface/checkpoint migration
-  notes and bounded malformed-source retry handling address the latest review; current-head approval remains pending.
+  notes and bounded malformed-source retry handling address the latest review; CodeRabbit approved current head
+  `75aa6b1d` on September 10. This is not Copilot review or hosted build completion.
 - [Paired analysis](benchmarks/analysis-d62d5cb/report.md): 14 Python contract tests pass. Retrospective reporting retains every scheduled run, marks unknown
   work and incomplete curves, and resamples paired seeds within tasks. The pinned CMA-versus-hill-climbing adjusted
   utility-difference interval crosses zero; the pilot is not evidence for promoting CMA as a universal default.
@@ -122,10 +128,10 @@ Durable evaluation identities and leases must be developed against its eventual 
 - [Diagonal CMA comparison](benchmarks/DIAGONAL_CMA_PILOT.md): 240 runs / 61,440 calls, no failures. The emitter's
   median final loss beats hill climbing on three development fixtures and loses on the rippled fixture. All six
   methods share the complete initial population and evaluator cap; proposal/evaluator ledger totals are retained.
-- Hosted checks remain unvalidated: Evolution/AiDotNet checks are queued, and the Tensors runs were cancelled.
-  AiDotNet's automated review requested facade integration; the follow-up hides the
-  implementation and adds builder-level tests. Current-head approval is still pending. All PRs remain drafts;
-  no merge-readiness claim.
+- Hosted validation remains incomplete for Evolution/AiDotNet (build/security checks queued). Tensors current head
+  `77d16869` now has successful build, AVX-512 verification and returned GPU-parity checks; earlier duplicate title
+  runs were cancelled. AiDotNet has current-head CodeRabbit approval, not Copilot approval. All PRs remain drafts;
+  no full-roadmap or merge-readiness claim.
 
 ## Experiment access policy
 

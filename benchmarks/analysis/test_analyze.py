@@ -30,6 +30,52 @@ def fixture():
 
 
 class AnalysisTests(unittest.TestCase):
+    def external_fixture(self):
+        campaign, plan = fixture()
+        external = "ScipyDifferentialEvolutionMatched8"
+        campaign.update(Protocol="numeric-development-v4-external", Budget=16, WorkingTreeSmoke=False, EvaluatorBinarySha256="c" * 64)
+        plan.update(Protocol=campaign["Protocol"], Budget=16, Methods=["Candidate", external], Comparators=[external])
+        campaign["Methods"] = plan["Methods"]
+        for row in campaign["Runs"]:
+            if row["Method"] == "Baseline":
+                row.update(Method=external, StopReason="converged", IndependentEvaluatorCalls=8, ControllerDispatches=8,
+                           OptimizerNfev=8, UnknownWork=False,
+                           EvaluatorManifest=dict(AssemblySha256="c" * 64, InitialPopulationHash="b" * 64,
+                                                  Task=row["Task"], Seed=row["Seed"], Budget=16))
+            else:
+                row.update(StopReason="evaluation-cap", EvaluatorCalls=16, Proposals=16)
+                row["Resources"]["Spent"] = dict(cost_units=16, proposal_calls=8)
+                row["Samples"] += [dict(EvaluationId=i, CostUnits=1, Attempts=1, BestLoss=row["FinalLoss"]) for i in range(8, 16)]
+        return campaign, plan
+
+    def test_external_convergence_preserves_utility_and_terminal_progress_without_extra_cost(self):
+        campaign, plan = self.external_fixture()
+        result = analyze(campaign, plan)
+        rows = [r for r in result["Runs"] if r["Method"] == plan["Comparators"][0]]
+        self.assertTrue(all(r["Status"] == "completed" and r["EvaluatorCalls"] == 8 and r["TerminalCarryForward"] for r in rows))
+        self.assertEqual(0, result["Comparisons"][0]["MeanPairedUtilityDifference"])
+        progress = [r for r in result["Progress"] if r["Method"] == plan["Comparators"][0] and r["CostUnits"] == 16]
+        self.assertTrue(all(r["KnownRuns"] == 3 and r["MissingRuns"] == 0 for r in progress))
+
+    def test_external_counter_provenance_and_stop_corruption_have_zero_utility(self):
+        for field, value in [("OptimizerNfev", 9), ("IndependentEvaluatorCalls", None), ("ControllerDispatches", 9),
+                             ("UnknownWork", True), ("StopReason", "evaluation-cap"), ("EvaluatorManifest", {})]:
+            campaign, plan = self.external_fixture()
+            target = next(r for r in campaign["Runs"] if r["Method"] == plan["Comparators"][0])
+            target[field] = value
+            result = analyze(campaign, plan)
+            row = next(r for r in result["Runs"] if r["Method"] == target["Method"] and r["Task"] == target["Task"] and r["Seed"] == target["Seed"])
+            self.assertEqual(0, row["Utility"], field)
+            self.assertEqual(8, row["EvaluatorCalls"])
+            self.assertFalse(row["TerminalCarryForward"])
+
+    def test_external_protocol_requires_binary_and_smoke_provenance(self):
+        for field in ("WorkingTreeSmoke", "EvaluatorBinarySha256"):
+            campaign, plan = self.external_fixture()
+            del campaign[field]
+            with self.assertRaises(ValueError):
+                analyze(campaign, plan)
+
     def test_cli_writes_auditable_artifacts_and_refuses_overwrite(self):
         campaign, plan = fixture()
         with tempfile.TemporaryDirectory() as directory:
