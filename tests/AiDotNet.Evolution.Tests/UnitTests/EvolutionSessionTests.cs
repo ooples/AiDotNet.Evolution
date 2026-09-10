@@ -290,6 +290,9 @@ public sealed class EvolutionSessionTests
         }
 
         Assert.True(ids.Count >= 2, $"expected at least two candidates, got {ids.Count}");
+        // Distinctness alone is satisfied by any per-genome string; the prefix is what
+        // proves the id came from the identity function this session was given.
+        Assert.All(ids, id => Assert.StartsWith("canonical:", id, StringComparison.Ordinal));
         Assert.Equal(ids.Count, ids.Distinct().Count());
     }
 
@@ -299,8 +302,16 @@ public sealed class EvolutionSessionTests
         new(task => Engine(task, Options(maxProposals, proposalBatchSize)), Seeds(2), Identity);
 
     /// <summary>A real canonical identity, not ToString: distinct values, distinct ids.</summary>
+    /// <remarks>
+    /// THE PREFIX IS THE POINT. Without it this returns exactly what a genome's
+    /// <c>ToString</c> would, so a regression to the old <c>genome.ToString()</c> default
+    /// would still produce distinct ids and every identity test would keep passing. The
+    /// prefix is a string only the supplied function can produce, which is what lets
+    /// <see cref="DistinctGenomesGetDistinctIdentities"/> prove the function was actually
+    /// called rather than merely that the ids came out distinct.
+    /// </remarks>
     private static string Identity(SessionGenome genome) =>
-        genome.Value.ToString(System.Globalization.CultureInfo.InvariantCulture);
+        "canonical:" + genome.Value.ToString(System.Globalization.CultureInfo.InvariantCulture);
 
     private static EvolutionEngineOptions Options(int maxProposals, int proposalBatchSize = 4) => new()
     {
@@ -362,7 +373,10 @@ public sealed class EvolutionSessionTests
 
         public int Value { get; }
 
-        public override string ToString() => Value.ToString(System.Globalization.CultureInfo.InvariantCulture);
+        // NO ToString OVERRIDE, deliberately. It used to return the value, which made this
+        // fixture one of the few genome types for which the old `genome.ToString()` default
+        // happened to be a correct identity -- so the suite could not see the defect that
+        // default causes for every type that does not override it.
     }
 
     private sealed class AddOneVariation : IVariationOperator<SessionGenome>
