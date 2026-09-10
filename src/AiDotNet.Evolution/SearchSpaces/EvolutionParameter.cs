@@ -112,10 +112,17 @@ public sealed class EvolutionParameter
     }
 
     /// <summary>Checks type, bounds, integrality and categorical membership without coercion.</summary>
-    public bool Contains(EvolutionParameterValue value) => value is not null && (Kind == EvolutionParameterKind.Categorical
-        ? !value.IsNumeric && Categories.Contains(value.Category, StringComparer.Ordinal)
-        : value.IsNumeric && value.Number >= Minimum && value.Number <= Maximum &&
-            (Kind != EvolutionParameterKind.Integer || value.Number == Math.Truncate(value.Number)));
+    public bool Contains(EvolutionParameterValue value)
+    {
+        if (value is null) return false;
+        if (Kind == EvolutionParameterKind.Categorical)
+            return !value.IsNumeric && Categories.Contains(value.Category, StringComparer.Ordinal);
+        if (!value.IsNumeric) return false;
+        double number = value.Number;
+        bool withinBounds = number >= Minimum && number <= Maximum;
+        if (!withinBounds) return false;
+        return Kind != EvolutionParameterKind.Integer || number == Math.Truncate(number);
+    }
 
     /// <summary>Samples a value using only the supplied stable random stream.</summary>
     public EvolutionParameterValue Sample(StableRandom random)

@@ -65,7 +65,7 @@ public sealed class EvolutionReplicationPlan
     internal double Radius(int samples)
     {
         int looks = NormalizedWidthTarget > 0 ? MaximumSamples - MinimumSamples + 1 : 1;
-        return Math.Min(1, Math.Sqrt(Math.Log(2d * looks / (1 - Confidence)) / (2 * samples)));
+        return Math.Min(1, Math.Sqrt(Math.Log(2d * looks / (1 - Confidence)) / (2d * samples)));
     }
     private static string Bits(double value) => BitConverter.DoubleToInt64Bits(value == 0 ? 0 : value).ToString("x16", CultureInfo.InvariantCulture);
     private static double Adjacent(double value, bool upward)
@@ -159,7 +159,7 @@ public sealed class EvolutionReplicationReport
         MeanQuality = mean;
         double normalizedScale = deviationScale / plan.Span;
         NormalizedSampleVariance = normalizedScale * normalizedScale * scaledSquares / (Samples.Count - 1);
-        StandardError = deviationScale * Math.Sqrt(scaledSquares / (Samples.Count * (Samples.Count - 1)));
+        StandardError = deviationScale * Math.Sqrt(scaledSquares / ((double)Samples.Count * (Samples.Count - 1)));
         plan.Bounds(mean, Samples.Count, out double lower, out double upper);
         LowerBound = lower; UpperBound = upper;
     }

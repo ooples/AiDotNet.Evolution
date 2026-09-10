@@ -59,8 +59,8 @@ public sealed class DiagonalCmaEmitter : IOutcomeAwareVariationOperator<Evolutio
         _ds = 1 + 2 * Math.Max(0, Math.Sqrt((_effectiveParents - 1) / (n + 1)) - 1) + _cs;
         _cc = (4 + _effectiveParents / n) / (n + 4 + 2 * _effectiveParents / n);
         _c1 = 2 / ((n + 1.3) * (n + 1.3) + _effectiveParents);
-        _cmu = Math.Min(1 - _c1, 2 * (_effectiveParents - 2 + 1 / _effectiveParents) / ((n + 2) * (n + 2) + _effectiveParents));
-        _chi = Math.Sqrt(n) * (1 - 1d / (4 * n) + 1d / (21 * n * n));
+        _cmu = Math.Min(1 - _c1, 2 * (_effectiveParents - 2 + 1 / _effectiveParents) / ((n + 2d) * (n + 2d) + _effectiveParents));
+        _chi = Math.Sqrt(n) * (1 - 1d / (4d * n) + 1d / (21d * n * n));
         VersionHash = EvolutionHash.Combine(new[] { "diagonal-cma-v1", space.VersionHash, PopulationSize.ToString(CultureInfo.InvariantCulture),
             EvolutionParameterValue.Numeric(initialStepSize).Canonical, direction.ToString() });
     }
@@ -200,13 +200,23 @@ public sealed class DiagonalCmaEmitter : IOutcomeAwareVariationOperator<Evolutio
         Guard.NotNull(state);
         if (state.Length > 16 * 1024 * 1024) throw new ArgumentException("CMA checkpoint exceeds 16 MiB.", nameof(state));
         Checkpoint saved = JsonSerializer.Deserialize<Checkpoint>(state) ?? throw new ArgumentException("Missing CMA state.", nameof(state));
-        if (saved.VersionHash != VersionHash || saved.NextCohort < 0 || saved.LastGeneration < 0 || saved.Stale < 0 || saved.Invalid < 0 ||
-            saved.Cohorts is null || saved.Cohorts.Length > 256 || saved.NextCohort > saved.LastGeneration ||
-            (decimal)(saved.Current?.Epoch ?? 0) + saved.Stale + saved.Invalid != (decimal)saved.NextCohort - saved.Cohorts.Length ||
-            (saved.Current is null && (saved.LastGeneration != 0 || saved.NextCohort != 0 || saved.Cohorts.Length != 0)) ||
-            (saved.Current is not null && saved.NextCohort == 0))
+        if (saved.VersionHash != VersionHash || saved.Cohorts is null || saved.Cohorts.Length > 256)
             throw new ArgumentException("Invalid or incompatible CMA state.", nameof(state));
-        if (saved.Current is not null) ValidateDistribution(saved.Current);
+        if (saved.NextCohort < 0 || saved.LastGeneration < 0 || saved.Stale < 0 || saved.Invalid < 0)
+            throw new ArgumentException("Invalid or incompatible CMA state.", nameof(state));
+        if (saved.NextCohort > saved.LastGeneration ||
+            (decimal)(saved.Current?.Epoch ?? 0) + saved.Stale + saved.Invalid != (decimal)saved.NextCohort - saved.Cohorts.Length)
+            throw new ArgumentException("Invalid or incompatible CMA state.", nameof(state));
+        if (saved.Current is null)
+        {
+            if (saved.LastGeneration != 0 || saved.NextCohort != 0 || saved.Cohorts.Length != 0)
+                throw new ArgumentException("Invalid or incompatible CMA state.", nameof(state));
+        }
+        else
+        {
+            if (saved.NextCohort == 0) throw new ArgumentException("Invalid or incompatible CMA state.", nameof(state));
+            ValidateDistribution(saved.Current);
+        }
         var cohorts = new SortedDictionary<long, Cohort>(); var pending = new Dictionary<long, Pending>(); var generations = new HashSet<long>();
         foreach (Cohort cohort in saved.Cohorts)
         {
