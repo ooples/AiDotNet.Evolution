@@ -5,7 +5,8 @@ param(
 $ErrorActionPreference = 'Stop'
 $report = Get-Content -LiteralPath $InputPath -Raw | ConvertFrom-Json
 $archiveProtocol = $report.SchemaVersion -eq 1 -and $report.Protocol -eq 'archive-partition-development-v1'
-if (-not $archiveProtocol -and ($report.SchemaVersion -ne 2 -or $report.Protocol -ne 'numeric-development-v3-diagonal-cma')) {
+$externalProtocol = $report.SchemaVersion -eq 2 -and $report.Protocol -eq 'numeric-development-v4-external'
+if (-not $archiveProtocol -and -not $externalProtocol -and ($report.SchemaVersion -ne 2 -or $report.Protocol -ne 'numeric-development-v3-diagonal-cma')) {
     throw 'Unsupported numeric evidence protocol.'
 }
 $methods = if ($archiveProtocol) { @('SparseGrid', 'FixedCentroid') } else { $report.Methods }
@@ -34,6 +35,11 @@ $evidence = [ordered]@{
     Dimensions = $report.Dimensions; InitialPopulation = $report.InitialPopulation; Methods = $report.Methods
     Comparability = $report.Comparability; Limitations = $report.Limitations; Runs = $rows
 }
+if ($externalProtocol) {
+    foreach ($property in @('BaselineInputSha256', 'ExternalEnvironment', 'ExternalConfiguration', 'EvaluatorBinarySha256', 'WorkingTreeSmoke')) {
+        $evidence[$property] = $report.$property
+    }
+}
 if ($archiveProtocol) {
     $evidence.Kind = 'compact-archive-partition-evidence'
     $evidence.Methods = $methods
@@ -42,6 +48,8 @@ if ($archiveProtocol) {
     $evidence.ReferenceDefinition = $report.ReferenceDefinition
     $evidence.Endpoint = $report.Endpoint
     $evidence.Remove('Comparability')
+}
+if ($archiveProtocol -or $externalProtocol) {
     $evidence.Runs = @($report.Runs | ForEach-Object {
         $row = $_ | Select-Object * -ExcludeProperty Samples
         $row.Resources = $_.Resources | Select-Object * -ExcludeProperty Receipts

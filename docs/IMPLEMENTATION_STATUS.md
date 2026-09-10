@@ -88,6 +88,10 @@ Durable evaluation identities and leases must be developed against its eventual 
   with byte-identical merged 56-run evidence. The analyzer now passes 17 tests and preserves valid under-budget
   convergence without invented measurements or costs. This is a controlled eight-member population, not SciPy native
   defaults or a competitive win. See [external baseline protocol](../benchmarks/external/README.md).
+  The [pinned external pilot](benchmarks/EXTERNAL_BASELINE_PILOT.md) completes 280 runs / 71,528 calls with no failures.
+  SciPy's matched-population DE has lower median loss than diagonal CMA on all four fixtures; the paired utility
+  difference interval crosses zero. All 240 core records reproduce the prior pilot exactly and the external campaign
+  replays byte-identically. This exposes an optimization gap without establishing representative superiority.
 - Fresh replication extension: 418 core tests pass on each of net10.0, net8.0 and net471, including 22 replication cases.
   Fresh net10.0 coverage is 90.77% line / 76.23% branch. The deterministic example verifies 64 fresh dispatches/charges,
   distinct search/confirmation identities and exact replay. Numerical regressions cover wide support, tiny variance,
