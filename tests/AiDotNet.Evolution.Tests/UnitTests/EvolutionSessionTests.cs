@@ -173,16 +173,84 @@ public sealed class EvolutionSessionTests
     public async Task ConstructorRejectsNulls()
     {
         Assert.Throws<ArgumentNullException>(() =>
-            new EvolutionSession<SessionGenome>(null!, Seeds(2)));
+            new EvolutionSession<SessionGenome>(null!, Seeds(2), Identity));
         Assert.Throws<ArgumentNullException>(() =>
-            new EvolutionSession<SessionGenome>(task => Engine(task, Options(4)), null!));
+            new EvolutionSession<SessionGenome>(task => Engine(task, Options(4)), null!, Identity));
+        // Identity has no default on purpose: falling back to ToString would give
+        // every genome of a type that does not override it the same id, and the
+        // engine would silently deduplicate distinct candidates into one.
+        Assert.Throws<ArgumentNullException>(() =>
+            new EvolutionSession<SessionGenome>(task => Engine(task, Options(4)), Seeds(2), null!));
         await Task.CompletedTask;
+    }
+
+    [Fact]
+    public void ConstructionRefusesAnEndlessSeedSequence()
+    {
+        // `ToArray` on an infinite sequence never returns, so construction would
+        // hang with nothing naming seeds as the cause. The limit turns it into an
+        // argument error instead.
+        static IEnumerable<SessionGenome> Endless()
+        {
+            for (int i = 0; ; i += 1) yield return new SessionGenome(i);
+        }
+
+        ArgumentException failure = Assert.Throws<ArgumentException>(() =>
+            new EvolutionSession<SessionGenome>(
+                task => Engine(task, Options(8)), Endless(), Identity));
+        Assert.Contains("at most", failure.Message, StringComparison.Ordinal);
+    }
+
+    [Fact]
+    public async Task AskCapsTheBatchItWillPreallocate()
+    {
+        // `new List(int.MaxValue)` exhausts the process before a single candidate
+        // is handed over. Asking for more than the cap is not an error; it simply
+        // yields at most the cap.
+        using var session = NewSession(maxProposals: 8);
+        IReadOnlyList<EvolutionAskItem<SessionGenome>> batch =
+            await WithTimeout(session.AskAsync(int.MaxValue));
+
+        Assert.NotEmpty(batch);
+        Assert.InRange(batch.Count, 1, EvolutionSession<SessionGenome>.MaxBatchSize);
+    }
+
+    [Fact]
+    public async Task DistinctGenomesGetDistinctIdentities()
+    {
+        // THE BUG THE REQUIRED IDENTITY EXISTS FOR. With ToString as the default,
+        // a genome type that does not override it gives every instance the same
+        // id and the engine folds distinct candidates into one -- a search that
+        // evaluates one thing and reports it as many.
+        using var session = NewSession(maxProposals: 8);
+
+        // Collected across asks: AskAsync returns as soon as ANY work is ready
+        // rather than waiting to fill the batch, so one call may yield one item.
+        var ids = new List<string>();
+        while (ids.Count < 2)
+        {
+            IReadOnlyList<EvolutionAskItem<SessionGenome>> batch =
+                await WithTimeout(session.AskAsync(4));
+            if (batch.Count == 0) break;
+            foreach (EvolutionAskItem<SessionGenome> item in batch)
+            {
+                ids.Add(item.Candidate.CanonicalGenome.Id);
+                session.Tell(item.EvaluationId, Score(item));
+            }
+        }
+
+        Assert.True(ids.Count >= 2, $"expected at least two candidates, got {ids.Count}");
+        Assert.Equal(ids.Count, ids.Distinct().Count());
     }
 
     // ----------------------------------------------------------------- helpers
 
     private static EvolutionSession<SessionGenome> NewSession(int maxProposals, int proposalBatchSize = 4) =>
-        new(task => Engine(task, Options(maxProposals, proposalBatchSize)), Seeds(2));
+        new(task => Engine(task, Options(maxProposals, proposalBatchSize)), Seeds(2), Identity);
+
+    /// <summary>A real canonical identity, not ToString: distinct values, distinct ids.</summary>
+    private static string Identity(SessionGenome genome) =>
+        genome.Value.ToString(System.Globalization.CultureInfo.InvariantCulture);
 
     private static EvolutionEngineOptions Options(int maxProposals, int proposalBatchSize = 4) => new()
     {

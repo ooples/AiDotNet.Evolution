@@ -60,7 +60,8 @@ public sealed class EvolutionSession<TGenome> : IDisposable
     private readonly TaskCompletionSource<EvolutionRunResult<TGenome>> _completion =
         new(TaskCreationOptions.RunContinuationsAsynchronously);
 
-    private Task? _engineRun;
+    private readonly Func<TGenome, string> _identity;
+    private readonly Task _engineRun;
     private int _disposed;
 
     /// <summary>Initializes a session over an engine the caller has already configured.</summary>
@@ -69,23 +70,74 @@ public sealed class EvolutionSession<TGenome> : IDisposable
     /// requires its task at construction, and the task cannot exist before the session that owns its queue.
     /// </param>
     /// <param name="initialGenomes">Finite seed genomes, as <see cref="EvolutionEngine{TGenome}.RunAsync"/> takes.</param>
-    /// <exception cref="ArgumentNullException"><paramref name="engineFactory"/> or <paramref name="initialGenomes"/> is null.</exception>
+    /// <param name="canonicalIdentity">
+    /// Returns a stable, collision-resistant identifier for a genome.
+    /// <para>
+    /// REQUIRED, WITH NO DEFAULT, and the first version of this class was wrong to
+    /// have one. It fell back to <c>genome.ToString()</c>, which for any type that
+    /// does not override it returns the type name -- so every distinct genome of
+    /// that type shares one identity and the engine silently deduplicates them into
+    /// a single candidate. A search that quietly evaluates one thing and reports it
+    /// as many is worse than one that refuses to start, and a default that is right
+    /// only for types that happen to override <c>ToString</c> is a trap rather than
+    /// a convenience.
+    /// </para>
+    /// </param>
+    /// <exception cref="ArgumentNullException">Any argument is null.</exception>
+    /// <exception cref="ArgumentException">
+    /// <paramref name="initialGenomes"/> yields more than <see cref="MaxSeeds"/> items.
+    /// </exception>
     public EvolutionSession(
         Func<IEvolutionTask<TGenome>, EvolutionEngine<TGenome>> engineFactory,
-        IEnumerable<TGenome> initialGenomes)
+        IEnumerable<TGenome> initialGenomes,
+        Func<TGenome, string> canonicalIdentity)
     {
         Guard.NotNull(engineFactory);
         Guard.NotNull(initialGenomes);
+        Guard.NotNull(canonicalIdentity);
 
-        // Unbounded, and deliberately: the engine's own concurrency options already cap
-        // how many evaluations are in flight, so a bound here would be a second limit
-        // that can only deadlock against the first.
-        TGenome[] seeds = initialGenomes.ToArray();
+        _identity = canonicalIdentity;
+        TGenome[] seeds = MaterializeSeeds(initialGenomes);
         var task = new QueueingTask(this);
         EvolutionEngine<TGenome> engine = engineFactory(task)
             ?? throw new ArgumentException("The engine factory returned null.", nameof(engineFactory));
 
         _engineRun = RunEngineAsync(engine, seeds);
+    }
+
+    /// <summary>Largest seed set accepted, so an endless sequence cannot hang construction.</summary>
+    /// <remarks>
+    /// `ToArray` on an infinite <see cref="IEnumerable{T}"/> never returns, and on a
+    /// merely enormous one exhausts memory before evolution starts. Neither failure
+    /// mentions seeds, so both are hard to diagnose from the symptom. Enumerating
+    /// one past the limit and refusing turns both into an argument error naming the
+    /// parameter.
+    /// </remarks>
+    public const int MaxSeeds = 100_000;
+
+    /// <summary>Largest batch <see cref="AskAsync"/> will return, and preallocate for.</summary>
+    /// <remarks>
+    /// `new List(maxCount)` with an unrestricted count allocates whatever the caller
+    /// names -- `int.MaxValue` exhausts the process before a single candidate is
+    /// handed over. The cap bounds the allocation; asking for more is not an error,
+    /// it simply yields at most this many.
+    /// </remarks>
+    public const int MaxBatchSize = 4096;
+
+    private static TGenome[] MaterializeSeeds(IEnumerable<TGenome> initialGenomes)
+    {
+        var seeds = new List<TGenome>();
+        foreach (TGenome genome in initialGenomes)
+        {
+            if (seeds.Count == MaxSeeds)
+            {
+                throw new ArgumentException(
+                    $"An evolution session accepts at most {MaxSeeds} seeds.",
+                    nameof(initialGenomes));
+            }
+            seeds.Add(genome);
+        }
+        return seeds.ToArray();
     }
 
     /// <summary>Gets a value indicating whether the run has finished and no further asks will yield work.</summary>
@@ -120,7 +172,9 @@ public sealed class EvolutionSession<TGenome> : IDisposable
     {
         if (maxCount <= 0) throw new ArgumentOutOfRangeException(nameof(maxCount));
 
-        var batch = new List<EvolutionAskItem<TGenome>>(maxCount);
+        // Capped before it reaches the allocator: the caller names the number.
+        int wanted = Math.Min(maxCount, MaxBatchSize);
+        var batch = new List<EvolutionAskItem<TGenome>>(wanted);
 
         using var linked = CancellationTokenSource.CreateLinkedTokenSource(
             cancellationToken, _closed.Token);
@@ -144,7 +198,7 @@ public sealed class EvolutionSession<TGenome> : IDisposable
 
         // Drain what is already queued, taking a permit for each so the count stays
         // in step with the queue.
-        while (batch.Count < maxCount && _available.Wait(0))
+        while (batch.Count < wanted && _available.Wait(0))
         {
             if (!_queue.TryDequeue(out PendingEvaluation? next))
             {
@@ -211,10 +265,11 @@ public sealed class EvolutionSession<TGenome> : IDisposable
         }
         _outstanding.Clear();
 
-        Task? run = _engineRun;
-        if (run is null || run.IsCompleted) ReleaseHandles();
-        else run.ContinueWith(static (_, state) => ((EvolutionSession<TGenome>)state!).ReleaseHandles(),
-            this, CancellationToken.None, TaskContinuationOptions.ExecuteSynchronously, TaskScheduler.Default);
+        if (_engineRun.IsCompleted) ReleaseHandles();
+        else _engineRun.ContinueWith(
+            static (_, state) => ((EvolutionSession<TGenome>)state!).ReleaseHandles(),
+            this, CancellationToken.None, TaskContinuationOptions.ExecuteSynchronously,
+            TaskScheduler.Default);
     }
 
     private void ReleaseHandles()
@@ -237,10 +292,18 @@ public sealed class EvolutionSession<TGenome> : IDisposable
             // already have released, turning a clean cancellation into a fault nobody observes.
             _completion.TrySetCanceled();
         }
+#pragma warning disable CA1031 // Do not catch general exception types
+        // DELIBERATELY GENERAL, and narrowing it would lose the only report. This
+        // runs on a detached background task, so an exception escaping here goes
+        // to TaskScheduler.UnobservedTaskException -- a process-level event the
+        // caller never sees -- while `Completion` hangs forever. Whatever the
+        // engine, the task, or a variation operator threw belongs to the caller,
+        // and this is the only place that can hand it over.
         catch (Exception ex)
         {
             _completion.TrySetException(ex);
         }
+#pragma warning restore CA1031
         finally
         {
             // No further candidates can appear, so a caller blocked in AskAsync must be
@@ -291,15 +354,23 @@ public sealed class EvolutionSession<TGenome> : IDisposable
             TGenome genome,
             CancellationToken cancellationToken = default)
         {
-            // Identity is the genome's own, because the session has no domain knowledge to canonicalize with. A
-            // host that needs semantic deduplication supplies it by canonicalizing before seeding.
+            // Identity comes from the caller, never from ToString. See the
+            // `canonicalIdentity` parameter for why there is no default.
             //
-            // `Guard.NotNull` is not used here: TGenome is unconstrained, so it may be a value type, and the
-            // guard requires a reference type. An explicit comparison covers both without constraining the
-            // type parameter, which would be a breaking change to the engine's own signature.
+            // `Guard.NotNull` is not used for the genome: TGenome is unconstrained, so
+            // it may be a value type, and the guard requires a reference type. An
+            // explicit comparison covers both without constraining the type parameter,
+            // which would be a breaking change to the engine's own signature.
             cancellationToken.ThrowIfCancellationRequested();
             if (genome is null) throw new ArgumentNullException(nameof(genome));
-            string id = genome.ToString() ?? string.Empty;
+
+            string id = _session._identity(genome);
+            if (string.IsNullOrEmpty(id))
+            {
+                throw new InvalidOperationException(
+                    "The canonical identity function returned an empty id; distinct genomes " +
+                    "would be deduplicated into one candidate.");
+            }
             return new ValueTask<EvolutionCanonicalGenome<TGenome>>(
                 new EvolutionCanonicalGenome<TGenome>(genome, id));
         }
