@@ -1,0 +1,264 @@
+using AiDotNet.Evolution;
+using Xunit;
+
+namespace AiDotNet.Evolution.Tests;
+
+/// <summary>
+/// Ask/tell, the inverted way to drive <see cref="EvolutionEngine{TGenome}"/>.
+/// </summary>
+/// <remarks>
+/// <para>
+/// The engine normally owns its loop and calls the task's evaluator. A session turns that inside out so the caller
+/// asks for work and tells the results. Two properties make it worth having and both are load-bearing here: the
+/// engine is not forked, so archives and determinism are unchanged, and nothing calls back across the boundary, so
+/// a native or cross-language host needs no function pointers.
+/// </para>
+/// <para>
+/// THE FAILURE MODE THESE TESTS EXIST FOR IS A HANG. Every path that could leave the engine awaiting a completion
+/// nobody will supply -- disposal with work outstanding, a run that finished while a caller waited, a duplicate
+/// tell -- is exercised with a timeout, because a deadlock in this design does not throw, it simply never returns.
+/// </para>
+/// </remarks>
+public sealed class EvolutionSessionTests
+{
+    /// <summary>A hang here must fail the test rather than wedge the suite.</summary>
+    private static readonly TimeSpan Timeout = TimeSpan.FromSeconds(30);
+
+    [Fact]
+    public async Task AskYieldsTheCandidatesTheEngineProposed()
+    {
+        using var session = NewSession(maxProposals: 4);
+
+        IReadOnlyList<EvolutionAskItem<SessionGenome>> batch = await WithTimeout(session.AskAsync(8));
+
+        Assert.NotEmpty(batch);
+        // Each item carries what an evaluator needs: the genome and the id to report against.
+        Assert.All(batch, item => Assert.True(item.EvaluationId >= 0));
+        Assert.All(batch, item => Assert.NotNull(item.Candidate.CanonicalGenome.Genome));
+        Assert.All(batch, item => Assert.NotNull(item.Context));
+    }
+
+    [Fact]
+    public async Task AFullAskTellLoopDrivesTheRunToCompletion()
+    {
+        // The whole point: the caller owns the loop and evolution still finishes with a populated archive.
+        using var session = NewSession(maxProposals: 24);
+
+        int told = 0;
+        while (!session.IsComplete)
+        {
+            IReadOnlyList<EvolutionAskItem<SessionGenome>> batch = await WithTimeout(session.AskAsync(4));
+            if (batch.Count == 0) break;
+
+            foreach (EvolutionAskItem<SessionGenome> item in batch)
+            {
+                Assert.True(session.Tell(item.EvaluationId, Score(item)));
+                told += 1;
+            }
+        }
+
+        EvolutionRunResult<SessionGenome> result = await WithTimeout(session.Completion);
+
+        Assert.True(told > 0);
+        Assert.NotNull(result);
+        // The archive is the engine's, filled through the ordinary path.
+        Assert.Contains(result.Islands, island => island.Best is not null);
+    }
+
+    [Fact]
+    public async Task AskReturnsAnEmptyBatchOnceTheRunIsOver()
+    {
+        // The completion signal for a host that cannot await a Task -- which is every host reached over a C ABI.
+        using var session = NewSession(maxProposals: 2);
+
+        while (true)
+        {
+            IReadOnlyList<EvolutionAskItem<SessionGenome>> batch = await WithTimeout(session.AskAsync(8));
+            if (batch.Count == 0) break;
+            foreach (EvolutionAskItem<SessionGenome> item in batch)
+                session.Tell(item.EvaluationId, Score(item));
+        }
+
+        await WithTimeout(session.Completion);
+        Assert.True(session.IsComplete);
+        Assert.Empty(await WithTimeout(session.AskAsync(8)));
+    }
+
+    [Fact]
+    public async Task TellRejectsAnUnknownIdAndASecondTellOfTheSameId()
+    {
+        // A duplicate tell is a routine consequence of a host retry, not a programming error, so it reports
+        // false rather than throwing across an ABI that cannot carry an exception.
+        using var session = NewSession(maxProposals: 4);
+        IReadOnlyList<EvolutionAskItem<SessionGenome>> batch = await WithTimeout(session.AskAsync(1));
+        EvolutionAskItem<SessionGenome> item = Assert.Single(batch);
+
+        Assert.False(session.Tell(long.MaxValue, Score(item)));
+        Assert.True(session.Tell(item.EvaluationId, Score(item)));
+        Assert.False(session.Tell(item.EvaluationId, Score(item)));
+    }
+
+    [Fact]
+    public async Task DisposeReleasesWorkTheCallerNeverTold()
+    {
+        // THE DEADLOCK THIS DESIGN COULD HAVE HAD. An outstanding candidate is an engine awaiting a completion;
+        // disposing without failing it would leave the run, and any awaiter of it, hanging forever.
+        var session = NewSession(maxProposals: 8);
+        IReadOnlyList<EvolutionAskItem<SessionGenome>> batch = await WithTimeout(session.AskAsync(4));
+        Assert.NotEmpty(batch);
+
+        session.Dispose();
+
+        // Completes one way or another -- result or cancellation -- but it must not hang.
+        await WithTimeout(Settled(session.Completion));
+    }
+
+    [Fact]
+    public async Task DisposeIsIdempotent()
+    {
+        var session = NewSession(maxProposals: 4);
+        await WithTimeout(session.AskAsync(1));
+        session.Dispose();
+        session.Dispose();
+        Assert.True(true);
+    }
+
+    [Fact]
+    public async Task AskNeverReturnsMoreThanAskedFor()
+    {
+        using var session = NewSession(maxProposals: 32, proposalBatchSize: 8);
+        IReadOnlyList<EvolutionAskItem<SessionGenome>> batch = await WithTimeout(session.AskAsync(2));
+        Assert.InRange(batch.Count, 1, 2);
+    }
+
+    [Fact]
+    public async Task AskRejectsANonPositiveBatchSize()
+    {
+        using var session = NewSession(maxProposals: 4);
+        await Assert.ThrowsAsync<ArgumentOutOfRangeException>(() => session.AskAsync(0));
+        await Assert.ThrowsAsync<ArgumentOutOfRangeException>(() => session.AskAsync(-1));
+    }
+
+    [Fact]
+    public async Task AskObservesTheCallersCancellation()
+    {
+        // A caller waiting for work it will never get must be able to walk away, and must see its OWN
+        // cancellation rather than an empty batch that would read as "the run finished".
+        using var session = NewSession(maxProposals: 4);
+        // Drain the first batch so the next ask has nothing immediately available.
+        IReadOnlyList<EvolutionAskItem<SessionGenome>> first = await WithTimeout(session.AskAsync(64));
+        Assert.NotEmpty(first);
+
+        using var cancellation = new CancellationTokenSource(TimeSpan.FromMilliseconds(150));
+        await Assert.ThrowsAnyAsync<OperationCanceledException>(
+            () => session.AskAsync(1, cancellation.Token));
+    }
+
+    [Fact]
+    public async Task RequestStopEndsTheRunWithoutTellingEverything()
+    {
+        using var session = NewSession(maxProposals: 64);
+        IReadOnlyList<EvolutionAskItem<SessionGenome>> batch = await WithTimeout(session.AskAsync(2));
+        Assert.NotEmpty(batch);
+
+        session.RequestStop();
+        foreach (EvolutionAskItem<SessionGenome> item in batch)
+            session.Tell(item.EvaluationId, Score(item));
+
+        await WithTimeout(Settled(session.Completion));
+        Assert.True(session.IsComplete);
+    }
+
+    [Fact]
+    public async Task ConstructorRejectsNulls()
+    {
+        Assert.Throws<ArgumentNullException>(() =>
+            new EvolutionSession<SessionGenome>(null!, Seeds(2)));
+        Assert.Throws<ArgumentNullException>(() =>
+            new EvolutionSession<SessionGenome>(task => Engine(task, Options(4)), null!));
+        await Task.CompletedTask;
+    }
+
+    // ----------------------------------------------------------------- helpers
+
+    private static EvolutionSession<SessionGenome> NewSession(int maxProposals, int proposalBatchSize = 4) =>
+        new(task => Engine(task, Options(maxProposals, proposalBatchSize)), Seeds(2));
+
+    private static EvolutionEngineOptions Options(int maxProposals, int proposalBatchSize = 4) => new()
+    {
+        RunId = "session-test",
+        Seed = 7UL,
+        MaxProposals = maxProposals,
+        MaxGenerations = 1_000,
+        ProposalBatchSize = proposalBatchSize,
+        CheckpointInterval = 0
+    };
+
+    private static EvolutionEngine<SessionGenome> Engine(IEvolutionTask<SessionGenome> task, EvolutionEngineOptions options) =>
+        new(task, new AddOneVariation(), _ => Archive(), options);
+
+    private static MapElitesArchive<SessionGenome> Archive() => new(new[]
+    {
+        new EvolutionDescriptorDefinition("x", 0, 100, 10, EvolutionOutOfRangePolicy.Clamp)
+    });
+
+    private static SessionGenome[] Seeds(int count) =>
+        Enumerable.Range(1, count).Select(value => new SessionGenome(value)).ToArray();
+
+    private static EvolutionTaskResult Score(EvolutionAskItem<SessionGenome> item)
+    {
+        double value = item.Candidate.CanonicalGenome.Genome.Value;
+        return EvolutionTaskResult.Completed(
+            quality: value,
+            direction: EvolutionOptimizationDirection.Maximize,
+            descriptors: new Dictionary<string, double> { ["x"] = value % 100 });
+    }
+
+    /// <summary>Fails the test on a hang instead of wedging the run.</summary>
+    private static async Task<T> WithTimeout<T>(Task<T> task)
+    {
+        Task completed = await Task.WhenAny(task, Task.Delay(Timeout));
+        Assert.True(ReferenceEquals(completed, task), "timed out waiting for the session");
+        return await task;
+    }
+
+    private static async Task WithTimeout(Task task)
+    {
+        Task completed = await Task.WhenAny(task, Task.Delay(Timeout));
+        Assert.True(ReferenceEquals(completed, task), "timed out waiting for the session");
+        await task;
+    }
+
+    /// <summary>Waits for a task to finish in any terminal state, since cancellation is a valid outcome here.</summary>
+    private static Task Settled(Task task) =>
+        task.ContinueWith(static _ => { }, TaskScheduler.Default);
+
+    /// <summary>Immutable by construction, which the engine requires of any reference genome.</summary>
+    private sealed class SessionGenome : IImmutableEvolutionGenome<SessionGenome>
+    {
+        public SessionGenome(int value) => Value = value;
+
+        /// <summary>A NEW instance: the engine rejects a snapshot that returns itself,
+        /// because retaining the caller's object would let a later mutation reach the archive.</summary>
+        public SessionGenome CreateOwnedSnapshot() => new(Value);
+
+        public int Value { get; }
+
+        public override string ToString() => Value.ToString(System.Globalization.CultureInfo.InvariantCulture);
+    }
+
+    private sealed class AddOneVariation : IVariationOperator<SessionGenome>
+    {
+        public string Id => "add-one";
+
+        public string VersionHash => "add-one-v1";
+
+        public ValueTask<SessionGenome> ProposeAsync(
+            EvolutionVariationContext<SessionGenome> context,
+            CancellationToken cancellationToken = default)
+        {
+            return new ValueTask<SessionGenome>(
+                new SessionGenome(context.Parent.Candidate.CanonicalGenome.Genome.Value + 1));
+        }
+    }
+}
