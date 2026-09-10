@@ -75,7 +75,7 @@ Durable evaluation identities and leases must be developed against its eventual 
 | US-19 model/prompt routing | Not implemented | Consumer routing policy, end-to-end costs, replay and fixed-routing comparisons. |
 | US-20 proposal concurrency | Not implemented | Immutable proposal contexts, bounded scheduling and deterministic policy. |
 | US-21 durable external work | Pending API integration | Run/evaluation/attempt identity, leases, heartbeats, stale results and pending-work persistence. |
-| US-22 centroid archive | Not implemented | Fixed-K archive, centroid identity, routing and deterministic restore. |
+| US-22 centroid archive | Partial | Fixed-K routing, immutable geometry, transactional offline projection and engine/checkpoint coverage implemented; matched common-reference runner available; controlled memory/latency and representative quality confirmation remain. |
 | US-23 warm starts | Not implemented | Applicability-keyed repertoire/evaluation reuse, noisy-sample freshness and fair warm/cold reporting. |
 | US-24 CLI/dashboard | Partial | Numeric CLI only; general configuration, preflight, run lifecycle and local inspection remain. |
 | US-25 promotion/retuning | Partial, companion | Persistent quarantine, retuning/drift policy and program/AutoML deployment registry. |
@@ -83,6 +83,10 @@ Durable evaluation identities and leases must be developed against its eventual 
 
 ## Validation evidence
 
+- Centroid extension: 396 core tests pass on each of net10.0, net8.0 and net471, including 18 centroid contract cases.
+  Fresh net10.0 coverage is 90.60% line / 75.97% branch, above the unchanged ratchet minimum.
+  The matched archive smoke completes eight runs / 256 evaluations with identical replay; equal elite slots are not a
+  claim of equal measured RAM. See [centroid archives](CENTROID_ARCHIVES.md) for geometry and projection boundaries.
 - Core after typed search spaces and checkpoint hardening: 378 tests pass on each of net10.0, net8.0 and net471,
   including 26 outcome/portfolio, 33 resource-accounting and 39 typed-space/emitter tests.
 - Core coverage after typed search spaces: 90.40% line / 75.39% branch; existing ratchet passes (88.80% / 73.51% minimum).

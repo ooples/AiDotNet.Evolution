@@ -66,6 +66,9 @@ jobs:
         run: dotnet run --project benchmarks/AiDotNet.Evolution.Performance -c Release -- --smoke
       - name: Verify paired analysis contracts
         run: python3 -m unittest discover -s benchmarks/analysis -v
+      - name: Verify archive partition accounting and replay
+        shell: pwsh
+        run: ./eng/Test-ArchivePartition.ps1 -SourceRevision '${{ github.sha }}'
       - name: Enforce coverage ratchet
         shell: pwsh
         run: |

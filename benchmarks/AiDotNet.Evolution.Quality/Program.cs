@@ -9,6 +9,7 @@ internal static class Program
 {
     private static async Task<int> Main(string[] args)
     {
+        if (args.Length > 0 && args[0] == "--archive-partition") return await ArchivePartitionPilot.RunAsync(args.Skip(1).ToArray());
         int methodCount = Enum.GetValues<QualityMethod>().Length;
         int taskCount = Enum.GetValues<QualityTask>().Length;
         if (args.Length != 4 || !int.TryParse(args[0], out int seeds) || seeds is < 1 or > 1000 ||
