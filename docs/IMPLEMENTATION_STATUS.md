@@ -68,7 +68,7 @@ Durable evaluation identities and leases must be developed against its eventual 
 | US-12 quality release gates | Partial | Representative measured quality thresholds, confidence and release artifacts. |
 | US-13 typed search spaces | Implemented | Mixed/conditional domains, owned canonical genomes, operators/refinement, checkpointed diagonal CMA and pinned simpler-baseline comparison; no universal-quality claim. |
 | US-14 surrogate assistance | Partial | Cost-metered acquisition, exploration/fallback contracts and a numeric KNN example implemented; production calibration/backends, representative expensive/noisy evidence and durable observation integration remain. |
-| US-15 multi-fidelity | Not implemented | Fidelity/replicate identities, promotions, resource accounting and resumable scheduler. |
+| US-15 multi-fidelity | Partial | Bounded successive-halving bracket, exploration, fidelity/replicate identities, incremental state handoff and fresh full confirmation implemented; real learning-workload integration, durable bracket resume and representative comparisons remain. |
 | US-16 adaptive islands | Not implemented | Resource allocation, heterogeneous policies and checkpointed restarts. |
 | US-17 compiler-guided edits | Partial, companion | Exact source identity and preserved feedback implemented; syntax-aware C# edits, bounded repair, isolation, dependency fingerprints and multi-file evolution remain. |
 | US-18 reusable experience | Not implemented | Provenance-backed retrieval, lessons and calibrated semantic novelty. |
@@ -83,6 +83,13 @@ Durable evaluation identities and leases must be developed against its eventual 
 
 ## Validation evidence
 
+- Multi-fidelity scheduling: 451 core tests pass on each of net10.0, net8.0 and net471, including 13 promotion/state/cost
+  contract cases. Fresh modern-framework coverage is 91.18% line / 76.74% branch; the unchanged ratchet passes.
+  The eight-run example replays exactly and checks 32 measurements, 12 resumed calls, four fresh full-fidelity confirmation
+  calls and 92.08 synthetic work units per run. Tests cover late improvers, incompatible tokens, incomplete/unknown work,
+  confirmation reversing the search ranking and retention of never-dispatched starting candidates. This is one bounded
+  synchronous bracket, not full Hyperband, persistent workers or a real learning-workload speedup claim.
+  See [multi-fidelity scheduling](MULTI_FIDELITY.md) for statistical, state ownership and isolation boundaries.
 - CodeQL follow-up: eight arithmetic/complexity findings are addressed in `3cb89477`; 438 tests still pass on all
   three frameworks and all 240 numeric run records remain unchanged. Fresh net10.0 coverage after the guard refactor
   is 90.86% line / 76.38% branch; the unchanged ratchet passes. Hosted rescan confirmation remains pending.
