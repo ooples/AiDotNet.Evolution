@@ -88,39 +88,26 @@ internal static class Program
                     setSession(HostSession.Open(request.Config));
                     return new Response { Ok = true, Version = Version };
 
+                // Ask and close have bodies rather than expressions, and the .editorconfig
+                // indents a braced case block twice. They are methods instead: the same code,
+                // without the switch growing an extra level of indentation.
                 case "ask":
-                {
-                    if (session is null) return Fail("no run is open");
-                    List<Candidate> candidates =
-                        await session.AskAsync(request.Max <= 0 ? 1 : request.Max, CancellationToken.None)
-                            .ConfigureAwait(false);
-                    return new Response
-                    {
-                        Ok = true,
-                        Candidates = candidates,
-                        Complete = candidates.Count == 0,
-                    };
-                }
+                    return session is null
+                        ? Fail("no run is open")
+                        : await Ask(request, session).ConfigureAwait(false);
 
                 case "tell":
-                {
                     if (session is null) return Fail("no run is open");
                     if (request.Results is null) return Fail("tell needs 'results'");
                     return new Response { Ok = true, Accepted = session.Tell(request.Results) };
-                }
 
                 case "status":
                     if (session is null) return Fail("no run is open");
                     return new Response { Ok = true, Complete = session.IsComplete };
 
                 case "close":
-                {
                     if (session is null) return new Response { Ok = true };
-                    (Candidate? best, string? stopReason) = await session.FinishAsync().ConfigureAwait(false);
-                    session.Dispose();
-                    setSession(null);
-                    return new Response { Ok = true, Best = best, StopReason = stopReason };
-                }
+                    return await Close(session, setSession).ConfigureAwait(false);
 
                 default:
                     return Fail($"unknown op '{request.Op}'");
@@ -136,6 +123,28 @@ internal static class Program
             return Fail($"{ex.GetType().Name}: {ex.Message}");
         }
 #pragma warning restore CA1031
+    }
+
+    private static async Task<Response> Ask(Request request, HostSession session)
+    {
+        List<Candidate> candidates =
+            await session.AskAsync(request.Max <= 0 ? 1 : request.Max, CancellationToken.None).ConfigureAwait(false);
+        return new Response
+        {
+            Ok = true,
+            Candidates = candidates,
+            // An empty batch is the completion signal, so it is stated rather than left for
+            // the client to infer from the array being empty.
+            Complete = candidates.Count == 0,
+        };
+    }
+
+    private static async Task<Response> Close(HostSession session, Action<HostSession?> setSession)
+    {
+        (Candidate? best, string? stopReason) = await session.FinishAsync().ConfigureAwait(false);
+        session.Dispose();
+        setSession(null);
+        return new Response { Ok = true, Best = best, StopReason = stopReason };
     }
 
     private static Response Fail(string error) => new() { Ok = false, Error = error };

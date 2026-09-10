@@ -1,0 +1,106 @@
+name: TypeScript binding
+
+on:
+  push:
+    branches: [main]
+    paths:
+      - 'bindings/typescript/**'
+      - 'src/AiDotNet.Evolution.Host/**'
+      - 'src/AiDotNet.Evolution/**'
+      - '.github/workflows/typescript-binding.yml'
+  pull_request:
+    branches: [main]
+    paths:
+      - 'bindings/typescript/**'
+      - 'src/AiDotNet.Evolution.Host/**'
+      - 'src/AiDotNet.Evolution/**'
+      - '.github/workflows/typescript-binding.yml'
+
+concurrency:
+  group: ${{ github.workflow }}-${{ github.ref }}
+  cancel-in-progress: true
+
+permissions:
+  contents: read
+
+env:
+  DOTNET_SKIP_FIRST_TIME_EXPERIENCE: true
+  DOTNET_CLI_TELEMETRY_OPTOUT: true
+  DOTNET_NOLOGO: true
+
+jobs:
+  host:
+    # ONE JOB PER PLATFORM, NOT A CROSS-COMPILE MATRIX. NativeAOT does not cross-compile:
+    # it invokes the platform linker, so each runtime identifier has to be built on a
+    # runner of that platform. That is also why the binding's own tests run here rather
+    # than in a separate job -- this is the only place a binary for this platform exists.
+    name: ${{ matrix.rid }}
+    runs-on: ${{ matrix.runner }}
+    timeout-minutes: 25
+    strategy:
+      fail-fast: false
+      matrix:
+        include:
+          - rid: win-x64
+            runner: windows-latest
+          - rid: linux-x64
+            runner: ubuntu-latest
+          - rid: osx-arm64
+            runner: macos-14
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+
+      - uses: actions/setup-dotnet@a98b56852c35b8e3190ac28c8c2271da59106c68 # v6.0.0
+        with:
+          dotnet-version: '8.0.x'
+
+      - uses: actions/setup-node@49933ea5288caeca8642d1e84afbd3f7d6820020 # v4
+        with:
+          node-version: '22'
+
+      # The AOT compiler links with the platform toolchain, which is present on the
+      # Windows and macOS images but needs the objcopy/ld pieces installed on Ubuntu.
+      - name: Install the Linux AOT prerequisites
+        if: matrix.rid == 'linux-x64'
+        run: |
+          sudo apt-get update
+          sudo apt-get install --yes clang zlib1g-dev
+
+      - name: Install the binding's dependencies
+        working-directory: bindings/typescript
+        run: npm install
+
+      - name: Publish the NativeAOT host
+        working-directory: bindings/typescript
+        run: npm run host
+
+      - name: Build the binding
+        working-directory: bindings/typescript
+        run: npm run build
+
+      # Runs against the REAL binary published above. Without it the engine tests skip
+      # themselves, so the count is asserted: a silent skip here would turn this whole
+      # job into a build check that proves nothing about behaviour.
+      - name: Test the binding
+        working-directory: bindings/typescript
+        shell: bash
+        run: |
+          npm test 2>&1 | tee test-output.txt
+          # '|| true' because grep exits non-zero on no match, and the shell here runs
+          # with -e: a missing line would abort the step instead of reaching the check.
+          skipped=$(grep -E '^# skipped ' test-output.txt | tr -dc '0-9' || true)
+          if [ "${skipped:-1}" != "0" ]; then
+            echo "::error::${skipped} tests skipped; the engine tests skip when no host binary is found."
+            exit 1
+          fi
+
+      - name: Package the platform binary
+        working-directory: bindings/typescript
+        run: npm run package -- ${{ matrix.rid }}
+
+      - uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02 # v4
+        with:
+          name: evolution-host-${{ matrix.rid }}
+          path: bindings/typescript/packages/${{ matrix.rid }}
+          if-no-files-found: error
+          retention-days: 7

@@ -63,10 +63,18 @@ internal sealed class HostSession : IDisposable
             descriptorNames.Add(descriptor.Name);
         }
 
-        EvolutionOptimizationDirection direction =
-            string.Equals(config.Direction, "minimize", StringComparison.OrdinalIgnoreCase)
-                ? EvolutionOptimizationDirection.Minimize
-                : EvolutionOptimizationDirection.Maximize;
+        // AN UNRECOGNISED DIRECTION IS AN ERROR, not a fallback to Maximize. Falling back
+        // means a client that sent "minimise" or "min" gets a run that optimises the
+        // opposite way and reports success -- the one failure a caller cannot detect from
+        // the results, because a wrong-direction search still returns a plausible genome.
+        EvolutionOptimizationDirection direction;
+        if (string.Equals(config.Direction, "minimize", StringComparison.OrdinalIgnoreCase))
+            direction = EvolutionOptimizationDirection.Minimize;
+        else if (string.Equals(config.Direction, "maximize", StringComparison.OrdinalIgnoreCase))
+            direction = EvolutionOptimizationDirection.Maximize;
+        else
+            throw new ArgumentException(
+                $"config.direction must be 'maximize' or 'minimize', not '{config.Direction}'.");
 
         var options = new EvolutionEngineOptions
         {
@@ -85,7 +93,12 @@ internal sealed class HostSession : IDisposable
             task => new EvolutionEngine<ParameterGenome>(
                 task,
                 new ParameterVariation(),
-                _ => new MapElitesArchive<ParameterGenome>(descriptorDefinitions),
+                // THE ARCHIVE MUST BE TOLD THE DIRECTION TOO. MapElitesArchive defaults to
+                // Maximize and rejects any evaluation whose direction differs from its own,
+                // so a minimizing run built on a defaulted archive inserts nothing, finds no
+                // elites to breed from, and stops after the seed batch with
+                // StopReason.NoCandidates -- a silent empty result, not an error.
+                _ => new MapElitesArchive<ParameterGenome>(descriptorDefinitions, direction),
                 options),
             seeds,
             // The genome's own canonical text, which IS its content rather than a type

@@ -1,6 +1,7 @@
 <Solution>
   <Folder Name="/src/">
     <Project Path="src/AiDotNet.Evolution/AiDotNet.Evolution.csproj" />
+    <Project Path="src/AiDotNet.Evolution.Host/AiDotNet.Evolution.Host.csproj" />
   </Folder>
   <Folder Name="/tests/">
     <Project Path="tests/AiDotNet.Evolution.Tests/AiDotNet.Evolution.Tests.csproj" />
