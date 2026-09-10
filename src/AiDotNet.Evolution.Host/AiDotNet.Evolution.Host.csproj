@@ -1,0 +1,45 @@
+<Project Sdk="Microsoft.NET.Sdk">
+
+  <PropertyGroup>
+    <OutputType>Exe</OutputType>
+    <!--
+      NET8 ONLY, unlike the library's net10/net8/net471 spread. This is a
+      published executable rather than a package: nobody references it, so the
+      only question is which runtime produces the smallest, most portable
+      NativeAOT binary, and net8 is the widest-supported LTS for that.
+    -->
+    <TargetFramework>net8.0</TargetFramework>
+    <ImplicitUsings>enable</ImplicitUsings>
+    <Nullable>enable</Nullable>
+    <LangVersion>latest</LangVersion>
+    <TreatWarningsAsErrors>true</TreatWarningsAsErrors>
+    <Deterministic>true</Deterministic>
+    <AssemblyName>aidotnet-evolution-host</AssemblyName>
+    <RootNamespace>AiDotNet.Evolution.Host</RootNamespace>
+
+    <!--
+      AOT, because the entire point is a binary a TypeScript user can run
+      without installing .NET. Trim and invariant-globalization warnings are
+      errors here for the same reason: a warning that only bites at runtime on
+      somebody else's machine is not a warning worth tolerating.
+    -->
+    <PublishAot>true</PublishAot>
+    <InvariantGlobalization>true</InvariantGlobalization>
+    <TrimmerSingleWarn>false</TrimmerSingleWarn>
+    <IsAotCompatible>true</IsAotCompatible>
+    <StripSymbols>true</StripSymbols>
+
+    <!-- Not a package; it ships as a release artifact. -->
+    <IsPackable>false</IsPackable>
+    <GeneratePackageOnBuild>false</GeneratePackageOnBuild>
+  </PropertyGroup>
+
+  <ItemGroup>
+    <ProjectReference Include="..\AiDotNet.Evolution\AiDotNet.Evolution.csproj" />
+  </ItemGroup>
+
+  <ItemGroup>
+    <InternalsVisibleTo Include="AiDotNet.Evolution.Tests" />
+  </ItemGroup>
+
+</Project>

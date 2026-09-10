@@ -61,6 +61,7 @@ public sealed class EvolutionSession<TGenome> : IDisposable
         new(TaskCreationOptions.RunContinuationsAsynchronously);
 
     private readonly Func<TGenome, string> _identity;
+    private readonly EvolutionEngine<TGenome> _engine;
     private readonly Task _engineRun;
     private int _disposed;
 
@@ -99,10 +100,10 @@ public sealed class EvolutionSession<TGenome> : IDisposable
         _identity = canonicalIdentity;
         TGenome[] seeds = MaterializeSeeds(initialGenomes);
         var task = new QueueingTask(this);
-        EvolutionEngine<TGenome> engine = engineFactory(task)
+        _engine = engineFactory(task)
             ?? throw new ArgumentException("The engine factory returned null.", nameof(engineFactory));
 
-        _engineRun = RunEngineAsync(engine, seeds);
+        _engineRun = RunEngineAsync(_engine, seeds);
     }
 
     /// <summary>Largest seed set accepted, so an endless sequence cannot hang construction.</summary>
@@ -151,7 +152,68 @@ public sealed class EvolutionSession<TGenome> : IDisposable
     public Task<EvolutionRunResult<TGenome>> Completion => _completion.Task;
 
     /// <summary>Requests that the engine stop at the next batch boundary, keeping results found so far.</summary>
-    public void RequestStop() => _cancellation.Cancel();
+    /// <remarks>
+    /// <para>
+    /// GRACEFUL, NOT CANCELLATION, and the difference is the whole value of calling it.
+    /// The engine distinguishes the two deliberately: <see cref="EvolutionEngine{TGenome}.RequestStop"/>
+    /// lets the current batch commit and returns a normal result whose archives hold
+    /// everything found, while cancelling the token ends the run immediately and the
+    /// caller gets an <see cref="OperationCanceledException"/> and nothing else.
+    /// </para>
+    /// <para>
+    /// The first version of this method cancelled, which collapsed the two into the
+    /// destructive one. It was caught by driving a real run from the host binary: a
+    /// client that asked to stop and read the best genome found got
+    /// <c>stopReason: "canceled"</c> and no result at all -- the archive was discarded
+    /// at the moment the caller asked to see it.
+    /// </para>
+    /// <para>
+    /// Outstanding evaluations are failed as part of stopping. The engine cannot
+    /// commit a batch while it is still awaiting one, so a graceful stop with work
+    /// outstanding would otherwise wait for results the caller has already decided not
+    /// to produce.
+    /// </para>
+    /// </remarks>
+    public void RequestStop()
+    {
+        _engine.RequestStop();
+        FailOutstanding("stop_requested", "The session was asked to stop before this candidate was told.");
+        // Release anyone blocked in AskAsync: no further candidates are coming.
+        if (!_closed.IsCancellationRequested) _closed.Cancel();
+    }
+
+    /// <summary>Ends the run immediately, discarding whatever the current batch held.</summary>
+    /// <remarks>
+    /// The counterpart to <see cref="RequestStop"/>, for when the work must end now and
+    /// the results do not matter -- a shutting-down process, a cancelled request.
+    /// <see cref="Completion"/> is canceled rather than returning a run result.
+    /// </remarks>
+    public void Abort()
+    {
+        _cancellation.Cancel();
+        FailOutstanding("aborted", "The session was aborted before this candidate was told.");
+    }
+
+    /// <summary>Completes every evaluation the engine is waiting on, asked for or not.</summary>
+    /// <remarks>
+    /// BOTH COLLECTIONS, and missing the second one deadlocked a graceful stop. A candidate
+    /// the engine has proposed sits in `_queue` until a caller asks for it, and only then
+    /// moves to `_outstanding`. Failing just the asked ones therefore leaves the engine
+    /// awaiting completions for everything it proposed and nobody collected -- so the batch
+    /// never commits, the stop flag is never observed, and `Completion` never settles.
+    /// Found by driving a real run from the host binary and watching `close` hang.
+    /// </remarks>
+    private void FailOutstanding(string code, string message)
+    {
+        EvolutionTaskResult failure = EvolutionTaskResult.Failed(code, message);
+
+        while (_queue.TryDequeue(out PendingEvaluation? queued))
+            queued.Completion.TrySetResult(failure);
+
+        foreach (KeyValuePair<long, PendingEvaluation> entry in _outstanding)
+            entry.Value.Completion.TrySetResult(failure);
+        _outstanding.Clear();
+    }
 
     /// <summary>Waits for up to <paramref name="maxCount"/> candidates that need evaluation.</summary>
     /// <param name="maxCount">The largest batch to return. Must be positive.</param>
@@ -258,12 +320,9 @@ public sealed class EvolutionSession<TGenome> : IDisposable
 
         // Anything the caller never told would otherwise leave the engine awaiting forever, and with it the task
         // this session hands back.
-        foreach (KeyValuePair<long, PendingEvaluation> entry in _outstanding)
-        {
-            entry.Value.Completion.TrySetResult(
-                EvolutionTaskResult.Failed("session_disposed", "The evolution session was disposed before this candidate was told."));
-        }
-        _outstanding.Clear();
+        FailOutstanding(
+            "session_disposed",
+            "The evolution session was disposed before this candidate was told.");
 
         if (_engineRun.IsCompleted) ReleaseHandles();
         else _engineRun.ContinueWith(

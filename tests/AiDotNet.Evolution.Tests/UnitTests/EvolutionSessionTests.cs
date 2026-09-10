@@ -155,18 +155,68 @@ public sealed class EvolutionSessionTests
     }
 
     [Fact]
-    public async Task RequestStopEndsTheRunWithoutTellingEverything()
+    public async Task RequestStopKeepsTheResultsFoundSoFar()
     {
+        // GRACEFUL, NOT CANCELLATION. The engine distinguishes the two deliberately:
+        // a requested stop commits the current batch and returns a normal result whose
+        // archives hold everything found, where cancelling throws and yields nothing.
+        // The first version of RequestStop cancelled, so a caller who asked to stop and
+        // read the best genome got an OperationCanceledException at the moment they
+        // asked to see it.
         using var session = NewSession(maxProposals: 64);
-        IReadOnlyList<EvolutionAskItem<SessionGenome>> batch = await WithTimeout(session.AskAsync(2));
-        Assert.NotEmpty(batch);
+
+        int told = 0;
+        while (told < 4)
+        {
+            IReadOnlyList<EvolutionAskItem<SessionGenome>> batch =
+                await WithTimeout(session.AskAsync(4));
+            if (batch.Count == 0) break;
+            foreach (EvolutionAskItem<SessionGenome> item in batch)
+            {
+                session.Tell(item.EvaluationId, Score(item));
+                told += 1;
+            }
+        }
 
         session.RequestStop();
-        foreach (EvolutionAskItem<SessionGenome> item in batch)
-            session.Tell(item.EvaluationId, Score(item));
+
+        EvolutionRunResult<SessionGenome> result = await WithTimeout(session.Completion);
+        Assert.Equal(EvolutionStopReason.Canceled, result.StopReason);
+        Assert.Contains(result.Islands, island => island.Best is not null);
+    }
+
+    [Fact]
+    public async Task RequestStopDoesNotHangOnCandidatesNobodyAskedFor()
+    {
+        // THE DEADLOCK THIS FOUND. A candidate the engine proposed sits in the queue
+        // until a caller asks for it, and only then becomes 'outstanding'. Failing just
+        // the asked ones left the engine awaiting completions for everything it had
+        // proposed and nobody collected, so the batch never committed and the stop flag
+        // was never observed. Stopping without asking for anything at all is the
+        // sharpest form of that.
+        using var session = NewSession(maxProposals: 64);
+
+        session.RequestStop();
 
         await WithTimeout(Settled(session.Completion));
         Assert.True(session.IsComplete);
+    }
+
+    [Fact]
+    public async Task AbortEndsTheRunImmediatelyAndDiscardsIt()
+    {
+        // The counterpart: when the work must end now and the results do not matter,
+        // Completion is canceled rather than returning a run result.
+        using var session = NewSession(maxProposals: 64);
+        await WithTimeout(session.AskAsync(2));
+
+        session.Abort();
+
+        await WithTimeout(Settled(session.Completion));
+        // `IsCompletedSuccessfully` does not exist on net471's Task<T>; Status does.
+        Assert.True(
+            session.Completion.Status is TaskStatus.Canceled or TaskStatus.RanToCompletion,
+            $"unexpected status {session.Completion.Status}");
     }
 
     [Fact]
