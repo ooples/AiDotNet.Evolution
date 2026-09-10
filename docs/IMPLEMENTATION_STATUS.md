@@ -87,6 +87,8 @@ Durable evaluation identities and leases must be developed against its eventual 
   Fresh net10.0 coverage is 90.60% line / 75.97% branch, above the unchanged ratchet minimum.
   The matched archive smoke completes eight runs / 256 evaluations with identical replay; equal elite slots are not a
   claim of equal measured RAM. See [centroid archives](CENTROID_ARCHIVES.md) for geometry and projection boundaries.
+  The [pinned archive pilot](benchmarks/ARCHIVE_PARTITION_PILOT.md) completes 40 runs / 10,240 calls: centroid median
+  loss/reference utility improves on the two fixtures, while mean reference occupancy does not. No confirmation claim.
 - Core after typed search spaces and checkpoint hardening: 378 tests pass on each of net10.0, net8.0 and net471,
   including 26 outcome/portfolio, 33 resource-accounting and 39 typed-space/emitter tests.
 - Core coverage after typed search spaces: 90.40% line / 75.39% branch; existing ratchet passes (88.80% / 73.51% minimum).
