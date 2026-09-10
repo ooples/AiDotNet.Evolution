@@ -26,13 +26,13 @@ for every evaluator call, including initialization; failed or incomplete runs re
 
 ## Companion work and integration boundaries
 
-AiDotNet companion: an explicit correctness-before-fitness evaluator and preservation of metrics/artifacts during
+[AiDotNet companion PR #2148](https://github.com/ooples/AiDotNet/pull/2148): an explicit correctness-before-fitness evaluator and preservation of metrics/artifacts during
 program descriptor merging. The latter changes future repair feedback, so the program-task semantic version is bumped.
 The existing [package migration PR #2092](https://github.com/ooples/AiDotNet/pull/2092) is independent and must be
 reconciled before treating the new core portfolio as available through AiDotNet's facade. No copied engine changes
 are introduced by this companion.
 
-AiDotNet.Tensors companion: compare-and-deactivate of an observed kernel deployment, enabling built-in fallback
+[AiDotNet.Tensors companion PR #1024](https://github.com/ooples/AiDotNet.Tensors/pull/1024): compare-and-deactivate of an observed kernel deployment, enabling built-in fallback
 without allowing stale runtime evidence to remove a newer snapshot. This adds to the validated promotion machinery
 already present on Tensors `main` at `67ceb6ed`; it is not a new promotion system. Deactivation is in-memory only,
 not a persistent quarantine, cancellation of in-flight work, or automatic performance-drift detector.
@@ -78,12 +78,15 @@ Durable evaluation identities and leases must be developed against its eventual 
 - Core: 306 tests pass on each of net10.0, net8.0 and net471, including 26 new outcome/portfolio tests.
 - Core coverage: 89.13% line / 73.85% branch; existing ratchet passes (88.80% / 73.51% minimum).
   These are not improvements over the stored baseline. Do not lower the baseline to accommodate the feature.
-- Harness: initial four-method smoke passed 32 runs / 1,024 calls per replay; the added uniform-allocation control
-  expands the required smoke to 40 runs / 1,280 calls. Initial repeated JSON is byte-identical, paired starting populations
+- Harness: five-method smoke passes 40 runs / 1,280 calls per replay. Repeated JSON is byte-identical, paired starting populations
   match, costs reconcile, and best-so-far curves are monotonic. This is an accounting/replay smoke test, not a
   statistically powered quality comparison.
 - Tensors: 22 targeted autotuning tests pass on net10.0, including three new deployment deactivation tests.
-- AiDotNet companion and hosted CI: validation still in progress; do not mark ready based on the core tests.
+- AiDotNet companion: 1,006 UnitTests.Evolution tests pass on net10.0, including 15 new gate/metadata tests.
+- [Development pilot](benchmarks/NUMERIC_PILOT.md): 200 runs / 51,200 calls, no failures. Adaptation beats the
+  same-operator uniform control on median loss here, but hill climbing beats both on every task's median loss.
+  Adaptation remains opt-in; this is not representative or statistically confirmed superiority.
+- Hosted CI is queued/pending, and draft PRs have not received independent review. No merge-readiness claim.
 
 ## Experiment access policy
 
