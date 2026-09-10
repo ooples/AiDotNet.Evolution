@@ -59,7 +59,7 @@ Durable evaluation identities and leases must be developed against its eventual 
 | US-03 correctness gates | Partial, companion | Trusted sandbox/reference integrations and held-out validation; wrapper alone is not proof of correctness. |
 | US-04 statistical evidence | Partial | Paired task/run analysis, failure-inclusive effects/intervals and trace checks implemented; prospective sample-size/power design and representative confirmation remain. |
 | US-05 resource ledger | Partial | Generic ledger, stage helper and evaluator/cascade adapter implemented; consumer model/compiler/setup integrations and deterministic concurrent admission remain. |
-| US-06 noisy evaluation | Not implemented | Independent replicates, uncertainty, resampling and cascade rejection audit. |
+| US-06 noisy evaluation | Partial | Fresh bounded replicate runner, per-sample costs, finite-look uncertainty and separate confirmation identities implemented; archive resampling policy, cascade-rejection audit and representative noisy comparisons remain. |
 | US-07 ablations | Partial | Same-operator uniform/adaptive allocation is available; representative island, migration, novelty and dispatch ablations remain. |
 | US-08 adaptive operators | Partial | Marginal-gain reward options, end-to-end cost credit, realistic benchmark validation. |
 | US-09 Pareto pipeline | Not implemented | Feasibility, objective definitions, archive/snapshot/selection/stopping/migration semantics together. |
@@ -83,6 +83,11 @@ Durable evaluation identities and leases must be developed against its eventual 
 
 ## Validation evidence
 
+- Fresh replication extension: 418 core tests pass on each of net10.0, net8.0 and net471, including 22 replication cases.
+  Fresh net10.0 coverage is 90.77% line / 76.23% branch. The deterministic example verifies 64 fresh dispatches/charges,
+  distinct search/confirmation identities and exact replay. Numerical regressions cover wide support, tiny variance,
+  large offsets and subnormal interval bounds. See [replicated evaluation](REPLICATED_EVALUATION.md) for the required
+  known bounds/IID assumptions and why batch confidence is not population-wide selection confidence.
 - Centroid extension: 396 core tests pass on each of net10.0, net8.0 and net471, including 18 centroid contract cases.
   Fresh net10.0 coverage is 90.60% line / 75.97% branch, above the unchanged ratchet minimum.
   The matched archive smoke completes eight runs / 256 evaluations with identical replay; equal elite slots are not a
@@ -100,12 +105,14 @@ Durable evaluation identities and leases must be developed against its eventual 
   sizes, including unchanged state on restore. BenchmarkDotNet Dry runs completed nine archive, 32 engine and nine checkpoint cases;
   these are execution checks under local development load, not timing baselines or speedup evidence.
 - Tensors: 22 targeted autotuning tests pass on net10.0, including three new deployment deactivation tests.
-- AiDotNet companion: 1,040 tests pass on net10.0 (1,018 UnitTests.Evolution tests and 22 facade integration tests),
-  including 15 new gate/metadata tests, three facade checks and 12 source-identity/proposal/output tests. Six identity
-  regressions first failed against the old library. Fresh scoped coverage passes the same selection: the correctness
+- AiDotNet companion: 1,042 tests pass separately on net10.0 and net8.0 (1,020 UnitTests.Evolution tests and 22 facade integration tests),
+  including 15 new gate/metadata tests, three facade checks, 12 source-identity/proposal/output tests and two malformed-source
+  retry tests. Six identity regressions first failed against the old library. Earlier scoped coverage passed the 1,040-test selection: the correctness
   decorator, genome codec and new Unicode validation method have 100% line/branch coverage. The `ProgramGenome` class
-  has 98.24% line / 91.66% branch coverage. These are not whole-repository coverage figures. A net8.0 compatibility
-  build ended with compiler exit -1 and is under investigation; no compatibility-build success is claimed yet.
+  has 98.24% line / 91.66% branch coverage. These are not whole-repository coverage figures. Final local net10/net8
+  builds disabled diagnostic analyzers and used unchanged dependency assemblies; they do not establish full analyzer
+  or net471 compatibility. The earlier compiler exit -1 has no established root cause. Interface/checkpoint migration
+  notes and bounded malformed-source retry handling address the latest review; current-head approval remains pending.
 - [Paired analysis](benchmarks/analysis-d62d5cb/report.md): 14 Python contract tests pass. Retrospective reporting retains every scheduled run, marks unknown
   work and incomplete curves, and resamples paired seeds within tasks. The pinned CMA-versus-hill-climbing adjusted
   utility-difference interval crosses zero; the pilot is not evidence for promoting CMA as a universal default.

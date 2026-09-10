@@ -4,6 +4,7 @@
     <Project Path="benchmarks/AiDotNet.Evolution.Quality/AiDotNet.Evolution.Quality.csproj" />
   </Folder>
   <Folder Name="/examples/">
+    <Project Path="examples/ReplicatedEvaluation/ReplicatedEvaluation.csproj" />
     <Project Path="examples/TypedParameterSearch/TypedParameterSearch.csproj" />
   </Folder>
   <Folder Name="/src/">
