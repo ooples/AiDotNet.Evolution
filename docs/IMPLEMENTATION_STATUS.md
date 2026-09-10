@@ -85,10 +85,13 @@ Durable evaluation identities and leases must be developed against its eventual 
 - Tensors: 22 targeted autotuning tests pass on net10.0, including three new deployment deactivation tests.
 - AiDotNet companion: 1,028 tests pass on net10.0 (1,006 UnitTests.Evolution tests and 22 facade integration tests),
   including 15 new gate/metadata tests and three new facade checks.
+  The same selection passes under coverage: the correctness decorator and new configuration method have 100% line/branch
+  coverage; `ProgramEvolutionTask` has 97.56% line / 100% branch coverage. These scoped figures are not whole-repository coverage.
 - [Development pilot](benchmarks/NUMERIC_PILOT.md): 200 runs / 51,200 calls, no failures. Adaptation beats the
   same-operator uniform control on median loss here, but hill climbing beats both on every task's median loss.
   Adaptation remains opt-in; this is not representative or statistically confirmed superiority.
-- Hosted CI is queued/pending. AiDotNet's automated review requested facade integration; the follow-up hides the
+- Hosted checks remain unvalidated: Evolution/AiDotNet checks are queued, and the Tensors runs were cancelled.
+  AiDotNet's automated review requested facade integration; the follow-up hides the
   implementation and adds builder-level tests. Current-head approval is still pending. All PRs remain drafts;
   no merge-readiness claim.
 
