@@ -9,6 +9,8 @@ namespace AiDotNet.Evolution;
 /// Cascade screens remain charged even if the engine refunds its evaluation-attempt counter. Cache hits never invoke
 /// this adapter. Restore the ledger with the matching engine checkpoint; restarting an engine from an older checkpoint
 /// cannot safely reuse already-spent operation identities. Producers must enforce declared maxima and isolation.
+/// Missing/unrepresentable receipts retain conservative engine-visible costs and cannot produce a successful candidate.
+/// A producer maximum violation retains its actual charge and fails that evaluation, not only subsequent admission.
 /// </remarks>
 public sealed class ResourceMeteredEvolutionTask<TGenome> : ICascadeEvolutionTask<TGenome>
 {
@@ -30,7 +32,7 @@ public sealed class ResourceMeteredEvolutionTask<TGenome> : ICascadeEvolutionTas
             throw new ArgumentException("Supply a bounded maximum for every evaluation stage.", nameof(maximumStageCostUnits));
         if (!ledger.Limits.Amounts.ContainsKey("cost_units")) throw new ArgumentException("The ledger must declare cost_units.", nameof(ledger));
         Guard.NotNullOrWhiteSpace(inner.Id); Guard.NotNullOrWhiteSpace(inner.VersionHash); Guard.NotNullOrWhiteSpace(inner.EvaluatorVersionHash);
-        VersionHash = EvolutionHash.Combine(new[] { "resource-metered-task-v1", inner.Id, inner.VersionHash, inner.EvaluatorVersionHash }
+        VersionHash = EvolutionHash.Combine(new[] { "resource-metered-task-v2-fail-closed-costs", inner.Id, inner.VersionHash, inner.EvaluatorVersionHash }
             .Concat(_maxima.Select(value => value.ToString(CultureInfo.InvariantCulture))));
     }
     /// <inheritdoc/>
@@ -63,31 +65,54 @@ public sealed class ResourceMeteredEvolutionTask<TGenome> : ICascadeEvolutionTas
         EvolutionResources reserved = EvolutionResources.Of("cost_units", maximum);
         string operation = "evaluation/" + context.EvaluationId.ToString(CultureInfo.InvariantCulture) + "/attempt/" +
             context.AttemptCount.ToString(CultureInfo.InvariantCulture) + "/stage/" + stage.ToString(CultureInfo.InvariantCulture);
-        try
-        {
-            return await EvolutionResourceWork.RunAsync(_ledger, operation,
-                stage >= 0 && stage < StageCount - 1 ? EvolutionResourceStage.Screening : EvolutionResourceStage.Evaluation,
-                reserved, reserved, async token =>
-                {
-                    EvolutionTaskResult result = stage >= 0 && _inner is ICascadeEvolutionTask<TGenome> cascade
-                        ? await cascade.EvaluateStageAsync(stage, candidate, context, token).ConfigureAwait(false)
-                        : await _inner.EvaluateAsync(candidate, context, token).ConfigureAwait(false);
-                    if (result is null) throw new InvalidOperationException("The evaluator returned no receipt.");
-                    var actual = EvolutionResources.Of("cost_units", checked((decimal)result.CostUnits));
-                    EvolutionResourceOutcome outcome = result.Status switch
-                    {
-                        EvolutionEvaluationStatus.Completed => EvolutionResourceOutcome.Completed,
-                        EvolutionEvaluationStatus.Rejected or EvolutionEvaluationStatus.Skipped or EvolutionEvaluationStatus.Duplicate => EvolutionResourceOutcome.Rejected,
-                        EvolutionEvaluationStatus.Canceled => EvolutionResourceOutcome.Canceled,
-                        _ => EvolutionResourceOutcome.Failed
-                    };
-                    return new EvolutionResourceResult<EvolutionTaskResult>(result, actual, outcome);
-                }, context.AttemptCount, cancellationToken).ConfigureAwait(false);
-        }
-        catch (EvolutionResourceBudgetException)
-        {
+        cancellationToken.ThrowIfCancellationRequested();
+        using EvolutionResourceReservation? reservation = _ledger.TryReserve(operation,
+            stage >= 0 && stage < StageCount - 1 ? EvolutionResourceStage.Screening : EvolutionResourceStage.Evaluation,
+            reserved, reserved, context.AttemptCount);
+        if (reservation is null)
             return new EvolutionTaskResult(EvolutionEvaluationStatus.Skipped,
                 diagnostics: new[] { new EvolutionDiagnostic("resource_budget_reached", "Evaluation was not dispatched because its resource reservation was denied.") });
+        EvolutionTaskResult result;
+        try
+        {
+            result = (stage >= 0 && _inner is ICascadeEvolutionTask<TGenome> cascade
+                ? await cascade.EvaluateStageAsync(stage, candidate, context, cancellationToken).ConfigureAwait(false)
+                : await _inner.EvaluateAsync(candidate, context, cancellationToken).ConfigureAwait(false))
+                ?? throw new InvalidOperationException("The evaluator returned no receipt.");
         }
+        catch (Exception exception) when (EvolutionExceptionPolicy.IsRecoverable(exception))
+        {
+            // This boundary is after dispatch, including a nested producer's budget exception.
+            reservation.Dispose();
+            return new EvolutionTaskResult(exception is OperationCanceledException ? EvolutionEvaluationStatus.Canceled : EvolutionEvaluationStatus.Failed,
+                costUnits: (double)maximum, diagnostics: new[] { new EvolutionDiagnostic("resource_cost_unknown",
+                    "Dispatched evaluation returned no usable receipt; its reserved maximum was charged conservatively.") });
+        }
+        if (result.CostUnits > (double)EvolutionResources.MaximumAmount || (result.CostUnits > 0 && (decimal)result.CostUnits == 0))
+        {
+            reservation.Dispose();
+            return InvalidReceipt(result, (double)maximum, "resource_cost_unrepresentable",
+                "Reported cost " + result.CostUnits.ToString("G17", CultureInfo.InvariantCulture) + " cannot be represented by the ledger; charged reserved maximum as unknown.");
+        }
+        decimal actualCost = (decimal)result.CostUnits;
+        if (actualCost > maximum)
+        {
+            reservation.Complete(EvolutionResources.Of("cost_units", actualCost), EvolutionResourceOutcome.Failed);
+            return InvalidReceipt(result, result.CostUnits, "resource_maximum_exceeded", "The evaluator exceeded its declared maximum; actual cost is retained but promotion is refused.");
+        }
+        EvolutionResourceOutcome outcome = result.Status switch
+        {
+            EvolutionEvaluationStatus.Completed => EvolutionResourceOutcome.Completed,
+            EvolutionEvaluationStatus.Rejected or EvolutionEvaluationStatus.Skipped or EvolutionEvaluationStatus.Duplicate => EvolutionResourceOutcome.Rejected,
+            EvolutionEvaluationStatus.Canceled => EvolutionResourceOutcome.Canceled,
+            _ => EvolutionResourceOutcome.Failed
+        };
+        reservation.Complete(EvolutionResources.Of("cost_units", actualCost), outcome);
+        return result;
     }
+
+    private static EvolutionTaskResult InvalidReceipt(EvolutionTaskResult result, double chargedCost, string code, string message) =>
+        new(EvolutionEvaluationStatus.Failed, result.Quality, result.Direction, result.Descriptors, result.Objectives,
+            result.ConstraintViolations, chargedCost,
+            new[] { new EvolutionDiagnostic(code, message) }.Concat(result.Diagnostics).Take(EvolutionTaskResult.MaximumDiagnostics), result.Metrics, result.Artifacts);
 }

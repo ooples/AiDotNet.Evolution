@@ -58,6 +58,15 @@ model code, compilation, canonicalization, setup, or refinement; those producers
 need declared caps. Token and currency conversion, wall-time measurement, hard process isolation and transport-specific
 limits remain consumer responsibilities. Rejected reservations do not invoke the producer.
 
+The task adapter distinguishes **its own pre-dispatch denial** from an exception thrown inside a dispatched producer.
+Missing receipts become failed/cancelled outcomes with conservative maximum costs visible to both the ledger and engine;
+successful retries retain those prior-attempt costs and the `resource_cost_unknown` diagnostic. A positive double cost
+that rounds to decimal zero, or a cost above the ledger's representable bound, fails closed, charges the maximum as unknown
+and retains the reported value in a diagnostic. A representable maximum overrun retains its actual cost and fails that
+candidate's evaluation. Neither case can silently become a successful free candidate. Fatal runtime exceptions still
+propagate after conservative settlement. This changes the adapter semantic version to `resource-metered-task-v2-fail-closed-costs`;
+old adapter checkpoints are intentionally incompatible. Ordinary in-bound numeric fixture receipts are unchanged.
+
 Concurrent reservations are serialized in arrival order. For reproducible cutoff decisions, reserve in a predetermined
 dispatch order or use a fixed single-worker campaign. Worker-timing-dependent admission must not be claimed to have the
 same deterministic guarantees as an unconstrained evaluator. The numeric harness fixes one worker and exact unit costs.

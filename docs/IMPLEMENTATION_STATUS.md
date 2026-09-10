@@ -83,6 +83,12 @@ Durable evaluation identities and leases must be developed against its eventual 
 
 ## Validation evidence
 
+- Evaluator receipt hardening: six new cases bring the core suite to 457 passing tests on each target framework.
+  Four regressions first failed: a positive cost rounding to zero, lost engine-visible unrepresentable cost, a nested
+  budget exception mislabeled as preflight denial, and a declared maximum overrun remaining promotable. The adapter
+  now fails closed, keeps actual/conservative attempt totals and preserves unknown-cost diagnostics through retries.
+  Simulated fatal errors still propagate after settlement. Fresh modern coverage is 91.20% line / 76.77% branch.
+  The adapter semantic version changes intentionally; old checkpoints are incompatible. See [resource accounting](RESOURCE_ACCOUNTING.md).
 - Multi-fidelity scheduling: 451 core tests pass on each of net10.0, net8.0 and net471, including 13 promotion/state/cost
   contract cases. Fresh modern-framework coverage is 91.18% line / 76.74% branch; the unchanged ratchet passes.
   The eight-run example replays exactly and checks 32 measurements, 12 resumed calls, four fresh full-fidelity confirmation
