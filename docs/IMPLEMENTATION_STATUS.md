@@ -57,7 +57,7 @@ Durable evaluation identities and leases must be developed against its eventual 
 | US-01 representative suites | Partial | Real program/kernel/AutoML tasks, AlgoTune subset, sealed task partitions. |
 | US-02 fair baselines | Partial | Matched OpenEvolve and other external adapters; stronger numeric baselines; consistent model access. |
 | US-03 correctness gates | Partial, companion | Trusted sandbox/reference integrations and held-out validation; wrapper alone is not proof of correctness. |
-| US-04 statistical evidence | Partial | Nested task/run uncertainty, effect sizes, preregistered sample plans and comparison reports. |
+| US-04 statistical evidence | Partial | Paired task/run analysis, failure-inclusive effects/intervals and trace checks implemented; prospective sample-size/power design and representative confirmation remain. |
 | US-05 resource ledger | Partial | Generic ledger, stage helper and evaluator/cascade adapter implemented; consumer model/compiler/setup integrations and deterministic concurrent admission remain. |
 | US-06 noisy evaluation | Not implemented | Independent replicates, uncertainty, resampling and cascade rejection audit. |
 | US-07 ablations | Partial | Same-operator uniform/adaptive allocation is available; representative island, migration, novelty and dispatch ablations remain. |
@@ -70,7 +70,7 @@ Durable evaluation identities and leases must be developed against its eventual 
 | US-14 surrogate assistance | Not implemented | Uncertainty-aware ranking, exploration and evaluated-only archive admission. |
 | US-15 multi-fidelity | Not implemented | Fidelity/replicate identities, promotions, resource accounting and resumable scheduler. |
 | US-16 adaptive islands | Not implemented | Resource allocation, heterogeneous policies and checkpointed restarts. |
-| US-17 compiler-guided edits | Not implemented | Syntax-aware C# edits, bounded repair, isolation and multi-file evolution. |
+| US-17 compiler-guided edits | Partial, companion | Exact source identity and preserved feedback implemented; syntax-aware C# edits, bounded repair, isolation, dependency fingerprints and multi-file evolution remain. |
 | US-18 reusable experience | Not implemented | Provenance-backed retrieval, lessons and calibrated semantic novelty. |
 | US-19 model/prompt routing | Not implemented | Consumer routing policy, end-to-end costs, replay and fixed-routing comparisons. |
 | US-20 proposal concurrency | Not implemented | Immutable proposal contexts, bounded scheduling and deterministic policy. |
@@ -91,13 +91,18 @@ Durable evaluation identities and leases must be developed against its eventual 
   match, costs reconcile, and best-so-far curves are monotonic. This is an accounting/replay smoke test, not a
   statistically powered quality comparison.
 - Performance fixture smoke verifies 16 engine configurations, three occupied archive sizes and three real checkpoint
-  sizes, including unchanged state on restore. BenchmarkDotNet Dry runs completed nine archive and 32 engine cases;
+  sizes, including unchanged state on restore. BenchmarkDotNet Dry runs completed nine archive, 32 engine and nine checkpoint cases;
   these are execution checks under local development load, not timing baselines or speedup evidence.
 - Tensors: 22 targeted autotuning tests pass on net10.0, including three new deployment deactivation tests.
-- AiDotNet companion: 1,028 tests pass on net10.0 (1,006 UnitTests.Evolution tests and 22 facade integration tests),
-  including 15 new gate/metadata tests and three new facade checks.
-  The same selection passes under coverage: the correctness decorator and new configuration method have 100% line/branch
-  coverage; `ProgramEvolutionTask` has 97.56% line / 100% branch coverage. These scoped figures are not whole-repository coverage.
+- AiDotNet companion: 1,040 tests pass on net10.0 (1,018 UnitTests.Evolution tests and 22 facade integration tests),
+  including 15 new gate/metadata tests, three facade checks and 12 source-identity/proposal/output tests. Six identity
+  regressions first failed against the old library. Fresh scoped coverage passes the same selection: the correctness
+  decorator, genome codec and new Unicode validation method have 100% line/branch coverage. The `ProgramGenome` class
+  has 98.24% line / 91.66% branch coverage. These are not whole-repository coverage figures. A net8.0 compatibility
+  build ended with compiler exit -1 and is under investigation; no compatibility-build success is claimed yet.
+- [Paired analysis](benchmarks/analysis-d62d5cb/report.md): 14 Python contract tests pass. Retrospective reporting retains every scheduled run, marks unknown
+  work and incomplete curves, and resamples paired seeds within tasks. The pinned CMA-versus-hill-climbing adjusted
+  utility-difference interval crosses zero; the pilot is not evidence for promoting CMA as a universal default.
 - [Development pilot](benchmarks/NUMERIC_PILOT.md): 200 runs / 51,200 calls, no failures. Adaptation beats the
   same-operator uniform control on median loss here, but hill climbing beats both on every task's median loss.
   Adaptation remains opt-in; this is not representative or statistically confirmed superiority.

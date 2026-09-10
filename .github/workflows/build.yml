@@ -64,6 +64,8 @@ jobs:
         run: ./eng/Test-TypedSearch.ps1
       - name: Verify performance fixture contracts
         run: dotnet run --project benchmarks/AiDotNet.Evolution.Performance -c Release -- --smoke
+      - name: Verify paired analysis contracts
+        run: python3 -m unittest discover -s benchmarks/analysis -v
       - name: Enforce coverage ratchet
         shell: pwsh
         run: |
