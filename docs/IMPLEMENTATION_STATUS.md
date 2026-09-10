@@ -66,7 +66,7 @@ Durable evaluation identities and leases must be developed against its eventual 
 | US-10 engine performance | Not implemented | BenchmarkDotNet throughput/allocation/scaling suite and regression thresholds. |
 | US-11 application examples | Not implemented | End-to-end program, AutoML, kernel and external-session examples. |
 | US-12 quality release gates | Partial | Representative measured quality thresholds, confidence and release artifacts. |
-| US-13 typed search spaces | Partial | Domains, operators, refinement, diagonal CMA-style state and example implemented; pinned quality/budget comparison pending. |
+| US-13 typed search spaces | Implemented | Mixed/conditional domains, owned canonical genomes, operators/refinement, checkpointed diagonal CMA and pinned simpler-baseline comparison; no universal-quality claim. |
 | US-14 surrogate assistance | Not implemented | Uncertainty-aware ranking, exploration and evaluated-only archive admission. |
 | US-15 multi-fidelity | Not implemented | Fidelity/replicate identities, promotions, resource accounting and resumable scheduler. |
 | US-16 adaptive islands | Not implemented | Resource allocation, heterogeneous policies and checkpointed restarts. |
@@ -98,6 +98,9 @@ Durable evaluation identities and leases must be developed against its eventual 
 - [Development pilot](benchmarks/NUMERIC_PILOT.md): 200 runs / 51,200 calls, no failures. Adaptation beats the
   same-operator uniform control on median loss here, but hill climbing beats both on every task's median loss.
   Adaptation remains opt-in; this is not representative or statistically confirmed superiority.
+- [Diagonal CMA comparison](benchmarks/DIAGONAL_CMA_PILOT.md): 240 runs / 61,440 calls, no failures. The emitter's
+  median final loss beats hill climbing on three development fixtures and loses on the rippled fixture. All six
+  methods share the complete initial population and evaluator cap; proposal/evaluator ledger totals are retained.
 - Hosted checks remain unvalidated: Evolution/AiDotNet checks are queued, and the Tensors runs were cancelled.
   AiDotNet's automated review requested facade integration; the follow-up hides the
   implementation and adds builder-level tests. Current-head approval is still pending. All PRs remain drafts;
