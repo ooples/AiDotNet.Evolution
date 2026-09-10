@@ -95,3 +95,6 @@ tensors-entitlement.json
 # Python tool caches
 __pycache__/
 *.pyc
+
+# Local tooling cache; never part of the package or the build.
+.token-optimizer/

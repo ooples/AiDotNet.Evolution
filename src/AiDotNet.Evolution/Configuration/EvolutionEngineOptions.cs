@@ -597,14 +597,20 @@ public sealed class EvolutionEngineOptions
     /// <summary>Copies every option without validating any of them.</summary>
     /// <returns>An independent instance carrying the same values, with each nested subsystem deep-copied.</returns>
     /// <remarks>
-    /// This is the single place that enumerates the options, so a new one cannot be forgotten by a second
+    /// <para>This is the single place that enumerates the options, so a new one cannot be forgotten by a second
     /// hand-maintained copy elsewhere. <see cref="SnapshotAndValidate"/> builds on it and then substitutes the
     /// validated nested subsystems. Before this existed a separate copy in
     /// AiDotNet's program-evolution adapter once silently dropped 19 of the 41 options, so that domain adapter
     /// discarded its cascade, early stopping, target quality, migration topology, selection policy and output
-    /// directory without any error.
+    /// directory without any error.</para>
+    /// <para><b>Public because the adapter that needed it now lives in another assembly.</b> While this
+    /// engine was carried inside AiDotNet, its program-evolution adapter reached this method as an
+    /// internal. Now that the engine ships as its own package that adapter cannot, and the alternatives
+    /// are for it to hand-maintain a second copy - the exact defect described above, which dropped 19 of
+    /// 41 options last time - or to lose the options silently. Any consumer composing engine options
+    /// from its own configuration needs this, so it belongs in the contract.</para>
     /// </remarks>
-    internal EvolutionEngineOptions Copy()
+    public EvolutionEngineOptions Copy()
     {
         return new EvolutionEngineOptions
         {
