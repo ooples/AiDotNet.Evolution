@@ -11,7 +11,7 @@ internal static class Program
     {
         if (args.Length != 4 || !int.TryParse(args[0], out int seeds) || seeds is < 1 or > 1000 ||
             !int.TryParse(args[1], out int budget) || budget is < 8 or > 1_000_000 ||
-            (long)seeds * budget * 16 > 2_000_000 ||
+            (long)seeds * budget * 20 > 2_000_000 ||
             string.IsNullOrWhiteSpace(args[2]) || string.IsNullOrWhiteSpace(args[3]))
         {
             Console.Error.WriteLine("Usage: <seed-count 1..1000> <evaluation-budget 8..1000000> <source-revision> <new-output.json>; at most 2,000,000 total evaluations.");
@@ -54,7 +54,7 @@ internal static class Program
 }
 
 internal enum QualityTask { Sphere, ShiftedQuadratic, AnisotropicQuadratic, RippledQuadratic }
-internal enum QualityMethod { RandomSearch, HillClimb, FixedMapElites, AdaptiveMapElites }
+internal enum QualityMethod { RandomSearch, HillClimb, FixedMapElites, AdaptiveMapElites, UniformPortfolioMapElites }
 
 internal sealed record RunRecord(QualityTask Task, QualityMethod Method, ulong Seed, string InitialPopulationHash,
     string Status, string? Error, long EvaluatorCalls, long Proposals, double? FinalLoss, double? MeanBestLoss,
@@ -78,10 +78,10 @@ internal static class QualityExperiment
         IVariationOperator<NumericGenome> variation = method switch
         {
             QualityMethod.RandomSearch => new NumericVariation(0, restart: true),
-            QualityMethod.AdaptiveMapElites => new AdaptiveVariationPortfolio<NumericGenome>(new IVariationOperator<NumericGenome>[]
+            QualityMethod.AdaptiveMapElites or QualityMethod.UniformPortfolioMapElites => new AdaptiveVariationPortfolio<NumericGenome>(new IVariationOperator<NumericGenome>[]
             {
                 new NumericVariation(0.1), new NumericVariation(1), new NumericVariation(0, restart: true)
-            }),
+            }, method == QualityMethod.UniformPortfolioMapElites ? 1 : 0.1),
             _ => new NumericVariation(0.1)
         };
         var options = new EvolutionEngineOptions

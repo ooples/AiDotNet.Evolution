@@ -10,7 +10,7 @@ This first PR is a reviewable foundation, **not completion of the roadmap and no
 - `AdaptiveVariationPortfolio<TGenome>` attributes outcomes to child operators, maintains bounded archive-success
   rewards divided by evaluator cost, explores with epsilon-greedy selection, exposes statistics and checkpoints
   both its learning and stateful children. This reward is not marginal scalar gain or total LLM cost.
-- The numeric development harness compares four methods on four objectives with identical initial populations,
+- The numeric development harness compares five methods on four objectives with identical initial populations,
   matched evaluator-call caps, complete failure accounting and machine-readable best-so-far traces.
 - CI checks harness accounting and exact same-platform replay. It does not require the new method to win these
   development fixtures, which would encourage tuning the fixtures into a misleading performance gate.
@@ -52,7 +52,7 @@ Durable evaluation identities and leases must be developed against its eventual 
 | US-04 statistical evidence | Partial | Nested task/run uncertainty, effect sizes, preregistered sample plans and comparison reports. |
 | US-05 resource ledger | Not implemented | End-to-end model/refiner/surrogate/retry costs, reservations and hard budget enforcement. |
 | US-06 noisy evaluation | Not implemented | Independent replicates, uncertainty, resampling and cascade rejection audit. |
-| US-07 ablations | Partial | Same-operator uniform versus adaptive allocation; island, migration, novelty and dispatch ablations. |
+| US-07 ablations | Partial | Same-operator uniform/adaptive allocation is available; representative island, migration, novelty and dispatch ablations remain. |
 | US-08 adaptive operators | Partial | Marginal-gain reward options, end-to-end cost credit, realistic benchmark validation. |
 | US-09 Pareto pipeline | Not implemented | Feasibility, objective definitions, archive/snapshot/selection/stopping/migration semantics together. |
 | US-10 engine performance | Not implemented | BenchmarkDotNet throughput/allocation/scaling suite and regression thresholds. |
@@ -78,7 +78,8 @@ Durable evaluation identities and leases must be developed against its eventual 
 - Core: 306 tests pass on each of net10.0, net8.0 and net471, including 26 new outcome/portfolio tests.
 - Core coverage: 89.13% line / 73.85% branch; existing ratchet passes (88.80% / 73.51% minimum).
   These are not improvements over the stored baseline. Do not lower the baseline to accommodate the feature.
-- Harness: 32 runs, 1,024 evaluator calls per replay; repeated JSON is byte-identical, paired starting populations
+- Harness: initial four-method smoke passed 32 runs / 1,024 calls per replay; the added uniform-allocation control
+  expands the required smoke to 40 runs / 1,280 calls. Initial repeated JSON is byte-identical, paired starting populations
   match, costs reconcile, and best-so-far curves are monotonic. This is an accounting/replay smoke test, not a
   statistically powered quality comparison.
 - Tensors: 22 targeted autotuning tests pass on net10.0, including three new deployment deactivation tests.

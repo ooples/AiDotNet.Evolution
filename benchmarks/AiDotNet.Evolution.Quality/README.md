@@ -2,7 +2,8 @@
 
 This is a small, reproducible starting point for roadmap US-01/02/04/07/12, not evidence of superiority over OpenEvolve.
 It exercises four explicitly defined eight-dimensional objectives on [-5, 5] with random search, best-parent hill climbing,
-fixed MAP-Elites and adaptive MAP-Elites. Descriptors are two coordinates, not the objective value. Each paired seed uses
+fixed MAP-Elites, adaptive MAP-Elites and the same portfolio with uniform allocation. Descriptors are two coordinates,
+not the objective value. Each paired seed uses
 the same eight initial genomes. Initial evaluations count against every method's budget.
 
 ```powershell
@@ -17,7 +18,9 @@ calls, including initial evaluations; lower is better. Coverage is meaningful fo
 All methods share the engine's canonicalization/cache infrastructure. Random search ignores the archive when proposing;
 hill climbing always chooses its best member; fixed and adaptive MAP-Elites sample occupied cells uniformly. Adaptive
 MAP-Elites adds coarse mutation and random restart, so its comparison with fixed MAP-Elites changes both the portfolio
-and its allocation. It is **not** an isolated bandit ablation. Epsilon is 0.1 and mutation radii are 0.1 and 1.
+and its allocation. It is **not** an isolated bandit ablation. `UniformPortfolioMapElites` uses exactly the adaptive
+method's operators, initial trials and parent selection, but epsilon 1 rather than 0.1; compare these two to test
+the allocation policy. Mutation radii are 0.1 and 1.
 
 Given identical arguments and the same runtime/platform, when the harness is rerun, then its semantic JSON records must
 match (output filename excluded). Given a task and seed, when methods are compared, then initial-population hashes and
