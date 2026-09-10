@@ -1,7 +1,7 @@
 # Competitive roadmap implementation
 
 Updated September 10, 2026. The [26-story roadmap](COMPETITIVE_ANALYSIS_AND_ROADMAP.md) remains the target.
-This first PR is a reviewable foundation, **not completion of the roadmap and not a competitive-win claim**.
+Implementation is continuing across the core and companion PRs. **The roadmap is not complete and no competitive win is claimed.**
 
 ## Implemented in the initial core PR
 
@@ -14,6 +14,9 @@ This first PR is a reviewable foundation, **not completion of the roadmap and no
   matched evaluator-call caps, complete failure accounting and machine-readable best-so-far traces.
 - CI checks harness accounting and exact same-platform replay. It does not require the new method to win these
   development fixtures, which would encourage tuning the fixtures into a misleading performance gate.
+- The [resource extension](RESOURCE_ACCOUNTING.md) adds multi-resource reservations, exactly-once actual receipts,
+  conservative unknown-cost handling, bounded history and explicit restore. An evaluator adapter meters every retry
+  and cascade stage independently of refunded evaluation-attempt counters. The numeric runner also meters proposal calls.
 
 Given a failed or repeated proposal, when its outcome commits, then the selected operator receives exactly one
 terminal notification and a cache hit cannot earn free success reward.
@@ -51,7 +54,7 @@ Durable evaluation identities and leases must be developed against its eventual 
 | US-02 fair baselines | Partial | Matched OpenEvolve and other external adapters; stronger numeric baselines; consistent model access. |
 | US-03 correctness gates | Partial, companion | Trusted sandbox/reference integrations and held-out validation; wrapper alone is not proof of correctness. |
 | US-04 statistical evidence | Partial | Nested task/run uncertainty, effect sizes, preregistered sample plans and comparison reports. |
-| US-05 resource ledger | Not implemented | End-to-end model/refiner/surrogate/retry costs, reservations and hard budget enforcement. |
+| US-05 resource ledger | Partial | Generic ledger, stage helper and evaluator/cascade adapter implemented; consumer model/compiler/setup integrations and deterministic concurrent admission remain. |
 | US-06 noisy evaluation | Not implemented | Independent replicates, uncertainty, resampling and cascade rejection audit. |
 | US-07 ablations | Partial | Same-operator uniform/adaptive allocation is available; representative island, migration, novelty and dispatch ablations remain. |
 | US-08 adaptive operators | Partial | Marginal-gain reward options, end-to-end cost credit, realistic benchmark validation. |
@@ -76,8 +79,9 @@ Durable evaluation identities and leases must be developed against its eventual 
 
 ## Validation evidence
 
-- Core: 306 tests pass on each of net10.0, net8.0 and net471, including 26 new outcome/portfolio tests.
-- Core coverage: 89.13% line / 73.85% branch; existing ratchet passes (88.80% / 73.51% minimum).
+- Core after the resource extension: 339 tests pass on each of net10.0, net8.0 and net471, including 26 outcome/portfolio
+  and 33 resource-accounting tests. Subsequent features require fresh verification before these counts are updated.
+- Core coverage after the resource extension: 89.78% line / 74.34% branch; existing ratchet passes (88.80% / 73.51% minimum).
   These are not improvements over the stored baseline. Do not lower the baseline to accommodate the feature.
 - Harness: five-method smoke passes 40 runs / 1,280 calls per replay. Repeated JSON is byte-identical, paired starting populations
   match, costs reconcile, and best-so-far curves are monotonic. This is an accounting/replay smoke test, not a

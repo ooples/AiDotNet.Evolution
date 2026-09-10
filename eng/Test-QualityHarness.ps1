@@ -27,6 +27,11 @@ foreach ($run in $report.Runs) {
         $run.Samples.Count -ne $run.Proposals -or ($run.Samples | Measure-Object CostUnits -Sum).Sum -ne 32) {
         throw 'The report violated its evaluator budget or trace contract.'
     }
+    if ($run.Resources.Spent.cost_units -ne 32 -or $run.Resources.Spent.proposal_calls -ne ($run.Proposals - 8) -or
+        $run.Resources.Reserved.cost_units -ne 0 -or $run.Resources.Reserved.proposal_calls -ne 0 -or
+        $run.Resources.Unknown -ne 0 -or $run.Resources.MaximumViolated) {
+        throw 'The resource ledger did not reconcile evaluation and proposal work.'
+    }
     $previous = [double]::PositiveInfinity
     foreach ($sample in $run.Samples) {
         if ($null -eq $sample.BestLoss -or $sample.BestLoss -gt $previous) { throw 'Best-so-far loss regressed.' }

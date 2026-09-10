@@ -30,8 +30,8 @@ internal static class Program
                 }
         var report = new
         {
-            SchemaVersion = 1,
-            Protocol = "numeric-development-v1",
+            SchemaVersion = 2,
+            Protocol = "numeric-development-v2-metered",
             Partition = "development",
             SourceRevision = args[2],
             Runtime = System.Runtime.InteropServices.RuntimeInformation.FrameworkDescription,
@@ -59,7 +59,7 @@ internal enum QualityMethod { RandomSearch, HillClimb, FixedMapElites, AdaptiveM
 internal sealed record RunRecord(QualityTask Task, QualityMethod Method, ulong Seed, string InitialPopulationHash,
     string Status, string? Error, long EvaluatorCalls, long Proposals, double? FinalLoss, double? MeanBestLoss,
     int OccupiedCells, string? StateHash, IReadOnlyList<SampleRecord> Samples,
-    IReadOnlyList<EvolutionOperatorStatistics> Operators);
+    IReadOnlyList<EvolutionOperatorStatistics> Operators, EvolutionResourceSnapshot Resources);
 internal sealed record SampleRecord(long EvaluationId, EvolutionEvaluationStatus Status, double? BestLoss,
     int Attempts, double CostUnits, IReadOnlyList<string> DiagnosticCodes);
 
@@ -70,6 +70,9 @@ internal static class QualityExperiment
 
     internal static async Task<RunRecord> RunAsync(QualityTask taskKind, QualityMethod method, ulong seed, int budget)
     {
+        var ledger = new EvolutionResourceLedger($"{taskKind}-{method}-{seed}", new EvolutionResources(
+            new Dictionary<string, decimal> { ["cost_units"] = budget, ["proposal_calls"] = budget * 4 }),
+            retainedReceiptLimit: 64, maximumOperations: Math.Min(1_000_000, budget * 5));
         var initialRandom = StableRandom.CreateStream(seed, 123);
         NumericGenome[] seeds = Enumerable.Range(0, InitialPopulation).Select(_ => RandomGenome(initialRandom)).ToArray();
         string initialHash = EvolutionHash.Combine(seeds.Select(genome => genome.Identity));
@@ -77,12 +80,12 @@ internal static class QualityExperiment
         var observer = new Progress();
         IVariationOperator<NumericGenome> variation = method switch
         {
-            QualityMethod.RandomSearch => new NumericVariation(0, restart: true),
+            QualityMethod.RandomSearch => new NumericVariation(ledger, 0, restart: true),
             QualityMethod.AdaptiveMapElites or QualityMethod.UniformPortfolioMapElites => new AdaptiveVariationPortfolio<NumericGenome>(new IVariationOperator<NumericGenome>[]
             {
-                new NumericVariation(0.1), new NumericVariation(1), new NumericVariation(0, restart: true)
+                new NumericVariation(ledger, 0.1), new NumericVariation(ledger, 1), new NumericVariation(ledger, 0, restart: true)
             }, method == QualityMethod.UniformPortfolioMapElites ? 1 : 0.1),
-            _ => new NumericVariation(0.1)
+            _ => new NumericVariation(ledger, 0.1)
         };
         var options = new EvolutionEngineOptions
         {
@@ -100,28 +103,32 @@ internal static class QualityExperiment
         };
         try
         {
-            var engine = new EvolutionEngine<NumericGenome>(task, variation,
+            var meteredTask = new ResourceMeteredEvolutionTask<NumericGenome>(task, ledger, new[] { 1m });
+            var engine = new EvolutionEngine<NumericGenome>(meteredTask, variation,
                 _ => new MapElitesArchive<NumericGenome>(new[]
                 {
                     new EvolutionDescriptorDefinition("coordinate-0", -5, 5, 10),
                     new EvolutionDescriptorDefinition("coordinate-1", -5, 5, 10)
                 }), options, selection: method == QualityMethod.HillClimb ? new BestSelection() : null, observer: observer);
             EvolutionRunResult<NumericGenome> result = await engine.RunAsync(seeds);
+            EvolutionResourceSnapshot resources = ledger.Snapshot();
             bool complete = task.Calls == budget && observer.Samples.Sum(sample => sample.Attempts) == budget &&
                 observer.Samples.Sum(sample => sample.CostUnits) == budget && observer.Samples.Count == result.Counters.Proposals &&
+                resources.Spent["cost_units"] == budget && resources.Spent["proposal_calls"] == result.Counters.Proposals - InitialPopulation &&
+                resources.Reserved.Values.All(amount => amount == 0) && resources.Unknown == 0 && !resources.MaximumViolated &&
                 observer.Samples.All(sample => sample.Status == EvolutionEvaluationStatus.Completed);
             double[] curve = observer.Samples.Where(sample => sample.Attempts > 0 && sample.BestLoss.HasValue)
                 .Select(sample => sample.BestLoss!.Value).ToArray();
             return new RunRecord(taskKind, method, seed, initialHash, complete ? "completed" : "incomplete",
                 complete ? null : result.StopReason.ToString(), task.Calls, result.Counters.Proposals,
                 observer.BestLoss, curve.Length == 0 ? null : curve.Average(), result.Islands.Sum(island => island.Count),
-                result.StateHash, observer.Samples, Statistics(variation));
+                result.StateHash, observer.Samples, Statistics(variation), resources);
         }
         catch (Exception exception) when (exception is not OutOfMemoryException)
         {
             // Failed seeds remain in the denominator and output; never silently drop them from comparisons.
             return new RunRecord(taskKind, method, seed, initialHash, "failed", exception.GetType().FullName,
-                task.Calls, observer.Samples.Count, observer.BestLoss, null, 0, null, observer.Samples, Statistics(variation));
+                task.Calls, observer.Samples.Count, observer.BestLoss, null, 0, null, observer.Samples, Statistics(variation), ledger.Snapshot());
         }
     }
 
@@ -170,17 +177,22 @@ internal static class QualityExperiment
         }
     }
 
-    private sealed class NumericVariation(double radius, bool restart = false) : IVariationOperator<NumericGenome>
+    private sealed class NumericVariation(EvolutionResourceLedger ledger, double radius, bool restart = false) : IVariationOperator<NumericGenome>
     {
         public string Id => restart ? "uniform-restart" : "uniform-mutation-" + radius.ToString("R", CultureInfo.InvariantCulture);
-        public string VersionHash => EvolutionHash.Combine(new[] { "numeric-variation-v1", Id });
+        public string VersionHash => EvolutionHash.Combine(new[] { "numeric-variation-v2-metered", Id });
         public ValueTask<NumericGenome> ProposeAsync(EvolutionVariationContext<NumericGenome> context,
             CancellationToken cancellationToken = default)
         {
             cancellationToken.ThrowIfCancellationRequested();
-            return new ValueTask<NumericGenome>(restart ? RandomGenome(context.Random) : new NumericGenome(
+            var cost = EvolutionResources.Of("proposal_calls", 1);
+            using EvolutionResourceReservation reservation = ledger.TryReserve("proposal/" + context.Generation.ToString(CultureInfo.InvariantCulture),
+                EvolutionResourceStage.Proposal, cost, cost) ?? throw new EvolutionResourceBudgetException("proposal");
+            var genome = restart ? RandomGenome(context.Random) : new NumericGenome(
                 context.Parent.Candidate.CanonicalGenome.Genome.Coordinates.Select(value =>
-                    Math.Clamp(value + radius * (2 * context.Random.NextDouble() - 1), -5, 5))));
+                    Math.Clamp(value + radius * (2 * context.Random.NextDouble() - 1), -5, 5)));
+            reservation.Complete(cost);
+            return new ValueTask<NumericGenome>(genome);
         }
     }
 
