@@ -59,6 +59,9 @@ jobs:
         env:
           QUALITY_SOURCE_REVISION: ${{ github.sha }}
         run: ./eng/Test-QualityHarness.ps1 -SourceRevision $env:QUALITY_SOURCE_REVISION
+      - name: Verify typed search example
+        shell: pwsh
+        run: ./eng/Test-TypedSearch.ps1
       - name: Enforce coverage ratchet
         shell: pwsh
         run: |

@@ -10,13 +10,17 @@ Implementation is continuing across the core and companion PRs. **The roadmap is
 - `AdaptiveVariationPortfolio<TGenome>` attributes outcomes to child operators, maintains bounded archive-success
   rewards divided by evaluator cost, explores with epsilon-greedy selection, exposes statistics and checkpoints
   both its learning and stateful children. This reward is not marginal scalar gain or total LLM cost.
-- The numeric development harness compares five methods on four objectives with identical initial populations,
+- The numeric development harness compares six methods on four objectives with identical initial populations,
   matched evaluator-call caps, complete failure accounting and machine-readable best-so-far traces.
 - CI checks harness accounting and exact same-platform replay. It does not require the new method to win these
   development fixtures, which would encourage tuning the fixtures into a misleading performance gate.
 - The [resource extension](RESOURCE_ACCOUNTING.md) adds multi-resource reservations, exactly-once actual receipts,
   conservative unknown-cost handling, bounded history and explicit restore. An evaluator adapter meters every retry
   and cascade stage independently of refunded evaluation-attempt counters. The numeric runner also meters proposal calls.
+- [Typed search spaces](TYPED_SEARCH_SPACES.md) provide real, integer, logarithmic, categorical and conditional domains,
+  canonical owned genomes, feature encoding, mutation/crossover/restart and budgeted local refinement. An opt-in diagonal
+  CMA-style emitter checkpoints covariance, step-size and pending cohorts; stale cohorts cannot overwrite newer learning.
+  A runnable mixed-parameter example checks validity, incumbent preservation, accounting and exact replay in CI.
 
 Given a failed or repeated proposal, when its outcome commits, then the selected operator receives exactly one
 terminal notification and a cache hit cannot earn free success reward.
@@ -62,7 +66,7 @@ Durable evaluation identities and leases must be developed against its eventual 
 | US-10 engine performance | Not implemented | BenchmarkDotNet throughput/allocation/scaling suite and regression thresholds. |
 | US-11 application examples | Not implemented | End-to-end program, AutoML, kernel and external-session examples. |
 | US-12 quality release gates | Partial | Representative measured quality thresholds, confidence and release artifacts. |
-| US-13 typed search spaces | Not implemented | Mixed/conditional parameters, normalization, reusable variation and refinement. |
+| US-13 typed search spaces | Partial | Domains, operators, refinement, diagonal CMA-style state and example implemented; pinned quality/budget comparison pending. |
 | US-14 surrogate assistance | Not implemented | Uncertainty-aware ranking, exploration and evaluated-only archive admission. |
 | US-15 multi-fidelity | Not implemented | Fidelity/replicate identities, promotions, resource accounting and resumable scheduler. |
 | US-16 adaptive islands | Not implemented | Resource allocation, heterogeneous policies and checkpointed restarts. |
@@ -79,11 +83,11 @@ Durable evaluation identities and leases must be developed against its eventual 
 
 ## Validation evidence
 
-- Core after the resource extension: 339 tests pass on each of net10.0, net8.0 and net471, including 26 outcome/portfolio
-  and 33 resource-accounting tests. Subsequent features require fresh verification before these counts are updated.
-- Core coverage after the resource extension: 89.78% line / 74.34% branch; existing ratchet passes (88.80% / 73.51% minimum).
+- Core after typed search spaces and checkpoint hardening: 378 tests pass on each of net10.0, net8.0 and net471,
+  including 26 outcome/portfolio, 33 resource-accounting and 39 typed-space/emitter tests.
+- Core coverage after typed search spaces: 90.40% line / 75.39% branch; existing ratchet passes (88.80% / 73.51% minimum).
   These are not improvements over the stored baseline. Do not lower the baseline to accommodate the feature.
-- Harness: five-method smoke passes 40 runs / 1,280 calls per replay. Repeated JSON is byte-identical, paired starting populations
+- Harness: six-method smoke passes 48 runs / 1,536 calls per replay. Repeated JSON is byte-identical, paired starting populations
   match, costs reconcile, and best-so-far curves are monotonic. This is an accounting/replay smoke test, not a
   statistically powered quality comparison.
 - Tensors: 22 targeted autotuning tests pass on net10.0, including three new deployment deactivation tests.

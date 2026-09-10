@@ -16,9 +16,9 @@ if ((Get-FileHash -LiteralPath $first).Hash -ne (Get-FileHash -LiteralPath $seco
     throw 'Repeated quality experiments produced different semantic records.'
 }
 $report = Get-Content -LiteralPath $first -Raw | ConvertFrom-Json
-if ($report.Runs.Count -ne 40) { throw 'The report omitted a scheduled task/method/seed.' }
+if ($report.Runs.Count -ne 48 -or $report.Methods.Count -ne 6 -or $report.Methods -notcontains 'DiagonalCma') { throw 'The report omitted a scheduled task/method/seed.' }
 foreach ($pair in ($report.Runs | Group-Object Task, Seed)) {
-    if ($pair.Count -ne 5 -or @($pair.Group.InitialPopulationHash | Sort-Object -Unique).Count -ne 1) {
+    if ($pair.Count -ne 6 -or @($pair.Group.InitialPopulationHash | Sort-Object -Unique).Count -ne 1) {
         throw 'Methods did not share their complete initial population.'
     }
 }
@@ -38,4 +38,4 @@ foreach ($run in $report.Runs) {
         $previous = $sample.BestLoss
     }
 }
-Write-Output "Quality harness verified: 40 paired runs, 1,280 evaluations, identical replay. Reports: $outputDirectory"
+Write-Output "Quality harness verified: 48 paired runs, 1,536 evaluations, identical replay. Reports: $outputDirectory"
