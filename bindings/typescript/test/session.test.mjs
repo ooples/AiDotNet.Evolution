@@ -174,11 +174,13 @@ test('evolve rejects rather than resolving empty when close is never answered', 
 });
 
 test('an evaluator error survives a failing close', async () => {
-  // BOTH FAIL HERE, and only one of them says what went wrong. Closing in a `finally`
-  // would let the teardown failure replace the evaluator error that caused it.
+  // BOTH MUST ACTUALLY FAIL, or this proves nothing. Against a host that closes
+  // cleanly there is only one error to report and any implementation passes; the
+  // question is which error survives when the cleanup fails too, so the host is one
+  // that dies on close.
   await assert.rejects(
     () =>
-      evolve(withMode('ok'), () => {
+      evolve(withMode('die-on-close'), () => {
         throw new Error('the evaluator exploded');
       }),
     /the evaluator exploded/
@@ -196,4 +198,22 @@ test('a request that is never answered kills the host instead of leaking it', as
   // repeated failed opens leak one host process each.
   await waitForExit(pid);
   assert.equal(alive(pid), false, 'the host outlives a timeout otherwise');
+});
+
+test('an unsuccessful close response is an error, not an empty summary', async () => {
+  // The transport is fine here and the host answered -- it answered `ok: false`.
+  // Reading that as `{best: null, stopReason: null}` makes the same wrong claim a
+  // swallowed transport failure did, arriving through the other door.
+  const session = await openSession(withMode('refuse-close'));
+
+  await assert.rejects(() => session.close(), (error) => {
+    assert.ok(error instanceof EvolutionError);
+    assert.match(error.message, /the run could not be stopped/);
+    return true;
+  });
+
+  // ...and the host is still torn down, because a caller who cannot stop the run
+  // cleanly must not be left holding the process either.
+  await waitForExit(session.pid);
+  assert.equal(alive(session.pid), false);
 });

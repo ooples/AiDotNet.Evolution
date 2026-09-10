@@ -51,6 +51,18 @@ public sealed class EvolutionSession<TGenome> : IDisposable
     private readonly ConcurrentQueue<PendingEvaluation> _queue = new();
     private readonly SemaphoreSlim _available = new(0);
     private readonly ConcurrentDictionary<long, PendingEvaluation> _outstanding = new();
+
+    /// <summary>Serialises taking work with failing it.</summary>
+    /// <remarks>
+    /// TAKING A CANDIDATE IS TWO STEPS, and a stop landing between them stranded it. The
+    /// dequeue removes it from `_queue` and the registration puts it in `_outstanding`;
+    /// a `FailOutstanding` in that window drains both and touches neither, so the
+    /// evaluation the engine is awaiting is settled by nobody and the run never
+    /// finishes. Both sequences take this, so the pair is indivisible with respect to
+    /// the drain. Nothing awaits while holding it, and the completion sources run their
+    /// continuations asynchronously, so it cannot deadlock on a caller's continuation.
+    /// </remarks>
+    private readonly object _handover = new();
     private readonly CancellationTokenSource _cancellation = new();
     // Fires when no further candidates can arrive, so a caller blocked in AskAsync
     // is released rather than waiting on a queue nothing will write to again. A
@@ -217,28 +229,48 @@ public sealed class EvolutionSession<TGenome> : IDisposable
     /// than removing it, because removing it would race the enqueue that put it there.
     /// Skipping those here is what keeps that safe.
     /// </remarks>
-    private bool TryTakeLive(out PendingEvaluation? pending)
+    private bool TryHandOver(out PendingEvaluation? pending)
     {
-        while (_queue.TryDequeue(out PendingEvaluation? candidate))
+        lock (_handover)
         {
-            if (candidate.Completion.Task.IsCompleted) continue;
-            pending = candidate;
-            return true;
+            while (_queue.TryDequeue(out PendingEvaluation? candidate))
+            {
+                if (candidate.Completion.Task.IsCompleted) continue;
+
+                if (_closed.IsCancellationRequested)
+                {
+                    // Taken out of the queue after the door shut. Handing it to a caller
+                    // who is about to be told the run is over would strand it, so it is
+                    // settled here instead -- the same answer FailOutstanding would have
+                    // given had it seen it.
+                    candidate.Completion.TrySetResult(EvolutionTaskResult.Failed(
+                        "session_closed",
+                        "The evolution session stopped accepting evaluations while this one was queued."));
+                    continue;
+                }
+
+                _outstanding[candidate.Candidate.EvaluationId] = candidate;
+                pending = candidate;
+                return true;
+            }
+            pending = null;
+            return false;
         }
-        pending = null;
-        return false;
     }
 
     private void FailOutstanding(string code, string message)
     {
         EvolutionTaskResult failure = EvolutionTaskResult.Failed(code, message);
 
-        while (_queue.TryDequeue(out PendingEvaluation? queued))
-            queued.Completion.TrySetResult(failure);
+        lock (_handover)
+        {
+            while (_queue.TryDequeue(out PendingEvaluation? queued))
+                queued.Completion.TrySetResult(failure);
 
-        foreach (KeyValuePair<long, PendingEvaluation> entry in _outstanding)
-            entry.Value.Completion.TrySetResult(failure);
-        _outstanding.Clear();
+            foreach (KeyValuePair<long, PendingEvaluation> entry in _outstanding)
+                entry.Value.Completion.TrySetResult(failure);
+            _outstanding.Clear();
+        }
     }
 
     /// <summary>Waits for up to <paramref name="maxCount"/> candidates that need evaluation.</summary>
@@ -282,25 +314,23 @@ public sealed class EvolutionSession<TGenome> : IDisposable
         // queued evaluation without removing it -- see the double-check in
         // EvaluateAsync -- and offering the caller a candidate whose result is already
         // recorded would have them do work that Tell then refuses.
-        if (TryTakeLive(out PendingEvaluation? first))
+        if (TryHandOver(out PendingEvaluation? first))
         {
-            _outstanding[first!.Candidate.EvaluationId] = first;
-            batch.Add(new EvolutionAskItem<TGenome>(first.Candidate, first.Context));
+            batch.Add(new EvolutionAskItem<TGenome>(first!.Candidate, first.Context));
         }
 
         // Drain what is already queued, taking a permit for each so the count stays
         // in step with the queue.
         while (batch.Count < wanted && _available.Wait(0))
         {
-            if (!TryTakeLive(out PendingEvaluation? next))
+            if (!TryHandOver(out PendingEvaluation? next))
             {
                 // Permit taken with nothing behind it: hand it back rather than
                 // losing a wakeup a concurrent writer is about to need.
                 _available.Release();
                 break;
             }
-            _outstanding[next!.Candidate.EvaluationId] = next;
-            batch.Add(new EvolutionAskItem<TGenome>(next.Candidate, next.Context));
+            batch.Add(new EvolutionAskItem<TGenome>(next!.Candidate, next.Context));
         }
 
         return batch;

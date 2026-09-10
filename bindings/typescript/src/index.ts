@@ -366,6 +366,13 @@ export class EvolutionSession {
     }
 
     this.#teardown();
+    // `ok: false` IS NOT A SUMMARY. FinishAsync throwing on the host produces a
+    // response with an error and no best, and reading it as `{best: null}` says "the
+    // run finished and found nothing" -- the same wrong claim a swallowed transport
+    // failure used to make, arriving through the other door.
+    if (!response.ok) {
+      throw new EvolutionError(response.error ?? 'the host could not stop the run');
+    }
     return { best: response.best ?? null, stopReason: response.stopReason ?? null };
   }
 

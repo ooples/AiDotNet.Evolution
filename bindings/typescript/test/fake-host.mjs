@@ -25,8 +25,16 @@ const writeThenExit = (stream, text, code) => {
 };
 
 if (mode === 'die-on-start') {
+  // AND NOTHING ELSE IS SET UP. `writeThenExit` exits from the write callback, so the
+  // process is briefly alive afterwards -- long enough to install a readline handler
+  // and answer an `open` that had already arrived. The fixture would then sometimes
+  // start successfully, which is the one thing it exists not to do.
   writeThenExit(process.stderr, 'fake host refusing to start\n', 3);
+} else {
+  serve();
 }
+
+function serve() {
 
 const say = (value) => process.stdout.write(`${JSON.stringify(value)}\n`);
 let nextEvaluationId = 1;
@@ -73,6 +81,12 @@ createInterface({ input: process.stdin }).on('line', (line) => {
       return;
 
     case 'close':
+      if (mode === 'refuse-close') {
+        // Answers, and says no. Distinct from dying: the transport is fine and
+        // the host is telling the client it could not stop the run.
+        say({ id: request.id, ok: false, error: 'the run could not be stopped' });
+        return;
+      }
       if (mode === 'die-on-close') {
         // Exits WITHOUT replying. The client cannot tell "stopped cleanly with no
         // result" from "never answered" unless close reports the difference.
@@ -94,3 +108,4 @@ createInterface({ input: process.stdin }).on('line', (line) => {
       say({ id: request.id, ok: false, error: `unknown op '${request.op}'` });
   }
 });
+}

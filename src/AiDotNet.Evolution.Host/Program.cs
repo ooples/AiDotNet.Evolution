@@ -201,6 +201,17 @@ internal sealed class FrameReader
     private int _offset;
     private bool _overlong;
 
+    /// <summary>A CR that may turn out to be the first half of the delimiter.</summary>
+    /// <remarks>
+    /// INSTANCE STATE, because a CRLF can straddle two reads. Held rather than dropped:
+    /// discarding every CR before the size check let a peer send more than
+    /// <see cref="ProtocolLimits.MaxFrameChars"/> carriage returns followed by valid
+    /// JSON, and the frame sailed past the limit it was supposed to be measured
+    /// against. Only the CR immediately before the LF is free; every other one is
+    /// content and is charged as content.
+    /// </remarks>
+    private bool _pendingCarriageReturn;
+
     internal FrameReader(TextReader reader) => _reader = reader;
 
     /// <summary>The next frame, or a null line at end of input.</summary>
@@ -214,6 +225,12 @@ internal sealed class FrameReader
                 _offset = 0;
                 if (_length == 0)
                 {
+                    // A CR held at end of input was never a delimiter, so it is content.
+                    if (_pendingCarriageReturn)
+                    {
+                        Charge('\r');
+                        _pendingCarriageReturn = false;
+                    }
                     // End of input. A frame without a trailing newline is still a frame.
                     if (_frame.Length == 0 && !_overlong) return (null, false);
                     return Take();
@@ -223,27 +240,48 @@ internal sealed class FrameReader
             for (; _offset < _length; _offset += 1)
             {
                 char c = _chunk[_offset];
+
+                if (c == '\r')
+                {
+                    // Might be the delimiter's CR, might be content. Two in a row means
+                    // the first was content, so it is charged before the second is held.
+                    if (_pendingCarriageReturn) Charge('\r');
+                    _pendingCarriageReturn = true;
+                    continue;
+                }
+
                 if (c == '\n')
                 {
+                    // The held CR was the delimiter's after all, and costs nothing.
+                    _pendingCarriageReturn = false;
                     _offset += 1;
                     return Take();
                 }
-                // A lone CR before the LF is dropped: a client on Windows may send CRLF,
-                // and the payload is JSON, where trailing whitespace is insignificant.
-                if (c == '\r') continue;
-                if (_overlong) continue;
 
-                if (_frame.Length >= ProtocolLimits.MaxFrameChars)
+                // A CR followed by anything but LF was content.
+                if (_pendingCarriageReturn)
                 {
-                    // Released now rather than at the newline: the point of the limit is
-                    // not to be holding this much.
-                    _frame.Clear();
-                    _overlong = true;
-                    continue;
+                    Charge('\r');
+                    _pendingCarriageReturn = false;
                 }
-                _frame.Append(c);
+                Charge(c);
             }
         }
+    }
+
+    /// <summary>Adds one character to the frame, or marks it overlong.</summary>
+    private void Charge(char c)
+    {
+        if (_overlong) return;
+        if (_frame.Length >= ProtocolLimits.MaxFrameChars)
+        {
+            // Released now rather than at the newline: the point of the limit is not to
+            // be holding this much.
+            _frame.Clear();
+            _overlong = true;
+            return;
+        }
+        _frame.Append(c);
     }
 
     private (string? Line, bool Overlong) Take()
@@ -252,6 +290,7 @@ internal sealed class FrameReader
         bool overlong = _overlong;
         _frame.Clear();
         _overlong = false;
+        _pendingCarriageReturn = false;
         return (line, overlong);
     }
 }
