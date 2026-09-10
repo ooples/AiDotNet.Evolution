@@ -1,4 +1,7 @@
 <Solution>
+  <Folder Name="/benchmarks/">
+    <Project Path="benchmarks/AiDotNet.Evolution.Quality/AiDotNet.Evolution.Quality.csproj" />
+  </Folder>
   <Folder Name="/src/">
     <Project Path="src/AiDotNet.Evolution/AiDotNet.Evolution.csproj" />
   </Folder>

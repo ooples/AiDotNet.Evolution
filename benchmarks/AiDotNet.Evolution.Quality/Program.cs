@@ -1,0 +1,209 @@
+using System.Globalization;
+using System.Text.Json;
+using System.Text.Json.Serialization;
+using AiDotNet.Evolution;
+
+namespace AiDotNet.Evolution.Quality;
+
+internal static class Program
+{
+    private static async Task<int> Main(string[] args)
+    {
+        if (args.Length != 4 || !int.TryParse(args[0], out int seeds) || seeds is < 1 or > 1000 ||
+            !int.TryParse(args[1], out int budget) || budget is < 8 or > 1_000_000 ||
+            (long)seeds * budget * 16 > 2_000_000 ||
+            string.IsNullOrWhiteSpace(args[2]) || string.IsNullOrWhiteSpace(args[3]))
+        {
+            Console.Error.WriteLine("Usage: <seed-count 1..1000> <evaluation-budget 8..1000000> <source-revision> <new-output.json>; at most 2,000,000 total evaluations.");
+            return 2;
+        }
+        // Refuse overwrites before any experiment begins.
+        using var output = new FileStream(args[3], FileMode.CreateNew, FileAccess.Write, FileShare.Read);
+        var records = new List<RunRecord>();
+        foreach (QualityTask task in Enum.GetValues<QualityTask>())
+            foreach (QualityMethod method in Enum.GetValues<QualityMethod>())
+                for (ulong seed = 0; seed < (ulong)seeds; seed++)
+                {
+                    RunRecord record = await QualityExperiment.RunAsync(task, method, seed, budget);
+                    records.Add(record);
+                    Console.Error.WriteLine($"{task}/{method}/{seed}: {record.Status}, calls={record.EvaluatorCalls}, loss={record.FinalLoss:R}");
+                }
+        var report = new
+        {
+            SchemaVersion = 1,
+            Protocol = "numeric-development-v1",
+            Partition = "development",
+            SourceRevision = args[2],
+            Runtime = System.Runtime.InteropServices.RuntimeInformation.FrameworkDescription,
+            OperatingSystem = System.Runtime.InteropServices.RuntimeInformation.OSDescription,
+            Seeds = seeds,
+            Budget = budget,
+            Dimensions = QualityExperiment.Dimensions,
+            InitialPopulation = QualityExperiment.InitialPopulation,
+            Comparability = "Same initial genomes and evaluator-call cap; proposals also capped. No model calls, cascade, retries, hidden refinement or persisted warm starts.",
+            Limitations = "Synthetic development fixtures only. Not an OpenEvolve comparison, runtime speedup, confidence interval or held-out superiority claim.",
+            Runs = records
+        };
+        await JsonSerializer.SerializeAsync(output, report, new JsonSerializerOptions
+        {
+            WriteIndented = true,
+            Converters = { new JsonStringEnumConverter() }
+        });
+        return records.All(record => record.Status == "completed") ? 0 : 1;
+    }
+}
+
+internal enum QualityTask { Sphere, ShiftedQuadratic, AnisotropicQuadratic, RippledQuadratic }
+internal enum QualityMethod { RandomSearch, HillClimb, FixedMapElites, AdaptiveMapElites }
+
+internal sealed record RunRecord(QualityTask Task, QualityMethod Method, ulong Seed, string InitialPopulationHash,
+    string Status, string? Error, long EvaluatorCalls, long Proposals, double? FinalLoss, double? MeanBestLoss,
+    int OccupiedCells, string? StateHash, IReadOnlyList<SampleRecord> Samples,
+    IReadOnlyList<EvolutionOperatorStatistics> Operators);
+internal sealed record SampleRecord(long EvaluationId, EvolutionEvaluationStatus Status, double? BestLoss,
+    int Attempts, double CostUnits, IReadOnlyList<string> DiagnosticCodes);
+
+internal static class QualityExperiment
+{
+    internal const int Dimensions = 8;
+    internal const int InitialPopulation = 8;
+
+    internal static async Task<RunRecord> RunAsync(QualityTask taskKind, QualityMethod method, ulong seed, int budget)
+    {
+        var initialRandom = StableRandom.CreateStream(seed, 123);
+        NumericGenome[] seeds = Enumerable.Range(0, InitialPopulation).Select(_ => RandomGenome(initialRandom)).ToArray();
+        string initialHash = EvolutionHash.Combine(seeds.Select(genome => genome.Identity));
+        var task = new NumericTask(taskKind);
+        var observer = new Progress();
+        IVariationOperator<NumericGenome> variation = method switch
+        {
+            QualityMethod.RandomSearch => new NumericVariation(0, restart: true),
+            QualityMethod.AdaptiveMapElites => new AdaptiveVariationPortfolio<NumericGenome>(new IVariationOperator<NumericGenome>[]
+            {
+                new NumericVariation(0.1), new NumericVariation(1), new NumericVariation(0, restart: true)
+            }),
+            _ => new NumericVariation(0.1)
+        };
+        var options = new EvolutionEngineOptions
+        {
+            RunId = $"{taskKind}-{method}-{seed}",
+            Seed = seed,
+            MaxEvaluationAttempts = budget,
+            MaxProposals = budget * 4,
+            MaxGenerations = budget * 4,
+            ProposalBatchSize = 1,
+            MaxDegreeOfParallelism = 1,
+            IslandCount = 1,
+            MigrationInterval = 0,
+            InspirationCount = 0,
+            EnableEvaluationCache = true
+        };
+        try
+        {
+            var engine = new EvolutionEngine<NumericGenome>(task, variation,
+                _ => new MapElitesArchive<NumericGenome>(new[]
+                {
+                    new EvolutionDescriptorDefinition("coordinate-0", -5, 5, 10),
+                    new EvolutionDescriptorDefinition("coordinate-1", -5, 5, 10)
+                }), options, selection: method == QualityMethod.HillClimb ? new BestSelection() : null, observer: observer);
+            EvolutionRunResult<NumericGenome> result = await engine.RunAsync(seeds);
+            bool complete = task.Calls == budget && observer.Samples.Sum(sample => sample.Attempts) == budget &&
+                observer.Samples.Sum(sample => sample.CostUnits) == budget && observer.Samples.Count == result.Counters.Proposals &&
+                observer.Samples.All(sample => sample.Status == EvolutionEvaluationStatus.Completed);
+            double[] curve = observer.Samples.Where(sample => sample.Attempts > 0 && sample.BestLoss.HasValue)
+                .Select(sample => sample.BestLoss!.Value).ToArray();
+            return new RunRecord(taskKind, method, seed, initialHash, complete ? "completed" : "incomplete",
+                complete ? null : result.StopReason.ToString(), task.Calls, result.Counters.Proposals,
+                observer.BestLoss, curve.Length == 0 ? null : curve.Average(), result.Islands.Sum(island => island.Count),
+                result.StateHash, observer.Samples, Statistics(variation));
+        }
+        catch (Exception exception) when (exception is not OutOfMemoryException)
+        {
+            // Failed seeds remain in the denominator and output; never silently drop them from comparisons.
+            return new RunRecord(taskKind, method, seed, initialHash, "failed", exception.GetType().FullName,
+                task.Calls, observer.Samples.Count, observer.BestLoss, null, 0, null, observer.Samples, Statistics(variation));
+        }
+    }
+
+    private static IReadOnlyList<EvolutionOperatorStatistics> Statistics(IVariationOperator<NumericGenome> variation) =>
+        (variation as AdaptiveVariationPortfolio<NumericGenome>)?.Statistics ?? Array.Empty<EvolutionOperatorStatistics>();
+
+    private static NumericGenome RandomGenome(StableRandom random) =>
+        new(Enumerable.Range(0, Dimensions).Select(_ => -5 + 10 * random.NextDouble()));
+
+    private sealed class NumericGenome : IImmutableEvolutionGenome<NumericGenome>
+    {
+        internal NumericGenome(IEnumerable<double> coordinates)
+        {
+            Coordinates = Array.AsReadOnly(coordinates.ToArray());
+            Identity = EvolutionHash.Combine(Coordinates.Select(value => value.ToString("R", CultureInfo.InvariantCulture)));
+        }
+        internal IReadOnlyList<double> Coordinates { get; }
+        internal string Identity { get; }
+        public NumericGenome CreateOwnedSnapshot() => new(Coordinates);
+    }
+
+    private sealed class NumericTask(QualityTask kind) : IEvolutionTask<NumericGenome>
+    {
+        public string Id => kind.ToString();
+        public string VersionHash => "numeric-development-v1";
+        public string EvaluatorVersionHash => VersionHash;
+        internal int Calls { get; private set; }
+        public ValueTask<EvolutionCanonicalGenome<NumericGenome>> CanonicalizeAsync(NumericGenome genome,
+            CancellationToken cancellationToken = default) => new(new EvolutionCanonicalGenome<NumericGenome>(genome, genome.Identity));
+        public ValueTask<EvolutionTaskResult> EvaluateAsync(EvolutionCandidate<NumericGenome> candidate,
+            EvolutionEvaluationContext context, CancellationToken cancellationToken = default)
+        {
+            cancellationToken.ThrowIfCancellationRequested();
+            Calls++;
+            IReadOnlyList<double> x = candidate.CanonicalGenome.Genome.Coordinates;
+            double loss = x.Select((value, index) => kind switch
+            {
+                QualityTask.Sphere => value * value,
+                QualityTask.ShiftedQuadratic => Math.Pow(value - (index % 2 == 0 ? 0.75 : -0.25), 2),
+                QualityTask.AnisotropicQuadratic => (index + 1) * (index + 1) * value * value,
+                QualityTask.RippledQuadratic => value * value + 10 * (1 - Math.Cos(2 * Math.PI * value)),
+                _ => throw new ArgumentOutOfRangeException(nameof(kind))
+            }).Sum();
+            return new ValueTask<EvolutionTaskResult>(EvolutionTaskResult.Completed(-loss,
+                new Dictionary<string, double> { ["coordinate-0"] = x[0], ["coordinate-1"] = x[1] }, costUnits: 1));
+        }
+    }
+
+    private sealed class NumericVariation(double radius, bool restart = false) : IVariationOperator<NumericGenome>
+    {
+        public string Id => restart ? "uniform-restart" : "uniform-mutation-" + radius.ToString("R", CultureInfo.InvariantCulture);
+        public string VersionHash => EvolutionHash.Combine(new[] { "numeric-variation-v1", Id });
+        public ValueTask<NumericGenome> ProposeAsync(EvolutionVariationContext<NumericGenome> context,
+            CancellationToken cancellationToken = default)
+        {
+            cancellationToken.ThrowIfCancellationRequested();
+            return new ValueTask<NumericGenome>(restart ? RandomGenome(context.Random) : new NumericGenome(
+                context.Parent.Candidate.CanonicalGenome.Genome.Coordinates.Select(value =>
+                    Math.Clamp(value + radius * (2 * context.Random.NextDouble() - 1), -5, 5))));
+        }
+    }
+
+    private sealed class BestSelection : ISelectionPolicy<NumericGenome>
+    {
+        public string Id => "best-parent";
+        public string VersionHash => "best-parent-v1";
+        public EvolutionSelection<NumericGenome>? Select(IEvolutionArchive<NumericGenome> archive, StableRandom random, int inspirationCount) =>
+            archive.Best is { } best ? new EvolutionSelection<NumericGenome>(best, Array.Empty<EvolutionArchiveEntry<NumericGenome>>()) : null;
+    }
+
+    private sealed class Progress : IEvolutionObserver<NumericGenome>
+    {
+        internal List<SampleRecord> Samples { get; } = new();
+        internal double? BestLoss { get; private set; }
+        public ValueTask OnEventAsync(EvolutionEvent<NumericGenome> evolutionEvent, CancellationToken cancellationToken = default)
+        {
+            if (evolutionEvent.Kind != EvolutionEventKind.Evaluated || evolutionEvent.Evaluation is not { } evaluation) return default;
+            if (evaluation.Status == EvolutionEvaluationStatus.Completed && evaluation.Quality is { } quality)
+                BestLoss = Math.Min(BestLoss ?? double.MaxValue, -quality);
+            Samples.Add(new SampleRecord(evaluation.EvaluationId, evaluation.Status, BestLoss, evaluation.Cost.AttemptCount,
+                evaluation.Cost.CostUnits, evaluation.Diagnostics.Select(diagnostic => diagnostic.Code).ToArray()));
+            return default;
+        }
+    }
+}

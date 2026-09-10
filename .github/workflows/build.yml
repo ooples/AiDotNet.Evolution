@@ -54,6 +54,11 @@ jobs:
           dotnet test tests/AiDotNet.Evolution.Tests/AiDotNet.Evolution.Tests.csproj
           --configuration Release --framework net8.0 --no-restore --verbosity normal
           --blame-hang --blame-hang-timeout 120s --blame-crash
+      - name: Verify numeric quality harness contracts
+        shell: pwsh
+        env:
+          QUALITY_SOURCE_REVISION: ${{ github.sha }}
+        run: ./eng/Test-QualityHarness.ps1 -SourceRevision $env:QUALITY_SOURCE_REVISION
       - name: Enforce coverage ratchet
         shell: pwsh
         run: |
@@ -66,6 +71,7 @@ jobs:
         with:
           name: coverage-and-diagnostics
           path: |
+            TestResults/quality/**/*.json
             coverage/**/coverage.cobertura.xml
             coverage/**/*.dmp
             coverage/**/Sequence_*.xml

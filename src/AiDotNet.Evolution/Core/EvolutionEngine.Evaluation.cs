@@ -455,6 +455,10 @@ public sealed partial class EvolutionEngine<TGenome>
             if (_selection is IOutcomeAwareEvolutionSelectionPolicy<TGenome> adaptiveSelection)
                 adaptiveSelection.Observe(evaluation, insertion);
 
+            if (evaluation.Lineage.Generation > 0 &&
+                _variation is IOutcomeAwareVariationOperator<TGenome> adaptiveVariation)
+                adaptiveVariation.Observe(evaluation, insertion);
+
             if (IsFailureLike(evaluation.Status))
             {
                 foreach (EvolutionDiagnostic diagnostic in evaluation.Diagnostics) RetainFailure(diagnostic);
