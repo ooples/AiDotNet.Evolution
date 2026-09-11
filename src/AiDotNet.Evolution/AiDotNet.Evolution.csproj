@@ -9,7 +9,7 @@
     <ContinuousIntegrationBuild Condition="'$(CI)' == 'true'">true</ContinuousIntegrationBuild>
     <GenerateDocumentationFile>true</GenerateDocumentationFile>
     <GeneratePackageOnBuild>true</GeneratePackageOnBuild>
-    <Version>0.1.0-preview.2</Version>
+    <Version>0.1.0</Version>
     <PackageId>AiDotNet.Evolution</PackageId>
     <Title>AiDotNet.Evolution</Title>
     <Description>Deterministic, task-agnostic quality-diversity evolution for .NET with typed genomes, MAP-Elites archives, checkpointing, migration, and reproducible parallel evaluation.</Description>
