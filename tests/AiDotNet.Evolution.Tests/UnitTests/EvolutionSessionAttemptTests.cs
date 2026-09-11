@@ -110,8 +110,10 @@ public sealed class EvolutionSessionAttemptTests
         Assert.NotEqual(first.CompatibilityHash, second.CompatibilityHash);
     }
 
-    [Fact]
-    public async Task LegacyEvaluationIdCannotCompleteAReplacementAttempt()
+    [Theory]
+    [InlineData(EvolutionEvaluationStatus.Failed)]
+    [InlineData(EvolutionEvaluationStatus.TimedOut)]
+    public async Task LegacyEvaluationIdCannotCompleteAReplacementAttempt(EvolutionEvaluationStatus firstOutcome)
     {
         var options = new EvolutionEngineOptions
         {
@@ -120,7 +122,7 @@ public sealed class EvolutionSessionAttemptTests
             MaxEvaluationAttempts = 2,
             MaxRetries = 1,
             MaxDegreeOfParallelism = 1,
-            EvaluationTimeout = TimeSpan.FromMilliseconds(250),
+            EvaluationTimeout = TimeSpan.FromSeconds(20),
             CheckpointInterval = 0
         };
         using var session = new EvolutionSession<TestGenome>(task => new EvolutionEngine<TestGenome>(task, new UnusedVariation(),
@@ -128,6 +130,11 @@ public sealed class EvolutionSessionAttemptTests
             new[] { new TestGenome(1) }, genome => genome.Value.ToString(CultureInfo.InvariantCulture));
         using var guard = new CancellationTokenSource(TimeSpan.FromSeconds(20));
         var first = Assert.Single(await session.AskAsync(1, guard.Token));
+        // Trigger the same real engine retry transition through its result contract. A 250 ms
+        // wall-clock timeout could expire BOTH attempts before the test thread was scheduled
+        // under coverage/load, testing scheduler speed instead of stale-result fencing.
+        // ExpiredQueuedWorkCannotPretendThatTheSessionHasFinished separately covers real timeout.
+        Assert.True(session.TellAttempt(first.WorkIdentity!, new EvolutionTaskResult(firstOutcome)));
         var replacement = Assert.Single(await session.AskAsync(1, guard.Token));
         Assert.Equal(first.EvaluationId, replacement.EvaluationId);
         Assert.Equal(1, first.Context.AttemptCount); Assert.Equal(2, replacement.Context.AttemptCount);

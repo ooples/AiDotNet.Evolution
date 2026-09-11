@@ -12,6 +12,11 @@ pending work, leases, reservations and receipts after process restart. Lost engi
 state still requires an explicitly labeled search fork, retained campaign costs and unresolved
 liabilities. There is no automatic fork, budget reset or exact partial-batch continuation.
 
+The optional [C ABI](../bindings/c/README.md) exposes the same protocol from a NativeAOT
+shared library. It uses bounded caller-owned buffers and separate submit/read operations;
+querying or resizing a reply buffer never executes the state-mutating request again.
+The newline framing below applies to the subprocess host, not the length-delimited C ABI.
+
 This is a trusted local pipe/library protocol, not an authenticated network service. A
 remote deployment must add access control, transport security, worker isolation and durable
 physical-operation receipts. Anyone with control access can enqueue/cancel work or declare

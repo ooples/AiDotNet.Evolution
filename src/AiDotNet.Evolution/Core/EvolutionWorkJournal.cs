@@ -55,6 +55,7 @@ internal sealed class EvolutionWorkJournal : IDisposable
     internal string Payload { get; private set; } = string.Empty;
     internal long Revision { get; private set; }
     internal bool WasRecovered { get; }
+    internal bool HasTemporaryCleanupFailure { get; private set; }
     // Fault injection at the two acknowledgement boundaries; not part of the public coordinator API.
     internal Action<bool>? Publishing { get; set; }
 
@@ -93,9 +94,11 @@ internal sealed class EvolutionWorkJournal : IDisposable
         finally
         {
             // Only our unique temporary file; committed state and unrelated files are never removed.
-            try { if (File.Exists(temporary)) File.Delete(temporary); }
-            catch (IOException) { }
-            catch (UnauthorizedAccessException) { }
+            // File.Delete already tolerates a missing file. Avoid a separate existence check
+            // that can hide access failures; preserve the publication exception if cleanup fails.
+            try { File.Delete(temporary); }
+            catch (IOException) { HasTemporaryCleanupFailure = true; }
+            catch (UnauthorizedAccessException) { HasTemporaryCleanupFailure = true; }
         }
     }
 

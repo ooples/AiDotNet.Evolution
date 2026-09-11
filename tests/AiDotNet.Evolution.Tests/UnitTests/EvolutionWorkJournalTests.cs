@@ -56,6 +56,34 @@ public sealed class EvolutionWorkJournalTests
     }
 
     [Fact]
+    public void TemporaryCleanupFailureIsObservableWithoutReplacingPublicationFailure()
+    {
+        using var directory = new WorkDirectory();
+        var failure = new IOException("original publication failure");
+        using (var journal = new EvolutionWorkJournal(directory.Path, "before", 1024))
+        {
+            Assert.False(journal.HasTemporaryCleanupFailure);
+            journal.Publishing = published =>
+            {
+                Assert.False(published);
+                string temporary = Assert.Single(Directory.GetFiles(directory.Path, "work-*.tmp"));
+                // The exact file created by this commit only. A directory at that name makes
+                // File.Delete fail on Windows and Unix without relying on platform file locks.
+                File.Delete(temporary);
+                Directory.CreateDirectory(temporary);
+                throw failure;
+            };
+            Assert.Same(failure, Assert.Throws<IOException>(() => journal.Commit("after")));
+            Assert.True(journal.HasTemporaryCleanupFailure);
+            Assert.Throws<InvalidOperationException>(() => journal.Commit("cannot continue"));
+        }
+        using var recovered = new EvolutionWorkJournal(directory.Path, "unused", 1024);
+        Assert.Equal("before", recovered.Payload);
+        Assert.False(recovered.HasTemporaryCleanupFailure);
+        Assert.Single(Directory.GetDirectories(directory.Path, "work-*.tmp"));
+    }
+
+    [Fact]
     public void MissingPublishedStateCannotBeMistakenForANewRun()
     {
         using var directory = new WorkDirectory();

@@ -5,7 +5,7 @@ delivery coordinator. It persists queued work, worker profiles, leases, resource
 results and external-response provenance together. `EvolutionDurableSessionBridge<TGenome>`
 now connects it to a live fingerprinted engine session. `EvolutionWorkProtocol` exposes a
 trusted JSON worker/control endpoint, the native host has a separate `--durable` mode, and
-TypeScript/Python clients use that protocol. It does not restore an evolution engine's
+TypeScript/Python clients and an optional NativeAOT C ABI use that protocol. It does not restore an evolution engine's
 pending proposals or operator state. Local contract/binding tests pass; pinned native
 bridge evidence and final review checks are being completed.
 
@@ -128,6 +128,9 @@ The store holds an exclusive `work.owner` handle. `work.current` contains a boun
 state with revision/length/checksum, written to a unique same-directory temporary file,
 flushed and atomically replaced. Resource and delivery state are one publication. An error
 around publication faults the live writer; dispose and reopen to discover which state won.
+`HasTemporaryCleanupFailure` records a failure to remove that writer's unique temporary
+file without replacing the original publication exception. It is a per-instance diagnostic,
+not persisted state and not permission to delete current work or reset its budget.
 
 Missing, corrupt or incompatible current state is a hard failure. There is no newest-valid
 checkpoint fallback: an older snapshot could forget already dispatched work and charges.

@@ -62,6 +62,10 @@ public sealed partial class DurableEvolutionWorkCoordinator : IDisposable
     public string CompatibilityHash { get; }
     /// <summary>Gets whether existing delivery state was recovered rather than a fresh run created.</summary>
     public bool WasRecovered => _journal.WasRecovered;
+    /// <summary>Gets whether this live coordinator failed to remove its own temporary publication file.</summary>
+    /// <remarks>Readable after a publication failure; diagnostic only, not proof of which state committed.
+    /// The flag is not persisted and never authorizes deleting current state or resetting reservations.</remarks>
+    public bool HasTemporaryCleanupFailure { get { lock (_sync) return _journal.HasTemporaryCleanupFailure; } }
     /// <summary>Always false: delivery persistence does not persist pending proposals or operator state.</summary>
     public bool SupportsExactSearchContinuation => false;
     /// <summary>Gets the explicit guarantee a caller must preserve when reporting a restarted search.</summary>
@@ -417,11 +421,16 @@ public sealed partial class DurableEvolutionWorkCoordinator : IDisposable
                     }
                 }
             }
-            if ((job.Status == WorkItemStatus.Completed ? accepted != 1 : accepted != 0)
-                || (job.Status == WorkItemStatus.Pending && job.Leases.Count >= _options.MaximumDeliveriesPerWork)
-                || (job.Status == WorkItemStatus.DeliveryLimitReached && job.Leases.Count != _options.MaximumDeliveriesPerWork)
-                || (job.Status == WorkItemStatus.Leased && (job.Leases.Count == 0 || job.Leases.Last().Actual is not null
-                    || job.Leases.Last().Expired || job.Leases.Last().CancelRequested)))
+            if (accepted != (job.Status == WorkItemStatus.Completed ? 1 : 0))
+                throw new InvalidDataException("Logical work status disagrees with its accepted results.");
+            bool deliveriesValid = job.Status switch
+            {
+                WorkItemStatus.Pending => job.Leases.Count < _options.MaximumDeliveriesPerWork,
+                WorkItemStatus.DeliveryLimitReached => job.Leases.Count == _options.MaximumDeliveriesPerWork,
+                WorkItemStatus.Leased => job.Leases.LastOrDefault() is { Actual: null, Expired: false, CancelRequested: false },
+                _ => true
+            };
+            if (!deliveriesValid)
                 throw new InvalidDataException("Logical work status disagrees with its deliveries.");
         }
         if (count != operations.Count) throw new InvalidDataException("Orphaned resource operations in durable work state.");
