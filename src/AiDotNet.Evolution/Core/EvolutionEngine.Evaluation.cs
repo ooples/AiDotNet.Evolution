@@ -25,6 +25,12 @@ public sealed partial class EvolutionEngine<TGenome>
     {
         long evaluationId = _nextEvaluationId;
         int island = (int)(evaluationId % _islands.Length);
+        if (_variation is IEvolutionIslandProposalScheduler islandScheduler)
+        {
+            island = islandScheduler.SelectIsland(evaluationId,
+                StableRandom.CreateStream(_options.Seed, unchecked((ulong)evaluationId * 8UL + 7UL)));
+            if (island < 0 || island >= _islands.Length) throw new InvalidOperationException("The island scheduler returned an invalid destination.");
+        }
         int sourceIsland = FindSelectionIsland(island);
         if (sourceIsland < 0) return null;
         IEvolutionArchive<TGenome> sourceArchive = _islands[sourceIsland];

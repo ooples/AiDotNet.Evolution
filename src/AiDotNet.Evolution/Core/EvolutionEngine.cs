@@ -142,6 +142,11 @@ public sealed partial class EvolutionEngine<TGenome>
         ValidateComponent(variation.Id, variation.VersionHash, nameof(variation));
 
         _options = options.SnapshotAndValidate();
+        if (variation is IEvolutionIslandProposalScheduler islandScheduler &&
+            (islandScheduler.IslandCount != _options.IslandCount ||
+             _options.IslandAssignment != EvolutionIslandAssignmentStrategy.RoundRobin ||
+             variation is not ICheckpointableVariationOperator<TGenome>))
+            throw new ArgumentException("An island scheduler requires matching fixed membership, round-robin destination semantics and checkpointable state.", nameof(variation));
         if (_options.EarlyStopping.PatienceEvaluations > 0 &&
             _options.EarlyStopping.MetricName is not null)
         {
