@@ -191,9 +191,16 @@ public sealed class EvolutionParameter
     }
     private static EvolutionParameter Numeric(string name, EvolutionParameterKind kind, double minimum, double maximum)
     {
-        if (!EvolutionDescriptorDefinition.IsFinite(minimum) || !EvolutionDescriptorDefinition.IsFinite(maximum) ||
-            maximum < minimum || !EvolutionDescriptorDefinition.IsFinite(maximum - minimum) ||
-            (kind == EvolutionParameterKind.Logarithmic && minimum <= 0)) throw new ArgumentOutOfRangeException(nameof(minimum));
+        if (!EvolutionDescriptorDefinition.IsFinite(minimum))
+            throw new ArgumentOutOfRangeException(nameof(minimum), minimum, "The minimum must be a finite number.");
+        if (!EvolutionDescriptorDefinition.IsFinite(maximum))
+            throw new ArgumentOutOfRangeException(nameof(maximum), maximum, "The maximum must be a finite number.");
+        if (kind == EvolutionParameterKind.Logarithmic && minimum <= 0)
+            throw new ArgumentOutOfRangeException(nameof(minimum), minimum, "A logarithmic minimum must be greater than zero.");
+        if (maximum < minimum)
+            throw new ArgumentOutOfRangeException(nameof(maximum), maximum, "The maximum must be greater than or equal to the minimum.");
+        if (!EvolutionDescriptorDefinition.IsFinite(maximum - minimum))
+            throw new ArgumentOutOfRangeException(nameof(maximum), maximum, "The interval width maximum - minimum must be finite.");
         return new(name, kind, minimum, maximum, Array.Empty<string>(), Array.Empty<EvolutionParameterCondition>());
     }
 }
