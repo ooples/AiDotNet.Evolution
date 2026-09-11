@@ -8,7 +8,7 @@
     <IsPackable>false</IsPackable>
   </PropertyGroup>
   <ItemGroup>
-    <ProjectReference Include="../../src/AiDotNet.Evolution.Surrogates/AiDotNet.Evolution.Surrogates.csproj" />
-    <ProjectReference Include="../../src/AiDotNet.Evolution/AiDotNet.Evolution.csproj" />
+    <PackageReference Include="AiDotNet.Evolution" Version="[$(CorePackageVersion)]" />
+    <PackageReference Include="AiDotNet.Evolution.Surrogates" Version="[$(SurrogatePackageVersion)]" />
   </ItemGroup>
 </Project>

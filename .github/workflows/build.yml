@@ -160,10 +160,11 @@ jobs:
         with:
           dotnet-version: '10.0.x'
           dotnet-quality: preview
-      - run: dotnet restore src/AiDotNet.Evolution/AiDotNet.Evolution.csproj
+      - run: dotnet restore src/AiDotNet.Evolution.Surrogates/AiDotNet.Evolution.Surrogates.csproj
       - name: Build every package target on this runner
-        run: dotnet build src/AiDotNet.Evolution/AiDotNet.Evolution.csproj --configuration Release --no-restore
+        run: dotnet build src/AiDotNet.Evolution.Surrogates/AiDotNet.Evolution.Surrogates.csproj --configuration Release --no-restore
       - run: dotnet pack src/AiDotNet.Evolution/AiDotNet.Evolution.csproj --configuration Release --no-build --no-restore --output artifacts
+      - run: dotnet pack src/AiDotNet.Evolution.Surrogates/AiDotNet.Evolution.Surrogates.csproj --configuration Release --no-build --no-restore --output artifacts
       - name: Validate package contents and dependency boundary
         shell: pwsh
         run: |
@@ -171,6 +172,9 @@ jobs:
           $version = [string] $project.Project.PropertyGroup.Version
           if ([string]::IsNullOrWhiteSpace($version)) { throw 'The package project has no Version.' }
           ./eng/Test-Package.ps1 -PackagePath "artifacts/AiDotNet.Evolution.$version.nupkg" -ExpectedVersion $version
+          [xml] $adapter = Get-Content -LiteralPath src/AiDotNet.Evolution.Surrogates/AiDotNet.Evolution.Surrogates.csproj -Raw
+          $adapterVersion = [string] $adapter.Project.PropertyGroup.Version
+          ./eng/Test-SurrogatePackage.ps1 -CorePackagePath "artifacts/AiDotNet.Evolution.$version.nupkg" -AdapterPackagePath "artifacts/AiDotNet.Evolution.Surrogates.$adapterVersion.nupkg" -CoreVersion $version -AdapterVersion $adapterVersion
       - uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02 # v4
         with:
           name: packages

@@ -8,6 +8,9 @@
 *.props     text eol=lf
 *.targets   text eol=lf
 *.json      text eol=lf
+# Generated evidence is hashed byte-for-byte by its paired analysis. Preserve
+# those bytes; CRLF-to-LF conversion after hashing invalidates audit provenance.
+benchmarks/evidence/surrogates/**/summary.json -text
 *.md        text eol=lf
 *.yml       text eol=lf
 *.yaml      text eol=lf

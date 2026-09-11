@@ -15,7 +15,8 @@ Given/When/Then checklists. Initial story commits were documentation-only, not c
 implementation slice: producer-declared reused measurements cannot earn fresh portfolio credit, enter
 surrogate training as new evidence or train CMA as fresh population members. Credit retains origin separately
 from current cost; semantic versions reject older learned checkpoints. This fix is on the dependent branch,
-not yet in this shared foundation or consumer source/package pins. US-13, US-14 and US-23 require integration.
+not yet in the shared foundation or consumer source/package pins. US-13, US-14 and US-16 have integrated it
+on their own dependent branches; US-23 still requires integration.
 Full story acceptance and independent current-head review remain open.
 
 ## Implemented in the initial core PR
@@ -123,14 +124,14 @@ Durable evaluation identities and leases must be developed against its eventual 
 | US-06 noisy evaluation | Partial | Fresh bounded replicate runner, per-sample costs, finite-look uncertainty and separate confirmation identities implemented; archive resampling policy, cascade-rejection audit and representative noisy comparisons remain. |
 | US-07 ablations | Partial | Same-operator uniform/adaptive allocation is available; representative island, migration, novelty and dispatch ablations remain. |
 | US-08 adaptive operators | Partial | Parent-improvement/archive-success policies, proposal-plus-evaluator credit and typed attribution implemented; full consumer-stage integration and representative held-out comparisons before default promotion remain. |
-| US-09 Pareto pipeline | Not implemented | Feasibility, objective definitions, archive/snapshot/selection/stopping/migration semantics together. |
-| US-10 engine performance | Partial | BenchmarkDotNet engine/archive/checkpoint suite and fixture validation implemented; controlled repeated baselines, peak memory, dimension/island scaling and regression thresholds remain. |
+| US-09 Pareto pipeline | Local acceptance verified in #52 | Feasible Pareto archive, independent infeasible pool, snapshots, migration and checkpoint validation; 716 tests per target and 180-run pilot. Review/dependencies remain. |
+| US-10 engine performance | Local acceptance verified in #53 | Isolated 44-case profile across three repeats, process CPU constraints, worker/checkpoint semantics and failed-campaign retention; review/dependencies remain. |
 | US-11 application examples | Partial, companion | Executable authored-C# facade/worker/timing/confirmation example exists; representative program, AutoML, kernel and external-session examples remain. |
 | US-12 quality release gates | Partial | Representative measured quality thresholds, confidence and release artifacts. |
 | US-13 typed search spaces | Implemented | Mixed/conditional domains, owned canonical genomes, operators/refinement, checkpointed diagonal CMA and pinned simpler-baseline comparison; no universal-quality claim. |
-| US-14 surrogate assistance | Partial | Cost-metered acquisition, exploration/fallback contracts and a numeric KNN example implemented; production calibration/backends, representative expensive/noisy evidence and durable observation integration remain. |
+| US-14 surrogate assistance | Local functional acceptance verified | Optional reusable numeric adapter, group-disjoint validation, logged reliability/fallback, original-sample guard and all-stage cost-ratio pilot; experimental/default off. External quality/default-promotion evidence remains. |
 | US-15 multi-fidelity | Partial | Bounded successive-halving bracket, exploration, fidelity/replicate identities, incremental state handoff and fresh full confirmation implemented; real learning-workload integration, durable bracket resume and representative comparisons remain. |
-| US-16 adaptive islands | Not implemented | Resource allocation, heterogeneous policies and checkpointed restarts. |
+| US-16 adaptive islands | Local acceptance verified in #58 | Adaptive allocation, minimum floors, archive-preserving restarts, checkpointed child attribution and repeated pilot; no adaptive-allocation superiority claim. |
 | US-17 compiler-guided edits | Partial, companion | Exact identity/boundaries plus bounded C# syntax edits, real emit, compiler repair, reference/assembly fingerprints, attempt evidence and a real console worker/facade integration implemented; correctness-driven repair, OS isolation, public-API/target validation, multi-file evolution and representative performance confirmation remain. |
 | US-18 reusable experience | Not implemented | Provenance-backed retrieval, lessons and calibrated semantic novelty. |
 | US-19 model/prompt routing | Not implemented | Consumer routing policy, end-to-end costs, replay and fixed-routing comparisons. |
@@ -141,6 +142,25 @@ Durable evaluation identities and leases must be developed against its eventual 
 | US-24 CLI/dashboard | Partial | Core numeric CLI plus consumer authored-C# pilot and existing YAML commands; broader lifecycle/provider/dashboard integration remains. |
 | US-25 promotion/retuning | Partial, companion | Tensors persistent quarantine, guarded publication and explicit validated rollback implemented; automatic drift/bounded retuning, coordinated cross-process revocation and program/AutoML registry remain. |
 | US-26 policy meta-evolution | Not implemented | Opt-in declarative policy search, held-out outer loop and complete inner/outer cost accounting. |
+
+## US-14 dependent implementation — September 11
+
+The separate [US-14 PR #56](https://github.com/ooples/AiDotNet.Evolution/pull/56), production `c770896`,
+adds `AiDotNet.Evolution.Surrogates` without making the generic core depend on a model package. It provides
+bounded typed kNN fitting with separate genome-group calibration and validation, auditable rejection reasons,
+uncertainty/domain checks and exact declared work tariffs. Reused or overlapping original measurements cannot
+inflate fitting evidence. A new local-feed/cache package consumer verifies actual dependency bytes.
+
+Local acceptance: 703 tests pass on each target framework, format and both local packages pass, 22 analysis tests
+pass, line/branch coverage 92.20%/78.32% passes the unchanged ratchet. The complete
+[cost-ratio pilot](../benchmarks/evidence/surrogates/c770896/README.md) has 240 scheduled runs and byte-identical
+full replay (27,254 objective calls total). All 18 paired intervals include zero and some observed tails regress.
+No superiority/default-enablement conclusion is warranted. Functional story criteria and remaining review,
+dependency and release integration requirements are recorded in [US-14](evolution-stories/US-14.md).
+
+US-16's separate [PR #58](https://github.com/ooples/AiDotNet.Evolution/pull/58) is also implemented and ready
+for review at `95e3883`, with 745 tests per target and full repeated/restart evidence. Its code is not part of
+this US-14 branch; do not assume that a branch-local test count represents all story branches combined.
 
 ## Validation evidence
 
