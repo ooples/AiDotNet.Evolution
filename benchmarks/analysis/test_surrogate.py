@@ -1,5 +1,8 @@
 import copy
+import gzip
+import hashlib
 import json
+from pathlib import Path
 import unittest
 
 from analyze_surrogate import METHODS, TASKS, analyze
@@ -17,6 +20,23 @@ def campaign():
 
 
 class SurrogateAnalysisTests(unittest.TestCase):
+    def test_checked_in_evidence_hash_chain_survives_git_checkout(self):
+        evidence = Path(__file__).resolve().parents[1] / "evidence" / "surrogates" / "c770896"
+        summary_bytes = (evidence / "summary.json").read_bytes()
+        summary = json.loads(summary_bytes)
+        analysis = json.loads((evidence / "analysis.json").read_bytes())
+        self.assertEqual(analysis["InputSummarySha256"], hashlib.sha256(summary_bytes).hexdigest())
+        compressed = evidence / "raw.json.gz"
+        self.assertEqual(summary["RawGzipSha256"], hashlib.sha256(compressed.read_bytes()).hexdigest())
+        raw_hash = hashlib.sha256(); size = 0
+        with gzip.open(compressed, "rb") as raw:
+            while block := raw.read(65536):
+                size += len(block)
+                self.assertLessEqual(size, 64 * 1024 * 1024)
+                raw_hash.update(block)
+        self.assertEqual(summary["FullTraceSha256"], raw_hash.hexdigest())
+        self.assertEqual(38307179, size)
+
     def test_pairs_are_stratified_by_tariff_and_task(self):
         result = analyze(campaign())
         self.assertEqual(48, result["ScheduledRuns"])

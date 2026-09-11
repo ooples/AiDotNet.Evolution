@@ -151,7 +151,7 @@ bounded typed kNN fitting with separate genome-group calibration and validation,
 uncertainty/domain checks and exact declared work tariffs. Reused or overlapping original measurements cannot
 inflate fitting evidence. A new local-feed/cache package consumer verifies actual dependency bytes.
 
-Local acceptance: 703 tests pass on each target framework, format and both local packages pass, 21 analysis tests
+Local acceptance: 703 tests pass on each target framework, format and both local packages pass, 22 analysis tests
 pass, line/branch coverage 92.20%/78.32% passes the unchanged ratchet. The complete
 [cost-ratio pilot](../benchmarks/evidence/surrogates/c770896/README.md) has 240 scheduled runs and byte-identical
 full replay (27,254 objective calls total). All 18 paired intervals include zero and some observed tails regress.
