@@ -2,7 +2,7 @@
 
 The [research roadmap](COMPETITIVE_ANALYSIS_AND_ROADMAP.md) has **26 open issues and 26 separate dependent draft PRs**.
 Each issue includes the original Given/When/Then criteria, dependency checklist, partial evidence and remaining work.
-All initial story PR commits are **tracking-only checklists, not new algorithm implementation**.
+All initial story PR commits were **tracking-only checklists**. US-08 / #51 now adds a tested partial implementation slice; the other 25 story PRs remain tracking-only.
 Creating a PR or inheriting a foundation does not complete a story.
 
 ## Agreed delivery structure
@@ -53,18 +53,21 @@ Retargeting after squash/rebase merging needs special care to avoid reintroducin
 
 A new 25-case local regression suite reproduced 15 failures where producer-declared reused measurements
 are treated as fresh by operator credit, surrogate observation intake and diagonal-CMA distribution learning.
-No-origin and fresh-measurement controls pass. The production fix is pending in
+No-origin and fresh-measurement controls pass. The fix is implemented and locally verified in
 [US-08 / #51](https://github.com/ooples/AiDotNet.Evolution/pull/51), with relevant acceptance checks in
 [US-13 / #55](https://github.com/ooples/AiDotNet.Evolution/pull/55),
 [US-14 / #56](https://github.com/ooples/AiDotNet.Evolution/pull/56) and
 [US-23 / #62](https://github.com/ooples/AiDotNet.Evolution/pull/62).
-US-13 is therefore partial, not fully verified.
+The expanded 53-case regression suite and all 647 core tests pass on net10.0, net8.0 and net471.
+The fix remains on #51, not the shared foundation; US-13, US-14 and US-23 require dependency integration.
+All affected stories remain partial: this does not establish their full acceptance criteria.
 
 ## Tracking verification
 
 GitHub returned 26 distinct open draft PRs with the expected issue URL, foundation base,
 story branch, original Given/When/Then criteria and exactly one story checklist file per initial diff.
 The issue bodies link back to their respective PRs. This verifies tracking structure only:
-no new production tests, current-head review approval or competitive superiority is claimed for these documentation commits.
+the initial documentation commits claimed no new production tests, current-head review approval or competitive superiority.
+US-08's subsequent code evidence is recorded separately; neither review approval nor competitive superiority is claimed.
 
 See [implementation evidence](IMPLEMENTATION_STATUS.md) for verified work already in the shared drafts.
