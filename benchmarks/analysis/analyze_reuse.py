@@ -85,8 +85,10 @@ def validate_run(group, row, plan, prior_files, repertoire_digest, imported, see
         require(receipt["OperationId"] not in operation_ids and receipt["Outcome"] == 0 and not receipt["ExceededMaximum"], "Invalid/duplicate resource receipt.")
         operation_ids.add(receipt["OperationId"])
         for key, value in receipt["Charged"]["Amounts"].items():
+            require(type(value) in (int, float) and math.isfinite(value) and value >= 0, "Invalid resource charge.")
             charges[key] = charges.get(key, 0) + value
-    require(all(charges.get(key, 0) == value for key, value in ledger["Spent"].items()), "Receipt charges differ from totals.")
+    require({key: value for key, value in charges.items() if value != 0} ==
+            {key: value for key, value in ledger["Spent"].items() if value != 0}, "Receipt charges differ from totals.")
     completed = [entry for entry in row["Trace"] if entry["Status"] == 0]
     require(row["BestObservedQuality"] == max(entry["Quality"] for entry in completed) and
             any(entry["Genome"] == row["BestGenome"] and entry["Quality"] == row["BestObservedQuality"] for entry in completed), "Reported winner differs from measured trace.")
@@ -139,6 +141,11 @@ def validate_run(group, row, plan, prior_files, repertoire_digest, imported, see
         require(confirmation["PhysicalObservations"] == receipt["Spent"]["cost_units"] == 25 and receipt["Unknown"] == 0 and
                 all(value == 0 for value in receipt["Reserved"].values()) and receipt["Admitted"] == receipt["Settled"] == 5 and
                 len(receipt["Receipts"]) == 5 and all(item["Charged"]["Amounts"]["cost_units"] == 5 and item["Outcome"] == 0 for item in receipt["Receipts"]), "Confirmation work was omitted or unsettled.")
+        require(not receipt["MaximumViolated"] and receipt["DroppedReceipts"] == 0 and
+                len({item["OperationId"] for item in receipt["Receipts"]}) == 5 and
+                receipt["Spent"] == {"cost_units": 25} and
+                all(not item["ExceededMaximum"] and item["Charged"]["Amounts"] == {"cost_units": 5} for item in receipt["Receipts"]),
+                "Confirmation receipts are duplicated, incomplete, over-budget or hide work.")
         require(len(confirmation["Rows"]) == 5, "Incomplete confirmation samples.")
         values = []
         for index, entry in enumerate(confirmation["Rows"]):

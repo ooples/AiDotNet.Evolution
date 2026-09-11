@@ -18,35 +18,82 @@ def plan():
         "ConfirmationAggregates": 5, "ConfirmationSamples": 25, "ConfirmationSeedOffset": 1000000}
 
 
-def fixture(group):
+def fixture(group, phase="prior"):
     (group / "raw").mkdir()
-    run = "primary/Quadratic/0/prior"
-    row = {"RunId": run, "Objective": "Quadratic", "Seed": 0, "Phase": "prior", "Method": "ExistingSamples", "Valid": True,
-           "ScopeKey": "a" * 64, "FreshAggregates": 16, "CurrentPhysicalObservations": 80, "Trace": [], "Decisions": [],
+    count = 16 if phase == "prior" else 64
+    run = "primary/Quadratic/0/" + ("prior" if phase == "prior" else phase + "/ExistingSamples")
+    observed = plan()["Clock"] if phase == "prior" else "2026-09-11T00:01:00+00:00"
+    row = {"RunId": run, "Objective": "Quadratic", "Seed": 0, "Phase": phase, "Method": "ExistingSamples", "Valid": True,
+           "ScopeKey": "a" * 64, "FreshAggregates": count, "CurrentPhysicalObservations": count * 5, "Trace": [], "Decisions": [],
            "PriorCostAttributed": 0, "CopiedPriorRecords": 0, "PriorCacheFiles": {}, "RepertoireSha256": None,
-           "CacheHits": 0, "OriginalSampleReferences": 0, "RawReads": 0, "RawWrites": 16,
-           "InitialGenomes": list(range(16)), "BestGenome": 15, "BestObservedQuality": 15,
-           "Counters": {"EvaluationAttempts": 16, "Proposals": 16}, "Confirmation": None}
-    spent = {"cost_units": 80, "cache_store_invocations": 32, "validation_calls": 16, "proposal_calls": 0}
+           "CacheHits": 0, "OriginalSampleReferences": 0, "RawReads": 0, "RawWrites": count,
+           "InitialGenomes": list(range(16 if phase == "prior" else 8)), "BestGenome": count - 1, "BestObservedQuality": count - 1,
+           "Counters": {"EvaluationAttempts": count, "Proposals": count}, "Confirmation": None}
+    spent = {"cost_units": count * 5, "cache_store_invocations": count * 2, "validation_calls": count,
+             "proposal_calls": count - len(row["InitialGenomes"])}
     row["Resources"] = {"Spent": spent, "Unknown": 0, "MaximumViolated": False, "Reserved": {}, "Admitted": 4, "Settled": 4,
         "DroppedReceipts": 0, "Receipts": [{"OperationId": key, "Outcome": 0, "ExceededMaximum": False,
             "Charged": {"Amounts": {key: value}}} for key, value in spent.items()]}
-    for index in range(16):
+    for index in range(count):
         origin = {"Kind": 0, "ScopeKey": "a" * 64, "SourceRunId": run, "SourceEvaluationId": str(index),
-                  "SampleIds": [f"{run}/{index}/{sample}" for sample in range(5)], "ObservedAt": plan()["Clock"],
+                  "SampleIds": [f"{run}/{index}/{sample}" for sample in range(5)], "ObservedAt": observed,
                   "OriginalCostUnits": 5, "StatisticsVersion": "arithmetic-mean-sample-se-v1", "StandardError": 0,
                   "LowerConfidenceBound": None, "UpperConfidenceBound": None, "ConfidenceLevel": None}
         raw = {"Genome": index, "ScopeKey": "a" * 64, "Origin": json.dumps(origin), "Values": [index] * 5,
-               "Mean": index, "StandardError": 0, "RootSeed": 100000, "SeedStream": index}
+               "Mean": index, "StandardError": 0, "RootSeed": plan()["PhaseSeedOffsets"][phase], "SeedStream": index}
         encoded = json.dumps(raw).encode()
         checksum = digest(encoded)
         (group / "raw" / (checksum + ".json")).write_bytes(encoded)
         row["Trace"].append({"EvaluationId": index, "Genome": index, "Status": 0, "Quality": index, "CostUnits": 5, "Origin": raw["Origin"]})
         row["Decisions"].append({"EvaluationId": index, "Decision": 3, "Origin": raw["Origin"], "EvidenceSha256": checksum})
+    if phase != "prior":
+        confirmation = row["Confirmation"] = {"PhysicalObservations": 25, "Mean": count - 1, "StandardError": 0, "Rows": [],
+            "Resources": {"Spent": {"cost_units": 25}, "Unknown": 0, "MaximumViolated": False, "Reserved": {},
+                "Admitted": 5, "Settled": 5, "DroppedReceipts": 0, "Receipts": []}}
+        for index in range(5):
+            origin = {"Kind": 0, "ScopeKey": row["ScopeKey"], "SourceRunId": run + "/confirmation", "SourceEvaluationId": str(index),
+                "SampleIds": [f"{run}/confirmation/{index}/{sample}" for sample in range(5)], "ObservedAt": "2026-09-11T00:01:01+00:00",
+                "OriginalCostUnits": 5, "StatisticsVersion": "arithmetic-mean-sample-se-v1", "StandardError": 0,
+                "LowerConfidenceBound": None, "UpperConfidenceBound": None, "ConfidenceLevel": None}
+            raw = {"Genome": count - 1, "ScopeKey": row["ScopeKey"], "Origin": json.dumps(origin), "Values": [count - 1] * 5,
+                "Mean": count - 1, "StandardError": 0, "RootSeed": plan()["PhaseSeedOffsets"][phase] + 1000000, "SeedStream": 990001 + index}
+            encoded = json.dumps(raw).encode(); checksum = digest(encoded)
+            (group / "raw" / (checksum + ".json")).write_bytes(encoded)
+            confirmation["Rows"].append({"EvaluationId": index, "Genome": count - 1, "Status": 0, "CostUnits": 5,
+                "Quality": count - 1, "Origin": raw["Origin"], "EvidenceSha256": checksum})
+            confirmation["Resources"]["Receipts"].append({"OperationId": str(index), "Outcome": 0, "ExceededMaximum": False,
+                "Charged": {"Amounts": {"cost_units": 5}}})
     return row
 
 
 class ReuseAnalysisTests(unittest.TestCase):
+    def test_fresh_confirmation_has_separate_samples_and_complete_receipts(self):
+        with tempfile.TemporaryDirectory(prefix="reuse-confirmation-") as directory:
+            root = Path(directory); original = fixture(root, "cold"); samples = {}
+            compared = validate_run(root, original, plan(), {}, None, [], samples, set())
+            self.assertEqual(63, compared["ConfirmationMean"])
+            self.assertEqual(345, len(samples))
+            changes = [lambda row: row["Confirmation"].update(Mean=999),
+                lambda row: row["Confirmation"].update(StandardError=999),
+                lambda row: row["Confirmation"]["Rows"][0].update(Genome=999),
+                lambda row: row["Confirmation"]["Resources"].update(DroppedReceipts=1),
+                lambda row: row["Confirmation"]["Resources"].update(MaximumViolated=True),
+                lambda row: row["Confirmation"]["Resources"]["Receipts"][0].update(ExceededMaximum=True),
+                lambda row: row["Confirmation"]["Resources"]["Receipts"][0].update(OperationId="1"),
+                lambda row: row["Confirmation"]["Resources"]["Receipts"][0]["Charged"]["Amounts"].update(hidden_work=1),
+                lambda row: row["Resources"]["Receipts"][0]["Charged"]["Amounts"].update(hidden_work=1)]
+            for index, change in enumerate(changes):
+                changed = copy.deepcopy(original); change(changed)
+                with self.subTest(change=index), self.assertRaises(ValueError):
+                    validate_run(root, changed, plan(), {}, None, [], {}, set())
+
+    def test_workflow_gate_requires_noisy_reuse_job(self):
+        workflow = (Path(__file__).resolve().parents[2] / ".github/workflows/build.yml").read_text()
+        gate = workflow.split("  ci-gate:", 1)[1]
+        self.assertRegex(gate, r"needs:\s*\[[^\]\n]*\bnoisy-reuse\b")
+        self.assertIn("REUSE_RESULT: ${{ needs.noisy-reuse.result }}", gate)
+        self.assertIn('"noisy-reuse:$REUSE_RESULT"', gate)
+
     def test_fixed_primary_plan_and_smoke_pin_rules(self):
         validate_plan(plan())
         for key, value in (("SeedCount", 32), ("SamplesPerAggregate", 1), ("PhysicalObservationCap", 321),
