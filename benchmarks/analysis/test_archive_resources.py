@@ -46,7 +46,7 @@ class ArchiveResourceTests(unittest.TestCase):
     def test_workflow_gate_requires_archive_resource_job(self):
         workflow = (Path(__file__).resolve().parents[2] / ".github/workflows/build.yml").read_text(encoding="utf-8")
         gate = workflow.split("\n  ci-gate:", 1)[1]
-        self.assertIn("needs: [modern, legacy, package, archive-resources]", gate)
+        self.assertRegex(gate, r"needs:\s*\[[^\]\n]*\barchive-resources\b")
         self.assertIn("ARCHIVE_RESULT: ${{ needs.archive-resources.result }}", gate)
         self.assertIn('"archive-resources:$ARCHIVE_RESULT"', gate)
 

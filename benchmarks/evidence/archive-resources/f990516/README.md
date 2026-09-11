@@ -73,6 +73,9 @@ Source-pinned local verification: **664/664 tests on net10.0, net8.0 and net471*
 coverage **91.99% line / 77.96% branch**, above unchanged ratchets. 27 Python analysis
 tests and formatting passed. All three package DLL hashes equal their explicit builds;
 the net10 core hash also equals every campaign worker's core hash. No package was published.
+The subsequent CI-only follow-up makes the archive job part of the aggregate CI gate
+and adds a regression test (28 analysis tests at PR head); the pinned experiment and
+its retained artifacts are unchanged.
 Separate smoke evidence retains 512+512 evaluations, both 1 MiB pre-admission rejections,
 64D grid configuration rejection (zero calls), and 64D centroid completion (eight calls).
 Smoke intervals are not inferential evidence; these additional calls are not hidden inside
