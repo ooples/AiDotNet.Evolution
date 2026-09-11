@@ -56,7 +56,7 @@ public sealed class EvolutionOptionClassificationTests
 
         foreach (PropertyInfo property in properties)
         {
-            var options = new EvolutionEngineOptions();
+            EvolutionEngineOptions options = OptionsFor(property);
             string semanticBefore = options.ToSemanticCanonicalString();
             string budgetBefore = options.ToBudgetCanonicalString();
 
@@ -91,14 +91,14 @@ public sealed class EvolutionOptionClassificationTests
     [Fact]
     public void ChangingAnySemanticOptionChangesTheConfigurationHashThatGuardsResume()
     {
-        string baseline = new EvolutionEngineOptions().ToSemanticCanonicalString();
         var seen = new HashSet<string>(StringComparer.Ordinal);
 
         foreach (PropertyInfo property in WritableOptions())
         {
             if (BudgetOptionNames.Contains(property.Name)) continue;
             if (DerivedOptionNames.Contains(property.Name)) continue;
-            var options = new EvolutionEngineOptions();
+            EvolutionEngineOptions options = OptionsFor(property);
+            string baseline = options.ToSemanticCanonicalString();
             property.SetValue(options, AlternativeValue(property, property.GetValue(options)));
             string canonical = options.ToSemanticCanonicalString();
 
@@ -114,7 +114,7 @@ public sealed class EvolutionOptionClassificationTests
     {
         foreach (PropertyInfo property in WritableOptions())
         {
-            var options = new EvolutionEngineOptions();
+            EvolutionEngineOptions options = OptionsFor(property);
             // A grace period is only valid alongside a timeout, so this pair is always configured together.
             if (property.Name == nameof(EvolutionEngineOptions.EvaluationGracePeriod))
                 options.EvaluationTimeout = TimeSpan.FromSeconds(11);
@@ -138,6 +138,13 @@ public sealed class EvolutionOptionClassificationTests
         .Where(property => property.CanRead && property.CanWrite && property.GetIndexParameters().Length == 0)
         .OrderBy(property => property.Name, StringComparer.Ordinal)
         .ToArray();
+
+    // Pipeline options are conditional semantics: exercise the enabled branch here; the pipeline tests separately
+    // prove disabled-mode hashes stay unchanged and nested options are owned. Do not classify them as budget-only.
+    private static EvolutionEngineOptions OptionsFor(PropertyInfo property) => new()
+    {
+        Dispatch = property.Name == nameof(EvolutionEngineOptions.Pipeline) ? EvolutionDispatchMode.Pipeline : EvolutionDispatchMode.Batch
+    };
 
     private static object AlternativeValue(PropertyInfo property, object? current)
     {
@@ -170,6 +177,8 @@ public sealed class EvolutionOptionClassificationTests
             return new EvolutionArtifactOptions { MaxArtifactBytes = 4_096 };
         if (type == typeof(EvolutionEarlyStoppingOptions))
             return new EvolutionEarlyStoppingOptions { PatienceEvaluations = 9 };
+        if (type == typeof(EvolutionPipelineOptions))
+            return new EvolutionPipelineOptions { WaveSize = 33 };
 
         throw new InvalidOperationException(
             $"'{property.Name}' has type '{type}', which this test cannot vary. Extend AlternativeValue so the new " +

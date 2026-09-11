@@ -22,6 +22,17 @@ public interface ICostedEvolutionProposalSource<TGenome>
     void RestoreState(string state);
 }
 
+/// <summary>Explicitly permits overlapping snapshot-local costed proposal callbacks while learning remains serialized.</summary>
+/// <typeparam name="TGenome">The immutable genome produced by the backend.</typeparam>
+/// <remarks>Callbacks must not mutate shared learning/random state or depend on arrival order. Source VersionHash
+/// must describe this capability and all external response semantics. The resource adapter enables parallelism only
+/// inside an engine-coordinated, pre-reserved pipeline phase; ordinary direct adapter calls remain serialized.</remarks>
+public interface IDeterministicConcurrentCostedEvolutionProposalSource<TGenome> : ICostedEvolutionProposalSource<TGenome>
+{
+    /// <summary>Gets whether the configured backend supports deterministic overlapping proposal callbacks.</summary>
+    bool SupportsDeterministicConcurrency { get; }
+}
+
 /// <summary>Supplies owned pending proposal costs before terminal outcome feedback consumes them.</summary>
 /// <remarks>The source must also implement checkpointable variation so pending costs participate in replay.</remarks>
 public interface IEvolutionProposalCostProvider

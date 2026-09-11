@@ -36,7 +36,7 @@ public sealed class EvolutionOperatorRewardPolicy
         if (!EvolutionDescriptorDefinition.IsFinite(qualityScale) || qualityScale <= 0) throw new ArgumentOutOfRangeException(nameof(qualityScale));
         if (!EvolutionDescriptorDefinition.IsFinite(minimumCostUnits) || minimumCostUnits <= 0) throw new ArgumentOutOfRangeException(nameof(minimumCostUnits));
         Kind = kind; CostBasis = costBasis; CostUnitVersionHash = costUnitVersionHash; QualityScale = qualityScale; MinimumCostUnits = minimumCostUnits;
-        VersionHash = EvolutionHash.Combine(new[] { "operator-reward-v1", kind.ToString(), costBasis.ToString(), costUnitVersionHash,
+        VersionHash = EvolutionHash.Combine(new[] { "operator-reward-v2-measurement-origin", kind.ToString(), costBasis.ToString(), costUnitVersionHash,
             EvolutionHash.EncodeDouble(qualityScale), EvolutionHash.EncodeDouble(minimumCostUnits) });
     }
     /// <summary>Gets archive-success or parent-relative scalar improvement semantics.</summary>
@@ -56,7 +56,7 @@ public sealed class EvolutionOperatorRewardPolicy
         EvolutionArchiveInsertionResult? insertion, EvolutionProposalCost? proposalCost)
     {
         bool changed = insertion is EvolutionArchiveInsertionResult.Inserted or EvolutionArchiveInsertionResult.Replaced or EvolutionArchiveInsertionResult.InsertedWithEviction;
-        if (!changed || evaluation.Status != EvolutionEvaluationStatus.Completed || evaluation.CacheStatus == EvolutionCacheStatus.Hit ||
+        if (!changed || evaluation.Status != EvolutionEvaluationStatus.Completed || evaluation.IsMeasurementReuse ||
             evaluation.Cost.AttemptCount == 0 || !evaluation.Quality.HasValue || evaluation.ConstraintViolations.Any(value => value > 0)) return 0;
         if (proposalCost is not null && (proposalCost.Outcome != EvolutionResourceOutcome.Completed || proposalCost.ExceededMaximum)) return 0;
         if (evaluation.Diagnostics.Any(diagnostic => diagnostic.Code is "resource_cost_unknown" or "resource_cost_unrepresentable" or "resource_maximum_exceeded")) return 0;

@@ -6,8 +6,9 @@ namespace AiDotNet.Evolution;
 /// <summary>Adapts a cost-receipting proposal backend to the engine with checkpointed generation-level cost attribution.</summary>
 /// <typeparam name="TGenome">The immutable task-specific genome.</typeparam>
 /// <remarks>Charges proposal work only, not evaluator/setup/refinement work outside the backend. Both its pending
-/// attribution and backend state are checkpointed; persist the matching shared ledger separately. Methods are serialized,
-/// like the engine's current proposal path. Mid-dispatch checkpoints and concurrent calls are rejected. No diagnostic
+/// attribution and backend state are checkpointed; persist the matching shared ledger separately. Ordinary calls are
+/// serialized; a declared concurrent backend may overlap only in an engine-coordinated pre-reserved pipeline phase.
+/// Mid-phase checkpoints and feedback are rejected. No diagnostic
 /// observer supplies learning or costs. A restored backend must be discarded if its own RestoreState fails.</remarks>
 public sealed class ResourceMeteredVariationOperator<TGenome> : IOutcomeAwareVariationOperator<TGenome>, IEvolutionProposalCostProvider
 {
@@ -17,6 +18,30 @@ public sealed class ResourceMeteredVariationOperator<TGenome> : IOutcomeAwareVar
     private readonly EvolutionResources _maximum;
     private SortedDictionary<long, Pending> _pending = new();
     private int _busy;
+    private int _pipelineCalls;
+    private readonly object _pendingGate = new();
+    private EvolutionPipelineResourcePhase? _pipelinePhase;
+    internal bool SupportsPipelineConcurrency => _source is IDeterministicConcurrentCostedEvolutionProposalSource<TGenome> concurrent && concurrent.SupportsDeterministicConcurrency;
+
+    internal void BeginPipelinePhase()
+    {
+        using var guard = Enter();
+        if (_pipelinePhase is not null) throw new InvalidOperationException("A pipeline proposal resource phase is already active.");
+        _pipelinePhase = new EvolutionPipelineResourcePhase(_ledger);
+    }
+
+    internal bool ReservePipelineProposal(long generation)
+    {
+        using var guard = Enter(allowPipelinePhase: true);
+        return (_pipelinePhase ?? throw new InvalidOperationException("Begin a pipeline resource phase first."))
+            .Reserve(Operation(generation), EvolutionResourceStage.Proposal, _maximum);
+    }
+
+    internal void EndPipelinePhase()
+    {
+        using var guard = Enter(allowPipelinePhase: true);
+        EvolutionPipelineResourcePhase? phase = _pipelinePhase; _pipelinePhase = null; phase?.Dispose();
+    }
 
     /// <summary>Creates an adapter with externally enforced proposal maxima, including an explicit cost_units maximum.</summary>
     public ResourceMeteredVariationOperator(ICostedEvolutionProposalSource<TGenome> source, EvolutionResourceLedger ledger,
@@ -30,7 +55,8 @@ public sealed class ResourceMeteredVariationOperator<TGenome> : IOutcomeAwareVar
         _source = source; _ledger = ledger; _maximum = maximumProposalResources; CostUnitVersionHash = costUnitVersionHash;
         Id = "resource-metered:" + source.Id;
         VersionHash = EvolutionHash.Combine(new[] { "resource-metered-variation-v1", source.Id, source.VersionHash, costUnitVersionHash }
-            .Concat(_maximum.Amounts.SelectMany(pair => new[] { pair.Key, pair.Value.ToString(CultureInfo.InvariantCulture) })));
+            .Concat(_maximum.Amounts.SelectMany(pair => new[] { pair.Key, pair.Value.ToString(CultureInfo.InvariantCulture) }))
+            .Concat(SupportsPipelineConcurrency ? new[] { "pipeline-concurrent-source-v1" } : Array.Empty<string>()));
     }
     /// <inheritdoc/>
     public string Id { get; }
@@ -42,18 +68,24 @@ public sealed class ResourceMeteredVariationOperator<TGenome> : IOutcomeAwareVar
     /// <inheritdoc/>
     public async ValueTask<TGenome> ProposeAsync(EvolutionVariationContext<TGenome> context, CancellationToken cancellationToken = default)
     {
-        Guard.NotNull(context); using var guard = Enter(); cancellationToken.ThrowIfCancellationRequested();
-        if (context.Generation <= 0 || _pending.ContainsKey(context.Generation)) throw new ArgumentException("Unique positive generation required.", nameof(context));
-        if (_pending.Count >= MaximumPending) throw new InvalidOperationException("Pending proposal costs reached their bound.");
+        Guard.NotNull(context); using var guard = EnterProposal(); cancellationToken.ThrowIfCancellationRequested();
+        var pending = new Pending { Charged = Copy(EvolutionResources.Of("cost_units", 0)), Outcome = EvolutionResourceOutcome.Rejected };
+        lock (_pendingGate)
+        {
+            if (context.Generation <= 0 || _pending.ContainsKey(context.Generation)) throw new ArgumentException("Unique positive generation required.", nameof(context));
+            if (_pending.Count >= MaximumPending) throw new InvalidOperationException("Pending proposal costs reached their bound.");
+            _pending.Add(context.Generation, pending);
+        }
         string operation = Operation(context.Generation);
-        using EvolutionResourceReservation? reservation = _ledger.TryReserve(operation, EvolutionResourceStage.Proposal, _maximum, _maximum);
+        EvolutionResourceReservation? admitted;
+        try { admitted = _pipelinePhase is not null ? _pipelinePhase.Take(operation) : _ledger.TryReserve(operation, EvolutionResourceStage.Proposal, _maximum, _maximum); }
+        catch { lock (_pendingGate) _pending.Remove(context.Generation); throw; }
+        using EvolutionResourceReservation? reservation = admitted;
         if (reservation is null)
         {
-            _pending.Add(context.Generation, new Pending { Charged = Copy(EvolutionResources.Of("cost_units", 0)), Outcome = EvolutionResourceOutcome.Rejected });
             throw new EvolutionResourceBudgetException(operation);
         }
-        var pending = new Pending { Charged = Copy(_maximum), Outcome = EvolutionResourceOutcome.Unknown, Dispatched = true };
-        _pending.Add(context.Generation, pending);
+        pending.Charged = Copy(_maximum); pending.Outcome = EvolutionResourceOutcome.Unknown; pending.Dispatched = true;
         var result = await _source.ProposeAsync(context, cancellationToken).ConfigureAwait(false)
             ?? throw new InvalidOperationException("Proposal backend returned no receipt.");
         if (!result.Actual.Amounts.ContainsKey("cost_units")) throw new InvalidOperationException("Proposal receipt omitted explicit cost_units.");
@@ -127,10 +159,28 @@ public sealed class ResourceMeteredVariationOperator<TGenome> : IOutcomeAwareVar
     }
 
     private string Operation(long generation) => "proposal/" + VersionHash + "/" + generation.ToString(CultureInfo.InvariantCulture);
-    private Invocation Enter()
+    private Invocation Enter(bool allowPipelinePhase = false)
     {
         if (Interlocked.CompareExchange(ref _busy, 1, 0) != 0) throw new InvalidOperationException("Concurrent proposal use or mid-dispatch checkpoint is unsupported.");
+        if (Volatile.Read(ref _pipelineCalls) != 0)
+        { Volatile.Write(ref _busy, 0); throw new InvalidOperationException("Pipeline proposals must drain before learning, receipt inspection or checkpointing."); }
+        if (_pipelinePhase is not null && !allowPipelinePhase)
+        { Volatile.Write(ref _busy, 0); throw new InvalidOperationException("End the pre-reserved pipeline phase before feedback, receipt inspection or checkpointing."); }
         return new Invocation(this);
+    }
+
+    private IDisposable EnterProposal()
+    {
+        if (_pipelinePhase is null || !SupportsPipelineConcurrency) return Enter(allowPipelinePhase: true);
+        Interlocked.Increment(ref _pipelineCalls);
+        if (Volatile.Read(ref _busy) != 0)
+        { Interlocked.Decrement(ref _pipelineCalls); throw new InvalidOperationException("Proposal dispatch cannot overlap checkpoint or feedback."); }
+        return new PipelineInvocation(this);
+    }
+
+    private sealed class PipelineInvocation(ResourceMeteredVariationOperator<TGenome> owner) : IDisposable
+    {
+        public void Dispose() => Interlocked.Decrement(ref owner._pipelineCalls);
     }
     private sealed class Invocation(ResourceMeteredVariationOperator<TGenome> owner) : IDisposable
     {

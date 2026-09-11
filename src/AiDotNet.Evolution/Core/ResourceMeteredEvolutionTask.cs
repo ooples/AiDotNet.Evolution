@@ -17,6 +17,28 @@ public sealed class ResourceMeteredEvolutionTask<TGenome> : ICascadeEvolutionTas
     private readonly IEvolutionTask<TGenome> _inner;
     private readonly EvolutionResourceLedger _ledger;
     private readonly decimal[] _maxima;
+    private EvolutionPipelineResourcePhase? _pipelinePhase;
+
+    internal void BeginPipelinePhase()
+    {
+        if (_pipelinePhase is not null) throw new InvalidOperationException("A pipeline evaluation resource phase is already active.");
+        _pipelinePhase = new EvolutionPipelineResourcePhase(_ledger);
+    }
+
+    internal void ReservePipelineAttempt(long evaluationId, int attempt, bool cascade)
+    {
+        EvolutionPipelineResourcePhase phase = _pipelinePhase ?? throw new InvalidOperationException("Begin a pipeline resource phase first.");
+        if (!cascade) phase.Reserve(Operation(evaluationId, attempt, -1), EvolutionResourceStage.Evaluation, EvolutionResources.Of("cost_units", _maxima.Sum()), attempt);
+        else
+            for (int stage = 0; stage < _maxima.Length; stage++)
+                phase.Reserve(Operation(evaluationId, attempt, stage), stage < _maxima.Length - 1 ? EvolutionResourceStage.Screening : EvolutionResourceStage.Evaluation,
+                    EvolutionResources.Of("cost_units", _maxima[stage]), attempt);
+    }
+
+    internal void EndPipelinePhase()
+    {
+        EvolutionPipelineResourcePhase? phase = _pipelinePhase; _pipelinePhase = null; phase?.Dispose();
+    }
 
     /// <summary>Wraps a task with one maximum per cascade stage, or one maximum for an ordinary task.</summary>
     public ResourceMeteredEvolutionTask(IEvolutionTask<TGenome> inner, EvolutionResourceLedger ledger,
@@ -63,10 +85,9 @@ public sealed class ResourceMeteredEvolutionTask<TGenome> : ICascadeEvolutionTas
         Guard.NotNull(candidate); Guard.NotNull(context);
         decimal maximum = stage < 0 ? _maxima.Sum() : _maxima[stage];
         EvolutionResources reserved = EvolutionResources.Of("cost_units", maximum);
-        string operation = "evaluation/" + context.EvaluationId.ToString(CultureInfo.InvariantCulture) + "/attempt/" +
-            context.AttemptCount.ToString(CultureInfo.InvariantCulture) + "/stage/" + stage.ToString(CultureInfo.InvariantCulture);
+        string operation = Operation(context.EvaluationId, context.AttemptCount, stage);
         cancellationToken.ThrowIfCancellationRequested();
-        using EvolutionResourceReservation? reservation = _ledger.TryReserve(operation,
+        using EvolutionResourceReservation? reservation = _pipelinePhase is not null ? _pipelinePhase.Take(operation) : _ledger.TryReserve(operation,
             stage >= 0 && stage < StageCount - 1 ? EvolutionResourceStage.Screening : EvolutionResourceStage.Evaluation,
             reserved, reserved, context.AttemptCount);
         if (reservation is null)
@@ -118,4 +139,7 @@ public sealed class ResourceMeteredEvolutionTask<TGenome> : ICascadeEvolutionTas
             new[] { new EvolutionDiagnostic(code, message) }.Concat(result.Diagnostics).Take(EvolutionTaskResult.MaximumDiagnostics), result.Metrics, result.Artifacts);
         return result.MeasurementOrigin is null ? failed : failed.WithMeasurementOrigin(result.MeasurementOrigin);
     }
+
+    private static string Operation(long evaluationId, int attempt, int stage) => "evaluation/" + evaluationId.ToString(CultureInfo.InvariantCulture) + "/attempt/" +
+        attempt.ToString(CultureInfo.InvariantCulture) + "/stage/" + stage.ToString(CultureInfo.InvariantCulture);
 }
