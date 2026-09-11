@@ -115,6 +115,47 @@ public sealed class EvolutionNarrowLogDomainTests
     }
 
     [Fact]
+    public void OrdinaryLogDomainsDecodeBothBoundsExactlyAndKeepIdentityWhenMutatingOutward()
+    {
+        var domains = new List<(double Minimum, double Maximum)>
+        {
+            (3, 7), (1e-8, 1), (0.001, 10), (1e-5, 1e-1), (1e100, 1e101), (1e-4, 1e4),
+            (1e-300, 1e300), (double.Epsilon, double.MaxValue), (1e100, Offset(1e100, 300))
+        };
+        var random = new Random(11);
+        for (int i = 0; i < 2000; i++)
+        {
+            double minimum = Math.Exp(random.NextDouble() * 200 - 100);
+            domains.Add((minimum, minimum * Math.Exp(random.NextDouble() * 20 + 1e-6)));
+        }
+        foreach ((double minimum, double maximum) in domains)
+        {
+            var parameter = EvolutionParameter.Logarithmic("x", minimum, maximum);
+            Assert.Equal(minimum, parameter.FromNormalized(0).Number);
+            Assert.Equal(maximum, parameter.FromNormalized(1).Number);
+            Assert.Equal(minimum, parameter.FromNormalized(-5).Number);
+            Assert.Equal(maximum, parameter.FromNormalized(5).Number);
+            Assert.Equal(0, parameter.Normalize(EvolutionParameterValue.Numeric(minimum)));
+            Assert.Equal(1, parameter.Normalize(EvolutionParameterValue.Numeric(maximum)));
+            // A parent sitting on a bound and mutating outward stays on that bound instead of drifting
+            // just inside it and acquiring a new identity.
+            var space = new EvolutionSearchSpaceBuilder().Add(parameter).Build();
+            foreach (double bound in new[] { minimum, maximum })
+            {
+                double coordinate = parameter.Normalize(EvolutionParameterValue.Numeric(bound));
+                double outward = bound == minimum ? coordinate - 0.37 : coordinate + 0.37;
+                Assert.Equal(bound, parameter.FromNormalized(outward).Number);
+                var parent = space.CreateGenome(new Dictionary<string, EvolutionParameterValue> { ["x"] = EvolutionParameterValue.Numeric(bound) });
+                var mutated = space.CreateGenome(new Dictionary<string, EvolutionParameterValue> { ["x"] = parameter.FromNormalized(outward) });
+                Assert.Equal(parent.Identity, mutated.Identity);
+            }
+        }
+        // Wide domains stay logarithmic rather than silently becoming linear interpolation.
+        Assert.Equal(Math.Sqrt(21), EvolutionParameter.Logarithmic("x", 3, 7).FromNormalized(0.5).Number, 12);
+        Assert.Equal(0.1, EvolutionParameter.Logarithmic("x", 0.001, 10).FromNormalized(0.5).Number, 12);
+    }
+
+    [Fact]
     public async Task SearchOverANearCollapsedLogDomainVisitsManyDistinctValues()
     {
         double minimum = 1e100;
