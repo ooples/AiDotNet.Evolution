@@ -1,6 +1,7 @@
 # User-story delivery index
 
-The [research roadmap](COMPETITIVE_ANALYSIS_AND_ROADMAP.md) has **26 open issues and 26 separate dependent draft PRs**.
+The [research roadmap](COMPETITIVE_ANALYSIS_AND_ROADMAP.md) has **26 open issues and 26 separate dependent PRs**:
+US-08 / #51 is ready for review of its completed learning-correctness slice; the other 25 remain tracking drafts.
 Each issue includes the original Given/When/Then criteria, dependency checklist, partial evidence and remaining work.
 All initial story PR commits were **tracking-only checklists**. US-08 / #51 now adds a tested partial implementation slice; the other 25 story PRs remain tracking-only.
 Creating a PR or inheriting a foundation does not complete a story.
@@ -13,14 +14,15 @@ Per the user's September 11 decision, retain [core #15](https://github.com/oople
 Story PRs target the corresponding foundation branch. All issues are centralized in Evolution;
 primary story PR ownership is 19 Evolution, six AiDotNet and one Tensors. Add companion PRs where needed.
 
-Keep dependent PRs in draft until their implementation and validation dependencies are satisfied.
+Mark a completed, verified PR scope ready for review; keep unfinished implementation and tracking-only PRs in draft.
+Review readiness is not merge approval, dependency completion or completion of the containing user story.
 Do not merge tracking-only PRs into the shared feature branches just to clear the queue.
 After a foundation merges, retarget dependents to the repository's default branch and verify ancestry,
 the resulting diff, package/source compatibility, tests, coverage and current-head reviews.
 Cross-repository prerequisites are explicit links, not dependencies enforced by GitHub's base branch.
 Retargeting after squash/rebase merging needs special care to avoid reintroducing foundation changes.
 
-| Story | Issue | Implementation status | Dependent draft PR |
+| Story | Issue | Implementation status | Dependent PR |
 | --- | --- | --- | --- |
 | US-01: Establish a representative benchmark suite | [#19](https://github.com/ooples/AiDotNet.Evolution/issues/19) | Partial | [AiDotNet.Evolution#45](https://github.com/ooples/AiDotNet.Evolution/pull/45) |
 | US-02: Make fair comparisons against competitors | [#20](https://github.com/ooples/AiDotNet.Evolution/issues/20) | Partial | [AiDotNet.Evolution#46](https://github.com/ooples/AiDotNet.Evolution/pull/46) |
@@ -29,7 +31,7 @@ Retargeting after squash/rebase merging needs special care to avoid reintroducin
 | US-05: Account for and enforce the real search budget | [#23](https://github.com/ooples/AiDotNet.Evolution/issues/23) | Partial | [AiDotNet.Evolution#48](https://github.com/ooples/AiDotNet.Evolution/pull/48) |
 | US-06: Handle noisy measurements and expensive evaluation | [#24](https://github.com/ooples/AiDotNet.Evolution/issues/24) | Partial | [AiDotNet.Evolution#49](https://github.com/ooples/AiDotNet.Evolution/pull/49) |
 | US-07: Identify which existing features improve search | [#25](https://github.com/ooples/AiDotNet.Evolution/issues/25) | Partial | [AiDotNet.Evolution#50](https://github.com/ooples/AiDotNet.Evolution/pull/50) |
-| US-08: Adapt proposal strategies using measured outcomes | [#26](https://github.com/ooples/AiDotNet.Evolution/issues/26) | Partial | [AiDotNet.Evolution#51](https://github.com/ooples/AiDotNet.Evolution/pull/51) |
+| US-08: Adapt proposal strategies using measured outcomes | [#26](https://github.com/ooples/AiDotNet.Evolution/issues/26) | Partial story; completed fix ready for review | [AiDotNet.Evolution#51](https://github.com/ooples/AiDotNet.Evolution/pull/51) |
 | US-09: Preserve useful tradeoffs between objectives | [#27](https://github.com/ooples/AiDotNet.Evolution/issues/27) | Not implemented | [AiDotNet.Evolution#52](https://github.com/ooples/AiDotNet.Evolution/pull/52) |
 | US-10: Measure engine overhead and scaling | [#28](https://github.com/ooples/AiDotNet.Evolution/issues/28) | Partial | [AiDotNet.Evolution#53](https://github.com/ooples/AiDotNet.Evolution/pull/53) |
 | US-11: Demonstrate value in consumer workloads | [#29](https://github.com/ooples/AiDotNet.Evolution/issues/29) | Partial, companion | [AiDotNet#2164](https://github.com/ooples/AiDotNet/pull/2164) |
@@ -49,6 +51,22 @@ Retargeting after squash/rebase merging needs special care to avoid reintroducin
 | US-25: Promote validated results and retune when conditions change | [#43](https://github.com/ooples/AiDotNet.Evolution/issues/43) | Partial, companion | [AiDotNet.Tensors#1030](https://github.com/ooples/AiDotNet.Tensors/pull/1030) |
 | US-26: Experiment with evolution of search policies themselves | [#44](https://github.com/ooples/AiDotNet.Evolution/issues/44) | Not implemented | [AiDotNet.Evolution#63](https://github.com/ooples/AiDotNet.Evolution/pull/63) |
 
+## Review-readiness audit
+
+The user requested that completed work leave draft status while continuing to build on the combined foundations.
+
+- **Evolution #51: ready for review.** The bounded reuse-learning fix is implemented; at code/integration head
+  `c412cc1`, all 651 tests passed on each target framework and all hosted gates passed. Full US-08 remains open.
+- **Tensors #1024: ready for review.** The bounded quarantine/validated-rollback slice at `665cb3c8` has passing
+  build, GPU-parity and coverage checks. Independent approval and the broader US-25 work remain outstanding.
+- **Evolution #15: draft.** Retained as the shared foundation; the known reuse-learning correction is in #51,
+  not this branch. Passing CI does not remove that integration requirement.
+- **AiDotNet #2148: draft.** At `367fce237`, focused compiler checks pass but normal build/validation,
+  documentation/sample and model-fixture workflows report failures. Compatible published-package integration
+  also remains unresolved. An older approval is not approval of this head.
+
+No issues were closed and no PRs merged. The full roadmap is unfinished.
+
 ## Current adversarial finding
 
 A new 25-case local regression suite reproduced 15 failures where producer-declared reused measurements
@@ -58,16 +76,17 @@ No-origin and fresh-measurement controls pass. The fix is implemented and locall
 [US-13 / #55](https://github.com/ooples/AiDotNet.Evolution/pull/55),
 [US-14 / #56](https://github.com/ooples/AiDotNet.Evolution/pull/56) and
 [US-23 / #62](https://github.com/ooples/AiDotNet.Evolution/pull/62).
-The expanded 53-case regression suite and all 647 core tests pass on net10.0, net8.0 and net471.
+The expanded 53-case regression suite passes. With four shared workflow-trigger tests integrated, all 651
+tests pass on net10.0, net8.0 and net471 at `c412cc1`; hosted checks also passed on that revision.
 The fix remains on #51, not the shared foundation; US-13, US-14 and US-23 require dependency integration.
 All affected stories remain partial: this does not establish their full acceptance criteria.
 
 ## Tracking verification
 
-GitHub returned 26 distinct open draft PRs with the expected issue URL, foundation base,
+At creation, GitHub returned 26 distinct open draft PRs with the expected issue URL, foundation base,
 story branch, original Given/When/Then criteria and exactly one story checklist file per initial diff.
 The issue bodies link back to their respective PRs. This verifies tracking structure only:
 the initial documentation commits claimed no new production tests, current-head review approval or competitive superiority.
 US-08's subsequent code evidence is recorded separately; neither review approval nor competitive superiority is claimed.
 
-See [implementation evidence](IMPLEMENTATION_STATUS.md) for verified work already in the shared drafts.
+See [implementation evidence](IMPLEMENTATION_STATUS.md) for verified work already in the shared foundations.
