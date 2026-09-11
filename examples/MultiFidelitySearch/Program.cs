@@ -1,6 +1,11 @@
 using System.Text.Json;
 using System.Text.Json.Serialization;
 using AiDotNet.Evolution;
+using MultiFidelitySearch;
+
+if (args.Length == 1 && args[0] == "--verify-training") { IncrementalRegressionTask.VerifyTraining(); return 0; }
+if (args.Length > 0 && args[0] == "--regression") return await RegressionCampaign.RunAsync(args.Skip(1).ToArray());
+if (args.Length > 0 && args[0] == "--checkpoint-regression") return await RegressionRecovery.RunAsync(args.Skip(1).ToArray());
 
 int seeds = 2;
 if (args.Length > 2 || (args.Length > 0 && !int.TryParse(args[0], out seeds)) || seeds is < 1 or > 32)

@@ -14,7 +14,9 @@ public enum EvolutionFidelityStopReason
     /// <summary>Cancellation ended the bracket; dispatched work remains charged.</summary>
     Canceled,
     /// <summary>A producer exceeded its declared measurement maximum.</summary>
-    MaximumCostExceeded
+    MaximumCostExceeded,
+    /// <summary>A caller persisted a coherent settled-batch checkpoint and requested a coordinated pause.</summary>
+    Paused
 }
 
 /// <summary>One genome's actual replicate batch at an identified fidelity and purpose.</summary>

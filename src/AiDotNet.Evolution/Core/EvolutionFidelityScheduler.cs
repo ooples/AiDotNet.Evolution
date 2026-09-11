@@ -9,7 +9,7 @@ namespace AiDotNet.Evolution;
 /// validate any external state referenced by a continuation token. No token is passed to confirmation.
 /// The bracket is not a persistent worker scheduler and does not automatically admit any result to an archive.
 /// Serialize runs sharing stateful callbacks unless the backend explicitly supports concurrent execution.</remarks>
-public sealed class EvolutionFidelityScheduler<TGenome>
+public sealed partial class EvolutionFidelityScheduler<TGenome>
 {
     private readonly EvolutionFidelityPlan _plan;
     private readonly EvolutionResourceLedger _ledger;
@@ -38,8 +38,28 @@ public sealed class EvolutionFidelityScheduler<TGenome>
     public string VersionHash { get; }
 
     /// <summary>Processes 2..64 candidates and then separately confirms all complete final-level survivors from scratch.</summary>
-    public async ValueTask<EvolutionFidelityReport<TGenome>> RunAsync(string runId, IReadOnlyList<EvolutionCanonicalGenome<TGenome>> candidates,
-        ulong seed, CancellationToken cancellationToken = default)
+    public ValueTask<EvolutionFidelityReport<TGenome>> RunAsync(string runId, IReadOnlyList<EvolutionCanonicalGenome<TGenome>> candidates,
+        ulong seed, CancellationToken cancellationToken = default) => RunCoreAsync(runId, candidates, seed, null, null, cancellationToken);
+
+    /// <summary>Runs with explicit settled-batch checkpoints; returning false from the sink pauses before further dispatch.</summary>
+    /// <remarks>
+    /// For resume, re-supply the same immutable cohort/run/seed and a ledger restored to checkpoint.GetResourceState().
+    /// The sink must persist atomically in a trusted store and must not mutate the ledger. Serialize access to this run
+    /// and its ledger. This is coordinated pause/restart, not recovery of unjournaled work after arbitrary process death.
+    /// Sink failures propagate after preserving measurement charges. Replayed prefix evidence never calls an evaluator
+    /// or reserves/charges an original sample again. Independent confirmation still receives no search token.
+    /// </remarks>
+    public ValueTask<EvolutionFidelityReport<TGenome>> RunCheckpointedAsync(string runId, IReadOnlyList<EvolutionCanonicalGenome<TGenome>> candidates,
+        ulong seed, Func<EvolutionFidelityCheckpoint, CancellationToken, ValueTask<bool>> checkpointSink,
+        EvolutionFidelityCheckpoint? checkpoint = null, CancellationToken cancellationToken = default)
+    {
+        Guard.NotNull(checkpointSink);
+        return RunCoreAsync(runId, candidates, seed, checkpointSink, checkpoint, cancellationToken);
+    }
+
+    private async ValueTask<EvolutionFidelityReport<TGenome>> RunCoreAsync(string runId, IReadOnlyList<EvolutionCanonicalGenome<TGenome>> candidates,
+        ulong seed, Func<EvolutionFidelityCheckpoint, CancellationToken, ValueTask<bool>>? checkpointSink,
+        EvolutionFidelityCheckpoint? checkpoint, CancellationToken cancellationToken)
     {
         Guard.NotNullOrWhiteSpace(runId); Guard.NotNull(candidates);
         if (runId.Length > 128 || runId.Any(char.IsControl)) throw new ArgumentException("Bounded printable run identity required.", nameof(runId));
@@ -52,12 +72,45 @@ public sealed class EvolutionFidelityScheduler<TGenome>
         var current = initial.ToList();
         var states = new Dictionary<string, EvolutionFidelityResumeState?[]>(StringComparer.Ordinal);
         var batches = new List<EvolutionFidelityBatch<TGenome>>(); var promotions = new List<EvolutionFidelityPromotion>();
-        EvolutionFidelityReport<TGenome> Report(EvolutionFidelityStopReason reason) => new(identity, VersionHash, _searchVersion, _confirmationVersion,
-            initial.Select(candidate => candidate.Id), _plan, reason, batches, promotions, _ledger.Snapshot());
+        var replay = new List<EvolutionFidelityBatch<TGenome>>(); int replayIndex = 0;
+        var replayExpectedStates = new Dictionary<string, EvolutionFidelityBatch<TGenome>>(StringComparer.Ordinal);
+        if (checkpoint is not null) (replay, states) = ReadCheckpoint(checkpoint, identity, initial, seed);
+        EvolutionFidelityReport<TGenome> Report(EvolutionFidelityStopReason reason)
+        {
+            if (replayIndex != replay.Count) throw new ArgumentException("Checkpoint contains an impossible or unused batch suffix.", nameof(checkpoint));
+            return new(identity, VersionHash, _searchVersion, _confirmationVersion, initial.Select(candidate => candidate.Id),
+                _plan, reason, batches, promotions, _ledger.Snapshot());
+        }
+        async ValueTask<bool> PersistBoundary(bool replayed)
+        {
+            if (checkpointSink is null || replayed) return true;
+            var captured = CaptureCheckpoint(identity, batches, states);
+            bool proceed = await checkpointSink(captured, cancellationToken).ConfigureAwait(false);
+            if (_ledger.CaptureState() != captured.GetResourceState())
+                throw new InvalidOperationException("The checkpoint sink mutated its ledger; the saved boundary is not coherent.");
+            return proceed;
+        }
 
         async ValueTask<EvolutionFidelityBatch<TGenome>> Evaluate(EvolutionCanonicalGenome<TGenome> candidate, int rung, bool confirmation)
         {
             EvolutionFidelityLevel level = _plan.Levels[rung];
+            if (replayIndex < replay.Count)
+            {
+                var recorded = replay[replayIndex++];
+                if (recorded.Candidate.Id != candidate.Id || recorded.Level.VersionHash != level.VersionHash ||
+                    recorded.Purpose != (confirmation ? EvolutionReplicationPurpose.Confirmation : EvolutionReplicationPurpose.Search))
+                    throw new ArgumentException("Checkpoint batch chronology differs from deterministic promotion.", nameof(checkpoint));
+                if (!confirmation)
+                {
+                    if (recorded.Measurements.IsComplete) replayExpectedStates[candidate.Id] = recorded;
+                    else replayExpectedStates.Remove(candidate.Id);
+                }
+                batches.Add(recorded);
+                if (replayIndex == replay.Count && (states.Count != replayExpectedStates.Count || replayExpectedStates.Any(pair =>
+                    !states.TryGetValue(pair.Key, out var slots) || slots.Count(state => state is not null) != pair.Value.AcceptedContinuationTokens)))
+                    throw new ArgumentException("Checkpoint omits or adds continuation state at its boundary.", nameof(checkpoint));
+                return recorded;
+            }
             var pending = new EvolutionFidelityResumeState?[_plan.Replicates];
             var prior = new List<string?>(); int offered = 0;
             var purpose = confirmation ? EvolutionReplicationPurpose.Confirmation : EvolutionReplicationPurpose.Search;
@@ -103,10 +156,12 @@ public sealed class EvolutionFidelityScheduler<TGenome>
             var successful = new List<EvolutionFidelityBatch<TGenome>>();
             foreach (var candidate in current)
             {
-                if (cancellationToken.IsCancellationRequested) return Report(EvolutionFidelityStopReason.Canceled);
+                if (cancellationToken.IsCancellationRequested && replayIndex == replay.Count) return Report(EvolutionFidelityStopReason.Canceled);
+                bool replayed = replayIndex < replay.Count;
                 var batch = await Evaluate(candidate, rung, false).ConfigureAwait(false);
                 var terminal = Terminal(batch.Measurements.StopReason);
                 if (terminal.HasValue) return Report(terminal.Value);
+                if (!await PersistBoundary(replayed).ConfigureAwait(false)) return Report(EvolutionFidelityStopReason.Paused);
                 if (batch.Measurements.IsComplete) successful.Add(batch);
             }
             if (successful.Count == 0) return Report(EvolutionFidelityStopReason.NoEligibleCandidates);
@@ -128,15 +183,19 @@ public sealed class EvolutionFidelityScheduler<TGenome>
                     _plan.Levels[rung + 1].Id, ranked.IndexOf(selection.Batch) + 1, selection.Exploration));
             current = selected.Select(selection => selection.Batch.Candidate).ToList();
             foreach (string id in states.Keys.Where(id => !current.Any(candidate => candidate.Id == id)).ToArray()) states.Remove(id);
+            foreach (string id in replayExpectedStates.Keys.Where(id => !current.Any(candidate => candidate.Id == id)).ToArray()) replayExpectedStates.Remove(id);
         }
         states.Clear(); // Search continuation state must never flow into independent final confirmation.
+        replayExpectedStates.Clear();
         bool confirmed = false;
         foreach (var candidate in current)
         {
-            if (cancellationToken.IsCancellationRequested) return Report(EvolutionFidelityStopReason.Canceled);
+            if (cancellationToken.IsCancellationRequested && replayIndex == replay.Count) return Report(EvolutionFidelityStopReason.Canceled);
+            bool replayed = replayIndex < replay.Count;
             var batch = await Evaluate(candidate, _plan.Levels.Count - 1, true).ConfigureAwait(false);
             var terminal = Terminal(batch.Measurements.StopReason);
             if (terminal.HasValue) return Report(terminal.Value);
+            if (!await PersistBoundary(replayed).ConfigureAwait(false)) return Report(EvolutionFidelityStopReason.Paused);
             confirmed |= batch.Measurements.IsComplete;
         }
         return Report(confirmed ? EvolutionFidelityStopReason.Completed : EvolutionFidelityStopReason.NoConfirmedCandidate);

@@ -46,14 +46,12 @@ public sealed class EvolutionReplicateRunner<TGenome>
         if (batchId.Length > 128 || batchId.Any(char.IsControl)) throw new ArgumentException("Batch identity must be bounded and printable.", nameof(batchId));
         if (!Enum.IsDefined(typeof(EvolutionReplicationPurpose), purpose)) throw new ArgumentOutOfRangeException(nameof(purpose));
         cancellationToken.ThrowIfCancellationRequested();
-        string identity = EvolutionHash.Combine(new[] { VersionHash, candidate.Id, batchId, purpose.ToString(),
-            context.EvaluationId.ToString(CultureInfo.InvariantCulture), context.RootSeed.ToString(CultureInfo.InvariantCulture),
-            context.SeedStream.ToString(CultureInfo.InvariantCulture), context.AttemptCount.ToString(CultureInfo.InvariantCulture) });
+        string identity = IdentifyBatch(VersionHash, candidate.Id, context, batchId, purpose);
         var samples = new List<EvolutionReplicateMeasurement>();
         string? originScope = null;
-        double mean = 0, deviationScale = 0, scaledSquares = 0;
+        var moments = new EvolutionReplicationMoments();
         var maximum = EvolutionResources.Of("cost_units", _plan.MaximumCostPerSample);
-        EvolutionReplicationReport Report(EvolutionReplicationStopReason reason) => new(identity, _plan, reason, samples, mean, deviationScale, scaledSquares);
+        EvolutionReplicationReport Report(EvolutionReplicationStopReason reason) => new(identity, _plan, reason, samples, moments.Mean, moments.DeviationScale, moments.ScaledSquares);
         for (int index = 0; index < _plan.MaximumSamples; index++)
         {
             if (cancellationToken.IsCancellationRequested) return Report(EvolutionReplicationStopReason.Canceled);
@@ -97,34 +95,44 @@ public sealed class EvolutionReplicateRunner<TGenome>
             samples.Add(new(sampleContext, result.Status, result.Quality, actual, false, result.CostUnits, origin));
             if (actual > _plan.MaximumCostPerSample) return Report(EvolutionReplicationStopReason.MaximumCostExceeded);
             if (!valid) return Report(EvolutionReplicationStopReason.InvalidMeasurement);
-            double quality = result.Quality!.Value;
-            if (samples.Count == 1) mean = quality;
-            else
-            {
-                // Welford's variance increment is delta^2 * (n-1)/n. Store it relative to the largest
-                // observed delta, not the declared support span: wide bounds must not erase small differences.
-                double delta = quality - mean, magnitude = Math.Abs(delta);
-                double weight = (samples.Count - 1d) / samples.Count;
-                if (magnitude > deviationScale)
-                {
-                    double ratio = deviationScale / magnitude;
-                    scaledSquares = scaledSquares * ratio * ratio + weight;
-                    deviationScale = magnitude;
-                }
-                else if (deviationScale > 0)
-                {
-                    double ratio = magnitude / deviationScale;
-                    scaledSquares += ratio * ratio * weight;
-                }
-                mean += delta / samples.Count;
-            }
+            moments.Add(result.Quality!.Value);
             if (_plan.NormalizedWidthTarget > 0 && samples.Count >= _plan.MinimumSamples)
             {
-                _plan.Bounds(mean, samples.Count, out double lower, out double upper);
+                _plan.Bounds(moments.Mean, samples.Count, out double lower, out double upper);
                 if ((upper - lower) / _plan.Span <= _plan.NormalizedWidthTarget)
                     return Report(EvolutionReplicationStopReason.PrecisionReached);
             }
         }
         return Report(EvolutionReplicationStopReason.Completed);
+    }
+
+    internal static string IdentifyBatch(string version, string genomeId, EvolutionEvaluationContext context, string batchId, EvolutionReplicationPurpose purpose) =>
+        EvolutionHash.Combine(new[] { version, genomeId, batchId, purpose.ToString(), context.EvaluationId.ToString(CultureInfo.InvariantCulture),
+            context.RootSeed.ToString(CultureInfo.InvariantCulture), context.SeedStream.ToString(CultureInfo.InvariantCulture), context.AttemptCount.ToString(CultureInfo.InvariantCulture) });
+}
+
+// Shared by actual measurement and checkpoint evidence reconstruction; never update from rejected samples.
+internal sealed class EvolutionReplicationMoments
+{
+    internal int Count { get; private set; }
+    internal double Mean { get; private set; }
+    internal double DeviationScale { get; private set; }
+    internal double ScaledSquares { get; private set; }
+    internal void Add(double quality)
+    {
+        Count++;
+        if (Count == 1) { Mean = quality; return; }
+        // Scaled Welford update: wide support bounds must not erase small observed differences.
+        double delta = quality - Mean, magnitude = Math.Abs(delta), weight = (Count - 1d) / Count;
+        if (magnitude > DeviationScale)
+        {
+            double ratio = DeviationScale / magnitude;
+            ScaledSquares = ScaledSquares * ratio * ratio + weight; DeviationScale = magnitude;
+        }
+        else if (DeviationScale > 0)
+        {
+            double ratio = magnitude / DeviationScale; ScaledSquares += ratio * ratio * weight;
+        }
+        Mean += delta / Count;
     }
 }
