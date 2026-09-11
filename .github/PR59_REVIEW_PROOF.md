@@ -92,6 +92,14 @@ controls in `34872a1a2029b3e3cd6da994ccdc218ba63d0c0d`. After fast-forwarding to
 revision, this follow-up replaced its new null-forgiving Task.Exception access
 with an explicit AggregateException pattern. No pipeline outcome policy changed.
 
+The subsequent CodeQL constant-condition thread identified a redundant null
+test guarded by a boolean that already proved the owner existed. The retry phase
+now retains the actual successfully begun resource owner instead of a separate
+boolean. Cleanup runs only for that owner, after draining, and never when begin
+failed. It adds no null-forgiving operator or scanner suppression. The same
+43-case cohort was rerun after this ownership simplification; all three targets
+passed again (`review-phase-owner-final-<TFM>.trx` in the same results directory).
+
 The actual pipeline, drain, and cleanup suites passed **43/43 on each of net10.0,
 net8.0, and net471**, with zero failures/skips. These include the collaborator's
 three new cancellation/fault controls. Evidence is in
