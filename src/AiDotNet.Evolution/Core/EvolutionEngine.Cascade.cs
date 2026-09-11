@@ -286,8 +286,12 @@ public sealed partial class EvolutionEngine<TGenome>
     {
         if (_options.EarlyStopping.PatienceEvaluations <= 0) return;
         double? metric = CurrentEarlyStoppingMetric();
-        if (metric.HasValue &&
-            (!_earlyStoppingBest.HasValue || metric.Value - _earlyStoppingBest.Value >= _options.EarlyStopping.MinimumImprovement))
+
+        // No value means the configured criterion has not been measured yet - an evaluator metric no evaluation has
+        // reported, or a feasible front that is still empty. That is neither improvement nor stagnation, so patience
+        // is not charged: a run stops early only after the criterion was observed and then stopped improving.
+        if (!metric.HasValue) return;
+        if (!_earlyStoppingBest.HasValue || metric.Value - _earlyStoppingBest.Value >= _options.EarlyStopping.MinimumImprovement)
         {
             _earlyStoppingBest = metric;
             _evaluationsSinceImprovement = 0;
@@ -325,8 +329,15 @@ public sealed partial class EvolutionEngine<TGenome>
         switch (_options.EarlyStopping.Metric)
         {
             case EvolutionEarlyStoppingMetric.ParetoHypervolume:
-                var definition = ((IEvolutionParetoArchiveView<TGenome>)_islands[0]).ParetoDefinition!;
-                return new EvolutionParetoFront<TGenome>(definition, _islands.SelectMany(archive => archive.Entries)).Hypervolume();
+                {
+                    var definition = ((IEvolutionParetoArchiveView<TGenome>)_islands[0]).ParetoDefinition!;
+                    var front = new EvolutionParetoFront<TGenome>(definition, _islands.SelectMany(archive => archive.Entries));
+
+                    // An empty feasible union is an unmeasured front, not a front whose volume happens to be zero.
+                    // Reporting zero makes a run that has not reached feasibility yet look like an immediate plateau,
+                    // which ends exploration before the first feasible point can exist.
+                    return front.Entries.Count == 0 ? (double?)null : front.Hypervolume();
+                }
             case EvolutionEarlyStoppingMetric.Coverage:
                 {
                     long occupied = 0;

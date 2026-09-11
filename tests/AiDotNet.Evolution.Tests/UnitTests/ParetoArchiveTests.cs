@@ -363,6 +363,53 @@ public sealed class ParetoArchiveTests
         if (scenario == "direction") Assert.Equal("Maximize", failure.Data["archive_direction"]);
     }
 
+    private sealed class LateFeasibilityTask : IEvolutionTask<TestGenome>
+    {
+        public string Id => "late-feasibility";
+        public string VersionHash => "late-feasibility-v1";
+        public string EvaluatorVersionHash => "late-feasibility-eval-v1";
+        public ValueTask<EvolutionCanonicalGenome<TestGenome>> CanonicalizeAsync(TestGenome genome, CancellationToken cancellationToken = default) =>
+            new(new EvolutionCanonicalGenome<TestGenome>(genome, genome.Value.ToString(System.Globalization.CultureInfo.InvariantCulture)));
+        public ValueTask<EvolutionTaskResult> EvaluateAsync(EvolutionCandidate<TestGenome> candidate, EvolutionEvaluationContext context,
+            CancellationToken cancellationToken = default)
+        {
+            int value = candidate.CanonicalGenome.Genome.Value;
+            double x = Math.Min(1, value / 20d);
+            return new(new EvolutionTaskResult(EvolutionEvaluationStatus.Completed, 1 - x, objectives: new[] { x, 1 - x },
+                constraintViolations: new[] { (double)Math.Max(0, 6 - value) }));
+        }
+    }
+
+    [Fact]
+    public async Task HypervolumeStoppingWaitsForFeasibilityAndDoesNotStopWhileVolumeKeepsRising()
+    {
+        var options = new EvolutionEngineOptions
+        {
+            RunId = "exploration-stopping",
+            Seed = 7,
+            MaxEvaluationAttempts = 12,
+            MaxProposals = 100,
+            MaxGenerations = 100,
+            ProposalBatchSize = 1,
+            MaxDegreeOfParallelism = 1,
+            MigrationInterval = 0,
+            EarlyStopping = new EvolutionEarlyStoppingOptions
+            {
+                Metric = EvolutionEarlyStoppingMetric.ParetoHypervolume,
+                PatienceEvaluations = 3
+            }
+        };
+        var run = await new EvolutionEngine<TestGenome>(new LateFeasibilityTask(), new SequentialVariation(),
+            _ => new ParetoArchive<TestGenome>(Exploring(4)), options).RunAsync(new[] { new TestGenome(1) });
+
+        // Five infeasible evaluations precede the first feasible one, and the front's volume rises on every feasible
+        // insertion afterwards. Reporting volume zero for the empty front would exhaust patience before feasibility.
+        Assert.Equal(EvolutionStopReason.EvaluationBudgetReached, run.StopReason);
+        Assert.Equal(12, run.Counters.EvaluationAttempts);
+        Assert.True(run.ParetoFront!.Entries.Count > 1);
+        Assert.True(run.ParetoFront.Hypervolume() > 0);
+    }
+
     [Fact]
     public void ScalarSnapshotJsonDoesNotAcquireParetoMetadata()
     {
