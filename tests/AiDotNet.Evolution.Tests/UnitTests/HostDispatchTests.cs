@@ -98,6 +98,17 @@ public sealed class HostDispatchTests
             s => captured = s);
 
         Assert.True(response.Ok);
+
+        // THE NAME OF THIS TEST PROMISED A CHECK IT DID NOT MAKE. Without it the open
+        // response could stop reporting a version entirely and nothing here would
+        // notice, which matters because a client reads this field to decide whether it
+        // understands the host at all.
+        //
+        // The literal is deliberate. This is a wire contract, not an implementation
+        // detail, so changing the version should require deliberately editing the test
+        // that pins it -- asserting merely "not empty" would let a rename through.
+        Assert.Equal("0.1.0", response.Version);
+
         Assert.NotNull(captured);
         captured!.Dispose();
     }

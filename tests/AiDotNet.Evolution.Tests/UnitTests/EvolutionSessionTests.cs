@@ -317,12 +317,15 @@ public sealed class EvolutionSessionTests
     }
 
     [Fact]
-    public async Task AnOperatorThatThrowsHandsTheExceptionToTheCaller()
+    public async Task AnOperatorThatThrowsIsRecordedAsAFailureRatherThanStoppingTheRun()
     {
-        // THE RUN IS ON A DETACHED TASK, so an exception escaping it would reach only
-        // TaskScheduler.UnobservedTaskException -- a process-level event no caller sees
-        // -- while Completion never settled. The general catch exists to turn that into
-        // something the caller can await, and this is the only test that proves it does.
+        // A RECOVERABLE OPERATOR FAILURE IS ABSORBED BY DESIGN. PrepareVariationAsync
+        // catches anything EvolutionExceptionPolicy calls recoverable and turns it into
+        // a pre-evaluation failure coded "variation_failure", so one bad proposal costs
+        // one candidate and not the run. That is the behaviour worth pinning, and it is
+        // the opposite of what this test used to allow: it accepted Faulted OR
+        // RanToCompletion, which is every terminal state a run can reach, so it could
+        // not have failed whatever the engine did.
         using var session = new EvolutionSession<SessionGenome>(
             task => new EvolutionEngine<SessionGenome>(
                 task, new ThrowingVariation(), _ => Archive(), Options(8)),
@@ -339,10 +342,46 @@ public sealed class EvolutionSessionTests
                 session.Tell(item.EvaluationId, Score(item));
         }
 
+        EvolutionRunResult<SessionGenome> result = await WithTimeout(session.Completion);
+
+        Assert.Contains(
+            result.RetainedFailures,
+            diagnostic => diagnostic.Code == "variation_failure");
+    }
+
+    [Fact]
+    public async Task AnUnrecoverableOperatorFailureIsHandedToTheCaller()
+    {
+        // THE RUN IS ON A DETACHED TASK, so an exception escaping it would reach only
+        // TaskScheduler.UnobservedTaskException -- a process-level event no caller sees
+        // -- while Completion never settled. RunEngineAsync's general catch exists to
+        // turn that into something the caller can await.
+        //
+        // REACHED WITH AN UNRECOVERABLE EXCEPTION, because a recoverable one never gets
+        // there: the test above shows the engine absorbing those on purpose. This is the
+        // narrow class EvolutionExceptionPolicy refuses to contain, which is precisely
+        // the class that must reach the caller rather than be swallowed into a
+        // diagnostic and reported as a tidy run.
+        using var session = new EvolutionSession<SessionGenome>(
+            task => new EvolutionEngine<SessionGenome>(
+                task, new UnrecoverableVariation(), _ => Archive(), Options(8)),
+            Seeds(2),
+            Identity);
+
+        for (int i = 0; i < 4; i += 1)
+        {
+            IReadOnlyList<EvolutionAskItem<SessionGenome>> batch =
+                await WithTimeout(session.AskAsync(4));
+            if (batch.Count == 0) break;
+            foreach (EvolutionAskItem<SessionGenome> item in batch)
+                session.Tell(item.EvaluationId, Score(item));
+        }
+
         await WithTimeout(Settled(session.Completion));
-        Assert.True(
-            session.Completion.Status is TaskStatus.Faulted or TaskStatus.RanToCompletion,
-            $"unexpected status {session.Completion.Status}");
+
+        OutOfMemoryException thrown =
+            await Assert.ThrowsAsync<OutOfMemoryException>(() => session.Completion);
+        Assert.Equal("the variation operator ran out of room", thrown.Message);
     }
 
     [Fact]
@@ -448,6 +487,26 @@ public sealed class EvolutionSessionTests
         // fixture one of the few genome types for which the old `genome.ToString()` default
         // happened to be a correct identity -- so the suite could not see the defect that
         // default causes for every type that does not override it.
+    }
+
+    /// <summary>
+    /// A variation operator whose failure the engine is not allowed to absorb.
+    /// </summary>
+    /// <remarks>
+    /// OutOfMemoryException is one of the few types EvolutionExceptionPolicy reports as
+    /// unrecoverable, so it passes straight through PrepareVariationAsync's catch and
+    /// out of the run -- which is the only route to RunEngineAsync's general handler.
+    /// </remarks>
+    private sealed class UnrecoverableVariation : IVariationOperator<SessionGenome>
+    {
+        public string Id => "unrecoverable";
+
+        public string VersionHash => "unrecoverable-v1";
+
+        public ValueTask<SessionGenome> ProposeAsync(
+            EvolutionVariationContext<SessionGenome> context,
+            CancellationToken cancellationToken = default) =>
+            throw new OutOfMemoryException("the variation operator ran out of room");
     }
 
     /// <summary>A variation operator that fails, to exercise the run's error path.</summary>
