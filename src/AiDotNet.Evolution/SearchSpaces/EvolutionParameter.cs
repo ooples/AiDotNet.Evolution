@@ -139,7 +139,7 @@ public sealed class EvolutionParameter
     {
         if (!Contains(value) || Kind == EvolutionParameterKind.Categorical) throw new ArgumentException("A valid numeric value is required.", nameof(value));
         if (Maximum == Minimum) return 0;
-        return Kind == EvolutionParameterKind.Logarithmic
+        return Kind == EvolutionParameterKind.Logarithmic && !HasCollapsedLogSpan
             ? (Math.Log(value.Number) - Math.Log(Minimum)) / (Math.Log(Maximum) - Math.Log(Minimum))
             : (value.Number - Minimum) / (Maximum - Minimum);
     }
@@ -150,7 +150,7 @@ public sealed class EvolutionParameter
         if (!EvolutionDescriptorDefinition.IsFinite(coordinate) || Kind == EvolutionParameterKind.Categorical)
             throw new ArgumentOutOfRangeException(nameof(coordinate));
         double t = Math.Max(0, Math.Min(1, coordinate));
-        double value = Kind == EvolutionParameterKind.Logarithmic
+        double value = Kind == EvolutionParameterKind.Logarithmic && !HasCollapsedLogSpan
             ? Math.Exp(Math.Log(Minimum) + t * (Math.Log(Maximum) - Math.Log(Minimum)))
             : Minimum + t * (Maximum - Minimum);
         value = Math.Max(Minimum, Math.Min(Maximum, value));
@@ -159,10 +159,14 @@ public sealed class EvolutionParameter
 
     internal bool IsActive(IReadOnlyDictionary<string, EvolutionParameterValue> values) => Conditions.All(condition =>
         values.TryGetValue(condition.Parameter, out EvolutionParameterValue? parent) && condition.AnyOf.Contains(parent));
+    // Adjacent positive doubles can have equal rounded logarithms. Their relative span is below log
+    // resolution, so use bounded linear interpolation rather than dividing zero by zero or collapsing sampling.
+    private bool HasCollapsedLogSpan => Maximum > Minimum && Math.Log(Maximum) == Math.Log(Minimum);
     internal string DefinitionHash => EvolutionHash.Combine(new[] { Name, Kind.ToString(),
         EvolutionParameterValue.Numeric(Minimum).Canonical, EvolutionParameterValue.Numeric(Maximum).Canonical,
         EvolutionHash.Combine(Categories) }.Concat(Conditions.OrderBy(condition => condition.Parameter, StringComparer.Ordinal)
-        .Select(condition => EvolutionHash.Combine(new[] { condition.Parameter }.Concat(condition.AnyOf.Select(value => value.Canonical))))));
+        .Select(condition => EvolutionHash.Combine(new[] { condition.Parameter }.Concat(condition.AnyOf.Select(value => value.Canonical)))))
+        .Concat(Kind == EvolutionParameterKind.Logarithmic ? new[] { "log-domain-v2-finite-narrow" } : Array.Empty<string>()));
 
     internal static void ValidateName(string name)
     {
