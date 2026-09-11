@@ -37,7 +37,8 @@ var resumed = Fixture.Bridge(session, restored);
 var envelope = EvolutionDurableEvaluationPayload.FromJson(payload);
 Fixture.Require(envelope.Context.RootSeed == ulong.MaxValue && envelope.Context.SeedStream == ask.Context.SeedStream, "full context bits");
 int genome = int.Parse(envelope.GenomePayload, CultureInfo.InvariantCulture);
-double quality = genome * genome; // Exactly one physical evaluator invocation in this probe.
+double quality = genome * genome;
+int physicalEvaluations = 1;
 Fixture.Require(restored.Commit(workerIdentity, "native-worker", quality.ToString(CultureInfo.InvariantCulture), "integer-square-v1", Fixture.Cost(2))
     == EvolutionWorkCommitDisposition.Accepted, "durable receipt");
 Fixture.Require(resumed.DeliverAvailableResults() == 1 && resumed.DeliverAvailableResults() == 0, "fenced engine delivery");
@@ -50,6 +51,29 @@ using (var newSession = Fixture.Session())
     catch (InvalidOperationException) { forkRequired = true; }
 }
 Fixture.Require(forkRequired, "new engine cannot attach by matching run/evaluation IDs");
+bool explicitStructOwnershipRequired = !System.Runtime.CompilerServices.RuntimeFeature.IsDynamicCodeSupported;
+bool plainStructRejected = false;
+try { _ = new EvolutionCanonicalGenome<PlainValue>(new PlainValue(7), "plain:7"); }
+catch (ArgumentException) { plainStructRejected = true; }
+Fixture.Require(plainStructRejected == explicitStructOwnershipRequired, "AOT must not infer ownership from missing struct metadata");
+Fixture.Require(new EvolutionCanonicalGenome<OwnedValue>(new OwnedValue(7), "owned:7").Genome.Value == 7, "explicit struct ownership");
+
+// Separately exercise actual checkpoint serialization/restoration at a completed boundary.
+// This does not imply exact continuation of a lost partial logical batch.
+var checkpoints = new InMemoryEvolutionCheckpointStore();
+using (var checkpointed = Fixture.Session(checkpoints))
+{
+    var checkpointAsk = (await checkpointed.AskAsync(1, guard.Token)).Single();
+    int input = checkpointAsk.Candidate.CanonicalGenome.Genome;
+    double checkpointQuality = input * input; physicalEvaluations++;
+    Fixture.Require(checkpointed.TellAttempt(checkpointAsk.WorkIdentity!, EvolutionTaskResult.Completed(checkpointQuality,
+        new Dictionary<string, double> { ["x"] = 7 })), "checkpoint evaluator receipt");
+    Fixture.Require((await checkpointed.Completion).Best?.Evaluation.Quality == 49, "checkpoint first result");
+}
+EvolutionCheckpoint saved = await checkpoints.LoadLatestAsync(session.RunId) ?? throw new InvalidOperationException("No engine checkpoint.");
+File.WriteAllText(Path.Combine(directory, "engine-checkpoint.json"), saved.Payload);
+using (var checkpointResume = Fixture.Session(checkpoints, resume: true))
+    Fixture.Require((await checkpointResume.Completion).Best?.Evaluation.Quality == 49, "completed-boundary checkpoint resume");
 string processPath = Environment.ProcessPath!;
 bool managed = string.Equals(Path.GetFileNameWithoutExtension(processPath), "dotnet", StringComparison.OrdinalIgnoreCase);
 var report = new ProbeReport
@@ -64,7 +88,11 @@ var report = new ProbeReport
     RootSeed = envelope.Context.RootSeed.ToString(CultureInfo.InvariantCulture),
     SeedStream = envelope.Context.SeedStream.ToString(CultureInfo.InvariantCulture),
     Quality = quality,
-    PhysicalEvaluations = 1,
+    PhysicalEvaluations = physicalEvaluations,
+    ExplicitStructOwnershipRequired = explicitStructOwnershipRequired,
+    PlainStructRejected = plainStructRejected,
+    CompletedBoundaryCheckpointRestored = true,
+    EngineCheckpointSha256 = Convert.ToHexString(SHA256.HashData(System.Text.Encoding.UTF8.GetBytes(saved.Payload))).ToLowerInvariant(),
     CoordinatorReopenedWhileEngineAlive = restored.WasRecovered,
     DifferentEngineRequiresExplicitFork = forkRequired,
     Spent = restored.Resources.Spent["cost_units"].ToString(CultureInfo.InvariantCulture),
@@ -81,7 +109,7 @@ internal static class Fixture
     internal static DurableEvolutionWorkCoordinator Coordinator(string directory, EvolutionSession<int> session) => new(directory, session.RunId, session.CompatibilityHash, Cost(10));
     internal static EvolutionDurableSessionBridge<int> Bridge(EvolutionSession<int> session, DurableEvolutionWorkCoordinator coordinator) => new(session, coordinator,
         payload => EvolutionTaskResult.Completed(double.Parse(payload, CultureInfo.InvariantCulture), new Dictionary<string, double> { ["x"] = 7 }), new(), Cost(1), Cost(5));
-    internal static EvolutionSession<int> Session() => new(task => new EvolutionEngine<int>(task, new UnusedVariation(),
+    internal static EvolutionSession<int> Session(IEvolutionCheckpointStore? checkpoints = null, bool resume = false) => new(task => new EvolutionEngine<int>(task, new UnusedVariation(),
         _ => new MapElitesArchive<int>(new[] { new EvolutionDescriptorDefinition("x", 0, 10, 10) }),
         new EvolutionEngineOptions
         {
@@ -90,9 +118,10 @@ internal static class Fixture
             MaxProposals = 1,
             MaxEvaluationAttempts = 1,
             MaxGenerations = 0,
-            CheckpointInterval = 0,
+            CheckpointInterval = checkpoints is null ? 0 : 1,
+            Resume = resume,
             EvaluationTimeout = TimeSpan.FromSeconds(60)
-        }, genomeCodec: new IntegerCodec()),
+        }, checkpointStore: checkpoints, genomeCodec: new IntegerCodec()),
         new[] { 7 }, value => "integer:" + value.ToString(CultureInfo.InvariantCulture), new EvolutionExternalTaskIdentity("integer", "task-v1", "square-result-codec-v1"));
     internal static void Require(bool condition, string name) { if (!condition) throw new InvalidOperationException("Probe failed: " + name); }
     internal static string Hash(string path) { using var input = File.OpenRead(path); return Convert.ToHexString(SHA256.HashData(input)).ToLowerInvariant(); }
@@ -128,6 +157,15 @@ internal sealed class ProbeReport
     public string Spent { get; set; } = "";
     public string Reserved { get; set; } = "";
     public long Settled { get; set; }
+    public bool ExplicitStructOwnershipRequired { get; set; }
+    public bool PlainStructRejected { get; set; }
+    public bool CompletedBoundaryCheckpointRestored { get; set; }
+    public string EngineCheckpointSha256 { get; set; } = "";
+}
+internal readonly record struct PlainValue(int Value);
+internal readonly record struct OwnedValue(int Value) : IImmutableEvolutionGenome<OwnedValue>
+{
+    public OwnedValue CreateOwnedSnapshot() => new(Value);
 }
 [JsonSerializable(typeof(ProbeReport))]
 [JsonSourceGenerationOptions(WriteIndented = true)]

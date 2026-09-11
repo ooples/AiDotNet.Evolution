@@ -122,7 +122,7 @@ public sealed class CuriosityEvolutionSelectionPolicy<TGenome> : IOutcomeAwareEv
         {
             var ordered = _scores.OrderBy(pair => pair.Key, StringComparer.Ordinal)
                 .ToDictionary(pair => pair.Key, pair => pair.Value, StringComparer.Ordinal);
-            return JsonSerializer.Serialize(ordered, EvolutionJson.Compact);
+            return JsonSerializer.Serialize(ordered, EvolutionStateJsonContext.Default.NumericMap);
         }
     }
 
@@ -131,7 +131,7 @@ public sealed class CuriosityEvolutionSelectionPolicy<TGenome> : IOutcomeAwareEv
     {
         Guard.NotNull(state);
         Dictionary<string, double>? restored;
-        try { restored = JsonSerializer.Deserialize<Dictionary<string, double>>(state, EvolutionJson.Compact); }
+        try { restored = JsonSerializer.Deserialize(state, EvolutionStateJsonContext.Default.NumericMap); }
         catch (JsonException exception) { throw new InvalidDataException("Curiosity state is invalid.", exception); }
         if (restored is null) throw new InvalidDataException("Curiosity state is empty.");
         if (restored.Count > MaximumTrackedScores) throw new InvalidDataException("Curiosity state exceeds its safety limit.");

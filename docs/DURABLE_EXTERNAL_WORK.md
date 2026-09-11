@@ -186,8 +186,21 @@ not optimization-quality comparisons or evidence of exactly-once physical execut
 a borrowed JSON protocol, coordinator reopen with the original engine still alive, fenced
 result delivery into its archive, and refusal of a new matching engine instance. Its single
 square-function evaluation consumes two authored cost units, not measured money or CPU.
-Its managed run passes. The first strict net10.0 NativeAOT build **fails** IL2026/IL3050/IL2070
+Its managed run passes. The first strict net10.0 NativeAOT build **failed** IL2026/IL3050/IL2070
 analysis in existing engine persistence, resource-metered variation, curiosity state,
 measurement serialization and ownership inspection. The shipped net8.0 native host's passing
-client tests do not resolve this broader engine-AOT boundary. This failure is retained while
-the relevant paths are reviewed; no warning suppression or whole-engine AOT clearance is claimed.
+client tests did not resolve this broader engine-AOT boundary. The follow-up separates
+non-generic checkpoint/proposal documents from generic engine classes and uses generated
+serializer metadata for those documents, curiosity state and measurement origins. Three
+compatibility tests compare generated JSON byte-for-byte with the previous encodings,
+including nested records, optional provenance and exact decimals. The initial strict net10
+native bridge probe subsequently builds and runs with **zero warnings**; the original failed
+build remains part of the evidence history. No warning gate was disabled or suppressed.
+
+When dynamic code support is disabled (including NativeAOT and managed hosts configured with
+AOT feature switches), custom struct genomes must implement `IImmutableEvolutionGenome<T>`.
+Missing trimmed field metadata is never treated as proof of deep immutability. Strings,
+primitives, enums and the documented immutable BCL values remain implicit; ordinary
+dynamic-code-enabled managed execution retains recursive value-field inspection. Additional
+probe cases check explicit struct ownership and actual completed-boundary checkpoint
+serialization/resume. They do not claim arbitrary partial-batch crash continuation.
