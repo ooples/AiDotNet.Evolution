@@ -87,6 +87,10 @@ jobs:
         run: dotnet run --project benchmarks/AiDotNet.Evolution.Performance -c Release --no-build -- --profile TestResults/performance '${{ github.sha }}' --smoke
       - name: Verify paired analysis contracts
         run: python3 -m unittest discover -s benchmarks/analysis -v
+      - name: Verify retained proposal pipeline and default-profile evidence
+        run: |
+          python3 benchmarks/analysis/analyze_pipeline.py --verify-evidence benchmarks/evidence/pipeline/9c3441d/pilot
+          python3 benchmarks/analysis/compare_pipeline_defaults.py --archive benchmarks/evidence/pipeline/9c3441d/default-profiles.zip --verify-comparison benchmarks/evidence/pipeline/9c3441d/default-comparison.json
       - name: Verify archive partition accounting and replay
         shell: pwsh
         run: ./eng/Test-ArchivePartition.ps1 -SourceRevision '${{ github.sha }}'

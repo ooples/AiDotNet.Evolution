@@ -39,7 +39,10 @@ public static class ProfileCampaign
             throw new IOException("Choose a new or empty output directory; previous evidence is never overwritten.");
         Directory.CreateDirectory(root);
         ulong affinity = ProfileRunner.SelectAffinity(ProfileRunner.CurrentAffinity());
-        ushort processorGroup = ProfileWindowsAffinity.CurrentThreadGroup();
+        ushort processorGroup = SelectProcessorGroup(Environment.GetEnvironmentVariable("AIDOTNET_PROFILE_PROCESSOR_GROUP"),
+            ProfileWindowsAffinity.CurrentThreadGroup());
+        if (!OperatingSystem.IsWindows() && processorGroup != 0)
+            throw new PlatformNotSupportedException("A nonzero processor-group override requires Windows.");
         int repetitions = smoke ? 1 : 3;
         var cases = ProfileCase.Suite(smoke, 4711);
         var started = DateTimeOffset.UtcNow;
@@ -188,6 +191,15 @@ public static class ProfileCampaign
         await using (var writer = new StreamWriter(stream))
             await writer.WriteAsync($"exit={child.ExitCode}; timeout={timedOut}\nSTDOUT\n{await stdout}\nSTDERR\n{await stderr}");
         if (timedOut || child.ExitCode != 0) throw new InvalidOperationException($"Profile worker failed (exit {child.ExitCode}, timeout {timedOut}); see {log}.");
+    }
+
+    /// <summary>Uses an explicit bounded Windows processor group for cross-build comparisons, or the current group when omitted.</summary>
+    public static ushort SelectProcessorGroup(string? requested, ushort current)
+    {
+        if (requested is null) return current;
+        if (!ushort.TryParse(requested, NumberStyles.None, CultureInfo.InvariantCulture, out ushort group) || group > 63)
+            throw new ArgumentException("AIDOTNET_PROFILE_PROCESSOR_GROUP must be an integer in 0..63.", nameof(requested));
+        return group;
     }
 
     public static async Task WriteNewAsync<T>(string path, T value)

@@ -70,7 +70,7 @@ Cancellation drains owned proposal/evaluator tasks before disposing gates and ro
 
 The pipeline tests exercise controlled generator/evaluator overlap, serialized learning, immutable held snapshots, timing/worker-count replay, bounded retries under tight budgets, small evaluation limits, cancellation/drain, settled-wave checkpoint resume, rate gates, opportunistic commit logging, record truncation, shared-resource admission and known-zero versus unknown cleanup.
 
-These contracts are necessary but are not a throughput, quality or competitor-superiority claim. A source-pinned repeated benchmark with retained physical work, declared costs, scheduling overhead, replay evidence and unfavorable outcomes is still required before US-20 delivery is ready for review. The story remains in progress.
+The US-20 implementation and local acceptance evidence are ready for review in PR #59: 691 core tests on each of net10.0/net8.0/net471, 55 performance-contract tests, the real-output smoke and [source-pinned raw evidence](../benchmarks/evidence/pipeline/9c3441d/README.md). The 576-case authored pilot and all offline replays passed. Matched Batch quality is unchanged; delayed callbacks overlap faster, while zero-latency execution is slower and allocates more. The accepted 132-pair default-mode comparison preserves state/quality/work but records nonzero allocation overhead. Hosted CI/current-head review and dependency readiness remain separate merge gates. No representative or competitor-superiority claim is made.
 
 ## Authored performance and replay protocol
 
@@ -89,3 +89,5 @@ python benchmarks/analysis/analyze_pipeline.py --verify-evidence new-evidence-di
 ```
 
 The evidence directory contains every live/replay response, receipt, schedule and failure in `raw.json.gz`, plus a recomputable `analysis.json` and both raw/compressed hashes. Hashes detect inconsistency, not malicious replacement by a trusted artifact writer. CI runs real C# output through the analyzer, unit-tests failure/corruption handling, and rejects three tampered response tapes. An empty/failed archive is retained with zero best quality rather than causing evidence serialization to drop the failed run.
+
+For cross-build default-mode overhead, the existing `engine-profile-v1` suite exercises variation after eight seed evaluations. On multi-group Windows machines, set `AIDOTNET_PROFILE_PROCESSOR_GROUP` explicitly (a bounded integer 0–63; the OS must support the requested group). Identical masks such as `F` do not identify the same CPUs in different groups. `compare_pipeline_defaults.py` rejects mismatched processor groups, runtime controls, missing/failed cases and changed logical work/state/quality. Three repeated fresh-process measurements per case remain descriptive when source groups run sequentially on a shared host.

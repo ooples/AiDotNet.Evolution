@@ -169,8 +169,21 @@ def verify_evidence(directory):
     require(len(raw) <= 256 * 1024 * 1024, "Expanded evidence exceeds its bound.")
     require(hashlib.sha256(raw).hexdigest() == report["InputSha256"], "Raw evidence hash mismatch.")
     recomputed = analyze(json.loads(raw), report["SourceRevision"])
-    require(recomputed == {k: v for k, v in report.items() if k not in ("InputSha256", "CompressedSha256")}, "Analysis differs from retained raw evidence.")
+    require(equivalent(recomputed, {k: v for k, v in report.items() if k not in ("InputSha256", "CompressedSha256")}), "Analysis differs from retained raw evidence.")
     return report
+
+
+def equivalent(left, right):
+    """Allow only libm roundoff across Python platforms, not changed counts, identities or evidence."""
+    if type(left) is not type(right):
+        return False
+    if isinstance(left, dict):
+        return left.keys() == right.keys() and all(equivalent(left[key], right[key]) for key in left)
+    if isinstance(left, list):
+        return len(left) == len(right) and all(equivalent(a, b) for a, b in zip(left, right))
+    if isinstance(left, float):
+        return math.isclose(left, right, rel_tol=1e-12, abs_tol=1e-15)
+    return left == right
 
 
 if __name__ == "__main__":
