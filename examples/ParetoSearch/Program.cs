@@ -38,7 +38,15 @@ foreach (bool constrained in new[] { false, true })
             var result = await engine.RunAsync(new[] { .1, .3, .5, .7, .9 }.Select(x => new Point(x, .8)));
             timer.Stop();
             if (result.Counters.EvaluationAttempts != evaluationBudget || result.Counters.CompletedEvaluations != evaluationBudget ||
-                result.RetainedFailures.Count != 0) throw new InvalidOperationException("Campaign did not consume the declared successful evaluation budget.");
+                result.RetainedFailures.Count != 0)
+            {
+                Directory.CreateDirectory(Path.GetDirectoryName(reportPath)!);
+                var failure = new { SourceCommit = args[1], Task = task.Id, Seed = seed, Method = method, result.StopReason,
+                    result.Counters, result.RetainedFailures, CompletedRuns = rows };
+                File.WriteAllText(reportPath, JsonSerializer.Serialize(failure, new JsonSerializerOptions { WriteIndented = true }));
+                throw new InvalidOperationException("Campaign budget validation failed: " + JsonSerializer.Serialize(new {
+                    task.Id, seed, method, result.StopReason, result.Counters, result.RetainedFailures }));
+            }
             var front = result.ParetoFront ?? new EvolutionParetoFront<Point>(definition, result.Islands.SelectMany(island => island.Entries));
             if (front.Entries.Count == 0 || front.Entries.Any(entry => entry.Evaluation.ConstraintViolations.Any(value => value > 0)))
                 throw new InvalidOperationException("Campaign produced no valid deployable front.");
