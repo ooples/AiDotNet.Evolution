@@ -7,6 +7,7 @@ import subprocess
 import sys
 import tempfile
 import unittest
+import zipfile
 
 from analyze_fidelity import analyze
 
@@ -86,6 +87,44 @@ class FidelityAnalysisTests(unittest.TestCase):
             self.assertEqual(hashlib.sha256(packed).hexdigest(), result["RawGzipSha256"])
             self.assertNotEqual(0, subprocess.run(command, capture_output=True).returncode)
             self.assertEqual(packed, (output / "raw.json.gz").read_bytes())
+
+    def test_committed_pilots_preserve_hash_chain_and_analysis(self):
+        root = Path(__file__).resolve().parents[1] / "evidence/fidelity/ac36140"
+        for name in ("trained", "curves"):
+            with self.subTest(fixture=name):
+                packed = (root / name / "raw.json.gz").read_bytes(); raw = gzip.decompress(packed)
+                result = json.loads((root / name / "analysis.json").read_text(encoding="utf-8"))
+                self.assertEqual(hashlib.sha256(packed).hexdigest(), result["RawGzipSha256"])
+                self.assertEqual(hashlib.sha256(raw).hexdigest(), result["FullTraceSha256"])
+                self.assertEqual(len(raw), result["RawBytes"])
+                recomputed = analyze(json.loads(raw))
+                self.assertEqual(128, recomputed["ScheduledRuns"]); self.assertEqual(0, recomputed["FailedOrInvalidRuns"])
+                for key, value in recomputed.items(): self.assertEqual(value, result[key])
+
+    def test_trained_pilot_rejects_fabricated_error_reused_confirmation_and_work(self):
+        path = Path(__file__).resolve().parents[1] / "evidence/fidelity/ac36140/trained/raw.json.gz"
+        original = json.loads(gzip.decompress(path.read_bytes()))
+        for change in (lambda row: row["Measurements"][0].update(MeanSquaredError=100),
+                       lambda row: row["Measurements"][-1].update(DataIdentity=row["Measurements"][0]["DataIdentity"]),
+                       lambda row: row["Measurements"][-1].update(ResumedFrom="search-token"),
+                       lambda row: row["Measurements"][0].update(ActualEpochs=-1)):
+            report = copy.deepcopy(original); change(report["Runs"][0]); result = analyze(report)
+            self.assertEqual(1, result["FailedOrInvalidRuns"])
+            self.assertEqual(0, result["Runs"][0]["PenalizedQuality"])
+
+    def test_committed_separate_process_recovery_has_no_duplicate_training(self):
+        path = Path(__file__).resolve().parents[1] / "evidence/fidelity/ac36140/recovery.zip"
+        self.assertEqual("d72bfdf4e2ef5312f4609493dec508417b3640102e44e3054e0ac56da6814512", hashlib.sha256(path.read_bytes()).hexdigest())
+        with zipfile.ZipFile(path) as archive:
+            baseline, start, resume = [json.loads(archive.read(name + ".json")) for name in ("baseline", "start", "resume")]
+        self.assertEqual(3, len({row["ProcessId"] for row in (baseline, start, resume)}))
+        self.assertEqual(1, len({row["AssemblySha256"] for row in (baseline, start, resume)}))
+        self.assertEqual("Paused", start["Report"]["StopReason"])
+        self.assertEqual("Completed", resume["Report"]["StopReason"])
+        self.assertEqual(baseline["Report"], resume["Report"])
+        self.assertEqual(baseline["Measurements"], start["Measurements"] + resume["Measurements"])
+        self.assertEqual(32, start["EvaluatorCalls"] + resume["EvaluatorCalls"])
+        self.assertEqual(608, start["ExecutedEpochs"] + resume["ExecutedEpochs"])
 
 
 if __name__ == "__main__":

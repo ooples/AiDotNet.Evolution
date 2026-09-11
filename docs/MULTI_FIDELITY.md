@@ -85,6 +85,8 @@ evaluators, but these examples are not AiDotNet AutoML integration or a code-exe
 
 ## Coordinated settled-batch checkpoint and resume
 
+[Pinned 256-run evidence and complete replay](../benchmarks/evidence/fidelity/ac36140/README.md) include actual regression training, misleading-curve controls, retained unfavorable outcomes, and separate-process recovery. The fixtures do not establish representative superiority or deployment readiness.
+
 `RunCheckpointedAsync` uses the same promotion algorithm and semantic identity as `RunAsync`. After each fully
 settled batch, its asynchronous sink receives an `EvolutionFidelityCheckpoint`; return `false` to pause before
 further dispatch. A paused report never exposes `BestConfirmed`, even when the last confirmation batch just finished.
