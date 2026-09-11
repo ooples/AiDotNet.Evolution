@@ -1,7 +1,12 @@
 import copy
+import hashlib
+import json
+from pathlib import Path
+import tempfile
 import unittest
+import zipfile
 
-from compare_pipeline_defaults import compare
+from compare_pipeline_defaults import compare, verify_archive
 
 
 def fixture():
@@ -38,3 +43,23 @@ class DefaultProfileComparisonTests(unittest.TestCase):
             before, after = fixture(); corrupt(after)
             with self.assertRaises(ValueError):
                 compare(before, after, "a" * 40, "b" * 40)
+
+    def test_archive_hash_chain_and_recomputation(self):
+        before, after = fixture()
+        report = compare(before, after, "a" * 40, "b" * 40)
+        first, second = json.dumps(before).encode(), json.dumps(after).encode()
+        with tempfile.TemporaryDirectory() as temporary:
+            root = Path(temporary); archive_path = root / "profiles.zip"; comparison_path = root / "comparison.json"
+            with zipfile.ZipFile(archive_path, "w") as archive:
+                archive.writestr("before/report.json", first); archive.writestr("after/report.json", second)
+            report.update(BeforeReportSha256=hashlib.sha256(first).hexdigest(), AfterReportSha256=hashlib.sha256(second).hexdigest(),
+                          BeforeReportMember="before/report.json", AfterReportMember="after/report.json",
+                          ProfilesZipSha256=hashlib.sha256(archive_path.read_bytes()).hexdigest())
+            comparison_path.write_text(json.dumps(report))
+            self.assertEqual(verify_archive(archive_path, comparison_path), report)
+            for field, value in (("AllStateQualityAndWorkIdentical", False), ("ProfilesZipSha256", "f" * 64),
+                                 ("BeforeReportSha256", "f" * 64), ("BeforeReportMember", "../report.json")):
+                corrupted = dict(report); corrupted[field] = value
+                comparison_path.write_text(json.dumps(corrupted))
+                with self.assertRaises(ValueError):
+                    verify_archive(archive_path, comparison_path)
