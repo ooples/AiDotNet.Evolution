@@ -119,3 +119,6 @@ x64 NativeAOT build and the same three-process-kill recovery probe also passed; 
 emitted no warnings. This is specific to the durable coordinator and its source-generated
 ledger/work serialization, not all engine persistence paths in the separate native host.
 Hosted CI, Linux/macOS and durable engine/binding integration remain unverified or unfinished.
+
+[Pinned managed/native reports and authoritative snapshots](../benchmarks/evidence/external-work/75fd8be/README.md)
+retain the process-crash evidence and its exact source/binary identities.
