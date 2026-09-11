@@ -4,6 +4,7 @@
     <Project Path="benchmarks/AiDotNet.Evolution.Quality/AiDotNet.Evolution.Quality.csproj" />
   </Folder>
   <Folder Name="/examples/">
+    <Project Path="examples/AdaptiveIslandSearch/AdaptiveIslandSearch.csproj" />
     <Project Path="examples/MultiFidelitySearch/MultiFidelitySearch.csproj" />
     <Project Path="examples/OperatorCreditSearch/OperatorCreditSearch.csproj" />
     <Project Path="examples/PersistentEvaluation/PersistentEvaluation.csproj" />
