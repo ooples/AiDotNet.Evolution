@@ -5,6 +5,9 @@ namespace AiDotNet.Evolution.Host;
 /// <summary>One knob: its name, its bounds, and how coarsely it is quantised.</summary>
 internal sealed class ParameterDefinition
 {
+    private readonly double _normalizationMinimum;
+    private readonly double _normalizationMaximum;
+
     internal ParameterDefinition(string name, double minimum, double maximum, double step, bool integral)
     {
         if (string.IsNullOrWhiteSpace(name))
@@ -13,8 +16,18 @@ internal sealed class ParameterDefinition
             throw new ArgumentException($"Parameter '{name}' has a non-finite bound.", nameof(name));
         if (maximum <= minimum)
             throw new ArgumentException($"Parameter '{name}' has maximum <= minimum.", nameof(name));
+        double span = maximum - minimum;
+        if (!double.IsFinite(span))
+            throw new ArgumentException($"Parameter '{name}' range must be representable as a finite double; use narrower bounds.", nameof(maximum));
         if (!double.IsFinite(step) || step <= 0)
-            throw new ArgumentException($"Parameter '{name}' has a non-positive step.", nameof(name));
+            throw new ArgumentException($"Parameter '{name}' requires a finite, positive step.", nameof(step));
+        if (!double.IsFinite(span / step))
+            throw new ArgumentException($"Parameter '{name}' range divided by step must be representable as a finite double; use a larger step.", nameof(step));
+
+        _normalizationMinimum = integral ? Math.Ceiling(minimum) : minimum;
+        _normalizationMaximum = integral ? Math.Floor(maximum) : maximum;
+        if (_normalizationMinimum > _normalizationMaximum)
+            throw new ArgumentException($"Parameter '{name}' has no integral value within its bounds.", nameof(integral));
 
         Name = name;
         Minimum = minimum;
@@ -44,12 +57,15 @@ internal sealed class ParameterDefinition
     /// <summary>Clamps to the bounds and snaps to the step.</summary>
     internal double Normalize(double value)
     {
-        if (!double.IsFinite(value)) return Minimum;
-        double clamped = Math.Min(Maximum, Math.Max(Minimum, value));
-        double snapped = Minimum + Math.Round((clamped - Minimum) / Step, MidpointRounding.AwayFromZero) * Step;
+        if (!double.IsFinite(value)) return _normalizationMinimum;
+        double clamped = Math.Min(_normalizationMaximum, Math.Max(_normalizationMinimum, value));
+        // The first admissible integer also anchors an integral grid. Keeping a fractional
+        // origin could move an already normalized value again (min=.5, step=1: 1 -> 2 -> 3).
+        double snapped = _normalizationMinimum
+            + Math.Round((clamped - _normalizationMinimum) / Step, MidpointRounding.AwayFromZero) * Step;
         if (Integral) snapped = Math.Round(snapped, MidpointRounding.AwayFromZero);
         // Rounding can leave the value a hair outside after the snap.
-        return Math.Min(Maximum, Math.Max(Minimum, snapped));
+        return Math.Min(_normalizationMaximum, Math.Max(_normalizationMinimum, snapped));
     }
 }
 
@@ -123,7 +139,7 @@ internal sealed class ParameterSpace
             ParameterDefinition parameter = Parameters[i];
             raw[i] = values.TryGetValue(parameter.Name, out double value)
                 ? value
-                : (parameter.Minimum + parameter.Maximum) / 2;
+                : parameter.Minimum + (parameter.Maximum - parameter.Minimum) / 2;
         }
         return Create(raw);
     }

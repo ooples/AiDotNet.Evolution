@@ -72,8 +72,13 @@ try {
 ```
 
 `close()` is where the result comes from, because it stops the run **gracefully**: the
-current batch commits and the archive is kept. It is idempotent, and always safe to call
-from a `finally`.
+current batch commits and the archive is kept. It is idempotent, but can throw if the host
+cannot confirm shutdown. To preserve an earlier evaluator error, catch a cleanup failure
+and rethrow that original error, as `evolve()` does.
+
+A pending `ask()` does not prevent `tell()` or `close()` from being processed. Closing
+cancels pending asks with an error, not an empty successful batch. The native protocol
+permits up to 32 waiting asks and returns a correlated error when that bound is exceeded.
 
 ## Reporting a failure
 
@@ -112,6 +117,12 @@ a plausible-looking answer.
 | `maxGenerations`, `batchSize` | |
 | `direction` | `'maximize'` (default) or `'minimize'`. Anything else is rejected. |
 | `hostPath`, `hostArgs` | Run a host you built yourself. |
+
+Parameter bounds must be finite, ordered (`min < max`), and have a finite `max-min`.
+The resolved step must be finite and positive, and `(max-min)/step` must remain finite.
+Integral parameters require at least one integer between `ceil(min)` and `floor(max)`;
+their quantization grid starts at `ceil(min)`. Unsupported numeric domains are rejected
+when opening the session rather than silently collapsing the search.
 
 ## Why a child process rather than a native binding
 

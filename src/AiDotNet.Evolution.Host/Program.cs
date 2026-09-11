@@ -26,6 +26,9 @@ internal static class Program
 {
     private const string Version = "0.1.0";
 
+    // A peer may pipeline asks, but waiting requests must not grow without a bound.
+    internal const int MaxPendingAsks = 32;
+
     private static async Task<int> Main()
     {
         // UTF-8 WITHOUT A BOM, EXPLICITLY. The default console encoding on Windows is the
@@ -51,15 +54,68 @@ internal static class Program
     /// </remarks>
     internal static async Task<int> ServeAsync(TextReader stdin, TextWriter stdout)
     {
-        var frames = new FrameReader(stdin);
-
         HostSession? session = null;
+        Action<HostSession?> setSession = value => session = value;
+        try
+        {
+            return await ServeRequestsAsync(stdin, stdout,
+                (request, cancellationToken) => Handle(request, session, setSession, cancellationToken))
+                .ConfigureAwait(false);
+        }
+        finally
+        {
+            session?.Dispose();
+        }
+    }
+
+    // The scheduler owns all read/write operations; the caller owns the session. Keeping
+    // dispatch separate also lets transport-fault tests control when a waiting ask finishes.
+    internal static async Task<int> ServeRequestsAsync(
+        TextReader stdin,
+        TextWriter stdout,
+        Func<Request, CancellationToken, Task<Response>> handle)
+    {
+        var frames = new FrameReader(stdin);
+        var pendingAsks = new List<Task<Response>>();
+        using var askCancellation = new CancellationTokenSource();
+        using var readCancellation = new CancellationTokenSource();
+        Task<(string? Line, bool Overlong)>? nextFrame = null;
         try
         {
             while (true)
             {
-                (string? line, bool overlong) = await frames.NextAsync().ConfigureAwait(false);
-                if (line is null) break;
+                // Only this loop writes responses or changes session ownership. An ask
+                // may wait for a tell, so it must not prevent that tell (or close) being read.
+                for (int i = 0; i < pendingAsks.Count;)
+                {
+                    Task<Response> pending = pendingAsks[i];
+                    if (!pending.IsCompleted)
+                    {
+                        i += 1;
+                        continue;
+                    }
+                    await Write(stdout, await pending.ConfigureAwait(false)).ConfigureAwait(false);
+                    pendingAsks.RemoveAt(i);
+                }
+
+                nextFrame ??= frames.NextAsync(readCancellation.Token);
+                if (!nextFrame.IsCompleted && pendingAsks.Count > 0)
+                {
+                    var ready = new Task[pendingAsks.Count + 1];
+                    ready[0] = nextFrame;
+                    for (int i = 0; i < pendingAsks.Count; i += 1) ready[i + 1] = pendingAsks[i];
+                    await Task.WhenAny(ready).ConfigureAwait(false);
+                    if (!nextFrame.IsCompleted) continue;
+                }
+
+                (string? line, bool overlong) = await nextFrame.ConfigureAwait(false);
+                nextFrame = null;
+                if (line is null)
+                {
+                    askCancellation.Cancel();
+                    await DrainAsks(stdout, pendingAsks).ConfigureAwait(false);
+                    break;
+                }
                 if (overlong)
                 {
                     // The rest of that frame was discarded, so there is no id to echo and
@@ -85,19 +141,94 @@ internal static class Program
                     continue;
                 }
 
-                Response response = await Handle(request, session, s => session = s).ConfigureAwait(false);
-                response.Id = request.Id;
+                Protocol.Op? op = Protocol.ParseOp(request.Op);
+                if (op == Protocol.Op.Ask)
+                {
+                    if (pendingAsks.Count == MaxPendingAsks)
+                    {
+                        await Write(stdout, new Response
+                        {
+                            Id = request.Id,
+                            Ok = false,
+                            Error = $"at most {MaxPendingAsks} asks may wait for results at once",
+                        }).ConfigureAwait(false);
+                    }
+                    else
+                    {
+                        pendingAsks.Add(Dispatch(request, handle, askCancellation.Token));
+                    }
+                    continue;
+                }
+
+                if (op == Protocol.Op.Close)
+                {
+                    // Settle callers before Close disposes the semaphore they await.
+                    // Cancellation is an error response, never a false end-of-run batch.
+                    askCancellation.Cancel();
+                    await DrainAsks(stdout, pendingAsks).ConfigureAwait(false);
+                }
+
+                Response response = await Dispatch(request, handle).ConfigureAwait(false);
                 await Write(stdout, response).ConfigureAwait(false);
 
-                if (Protocol.ParseOp(request.Op) == Protocol.Op.Close) break;
+                if (op == Protocol.Op.Close) break;
             }
         }
         finally
         {
-            session?.Dispose();
+            askCancellation.Cancel();
+            readCancellation.Cancel();
+            try
+            {
+                await Task.WhenAll(pendingAsks).ConfigureAwait(false);
+            }
+            finally
+            {
+                ObserveAbandonedRead(nextFrame);
+            }
         }
 
         return 0;
+    }
+
+    private static void ObserveAbandonedRead(Task<(string? Line, bool Overlong)>? pendingRead)
+    {
+        if (pendingRead is null) return;
+        if (pendingRead.IsCompleted)
+        {
+            _ = pendingRead.Exception;
+            return;
+        }
+
+        // Normal Close/EOF has already consumed and cleared nextFrame. A read remains
+        // only when the loop is unwinding an exception, such as a broken stdout pipe.
+        // Cancellation is best effort for a borrowed TextReader: Windows console-pipe
+        // reads can ignore cancellation after starting. Awaiting that read here would
+        // prevent the failing host from exiting until its peer also closed stdin.
+        // Observe a late fault without replacing the primary transport failure. The
+        // continuation also covers completion racing the IsCompleted check above.
+        _ = pendingRead.ContinueWith(
+            static completed => { _ = completed.Exception; },
+            CancellationToken.None,
+            TaskContinuationOptions.ExecuteSynchronously | TaskContinuationOptions.OnlyOnFaulted,
+            TaskScheduler.Default);
+    }
+
+    private static async Task DrainAsks(TextWriter stdout, List<Task<Response>> pendingAsks)
+    {
+        foreach (Task<Response> pending in pendingAsks)
+            await Write(stdout, await pending.ConfigureAwait(false)).ConfigureAwait(false);
+        pendingAsks.Clear();
+    }
+
+    private static async Task<Response> Dispatch(
+        Request request,
+        Func<Request, CancellationToken, Task<Response>> handle,
+        CancellationToken cancellationToken = default)
+    {
+        Response response = await handle(request, cancellationToken).ConfigureAwait(false);
+        response.Id = request.Id;
+        return response;
     }
 
     // Internal so the dispatch can be tested without pipes. Main's loop is framing;
@@ -105,7 +236,8 @@ internal static class Program
     internal static async Task<Response> Handle(
         Request request,
         HostSession? session,
-        Action<HostSession?> setSession)
+        Action<HostSession?> setSession,
+        CancellationToken cancellationToken = default)
     {
         try
         {
@@ -131,7 +263,7 @@ internal static class Program
                 case Protocol.Op.Ask:
                     return session is null
                         ? Fail("no run is open")
-                        : await Ask(request, session).ConfigureAwait(false);
+                        : await Ask(request, session, cancellationToken).ConfigureAwait(false);
 
                 case Protocol.Op.Tell:
                     if (session is null) return Fail("no run is open");
@@ -152,6 +284,10 @@ internal static class Program
                     return Fail($"unknown op '{request.Op}'");
             }
         }
+        catch (OperationCanceledException) when (cancellationToken.IsCancellationRequested)
+        {
+            return Fail("request was canceled");
+        }
 #pragma warning disable CA1031 // Do not catch general exception types
         // DELIBERATELY GENERAL. This is a protocol boundary: whatever went wrong belongs on
         // the wire as an error the client can read, not on stderr where a spawned process
@@ -164,10 +300,11 @@ internal static class Program
 #pragma warning restore CA1031
     }
 
-    private static async Task<Response> Ask(Request request, HostSession session)
+    private static async Task<Response> Ask(
+        Request request, HostSession session, CancellationToken cancellationToken)
     {
         List<Candidate> candidates =
-            await session.AskAsync(request.Max <= 0 ? 1 : request.Max, CancellationToken.None).ConfigureAwait(false);
+            await session.AskAsync(request.Max <= 0 ? 1 : request.Max, cancellationToken).ConfigureAwait(false);
         return new Response
         {
             Ok = true,
@@ -234,13 +371,13 @@ internal sealed class FrameReader
     internal FrameReader(TextReader reader) => _reader = reader;
 
     /// <summary>The next frame, or a null line at end of input.</summary>
-    internal async Task<(string? Line, bool Overlong)> NextAsync()
+    internal async Task<(string? Line, bool Overlong)> NextAsync(CancellationToken cancellationToken = default)
     {
         while (true)
         {
             if (_offset >= _length)
             {
-                _length = await _reader.ReadAsync(_chunk, 0, ChunkChars).ConfigureAwait(false);
+                _length = await _reader.ReadAsync(_chunk.AsMemory(), cancellationToken).ConfigureAwait(false);
                 _offset = 0;
                 if (_length == 0)
                 {

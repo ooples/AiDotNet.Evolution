@@ -1,3 +1,4 @@
+using System.Reflection;
 using AiDotNet.Evolution;
 using Xunit;
 
@@ -222,18 +223,29 @@ public sealed class EvolutionSessionTests
     }
 
     [Fact]
-    public async Task ConstructorRejectsNulls()
+    public void ConstructorRejectsNulls()
     {
-        Assert.Throws<ArgumentNullException>(() =>
-            new EvolutionSession<SessionGenome>(null!, Seeds(2), Identity));
-        Assert.Throws<ArgumentNullException>(() =>
-            new EvolutionSession<SessionGenome>(task => Engine(task, Options(4)), null!, Identity));
+        AssertNullConstructorArgument(null, Seeds(2), Identity, "engineFactory");
+        AssertNullConstructorArgument(task => Engine(task, Options(4)), null, Identity, "initialGenomes");
         // Identity has no default on purpose: falling back to ToString would give
         // every genome of a type that does not override it the same id, and the
         // engine would silently deduplicate distinct candidates into one.
-        Assert.Throws<ArgumentNullException>(() =>
-            new EvolutionSession<SessionGenome>(task => Engine(task, Options(4)), Seeds(2), null!));
-        await Task.CompletedTask;
+        AssertNullConstructorArgument(task => Engine(task, Options(4)), Seeds(2), null, "canonicalIdentity");
+    }
+
+    private static void AssertNullConstructorArgument(
+        Func<IEvolutionTask<SessionGenome>, EvolutionEngine<SessionGenome>>? engineFactory,
+        IEnumerable<SessionGenome>? initialGenomes,
+        Func<SessionGenome, string>? canonicalIdentity,
+        string parameterName)
+    {
+        // Exercise the runtime boundary without lying to nullable analysis or relaxing
+        // the public constructor's non-null contract. Reflection wraps the actual guard.
+        ConstructorInfo constructor = Assert.Single(typeof(EvolutionSession<SessionGenome>).GetConstructors());
+        TargetInvocationException invocation = Assert.Throws<TargetInvocationException>(() =>
+            constructor.Invoke(new object?[] { engineFactory, initialGenomes, canonicalIdentity }));
+        ArgumentNullException argument = Assert.IsType<ArgumentNullException>(invocation.InnerException);
+        Assert.Equal(parameterName, argument.ParamName);
     }
 
     [Fact]

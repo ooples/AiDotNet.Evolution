@@ -34,6 +34,47 @@ const CONFIG = {
   batchSize: 8,
 };
 
+test('integral parameters remain integral with fractional bounds', { skip }, async () => {
+  const session = await openSession({
+    parameters: [{ name: 'x', min: 0.1, max: 2.4, step: 1, integral: true }],
+    descriptors: [{ name: 'x', min: 0, max: 3, bins: 3 }],
+    seeds: [{ x: 0.1 }],
+    maxProposals: 1,
+    maxEvaluations: 1,
+  });
+  try {
+    const batch = await session.ask(1);
+    assert.equal(batch.length, 1);
+    const value = batch[0].parameters.x;
+    assert.ok(Number.isInteger(value), `integral parameter returned ${value}`);
+    assert.ok(value >= 1 && value <= 2, 'the candidate must be an integer inside the declared bounds');
+  } finally {
+    await session.close();
+  }
+});
+
+test('a binary integral search can leave its seed with the default step', { skip }, async () => {
+  const seen = [];
+  await evolve({
+    parameters: [{ name: 'x', min: 0, max: 1, integral: true }],
+    descriptors: [{ name: 'x', min: 0, max: 1, bins: 2 }],
+    seeds: [{ x: 1 }],
+    seed: 1234,
+    maxProposals: 10,
+    maxEvaluations: 10,
+    batchSize: 1,
+  }, (candidates) => candidates.map((candidate) => {
+    seen.push(candidate.parameters.x);
+    return {
+      evaluationId: candidate.evaluationId,
+      quality: candidate.parameters.x,
+      descriptors: candidate.parameters,
+    };
+  }));
+  assert.deepEqual([...new Set(seen)].sort((a, b) => a - b), [0, 1],
+    'a representable alternative must be evaluated, not lost as repeated parent proposals');
+});
+
 test('a real run converges on the optimum of a quadratic', { skip }, async () => {
   const summary = await evolve(CONFIG, (candidates) =>
     candidates.map((candidate) => ({
@@ -50,6 +91,43 @@ test('a real run converges on the optimum of a quadratic', { skip }, async () =>
   assert.ok(Math.abs(x - 3) < 0.5, `x converged to ${x}, expected near 3`);
   assert.ok(Math.abs(y + 1) < 0.5, `y converged to ${y}, expected near -1`);
   assert.ok(summary.best.quality > -0.5, `quality ${summary.best.quality} is too poor`);
+});
+
+test('a pending real-host ask cannot block the tell needed to produce its batch', { skip }, async () => {
+  const session = await openSession({ ...CONFIG, batchSize: 1, requestTimeoutMs: 3000 });
+  try {
+    const first = await session.ask(1);
+    assert.equal(first.length, 1);
+    // Register both outcomes immediately: the old host deadlocked here, so the
+    // timeout must remain an asserted failure, not an unhandled rejection.
+    const next = session.ask(1).then((batch) => ({ batch }), (error) => ({ error }));
+    assert.equal(await session.tell(first.map((candidate) => ({
+      evaluationId: candidate.evaluationId,
+      quality: quality(candidate.parameters),
+      descriptors: candidate.parameters,
+    }))), 1);
+    const result = await next;
+    assert.ok('batch' in result, `pending ask failed: ${result.error}`);
+    assert.equal(result.batch.length, 1);
+    assert.notEqual(result.batch[0].evaluationId, first[0].evaluationId);
+  } finally {
+    await session.close().catch(() => undefined);
+  }
+});
+
+test('closing the real host cancels a pending ask without reporting completion', { skip }, async () => {
+  const session = await openSession({ ...CONFIG, batchSize: 1, requestTimeoutMs: 3000 });
+  try {
+    assert.equal((await session.ask(1)).length, 1);
+    const next = session.ask(1).then((batch) => ({ batch }), (error) => ({ error }));
+    const summary = await session.close();
+    assert.ok(summary.stopReason, 'the host must confirm that the run stopped');
+    const result = await next;
+    assert.ok('error' in result, 'a canceled ask must not be an empty successful batch');
+    assert.match(result.error.message, /request was canceled/);
+  } finally {
+    await session.close().catch(() => undefined);
+  }
 });
 
 test('the same seed replays the same search', { skip }, async () => {

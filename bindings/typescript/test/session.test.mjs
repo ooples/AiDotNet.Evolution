@@ -100,6 +100,27 @@ test('an unparseable line is ignored and the real response still arrives', async
   }
 });
 
+test('non-object JSON cannot crash the client before the real response', { timeout: 5000 }, async () => {
+  const session = await openSession(withMode('non-object-before-ask', { requestTimeoutMs: 1000 }));
+  try {
+    const batch = await session.ask(2);
+    assert.equal(batch.length, 2);
+    assert.deepEqual(batch.map((candidate) => candidate.evaluationId), [1, 2]);
+  } finally {
+    await session.close();
+  }
+});
+
+test('an invalid response envelope cannot complete a pending request', async () => {
+  const session = await openSession(withMode('invalid-response-before-ask', { requestTimeoutMs: 1000 }));
+  try {
+    const batch = await session.ask(2);
+    assert.equal(batch.length, 2, 'a string ok value must not turn an invalid frame into end-of-run');
+  } finally {
+    await session.close();
+  }
+});
+
 test('every request after the host dies fails immediately', async () => {
   const session = await openSession(withMode('die-on-ask'));
   await assert.rejects(() => session.ask(1));
@@ -108,6 +129,92 @@ test('every request after the host dies fails immediately', async () => {
   await assert.rejects(() => session.ask(1), /exited unexpectedly/);
   assert.ok(Date.now() - started < 1000, 'a known-dead host is failed without waiting');
   await assert.rejects(() => session.close(), /exited unexpectedly/);
+});
+
+const withInvalidPayload = (op, payload, mode = 'before') => withMode('unused', {
+  hostArgs: [FAKE, `invalid-payload-${mode}-${op}`, JSON.stringify(payload)],
+  requestTimeoutMs: 1000,
+});
+
+for (const [name, payload] of [
+  ['missing candidates', { complete: true }],
+  ['null candidates', { candidates: null, complete: true }],
+  ['non-array candidates', { candidates: {}, complete: false }],
+  ['null candidate', { candidates: [null], complete: false }],
+  ['unsafe evaluation id', { candidates: [{ evaluationId: 9007199254740992, parameters: { x: 0 } }], complete: false }],
+  ['invalid parameter map', { candidates: [{ evaluationId: 1, parameters: [] }], complete: false }],
+  ['invalid parameter value', { candidates: [{ evaluationId: 1, parameters: { x: null } }], complete: false }],
+  ['invalid quality', { candidates: [{ evaluationId: 1, parameters: { x: 0 }, quality: 'good' }], complete: false }],
+  ['missing completion flag', { candidates: [] }],
+  ['false completion flag', { candidates: [], complete: false }],
+]) {
+  test(`ask ignores ${name} without losing its real response`, async () => {
+    const session = await openSession(withInvalidPayload('ask', payload));
+    try {
+      assert.deepEqual(await session.ask(2), [
+        { evaluationId: 1, parameters: { x: 0 } },
+        { evaluationId: 2, parameters: { x: 1 } },
+      ]);
+    } finally {
+      await session.close();
+    }
+  });
+}
+
+for (const [name, payload] of [
+  ['missing count', {}],
+  ['negative count', { accepted: -1 }],
+  ['fractional count', { accepted: 0.5 }],
+  ['non-numeric count', { accepted: '2' }],
+]) {
+  test(`tell ignores a ${name} without losing its real response`, async () => {
+    const session = await openSession(withInvalidPayload('tell', payload));
+    try {
+      const batch = await session.ask(2);
+      assert.equal(await session.tell(batch.map((c) => ({ evaluationId: c.evaluationId, quality: 1 }))), 2);
+    } finally {
+      await session.close();
+    }
+  });
+}
+
+for (const [name, payload] of [
+  ['invalid best', { best: 1, stopReason: 'Fake' }],
+  ['invalid best quality', { best: { evaluationId: 1, parameters: { x: 0 }, quality: 'good' }, stopReason: 'Fake' }],
+  ['invalid stop reason', { stopReason: 1 }],
+  ['missing stop reason', {}],
+]) {
+  test(`close ignores a payload with ${name} without reporting a false result`, async () => {
+    const session = await openSession(withInvalidPayload('close', payload));
+    assert.deepEqual(await session.close(), {
+      best: { evaluationId: 1, parameters: { x: 0 }, quality: 1 },
+      stopReason: 'Fake',
+    });
+  });
+}
+
+for (const version of [undefined, null, 1]) {
+  test(`open cannot accept an invalid version (${version})`, async () => {
+    let session;
+    try {
+      await assert.rejects(async () => {
+        session = await openSession(withInvalidPayload('open', { version }));
+      }, /valid rejection after malformed open/);
+    } finally {
+      await session?.close();
+    }
+  });
+}
+
+test('a malformed-only ask times out and terminates its host instead of completing empty', async () => {
+  const session = await openSession(withInvalidPayload('ask', {}, 'only'));
+  try {
+    await assert.rejects(() => session.ask(1), /did not answer 'ask'/);
+  } finally {
+    await session.close().catch(() => undefined);
+  }
+  await waitForExit(session.pid);
+  assert.equal(alive(session.pid), false);
 });
 
 test('evolve drives the loop and returns the summary', async () => {

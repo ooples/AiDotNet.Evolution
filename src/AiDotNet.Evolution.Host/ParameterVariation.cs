@@ -53,7 +53,7 @@ internal sealed class ParameterVariation : IVariationOperator<ParameterGenome>
             }
 
             double range = parameter.Maximum - parameter.Minimum;
-            values[i] = current + Gaussian(random) * Sigma * range;
+            values[i] = ClampGeneratedValue(parameter, current + Gaussian(random) * Sigma * range);
             touchedAny = true;
         }
 
@@ -65,7 +65,7 @@ internal sealed class ParameterVariation : IVariationOperator<ParameterGenome>
             if (index >= values.Length) index = values.Length - 1;
             ParameterDefinition parameter = space.Parameters[index];
             double range = parameter.Maximum - parameter.Minimum;
-            values[index] = parent.Values[index] + Gaussian(random) * Sigma * range;
+            values[index] = ClampGeneratedValue(parameter, parent.Values[index] + Gaussian(random) * Sigma * range);
         }
 
         return new ValueTask<ParameterGenome>(EnsureDifferent(space.Create(values), parent, random));
@@ -84,8 +84,9 @@ internal sealed class ParameterVariation : IVariationOperator<ParameterGenome>
     /// <para>
     /// The engine notices the duplicate and never spends an evaluation on it, so nothing is
     /// scored twice. What it does spend is a PROPOSAL, and a run whose budget is proposals
-    /// simply searches less. So one dimension is moved to the nearest genuinely different
-    /// representable value: up a step, or down one where up is out of range.
+    /// simply searches less. So one dimension is moved up or down a step. If both steps
+    /// collapse under integral rounding, its normalized endpoints are tried instead. The
+    /// normalizer is monotone, so equal endpoints mean that dimension has only one value.
     /// </para>
     /// <para>
     /// Starting from a random dimension rather than the first keeps the forced move from
@@ -114,18 +115,14 @@ internal sealed class ParameterVariation : IVariationOperator<ParameterGenome>
             ParameterDefinition parameter = space.Parameters[i];
             double current = child.Values[i];
 
-            foreach (double moved in new[]
-            {
-                parameter.Normalize(current + parameter.Step),
-                parameter.Normalize(current - parameter.Step),
-            })
-            {
-                if (moved == current) continue;
-                var values = new double[count];
-                for (int j = 0; j < count; j += 1) values[j] = child.Values[j];
-                values[i] = moved;
-                return space.Create(values);
-            }
+            // Endpoints are only evaluated when both local probes collapse. Unlike random
+            // retries this is bounded, and it also handles a default subunit step on a
+            // binary integral parameter without spending every proposal on the parent.
+            ParameterGenome? moved = TryMove(child, i, current + parameter.Step)
+                ?? TryMove(child, i, current - parameter.Step)
+                ?? TryMove(child, i, parameter.Minimum)
+                ?? TryMove(child, i, parameter.Maximum);
+            if (moved is not null) return moved;
         }
 
         // Every dimension is a single representable point, so there is no neighbour to
@@ -133,6 +130,27 @@ internal sealed class ParameterVariation : IVariationOperator<ParameterGenome>
         // duplicate.
         return child;
     }
+
+    private static ParameterGenome? TryMove(ParameterGenome child, int index, double value)
+    {
+        ParameterSpace space = child.Space;
+        ParameterDefinition parameter = space.Parameters[index];
+        double moved = parameter.Normalize(ClampGeneratedValue(parameter, value));
+        if (moved == child.Values[index]) return null;
+
+        var values = new double[space.Parameters.Count];
+        for (int i = 0; i < values.Length; i += 1) values[i] = child.Values[i];
+        values[index] = moved;
+        return space.Create(values);
+    }
+
+    /// <summary>Clamps generated arithmetic before the external-input normalization policy applies.</summary>
+    /// <remarks>
+    /// Finite operands can overflow at a boundary. A positive overflow is an upper-bound
+    /// overshoot, not an unusable external value that should fall back to the minimum.
+    /// </remarks>
+    internal static double ClampGeneratedValue(ParameterDefinition parameter, double value) =>
+        Math.Min(parameter.Maximum, Math.Max(parameter.Minimum, value));
 
     /// <summary>
     /// A standard normal sample, by Box-Muller.

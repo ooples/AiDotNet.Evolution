@@ -45,9 +45,11 @@ internal static class Protocol
         }
         catch (JsonException ex)
         {
-            // No id is recoverable here: the document did not parse, so there is nothing
-            // to read one out of.
-            error = $"malformed JSON: {ex.Message}";
+            // A DTO conversion error is not necessarily malformed JSON. Recover a
+            // valid envelope id even when another field has the wrong JSON type.
+            // Only this failure path needs a DOM; valid requests retain the direct,
+            // source-generated deserialization path without a second parse.
+            error = ClassifyDeserializationFailure(line, ex, out id);
             return null;
         }
 
@@ -68,14 +70,37 @@ internal static class Protocol
         return request;
     }
 
+    private static string ClassifyDeserializationFailure(string line, JsonException conversionError, out long id)
+    {
+        id = 0;
+        try
+        {
+            using JsonDocument document = JsonDocument.Parse(line);
+            JsonElement root = document.RootElement;
+            if (root.ValueKind != JsonValueKind.Object)
+            {
+                return "a request must be a JSON object";
+            }
+
+            if (root.TryGetProperty("id", out JsonElement idElement) &&
+                idElement.ValueKind == JsonValueKind.Number && idElement.TryGetInt64(out long recoveredId))
+            {
+                id = recoveredId;
+            }
+            return $"invalid request: {conversionError.Message}";
+        }
+        catch (JsonException syntaxError)
+        {
+            return $"malformed JSON: {syntaxError.Message}";
+        }
+    }
+
     /// <summary>The operations this host implements.</summary>
     /// <remarks>
-    /// AN ENUM INSIDE, A STRING ON THE WIRE, deliberately. Deserializing straight into an
-    /// enum makes an unknown op a <c>JsonException</c>, which reaches the client as
-    /// "malformed JSON" and drops the id -- so a client that sent a typo, or spoke a newer
-    /// protocol version, would be told its perfectly valid JSON was broken. Mapping here
-    /// keeps the closed set inside the host, where the compiler can check the switch, and
-    /// keeps the wire error accurate.
+    /// AN ENUM INSIDE, A STRING ON THE WIRE, deliberately. Keeping the raw operation until
+    /// dispatch lets the host quote an unknown name instead of returning a serializer
+    /// conversion error. Mapping here keeps the closed set inside the host, where the
+    /// compiler can check the switch, while callers receive a correlated protocol error.
     /// </remarks>
     internal enum Op
     {

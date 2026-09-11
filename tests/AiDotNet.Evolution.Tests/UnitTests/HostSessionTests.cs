@@ -93,10 +93,10 @@ public sealed class HostSessionTests
     {
         (Candidate? best, _, int evaluated) = await RunAsync(Quadratic("maximize"));
 
-        Assert.NotNull(best);
+        Candidate optimum = Assert.IsType<Candidate>(best);
         Assert.True(evaluated > 8, $"only {evaluated} candidates were evaluated; the run stopped after the seed batch");
-        Assert.True(Math.Abs(best!.Parameters["x"] - 3.0) <= 1.0, $"x reached {best.Parameters["x"]}");
-        Assert.True(Math.Abs(best.Parameters["y"] + 1.0) <= 1.0, $"y reached {best.Parameters["y"]}");
+        Assert.True(Math.Abs(optimum.Parameters["x"] - 3.0) <= 1.0, $"x reached {optimum.Parameters["x"]}");
+        Assert.True(Math.Abs(optimum.Parameters["y"] + 1.0) <= 1.0, $"y reached {optimum.Parameters["y"]}");
     }
 
     /// <summary>
@@ -116,9 +116,9 @@ public sealed class HostSessionTests
         (Candidate? best, string? stopReason, int evaluated) = await RunAsync(Quadratic("minimize"));
 
         Assert.True(evaluated > 8, $"only {evaluated} candidates were evaluated, stopping with '{stopReason}'");
-        Assert.NotNull(best);
-        Assert.True(Math.Abs(best!.Parameters["x"] - 3.0) <= 1.0, $"x reached {best.Parameters["x"]}");
-        Assert.True(Math.Abs(best.Parameters["y"] + 1.0) <= 1.0, $"y reached {best.Parameters["y"]}");
+        Candidate optimum = Assert.IsType<Candidate>(best);
+        Assert.True(Math.Abs(optimum.Parameters["x"] - 3.0) <= 1.0, $"x reached {optimum.Parameters["x"]}");
+        Assert.True(Math.Abs(optimum.Parameters["y"] + 1.0) <= 1.0, $"y reached {optimum.Parameters["y"]}");
     }
 
     [Theory]

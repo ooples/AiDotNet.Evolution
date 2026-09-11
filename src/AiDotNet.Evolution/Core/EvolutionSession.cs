@@ -214,22 +214,13 @@ public sealed class EvolutionSession<TGenome> : IDisposable
         FailOutstanding("aborted", "The session was aborted before this candidate was told.");
     }
 
-    /// <summary>Completes every evaluation the engine is waiting on, asked for or not.</summary>
-    /// <remarks>
-    /// BOTH COLLECTIONS, and missing the second one deadlocked a graceful stop. A candidate
-    /// the engine has proposed sits in `_queue` until a caller asks for it, and only then
-    /// moves to `_outstanding`. Failing just the asked ones therefore leaves the engine
-    /// awaiting completions for everything it proposed and nobody collected -- so the batch
-    /// never commits, the stop flag is never observed, and `Completion` never settles.
-    /// Found by driving a real run from the host binary and watching `close` hang.
-    /// </remarks>
     /// <summary>Dequeues the next evaluation that still needs a result.</summary>
     /// <remarks>
     /// A queued evaluation can already carry a result: a stop settles it in place rather
     /// than removing it, because removing it would race the enqueue that put it there.
     /// Skipping those here is what keeps that safe.
     /// </remarks>
-    private bool TryHandOver(out PendingEvaluation? pending)
+    private PendingEvaluation? HandOverNext()
     {
         lock (_handover)
         {
@@ -250,14 +241,17 @@ public sealed class EvolutionSession<TGenome> : IDisposable
                 }
 
                 _outstanding[candidate.Candidate.EvaluationId] = candidate;
-                pending = candidate;
-                return true;
+                return candidate;
             }
-            pending = null;
-            return false;
+            return null;
         }
     }
 
+    /// <summary>Completes every evaluation the engine is waiting on, asked for or not.</summary>
+    /// <remarks>
+    /// Both collections must be settled: the engine also awaits queued candidates that
+    /// nobody has asked for yet. Otherwise its current batch cannot commit or observe stop.
+    /// </remarks>
     private void FailOutstanding(string code, string message)
     {
         EvolutionTaskResult failure = EvolutionTaskResult.Failed(code, message);
@@ -314,23 +308,23 @@ public sealed class EvolutionSession<TGenome> : IDisposable
         // queued evaluation without removing it -- see the double-check in
         // EvaluateAsync -- and offering the caller a candidate whose result is already
         // recorded would have them do work that Tell then refuses.
-        if (TryHandOver(out PendingEvaluation? first))
+        if (HandOverNext() is { } first)
         {
-            batch.Add(new EvolutionAskItem<TGenome>(first!.Candidate, first.Context));
+            batch.Add(new EvolutionAskItem<TGenome>(first.Candidate, first.Context));
         }
 
         // Drain what is already queued, taking a permit for each so the count stays
         // in step with the queue.
         while (batch.Count < wanted && _available.Wait(0))
         {
-            if (!TryHandOver(out PendingEvaluation? next))
+            if (HandOverNext() is not { } next)
             {
                 // Permit taken with nothing behind it: hand it back rather than
                 // losing a wakeup a concurrent writer is about to need.
                 _available.Release();
                 break;
             }
-            batch.Add(new EvolutionAskItem<TGenome>(next!.Candidate, next.Context));
+            batch.Add(new EvolutionAskItem<TGenome>(next.Candidate, next.Context));
         }
 
         return batch;
@@ -386,7 +380,14 @@ public sealed class EvolutionSession<TGenome> : IDisposable
 
         if (_engineRun.IsCompleted) ReleaseHandles();
         else _engineRun.ContinueWith(
-            static (_, state) => ((EvolutionSession<TGenome>)state!).ReleaseHandles(),
+            static (_, state) =>
+            {
+                if (state is not EvolutionSession<TGenome> session)
+                {
+                    throw new InvalidOperationException("The continuation requires its evolution session.");
+                }
+                session.ReleaseHandles();
+            },
             this, CancellationToken.None, TaskContinuationOptions.ExecuteSynchronously,
             TaskScheduler.Default);
     }
@@ -525,8 +526,15 @@ public sealed class EvolutionSession<TGenome> : IDisposable
             }
 
             using CancellationTokenRegistration registration = cancellationToken.Register(
-                static state => ((TaskCompletionSource<EvolutionTaskResult>)state!).TrySetResult(
-                    EvolutionTaskResult.Failed("evaluation_canceled", "The evaluation was canceled before the host reported a result.")),
+                static state =>
+                {
+                    if (state is not TaskCompletionSource<EvolutionTaskResult> completion)
+                    {
+                        throw new InvalidOperationException("The cancellation callback requires its evaluation completion.");
+                    }
+                    completion.TrySetResult(EvolutionTaskResult.Failed(
+                        "evaluation_canceled", "The evaluation was canceled before the host reported a result."));
+                },
                 pending.Completion);
 
             return await pending.Completion.Task.ConfigureAwait(false);

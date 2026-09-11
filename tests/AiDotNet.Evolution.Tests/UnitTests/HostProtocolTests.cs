@@ -65,17 +65,17 @@ public sealed class HostProtocolTests
         Request? request = Protocol.ParseRequest(
             "{\"id\":7,\"op\":\"ask\",\"max\":4}", out string? error, out long id);
 
-        Assert.NotNull(request);
+        Request parsed = Assert.IsType<Request>(request);
         Assert.Null(error);
         Assert.Equal(7, id);
-        Assert.Equal("ask", request!.Op);
-        Assert.Equal(4, request.Max);
+        Assert.Equal("ask", parsed.Op);
+        Assert.Equal(4, parsed.Max);
     }
 
-    private static async Task<List<(string? Line, bool Overlong)>> ReadAllAsync(string input)
+    private static async Task<List<(string Line, bool Overlong)>> ReadAllAsync(string input)
     {
         var reader = new FrameReader(new StringReader(input));
-        var frames = new List<(string?, bool)>();
+        var frames = new List<(string, bool)>();
         while (true)
         {
             (string? line, bool overlong) = await reader.NextAsync();
@@ -88,7 +88,7 @@ public sealed class HostProtocolTests
     [Fact]
     public async Task FramesSplitOnNewlines()
     {
-        List<(string? Line, bool Overlong)> frames = await ReadAllAsync("one\ntwo\nthree");
+        List<(string Line, bool Overlong)> frames = await ReadAllAsync("one\ntwo\nthree");
 
         Assert.Equal(new[] { "one", "two", "three" }, frames.ConvertAll(f => f.Line));
         Assert.All(frames, f => Assert.False(f.Overlong));
@@ -99,7 +99,7 @@ public sealed class HostProtocolTests
     {
         // A client on Windows may send CRLF, and the payload is JSON, where trailing
         // whitespace is insignificant. A CR left in place makes every frame unparseable.
-        List<(string? Line, bool Overlong)> frames = await ReadAllAsync("{\"op\":\"ping\"}\r\n");
+        List<(string Line, bool Overlong)> frames = await ReadAllAsync("{\"op\":\"ping\"}\r\n");
 
         Assert.Equal(new[] { "{\"op\":\"ping\"}" }, frames.ConvertAll(f => f.Line));
     }
@@ -107,7 +107,7 @@ public sealed class HostProtocolTests
     [Fact]
     public async Task AnEmptyFrameIsStillAFrame()
     {
-        List<(string? Line, bool Overlong)> frames = await ReadAllAsync("a\n\nb\n");
+        List<(string Line, bool Overlong)> frames = await ReadAllAsync("a\n\nb\n");
 
         Assert.Equal(new[] { "a", string.Empty, "b" }, frames.ConvertAll(f => f.Line));
     }
@@ -125,7 +125,7 @@ public sealed class HostProtocolTests
         oversized.Append('\n');
         oversized.Append("{\"op\":\"ping\"}\n");
 
-        List<(string? Line, bool Overlong)> frames = await ReadAllAsync(oversized.ToString());
+        List<(string Line, bool Overlong)> frames = await ReadAllAsync(oversized.ToString());
 
         Assert.Equal(2, frames.Count);
         Assert.True(frames[0].Overlong, "the oversized frame must be reported as abandoned");
@@ -146,7 +146,7 @@ public sealed class HostProtocolTests
         payload.Append("{\"op\":\"ping\"}");
         payload.Append('\n');
 
-        List<(string? Line, bool Overlong)> frames = await ReadAllAsync(payload.ToString());
+        List<(string Line, bool Overlong)> frames = await ReadAllAsync(payload.ToString());
 
         Assert.Single(frames);
         Assert.True(frames[0].Overlong, "carriage returns are content unless they precede the newline");
@@ -160,11 +160,11 @@ public sealed class HostProtocolTests
         // everywhere else.
         string exact = new('x', ProtocolLimits.MaxFrameChars);
 
-        List<(string? Line, bool Overlong)> frames = await ReadAllAsync(exact + "\r\n");
+        List<(string Line, bool Overlong)> frames = await ReadAllAsync(exact + "\r\n");
 
         Assert.Single(frames);
         Assert.False(frames[0].Overlong);
-        Assert.Equal(ProtocolLimits.MaxFrameChars, frames[0].Line!.Length);
+        Assert.Equal(ProtocolLimits.MaxFrameChars, frames[0].Line.Length);
     }
 
     [Fact]
@@ -172,7 +172,7 @@ public sealed class HostProtocolTests
     {
         // Kept rather than dropped, because "not a delimiter" means "content". Dropping
         // it is what made the limit unenforceable in the first place.
-        List<(string? Line, bool Overlong)> frames = await ReadAllAsync("a\rb\n");
+        List<(string Line, bool Overlong)> frames = await ReadAllAsync("a\rb\n");
 
         Assert.Equal(new[] { "a\rb" }, frames.ConvertAll(f => f.Line));
     }
@@ -182,7 +182,7 @@ public sealed class HostProtocolTests
     {
         // Only the LAST CR can be the delimiter's. Treating a run of them as free is
         // the bypass again, one character narrower.
-        List<(string? Line, bool Overlong)> frames = await ReadAllAsync("a\r\r\n");
+        List<(string Line, bool Overlong)> frames = await ReadAllAsync("a\r\r\n");
 
         Assert.Equal(new[] { "a\r" }, frames.ConvertAll(f => f.Line));
     }
@@ -191,7 +191,7 @@ public sealed class HostProtocolTests
     public async Task ACarriageReturnAtTheVeryEndIsContent()
     {
         // No newline ever arrives, so the CR held back was never a delimiter.
-        List<(string? Line, bool Overlong)> frames = await ReadAllAsync("a\r");
+        List<(string Line, bool Overlong)> frames = await ReadAllAsync("a\r");
 
         Assert.Equal(new[] { "a\r" }, frames.ConvertAll(f => f.Line));
     }
@@ -202,11 +202,11 @@ public sealed class HostProtocolTests
         // The boundary itself, because an off-by-one here rejects valid traffic.
         string exact = new('x', ProtocolLimits.MaxFrameChars);
 
-        List<(string? Line, bool Overlong)> frames = await ReadAllAsync(exact + "\n");
+        List<(string Line, bool Overlong)> frames = await ReadAllAsync(exact + "\n");
 
         Assert.Single(frames);
         Assert.False(frames[0].Overlong);
-        Assert.Equal(ProtocolLimits.MaxFrameChars, frames[0].Line!.Length);
+        Assert.Equal(ProtocolLimits.MaxFrameChars, frames[0].Line.Length);
     }
 }
 #endif

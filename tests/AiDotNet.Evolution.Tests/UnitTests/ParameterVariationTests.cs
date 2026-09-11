@@ -101,5 +101,85 @@ public sealed class ParameterVariationTests
 
         Assert.True(moved.Count > 1, $"only dimension(s) {string.Join(",", moved)} ever moved");
     }
+
+    [Theory]
+    [InlineData(0.0, 0.01)]
+    [InlineData(1.0, 0.01)]
+    [InlineData(0.0, 0.1)]
+    [InlineData(1.0, 0.1)]
+    [InlineData(0.0, 0.5)]
+    [InlineData(1.0, 0.5)]
+    public void IntegralBinaryDomainEscapesSubunitSteps(double at, double step)
+    {
+        // .01 is also HostSession's default step for [0,1]. Integral rounding used to
+        // collapse both local probes, even though the other binary value is admissible.
+        var space = new ParameterSpace(new[] { new ParameterDefinition("x", 0, 1, step, true) });
+        ParameterGenome parent = space.Create(new[] { at });
+
+        ParameterGenome moved = ParameterVariation.EnsureDifferent(parent, parent, new StableRandom(1234UL));
+
+        Assert.NotEqual(parent.CanonicalId(), moved.CanonicalId());
+        Assert.Equal(1 - at, moved.Values[0]);
+        Assert.Equal(moved.CanonicalId(), space.Create(moved.Values).CanonicalId());
+    }
+
+    [Fact]
+    public void SingletonIntegralDomainCannotInventANeighbour()
+    {
+        var space = new ParameterSpace(new[] { new ParameterDefinition("x", 0.1, 1.9, 0.01, true) });
+        ParameterGenome parent = space.Create(new[] { 1.0 });
+
+        ParameterGenome moved = ParameterVariation.EnsureDifferent(parent, parent, new StableRandom(1UL));
+
+        Assert.Equal(parent.CanonicalId(), moved.CanonicalId());
+        Assert.Equal(1.0, moved.Values[0]);
+    }
+
+    [Fact]
+    public void MovingOneDimensionDoesNotRenormalizeAnotherIntoADifferentValue()
+    {
+        var space = new ParameterSpace(new[]
+        {
+            new ParameterDefinition("integral", 0.5, 3.5, 1, true),
+            new ParameterDefinition("continuous", 0, 1, 0.1, false),
+        });
+        ParameterGenome parent = space.Create(new[] { 1.0, 0.5 });
+
+        ParameterGenome moved = ParameterVariation.EnsureDifferent(parent, parent, new StableRandom(1UL));
+
+        int changed = Enumerable.Range(0, parent.Values.Count)
+            .Count(index => parent.Values[index] != moved.Values[index]);
+        Assert.Equal(1, changed);
+        Assert.Equal(moved.CanonicalId(), space.Create(moved.Values).CanonicalId());
+    }
+
+    [Fact]
+    public void AnOverflowingUpperNeighbourUsesTheNearbyLowerStepInsteadOfTheMinimum()
+    {
+        var parameter = new ParameterDefinition("x", 1e308, 1.7e308, 1e307, false);
+        var space = new ParameterSpace(new[] { parameter });
+        ParameterGenome parent = space.Create(new[] { parameter.Maximum });
+        Assert.True(double.IsPositiveInfinity(parent.Values[0] + parameter.Step));
+
+        ParameterGenome moved = ParameterVariation.EnsureDifferent(parent, parent, new StableRandom(1UL));
+
+        Assert.Equal(parameter.Normalize(parent.Values[0] - parameter.Step), moved.Values[0]);
+        Assert.NotEqual(parameter.Minimum, moved.Values[0]);
+    }
+
+    [Theory]
+    [InlineData(double.PositiveInfinity)]
+    [InlineData(double.NegativeInfinity)]
+    public void GeneratedOverflowClampsToItsOwnBoundary(double generated)
+    {
+        var parameter = new ParameterDefinition("x", 1e308, 1.7e308, 1e305, false);
+
+        double bounded = ParameterVariation.ClampGeneratedValue(parameter, generated);
+
+        Assert.Equal(double.IsPositiveInfinity(generated) ? parameter.Maximum : parameter.Minimum, bounded);
+        Assert.True(double.IsFinite(parameter.Normalize(bounded)));
+        // External non-finite values retain the established fallback policy.
+        Assert.Equal(parameter.Minimum, parameter.Normalize(generated));
+    }
 }
 #endif

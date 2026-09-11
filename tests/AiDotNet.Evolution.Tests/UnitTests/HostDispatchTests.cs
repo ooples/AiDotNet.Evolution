@@ -109,8 +109,7 @@ public sealed class HostDispatchTests
         // that pins it -- asserting merely "not empty" would let a rename through.
         Assert.Equal("0.1.0", response.Version);
 
-        Assert.NotNull(captured);
-        captured!.Dispose();
+        Assert.IsType<HostSession>(captured).Dispose();
     }
 
     [Fact]
@@ -186,14 +185,15 @@ public sealed class HostDispatchTests
         {
             Response asked = await Dispatch(new Request { Op = "ask", Id = 10, Max = 2 }, session);
             Assert.True(asked.Ok);
-            Assert.NotNull(asked.Candidates);
-            Assert.NotEmpty(asked.Candidates!);
+            List<Candidate> candidates = Assert.IsType<List<Candidate>>(asked.Candidates);
+            Assert.NotEmpty(candidates);
             Assert.False(asked.Complete);
 
-            var told = new Request { Op = "tell", Id = 11, Results = new List<TellResult>() };
-            foreach (Candidate candidate in asked.Candidates!)
+            var results = new List<TellResult>();
+            var told = new Request { Op = "tell", Id = 11, Results = results };
+            foreach (Candidate candidate in candidates)
             {
-                told.Results!.Add(new TellResult
+                results.Add(new TellResult
                 {
                     EvaluationId = candidate.EvaluationId,
                     Quality = 1.0,
@@ -202,7 +202,7 @@ public sealed class HostDispatchTests
             }
             Response accepted = await Dispatch(told, session);
             Assert.True(accepted.Ok);
-            Assert.Equal(asked.Candidates!.Count, accepted.Accepted);
+            Assert.Equal(candidates.Count, accepted.Accepted);
 
             HostSession? cleared = session;
             Response closed = await Program.Handle(
@@ -230,7 +230,7 @@ public sealed class HostDispatchTests
         Response response = await Dispatch(new Request { Op = "ask", Id = 13, Max = 0 }, session);
 
         Assert.True(response.Ok);
-        Assert.NotEmpty(response.Candidates!);
+        Assert.NotEmpty(Assert.IsType<List<Candidate>>(response.Candidates));
     }
 }
 #endif

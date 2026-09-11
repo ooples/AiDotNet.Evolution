@@ -12,6 +12,7 @@
 import { createInterface } from 'node:readline';
 
 const mode = process.argv[2] ?? 'ok';
+const invalidPayload = process.argv[3] ? JSON.parse(process.argv[3]) : {};
 
 /**
  * Exits only once the write has reached the pipe.
@@ -46,6 +47,11 @@ createInterface({ input: process.stdin }).on('line', (line) => {
 
   switch (request.op) {
     case 'open':
+      if (mode === 'invalid-payload-before-open') {
+        say({ id: request.id, ok: true, ...invalidPayload });
+        say({ id: request.id, ok: false, error: 'valid rejection after malformed open' });
+        return;
+      }
       if (mode === 'refuse-open') {
         say({ id: request.id, ok: false, error: 'the fake host refuses to open' });
         return;
@@ -64,6 +70,18 @@ createInterface({ input: process.stdin }).on('line', (line) => {
         // failed request.
         process.stdout.write('this is not json\n');
       }
+      if (mode === 'non-object-before-ask') {
+        // Valid JSON is not necessarily a protocol response. None of these frames
+        // may throw in the parent process's stdout event handler.
+        process.stdout.write('null\n17\ntrue\n"not a response"\n[]\n');
+      }
+      if (mode === 'invalid-response-before-ask') {
+        say({ id: request.id, ok: 'false', candidates: [] });
+      }
+      if (mode === 'invalid-payload-before-ask' || mode === 'invalid-payload-only-ask') {
+        say({ id: request.id, ok: true, ...invalidPayload });
+        if (mode === 'invalid-payload-only-ask') return;
+      }
       if (mode === 'silent-on-ask') return;
 
       const count = Math.min(request.max ?? 1, remaining);
@@ -77,10 +95,16 @@ createInterface({ input: process.stdin }).on('line', (line) => {
     }
 
     case 'tell':
+      if (mode === 'invalid-payload-before-tell') {
+        say({ id: request.id, ok: true, ...invalidPayload });
+      }
       say({ id: request.id, ok: true, accepted: request.results.length });
       return;
 
     case 'close':
+      if (mode === 'invalid-payload-before-close') {
+        say({ id: request.id, ok: true, ...invalidPayload });
+      }
       if (mode === 'refuse-close') {
         // Answers, and says no. Distinct from dying: the transport is fine and
         // the host is telling the client it could not stop the run.

@@ -16,7 +16,11 @@ import { spawn, type ChildProcessWithoutNullStreams } from 'node:child_process';
 import { createInterface, type Interface } from 'node:readline';
 import { resolveHostBinary } from './binary.js';
 
-/** One knob the search varies. */
+/**
+ * One knob the search varies. Bounds, their difference, the resolved step, and
+ * (max-min)/step must be finite, with min < max and step > 0. An integral range
+ * must contain at least one integer. Unsupported domains are rejected by open.
+ */
 export interface ParameterSpec {
   readonly name: string;
   readonly min: number;
@@ -29,7 +33,7 @@ export interface ParameterSpec {
    * float noise.
    */
   readonly step?: number;
-  /** True when only whole numbers are meaningful, such as a count. */
+  /** Whole numbers only; the quantization grid starts at Math.ceil(min). */
   readonly integral?: boolean;
 }
 
@@ -122,16 +126,65 @@ export interface RunSummary {
   readonly stopReason: string | null;
 }
 
-interface Response {
-  id: number;
-  ok: boolean;
-  error?: string;
-  candidates?: Candidate[];
-  accepted?: number;
-  complete?: boolean;
-  best?: Candidate | null;
-  stopReason?: string | null;
-  version?: string;
+enum HostOperation {
+  Open = 'open',
+  Ask = 'ask',
+  Tell = 'tell',
+  Close = 'close',
+}
+
+interface ResponsePayloads {
+  [HostOperation.Open]: { version: string };
+  [HostOperation.Ask]: { candidates: Candidate[]; complete: boolean };
+  [HostOperation.Tell]: { accepted: number };
+  [HostOperation.Close]: { best?: Candidate | null; stopReason: string };
+}
+
+type Response<Operation extends HostOperation> =
+  | ({ id: number; ok: true } & ResponsePayloads[Operation])
+  | { id: number; ok: false; error?: string };
+
+function isRecord(value: unknown): value is Record<string, unknown> {
+  return typeof value === 'object' && value !== null && !Array.isArray(value);
+}
+
+function isCandidate(value: unknown): value is Candidate {
+  if (!isRecord(value) || typeof value.evaluationId !== 'number' ||
+      !Number.isSafeInteger(value.evaluationId) || value.evaluationId < 0 ||
+      !isRecord(value.parameters)) return false;
+  for (const name in value.parameters) {
+    const parameter = value.parameters[name];
+    if (typeof parameter !== 'number' || !Number.isFinite(parameter)) return false;
+  }
+  return value.quality === undefined ||
+    (typeof value.quality === 'number' && Number.isFinite(value.quality));
+}
+
+/** A syntactically valid reply must also carry the payload for the operation awaiting it. */
+function isResponse<Operation extends HostOperation>(
+  value: unknown, operation: Operation
+): value is Response<Operation> {
+  if (!isRecord(value) || typeof value.id !== 'number' || !Number.isSafeInteger(value.id) ||
+      value.id < 0 || typeof value.ok !== 'boolean') return false;
+  if (!value.ok) return value.error === undefined || typeof value.error === 'string';
+
+  switch (operation) {
+    case HostOperation.Open:
+      return typeof value.version === 'string' && value.version.length > 0;
+    case HostOperation.Ask:
+      return Array.isArray(value.candidates) && value.candidates.every(isCandidate) &&
+        typeof value.complete === 'boolean' && value.complete === (value.candidates.length === 0);
+    case HostOperation.Tell:
+      return typeof value.accepted === 'number' && Number.isSafeInteger(value.accepted) &&
+        value.accepted >= 0;
+    case HostOperation.Close:
+      // The serializer omits a null best. A session successfully opened by this client
+      // always has a stop reason, including cancellation and an empty archive.
+      return (value.best === undefined || value.best === null || isCandidate(value.best)) &&
+        typeof value.stopReason === 'string' && value.stopReason.length > 0;
+    default:
+      return false;
+  }
 }
 
 /** How long any single request may take before the session is considered wedged. */
@@ -190,7 +243,7 @@ export class EvolutionSession {
   readonly #lines: Interface;
   readonly #pending = new Map<
     number,
-    { resolve: (value: Response) => void; reject: (error: Error) => void; timer: NodeJS.Timeout }
+    { accept: (value: unknown) => boolean; reject: (error: Error) => void; timer: NodeJS.Timeout }
   >();
 
   #nextId = 1;
@@ -215,19 +268,22 @@ export class EvolutionSession {
 
     this.#lines.on('line', (line: string) => {
       if (!line) return;
-      let response: Response;
+      let value: unknown;
       try {
-        response = JSON.parse(line) as Response;
+        value = JSON.parse(line);
       } catch {
         // A line we cannot parse is the host misbehaving; there is no id to fail, so the
         // request will time out rather than hang forever.
         return;
       }
-      const waiter = this.#pending.get(response.id);
-      if (!waiter) return;
-      this.#pending.delete(response.id);
+      // Parsing JSON establishes no protocol types. Do not consume a waiter until
+      // its entire operation-specific response is validated: missing candidates
+      // previously became [], falsely signaling successful end-of-run.
+      if (!isRecord(value) || typeof value.id !== 'number') return;
+      const waiter = this.#pending.get(value.id);
+      if (!waiter || !waiter.accept(value)) return;
+      this.#pending.delete(value.id);
       clearTimeout(waiter.timer);
-      waiter.resolve(response);
     });
 
     // AN EXIT ALWAYS FAILS THE WAITERS, including during close. Skipping them while closing
@@ -292,7 +348,7 @@ export class EvolutionSession {
       config.requestTimeoutMs ?? DEFAULT_REQUEST_TIMEOUT_MS
     );
 
-    const response = await session.#send('open', {
+    const response = await session.#send(HostOperation.Open, {
       config: {
         parameters: config.parameters,
         descriptors: config.descriptors,
@@ -322,17 +378,17 @@ export class EvolutionSession {
    * separate "done" event to miss.
    */
   async ask(max = 8): Promise<Candidate[]> {
-    const response = await this.#send('ask', { max });
+    const response = await this.#send(HostOperation.Ask, { max });
     if (!response.ok) throw new EvolutionError(response.error ?? 'ask failed');
-    return response.candidates ?? [];
+    return response.candidates;
   }
 
   /** Reports scores. Returns how many were actually outstanding. */
   async tell(results: readonly Evaluation[]): Promise<number> {
     if (results.length === 0) return 0;
-    const response = await this.#send('tell', { results });
+    const response = await this.#send(HostOperation.Tell, { results });
     if (!response.ok) throw new EvolutionError(response.error ?? 'tell failed');
-    return response.accepted ?? 0;
+    return response.accepted;
   }
 
   /**
@@ -352,9 +408,9 @@ export class EvolutionSession {
     if (this.#closed) return { best: null, stopReason: null };
     this.#closed = true;
 
-    let response: Response;
+    let response: Response<HostOperation.Close>;
     try {
-      response = await this.#send('close', {});
+      response = await this.#send(HostOperation.Close, {});
     } catch (error) {
       // A FAILED CLOSE IS NOT AN EMPTY RESULT. Swallowing it here returned
       // `{best: null, stopReason: null}` from a host that died before answering, so
@@ -373,14 +429,16 @@ export class EvolutionSession {
     if (!response.ok) {
       throw new EvolutionError(response.error ?? 'the host could not stop the run');
     }
-    return { best: response.best ?? null, stopReason: response.stopReason ?? null };
+    return { best: response.best ?? null, stopReason: response.stopReason };
   }
 
-  #send(op: string, extra: Record<string, unknown>): Promise<Response> {
+  #send<Operation extends HostOperation>(
+    op: Operation, extra: Record<string, unknown>
+  ): Promise<Response<Operation>> {
     if (this.#exitError) return Promise.reject(this.#exitError);
 
     const id = this.#nextId++;
-    return new Promise<Response>((resolve, reject) => {
+    return new Promise<Response<Operation>>((resolve, reject) => {
       const timer = setTimeout(() => {
         // A TIMEOUT KILLS THE SESSION, it does not just fail one request. Removing the
         // waiter alone leaves the child alive with nobody holding a reference that could
@@ -394,7 +452,15 @@ export class EvolutionSession {
       // Unref'd so a pending request cannot by itself keep the process alive.
       timer.unref?.();
 
-      this.#pending.set(id, { resolve, reject, timer });
+      this.#pending.set(id, {
+        accept: (value) => {
+          if (!isResponse(value, op)) return false;
+          resolve(value);
+          return true;
+        },
+        reject,
+        timer,
+      });
       this.#child.stdin.write(`${JSON.stringify({ op, id, ...extra })}\n`, (error) => {
         if (!error) return;
         this.#pending.delete(id);
