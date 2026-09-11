@@ -46,6 +46,14 @@ or modified. This removes the copied engine and enables local validation against
 `0.1.0-preview.1` NuGet artifact exists but identifies baseline `f0f282cf`, not the new roadmap APIs; a newer artifact
 is required before claiming those APIs work through the normal package path.
 
+Companion `fcb29b770` adds the opt-in `AiDotNet.Evolution.CSharp` package: bounded syntax-addressed edits,
+real deterministic Roslyn emit, bounded compiler-feedback repair, owned/reference/assembly fingerprints,
+write-once exact-source evidence, and shared model/setup/compiler/audit/evaluation resource accounting.
+The facade also accepts caller-owned proposal loops. Adversarial regressions fixed canceled I/O undercounting,
+fatal runner suppression, missing receipts being treated as known costs, lazy provenance opt-in and lost terminal
+cost-bookkeeping cleanup. These are tested contracts, not live-model or runtime optimization results; compiler
+cancellation is cooperative, not OS isolation, and sealed correctness/performance promotion remains external.
+
 [AiDotNet.Tensors companion PR #1024](https://github.com/ooples/AiDotNet.Tensors/pull/1024): compare-and-deactivate of an observed kernel deployment, enabling built-in fallback
 without allowing stale runtime evidence to remove a newer snapshot. This adds to the validated promotion machinery
 already present on Tensors `main` at `67ceb6ed`; it is not a new promotion system. Deactivation is in-memory only,
@@ -64,7 +72,7 @@ Durable evaluation identities and leases must be developed against its eventual 
 | US-02 fair baselines | Partial | Matched-population SciPy differential evolution now uses the shared C# evaluator and independent counters; native-default/tuned controls, OpenEvolve and consistent model access remain. |
 | US-03 correctness gates | Partial, companion | Trusted sandbox/reference integrations and held-out validation; wrapper alone is not proof of correctness. |
 | US-04 statistical evidence | Partial | Paired task/run analysis, failure-inclusive effects/intervals and trace checks implemented; prospective sample-size/power design and representative confirmation remain. |
-| US-05 resource ledger | Partial | Generic ledger, stage helper and evaluator/cascade adapter implemented; consumer model/compiler/setup integrations and deterministic concurrent admission remain. |
+| US-05 resource ledger | Partial | Generic ledger and adapters plus bounded C# consumer model/compiler/setup/audit/evaluation integration implemented; other consumer stages, coordinated persistence and deterministic concurrent admission remain. |
 | US-06 noisy evaluation | Partial | Fresh bounded replicate runner, per-sample costs, finite-look uncertainty and separate confirmation identities implemented; archive resampling policy, cascade-rejection audit and representative noisy comparisons remain. |
 | US-07 ablations | Partial | Same-operator uniform/adaptive allocation is available; representative island, migration, novelty and dispatch ablations remain. |
 | US-08 adaptive operators | Partial | Parent-improvement/archive-success policies, proposal-plus-evaluator credit and typed attribution implemented; full consumer-stage integration and representative held-out comparisons before default promotion remain. |
@@ -76,7 +84,7 @@ Durable evaluation identities and leases must be developed against its eventual 
 | US-14 surrogate assistance | Partial | Cost-metered acquisition, exploration/fallback contracts and a numeric KNN example implemented; production calibration/backends, representative expensive/noisy evidence and durable observation integration remain. |
 | US-15 multi-fidelity | Partial | Bounded successive-halving bracket, exploration, fidelity/replicate identities, incremental state handoff and fresh full confirmation implemented; real learning-workload integration, durable bracket resume and representative comparisons remain. |
 | US-16 adaptive islands | Not implemented | Resource allocation, heterogeneous policies and checkpointed restarts. |
-| US-17 compiler-guided edits | Partial, companion | Exact source identity, protected edit boundaries, complete configured proposal hashing and preserved feedback implemented; syntax-aware C# edits, compiler-guided repair, isolation, dependency fingerprints and multi-file evolution remain. |
+| US-17 compiler-guided edits | Partial, companion | Exact identity/boundaries plus bounded C# syntax edits, real emit, compiler repair, reference/assembly fingerprints and complete attempt evidence implemented; correctness-driven repair, OS isolation, public-API/target validation, multi-file evolution and representative performance confirmation remain. |
 | US-18 reusable experience | Not implemented | Provenance-backed retrieval, lessons and calibrated semantic novelty. |
 | US-19 model/prompt routing | Not implemented | Consumer routing policy, end-to-end costs, replay and fixed-routing comparisons. |
 | US-20 proposal concurrency | Not implemented | Immutable proposal contexts, bounded scheduling and deterministic policy. |
@@ -175,6 +183,12 @@ Durable evaluation identities and leases must be developed against its eventual 
   One regression assertion was corrected to require the engine-owned parent snapshot, not caller reference identity.
   This is local project-path validation; the published preview still points to `f0f282cf`. The detailed migration
   evidence and DLL hashes are in the companion's `docs/evolution-package-integration.md`.
+- AiDotNet companion `fcb29b770`: all 876 focused consumer/facade/AutoML/YAML tests and all 62 optional compiler
+  package tests pass separately on net10.0 and net8.0. Compiler-package net10.0 coverage is 499/505 lines (98.81%)
+  and 331/360 branches (91.94%). Main DLL hashes matched the test copies before execution; compiler tests invoke
+  real Roslyn emit with scripted model and execution doubles. The optional package locally packs both TFMs,
+  XML documentation, license and README; that is not proof of compatible published AiDotNet/Evolution dependencies.
+  Normal NuGet resolution, net471 verification, whole-repository/current-head CI and review remain separate.
 - [Paired analysis](benchmarks/analysis-d62d5cb/report.md): 14 Python contract tests pass. Retrospective reporting retains every scheduled run, marks unknown
   work and incomplete curves, and resamples paired seeds within tasks. The pinned CMA-versus-hill-climbing adjusted
   utility-difference interval crosses zero; the pilot is not evidence for promoting CMA as a universal default.
