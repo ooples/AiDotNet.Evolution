@@ -6,7 +6,7 @@ from pathlib import Path
 import tempfile
 import unittest
 
-from analyze_pipeline import METHODS, PROFILES, TASKS, analyze, execution_valid, verify_evidence
+from analyze_pipeline import METHODS, PROFILES, TASKS, analyze, equivalent, execution_valid, verify_evidence
 
 
 def fixture(seeds=2, repeats=2):
@@ -97,6 +97,13 @@ class PipelineAnalysisTests(unittest.TestCase):
 
     def test_empty_receipts_fail_validation(self):
         self.assertFalse(execution_valid({}))
+
+    def test_cross_platform_roundoff_does_not_relax_identity_or_count_checks(self):
+        self.assertTrue(equivalent({"metric": 1.0}, {"metric": 1.0000000000000002}))
+        self.assertFalse(equivalent({"metric": 1.0}, {"metric": 1.001}))
+        self.assertFalse(equivalent({"count": 1}, {"count": 1.0}))
+        self.assertFalse(equivalent({"count": 1}, {"count": True}))
+        self.assertFalse(equivalent({"hash": "a"}, {"hash": "b"}))
 
     def test_retained_evidence_hashes_and_recomputed_analysis_reject_corruption(self):
         campaign = fixture(1, 1); report = analyze(campaign, "a" * 40)
