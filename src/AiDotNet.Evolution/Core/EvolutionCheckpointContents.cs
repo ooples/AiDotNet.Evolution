@@ -27,6 +27,14 @@ public sealed class EvolutionCheckpointContents<TGenome>
     private readonly Dictionary<string, EvolutionCheckpointEntry<TGenome>> _byGenomeId;
     private readonly ReadOnlyCollection<EvolutionCheckpointEntry<TGenome>> _distinct;
 
+    internal EvolutionCheckpointContents(string runId, long sequence, string compatibilityHash,
+        IReadOnlyList<EvolutionCheckpointEntry<TGenome>> entries, EvolutionParetoFront<TGenome>? paretoFront)
+        : this(runId, sequence, compatibilityHash, entries) => ParetoFront = paretoFront;
+
+    /// <summary>Gets the nondominated union and objective metadata from a Pareto checkpoint, or null for scalar runs.</summary>
+    [System.Text.Json.Serialization.JsonIgnore(Condition = System.Text.Json.Serialization.JsonIgnoreCondition.WhenWritingNull)]
+    public EvolutionParetoFront<TGenome>? ParetoFront { get; }
+
     /// <summary>Initializes the contents of one checkpoint.</summary>
     /// <param name="runId">The run the checkpoint belongs to.</param>
     /// <param name="sequence">The checkpoint's monotonic sequence number.</param>

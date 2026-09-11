@@ -324,6 +324,9 @@ public sealed partial class EvolutionEngine<TGenome>
 
         switch (_options.EarlyStopping.Metric)
         {
+            case EvolutionEarlyStoppingMetric.ParetoHypervolume:
+                var definition = ((IEvolutionParetoArchiveView<TGenome>)_islands[0]).ParetoDefinition!;
+                return new EvolutionParetoFront<TGenome>(definition, _islands.SelectMany(archive => archive.Entries)).Hypervolume();
             case EvolutionEarlyStoppingMetric.Coverage:
                 {
                     long occupied = 0;

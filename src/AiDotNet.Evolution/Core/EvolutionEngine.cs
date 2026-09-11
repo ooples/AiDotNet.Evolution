@@ -184,6 +184,31 @@ public sealed partial class EvolutionEngine<TGenome>
                     throw new ArgumentException("The archive factory must return independent instances.", nameof(archiveFactory));
         }
         ValidateCompatibleArchives(_islands);
+        var paretoDefinition = (_islands[0] as IEvolutionParetoArchiveView<TGenome>)?.ParetoDefinition;
+        if (paretoDefinition is not null)
+        {
+            if ((long)_islands.Length * paretoDefinition.Capacity > 4096)
+                throw new ArgumentException("Pareto island capacities may total at most 4096.", nameof(options));
+            if (_options.GlobalEliteCount != 0 || _options.HistorySize != 0)
+                throw new ArgumentException("Scalar global-elite and history indexes must be disabled for Pareto runs; query the retained front instead.", nameof(options));
+            if (selection is null)
+            {
+                if (_options.SelectionPolicy != EvolutionSelectionPolicyKind.Uniform)
+                    throw new ArgumentException("Pareto runs default to uniform front selection; supply an explicit custom front policy for other semantics.", nameof(selection));
+                _selection = new ParetoEvolutionSelectionPolicy<TGenome>();
+            }
+            if (migration is null) _migration = new ParetoEvolutionMigrationPolicy<TGenome>(
+                _options.MigrationTopology, _options.MigrationRate, _options.PreventRepeatedMigration);
+            if (_options.TargetQuality.HasValue && paretoDefinition.Representative != EvolutionParetoRepresentative.ScalarQuality)
+                throw new ArgumentException("TargetQuality requires explicitly choosing the ScalarQuality front representative.", nameof(options));
+            if (_options.EarlyStopping.PatienceEvaluations > 0 && _options.EarlyStopping.MetricName is null &&
+                _options.EarlyStopping.Metric != EvolutionEarlyStoppingMetric.ParetoHypervolume &&
+                !(_options.EarlyStopping.Metric == EvolutionEarlyStoppingMetric.BestQuality && paretoDefinition.Representative == EvolutionParetoRepresentative.ScalarQuality))
+                throw new ArgumentException("Choose ParetoHypervolume or explicitly opt into scalar-representative early stopping.", nameof(options));
+        }
+        if (_options.EarlyStopping.Metric == EvolutionEarlyStoppingMetric.ParetoHypervolume &&
+            (paretoDefinition is null || paretoDefinition.Objectives.Count > 3))
+            throw new ArgumentException("Pareto hypervolume requires a two- or three-objective archive.", nameof(options));
         if (_options.Cascade.Enabled) _options.Cascade.ValidateAgainstStages(_cascadeStageCount, _islands[0].Direction);
         _islandGenerations = new long[_islands.Length];
         _globalElites = new EvolutionGlobalEliteIndex<TGenome>(

@@ -488,6 +488,7 @@ public sealed partial class EvolutionEngine<TGenome>
     private void RecordCompletedEvaluation(int island, EvolutionCandidate<TGenome> candidate, EvolutionEvaluation evaluation)
     {
         IEvolutionArchive<TGenome> archive = _islands[island];
+        if ((archive as IEvolutionParetoArchiveView<TGenome>)?.ParetoDefinition is not null) return;
         EvolutionCellKey? cell = TryCreateCellKey(archive, evaluation.Descriptors);
         if (cell is null)
         {

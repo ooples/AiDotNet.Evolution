@@ -71,6 +71,14 @@ public sealed class EvolutionRunResult<TGenome>
             islandCopies[index] = new EvolutionArchiveSnapshot<TGenome>(archive);
         }
         Islands = Array.AsReadOnly(islandCopies);
+        var frontDefinitions = islandCopies.Select(archive => (archive as IEvolutionParetoArchiveView<TGenome>)?.ParetoDefinition).ToArray();
+        if (frontDefinitions.Any(definition => definition is not null))
+        {
+            var definition = frontDefinitions.First(item => item is not null)!;
+            if (frontDefinitions.Any(item => item is null || item.DefinitionHash != definition.DefinitionHash))
+                throw new ArgumentException("Pareto results require the same front definition on every island.", nameof(islands));
+            ParetoFront = new EvolutionParetoFront<TGenome>(definition, islandCopies.SelectMany(archive => archive.Entries));
+        }
         Counters = counters ?? throw new ArgumentNullException(nameof(counters));
         Guard.NotNullOrWhiteSpace(stateHash);
         StateHash = stateHash.Trim();
@@ -142,6 +150,11 @@ public sealed class EvolutionRunResult<TGenome>
     /// <summary>Gets a deterministic hash that excludes wall-clock timing and observer behavior.</summary>
     public string StateHash { get; }
 
+    /// <summary>Gets the nondominated union of retained island fronts, or null for scalar runs.</summary>
+    /// <remarks>Best is this front's explicit representative; it does not replace this set of deployment choices.</remarks>
+    [System.Text.Json.Serialization.JsonIgnore(Condition = System.Text.Json.Serialization.JsonIgnoreCondition.WhenWritingNull)]
+    public EvolutionParetoFront<TGenome>? ParetoFront { get; }
+
     /// <summary>Gets the cross-island global elites in best-first order; empty when the index is disabled.</summary>
     /// <remarks>
     /// Populated when <c>EvolutionEngineOptions.GlobalEliteCount</c> is positive. Unlike <see cref="Best"/>, which
@@ -174,7 +187,7 @@ public sealed class EvolutionRunResult<TGenome>
     /// Returns <c>null</c> when every island is empty. The comparison direction is read from the first island; the
     /// engine requires every island to share one archive definition, so all islands agree on it.
     /// </remarks>
-    public EvolutionArchiveEntry<TGenome>? Best => Islands.Select(archive => archive.Best)
+    public EvolutionArchiveEntry<TGenome>? Best => ParetoFront is not null ? ParetoFront.Representative : Islands.Select(archive => archive.Best)
         .OfType<EvolutionArchiveEntry<TGenome>>()
         .OrderBy(entry => entry.Evaluation.Quality,
             Islands.Count == 0 || Islands[0].Direction == EvolutionOptimizationDirection.Maximize

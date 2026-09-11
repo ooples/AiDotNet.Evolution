@@ -27,7 +27,7 @@ namespace AiDotNet.Evolution;
 /// in a snapshot and store it; the stored copy stays exactly as it was even after the search moves on. This is also
 /// the type behind each island in <see cref="EvolutionRunResult{TGenome}.Islands"/> once a run finishes.</para>
 /// </remarks>
-public sealed class EvolutionArchiveSnapshot<TGenome> : IEvolutionArchiveView<TGenome>, IEvolutionArchiveCellCount
+public sealed class EvolutionArchiveSnapshot<TGenome> : IEvolutionParetoArchiveView<TGenome>, IEvolutionArchiveCellCount
 {
     private readonly ReadOnlyCollection<EvolutionDescriptorDefinition> _descriptors;
     private readonly ReadOnlyCollection<EvolutionArchiveEntry<TGenome>> _entries;
@@ -72,7 +72,15 @@ public sealed class EvolutionArchiveSnapshot<TGenome> : IEvolutionArchiveView<TG
         Direction = source.Direction;
         Version = source.Version;
         TotalCells = EvolutionArchiveGeometry.CellCount(source);
-        Best = entries.OrderBy(entry => entry, EvolutionEntryOrdering.BestFirst<TGenome>(Direction)).FirstOrDefault();
+        ParetoDefinition = (source as IEvolutionParetoArchiveView<TGenome>)?.ParetoDefinition;
+        if (ParetoDefinition is not null)
+        {
+            var front = new EvolutionParetoFront<TGenome>(ParetoDefinition, entries);
+            if (front.Entries.Count != entries.Length || entries.Length > ParetoDefinition.Capacity)
+                throw new ArgumentException("Pareto archive views must contain a bounded nondominated front.", nameof(source));
+            Best = front.Representative;
+        }
+        else Best = entries.OrderBy(entry => entry, EvolutionEntryOrdering.BestFirst<TGenome>(Direction)).FirstOrDefault();
     }
 
     /// <inheritdoc/>
@@ -92,6 +100,10 @@ public sealed class EvolutionArchiveSnapshot<TGenome> : IEvolutionArchiveView<TG
 
     /// <inheritdoc/>
     public long TotalCells { get; }
+
+    /// <inheritdoc/>
+    [System.Text.Json.Serialization.JsonIgnore(Condition = System.Text.Json.Serialization.JsonIgnoreCondition.WhenWritingNull)]
+    public EvolutionParetoDefinition? ParetoDefinition { get; }
 
     /// <inheritdoc/>
     public IReadOnlyList<EvolutionArchiveEntry<TGenome>> Entries => _entries;
