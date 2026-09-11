@@ -41,7 +41,7 @@ foreach (bool constrained in new[] { false, true })
                 result.RetainedFailures.Count != 0)
             {
                 Directory.CreateDirectory(Path.GetDirectoryName(reportPath)!);
-                var failure = new { SourceCommit = args[1], Task = task.Id, Seed = seed, Method = method, result.StopReason,
+                var failure = new { Schema = "pareto-campaign-failure-v1", SourceCommit = args[1], Task = task.Id, Seed = seed, Method = method, result.StopReason,
                     result.Counters, result.RetainedFailures, CompletedRuns = rows };
                 File.WriteAllText(reportPath, JsonSerializer.Serialize(failure, new JsonSerializerOptions { WriteIndented = true }));
                 throw new InvalidOperationException("Campaign budget validation failed: " + JsonSerializer.Serialize(new {
@@ -110,7 +110,10 @@ static object Summarize(double[] differences)
     return new { Mean = differences.Average(), Lower95 = means[49], Upper95 = means[1949], PositivePairs = differences.Count(value => value > 0), NegativePairs = differences.Count(value => value < 0) };
 }
 
-internal sealed record Point(double X, double Y);
+internal sealed record Point(double X, double Y) : IImmutableEvolutionGenome<Point>
+{
+    public Point CreateOwnedSnapshot() => new(X, Y);
+}
 internal sealed record PointRow(string GenomeId, Point Genome, double[] Objectives, double ScalarQuality);
 internal sealed record RunRow(string Task, ulong Seed, string Method, int Capacity, long Evaluations, long Proposals,
     double WallMilliseconds, string StateHash, double Hypervolume, double MinimumF1, double MinimumF2, double BestScalar, PointRow[] Front);
