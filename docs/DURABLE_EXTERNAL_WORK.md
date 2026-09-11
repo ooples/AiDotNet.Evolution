@@ -1,4 +1,4 @@
-# Durable external-work delivery (US-21, in progress)
+# Durable external-work delivery (US-21)
 
 `DurableEvolutionWorkCoordinator` is an optional, bounded, single-owner local-filesystem
 delivery coordinator. It persists queued work, worker profiles, leases, resource reservations,
@@ -6,8 +6,9 @@ results and external-response provenance together. `EvolutionDurableSessionBridg
 now connects it to a live fingerprinted engine session. `EvolutionWorkProtocol` exposes a
 trusted JSON worker/control endpoint, the native host has a separate `--durable` mode, and
 TypeScript/Python clients and an optional NativeAOT C ABI use that protocol. It does not restore an evolution engine's
-pending proposals or operator state. Local contract/binding tests pass; pinned native
-bridge evidence and final review checks are being completed.
+pending proposals or operator state. Local implementation/acceptance checks pass with
+[pinned native and managed evidence](../benchmarks/evidence/external-work/8aaef1e/README.md).
+Hosted CI, review and cross-repository dependency approval remain merge gates.
 
 ## Delivery and accounting
 
@@ -145,6 +146,16 @@ guaranteed. A production service needs authentication, deployment isolation and 
 durable storage provider; this library does not claim those from an in-process API.
 
 ## Verification
+
+Latest verified runtime: **8aaef1e**, including US-20 cleanup fix **96d245e**.
+**1,000 net10.0 / 1,000 net8.0 / 800 net471 tests pass**, zero skips;
+coverage is **92.96% line / 79.64% branch**, passing the unchanged ratchet. All 139 native
+TypeScript tests, six Python tests on each managed/native host, and six exported C ABI
+tests pass. Strict .NET 10 native delivery, live-engine and shared-library builds emit
+zero warnings. All three packaged DLLs match their explicit builds. The
+[current evidence archive](../benchmarks/evidence/external-work/8aaef1e/README.md) retains
+raw journals, checkpoint payloads, reports, logs and failed approaches with an offline verifier.
+The following older counts describe implementation history, not the current test totals.
 
 The initial implementation passed 17 coordinator tests and 10 journal tests on net10.0,
 including pre/post-publication failures, lost acknowledgements, stale receipt settlement,
