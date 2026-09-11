@@ -30,21 +30,22 @@ public sealed partial class AdaptiveIslandSearch<TGenome>
         Guard.NotNull(state);
         EnsureIdentities();
         if (state.Length > MaximumStateCharacters) throw new InvalidDataException("The island state exceeds its safety limit.");
-        PolicyState? restored;
-        try { restored = JsonSerializer.Deserialize<PolicyState>(state, EvolutionJson.Compact); }
+        PolicyState? deserialized;
+        try { deserialized = JsonSerializer.Deserialize<PolicyState>(state, EvolutionJson.Compact); }
         catch (JsonException exception) { throw new InvalidDataException("The island state is invalid.", exception); }
-        Validate(restored);
+        ValidatedPolicyState restored = Validate(deserialized);
         IVariationOperator<TGenome>[] children = _members.SelectMany(member => new[] { member.Variation, member.Restart }).ToArray();
         for (int i = 0; i < children.Length; i++)
-            if ((children[i] is ICheckpointableVariationOperator<TGenome>) != (restored!.Children![i] is not null))
+            if ((children[i] is ICheckpointableVariationOperator<TGenome>) != (restored.Children[i] is not null))
                 throw new InvalidDataException("The island child state is missing or unexpected.");
         for (int i = 0; i < children.Length; i++)
-            if (children[i] is ICheckpointableVariationOperator<TGenome> child) child.RestoreState(restored!.Children![i]!);
-        _islands = restored!.Islands!; _pending = restored.Pending!; _decisions = restored.Decisions!;
+            if (children[i] is ICheckpointableVariationOperator<TGenome> child && restored.Children[i] is string childState)
+                child.RestoreState(childState);
+        _islands = restored.Islands; _pending = restored.Pending; _decisions = restored.Decisions;
         _epoch = restored.Epoch; _lastGeneration = restored.LastGeneration;
     }
 
-    private void Validate(PolicyState? state)
+    private ValidatedPolicyState Validate(PolicyState? state)
     {
         if (state is null || state.VersionHash != VersionHash || state.Islands is null || state.Islands.Length != IslandCount ||
             state.Pending is null || state.Pending.Count > MaximumPending || state.Decisions is null || state.Decisions.Count > MaximumDecisions ||
@@ -80,21 +81,94 @@ public sealed partial class AdaptiveIslandSearch<TGenome>
                 throw new InvalidDataException("The island statistics are invalid.");
             total += island.Proposals; epochTotal += island.EpochProposals;
         }
-        if (epochTotal > _epochLength || (epochTotal == _epochLength && state.Islands.Any(island => island.EpochProposals < _options.MinimumPerIslandPerEpoch)) ||
-            total != (decimal)state.Epoch * _epochLength + epochTotal || total > state.LastGeneration ||
-            state.Decisions.Count != Math.Min((decimal)MaximumDecisions, total) ||
-            (total == 0 && state.LastGeneration != 0) || (total > 0 && state.Decisions[state.Decisions.Count - 1]?.Generation != state.LastGeneration))
+        var validated = new ValidatedPolicyState(state.Islands, state.Pending, state.Decisions,
+            state.Children, state.Epoch, state.LastGeneration);
+        ValidateAllocationAccounting(validated, total, epochTotal);
+        ValidateRecordedAllocationHistory(validated, total);
+        ValidateDecisionHistory(validated);
+        return validated;
+    }
+
+    private void ValidateAllocationAccounting(ValidatedPolicyState state, decimal total, int epochTotal)
+    {
+        if (epochTotal > _epochLength)
             throw new InvalidDataException("The island allocation history is inconsistent.");
+        if (epochTotal == _epochLength && state.Islands.Any(island => island.EpochProposals < _options.MinimumPerIslandPerEpoch))
+            throw new InvalidDataException("The island allocation history is inconsistent.");
+        if (total != (decimal)state.Epoch * _epochLength + epochTotal || total > state.LastGeneration)
+            throw new InvalidDataException("The island allocation history is inconsistent.");
+    }
+
+    private static void ValidateRecordedAllocationHistory(ValidatedPolicyState state, decimal total)
+    {
+        if (state.Decisions.Count != Math.Min((decimal)MaximumDecisions, total))
+            throw new InvalidDataException("The island allocation history is inconsistent.");
+        if (total == 0)
+        {
+            if (state.LastGeneration != 0)
+                throw new InvalidDataException("The island allocation history is inconsistent.");
+            return;
+        }
+        if (state.Decisions[state.Decisions.Count - 1]?.Generation != state.LastGeneration)
+            throw new InvalidDataException("The island allocation history is inconsistent.");
+    }
+
+    private void ValidateDecisionHistory(ValidatedPolicyState state)
+    {
         long last = 0;
         foreach (DecisionState decision in state.Decisions)
         {
-            if (decision is null || decision.Generation <= last || decision.Generation > state.LastGeneration ||
-                decision.Island < 0 || decision.Island >= IslandCount || (!_options.EnableRestarts && decision.Restart) ||
-                (state.Pending.TryGetValue(decision.Generation, out Attribution? pending) &&
-                    (pending.Island != decision.Island || pending.Restart != decision.Restart)))
+            if (decision is null)
                 throw new InvalidDataException("The island decision history is invalid.");
+            ValidateDecisionOrder(decision, last, state.LastGeneration);
+            ValidateDecisionDestination(decision);
+            ValidateDecisionAttribution(decision, state.Pending);
             last = decision.Generation;
         }
+    }
+
+    private static void ValidateDecisionOrder(DecisionState decision, long last, long lastGeneration)
+    {
+        if (decision.Generation <= last || decision.Generation > lastGeneration)
+            throw new InvalidDataException("The island decision history is invalid.");
+    }
+
+    private void ValidateDecisionDestination(DecisionState decision)
+    {
+        if (decision.Island < 0 || decision.Island >= IslandCount)
+            throw new InvalidDataException("The island decision history is invalid.");
+        if (!_options.EnableRestarts && decision.Restart)
+            throw new InvalidDataException("The island decision history is invalid.");
+    }
+
+    private static void ValidateDecisionAttribution(DecisionState decision, SortedDictionary<long, Attribution> pending)
+    {
+        if (pending.TryGetValue(decision.Generation, out Attribution? attribution) &&
+            (attribution.Island != decision.Island || attribution.Restart != decision.Restart))
+            throw new InvalidDataException("The island decision history is invalid.");
+    }
+
+    // Holds the actual validated, privately deserialized collections. It does not substitute
+    // empty collections for missing JSON, copy the policy graph, or expose nullable state fields.
+    private readonly struct ValidatedPolicyState
+    {
+        public ValidatedPolicyState(IslandState[] islands, SortedDictionary<long, Attribution> pending,
+            List<DecisionState> decisions, string?[] children, long epoch, long lastGeneration)
+        {
+            Islands = islands;
+            Pending = pending;
+            Decisions = decisions;
+            Children = children;
+            Epoch = epoch;
+            LastGeneration = lastGeneration;
+        }
+
+        public IslandState[] Islands { get; }
+        public SortedDictionary<long, Attribution> Pending { get; }
+        public List<DecisionState> Decisions { get; }
+        public string?[] Children { get; }
+        public long Epoch { get; }
+        public long LastGeneration { get; }
     }
 
     private static bool Unit(double value) => EvolutionDescriptorDefinition.IsFinite(value) && value >= 0 && value <= 1;
