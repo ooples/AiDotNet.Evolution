@@ -620,11 +620,14 @@ public sealed partial class EvolutionEngine<TGenome>
         catch (ArgumentException exception) { throw new InvalidDataException("Invalid Pareto checkpoint archive.", exception); }
     }
 
-    private static bool HasMeasurementOrigins(EngineStateDocument state) =>
-        (state.Cache?.Any(item => item?.Result?.MeasurementOriginJson is not null) ?? false) ||
-        (state.Islands?.Any(island => island?.Entries?.Any(entry => entry?.Evaluation?.MeasurementOriginJson is not null) == true) ?? false) ||
-        (state.GlobalElites?.Any(item => item?.Entry?.Evaluation?.MeasurementOriginJson is not null) ?? false) ||
-        (state.IslandHistories?.Any(history => history?.Any(entry => entry?.Evaluation?.MeasurementOriginJson is not null) == true) ?? false);
+    private static bool HasMeasurementOrigins(EngineStateDocument state)
+    {
+        if (state.Cache?.Any(item => item?.Result?.MeasurementOriginJson is not null) == true) return true;
+        if (state.Islands?.Any(island => island?.Entries?.Any(entry => entry?.Evaluation?.MeasurementOriginJson is not null) == true) == true)
+            return true;
+        if (state.GlobalElites?.Any(item => item?.Entry?.Evaluation?.MeasurementOriginJson is not null) == true) return true;
+        return state.IslandHistories?.Any(history => history?.Any(entry => entry?.Evaluation?.MeasurementOriginJson is not null) == true) == true;
+    }
 
     private static byte[] GetCheckpointPayloadBytes(EvolutionCheckpoint checkpoint)
     {
