@@ -86,11 +86,13 @@ For mixed durations, deterministic genome-dependent 0/1/8 ms asynchronous delays
 `evaluatorSlotUtilization` is summed occupied evaluator time divided by workers times elapsed time, not CPU
 utilization. Every completed evaluation records best-so-far quality and elapsed time. Compare both fields for
 batch versus continuous; high utilization alone does not establish better search. Continuous comparisons keep
-`MaxInFlight=8`. Worker-count comparisons require identical state hashes within fixed dispatch semantics and
-also verify checkpoint-on/off invariance. Different dispatch policies are not asserted to have identical trajectories.
+`MaxInFlight=8`. Worker-count comparisons require identical state hashes within fixed dispatch and checkpoint
+settings. Continuous checkpoints drain the in-flight window before saving; this changes subsequent proposal context
+and lineage even with a deterministic evaluator. Different checkpoint or dispatch policies are therefore not asserted
+to have identical trajectories. Their quality curves are reported, not silently treated as equal-workload timing samples.
 
 Checkpoint store timing measures cloning/storage only, excluding serialization. Paired whole-run checkpoint-on/off
-elapsed and allocated-byte contrasts include serialization, hashing and the store. Payload bytes and save counts
+elapsed and allocated-byte contrasts include serialization, hashing, the store and continuous queue-drain effects. Payload bytes and save counts
 are retained. The evaluator-only control has the same call budget but precomputed candidates, so it is a lower-bound
 orchestration contrast, not a search-quality baseline.
 

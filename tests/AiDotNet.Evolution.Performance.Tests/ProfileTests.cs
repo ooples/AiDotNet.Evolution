@@ -49,10 +49,11 @@ public sealed class ProfileTests
     }
 
     [Fact]
-    public void SemanticKeyExcludesOnlySchedulingConcurrencyAndCheckpointSideEffects()
+    public void SemanticKeyExcludesWorkersButIncludesCheckpointDrainSchedule()
     {
         var scenario = Case();
-        Assert.Equal(scenario.DeterminismKey, (scenario with { Id = "different", Workers = 4, Checkpoint = true }).DeterminismKey);
+        Assert.Equal(scenario.DeterminismKey, (scenario with { Id = "different", Workers = 4 }).DeterminismKey);
+        Assert.NotEqual(scenario.DeterminismKey, (scenario with { Checkpoint = true }).DeterminismKey);
         Assert.NotEqual(scenario.DeterminismKey, (scenario with { MaxInFlight = 16 }).DeterminismKey);
         Assert.NotEqual(scenario.DeterminismKey, (scenario with { Dispatch = EvolutionDispatchMode.Continuous }).DeterminismKey);
         Assert.NotEqual(scenario.DeterminismKey, (scenario with { Seed = 43 }).DeterminismKey);

@@ -17,8 +17,8 @@ public sealed record ProfileCase(string Id, string Kind, int Cells, int Dimensio
             !Enum.IsDefined(Dispatch)) throw new ArgumentOutOfRangeException(nameof(Cells), "Profile factors exceed the bounded protocol.");
     }
 
-    /// <summary>Identifies fixed search semantics, excluding worker count and checkpoint frequency.</summary>
-    public string DeterminismKey => string.Join("|", Kind, Cells, Dimensions, Islands, Budget, MixedDuration, Dispatch,
+    /// <summary>Identifies fixed search semantics, excluding worker count. Continuous checkpoint drains change proposal context.</summary>
+    public string DeterminismKey => string.Join("|", Kind, Cells, Dimensions, Islands, Budget, MixedDuration, Checkpoint, Dispatch,
         MaxInFlight, Seed.ToString(CultureInfo.InvariantCulture));
 
     public static IReadOnlyList<ProfileCase> Suite(bool smoke, ulong seed)
