@@ -142,6 +142,13 @@ public sealed class EvolutionEvaluation
     [JsonIgnore(Condition = JsonIgnoreCondition.WhenWritingNull)]
     public EvolutionMeasurementOrigin? MeasurementOrigin => _measurementOrigin;
 
+    /// <summary>Gets whether the engine memo or producer provenance declares reuse of an existing measurement.</summary>
+    /// <remarks>A false value does not prove independent sampling: producers must report provenance truthfully.
+    /// This derived learning guard does not change engine-only cache counters or serialized evaluation shape.</remarks>
+    [JsonIgnore]
+    public bool IsMeasurementReuse => CacheStatus == EvolutionCacheStatus.Hit ||
+        (MeasurementOrigin is not null && MeasurementOrigin.Kind != EvolutionMeasurementOriginKind.Measured);
+
     /// <summary>Returns an immutable evaluation copy retaining original sample identity independently of artifacts.</summary>
     public EvolutionEvaluation WithMeasurementOrigin(EvolutionMeasurementOrigin origin)
     {
