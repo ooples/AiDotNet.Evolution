@@ -113,12 +113,19 @@ Durable evaluation identities and leases must be developed against its eventual 
 | US-20 proposal concurrency | Not implemented | Immutable proposal contexts, bounded scheduling and deterministic policy. |
 | US-21 durable external work | Pending API integration | Run/evaluation/attempt identity, leases, heartbeats, stale results and pending-work persistence. |
 | US-22 centroid archive | Partial | Fixed-K routing, immutable geometry, transactional offline projection and engine/checkpoint coverage implemented; matched common-reference runner available; controlled memory/latency and representative quality confirmation remain. |
-| US-23 warm starts | Not implemented | Applicability-keyed repertoire/evaluation reuse, noisy-sample freshness and fair warm/cold reporting. |
+| US-23 warm starts | Partial | Bounded [seed repertoires](WARM_START_REPERTOIRES.md), twelve-facet applicability, current-task revalidation, source/current decisions and prior-cost provenance implemented; persistent evaluation/sample reuse, noisy-sample freshness and controlled fair warm/cold campaigns remain. |
 | US-24 CLI/dashboard | Partial | Core numeric CLI plus consumer authored-C# pilot and existing YAML commands; broader lifecycle/provider/dashboard integration remains. |
 | US-25 promotion/retuning | Partial, companion | Tensors persistent quarantine, guarded publication and explicit validated rollback implemented; automatic drift/bounded retuning, coordinated cross-process revocation and program/AutoML registry remain. |
 | US-26 policy meta-evolution | Not implemented | Opt-in declarative policy search, held-out outer loop and complete inner/outer cost accounting. |
 
 ## Validation evidence
+
+- Warm-start repertoire slice: all 531 core tests pass separately on net10.0/net8.0/net471, including 53 new
+  repertoire cases. The final suite covers changed constraints/evaluator behavior, fresh engine evaluation,
+  source/current import decisions, schema and identity drift, malformed/oversized JSON, cancellation and provenance
+  limits. Net10 coverage is 7,741/8,453 lines (91.58%) and 4,563/5,916 branches (77.13%); the two new source files
+  cover 227/228 executable lines. All production/test-copy DLL hashes match; whitespace verification passes.
+  These are deterministic contract tests, not a warm/cold superiority campaign or evidence for reusing old fitness.
 
 - Explicit operator credit: 478 core tests pass on each of net10.0, net8.0 and net471, including 21 new gain/cost cases.
   Fresh modern coverage is 91.35% line / 76.77% branch; the unchanged ratchet passes. Tests cover pending parent/cost

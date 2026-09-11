@@ -25,6 +25,10 @@ Evaluation caches inside the engine are run-local memoization keyed by canonical
 owned by consumers—such as a GPU kernel autotune cache—remain separate because their keys also need hardware, driver,
 compiler, and correctness-policy fingerprints.
 
+[Portable warm-start repertoires](docs/WARM_START_REPERTOIRES.md) export bounded canonical seeds with applicability
+and prior-cost provenance. Import revalidates seeds under the current task and never imports old fitness;
+persistent evaluation reuse is a separate contract, not checkpoint resume or a deployment-cache hit.
+
 ## Integration boundaries
 
 The engine intentionally knows nothing about models, prompts, compilers, or hardware. Integrations keep those domain
