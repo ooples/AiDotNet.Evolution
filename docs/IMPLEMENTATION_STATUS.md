@@ -61,6 +61,19 @@ call undercounting and fatal suppression, mutable exported cases invalidating ta
 diagnostics, and unused legacy provenance construction for custom loops. The worker is not OS isolation. Its internal
 compilation is included in whole evaluation-call units, not separately instrumented compiler/CPU/memory totals.
 
+Companion `ddad4e3e7` adds caller-owned custom fitness through the facade with version-pinned identities, explicit
+conflict validation and minimization configuration. Its existing CLI now offers an
+[authored C# runtime pilot](https://github.com/ooples/AiDotNet/blob/ddad4e3e71e214ddc5c0fbeb072c9854c57fea64/docs/evolution-runtime-benchmark.md):
+independent public correctness checks, search timing, frozen-winner confirmation, shared receipts and write-once
+failure-inclusive evidence. The retained four-run export contains all 96 worker calls/units, zero unknown receipts
+and unchanged listed binary hashes. This fixed authored catalog uses no model calls; timings include startup,
+compilation, execution and cleanup. It is not an isolated algorithm benchmark, sealed suite or competitive win.
+
+Hosted source validation at `d0c4039ac` failed NU1008 because the nested core checkout inherited consumer Central
+Package Management; the companion workflow now uses sibling checkouts. The normal package-path wiki build also
+failed on missing `EvolutionResourceLedger`, confirming the published-preview gap. Neither failure is hidden by
+the local source-path tests; current-head hosted validation remains pending.
+
 [AiDotNet.Tensors companion PR #1024](https://github.com/ooples/AiDotNet.Tensors/pull/1024): compare-and-deactivate of an observed kernel deployment, enabling built-in fallback
 without allowing stale runtime evidence to remove a newer snapshot. This adds to the validated promotion machinery
 already present on Tensors `main` at `67ceb6ed`; it is not a new promotion system. Deactivation is in-memory only,
@@ -75,7 +88,7 @@ Durable evaluation identities and leases must be developed against its eventual 
 
 | Story | State | Work still required |
 | --- | --- | --- |
-| US-01 representative suites | Partial | Real program/kernel/AutoML tasks, AlgoTune subset, sealed task partitions. |
+| US-01 representative suites | Partial | Authored C# end-to-end pilot now runs; representative program/kernel/AutoML tasks, AlgoTune subset and sealed task partitions remain. |
 | US-02 fair baselines | Partial | Matched-population SciPy differential evolution now uses the shared C# evaluator and independent counters; native-default/tuned controls, OpenEvolve and consistent model access remain. |
 | US-03 correctness gates | Partial, companion | Real C# worker/facade checks and fail-closed truncated-output/owned-case contracts exist; trusted OS isolation, reference integrations and held-out validation remain. |
 | US-04 statistical evidence | Partial | Paired task/run analysis, failure-inclusive effects/intervals and trace checks implemented; prospective sample-size/power design and representative confirmation remain. |
@@ -85,7 +98,7 @@ Durable evaluation identities and leases must be developed against its eventual 
 | US-08 adaptive operators | Partial | Parent-improvement/archive-success policies, proposal-plus-evaluator credit and typed attribution implemented; full consumer-stage integration and representative held-out comparisons before default promotion remain. |
 | US-09 Pareto pipeline | Not implemented | Feasibility, objective definitions, archive/snapshot/selection/stopping/migration semantics together. |
 | US-10 engine performance | Partial | BenchmarkDotNet engine/archive/checkpoint suite and fixture validation implemented; controlled repeated baselines, peak memory, dimension/island scaling and regression thresholds remain. |
-| US-11 application examples | Not implemented | End-to-end program, AutoML, kernel and external-session examples. |
+| US-11 application examples | Partial, companion | Executable authored-C# facade/worker/timing/confirmation example exists; representative program, AutoML, kernel and external-session examples remain. |
 | US-12 quality release gates | Partial | Representative measured quality thresholds, confidence and release artifacts. |
 | US-13 typed search spaces | Implemented | Mixed/conditional domains, owned canonical genomes, operators/refinement, checkpointed diagonal CMA and pinned simpler-baseline comparison; no universal-quality claim. |
 | US-14 surrogate assistance | Partial | Cost-metered acquisition, exploration/fallback contracts and a numeric KNN example implemented; production calibration/backends, representative expensive/noisy evidence and durable observation integration remain. |
@@ -98,7 +111,7 @@ Durable evaluation identities and leases must be developed against its eventual 
 | US-21 durable external work | Pending API integration | Run/evaluation/attempt identity, leases, heartbeats, stale results and pending-work persistence. |
 | US-22 centroid archive | Partial | Fixed-K routing, immutable geometry, transactional offline projection and engine/checkpoint coverage implemented; matched common-reference runner available; controlled memory/latency and representative quality confirmation remain. |
 | US-23 warm starts | Not implemented | Applicability-keyed repertoire/evaluation reuse, noisy-sample freshness and fair warm/cold reporting. |
-| US-24 CLI/dashboard | Partial | Numeric CLI only; general configuration, preflight, run lifecycle and local inspection remain. |
+| US-24 CLI/dashboard | Partial | Core numeric CLI plus consumer authored-C# pilot and existing YAML commands; broader lifecycle/provider/dashboard integration remains. |
 | US-25 promotion/retuning | Partial, companion | Persistent quarantine, retuning/drift policy and program/AutoML deployment registry. |
 | US-26 policy meta-evolution | Not implemented | Opt-in declarative policy search, held-out outer loop and complete inner/outer cost accounting. |
 
@@ -203,6 +216,14 @@ Durable evaluation identities and leases must be developed against its eventual 
   excluding the builder and unrelated assembly types. Production/test-copy hashes matched before execution. Worker
   fixtures execute real C# but are neither live-model optimization benchmarks nor hostile-code containment tests;
   Linux behavior, normal NuGet resolution and current-head hosted validation remain unverified.
+- AiDotNet companion `ddad4e3e7`: 901 focused consumer tests plus 79 optional compiler/worker tests pass separately
+  on net8.0 and net10.0. Forty-two CLI tests pass on net10.0; the benchmark file has 268/270 executable lines covered,
+  with a 90% file gate and explicit coverage-module verification. The full CLI is 389/463 lines, not 99%.
+  The custom-fitness identity wrapper has 100% line/branch coverage; selected consumer program/options paths have
+  5,026/5,440 lines and 2,456/3,011 branches covered (builder and unrelated types excluded). Library rebuilds succeed
+  on net8.0/net10.0/net471 with diagnostic analyzers disabled and existing warnings retained; no net471 tests are
+  claimed. The four-run raw pilot export retains every sample and receipt, including the deliberately wrong
+  candidate's failures. Current-head hosted/package-path validation and independent review remain outstanding.
 - [Paired analysis](benchmarks/analysis-d62d5cb/report.md): 14 Python contract tests pass. Retrospective reporting retains every scheduled run, marks unknown
   work and incomplete curves, and resamples paired seeds within tasks. The pinned CMA-versus-hill-climbing adjusted
   utility-difference interval crosses zero; the pilot is not evidence for promoting CMA as a universal default.
