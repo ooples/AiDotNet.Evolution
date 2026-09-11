@@ -108,6 +108,20 @@ python benchmarks/analysis/run_archive_resources.py --worker benchmarks/AiDotNet
 python benchmarks/analysis/run_archive_resources.py --verify TestResults/archive-primary
 ```
 
-The resource runner and immutable remap reports are implemented; the pinned full campaign,
-final review and acceptance evidence are still in progress. Smoke results do not justify a
-default change, claim representative superiority, or establish equal actual memory usage.
+The pinned full campaign at `f990516a31c5e6c9f2e7f7110373581a9d460cfc` completed
+all 512 cases with no failures or unknown calls: 65,536 primary evaluations and 65,536
+additional replay evaluations. Quality replay was exact. The pooled centroid-minus-grid
+utility difference was **-0.00058978**, with paired-seed bootstrap 95% interval
+**[-0.00504834, 0.00419849]**: inconclusive, not equivalence or superiority.
+Median process peak RSS across the four contexts was 44.95–46.09 MB for the grid and
+44.80–45.37 MB for centroids (decimal MB); both stayed within the declared 256 MiB cap.
+These descriptive process measurements include instrumentation/runtime overhead, not
+isolated retained archive memory. The host was not exclusive; latency is not a controlled
+performance claim. No default change is justified.
+
+[Raw primary/replay, failed instrumentation and verification evidence](../benchmarks/evidence/archive-resources/f990516/README.md)
+retains the fixed plans, all observations/traces, immutable remap reports, byte checksums,
+low-memory/64D support probes and source-pinned test/package receipts. Representative
+held-out tasks, fitted CVT sites and competitor comparisons remain separate validation
+work; this authored campaign establishes the implementation's paired-budget reporting,
+not a general quality advantage.
