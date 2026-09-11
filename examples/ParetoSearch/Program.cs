@@ -40,11 +40,28 @@ foreach (bool constrained in new[] { false, true })
                 result.RetainedFailures.Count != 0)
             {
                 Directory.CreateDirectory(Path.GetDirectoryName(reportPath)!);
-                var failure = new { Schema = "pareto-campaign-failure-v1", SourceCommit = args[1], Task = task.Id, Seed = seed, Method = method, result.StopReason,
-                    result.Counters, result.RetainedFailures, CompletedRuns = rows };
+                var failure = new
+                {
+                    Schema = "pareto-campaign-failure-v1",
+                    SourceCommit = args[1],
+                    Task = task.Id,
+                    Seed = seed,
+                    Method = method,
+                    result.StopReason,
+                    result.Counters,
+                    result.RetainedFailures,
+                    CompletedRuns = rows
+                };
                 File.WriteAllText(reportPath, JsonSerializer.Serialize(failure, new JsonSerializerOptions { WriteIndented = true }));
-                throw new InvalidOperationException("Campaign budget validation failed: " + JsonSerializer.Serialize(new {
-                    task.Id, seed, method, result.StopReason, result.Counters, result.RetainedFailures }));
+                throw new InvalidOperationException("Campaign budget validation failed: " + JsonSerializer.Serialize(new
+                {
+                    task.Id,
+                    seed,
+                    method,
+                    result.StopReason,
+                    result.Counters,
+                    result.RetainedFailures
+                }));
             }
             var front = result.ParetoFront ?? new EvolutionParetoFront<Point>(definition, result.Islands.SelectMany(island => island.Entries));
             if (front.Entries.Count == 0 || front.Entries.Any(entry => entry.Evaluation.ConstraintViolations.Any(value => value > 0)))

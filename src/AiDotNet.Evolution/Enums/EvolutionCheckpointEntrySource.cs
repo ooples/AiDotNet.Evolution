@@ -22,5 +22,8 @@ public enum EvolutionCheckpointEntrySource
     GlobalElite = 1,
 
     /// <summary>A retained runner-up from one island's bounded history.</summary>
-    IslandHistory = 2
+    IslandHistory = 2,
+
+    /// <summary>A non-deployable infeasible candidate retained only to seed further exploration.</summary>
+    InfeasibleExploration = 3
 }

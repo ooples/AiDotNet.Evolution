@@ -204,11 +204,11 @@ public sealed partial class EvolutionEngine<TGenome>
     /// </summary>
     private int FindSelectionIsland(int preferredIsland)
     {
-        if (_islands[preferredIsland].Count > 0) return preferredIsland;
+        if (HasSelectionCandidates(_islands[preferredIsland])) return preferredIsland;
         for (int offset = 1; offset < _islands.Length; offset++)
         {
             int island = (preferredIsland + offset) % _islands.Length;
-            if (_islands[island].Count > 0) return island;
+            if (HasSelectionCandidates(_islands[island])) return island;
         }
         return -1;
     }
@@ -470,7 +470,8 @@ public sealed partial class EvolutionEngine<TGenome>
                 item.Candidate, evaluation, insertion), cancellationToken).ConfigureAwait(false);
             if (insertion == EvolutionArchiveInsertionResult.Inserted ||
                 insertion == EvolutionArchiveInsertionResult.Replaced ||
-                insertion == EvolutionArchiveInsertionResult.InsertedWithEviction)
+                insertion == EvolutionArchiveInsertionResult.InsertedWithEviction ||
+                insertion == EvolutionArchiveInsertionResult.RetainedForExploration)
             {
                 await NotifyAsync(new EvolutionEvent<TGenome>(EvolutionEventKind.ArchiveChanged, NextEventSequence(),
                     item.Candidate, evaluation, insertion), cancellationToken).ConfigureAwait(false);
@@ -533,6 +534,9 @@ public sealed partial class EvolutionEngine<TGenome>
         }
         return new EvolutionCellKey(bins);
     }
+
+    private static bool HasSelectionCandidates(IEvolutionArchive<TGenome> archive) => archive.Count > 0 ||
+        ((archive as IEvolutionParetoArchiveView<TGenome>)?.InfeasibleEntries?.Count ?? 0) > 0;
 
     /// <summary>Builds the immutable evaluation record for a work item from its terminal result and attempt metadata.</summary>
     private EvolutionEvaluation BuildEvaluation(WorkItem item, EvolutionTaskResult result)

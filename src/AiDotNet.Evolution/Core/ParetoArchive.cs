@@ -5,14 +5,17 @@ namespace AiDotNet.Evolution;
 /// Epsilon-box dominance follows the immutable definition; equal boxes retain the lexicographically best raw
 /// objective vector. Capacity overflow removes the least crowded member, with ordinal identity tie-breaking.
 /// Pruned historical candidates cannot be recovered: nondominance is guaranteed for the retained set, not the
-/// entire evaluation history. Infeasible candidates are rejected; this archive has no infeasible exploration pool.
+/// entire evaluation history. Infeasible candidates are rejected unless the separate exploration pool is enabled;
+/// they never enter Entries, Best, Front, Sample, or Get. The engine samples an enabled nonempty pool with 10%
+/// probability, or always while no feasible parent exists. Violation magnitudes should use comparable task-defined scales.
 /// Cells are stable storage slots, not behavior-grid bins. Best is only the configured front representative.
 /// </remarks>
-public sealed class ParetoArchive<TGenome> : ICheckpointableEvolutionArchive<TGenome>, IEvolutionArchiveCellCount,
+public sealed class ParetoArchive<TGenome> : ICheckpointableParetoArchive<TGenome>, IEvolutionArchiveCellCount,
     IEvolutionParetoArchiveView<TGenome>, IEvolutionArchiveMutationSource<TGenome>
 {
     private readonly SortedDictionary<int, EvolutionArchiveEntry<TGenome>> _slots = new();
     private IReadOnlyList<EvolutionArchiveEntry<TGenome>>? _entries;
+    private readonly EvolutionInfeasiblePool<TGenome>? _exploration;
 
     /// <summary>Creates an empty front; scalar direction affects only reporting and an explicitly chosen scalar representative.</summary>
     public ParetoArchive(EvolutionParetoDefinition definition,
@@ -21,12 +24,15 @@ public sealed class ParetoArchive<TGenome> : ICheckpointableEvolutionArchive<TGe
         Guard.NotNull(definition);
         if (!Enum.IsDefined(typeof(EvolutionOptimizationDirection), direction)) throw new ArgumentOutOfRangeException(nameof(direction));
         ParetoDefinition = definition; Direction = direction;
+        if (definition.InfeasibleCapacity > 0) _exploration = new EvolutionInfeasiblePool<TGenome>(definition, direction);
         DefinitionHash = EvolutionHash.Combine(new[] { definition.DefinitionHash, direction.ToString() });
         Descriptors = Array.AsReadOnly(new[] { new EvolutionDescriptorDefinition("__pareto_slot", 0, definition.Capacity, definition.Capacity) });
     }
 
     /// <inheritdoc/>
     public EvolutionParetoDefinition ParetoDefinition { get; }
+    /// <inheritdoc/>
+    public IReadOnlyList<EvolutionArchiveEntry<TGenome>>? InfeasibleEntries => _exploration?.Entries;
     /// <inheritdoc/>
     public IReadOnlyList<EvolutionDescriptorDefinition> Descriptors { get; }
     /// <inheritdoc/>
@@ -68,11 +74,22 @@ public sealed class ParetoArchive<TGenome> : ICheckpointableEvolutionArchive<TGe
     private EvolutionArchiveMutation<TGenome> Add(EvolutionCandidate<TGenome> candidate, EvolutionEvaluation evaluation)
     {
         Guard.NotNull(candidate); Guard.NotNull(evaluation);
-        if (!ParetoDefinition.Accepts(evaluation) || evaluation.Direction != Direction ||
+        if (!ParetoDefinition.HasValidObjectives(evaluation) || evaluation.Direction != Direction ||
             candidate.EvaluationId != evaluation.EvaluationId || candidate.CanonicalGenome.Id != evaluation.GenomeId)
             return Unchanged(EvolutionArchiveInsertionResult.Rejected);
         // A different measurement of one identity must be aggregated by the evaluator, not counted twice here.
-        if (Entries.Any(entry => entry.Evaluation.GenomeId == evaluation.GenomeId)) return Unchanged(EvolutionArchiveInsertionResult.NotImproved);
+        var all = Entries.Concat(InfeasibleEntries ?? Array.Empty<EvolutionArchiveEntry<TGenome>>()).ToArray();
+        if (all.Any(entry => entry.Evaluation.GenomeId == evaluation.GenomeId)) return Unchanged(EvolutionArchiveInsertionResult.NotImproved);
+        if (all.Any(entry => entry.Evaluation.EvaluationId == evaluation.EvaluationId)) return Unchanged(EvolutionArchiveInsertionResult.Rejected);
+        if (evaluation.ConstraintViolations.Any(value => value > 0))
+        {
+            if (_exploration is null) return Unchanged(EvolutionArchiveInsertionResult.Rejected);
+            long next = Version;
+            if (!_exploration.TryAdd(candidate, evaluation, () => next = checked(Version + 1)))
+                return Unchanged(EvolutionArchiveInsertionResult.NotImproved);
+            Version = next;
+            return Unchanged(EvolutionArchiveInsertionResult.RetainedForExploration);
+        }
         var proposed = new EvolutionArchiveEntry<TGenome>(new EvolutionCellKey(new[] { 0 }), candidate, evaluation);
         var front = new EvolutionParetoFront<TGenome>(ParetoDefinition, Entries.Concat(new[] { proposed }));
         var retained = front.Entries.ToArray();
@@ -93,11 +110,17 @@ public sealed class ParetoArchive<TGenome> : ICheckpointableEvolutionArchive<TGe
 
     /// <inheritdoc/>
     public void Restore(IReadOnlyList<EvolutionArchiveEntry<TGenome>> entries, IReadOnlyList<EvolutionDescriptorDefinition> descriptors, long version)
+        => RestoreWithExploration(entries, Array.Empty<EvolutionArchiveEntry<TGenome>>(), descriptors, version);
+
+    /// <summary>Restores feasible and infeasible storage separately in one validated transaction.</summary>
+    public void RestoreWithExploration(IReadOnlyList<EvolutionArchiveEntry<TGenome>> entries,
+        IReadOnlyList<EvolutionArchiveEntry<TGenome>> infeasibleEntries, IReadOnlyList<EvolutionDescriptorDefinition> descriptors, long version)
     {
-        Guard.NotNull(entries); Guard.NotNull(descriptors);
+        Guard.NotNull(entries); Guard.NotNull(infeasibleEntries); Guard.NotNull(descriptors);
         if (Version != 0 || Count != 0) throw new InvalidOperationException("Restore requires a pristine archive.");
         var copy = EvolutionCollection.CopyBounded(entries, ParetoDefinition.Capacity, nameof(entries));
-        if (version < copy.Length || !descriptors.Select(axis => axis?.ToCanonicalString()).SequenceEqual(Descriptors.Select(axis => axis.ToCanonicalString())) ||
+        var exploration = EvolutionCollection.CopyBounded(infeasibleEntries, ParetoDefinition.InfeasibleCapacity, nameof(infeasibleEntries));
+        if (version < copy.Length + exploration.Length || !descriptors.Select(axis => axis?.ToCanonicalString()).SequenceEqual(Descriptors.Select(axis => axis.ToCanonicalString())) ||
             copy.Any(entry => entry is null || entry.Cell.Bins.Count != 1 || entry.Cell.Bins[0] >= ParetoDefinition.Capacity ||
                 entry.Evaluation.Direction != Direction || !ParetoDefinition.Accepts(entry.Evaluation) ||
                 entry.Candidate.EvaluationId != entry.Evaluation.EvaluationId || entry.Candidate.CanonicalGenome.Id != entry.Evaluation.GenomeId) ||
@@ -107,6 +130,10 @@ public sealed class ParetoArchive<TGenome> : ICheckpointableEvolutionArchive<TGe
             throw new ArgumentException("Incompatible Pareto snapshot.", nameof(entries));
         var front = new EvolutionParetoFront<TGenome>(ParetoDefinition, copy);
         if (front.Entries.Count != copy.Length) throw new ArgumentException("Snapshot contains dominated or equivalent members.", nameof(entries));
+        if (exploration.Any(entry => entry is null) || copy.Concat(exploration).Select(entry => entry.Evaluation.GenomeId).Distinct(StringComparer.Ordinal).Count() != copy.Length + exploration.Length ||
+            copy.Concat(exploration).Select(entry => entry.Evaluation.EvaluationId).Distinct().Count() != copy.Length + exploration.Length)
+            throw new ArgumentException("Feasible and infeasible pools cannot share identities.", nameof(infeasibleEntries));
+        _exploration?.Restore(exploration);
         foreach (var entry in copy) _slots.Add(entry.Cell.Bins[0], entry);
         Version = version; Best = front.Representative; _entries = null;
     }

@@ -78,6 +78,12 @@ public sealed class EvolutionRunResult<TGenome>
             if (frontDefinitions.Any(item => item is null || item.DefinitionHash != definition.DefinitionHash))
                 throw new ArgumentException("Pareto results require the same front definition on every island.", nameof(islands));
             ParetoFront = new EvolutionParetoFront<TGenome>(definition, islandCopies.SelectMany(archive => archive.Entries));
+            if (definition.InfeasibleCapacity > 0)
+            {
+                var exploration = islandCopies.SelectMany((archive, island) =>
+                    ((IEvolutionParetoArchiveView<TGenome>)archive).InfeasibleEntries!.Select(entry => new EvolutionInfeasibleEntry<TGenome>(island, entry)));
+                InfeasibleExploration = Array.AsReadOnly(EvolutionCollection.CopyBounded(exploration.Take(4097).ToArray(), 4096, nameof(islands)));
+            }
         }
         Counters = counters ?? throw new ArgumentNullException(nameof(counters));
         Guard.NotNullOrWhiteSpace(stateHash);
@@ -154,6 +160,10 @@ public sealed class EvolutionRunResult<TGenome>
     /// <remarks>Best is this front's explicit representative; it does not replace this set of deployment choices.</remarks>
     [System.Text.Json.Serialization.JsonIgnore(Condition = System.Text.Json.Serialization.JsonIgnoreCondition.WhenWritingNull)]
     public EvolutionParetoFront<TGenome>? ParetoFront { get; }
+
+    /// <summary>Gets separately retained non-deployable exploration candidates, or null when disabled.</summary>
+    [System.Text.Json.Serialization.JsonIgnore(Condition = System.Text.Json.Serialization.JsonIgnoreCondition.WhenWritingNull)]
+    public IReadOnlyList<EvolutionInfeasibleEntry<TGenome>>? InfeasibleExploration { get; }
 
     /// <summary>Gets the cross-island global elites in best-first order; empty when the index is disabled.</summary>
     /// <remarks>

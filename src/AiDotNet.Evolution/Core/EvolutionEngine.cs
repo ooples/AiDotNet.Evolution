@@ -179,6 +179,8 @@ public sealed partial class EvolutionEngine<TGenome>
         {
             _islands[i] = archiveFactory(i) ?? throw new ArgumentException("The archive factory returned null.", nameof(archiveFactory));
             if (_islands[i].Count != 0) throw new ArgumentException("New engine archives must be empty; use checkpoint import for prior state.", nameof(archiveFactory));
+            if (((_islands[i] as IEvolutionParetoArchiveView<TGenome>)?.InfeasibleEntries?.Count ?? 0) != 0)
+                throw new ArgumentException("New engine exploration pools must be empty.", nameof(archiveFactory));
             for (int prior = 0; prior < i; prior++)
                 if (ReferenceEquals(_islands[prior], _islands[i]))
                     throw new ArgumentException("The archive factory must return independent instances.", nameof(archiveFactory));
@@ -187,7 +189,7 @@ public sealed partial class EvolutionEngine<TGenome>
         var paretoDefinition = (_islands[0] as IEvolutionParetoArchiveView<TGenome>)?.ParetoDefinition;
         if (paretoDefinition is not null)
         {
-            if ((long)_islands.Length * paretoDefinition.Capacity > 4096)
+            if ((long)_islands.Length * (paretoDefinition.Capacity + paretoDefinition.InfeasibleCapacity) > 4096)
                 throw new ArgumentException("Pareto island capacities may total at most 4096.", nameof(options));
             if (_options.GlobalEliteCount != 0 || _options.HistorySize != 0)
                 throw new ArgumentException("Scalar global-elite and history indexes must be disabled for Pareto runs; query the retained front instead.", nameof(options));
@@ -195,7 +197,7 @@ public sealed partial class EvolutionEngine<TGenome>
             {
                 if (_options.SelectionPolicy != EvolutionSelectionPolicyKind.Uniform)
                     throw new ArgumentException("Pareto runs default to uniform front selection; supply an explicit custom front policy for other semantics.", nameof(selection));
-                _selection = new ParetoEvolutionSelectionPolicy<TGenome>();
+                _selection = new ParetoEvolutionSelectionPolicy<TGenome>(paretoDefinition.InfeasibleCapacity > 0 ? .1 : 0);
             }
             if (migration is null) _migration = new ParetoEvolutionMigrationPolicy<TGenome>(
                 _options.MigrationTopology, _options.MigrationRate, _options.PreventRepeatedMigration);

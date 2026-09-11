@@ -7,7 +7,7 @@ public sealed class EvolutionParetoDefinition
 {
     /// <summary>Creates a two-to-eight-objective front with capacity between two and 256.</summary>
     public EvolutionParetoDefinition(IEnumerable<EvolutionObjectiveDefinition> objectives, int capacity = 64,
-        EvolutionParetoRepresentative representative = EvolutionParetoRepresentative.ClosestToIdeal)
+        EvolutionParetoRepresentative representative = EvolutionParetoRepresentative.ClosestToIdeal, int infeasibleCapacity = 0)
     {
         Guard.NotNull(objectives);
         var copy = EvolutionCollection.CopyBounded(objectives.Take(9).ToArray(), 8, nameof(objectives));
@@ -15,16 +15,21 @@ public sealed class EvolutionParetoDefinition
             copy.Select(axis => axis.Name).Distinct(StringComparer.Ordinal).Count() != copy.Length)
             throw new ArgumentException("Provide two to eight uniquely named objective definitions.", nameof(objectives));
         if (capacity < 2 || capacity > 256) throw new ArgumentOutOfRangeException(nameof(capacity));
+        if (infeasibleCapacity < 0 || infeasibleCapacity > 256) throw new ArgumentOutOfRangeException(nameof(infeasibleCapacity));
         if (!Enum.IsDefined(typeof(EvolutionParetoRepresentative), representative)) throw new ArgumentOutOfRangeException(nameof(representative));
-        Objectives = Array.AsReadOnly(copy); Capacity = capacity; Representative = representative;
+        Objectives = Array.AsReadOnly(copy); Capacity = capacity; Representative = representative; InfeasibleCapacity = infeasibleCapacity;
         DefinitionHash = EvolutionHash.Combine(new[] { "pareto-epsilon-box-crowding-v1",
             capacity.ToString(CultureInfo.InvariantCulture), representative.ToString() }.Concat(copy.Select(axis => axis.Canonical)));
+        if (infeasibleCapacity > 0) DefinitionHash = EvolutionHash.Combine(new[] { DefinitionHash, "infeasible-max-violation-v1",
+            infeasibleCapacity.ToString(CultureInfo.InvariantCulture) });
     }
 
     /// <summary>Gets definitions in exactly the order of EvolutionEvaluation.Objectives.</summary>
     public IReadOnlyList<EvolutionObjectiveDefinition> Objectives { get; }
     /// <summary>Gets the maximum number of retained feasible front members per island.</summary>
     public int Capacity { get; }
+    /// <summary>Gets the separate infeasible exploration capacity; zero disables it without changing feasible-only semantics.</summary>
+    public int InfeasibleCapacity { get; }
     /// <summary>Gets the explicit policy for Best; the complete answer is the front, not Best.</summary>
     public EvolutionParetoRepresentative Representative { get; }
     /// <summary>Gets the versioned identity of every admission, retention and reporting choice.</summary>
@@ -34,8 +39,13 @@ public sealed class EvolutionParetoDefinition
     public bool Accepts(EvolutionEvaluation evaluation)
     {
         Guard.NotNull(evaluation);
+        return HasValidObjectives(evaluation) && !evaluation.ConstraintViolations.Any(value => value > 0);
+    }
+
+    internal bool HasValidObjectives(EvolutionEvaluation evaluation)
+    {
         if (evaluation.Status != EvolutionEvaluationStatus.Completed || !evaluation.Quality.HasValue ||
-            evaluation.ConstraintViolations.Any(value => value > 0) || evaluation.Objectives.Count != Objectives.Count) return false;
+            evaluation.Objectives.Count != Objectives.Count) return false;
         for (int i = 0; i < Objectives.Count; i++)
             if (!EvolutionDescriptorDefinition.IsFinite(evaluation.Objectives[i]) ||
                 evaluation.Objectives[i] < Objectives[i].Minimum || evaluation.Objectives[i] > Objectives[i].Maximum) return false;

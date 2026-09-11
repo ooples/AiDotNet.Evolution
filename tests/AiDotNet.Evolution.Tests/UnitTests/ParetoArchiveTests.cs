@@ -370,4 +370,202 @@ public sealed class ParetoArchiveTests
         public string Serialize(TestGenome genome) => "0";
         public TestGenome Deserialize(string payload) { Reads++; return new TestGenome(0); }
     }
+
+    private static EvolutionParetoDefinition Exploring(int capacity = 2) => new(Definition().Objectives, 8,
+        EvolutionParetoRepresentative.ClosestToIdeal, capacity);
+
+    [Fact]
+    public void SnapshotRejectsExplorationMetadataWhenThePoolIsNotEnabled()
+    {
+        var archive = new ParetoArchive<TestGenome>(Exploring()); Add(archive, 0, "invalid", 1, .1, .1, 1);
+        Assert.Throws<ArgumentException>(() => new EvolutionArchiveSnapshot<TestGenome>(new MisreportedPoolView(archive)));
+    }
+
+    private sealed class MisreportedPoolView(ParetoArchive<TestGenome> source) : IEvolutionParetoArchiveView<TestGenome>
+    {
+        public EvolutionParetoDefinition? ParetoDefinition => Definition();
+        public IReadOnlyList<EvolutionArchiveEntry<TestGenome>>? InfeasibleEntries => source.InfeasibleEntries;
+        public IReadOnlyList<EvolutionDescriptorDefinition> Descriptors => source.Descriptors;
+        public string DefinitionHash => source.DefinitionHash;
+        public EvolutionOptimizationDirection Direction => source.Direction;
+        public int Count => source.Count;
+        public long Version => source.Version;
+        public IReadOnlyList<EvolutionArchiveEntry<TestGenome>> Entries => source.Entries;
+        public EvolutionArchiveEntry<TestGenome>? Best => source.Best;
+        public EvolutionArchiveEntry<TestGenome>? Get(EvolutionCellKey cell) => source.Get(cell);
+    }
+
+    [Fact]
+    public void ExplorationIsBoundedSeparateAndNeverADeployableWinner()
+    {
+        var archive = new ParetoArchive<TestGenome>(Exploring());
+        Assert.Equal(EvolutionArchiveInsertionResult.RetainedForExploration, Add(archive, 0, "far", 1000, .1, .1, 3));
+        var old = archive.InfeasibleEntries!;
+        Add(archive, 1, "close", 10, .2, .2, 1); Add(archive, 2, "middle", 9999, .1, .1, 2);
+        Assert.Equal(new[] { "close", "middle" }, archive.InfeasibleEntries!.Select(entry => entry.Evaluation.GenomeId).OrderBy(id => id));
+        Assert.Single(old); Assert.Equal(3, archive.Version); Assert.Equal(0, archive.Count);
+        Assert.Empty(archive.Entries); Assert.Empty(archive.Front.Entries); Assert.Equal(0, archive.Front.Hypervolume());
+        Assert.Null(archive.Best); Assert.Null(archive.Sample(new StableRandom(1, 2)));
+        Assert.Null(archive.Get(archive.InfeasibleEntries![0].Cell));
+        Add(archive, 3, "feasible", 0, .9, .9);
+        Assert.Equal("feasible", archive.Best!.Evaluation.GenomeId);
+        Assert.Equal(2, archive.InfeasibleEntries.Count); Assert.Single(archive.Front.Entries);
+    }
+
+    [Fact]
+    public void ExplorationRankingUsesViolationsNotScalarQualityAndRejectsDuplicateEvaluationIds()
+    {
+        var archive = new ParetoArchive<TestGenome>(Exploring(1));
+        Add(archive, 0, "b", 1, .5, .5, 1);
+        Assert.Equal(EvolutionArchiveInsertionResult.NotImproved, Add(archive, 1, "worse", 1e20, 0, 0, 2));
+        Assert.Equal(EvolutionArchiveInsertionResult.Rejected, Add(archive, 0, "same-id", 1, .3, .3, .5));
+        Assert.Equal(EvolutionArchiveInsertionResult.RetainedForExploration, Add(archive, 2, "a", -1e20, .9, .9, 1));
+        Assert.Equal("a", Assert.Single(archive.InfeasibleEntries!).Evaluation.GenomeId);
+        Assert.Equal(EvolutionArchiveInsertionResult.NotImproved, Add(archive, 3, "a", 999, 0, 0));
+        Assert.Empty(archive.Entries);
+        Assert.Throws<ArgumentOutOfRangeException>(() => Exploring(-1));
+        Assert.Throws<ArgumentOutOfRangeException>(() => Exploring(257));
+        Assert.NotEqual(Exploring(0).DefinitionHash, Exploring(1).DefinitionHash);
+    }
+
+    [Fact]
+    public void ExplorationSelectionIsOnlyAnExplicitFallbackAndMigrationNeverCopiesIt()
+    {
+        var archive = new ParetoArchive<TestGenome>(Exploring());
+        Add(archive, 0, "a", 99, .1, .1, 1); Add(archive, 1, "b", 99, .1, .1, 2);
+        var policy = new ParetoEvolutionSelectionPolicy<TestGenome>();
+        var first = new StableRandom(2, 3); var second = new StableRandom(2, 3);
+        for (int i = 0; i < 20; i++)
+        {
+            var selection = policy.Select(archive, first, int.MaxValue)!;
+            Assert.Equal(selection.Parent.Evaluation.GenomeId, policy.Select(archive, second, int.MaxValue)!.Parent.Evaluation.GenomeId);
+            Assert.Single(selection.Inspirations); Assert.DoesNotContain(selection.Parent, selection.Inspirations);
+        }
+        var snapshot = new EvolutionArchiveSnapshot<TestGenome>(archive);
+        var nested = new EvolutionArchiveSnapshot<TestGenome>(snapshot);
+        Assert.Empty(nested.Entries); Assert.Equal(2, nested.InfeasibleEntries!.Count); Assert.Null(nested.Best);
+        Assert.Empty(new ParetoEvolutionMigrationPolicy<TestGenome>().CreateMigrations(new IEvolutionArchiveView<TestGenome>[]
+            { snapshot, new ParetoArchive<TestGenome>(Exploring()) }, 2, first));
+        Add(archive, 2, "valid", 0, .9, .9);
+        Assert.Equal("valid", policy.Select(archive, first, 10)!.Parent.Evaluation.GenomeId);
+        Assert.Empty(snapshot.Entries);
+    }
+
+    [Fact]
+    public void ExplorationRestoreIsAtomicAndInvalidatesEmptyCachedViews()
+    {
+        var source = new ParetoArchive<TestGenome>(Exploring()); Add(source, 0, "a", 1, .2, .2, 1);
+        Add(source, 1, "valid", 1, .5, .5);
+        var copy = new ParetoArchive<TestGenome>(Exploring()); Assert.Empty(copy.InfeasibleEntries!); Assert.Empty(copy.Entries);
+        var invalid = new EvolutionArchiveEntry<TestGenome>(source.InfeasibleEntries![0].Cell, source.Entries[0].Candidate, source.Entries[0].Evaluation);
+        Assert.Throws<ArgumentException>(() => copy.RestoreWithExploration(source.Entries, new[] { invalid }, source.Descriptors, 5));
+        Assert.Empty(copy.Entries); Assert.Empty(copy.InfeasibleEntries!); Assert.Equal(0, copy.Version);
+        copy.RestoreWithExploration(source.Entries, source.InfeasibleEntries, source.Descriptors, source.Version);
+        Assert.Single(copy.Entries); Assert.Single(copy.InfeasibleEntries!); Assert.Equal(source.Version, copy.Version);
+        var overflow = new ParetoArchive<TestGenome>(Exploring()); overflow.Restore(Array.Empty<EvolutionArchiveEntry<TestGenome>>(), overflow.Descriptors, long.MaxValue);
+        Assert.Throws<OverflowException>(() => Add(overflow, 0, "a", 1, .2, .2, 1)); Assert.Empty(overflow.InfeasibleEntries!);
+    }
+
+    [Fact]
+    public void ExplorationProbabilityIsExplicitReproducibleAndCheckpointIdentified()
+    {
+        var archive = new ParetoArchive<TestGenome>(Exploring()); Add(archive, 0, "invalid", 99, 0, 0, 1); Add(archive, 1, "valid", 1, .5, .5);
+        var policy = new ParetoEvolutionSelectionPolicy<TestGenome>(.5); var first = new StableRandom(1, 7); var second = new StableRandom(1, 7);
+        var parents = new HashSet<string>();
+        for (int i = 0; i < 50; i++)
+        {
+            string parent = policy.Select(archive, first, 0)!.Parent.Evaluation.GenomeId; parents.Add(parent);
+            Assert.Equal(parent, policy.Select(archive, second, 0)!.Parent.Evaluation.GenomeId);
+        }
+        Assert.Equal(2, parents.Count);
+        Assert.Equal("invalid", new ParetoEvolutionSelectionPolicy<TestGenome>(1).Select(archive, first, 1)!.Parent.Evaluation.GenomeId);
+        Assert.NotEqual(policy.VersionHash, new ParetoEvolutionSelectionPolicy<TestGenome>().VersionHash);
+        Assert.NotEqual(policy.VersionHash, new ParetoEvolutionSelectionPolicy<TestGenome>(.1).VersionHash);
+        Assert.Throws<ArgumentOutOfRangeException>(() => new ParetoEvolutionSelectionPolicy<TestGenome>(double.NaN));
+        Assert.Throws<ArgumentOutOfRangeException>(() => new ParetoEvolutionSelectionPolicy<TestGenome>(-1));
+        Assert.Throws<ArgumentOutOfRangeException>(() => new ParetoEvolutionSelectionPolicy<TestGenome>(1.1));
+    }
+
+    private sealed class ReachFeasibilityTask : IEvolutionTask<TestGenome>
+    {
+        public string Id => "reach-feasibility";
+        public string VersionHash => "reach-feasibility-v1";
+        public string EvaluatorVersionHash => "reach-feasibility-eval-v1";
+        public ValueTask<EvolutionCanonicalGenome<TestGenome>> CanonicalizeAsync(TestGenome genome, CancellationToken cancellationToken = default) =>
+            new(new EvolutionCanonicalGenome<TestGenome>(genome, genome.Value.ToString(System.Globalization.CultureInfo.InvariantCulture)));
+        public ValueTask<EvolutionTaskResult> EvaluateAsync(EvolutionCandidate<TestGenome> candidate, EvolutionEvaluationContext context,
+            CancellationToken cancellationToken = default)
+        {
+            double x = Math.Min(1, candidate.CanonicalGenome.Genome.Value / 10d);
+            return new(new EvolutionTaskResult(EvolutionEvaluationStatus.Completed, 1 - x, objectives: new[] { x, 1 - x },
+                constraintViolations: new[] { (double)Math.Max(0, 3 - candidate.CanonicalGenome.Genome.Value) }));
+        }
+    }
+
+    private static EvolutionEngine<TestGenome> ExploringEngine(int budget, InMemoryEvolutionCheckpointStore? store = null, bool resume = false,
+        int capacity = 2) => new(new ReachFeasibilityTask(), new IncrementVariation(), _ => new ParetoArchive<TestGenome>(Exploring(capacity)),
+            new EvolutionEngineOptions
+            {
+                RunId = "exploration",
+                Seed = 7,
+                MaxEvaluationAttempts = budget,
+                MaxProposals = 100,
+                MaxGenerations = 100,
+                ProposalBatchSize = 1,
+                MaxDegreeOfParallelism = 1,
+                MigrationInterval = 0,
+                Resume = resume
+            },
+            checkpointStore: store, genomeCodec: new TestGenomeCodec());
+
+    [Fact]
+    public async Task InfeasibleOnlyStartCanReachFeasibilityAndResumeWithoutLeakingWinners()
+    {
+        var seeds = new[] { new TestGenome(1) }; var store = new InMemoryEvolutionCheckpointStore();
+        var partial = await ExploringEngine(2, store).RunAsync(seeds);
+        Assert.Null(partial.Best); Assert.Empty(partial.ParetoFront!.Entries);
+        Assert.Equal(2, partial.InfeasibleExploration!.Count);
+        Assert.All(partial.InfeasibleExploration, entry => Assert.Equal(0, entry.Island));
+        Assert.Contains("InfeasibleExploration", JsonSerializer.Serialize(partial));
+        Assert.Throws<ArgumentOutOfRangeException>(() => new EvolutionInfeasibleEntry<TestGenome>(-1, partial.InfeasibleExploration[0].Entry));
+        Assert.Equal(2, Assert.IsAssignableFrom<IEvolutionParetoArchiveView<TestGenome>>(partial.Islands[0]).InfeasibleEntries!.Count);
+        var saved = (await store.LoadLatestAsync("exploration"))!;
+        var offline = EvolutionEngine<TestGenome>.ReadCheckpoint(saved, new TestGenomeCodec());
+        Assert.Empty(offline.ParetoFront!.Entries);
+        Assert.All(offline.Entries, entry => Assert.Equal(EvolutionCheckpointEntrySource.InfeasibleExploration, entry.Source));
+        var resumed = await ExploringEngine(5, store, true).RunAsync(seeds);
+        var full = await ExploringEngine(5).RunAsync(seeds);
+        Assert.Equal(full.StateHash, resumed.StateHash);
+        Assert.NotNull(full.Best); Assert.All(full.ParetoFront!.Entries, entry => Assert.All(entry.Evaluation.ConstraintViolations, value => Assert.Equal(0, value)));
+        Assert.Throws<ArgumentException>(() => new EvolutionInfeasibleEntry<TestGenome>(0, full.Best!));
+        var disabled = await ExploringEngine(5, capacity: 0).RunAsync(seeds);
+        Assert.Null(disabled.Best); Assert.Equal(1, disabled.Counters.EvaluationAttempts);
+    }
+
+    [Theory]
+    [InlineData("missing-pool")]
+    [InlineData("disabled-pool")]
+    [InlineData("feasible-in-pool")]
+    [InlineData("pool-in-front")]
+    [InlineData("duplicate-pool")]
+    [InlineData("slot")]
+    [InlineData("count")]
+    public async Task ExplorationCheckpointCorruptionIsRejectedBeforeCodecs(string corruption)
+    {
+        var store = new InMemoryEvolutionCheckpointStore(); await ExploringEngine(2, store).RunAsync(new[] { new TestGenome(1) });
+        var saved = (await store.LoadLatestAsync("exploration"))!; var node = JsonNode.Parse(saved.Payload)!;
+        var island = node["Islands"]![0]!; var pool = island["InfeasibleEntries"]!.AsArray();
+        switch (corruption)
+        {
+            case "missing-pool": island.AsObject().Remove("InfeasibleEntries"); break;
+            case "disabled-pool": island["Pareto"]!["InfeasibleCapacity"] = 0; break;
+            case "feasible-in-pool": pool[0]!["Evaluation"]!["ConstraintViolations"] = new JsonArray(0d); break;
+            case "pool-in-front": island["Entries"]!.AsArray().Add(JsonNode.Parse(pool[0]!.ToJsonString())); break;
+            case "duplicate-pool": pool.Add(JsonNode.Parse(pool[0]!.ToJsonString())); break;
+            case "slot": pool[0]!["CellBins"]![0] = 0; break;
+            case "count": island["Pareto"]!["InfeasibleCapacity"] = 257; break;
+        }
+        var corrupt = new EvolutionCheckpoint(saved.RunId, saved.Sequence, saved.CompatibilityHash, node.ToJsonString()); var codec = new CountingCodec();
+        Assert.Throws<InvalidDataException>(() => EvolutionEngine<TestGenome>.ReadCheckpoint(corrupt, codec)); Assert.Equal(0, codec.Reads);
+    }
 }

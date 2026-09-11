@@ -155,6 +155,7 @@ internal static class EvolutionCheckpointJsonPreflight
         if (reader.ValueTextEquals("PendingArtifacts")) return CheckpointCollectionKind.PendingArtifacts;
         if (reader.ValueTextEquals("Islands")) return CheckpointCollectionKind.Islands;
         if (reader.ValueTextEquals("Entries")) return CheckpointCollectionKind.ArchiveEntries;
+        if (reader.ValueTextEquals("InfeasibleEntries")) return CheckpointCollectionKind.ArchiveEntries;
         if (reader.ValueTextEquals("Descriptors")) return CheckpointCollectionKind.Descriptors;
         if (reader.ValueTextEquals("CellBins")) return CheckpointCollectionKind.CellBins;
         if (reader.ValueTextEquals("ParentIds")) return CheckpointCollectionKind.ParentIds;

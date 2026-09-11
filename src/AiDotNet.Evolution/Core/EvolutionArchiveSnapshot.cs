@@ -73,12 +73,26 @@ public sealed class EvolutionArchiveSnapshot<TGenome> : IEvolutionParetoArchiveV
         Version = source.Version;
         TotalCells = EvolutionArchiveGeometry.CellCount(source);
         ParetoDefinition = (source as IEvolutionParetoArchiveView<TGenome>)?.ParetoDefinition;
+        if ((source as IEvolutionParetoArchiveView<TGenome>)?.InfeasibleEntries is not null &&
+            (ParetoDefinition is null || ParetoDefinition.InfeasibleCapacity == 0))
+            throw new ArgumentException("Exploration entries require an explicitly enabled Pareto pool.", nameof(source));
         if (ParetoDefinition is not null)
         {
             var front = new EvolutionParetoFront<TGenome>(ParetoDefinition, entries);
             if (front.Entries.Count != entries.Length || entries.Length > ParetoDefinition.Capacity)
                 throw new ArgumentException("Pareto archive views must contain a bounded nondominated front.", nameof(source));
             Best = front.Representative;
+            if (ParetoDefinition.InfeasibleCapacity > 0)
+            {
+                var exploration = new EvolutionInfeasiblePool<TGenome>(ParetoDefinition, Direction);
+                exploration.Restore(((IEvolutionParetoArchiveView<TGenome>)source).InfeasibleEntries ??
+                    throw new ArgumentException("Enabled exploration metadata is missing.", nameof(source)));
+                InfeasibleEntries = exploration.Entries;
+                var combined = entries.Concat(InfeasibleEntries).ToArray();
+                if (Version < combined.Length || combined.Select(entry => entry.Evaluation.GenomeId).Distinct(StringComparer.Ordinal).Count() != combined.Length ||
+                    combined.Select(entry => entry.Evaluation.EvaluationId).Distinct().Count() != combined.Length)
+                    throw new ArgumentException("Pareto snapshot pools repeat identities or exceed the archive version.", nameof(source));
+            }
         }
         else Best = entries.OrderBy(entry => entry, EvolutionEntryOrdering.BestFirst<TGenome>(Direction)).FirstOrDefault();
     }
@@ -104,6 +118,9 @@ public sealed class EvolutionArchiveSnapshot<TGenome> : IEvolutionParetoArchiveV
     /// <inheritdoc/>
     [System.Text.Json.Serialization.JsonIgnore(Condition = System.Text.Json.Serialization.JsonIgnoreCondition.WhenWritingNull)]
     public EvolutionParetoDefinition? ParetoDefinition { get; }
+    /// <inheritdoc/>
+    [System.Text.Json.Serialization.JsonIgnore(Condition = System.Text.Json.Serialization.JsonIgnoreCondition.WhenWritingNull)]
+    public IReadOnlyList<EvolutionArchiveEntry<TGenome>>? InfeasibleEntries { get; }
 
     /// <inheritdoc/>
     public IReadOnlyList<EvolutionArchiveEntry<TGenome>> Entries => _entries;
