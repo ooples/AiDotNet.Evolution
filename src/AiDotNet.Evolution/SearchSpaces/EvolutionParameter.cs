@@ -63,12 +63,25 @@ public sealed class EvolutionParameterCondition
 /// <summary>An immutable parameter domain with optional activation conditions.</summary>
 public sealed class EvolutionParameter
 {
+    // Logarithmic coordinates use the ratio maximum/minimum, whose rounding is IEEE-deterministic, rather than a
+    // difference of two logarithms that cancels catastrophically and depends on the runtime's Math.Log rounding.
+    private readonly double _logSpan;
+    private readonly bool _logRatioIsFinite;
+    private readonly bool _logSpanIsLinear;
+
     private EvolutionParameter(string name, EvolutionParameterKind kind, double minimum, double maximum,
         string[] categories, EvolutionParameterCondition[] conditions)
     {
         ValidateName(name);
         Name = name; Kind = kind; Minimum = minimum == 0 ? 0 : minimum; Maximum = maximum == 0 ? 0 : maximum;
         Categories = Array.AsReadOnly(categories); Conditions = Array.AsReadOnly(conditions);
+        if (kind != EvolutionParameterKind.Logarithmic || Maximum <= Minimum) return;
+        double ratio = Maximum / Minimum;
+        _logRatioIsFinite = EvolutionDescriptorDefinition.IsFinite(ratio);
+        // Below one part in 1e9 the logarithmic and linear maps differ by under 1.3e-10 of the normalized span,
+        // which is far below double resolution, while the linear map keeps every representable point distinct.
+        _logSpanIsLinear = _logRatioIsFinite && ratio - 1 < 1e-9;
+        _logSpan = _logRatioIsFinite ? Math.Log(ratio) : Math.Log(Maximum) - Math.Log(Minimum);
     }
     /// <summary>Gets the unique parameter name.</summary>
     public string Name { get; }
@@ -139,9 +152,11 @@ public sealed class EvolutionParameter
     {
         if (!Contains(value) || Kind == EvolutionParameterKind.Categorical) throw new ArgumentException("A valid numeric value is required.", nameof(value));
         if (Maximum == Minimum) return 0;
-        return Kind == EvolutionParameterKind.Logarithmic && !HasCollapsedLogSpan
-            ? (Math.Log(value.Number) - Math.Log(Minimum)) / (Math.Log(Maximum) - Math.Log(Minimum))
-            : (value.Number - Minimum) / (Maximum - Minimum);
+        if (Kind != EvolutionParameterKind.Logarithmic || _logSpanIsLinear) return (value.Number - Minimum) / (Maximum - Minimum);
+        double coordinate = _logRatioIsFinite
+            ? Math.Log(value.Number / Minimum) / _logSpan
+            : (Math.Log(value.Number) - Math.Log(Minimum)) / _logSpan;
+        return Math.Max(0, Math.Min(1, coordinate));
     }
 
     /// <summary>Decodes a normalized numeric coordinate, clipping finite out-of-range values and rounding integers.</summary>
@@ -150,23 +165,24 @@ public sealed class EvolutionParameter
         if (!EvolutionDescriptorDefinition.IsFinite(coordinate) || Kind == EvolutionParameterKind.Categorical)
             throw new ArgumentOutOfRangeException(nameof(coordinate));
         double t = Math.Max(0, Math.Min(1, coordinate));
-        double value = Kind == EvolutionParameterKind.Logarithmic && !HasCollapsedLogSpan
-            ? Math.Exp(Math.Log(Minimum) + t * (Math.Log(Maximum) - Math.Log(Minimum)))
-            : Minimum + t * (Maximum - Minimum);
+        // Both endpoints are pinned exactly: a parent sitting on a bound and mutating outward keeps its identity.
+        double value = Kind != EvolutionParameterKind.Logarithmic || Maximum <= Minimum ? Minimum + t * (Maximum - Minimum)
+            : t <= 0 ? Minimum
+            : t >= 1 ? Maximum
+            : _logSpanIsLinear ? Minimum + t * (Maximum - Minimum)
+            : _logRatioIsFinite ? Minimum * Math.Exp(t * _logSpan)
+            : Math.Exp(Math.Log(Minimum) + t * _logSpan);
         value = Math.Max(Minimum, Math.Min(Maximum, value));
         return EvolutionParameterValue.Numeric(Kind == EvolutionParameterKind.Integer ? Math.Round(value, MidpointRounding.AwayFromZero) : value);
     }
 
     internal bool IsActive(IReadOnlyDictionary<string, EvolutionParameterValue> values) => Conditions.All(condition =>
         values.TryGetValue(condition.Parameter, out EvolutionParameterValue? parent) && condition.AnyOf.Contains(parent));
-    // Adjacent positive doubles can have equal rounded logarithms. Their relative span is below log
-    // resolution, so use bounded linear interpolation rather than dividing zero by zero or collapsing sampling.
-    private bool HasCollapsedLogSpan => Maximum > Minimum && Math.Log(Maximum) == Math.Log(Minimum);
     internal string DefinitionHash => EvolutionHash.Combine(new[] { Name, Kind.ToString(),
         EvolutionParameterValue.Numeric(Minimum).Canonical, EvolutionParameterValue.Numeric(Maximum).Canonical,
         EvolutionHash.Combine(Categories) }.Concat(Conditions.OrderBy(condition => condition.Parameter, StringComparer.Ordinal)
         .Select(condition => EvolutionHash.Combine(new[] { condition.Parameter }.Concat(condition.AnyOf.Select(value => value.Canonical)))))
-        .Concat(Kind == EvolutionParameterKind.Logarithmic ? new[] { "log-domain-v2-finite-narrow" } : Array.Empty<string>()));
+        .Concat(Kind == EvolutionParameterKind.Logarithmic ? new[] { "log-domain-v3-ratio-pinned" } : Array.Empty<string>()));
 
     internal static void ValidateName(string name)
     {
