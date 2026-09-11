@@ -42,3 +42,18 @@ powershell -NoProfile -ExecutionPolicy Bypass -File eng/Export-NumericEvidence.p
 Full JSON includes every terminal proposal and best-so-far trace. Compact evidence excludes those long traces
 and the bounded receipt tail, retaining their raw file hash and reconciled totals. This is local CPU evidence;
 whole-file hashes include runtime/OS metadata and are not expected to match across platforms.
+
+## US-13 current-revision verification
+
+The complete 240-run campaign was repeated at `a071dc6842e0b45edc2604aad00aabf68440eee0` after integrating
+measurement-origin-aware learning, adding explicit typed presets and fixing collapsed logarithmic intervals.
+[New compact evidence](numeric-pilot-a071dc6.json) retains all runs, costs and the raw trace SHA-256
+`56eac7161f0724bebd329766fc5278bfaa3d97496a5806ffbe6e01b91ae49d15`.
+All 61,440 evaluator calls completed; every paired initial-population hash, final loss, mean loss, evaluator-call
+count and proposal count matches the earlier evidence exactly. This confirms unchanged fresh-measurement behavior
+on these real-valued fixtures; it is not an independent confirmation set. State hashes are not compared across
+changed learning semantic versions. The unfavorable rippled result and the opt-in/default decision remain unchanged.
+
+Reproduce by replacing the source revision in the command above with `a071dc6842e0b45edc2604aad00aabf68440eee0`
+and choosing new output filenames. The separate narrow-log and preset tests, not these broad real-valued fixtures,
+verify the new domain edge case, ownership, checkpoint compatibility and factory behavior.

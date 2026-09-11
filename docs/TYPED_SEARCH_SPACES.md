@@ -27,6 +27,15 @@ var crossover = new SearchSpaceCrossover(space); // configure inspirations on th
 var restart = new SearchSpaceRestart(space);
 ```
 
+For a ready-made operator choice, use `EvolutionSearchPresets.Create(space)`. The default is mutation only;
+`UniformMixed` and `AdaptiveMixed` explicitly select the same mutation/crossover/restart catalog, while
+`DiagonalCma` is an opt-in continuous-domain emitter. The uniform preset tries each operator once before uniform
+allocation; the adaptive preset uses archive-success credit and 0.1 exploration. Configure `InspirationCount`
+on the engine for crossover. Each factory call owns fresh state, and checkpoints validate the resulting operator
+versions. Unsupported CMA domains fail immediately. Use direct constructors for custom settings and
+`SearchSpaceLocalRefiner` for explicit budgeted refinement; the catalog never invents an objective or an unmetered
+refinement budget. Simpler presets are retained because the development evidence does not justify an adaptive default.
+
 `EvolutionSearchTask` accepts an objective delegate plus explicit task/evaluator versions. Pass `space` as the engine's
 genome codec for checkpoints. Domain legality is separate from application correctness and hard constraints; retain the
 independent evaluation gates required by your application.
@@ -49,6 +58,12 @@ independent evaluation gates required by your application.
 - Given a compatible checkpoint, when the engine restores, then typed genomes and adaptive operator state preserve the
   continuation. Malformed or differently versioned payloads are rejected.
 
+Extremely narrow positive intervals can have distinct bounds but identical rounded logarithms. Those intervals use
+bounded linear normalization/interpolation (log variation is below floating-point resolution), keeping features finite
+and both endpoints representable. Logarithmic domain fingerprints include `log-domain-v2-finite-narrow`; checkpoints
+and genomes from the earlier logarithmic schema are rejected, not silently reinterpreted. Non-logarithmic schemas
+retain their prior fingerprints. Domain identity does not depend on whether a particular runtime rounds the logs equal.
+
 ## Optional diagonal CMA-style learning
 
 `DiagonalCmaEmitter` implements positive-weight ranked recombination, diagonal covariance adaptation and cumulative
@@ -57,7 +72,9 @@ unconditional real/logarithmic parameters. It does not model cross-coordinate co
 
 The bounded-domain variant clips proposals and learns from their evaluated coordinates. Variances and step size have
 finite safety bounds. Only fresh, completed, feasible measurements with the configured direction train it. Full learning
-populations require enough valid parents; failed, cached or infeasible outcomes never become successful parents.
+populations require enough valid parents; failed, cached, producer-declared reused or infeasible outcomes never
+become successful parents. Measurement-origin-aware CMA versions reject older learned checkpoints; see
+[measurement origin](MEASUREMENT_ORIGIN.md#learning-from-measurements).
 
 Proposal generation can span evaluation batches. Each population retains its sampling distribution. A stale population's
 results can still enter the archive, but cannot overwrite a newer distribution; `StalePopulations` exposes this tradeoff.
