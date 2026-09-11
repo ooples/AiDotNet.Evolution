@@ -7,6 +7,15 @@ if (args.Length != 2 || args[1].Length != 40 || args[1].Any(c => !Uri.IsHexDigit
     throw new ArgumentException("Usage: ParetoSearch <new-report.json> <40-character-source-commit>");
 string reportPath = Path.GetFullPath(args[0]);
 if (File.Exists(reportPath)) throw new IOException("Preserve prior campaign evidence: choose a new report path.");
+
+// The declared revision is an argument, so it is a claim, not evidence. Source Link stamps the commit the engine
+// assembly was actually built from into its informational version; a campaign whose argument disagrees with the
+// binary under test would attribute its numbers to the wrong code and is refused before any run starts.
+string embeddedCommit = EmbeddedCommit();
+if (embeddedCommit.Length != 40 || embeddedCommit.Any(c => !Uri.IsHexDigit(c)))
+    throw new InvalidOperationException("The engine assembly carries no embedded source revision: build from a Git checkout.");
+if (!string.Equals(embeddedCommit, args[1], StringComparison.OrdinalIgnoreCase))
+    throw new ArgumentException("The declared source commit does not match the commit the engine was built from: " + embeddedCommit);
 var definition = new EvolutionParetoDefinition(new[]
 {
     new EvolutionObjectiveDefinition("f1", EvolutionOptimizationDirection.Minimize, 0, 2),
@@ -97,6 +106,7 @@ File.WriteAllText(reportPath, JsonSerializer.Serialize(new
 {
     Schema = "pareto-campaign-v1",
     SourceCommit = args[1],
+    EmbeddedCommit = embeddedCommit,
     Runtime = System.Runtime.InteropServices.RuntimeInformation.FrameworkDescription,
     Architecture = System.Runtime.InteropServices.RuntimeInformation.ProcessArchitecture.ToString(),
     Tasks = "Authored bounded quadratic tradeoffs; disconnected variant rejects 0.4 < x < 0.6.",
@@ -112,6 +122,16 @@ File.WriteAllText(reportPath, JsonSerializer.Serialize(new
     Runs = rows
 }, new JsonSerializerOptions { WriteIndented = true }));
 Console.WriteLine($"Validated {rows.Count} matched-budget runs; report: {reportPath}");
+
+// The commit Source Link embedded in the engine assembly under test, or an empty string outside a Git build.
+static string EmbeddedCommit()
+{
+    string informational = typeof(EvolutionParetoDefinition).Assembly
+        .GetCustomAttributes(typeof(System.Reflection.AssemblyInformationalVersionAttribute), false)
+        .Cast<System.Reflection.AssemblyInformationalVersionAttribute>().FirstOrDefault()?.InformationalVersion ?? string.Empty;
+    int separator = informational.IndexOf('+');
+    return separator >= 0 ? informational.Substring(separator + 1) : string.Empty;
+}
 
 static object Summarize(double[] differences)
 {

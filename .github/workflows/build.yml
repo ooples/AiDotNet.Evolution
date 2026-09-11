@@ -76,8 +76,9 @@ jobs:
       - name: Verify gain and all-stage operator credit
         shell: pwsh
         run: ./eng/Test-OperatorCredit.ps1
-      - name: Verify matched-budget Pareto and scalar search campaign
-        run: dotnet run --project examples/ParetoSearch -c Release -- "${{ github.workspace }}/TestResults/pareto/campaign.json" "${{ github.sha }}"
+      - name: Verify matched-budget Pareto campaign against retained evidence
+        shell: pwsh
+        run: ./eng/Test-ParetoCampaign.ps1 -SourceRevision '${{ github.sha }}'
       - name: Verify performance fixture contracts
         run: dotnet run --project benchmarks/AiDotNet.Evolution.Performance -c Release -- --smoke
       - name: Verify paired analysis contracts
