@@ -227,6 +227,9 @@ public sealed partial class EvolutionEngine<TGenome>
     /// </remarks>
     public string CompatibilityHash => _compatibilityHash;
 
+    /// <summary>Gets the owned run identity used by external-work correlation.</summary>
+    public string RunId => _options.RunId;
+
     /// <summary>Asks a running or not-yet-started run to finish its current batch and return a result.</summary>
     /// <remarks>
     /// <para>
