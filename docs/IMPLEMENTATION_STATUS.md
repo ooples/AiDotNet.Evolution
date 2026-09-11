@@ -54,6 +54,13 @@ fatal runner suppression, missing receipts being treated as known costs, lazy pr
 cost-bookkeeping cleanup. These are tested contracts, not live-model or runtime optimization results; compiler
 cancellation is cooperative, not OS isolation, and sealed correctness/performance promotion remains external.
 
+Companion `d0c4039ac` adds a real C# execution worker without a scripting-tool dependency and tests the full
+facade/compiler/correctness/fitness/shared-ledger path using authored sources and scripted proposals. Compile-only
+does not load the emitted assembly. Adversarial tests also fixed truncated-prefix false passes, asynchronous canceled
+call undercounting and fatal suppression, mutable exported cases invalidating task identity, raw payloads in redacted
+diagnostics, and unused legacy provenance construction for custom loops. The worker is not OS isolation. Its internal
+compilation is included in whole evaluation-call units, not separately instrumented compiler/CPU/memory totals.
+
 [AiDotNet.Tensors companion PR #1024](https://github.com/ooples/AiDotNet.Tensors/pull/1024): compare-and-deactivate of an observed kernel deployment, enabling built-in fallback
 without allowing stale runtime evidence to remove a newer snapshot. This adds to the validated promotion machinery
 already present on Tensors `main` at `67ceb6ed`; it is not a new promotion system. Deactivation is in-memory only,
@@ -70,7 +77,7 @@ Durable evaluation identities and leases must be developed against its eventual 
 | --- | --- | --- |
 | US-01 representative suites | Partial | Real program/kernel/AutoML tasks, AlgoTune subset, sealed task partitions. |
 | US-02 fair baselines | Partial | Matched-population SciPy differential evolution now uses the shared C# evaluator and independent counters; native-default/tuned controls, OpenEvolve and consistent model access remain. |
-| US-03 correctness gates | Partial, companion | Trusted sandbox/reference integrations and held-out validation; wrapper alone is not proof of correctness. |
+| US-03 correctness gates | Partial, companion | Real C# worker/facade checks and fail-closed truncated-output/owned-case contracts exist; trusted OS isolation, reference integrations and held-out validation remain. |
 | US-04 statistical evidence | Partial | Paired task/run analysis, failure-inclusive effects/intervals and trace checks implemented; prospective sample-size/power design and representative confirmation remain. |
 | US-05 resource ledger | Partial | Generic ledger and adapters plus bounded C# consumer model/compiler/setup/audit/evaluation integration implemented; other consumer stages, coordinated persistence and deterministic concurrent admission remain. |
 | US-06 noisy evaluation | Partial | Fresh bounded replicate runner, per-sample costs, finite-look uncertainty and separate confirmation identities implemented; archive resampling policy, cascade-rejection audit and representative noisy comparisons remain. |
@@ -84,7 +91,7 @@ Durable evaluation identities and leases must be developed against its eventual 
 | US-14 surrogate assistance | Partial | Cost-metered acquisition, exploration/fallback contracts and a numeric KNN example implemented; production calibration/backends, representative expensive/noisy evidence and durable observation integration remain. |
 | US-15 multi-fidelity | Partial | Bounded successive-halving bracket, exploration, fidelity/replicate identities, incremental state handoff and fresh full confirmation implemented; real learning-workload integration, durable bracket resume and representative comparisons remain. |
 | US-16 adaptive islands | Not implemented | Resource allocation, heterogeneous policies and checkpointed restarts. |
-| US-17 compiler-guided edits | Partial, companion | Exact identity/boundaries plus bounded C# syntax edits, real emit, compiler repair, reference/assembly fingerprints and complete attempt evidence implemented; correctness-driven repair, OS isolation, public-API/target validation, multi-file evolution and representative performance confirmation remain. |
+| US-17 compiler-guided edits | Partial, companion | Exact identity/boundaries plus bounded C# syntax edits, real emit, compiler repair, reference/assembly fingerprints, attempt evidence and a real console worker/facade integration implemented; correctness-driven repair, OS isolation, public-API/target validation, multi-file evolution and representative performance confirmation remain. |
 | US-18 reusable experience | Not implemented | Provenance-backed retrieval, lessons and calibrated semantic novelty. |
 | US-19 model/prompt routing | Not implemented | Consumer routing policy, end-to-end costs, replay and fixed-routing comparisons. |
 | US-20 proposal concurrency | Not implemented | Immutable proposal contexts, bounded scheduling and deterministic policy. |
@@ -189,6 +196,13 @@ Durable evaluation identities and leases must be developed against its eventual 
   real Roslyn emit with scripted model and execution doubles. The optional package locally packs both TFMs,
   XML documentation, license and README; that is not proof of compatible published AiDotNet/Evolution dependencies.
   Normal NuGet resolution, net471 verification, whole-repository/current-head CI and review remain separate.
+- AiDotNet companion `d0c4039ac`: 888 focused consumer tests and 79 compiler/worker tests pass on each of net8.0
+  and net10.0. Twelve evaluator/custom-provenance regressions were first red. Combined optional/worker coverage on
+  each target is 544/550 lines and 365/404 branches; separately, compiler coverage is 98.81%/91.94% and worker
+  coverage 100%/77.27%. Targeted consumer coverage is 4,994/5,408 lines (92.34%) and 2,434/2,989 branches (81.43%),
+  excluding the builder and unrelated assembly types. Production/test-copy hashes matched before execution. Worker
+  fixtures execute real C# but are neither live-model optimization benchmarks nor hostile-code containment tests;
+  Linux behavior, normal NuGet resolution and current-head hosted validation remain unverified.
 - [Paired analysis](benchmarks/analysis-d62d5cb/report.md): 14 Python contract tests pass. Retrospective reporting retains every scheduled run, marks unknown
   work and incomplete curves, and resamples paired seeds within tasks. The pinned CMA-versus-hill-climbing adjusted
   utility-difference interval crosses zero; the pilot is not evidence for promoting CMA as a universal default.
@@ -200,7 +214,8 @@ Durable evaluation identities and leases must be developed against its eventual 
   methods share the complete initial population and evaluator cap; proposal/evaluator ledger totals are retained.
 - Hosted validation remains incomplete for Evolution/AiDotNet (build/security checks queued). Tensors current head
   `77d16869` now has successful build, AVX-512 verification and returned GPU-parity checks; earlier duplicate title
-  runs were cancelled. AiDotNet has current-head CodeRabbit approval, not Copilot approval. All PRs remain drafts;
+  runs were cancelled. AiDotNet's CodeRabbit approval applies only to historical head `75aa6b1d`; its later review
+  was skipped because 175 files exceeded the 100-file limit. No current-head CodeRabbit or Copilot approval is claimed. All PRs remain drafts;
   no full-roadmap or merge-readiness claim.
 
 ## Experiment access policy
