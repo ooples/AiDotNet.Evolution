@@ -81,10 +81,10 @@ Base64 is transport encoding, not encryption, redaction or a sandbox.
 
 ## Remaining US-23 work
 
-Pluggable persistent evaluation storage, exact sample/fidelity identity, noisy-sample freshness and uncertainty,
-cache-hit provenance/accounting, and controlled warm/cold benchmark campaigns remain separate work. The seed-only
-repertoire intentionally cannot substitute for those contracts. No competitive advantage is claimed by the
-deterministic contract tests.
+[Persistent evaluation reuse](PERSISTENT_EVALUATION_REUSE.md) now provides separate storage, exact sample/fidelity
+keys, original-sample uncertainty/age policies and cache-hit provenance/accounting. Representative fair warm/cold
+campaigns and consumer-facade integration remain. Seed-only repertoires cannot substitute for those contracts;
+no competitive advantage is claimed by deterministic contract tests.
 
 ## Local verification
 

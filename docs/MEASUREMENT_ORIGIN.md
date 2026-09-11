@@ -80,6 +80,6 @@ was already implemented; the unchanged failing assertion passed after fixing tha
 migration, compressed trace formats, default schema 6, malformed checkpoint metadata, invalid metering receipts,
 cascade failure and refusal to count declared reused evidence as independent samples.
 
-Still required for US-23: persistent evaluation storage, exact-key validation and freshness/force-fresh controls,
-current lookup/write/validation accounting, consumer integration and a predeclared matched warm/cold campaign.
-None of those is established merely by attaching provenance.
+[Persistent evaluation reuse](PERSISTENT_EVALUATION_REUSE.md) now implements separate storage, exact-key validation,
+freshness/force-fresh controls and store-call accounting, with an explicit caller-metered engine example.
+Consumer-facade integration and representative fair warm/cold campaigns remain; provenance alone does not establish them.

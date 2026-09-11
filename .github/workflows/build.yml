@@ -65,6 +65,8 @@ jobs:
       - name: Verify replication accounting and confirmation
         shell: pwsh
         run: ./eng/Test-Replication.ps1
+      - name: Verify persistent evaluation reuse and force-fresh accounting
+        run: dotnet run --project examples/PersistentEvaluation -c Release -- "${{ github.workspace }}/TestResults/persistent-evaluation"
       - name: Verify surrogate backend and measured-only selection
         shell: pwsh
         run: ./eng/Test-SurrogateSearch.ps1
@@ -94,6 +96,8 @@ jobs:
           name: coverage-and-diagnostics
           path: |
             TestResults/quality/**/*.json
+            TestResults/persistent-evaluation/**/*.json
+            TestResults/persistent-evaluation/*.jsonl
             coverage/**/coverage.cobertura.xml
             coverage/**/*.dmp
             coverage/**/Sequence_*.xml

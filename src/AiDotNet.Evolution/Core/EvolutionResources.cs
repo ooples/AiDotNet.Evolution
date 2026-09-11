@@ -58,7 +58,9 @@ public enum EvolutionResourceStage
     /// <summary>A full evaluation or an independent replicate.</summary>
     Evaluation,
     /// <summary>A final independent correctness/performance confirmation.</summary>
-    Confirmation
+    Confirmation,
+    /// <summary>Persistent evidence-store calls, separate from evaluation/acquisition work.</summary>
+    Persistence
 }
 
 /// <summary>A terminal resource-accounting outcome, independent of archive admission.</summary>

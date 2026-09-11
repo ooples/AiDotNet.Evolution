@@ -113,12 +113,19 @@ Durable evaluation identities and leases must be developed against its eventual 
 | US-20 proposal concurrency | Not implemented | Immutable proposal contexts, bounded scheduling and deterministic policy. |
 | US-21 durable external work | Pending API integration | Run/evaluation/attempt identity, leases, heartbeats, stale results and pending-work persistence. |
 | US-22 centroid archive | Partial | Fixed-K routing, immutable geometry, transactional offline projection and engine/checkpoint coverage implemented; matched common-reference runner available; controlled memory/latency and representative quality confirmation remain. |
-| US-23 warm starts | Partial | Bounded [seed repertoires](WARM_START_REPERTOIRES.md), twelve-facet applicability, revalidation and [sample provenance](MEASUREMENT_ORIGIN.md) across cache/migration/checkpoint/trace implemented; replication rejects declared reuse as fresh evidence. Persistent evaluation storage, noisy-sample freshness, consumer integration and fair warm/cold campaigns remain. |
+| US-23 warm starts | Partial | Bounded [seed repertoires](WARM_START_REPERTOIRES.md), twelve-facet revalidation, [sample provenance](MEASUREMENT_ORIGIN.md), [persistent evaluation storage](PERSISTENT_EVALUATION_REUSE.md), age/uncertainty/force-fresh decisions and store accounting implemented. Real-engine deterministic cold/warm/force-fresh example passes; consumer facades and representative fair warm/cold/freshness campaigns remain. |
 | US-24 CLI/dashboard | Partial | Core numeric CLI plus consumer authored-C# pilot and existing YAML commands; broader lifecycle/provider/dashboard integration remains. |
 | US-25 promotion/retuning | Partial, companion | Tensors persistent quarantine, guarded publication and explicit validated rollback implemented; automatic drift/bounded retuning, coordinated cross-process revocation and program/AutoML registry remain. |
 | US-26 policy meta-evolution | Not implemented | Opt-in declarative policy search, held-out outer loop and complete inner/outer cost accounting. |
 
 ## Validation evidence
+
+- Persistent evaluation slice: 594 tests pass on each of net10.0/net8.0/net471 (28 new cases). Final net10 coverage:
+  8,172/8,884 lines (91.99%), 4,866/6,242 branches (77.96%); new source files 255/257 executable lines.
+  Final real-engine cold/warm/force-fresh example checks evaluator calls 8/0/8, store calls 16/8/8, validation
+  calls 8/8/8 and unchanged original IDs only on reuse. Prior acquisition remains accounted, not free information.
+  Production/test-copy hashes match; whitespace passes. This is deterministic integration evidence, not
+  representative noisy-task freshness, cross-process coordination or competitor superiority.
 
 - Measurement-origin slice: 566 tests pass on each of net10.0/net8.0/net471 (35 new cases). Net10 coverage:
   7,916/8,627 lines (91.76%), 4,708/6,074 branches (77.51%); new origin class has 100% executable-line coverage.
