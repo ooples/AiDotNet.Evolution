@@ -1,0 +1,49 @@
+{
+  "SourceCommit": "a79b39632a2867e97d9540a5459d873089fef183",
+  "Task": "authored-convex-quadratic",
+  "Seed": 1,
+  "Method": "pareto-32",
+  "StopReason": 2,
+  "Counters": {
+    "Proposals": 5,
+    "EvaluationAttempts": 0,
+    "CompletedEvaluations": 0,
+    "StatusCounts": {
+      "Failed": 5
+    },
+    "AbandonedEvaluations": 0
+  },
+  "RetainedFailures": [
+    {
+      "Code": "canonicalization_failure",
+      "Message": "Candidate preparation failed.",
+      "IsRedacted": false,
+      "Data": {}
+    },
+    {
+      "Code": "canonicalization_failure",
+      "Message": "Candidate preparation failed.",
+      "IsRedacted": false,
+      "Data": {}
+    },
+    {
+      "Code": "canonicalization_failure",
+      "Message": "Candidate preparation failed.",
+      "IsRedacted": false,
+      "Data": {}
+    },
+    {
+      "Code": "canonicalization_failure",
+      "Message": "Candidate preparation failed.",
+      "IsRedacted": false,
+      "Data": {}
+    },
+    {
+      "Code": "canonicalization_failure",
+      "Message": "Candidate preparation failed.",
+      "IsRedacted": false,
+      "Data": {}
+    }
+  ],
+  "CompletedRuns": []
+}
