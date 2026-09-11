@@ -10,14 +10,15 @@ public sealed class EvolutionSurrogateTests
     private static ValueTask<EvolutionResourceResult<IReadOnlyList<EvolutionCanonicalGenome<int>>>> Propose(CancellationToken _) =>
         new(new EvolutionResourceResult<IReadOnlyList<EvolutionCanonicalGenome<int>>>(Pool, Cost(3)));
     private static EvolutionSurrogateObservation<int> Observation(int id, EvolutionOptimizationDirection direction = EvolutionOptimizationDirection.Maximize,
-        EvolutionCacheStatus cache = EvolutionCacheStatus.Miss, int attempts = 1, double violation = 0, string task = "task", string? evaluationGenome = null)
+        EvolutionCacheStatus cache = EvolutionCacheStatus.Miss, int attempts = 1, double violation = 0, string task = "task", string? evaluationGenome = null,
+        EvolutionMeasurementOrigin? origin = null)
     {
         var lineage = new EvolutionLineage(null, null, "test", null, 0, 0, (ulong)id);
         var candidate = new EvolutionCandidate<int>(id, new(id, "measured-" + id), lineage);
         var evaluation = new EvolutionEvaluation(id, evaluationGenome ?? candidate.CanonicalGenome.Id, EvolutionEvaluationStatus.Completed, id,
             direction, new Dictionary<string, double>(), Array.Empty<double>(), new[] { violation },
             new EvolutionEvaluationCost(TimeSpan.Zero, attempts, 1), lineage, cache, Array.Empty<EvolutionDiagnostic>(), task, "eval", "config");
-        return new(candidate, evaluation);
+        return new(candidate, origin is null ? evaluation : evaluation.WithMeasurementOrigin(origin));
     }
     private static EvolutionSurrogateObservation<int>[] Observations(EvolutionOptimizationDirection direction = EvolutionOptimizationDirection.Maximize) =>
         new[] { Observation(0, direction), Observation(1, direction) };
@@ -206,6 +207,33 @@ public sealed class EvolutionSurrogateTests
         Assert.Equal(first.TrainingIdentity, second.TrainingIdentity); Assert.Equal(first.ModelVersionHash, second.ModelVersionHash);
         Assert.Equal(first.Predictions.Select(p => p.Mean), second.Predictions.Select(p => p.Mean));
     }
+
+    [Theory]
+    [InlineData(false)]
+    [InlineData(true)]
+    public async Task Overlapping_declared_samples_cannot_be_counted_as_independent_training_records(bool differentScope)
+    {
+        var first = Origin("shared", "first");
+        var second = Origin("shared", "second", differentScope ? 'b' : 'a');
+        var ledger = Ledger(); var backend = new Backend();
+        await Assert.ThrowsAsync<ArgumentException>(async () => await Selector(backend, ledger).SelectAsync("overlap",
+            new[] { Observation(0, origin: first), Observation(1, origin: second) }, AcquisitionRandom(), Propose));
+        Assert.Equal(0, backend.Fits); Assert.Equal(0, ledger.Snapshot().Spent["cost_units"]);
+    }
+
+    [Fact]
+    public async Task Training_identity_includes_original_measurement_sample_identity()
+    {
+        var first = await Selector(new Backend(), Ledger()).SelectAsync("same-labels",
+            new[] { Observation(0, origin: Origin("sample-a", "a")), Observation(1, origin: Origin("sample-b", "b")) }, AcquisitionRandom(), Propose);
+        var second = await Selector(new Backend(), Ledger()).SelectAsync("same-labels",
+            new[] { Observation(0, origin: Origin("sample-c", "c")), Observation(1, origin: Origin("sample-d", "d")) }, AcquisitionRandom(), Propose);
+        Assert.NotEqual(first.TrainingIdentity, second.TrainingIdentity);
+        Assert.NotEqual(first.OperationIdentity, second.OperationIdentity);
+    }
+
+    private static EvolutionMeasurementOrigin Origin(string shared, string unique, char scope = 'a') => new(new string(scope, 64), "source", unique,
+        new[] { shared, unique }, new DateTimeOffset(2026, 1, 1, 0, 0, 0, TimeSpan.Zero), 1, "calls", "test-v1");
 
     private sealed class Backend : IEvolutionSurrogateTrainer<int>, IEvolutionSurrogateModel<int>
     {

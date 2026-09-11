@@ -8,7 +8,12 @@ insertion, correctness acceptance or deployment. This opt-in contract has no mod
 
 - Supply at most 256 measured search observations with matching candidate/evaluation identity, task/evaluator
   versions and direction. Failures, infeasible records, cache hits, producer-declared reuse, zero-attempt records and duplicate measured
-  identities are rejected. Record validation cannot prove evaluator correctness or enforce hidden-data isolation.
+  identities are rejected. Declared original sample IDs must also be disjoint across records, even when records
+  carry different evaluation IDs or scope keys: sample IDs are globally stable observation identities. Changing
+  the label to Measured cannot manufacture independence. Original measurement metadata participates in the
+  training/operation fingerprint. Selector v3 rejects the older semantic identity rather than preserving inflated
+  sample credit. Unreported sample identities cannot be cross-checked; producers must report provenance truthfully.
+  Record validation cannot prove evaluator correctness or enforce hidden-data isolation.
 - Supply a proposal factory returning 1–64 unique owned canonical genomes and actual cost for **all** generated
   candidates, including rejected/unselected work. Maxima are reserved before proposal generation, fitting and inference.
 - Implement `IEvolutionSurrogateTrainer<TGenome>` and a detached `IEvolutionSurrogateModel<TGenome>`. Return a
@@ -30,6 +35,8 @@ insertion, correctness acceptance or deployment. This opt-in contract has no mod
 identity, ordered training-data identity, exploration allocation and ledger operation identity. All generated pool
 members are charged even when no predictions are requested. The caller must meter the selected candidate's actual
 evaluation too, and must not double-charge a model call through both this selector and a nested receipt owner.
+Backends may implement `IEvolutionSurrogateDiagnosticModel`; its detached, finite, bounded validation report is
+retained on both acquisition and unreliable-model fallback. It does not turn empirical diagnostics into confirmation.
 
 ## State and integration
 
@@ -44,7 +51,36 @@ checkpoint contract. Use explicit inputs or a checkpointable outcome-aware opera
 operation with identical semantic inputs is rejected before new proposal work; changing inputs requests new work,
 not permission to reuse the old identity as a cache or retry receipt. Keep sealed confirmation data outside training.
 
-## First numeric backend and runnable comparison
+## Optional numeric package
+
+`AiDotNet.Evolution.Surrogates` supplies `ValidatedNearestNeighborTrainer` for typed numeric genomes, without adding
+a dependency from the generic core to any model package. It targets .NET 10, .NET 8 and .NET Framework 4.7.1.
+See the [package README](../src/AiDotNet.Evolution.Surrogates/README.md) and executable example for integration.
+
+The trainer accepts 2–256 fresh observations and at most 128 encoded features. Repeated measurements of the same
+genome stay in one group and contribute an equally weighted record-quality mean. With at least 18 distinct genomes,
+a deterministic genome-hash split creates disjoint interpolation, residual-calibration and validation groups
+(minimum eight/five/five). Validation labels never fit the residual radius. Excess relative validation MAE,
+insufficient empirical radius coverage or too few groups mark the model unreliable. Candidate support uses nearest
+normalized RMS distance. All model settings, prices, original-sample provenance and observations affect identity.
+
+These are **empirical search-data diagnostics**, not a conformal coverage guarantee or sealed deployment holdout.
+Replicate-group means are the validation targets, not coverage for an independent noisy draw. Adaptive collection,
+small holdouts, nonstationarity and mismatched feature geometry can invalidate generalization. Keep the backend
+opt-in, report fallback reasons, collect true measurements through explicit exploration, and confirm deployment
+winners separately. There is no automatic observer-based learning, persistent collector, or model checkpoint blob.
+
+Fitting charges a declared fixed bookkeeping tariff plus each encoded feature and each distance coordinate used
+in both residual calibration and validation. Inference charges encoding and all training distances. Use
+`MaximumTrainingCost(windowBound)` and `MaximumInferenceCost(poolBound, windowBound)` for conservative reservations.
+These user-supplied work prices cover declared operations, not measured wall time or dollar expenses; representative
+hardware/workload pricing is required before an economic claim. Models rejected as unreliable still incur fit cost.
+
+The package job validates both archives and runs a **PackageReference-only** consumer with a new local feed/cache,
+verifying restored package hashes before fitting and prediction. It does not use a published same-version core as
+a substitute. The compatible core and adapter require coordinated versioning/release; this PR publishes neither.
+
+## Runnable comparison
 
 The [example adapter](../examples/SurrogateSearch/NearestNeighborSurrogate.cs) implements three-neighbor interpolation
 over typed features, leave-one-out error screening and a distance support guard. Its residual-plus-distance
@@ -53,16 +89,21 @@ the model identity includes the observed genomes/qualities. It is intentionally 
 
 ```powershell
 powershell -ExecutionPolicy Bypass -File eng/Test-SurrogateSearch.ps1
-dotnet run --project examples/SurrogateSearch -c Release -- 10 128
+dotnet run --project examples/SurrogateSearch -c Release -- --cost-ratios 10 64 TestResults/surrogate-new.json
+powershell -ExecutionPolicy Bypass -File eng/Export-SurrogateEvidence.ps1 -InputPath TestResults/surrogate-new.json -OutputPath TestResults/surrogate-summary-new.json -RawGzipPath TestResults/surrogate-raw-new.json.gz
 ```
 
-The example compares ordinary single proposals, uniform four-proposal pools and learned four-proposal acquisition
+The example compares ordinary single proposals, uniform four-proposal pools, the historical heuristic backend and
+the reusable validation-guarded backend's four-proposal acquisition
 on two synthetic objectives with paired initialization and identical total **synthetic work-unit caps**. It charges
 setup, all attempted proposals, model training, inference and true evaluations separately. These prices are declared
-demonstration assumptions, not measured runtime or realistic universal model/evaluator cost ratios. The archive
+demonstration assumptions, not measured runtime or realistic universal model/evaluator cost ratios. `--cost-ratios`
+uses evaluator tariffs 0.1, 1 and 10 with fixed proposal/model tariffs. Within each scenario every method has the
+same total cap (`base cap × evaluator tariff`); comparisons across tariffs are sensitivity checks, not paired equal
+absolute caps. The archive
 receives only true measurements, and each run retains decisions, predictions, raw measurements and resource receipts.
 The smoke checks replay/accounting/backend behavior, not a requirement that the surrogate win development fixtures.
 
-Production-quality uncertainty backends, independently validated calibration, representative expensive/noisy tasks,
-cost-ratio sensitivity, fair matched tuning, consumer facade/package integration and durable observation collection
-remain open. Neither this example nor a good synthetic loss closes those acceptance requirements.
+Representative expensive/noisy tasks, externally validated coverage, matched tuning and release/default-promotion
+evidence remain necessary before broader claims. The first optional backend and synthetic cost-ratio pilot do not
+demonstrate superiority over OpenEvolve or establish that surrogate selection is universally beneficial.

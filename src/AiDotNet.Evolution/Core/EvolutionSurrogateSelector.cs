@@ -38,7 +38,7 @@ public sealed class EvolutionSurrogateSelector<TGenome>
         _trainer = trainer; _ledger = ledger; _taskVersion = taskVersionHash; _evaluatorVersion = evaluatorVersionHash;
         _trainerVersion = trainer.VersionHash; _proposalMaximum = proposalMaximum; _trainingMaximum = trainingMaximum; _inferenceMaximum = inferenceMaximum;
         _minimumSamples = minimumSamples; _exploration = explorationProbability; _optimism = optimism; _direction = direction;
-        VersionHash = EvolutionHash.Combine(new[] { "surrogate-selector-v2-measurement-origin", _trainerVersion, _taskVersion, _evaluatorVersion,
+        VersionHash = EvolutionHash.Combine(new[] { "surrogate-selector-v3-distinct-original-samples", _trainerVersion, _taskVersion, _evaluatorVersion,
             minimumSamples.ToString(CultureInfo.InvariantCulture), Bits(explorationProbability), Bits(optimism), direction.ToString(),
             ResourceHash(proposalMaximum), ResourceHash(trainingMaximum), ResourceHash(inferenceMaximum) });
     }
@@ -61,9 +61,15 @@ public sealed class EvolutionSurrogateSelector<TGenome>
                 value.Evaluation.EvaluatorVersionHash != _evaluatorVersion || value.Evaluation.Direction != _direction) ||
             training.Select(value => value.Evaluation.GenomeId + "/" + value.Evaluation.EvaluationId.ToString(CultureInfo.InvariantCulture)).Distinct().Count() != training.Length)
             throw new ArgumentException("Observations must have matching provenance/direction and unique measured identities.", nameof(observations));
+        var originalSamples = new HashSet<string>(StringComparer.Ordinal);
+        foreach (EvolutionSurrogateObservation<TGenome> observation in training)
+            foreach (string sample in observation.Evaluation.MeasurementOrigin?.SampleIds ?? Array.Empty<string>())
+                if (!originalSamples.Add(sample))
+                    throw new ArgumentException("Declared original sample identities overlap between training records.", nameof(observations));
         if (_trainer.VersionHash != _trainerVersion) throw new InvalidOperationException("Trainer semantic identity changed.");
         string trainingIdentity = EvolutionHash.Combine(training.Select(value => EvolutionHash.Combine(new[] { value.Candidate.Id,
-            value.Evaluation.EvaluationId.ToString(CultureInfo.InvariantCulture), Bits(value.Evaluation.Quality!.Value), _taskVersion, _evaluatorVersion })));
+            value.Evaluation.EvaluationId.ToString(CultureInfo.InvariantCulture), Bits(value.Evaluation.Quality!.Value), _taskVersion, _evaluatorVersion,
+            value.Evaluation.MeasurementOrigin is { } origin ? EvolutionHash.Combine(new[] { "original-measurement-v1", origin.ToJson() }) : "unreported-samples" })));
         string identity = EvolutionHash.Combine(new[] { VersionHash, operationId, trainingIdentity });
         var proposal = await Meter(identity + "/proposals", EvolutionResourceStage.Proposal, _proposalMaximum, proposePool, cancellationToken).ConfigureAwait(false);
         if (proposal.Outcome != EvolutionResourceOutcome.Completed) throw new InvalidOperationException("Proposal pool did not complete.");
@@ -73,9 +79,10 @@ public sealed class EvolutionSurrogateSelector<TGenome>
         int fallback = random.NextInt(pool.Length);
         bool explore = random.NextDouble() < _exploration;
         string? modelVersion = null;
+        EvolutionSurrogateValidationReport? validationReport = null;
         EvolutionSurrogatePrediction[] predictions = Array.Empty<EvolutionSurrogatePrediction>();
         EvolutionSurrogateSelection<TGenome> Result(EvolutionSurrogateSelectionReason reason, int index = -1) =>
-            new(pool[index < 0 ? fallback : index], reason, identity, trainingIdentity, modelVersion, _exploration, pool.Length, predictions);
+            new(pool[index < 0 ? fallback : index], reason, identity, trainingIdentity, modelVersion, _exploration, pool.Length, predictions, validationReport);
         if (training.Length < _minimumSamples) return Result(EvolutionSurrogateSelectionReason.InsufficientData);
         if (explore) return Result(EvolutionSurrogateSelectionReason.Exploration);
         IEvolutionSurrogateModel<TGenome> model;
@@ -86,6 +93,7 @@ public sealed class EvolutionSurrogateSelector<TGenome>
             if (fitted.Outcome != EvolutionResourceOutcome.Completed || fitted.Value is null) return Result(EvolutionSurrogateSelectionReason.TrainingFailure);
             model = fitted.Value; modelVersion = model.VersionHash;
             if (string.IsNullOrWhiteSpace(modelVersion) || modelVersion!.Length > 256) return Result(EvolutionSurrogateSelectionReason.TrainingFailure);
+            validationReport = (model as IEvolutionSurrogateDiagnosticModel)?.ValidationReport;
             if (!model.IsReliable) return Result(EvolutionSurrogateSelectionReason.UnreliableModel);
         }
         catch (EvolutionResourceBudgetException) { return Result(EvolutionSurrogateSelectionReason.TrainingBudgetDenied); }
