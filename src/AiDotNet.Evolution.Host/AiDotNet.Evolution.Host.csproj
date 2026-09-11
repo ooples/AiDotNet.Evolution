@@ -8,7 +8,21 @@
       only question is which runtime produces the smallest, most portable
       NativeAOT binary, and net8 is the widest-supported LTS for that.
     -->
-    <TargetFramework>net8.0</TargetFramework>
+    <!--
+      BUILT FOR BOTH, SHIPPED AS NET8. The binary is published net8.0 and nothing about
+      that changed: it is the widest supported LTS, which is the only question that
+      matters for a NativeAOT executable nobody references.
+
+      net10.0 is here because solution wide tooling builds every project at one
+      framework. The SonarCloud job builds the solution pinned to net10.0, and a project
+      without that target fails the entire build with NETSDK1005 rather than being
+      skipped. Adding the target costs a compile and
+      buys analysis of the host alongside the library.
+
+      The publish pins net8.0, because a multi targeted project cannot be published
+      without choosing one.
+    -->
+    <TargetFrameworks>net8.0;net10.0</TargetFrameworks>
     <ImplicitUsings>enable</ImplicitUsings>
     <Nullable>enable</Nullable>
     <LangVersion>latest</LangVersion>

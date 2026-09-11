@@ -42,7 +42,11 @@ const project = join(repoRoot, 'src', 'AiDotNet.Evolution.Host');
 // every referenced project, and the library multi-targets net471, for which AOT is not a
 // thing -- so passing it fails the restore with NETSDK1207 before anything is compiled.
 // The host's own csproj sets PublishAot, which is the only place it belongs.
-const publish = spawnSync('dotnet', ['publish', project, '-c', 'Release', '-r', rid], {
+// -f net8.0 BECAUSE THE PROJECT MULTI-TARGETS. It also builds net10.0 so that
+// solution-wide tooling pinned to that framework does not fail on a project
+// missing the target; the shipped binary is still net8.0, the widest-supported
+// LTS for a NativeAOT executable.
+const publish = spawnSync('dotnet', ['publish', project, '-c', 'Release', '-f', 'net8.0', '-r', rid], {
   stdio: 'inherit',
   shell: false,
 });
