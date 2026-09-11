@@ -73,6 +73,9 @@ jobs:
       - name: Verify multi-fidelity promotion and independent confirmation
         shell: pwsh
         run: ./eng/Test-MultiFidelity.ps1
+      - name: Verify concurrent proposal pipeline and recorded-response replay
+        shell: pwsh
+        run: ./eng/Test-ProposalPipeline.ps1
       - name: Verify gain and all-stage operator credit
         shell: pwsh
         run: ./eng/Test-OperatorCredit.ps1

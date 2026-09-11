@@ -112,6 +112,9 @@ public sealed class EvolutionEngineOptions
     /// </remarks>
     public int MaxDegreeOfParallelism { get; set; } = 1;
 
+    /// <summary>Gets or sets bounded proposal/evaluation pipeline settings; used only with Pipeline dispatch.</summary>
+    public EvolutionPipelineOptions Pipeline { get; set; } = new();
+
     /// <summary>Gets or sets deterministic or opportunistic commit behavior.</summary>
     public EvolutionExecutionMode ExecutionMode { get; set; } = EvolutionExecutionMode.Deterministic;
 
@@ -565,6 +568,10 @@ public sealed class EvolutionEngineOptions
         Guard.NotNull(Cascade);
         Guard.NotNull(Artifacts);
         Guard.NotNull(EarlyStopping);
+        Guard.NotNull(Pipeline);
+        EvolutionPipelineOptions pipeline = Pipeline.SnapshotAndValidate();
+        if (Dispatch == EvolutionDispatchMode.Pipeline && (MaxInFlight != 0 || MaxInFlightPerIsland != 0))
+            throw new ArgumentException("Pipeline uses its own WaveSize and bounded queues; continuous-window/island quotas are not supported.", nameof(Pipeline));
         EvolutionSelectionOptions selection = Selection.SnapshotAndValidate();
         EvolutionCascadeOptions cascade = Cascade.SnapshotAndValidate();
         EvolutionArtifactOptions artifacts = Artifacts.SnapshotAndValidate();
@@ -575,6 +582,7 @@ public sealed class EvolutionEngineOptions
         snapshot.Artifacts = artifacts;
         snapshot.EarlyStopping = earlyStopping;
         snapshot.Selection = selection;
+        snapshot.Pipeline = pipeline;
         snapshot.RunId = RunId.Trim();
         snapshot.OutputDirectory = outputDirectory;
         snapshot.QualityDescriptorName = QualityDescriptorName?.Trim();
@@ -612,6 +620,7 @@ public sealed class EvolutionEngineOptions
             Artifacts = Artifacts.SnapshotAndValidate(),
             EarlyStopping = EarlyStopping.SnapshotAndValidate(),
             Selection = Selection.SnapshotAndValidate(),
+            Pipeline = Pipeline.SnapshotAndValidate(),
             QualityDescriptorName = QualityDescriptorName,
             OutputDirectory = OutputDirectory,
             RunId = RunId,
@@ -707,7 +716,9 @@ public sealed class EvolutionEngineOptions
         Field("retry-base-delay", RetryBaseDelay.Ticks.ToString(CultureInfo.InvariantCulture)),
         Field("retry-backoff-multiplier", EvolutionHash.EncodeDouble(RetryBackoffMultiplier)),
         Field("target-quality", EvolutionHash.EncodeNullableDouble(TargetQuality))
-    };
+    }.Concat(Dispatch == EvolutionDispatchMode.Pipeline
+        ? new[] { Field("pipeline", Pipeline.ToCanonicalString()) }
+        : Array.Empty<KeyValuePair<string, string>>()).ToArray();
 
     /// <summary>Lists every option that only bounds or locates a run, as ordered name/value pairs.</summary>
     /// <remarks>
@@ -726,7 +737,9 @@ public sealed class EvolutionEngineOptions
         Field("resume", Resume ? "resume" : "fresh"),
         Field("max-degree-of-parallelism", MaxDegreeOfParallelism.ToString(CultureInfo.InvariantCulture)),
         Field("output-directory", OutputDirectory ?? "none")
-    };
+    }.Concat(Dispatch == EvolutionDispatchMode.Pipeline
+        ? new[] { Field("pipeline-schedule-records", Pipeline.MaximumScheduleRecords.ToString(CultureInfo.InvariantCulture)) }
+        : Array.Empty<KeyValuePair<string, string>>()).ToArray();
 
     /// <summary>Encodes the semantic options into the string the configuration hash is computed from.</summary>
     internal string ToSemanticCanonicalString() => Encode(SemanticFields());
