@@ -2,7 +2,7 @@ name: Dependency Review
 
 on:
   pull_request:
-    branches: [main]
+    branches: [main, feat/competitive-evolution-platform]
 
 permissions:
   contents: read
