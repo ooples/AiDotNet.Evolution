@@ -76,6 +76,10 @@ jobs:
       - name: Verify concurrent proposal pipeline and recorded-response replay
         shell: pwsh
         run: ./eng/Test-ProposalPipeline.ps1
+      - name: Verify durable delivery across coordinator and worker process crashes
+        run: |
+          dotnet build examples/DurableWork -c Release
+          dotnet examples/DurableWork/bin/Release/net10.0/DurableWork.dll verify TestResults/durable-work
       - name: Verify gain and all-stage operator credit
         shell: pwsh
         run: ./eng/Test-OperatorCredit.ps1
@@ -96,7 +100,7 @@ jobs:
         run: ./eng/Test-ArchivePartition.ps1 -SourceRevision '${{ github.sha }}'
       # GENERATED CODE IS EXCLUDED FROM THE RATCHET, and that is a like-for-like
       # correction rather than a relaxation. The baseline was recorded on a solution
-      # with one project and no source generators. AiDotNet.Evolution.Host uses
+      # with one project and no source generators. The host and durable-work ledger use
       # System.Text.Json source generation because NativeAOT trims the reflection
       # path. Only GeneratedCodeAttribute is excluded: CompilerGeneratedAttribute
       # also marks user-written closures and must remain in the measured surface.
@@ -116,6 +120,7 @@ jobs:
             TestResults/performance/**
             TestResults/persistent-evaluation/**/*.json
             TestResults/persistent-evaluation/*.jsonl
+            TestResults/durable-work/**
             coverage/**/coverage.cobertura.xml
             coverage/**/*.dmp
             coverage/**/Sequence_*.xml
