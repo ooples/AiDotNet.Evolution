@@ -7,6 +7,10 @@ Track the full plan through the [26 user-story issues and PR delivery index](USE
 
 ## Dependent story delivery
 
+September 11 story update: [US-16 / #58](https://github.com/ooples/AiDotNet.Evolution/pull/58) now implements the fixed adaptive-island pool, bounded exploration floors/restarts and strict policy/child persistence. Production `a6199ee` passes all 745 tests on each framework, full format and local pack; coverage is 92.25% lines / 78.65% branches. The 240-primary-run pilot passes all replay/accounting and eight aligned checkpoint checks. Its authored basin fixture supports restart escape, not superiority of adaptive allocation; negative and inconclusive contrasts remain visible. See [acceptance proof](evolution-stories/US-16.md) and [complete raw evidence](../benchmarks/evidence/adaptive-islands/README.md). Review, hosted CI and dependencies remain open; the paragraphs below retain historical foundation scope.
+
+US-09/#52, US-10/#53 and US-13/#55 also have story-owned implementations ready for review; see the delivery index. US-14 is actively being completed. This branch integrates #51's measured-reuse correction; that does not imply the original foundation or consumer package pins already include it.
+
 The user chose to retain #15, AiDotNet #2148 and Tensors #1024 as shared foundations.
 All 26 stories now have individual open issues and dependent draft PRs, with reciprocal links and original
 Given/When/Then checklists. Initial story commits were documentation-only, not completed implementation.
