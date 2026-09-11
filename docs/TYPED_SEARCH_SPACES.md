@@ -27,6 +27,20 @@ var crossover = new SearchSpaceCrossover(space); // configure inspirations on th
 var restart = new SearchSpaceRestart(space);
 ```
 
+For a ready-made operator choice, use `EvolutionSearchPresets.Create(space)`. The default is mutation only;
+`UniformMixed` and `AdaptiveMixed` explicitly select the same mutation/crossover/restart catalog, while
+`DiagonalCma` is an opt-in continuous-domain emitter. The uniform preset tries each operator once before uniform
+allocation; the adaptive preset uses archive-success credit and 0.1 exploration. Configure `InspirationCount`
+on the engine for crossover. Each factory call owns fresh state, and checkpoints validate the resulting operator
+versions. Unsupported CMA domains fail immediately. `Create` returns `IVariationOperator<EvolutionSearchGenome>`;
+`CreateMutation`, `CreateUniformMixed`, `CreateAdaptiveMixed` and `CreateDiagonalCma` return `SearchSpaceMutation`,
+`AdaptiveVariationPortfolio<EvolutionSearchGenome>` (both mixed presets) and `DiagonalCmaEmitter`, so concrete members
+such as portfolio statistics need no downcast. Only `DiagonalCma` uses a scalar `direction`; supplying one to any other
+preset is rejected rather than silently ignored. Use direct constructors for custom settings and
+`SearchSpaceLocalRefiner` for explicit budgeted refinement; the catalog never invents an objective or an unmetered
+refinement budget. Mutation remains the default: the recorded numeric pilot compared operator policies directly rather
+than through this preset catalog, so it is not evidence about the presets themselves.
+
 `EvolutionSearchTask` accepts an objective delegate plus explicit task/evaluator versions. Pass `space` as the engine's
 genome codec for checkpoints. Domain legality is separate from application correctness and hard constraints; retain the
 independent evaluation gates required by your application.
@@ -49,6 +63,20 @@ independent evaluation gates required by your application.
 - Given a compatible checkpoint, when the engine restores, then typed genomes and adaptive operator state preserve the
   continuation. Malformed or differently versioned payloads are rejected.
 
+Logarithmic coordinates use the ratio `maximum / minimum`, whose rounding is IEEE-deterministic, rather than a
+difference of two logarithms that cancels when the bounds are close. Both endpoints are pinned, so a normalized
+coordinate at or beyond 0 or 1 decodes to exactly the declared bound and a parent on a bound keeps its identity when
+mutation pushes it outward. Intervals narrower than one part in 1e9 interpolate linearly, which differs from the
+logarithmic map by under 1.3e-10 of the normalized span and keeps every representable value distinct; when the ratio
+overflows to infinity the difference-of-logarithms form is used instead. Logarithmic domain fingerprints include
+`log-domain-v3-ratio-pinned`; genomes and checkpoints from either earlier logarithmic schema are rejected, not
+silently reinterpreted. Non-logarithmic schemas retain their prior fingerprints. Domain identity does not depend on
+how a particular runtime rounds `Math.Log`.
+
+Known limitation: there is no integer logarithmic kind. `Integer` is always sampled and mutated in linear
+coordinates, so a wide integer range is not log-uniform. Declare a `Logarithmic` parameter and round it inside the
+evaluator when a log-scaled integer is needed.
+
 ## Optional diagonal CMA-style learning
 
 `DiagonalCmaEmitter` implements positive-weight ranked recombination, diagonal covariance adaptation and cumulative
@@ -57,7 +85,9 @@ unconditional real/logarithmic parameters. It does not model cross-coordinate co
 
 The bounded-domain variant clips proposals and learns from their evaluated coordinates. Variances and step size have
 finite safety bounds. Only fresh, completed, feasible measurements with the configured direction train it. Full learning
-populations require enough valid parents; failed, cached or infeasible outcomes never become successful parents.
+populations require enough valid parents; failed, cached, producer-declared reused or infeasible outcomes never
+become successful parents. Measurement-origin-aware CMA versions reject older learned checkpoints; see
+[measurement origin](MEASUREMENT_ORIGIN.md#learning-from-measurements).
 
 Proposal generation can span evaluation batches. Each population retains its sampling distribution. A stale population's
 results can still enter the archive, but cannot overwrite a newer distribution; `StalePopulations` exposes this tradeoff.
