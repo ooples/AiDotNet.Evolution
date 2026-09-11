@@ -205,7 +205,7 @@ jobs:
 
   ci-gate:
     name: CI Gate
-    needs: [modern, legacy, package]
+    needs: [modern, legacy, package, archive-resources]
     if: "${{ always() && !startsWith(github.head_ref, 'release-please--') && !(github.event_name == 'push' && startsWith(github.event.head_commit.message, 'chore(main): release')) }}"
     runs-on: ubuntu-latest
     timeout-minutes: 5
@@ -215,6 +215,7 @@ jobs:
           MODERN_RESULT: ${{ needs.modern.result }}
           LEGACY_RESULT: ${{ needs.legacy.result }}
           PACKAGE_RESULT: ${{ needs.package.result }}
+          ARCHIVE_RESULT: ${{ needs.archive-resources.result }}
         shell: bash
         run: |
           set -euo pipefail
@@ -222,7 +223,8 @@ jobs:
           for result in \
             "modern:$MODERN_RESULT" \
             "legacy:$LEGACY_RESULT" \
-            "package:$PACKAGE_RESULT"; do
+            "package:$PACKAGE_RESULT" \
+            "archive-resources:$ARCHIVE_RESULT"; do
             job="${result%%:*}"
             conclusion="${result#*:}"
             if [ "$conclusion" != success ]; then

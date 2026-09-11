@@ -43,6 +43,13 @@ def fixture():
 
 
 class ArchiveResourceTests(unittest.TestCase):
+    def test_workflow_gate_requires_archive_resource_job(self):
+        workflow = (Path(__file__).resolve().parents[2] / ".github/workflows/build.yml").read_text(encoding="utf-8")
+        gate = workflow.split("\n  ci-gate:", 1)[1]
+        self.assertIn("needs: [modern, legacy, package, archive-resources]", gate)
+        self.assertIn("ARCHIVE_RESULT: ${{ needs.archive-resources.result }}", gate)
+        self.assertIn('"archive-resources:$ARCHIVE_RESULT"', gate)
+
     def test_paired_effect_and_physical_replay_accounting(self):
         configuration, records = fixture()
         result = summarize(configuration, records)
