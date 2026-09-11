@@ -110,10 +110,28 @@ public sealed partial class EvolutionEngine<TGenome>
                 }
                 catch (Exception exception)
                 {
-                    waveCancellation.Cancel();
-                    await DrainPipelineTasksAsync(allProposals.Concat(evaluations)).ConfigureAwait(false);
-                    _pipelineStatistics.WaveAborted(transaction.NextEvaluationId, transaction.Generation, exception is OperationCanceledException);
-                    RestoreBatchTransaction(transaction, batch);
+                    try
+                    {
+                        try { waveCancellation.Cancel(); }
+                        catch (Exception cancellationFailure) when (EvolutionExceptionPolicy.IsRecoverable(cancellationFailure))
+                        {
+                            // A caller's cancellation callback must not replace the original wave failure.
+                            _pipelineStatistics.RecordCancellationFailure();
+                        }
+                    }
+                    finally
+                    {
+                        try
+                        {
+                            _pipelineStatistics.RecordDrain(await DrainPipelineTasksAsync(allProposals.Concat(evaluations)).ConfigureAwait(false));
+                        }
+                        finally
+                        {
+                            // Fatal drain failures still require settled callbacks before restoring cursors.
+                            _pipelineStatistics.WaveAborted(transaction.NextEvaluationId, transaction.Generation, exception is OperationCanceledException);
+                            RestoreBatchTransaction(transaction, batch);
+                        }
+                    }
                     throw;
                 }
                 finally
@@ -180,12 +198,23 @@ public sealed partial class EvolutionEngine<TGenome>
         return plan;
     }
 
-    private static async Task DrainPipelineTasksAsync(IEnumerable<Task> tasks)
+    private static async Task<EvolutionPipelineDrainStatus> DrainPipelineTasksAsync(IEnumerable<Task> tasks)
     {
-        try { await Task.WhenAll(tasks).ConfigureAwait(false); }
+        Task completion = Task.WhenAll(tasks);
+        try { await completion.ConfigureAwait(false); }
 #pragma warning disable CA1031
-        catch (Exception exception) when (EvolutionExceptionPolicy.IsRecoverable(exception)) { }
+        catch (Exception exception) when (EvolutionExceptionPolicy.IsRecoverable(exception))
+        {
+            // Await surfaces one failure, but another owned callback may have failed fatally.
+            // Inspect the complete aggregate before treating a drained batch as recoverable.
+            if (completion.Exception is AggregateException aggregate && !EvolutionExceptionPolicy.IsRecoverable(aggregate))
+                throw aggregate;
+            // Preserve the caller's original failure while making the drain outcome observable.
+            // Diagnostics contain only bounded counts, never callback exception text or genomes.
+            return completion.IsCanceled ? EvolutionPipelineDrainStatus.Canceled : EvolutionPipelineDrainStatus.Faulted;
+        }
 #pragma warning restore CA1031
+        return EvolutionPipelineDrainStatus.Completed;
     }
 
     private async Task EvaluatePipelineRetriesAsync(List<WorkItem> batch, SemaphoreSlim slots, CancellationToken cancellationToken)
@@ -226,8 +255,15 @@ public sealed partial class EvolutionEngine<TGenome>
             }
             finally
             {
-                await DrainPipelineTasksAsync(tasks).ConfigureAwait(false);
-                if (resourcePhase) meteredTask!.EndPipelinePhase();
+                try
+                {
+                    var statistics = _pipelineStatistics ?? throw new InvalidOperationException("Pipeline diagnostics were not initialized.");
+                    statistics.RecordDrain(await DrainPipelineTasksAsync(tasks).ConfigureAwait(false));
+                }
+                finally
+                {
+                    if (resourcePhase && meteredTask is not null) meteredTask.EndPipelinePhase();
+                }
             }
             cancellationToken.ThrowIfCancellationRequested();
             foreach (WorkItem item in round)

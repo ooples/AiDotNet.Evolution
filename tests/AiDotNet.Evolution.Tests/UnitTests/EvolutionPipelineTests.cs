@@ -175,8 +175,11 @@ public sealed class EvolutionPipelineTests
         await variation.FirstProposal.Task; cancellation.Cancel();
         await Assert.ThrowsAnyAsync<OperationCanceledException>(() => run);
         Assert.Equal(0, variation.Active); Assert.Empty(variation.Observed);
-        Assert.Equal(1, engine.PipelineReport!.AbortedWaves);
-        Assert.Equal("canceled", Assert.Single(engine.PipelineReport.Schedule, entry => entry.Kind == EvolutionPipelineScheduleKind.WaveAborted).Identity);
+        var report = Assert.IsType<EvolutionPipelineReport>(engine.PipelineReport);
+        Assert.Equal(1, report.AbortedWaves);
+        Assert.Equal(1, report.CanceledTaskDrains);
+        Assert.Equal(0, report.FaultedTaskDrains);
+        Assert.Equal("canceled", Assert.Single(report.Schedule, entry => entry.Kind == EvolutionPipelineScheduleKind.WaveAborted).Identity);
         Assert.NotNull(await store.LoadLatestAsync("pipeline-test"));
     }
 

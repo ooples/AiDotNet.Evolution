@@ -38,7 +38,8 @@ public sealed class EvolutionPipelineReport
         long proposalCalls, long evaluationCalls, int proposalQueuePeak, int evaluationQueuePeak, int proposalRunningPeak,
         int evaluationRunningPeak, double proposalBusySeconds, double evaluationBusySeconds, double elapsedSeconds,
         long completedWaves, long dropped, EvolutionPipelineScheduleEntry[] schedule,
-        string runId, string compatibilityHash, long firstEvaluationId, EvolutionPipelineOptions options, long abortedWaves)
+        string runId, string compatibilityHash, long firstEvaluationId, EvolutionPipelineOptions options, long abortedWaves,
+        long faultedTaskDrains, long canceledTaskDrains, long faultedWaveCancellations)
     {
         ExecutionMode = mode; ProposalWorkers = proposalWorkers; EvaluationWorkers = evaluationWorkers;
         ProposalCalls = proposalCalls; EvaluationCalls = evaluationCalls; ProposalQueuePeak = proposalQueuePeak;
@@ -48,6 +49,8 @@ public sealed class EvolutionPipelineReport
         RunId = runId; CompatibilityHash = compatibilityHash; FirstEvaluationId = firstEvaluationId;
         WaveSize = options.WaveSize; ProposalQueueCapacity = options.ProposalQueueCapacity; EvaluationQueueCapacity = options.EvaluationQueueCapacity;
         AbortedWaves = abortedWaves;
+        FaultedTaskDrains = faultedTaskDrains; CanceledTaskDrains = canceledTaskDrains;
+        FaultedWaveCancellations = faultedWaveCancellations;
     }
     /// <summary>Gets the caller's run identity.</summary>
     public string RunId { get; }
@@ -89,6 +92,15 @@ public sealed class EvolutionPipelineReport
     public long CompletedWaves { get; }
     /// <summary>Gets admitted waves aborted by cancellation or a fault; their actual resource charges were not undone.</summary>
     public long AbortedWaves { get; }
+    /// <summary>Gets cleanup drains containing recoverable task faults. A drain counts once regardless of the number
+    /// of failed tasks, and may include the original wave failure. Faults take precedence over cancellation.</summary>
+    public long FaultedTaskDrains { get; }
+    /// <summary>Gets cleanup drains containing canceled tasks and no task faults. These bounded diagnostics do not
+    /// change search state or retain callback exception messages.</summary>
+    public long CanceledTaskDrains { get; }
+    /// <summary>Gets failed-wave cancellation operations whose callbacks threw recoverable exceptions.
+    /// Each operation counts once; cleanup preserves the original wave failure and retains no exception text.</summary>
+    public long FaultedWaveCancellations { get; }
     /// <summary>Gets logical records omitted after reaching the configured bound.</summary>
     public long DroppedScheduleRecords { get; }
     /// <summary>Gets whether no logical records were dropped; external response evidence is still required for replay.</summary>
@@ -96,6 +108,8 @@ public sealed class EvolutionPipelineReport
     /// <summary>Gets retained immutable logical events in allocation/commit order.</summary>
     public IReadOnlyList<EvolutionPipelineScheduleEntry> Schedule { get; }
 }
+
+internal enum EvolutionPipelineDrainStatus { Completed, Canceled, Faulted }
 
 internal sealed class EvolutionPipelineStatistics(EvolutionExecutionMode mode, int proposalWorkers, int evaluationWorkers, int recordLimit,
     string runId, string compatibilityHash, long firstEvaluationId, EvolutionPipelineOptions options)
@@ -107,12 +121,28 @@ internal sealed class EvolutionPipelineStatistics(EvolutionExecutionMode mode, i
     private readonly long[] _calls = new long[2];
     private readonly double[] _seconds = new double[2];
     private long _waves, _dropped, _aborted;
+    private long _faultedTaskDrains, _canceledTaskDrains, _faultedWaveCancellations;
     public void Enqueue(int stage) { lock (_gate) { _queued[stage]++; _queuePeak[stage] = Math.Max(_queuePeak[stage], Math.Max(0, _queued[stage] - Math.Max(0, (stage == 0 ? proposalWorkers : evaluationWorkers) - _active[stage]))); } }
     public void Claim(int stage) { lock (_gate) { _queued[stage]--; _active[stage]++; _activePeak[stage] = Math.Max(_activePeak[stage], _active[stage]); } }
     public void CancelQueued(int stage) { lock (_gate) _queued[stage]--; }
     public void Started(int stage) { lock (_gate) _calls[stage]++; }
     public void Released(int stage, double seconds) { lock (_gate) { _active[stage]--; _seconds[stage] += seconds; } }
     public void WaveCommitted() { lock (_gate) _waves++; }
+    public void RecordCancellationFailure() { lock (_gate) _faultedWaveCancellations++; }
+    public void RecordDrain(EvolutionPipelineDrainStatus status)
+    {
+        // Successful retry drains add neither a lock nor a diagnostic record to the hot path.
+        if (status == EvolutionPipelineDrainStatus.Completed) return;
+        lock (_gate)
+        {
+            switch (status)
+            {
+                case EvolutionPipelineDrainStatus.Faulted: _faultedTaskDrains++; break;
+                case EvolutionPipelineDrainStatus.Canceled: _canceledTaskDrains++; break;
+                default: throw new ArgumentOutOfRangeException(nameof(status));
+            }
+        }
+    }
     public void WaveAborted(long firstId, long generation, bool canceled)
     {
         lock (_gate)
@@ -134,7 +164,7 @@ internal sealed class EvolutionPipelineStatistics(EvolutionExecutionMode mode, i
     {
         lock (_gate) return new(mode, proposalWorkers, evaluationWorkers, _calls[0], _calls[1], _queuePeak[0], _queuePeak[1],
             _activePeak[0], _activePeak[1], _seconds[0], _seconds[1], _timer.Elapsed.TotalSeconds, _waves, _dropped, _schedule.ToArray(),
-            runId, compatibilityHash, firstEvaluationId, options, _aborted);
+            runId, compatibilityHash, firstEvaluationId, options, _aborted, _faultedTaskDrains, _canceledTaskDrains, _faultedWaveCancellations);
     }
 }
 
