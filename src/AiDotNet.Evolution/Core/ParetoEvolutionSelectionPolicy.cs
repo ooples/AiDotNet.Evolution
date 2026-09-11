@@ -1,7 +1,7 @@
 namespace AiDotNet.Evolution;
 
 /// <summary>Uniformly samples the feasible front, with an explicit optional probability of exploring the separate infeasible pool.</summary>
-public sealed class ParetoEvolutionSelectionPolicy<TGenome> : ISelectionPolicy<TGenome>
+public sealed class ParetoEvolutionSelectionPolicy<TGenome> : IInfeasibleExplorationSelectionPolicy<TGenome>
 {
     private readonly UniformEvolutionSelectionPolicy<TGenome> _uniform = new();
     /// <summary>Creates a policy; zero uses infeasible candidates only as a fallback while the feasible front is empty.</summary>

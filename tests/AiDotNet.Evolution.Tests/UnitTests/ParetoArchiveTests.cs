@@ -410,6 +410,60 @@ public sealed class ParetoArchiveTests
         Assert.True(run.ParetoFront.Hypervolume() > 0);
     }
 
+    private sealed class AlternatingFeasibilityTask : IEvolutionTask<TestGenome>
+    {
+        public string Id => "alternating-feasibility";
+        public string VersionHash => "alternating-feasibility-v1";
+        public string EvaluatorVersionHash => "alternating-feasibility-eval-v1";
+        public ValueTask<EvolutionCanonicalGenome<TestGenome>> CanonicalizeAsync(TestGenome genome, CancellationToken cancellationToken = default) =>
+            new(new EvolutionCanonicalGenome<TestGenome>(genome, genome.Value.ToString(System.Globalization.CultureInfo.InvariantCulture)));
+        public ValueTask<EvolutionTaskResult> EvaluateAsync(EvolutionCandidate<TestGenome> candidate, EvolutionEvaluationContext context,
+            CancellationToken cancellationToken = default)
+        {
+            int value = candidate.CanonicalGenome.Genome.Value;
+            double x = Math.Min(1, value / 100d);
+            return new(new EvolutionTaskResult(EvolutionEvaluationStatus.Completed, 1 - x, objectives: new[] { x, 1 - x },
+                constraintViolations: new[] { value % 2 == 1 ? 1d : 0d }));
+        }
+    }
+
+    [Fact]
+    public async Task ExplorationPoolDoesNotStallAnExplicitNonParetoSelectionPolicy()
+    {
+        static Task<EvolutionRunResult<TestGenome>> RunAsync(int infeasibleCapacity)
+        {
+            var definition = new EvolutionParetoDefinition(Definition().Objectives, 8,
+                EvolutionParetoRepresentative.ClosestToIdeal, infeasibleCapacity);
+            var options = new EvolutionEngineOptions
+            {
+                RunId = "custom-front-selection",
+                Seed = 1,
+                IslandCount = 2,
+                MaxEvaluationAttempts = 20,
+                MaxProposals = 60,
+                MaxGenerations = 100,
+                ProposalBatchSize = 1,
+                MaxDegreeOfParallelism = 1,
+                MigrationInterval = 0
+            };
+            return new EvolutionEngine<TestGenome>(new AlternatingFeasibilityTask(), new IncrementVariation(),
+                _ => new ParetoArchive<TestGenome>(definition), options,
+                selection: new UniformEvolutionSelectionPolicy<TestGenome>())
+                .RunAsync(new[] { new TestGenome(2), new TestGenome(1) });
+        }
+
+        // The island holding only pool members is not selectable material for a policy that samples the feasible
+        // front alone: enabling the pool must not shorten the run or empty its front relative to the disabled control.
+        var control = await RunAsync(0);
+        var exploring = await RunAsync(4);
+
+        Assert.NotEqual(EvolutionStopReason.NoCandidates, exploring.StopReason);
+        Assert.Equal(control.StopReason, exploring.StopReason);
+        Assert.Equal(control.Counters.CompletedEvaluations, exploring.Counters.CompletedEvaluations);
+        Assert.NotEmpty(exploring.ParetoFront!.Entries);
+        Assert.NotEmpty(exploring.InfeasibleExploration!);
+    }
+
     [Fact]
     public void ScalarSnapshotJsonDoesNotAcquireParetoMetadata()
     {

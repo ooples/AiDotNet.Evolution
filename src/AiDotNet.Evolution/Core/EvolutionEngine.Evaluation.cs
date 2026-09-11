@@ -27,14 +27,27 @@ public sealed partial class EvolutionEngine<TGenome>
         int island = (int)(evaluationId % _islands.Length);
         int sourceIsland = FindSelectionIsland(island);
         if (sourceIsland < 0) return null;
-        IEvolutionArchive<TGenome> sourceArchive = _islands[sourceIsland];
-        if (_options.IslandAssignment == EvolutionIslandAssignmentStrategy.InheritParent) island = sourceIsland;
 
         StableRandom proposalRandom = StableRandom.CreateStream(_options.Seed, unchecked((ulong)evaluationId * 8UL));
         if (_selection is IEliteIndexAwareEvolutionSelectionPolicy<TGenome> eliteAwareSelection)
             eliteAwareSelection.UseEliteIndex(_globalElites.Entries, island);
-        EvolutionSelection<TGenome>? selection = _selection.Select(sourceArchive, proposalRandom, _options.InspirationCount);
+
+        // A policy may decline an island the engine considers occupied, so the remaining occupied islands are tried
+        // before the run is declared out of candidates. The single-island and always-succeeding cases are unchanged.
+        EvolutionSelection<TGenome>? selection = null;
+        IEvolutionArchive<TGenome> sourceArchive = _islands[sourceIsland];
+        for (int offset = 0; offset < _islands.Length; offset++)
+        {
+            int candidateIsland = (sourceIsland + offset) % _islands.Length;
+            if (offset > 0 && !HasSelectionCandidates(_islands[candidateIsland])) continue;
+            sourceArchive = _islands[candidateIsland];
+            selection = _selection.Select(sourceArchive, proposalRandom, _options.InspirationCount);
+            if (selection is null) continue;
+            sourceIsland = candidateIsland;
+            break;
+        }
         if (selection is null) return null;
+        if (_options.IslandAssignment == EvolutionIslandAssignmentStrategy.InheritParent) island = sourceIsland;
         long allocatedId = AllocateProposalId();
         if (allocatedId != evaluationId) throw new InvalidOperationException("Proposal identity allocation was not sequential.");
         long generation = ++_generation;
@@ -577,8 +590,17 @@ public sealed partial class EvolutionEngine<TGenome>
             isRedacted: false, data: data));
     }
 
-    private static bool HasSelectionCandidates(IEvolutionArchive<TGenome> archive) => archive.Count > 0 ||
-        ((archive as IEvolutionParetoArchiveView<TGenome>)?.InfeasibleEntries?.Count ?? 0) > 0;
+    /// <summary>
+    /// Reports whether the configured policy could draw a parent from this island: the feasible archive always
+    /// counts, and a separate infeasible exploration pool counts only for a policy that declares it samples one.
+    /// </summary>
+    /// <remarks>
+    /// Counting the pool for every policy made an explicit non-Pareto policy fail on the island it was handed: the
+    /// island looked occupied, the policy found no feasible elite, and the batch ended with <c>NoCandidates</c>.
+    /// </remarks>
+    private bool HasSelectionCandidates(IEvolutionArchive<TGenome> archive) => archive.Count > 0 ||
+        (_selection is IInfeasibleExplorationSelectionPolicy<TGenome> &&
+         ((archive as IEvolutionParetoArchiveView<TGenome>)?.InfeasibleEntries?.Count ?? 0) > 0);
 
     /// <summary>Builds the immutable evaluation record for a work item from its terminal result and attempt metadata.</summary>
     private EvolutionEvaluation BuildEvaluation(WorkItem item, EvolutionTaskResult result)
