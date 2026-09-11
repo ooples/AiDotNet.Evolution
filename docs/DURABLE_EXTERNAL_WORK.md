@@ -2,9 +2,12 @@
 
 `DurableEvolutionWorkCoordinator` is an optional, bounded, single-owner local-filesystem
 delivery coordinator. It persists queued work, worker profiles, leases, resource reservations,
-results and external-response provenance together. It is not yet wired into the native host
-or TypeScript binding, and it does not restore an evolution engine's pending proposals or
-operator state. US-21 remains incomplete until those integrations and verification are done.
+results and external-response provenance together. `EvolutionDurableSessionBridge<TGenome>`
+now connects it to a live fingerprinted engine session. `EvolutionWorkProtocol` exposes a
+trusted JSON worker/control endpoint, the native host has a separate `--durable` mode, and
+TypeScript/Python clients use that protocol. It does not restore an evolution engine's
+pending proposals or operator state. Local contract/binding tests pass; pinned native
+bridge evidence and final review checks are being completed.
 
 ## Delivery and accounting
 
@@ -73,7 +76,51 @@ Do not attach old logical results to a new engine merely because their numeric I
 The integration must retain the original full session ticket, validate compatibility, and
 report a new/forked trajectory if proposal/operator/search state was lost. A fork must also
 carry forward campaign spend and unresolved liabilities; creating a fresh directory is not
-authorization to reset the real budget. Automatic engine/fork integration is still pending.
+authorization to reset the real budget. Automatic fork creation is not provided.
+
+### Attaching a live engine session
+
+Create a strict `EvolutionSession<TGenome>` with caller task/evaluator fingerprints and an
+engine-owned `IEvolutionGenomeCodec<TGenome>`. Create the coordinator with that session's
+`RunId` and `CompatibilityHash`, then attach:
+
+```csharp
+var bridge = new EvolutionDurableSessionBridge<MyGenome>(session, coordinator,
+    decodeVersionedResult, requirements, estimatedDeliveryCost, maximumDeliveryCost);
+foreach (var originalAsk in await session.AskAsync(8, cancellationToken))
+    bridge.Enqueue(originalAsk); // Retain the original object until durable success.
+
+bridge.ReconcileExpiredWork(); // Periodically, and before dispatching.
+// Workers claim, heartbeat, and commit through the coordinator.
+int newlyDelivered = bridge.DeliverAvailableResults();
+```
+
+The bridge stores the original engine ticket separately from each physical worker lease.
+Results return through the original ticket, never a lookup of the current attempt by numeric
+ID. The encoded `EvolutionDurableEvaluationPayload` carries the full canonical identity,
+engine codec payload and exact evaluation context. Int64 evaluation IDs and UInt64 random
+seeds are decimal **strings** in that JSON envelope, preserving all bits across JavaScript.
+The caller's evaluator fingerprint must include the result-decoding protocol version.
+
+Each session has a unique `InstanceId`. Reopening a coordinator can reattach to that same
+still-live session; a new session with the same run and compatibility is rejected. The
+caller owns both lifetimes. Coordinator reconstruction is not full engine-process recovery.
+Check persisted attachment before constructing a replacement engine where practical;
+constructing a new engine may already begin work that a bridge cannot undo.
+
+After an enqueue I/O failure, reopen the coordinator and retry the same retained ask object.
+After a result-tell acknowledgement failure, replay is fenced: it cannot tell or charge the
+source attempt twice. A replay count of zero does not prove that the first tell failed.
+Decoder failures leave the raw durable result and receipt available for explicit handling;
+no implicit success, refund or archive admission is inferred. Periodic cancellation polling
+is cooperative and never proves physical work has stopped.
+
+The authoritative work-state schema and contract are now **version 2**. Old version-1
+journals are deliberately refused, not silently migrated: older code must not ignore the
+new source-session fields and reinterpret attached work as an unbound queue. Keep old
+artifacts with their pinned source when reproducing version-1 evidence. Schema omission,
+old schema and incomplete source-ticket/acknowledgement state are rejected even when the
+outer journal checksum is valid.
 
 ## Storage boundary
 
@@ -118,7 +165,29 @@ The cost units are declared test units, not measured CPU time or money. A standa
 x64 NativeAOT build and the same three-process-kill recovery probe also passed; that build
 emitted no warnings. This is specific to the durable coordinator and its source-generated
 ledger/work serialization, not all engine persistence paths in the separate native host.
-Hosted CI, Linux/macOS and durable engine/binding integration remain unverified or unfinished.
+The additional engine bridge and worker/binding integration is described in the
+[worker protocol contract](DURABLE_WORKER_PROTOCOL.md). Hosted CI and Linux/macOS execution
+must be checked separately; local Windows evidence does not establish those outcomes.
 
 [Pinned managed/native reports and authoritative snapshots](../benchmarks/evidence/external-work/75fd8be/README.md)
 retain the process-crash evidence and its exact source/binary identities.
+
+The schema-2 bridge/protocol integration additionally passes **985 net10.0 / 985 net8.0 /
+785 net471 tests**, zero skips, with 92.95% line / 79.73% branch coverage and the unchanged
+ratchet. This includes 18 live-session bridge cases, 17 JSON protocol cases and two host
+framing cases (the host cases are excluded on net471). All **139 TypeScript tests** pass
+against the Windows NativeAOT host. The six Python cases pass against both that native host
+and its managed build; subcases exercise malformed responses, downgrade, timeout and bounds.
+Both clients actually kill an owned coordinator child after a published dispatch and verify
+recovered identity/reservation/receipt state. These are authored correctness/recovery checks,
+not optimization-quality comparisons or evidence of exactly-once physical execution.
+
+`examples/DurableSession` exercises the engine-owned codec and full random context through
+a borrowed JSON protocol, coordinator reopen with the original engine still alive, fenced
+result delivery into its archive, and refusal of a new matching engine instance. Its single
+square-function evaluation consumes two authored cost units, not measured money or CPU.
+Its managed run passes. The first strict net10.0 NativeAOT build **fails** IL2026/IL3050/IL2070
+analysis in existing engine persistence, resource-metered variation, curiosity state,
+measurement serialization and ownership inspection. The shipped net8.0 native host's passing
+client tests do not resolve this broader engine-AOT boundary. This failure is retained while
+the relevant paths are reviewed; no warning suppression or whole-engine AOT clearance is claimed.

@@ -11,7 +11,7 @@ namespace AiDotNet.Evolution;
 /// Restoring delivery does not restore pending proposals or operator state; partial-batch search continuation is a fork.
 /// Do not use network filesystems, revert its directory to an older backup, or infer power-loss durability from process-crash tests.
 /// </remarks>
-public sealed class DurableEvolutionWorkCoordinator : IDisposable
+public sealed partial class DurableEvolutionWorkCoordinator : IDisposable
 {
     private readonly object _sync = new();
     private readonly EvolutionWorkJournal _journal;
@@ -34,11 +34,11 @@ public sealed class DurableEvolutionWorkCoordinator : IDisposable
         RunId = runId; CompatibilityHash = compatibilityHash; _limits = limits;
         _options = options ?? new EvolutionWorkCoordinatorOptions(); _utcNow = utcNow ?? (() => DateTimeOffset.UtcNow);
         _ledger = NewLedger();
-        _contractHash = EvolutionHash.Combine(new[] { "durable-external-work-v1", runId, compatibilityHash,
+        _contractHash = EvolutionHash.Combine(new[] { "durable-external-work-v2", runId, compatibilityHash,
             Number(_options.MaximumWorkItems), Number(_options.MaximumDeliveriesPerWork), Number(_options.MaximumStateBytes),
             Number(_options.MaximumPayloadBytes), Number(_options.MaximumWorkers), Number(_options.LeaseDuration.Ticks) }
             .Concat(limits.Amounts.SelectMany(p => new[] { p.Key, p.Value.ToString(CultureInfo.InvariantCulture) })));
-        _state = new EvolutionWorkState { ContractHash = _contractHash, Ledger = _ledger.CaptureState(), LastUtcTicks = Now() };
+        _state = new EvolutionWorkState { Schema = 2, ContractHash = _contractHash, Ledger = _ledger.CaptureState(), LastUtcTicks = Now() };
         _journal = new EvolutionWorkJournal(directory, Serialize(_state), _options.MaximumStateBytes);
         try
         {
@@ -47,6 +47,11 @@ public sealed class DurableEvolutionWorkCoordinator : IDisposable
             _ledger = NewLedger(); _ledger.RestoreState(_state.Ledger);
             _lastObservedUtcTicks = _state.LastUtcTicks;
             _ = Now(); // Refuse clock rollback immediately on recovery, before work can be returned.
+        }
+        catch (Exception ex) when (ex is ArgumentException or JsonException or OverflowException)
+        {
+            _journal.Dispose();
+            throw new InvalidDataException("Durable work state contains invalid persisted values.", ex);
         }
         catch { _journal.Dispose(); throw; }
     }
@@ -68,9 +73,14 @@ public sealed class DurableEvolutionWorkCoordinator : IDisposable
     /// <summary>Durably adds one engine attempt; identical submissions are idempotent and conflicting reuse is refused.</summary>
     public bool Enqueue(long evaluationId, int attempt, string canonicalGenomeId, string serializedGenome,
         EvolutionWorkRequirements requirements, EvolutionResources estimated, EvolutionResources maximum)
+        => EnqueueCore(evaluationId, attempt, canonicalGenomeId, serializedGenome, requirements, estimated, maximum, null);
+
+    private bool EnqueueCore(long evaluationId, int attempt, string canonicalGenomeId, string serializedGenome,
+        EvolutionWorkRequirements requirements, EvolutionResources estimated, EvolutionResources maximum, EvolutionWorkIdentity? source)
     {
         string key = Key(evaluationId, attempt);
-        EvolutionWorkValidation.Id(canonicalGenomeId, nameof(canonicalGenomeId));
+        Guard.NotNullOrWhiteSpace(canonicalGenomeId);
+        EvolutionWorkValidation.Payload(canonicalGenomeId, _options.MaximumPayloadBytes, nameof(canonicalGenomeId));
         EvolutionWorkValidation.Payload(serializedGenome, _options.MaximumPayloadBytes, nameof(serializedGenome));
         Guard.NotNull(requirements); ValidateCost(estimated, maximum);
         var incoming = new WorkItemState
@@ -83,10 +93,13 @@ public sealed class DurableEvolutionWorkCoordinator : IDisposable
             MinimumResources = EvolutionWorkValidation.Copy(requirements.MinimumResources),
             Estimated = EvolutionWorkValidation.Copy(estimated),
             Maximum = EvolutionWorkValidation.Copy(maximum),
+            SourceLeaseId = source?.LeaseId,
         };
         lock (_sync)
         {
             _journal.EnsureUsable();
+            if ((_state.SourceSessionId is null) != (source is null) || (source is not null && source.RunId != RunId))
+                throw new InvalidOperationException("Attached sessions require their original source work identity; unbound work cannot be mixed in.");
             if (_state.Work.TryGetValue(key, out WorkItemState? prior))
             {
                 if (!SameRequest(prior, incoming)) throw new InvalidOperationException("A conflicting request cannot reuse an engine attempt identity.");
@@ -317,7 +330,7 @@ public sealed class DurableEvolutionWorkCoordinator : IDisposable
     private static bool Equal(Dictionary<string, decimal> a, Dictionary<string, decimal> b) => a.Count == b.Count && a.All(p => b.TryGetValue(p.Key, out decimal value) && p.Value == value);
     private static bool SameWorker(WorkerState a, WorkerState b) => a.CompatibilityHash == b.CompatibilityHash
         && a.MaximumConcurrentWork == b.MaximumConcurrentWork && a.Tags.SequenceEqual(b.Tags) && Equal(a.Capacity, b.Capacity);
-    private static bool SameRequest(WorkItemState a, WorkItemState b) => a.CanonicalGenomeId == b.CanonicalGenomeId && a.Payload == b.Payload
+    private static bool SameRequest(WorkItemState a, WorkItemState b) => a.SourceLeaseId == b.SourceLeaseId && a.CanonicalGenomeId == b.CanonicalGenomeId && a.Payload == b.Payload
         && a.Tags.SequenceEqual(b.Tags) && Equal(a.MinimumResources, b.MinimumResources) && Equal(a.Estimated, b.Estimated) && Equal(a.Maximum, b.Maximum);
     private void ValidateCost(EvolutionResources estimated, EvolutionResources maximum)
     {
@@ -343,13 +356,14 @@ public sealed class DurableEvolutionWorkCoordinator : IDisposable
 
     private void ValidateState(EvolutionWorkState state)
     {
-        if (state.Schema != 1 || state.ContractHash != _contractHash || state.Work is null || state.Workers is null
+        if (state.Schema != 2 || state.ContractHash != _contractHash || state.Work is null || state.Workers is null
             || state.Work.Count > _options.MaximumWorkItems || state.Workers.Count > _options.MaximumWorkers
             || state.LastUtcTicks < 0 || state.LastUtcTicks > DateTime.MaxValue.Ticks)
             throw new InvalidDataException("Durable work state/configuration is incompatible or invalid.");
         EvolutionResourceLedger ledger = NewLedger(); ledger.RestoreState(state.Ledger);
         EvolutionResourceLedger.State receipts = JsonSerializer.Deserialize(state.Ledger, EvolutionWorkJsonContext.Default.ResourceLedgerState)!;
         var operations = receipts.Operations!.ToDictionary(o => o.Id, StringComparer.Ordinal);
+        if (state.SourceSessionId is not null) _ = new EvolutionWorkIdentity(RunId, 0, 1, state.SourceSessionId);
         foreach (var worker in state.Workers)
         {
             var validated = new EvolutionWorkerProfile(worker.Key, worker.Value.CompatibilityHash, worker.Value.Tags,
@@ -363,7 +377,12 @@ public sealed class DurableEvolutionWorkCoordinator : IDisposable
             WorkItemState job = entry.Value;
             if (entry.Key != Key(job.EvaluationId, job.Attempt) || job.Leases is null || job.Leases.Count > _options.MaximumDeliveriesPerWork
                 || !Enum.IsDefined(typeof(WorkItemStatus), job.Status)) throw new InvalidDataException("Invalid work identity/state.");
-            EvolutionWorkValidation.Id(job.CanonicalGenomeId, nameof(job.CanonicalGenomeId));
+            Guard.NotNullOrWhiteSpace(job.CanonicalGenomeId);
+            EvolutionWorkValidation.Payload(job.CanonicalGenomeId, _options.MaximumPayloadBytes, nameof(job.CanonicalGenomeId));
+            if ((state.SourceSessionId is null) != (job.SourceLeaseId is null) ||
+                (job.SourceTellAccepted.HasValue && (job.SourceLeaseId is null || job.Status != WorkItemStatus.Completed)))
+                throw new InvalidDataException("Invalid source-session attachment or result acknowledgement.");
+            if (job.SourceLeaseId is not null) _ = new EvolutionWorkIdentity(RunId, job.EvaluationId, job.Attempt, job.SourceLeaseId);
             EvolutionWorkValidation.Payload(job.Payload, _options.MaximumPayloadBytes, nameof(job.Payload));
             _ = new EvolutionWorkRequirements(job.Tags, new EvolutionResources(job.MinimumResources));
             ValidateCost(new EvolutionResources(job.Estimated), new EvolutionResources(job.Maximum));

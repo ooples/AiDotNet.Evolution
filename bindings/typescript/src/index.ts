@@ -16,6 +16,8 @@ import { spawn, type ChildProcessWithoutNullStreams } from 'node:child_process';
 import { createInterface, type Interface } from 'node:readline';
 import { resolveHostBinary } from './binary.js';
 
+export * from './durable.js';
+
 /**
  * One knob the search varies. Bounds, their difference, the resolved step, and
  * (max-min)/step must be finite, with min < max and step > 0. An integral range

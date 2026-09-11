@@ -180,6 +180,24 @@ public sealed class EvolutionSession<TGenome> : IDisposable
     /// <summary>Gets the engine/task/evaluator compatibility fingerprint for this session.</summary>
     public string CompatibilityHash => _engine.CompatibilityHash;
 
+    /// <summary>Gets the configured run identity, distinct from this live session's instance identity.</summary>
+    public string RunId => _engine.RunId;
+
+    /// <summary>Gets this live session's unique identity; a new process/session never inherits it by reusing a run ID.</summary>
+    public string InstanceId { get; } = Guid.NewGuid().ToString("N");
+
+    internal IEvolutionGenomeCodec<TGenome>? ExternalWorkCodec => _engine.ExternalWorkCodec;
+    internal bool RequiresWorkIdentity => !_allowLegacyTells;
+
+    internal bool IsOutstanding(EvolutionWorkIdentity identity, EvolutionCandidate<TGenome>? candidate = null, EvolutionEvaluationContext? context = null)
+    {
+        lock (_handover)
+            return _outstanding.TryGetValue(identity.EvaluationId, out PendingEvaluation? pending)
+                && pending.Identity.Matches(identity) && !pending.Completion.Task.IsCompleted
+                && (candidate is null || ReferenceEquals(candidate, pending.Candidate))
+                && (context is null || ReferenceEquals(context, pending.Context));
+    }
+
     /// <summary>Requests that the engine stop at the next batch boundary, keeping results found so far.</summary>
     /// <remarks>
     /// <para>

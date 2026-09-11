@@ -80,6 +80,10 @@ jobs:
         run: |
           dotnet build examples/DurableWork -c Release
           dotnet examples/DurableWork/bin/Release/net10.0/DurableWork.dll verify TestResults/durable-work
+      - name: Verify durable worker protocol against a live engine session
+        run: |
+          dotnet build examples/DurableSession -c Release
+          dotnet examples/DurableSession/bin/Release/net10.0/DurableSession.dll TestResults/durable-session
       - name: Verify gain and all-stage operator credit
         shell: pwsh
         run: ./eng/Test-OperatorCredit.ps1
@@ -121,6 +125,7 @@ jobs:
             TestResults/persistent-evaluation/**/*.json
             TestResults/persistent-evaluation/*.jsonl
             TestResults/durable-work/**
+            TestResults/durable-session/**
             coverage/**/coverage.cobertura.xml
             coverage/**/*.dmp
             coverage/**/Sequence_*.xml

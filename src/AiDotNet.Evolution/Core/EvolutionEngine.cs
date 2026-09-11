@@ -230,6 +230,8 @@ public sealed partial class EvolutionEngine<TGenome>
     /// <summary>Gets the owned run identity used by external-work correlation.</summary>
     public string RunId => _options.RunId;
 
+    internal IEvolutionGenomeCodec<TGenome>? ExternalWorkCodec => _codec;
+
     /// <summary>Asks a running or not-yet-started run to finish its current batch and return a result.</summary>
     /// <remarks>
     /// <para>

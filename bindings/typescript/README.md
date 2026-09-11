@@ -207,3 +207,36 @@ After publishing the three packages at the versions in `optionalDependencies`:
 ## Licence
 
 Apache-2.0.
+## Durable worker/control client
+
+`DurableWorkClient` uses the host's separate `--durable` mode. It recovers delivery state,
+not an engine's lost proposal/operator state. Use the same directory, run ID, compatibility,
+limits and options when reopening; all evaluation IDs and resource amounts are exact strings.
+
+```typescript
+import { DurableWorkClient } from '@aidotnet/evolution';
+
+const work = await DurableWorkClient.open({
+  directory: '/owned/run-work', runId: 'example',
+  compatibilityHash: 'task-codec-evaluator-v1', limits: { evaluation_calls: '100' },
+});
+try {
+  await work.enqueue({ evaluationId: '1', attempt: 1, canonicalGenomeId: 'integer:7', payload: '7',
+    estimated: { evaluation_calls: '1' }, maximum: { evaluation_calls: '1' } });
+  const lease = await work.claim({ workerId: 'process-incarnation-1', compatibilityHash: 'task-codec-evaluator-v1' });
+  if (lease !== null) {
+    // Toy evaluator. Production workers durably record execution IDs and receipts;
+    // do not repeat a physical operation just because its reply was lost.
+    await work.commit({ identity: lease.identity, workerId: lease.workerId,
+      payload: String(Number(lease.payload) ** 2), provenance: 'integer-square-v1',
+      actual: { evaluation_calls: '1' }, outcome: 'completed' });
+  }
+} finally { await work.close(); }
+```
+
+Null claims mean unavailable now, never completion. Use `heartbeat`, `cancel`, `result`,
+`delivery`, `unsettled` and `status` for supervision/reconciliation. Timeouts or malformed
+replies tear down the owned endpoint; they never trigger automatic physical retries. A lost
+receipt leaves its original reservation unresolved. `parseDurableEvaluationPayload` retains
+all UInt64 seed bits from an engine bridge. This is trusted local IPC, not a network service
+or an automatic search-fork controller. See [the complete wire and recovery contract](../../docs/DURABLE_WORKER_PROTOCOL.md).

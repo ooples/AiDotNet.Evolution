@@ -181,7 +181,8 @@ internal static class EvolutionWorkValidation
 
 internal sealed class EvolutionWorkState
 {
-    public int Schema { get; set; } = 1;
+    public string? SourceSessionId { get; set; }
+    public int Schema { get; set; }
     public string ContractHash { get; set; } = string.Empty;
     public long LastUtcTicks { get; set; }
     public string Ledger { get; set; } = string.Empty;
@@ -192,6 +193,8 @@ internal sealed class EvolutionWorkState
 internal enum WorkItemStatus { Pending, Leased, Completed, Canceled, DeliveryLimitReached }
 internal sealed class WorkItemState
 {
+    public string? SourceLeaseId { get; set; }
+    public bool? SourceTellAccepted { get; set; }
     public long EvaluationId { get; set; }
     public int Attempt { get; set; }
     public string CanonicalGenomeId { get; set; } = string.Empty;

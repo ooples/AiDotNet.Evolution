@@ -5,13 +5,15 @@ on:
     branches: [main]
     paths:
       - 'bindings/typescript/**'
+      - 'bindings/python/**'
       - 'src/AiDotNet.Evolution.Host/**'
       - 'src/AiDotNet.Evolution/**'
       - '.github/workflows/typescript-binding.yml'
   pull_request:
-    branches: [main]
+    branches: [main, feat/competitive-evolution-platform]
     paths:
       - 'bindings/typescript/**'
+      - 'bindings/python/**'
       - 'src/AiDotNet.Evolution.Host/**'
       - 'src/AiDotNet.Evolution/**'
       - '.github/workflows/typescript-binding.yml'
@@ -69,6 +71,10 @@ jobs:
         with:
           node-version: ${{ matrix.node }}
 
+      - uses: actions/setup-python@a26af69be951a213d495a4c3e4e4022e16d87065 # v5
+        with:
+          python-version: '3.10'
+
       # The AOT compiler links with the platform toolchain, which is present on the
       # Windows and macOS images but needs the objcopy/ld pieces installed on Ubuntu.
       - name: Install the Linux AOT prerequisites
@@ -98,6 +104,14 @@ jobs:
         run: |
           npm test 2>&1 | tee test-output.txt
           node scripts/check-test-output.mjs test-output.txt
+
+      - name: Test Python durable binding against the real native host
+        shell: pwsh
+        run: |
+          $suffix = if ($IsWindows) { '.exe' } else { '' }
+          $env:AIDOTNET_DURABLE_HOST_PATH = Join-Path $PWD "bindings/typescript/bin/${{ matrix.rid }}/aidotnet-evolution-host$suffix"
+          python -W error::ResourceWarning -m unittest discover -s bindings/python/tests -v
+          if ($LASTEXITCODE -ne 0) { exit $LASTEXITCODE }
 
       # ONLY THE PRIMARY NODE VERSION PUBLISHES. Two jobs now build linux-x64, and
       # uploading from both would collide on the artifact name -- the extra job exists

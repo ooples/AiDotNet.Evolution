@@ -29,7 +29,7 @@ internal static class Program
     // A peer may pipeline asks, but waiting requests must not grow without a bound.
     internal const int MaxPendingAsks = 32;
 
-    private static async Task<int> Main()
+    private static async Task<int> Main(string[] args)
     {
         // UTF-8 WITHOUT A BOM, EXPLICITLY. The default console encoding on Windows is the
         // active code page, which mangles any non-ASCII a client sends back in a reason
@@ -41,7 +41,27 @@ internal static class Program
         };
         var stdin = new StreamReader(Console.OpenStandardInput(), new UTF8Encoding(false));
 
+        if (args.Length == 1 && args[0] == "--durable") return await ServeDurableAsync(stdin, stdout).ConfigureAwait(false);
+        if (args.Length != 0) { await Console.Error.WriteLineAsync("Usage: aidotnet-evolution-host [--durable]").ConfigureAwait(false); return 2; }
         return await ServeAsync(stdin, stdout).ConfigureAwait(false);
+    }
+
+    /// <summary>Trusted local IPC for durable delivery; it does not instantiate or restore an evolution engine.</summary>
+    internal static async Task<int> ServeDurableAsync(TextReader stdin, TextWriter stdout)
+    {
+        using var endpoint = new AiDotNet.Evolution.EvolutionWorkProtocol();
+        var frames = new FrameReader(stdin);
+        while (!endpoint.IsClosed)
+        {
+            (string? line, bool overlong) = await frames.NextAsync().ConfigureAwait(false);
+            if (line is null) break;
+            if (!overlong && string.IsNullOrWhiteSpace(line)) continue;
+            // An oversized frame has no recoverable correlation ID. The dispatcher returns a
+            // bounded id:0 error; clients must reconcile, never infer that a mutation failed.
+            string response = endpoint.ProcessJson(overlong ? string.Empty : line);
+            await stdout.WriteLineAsync(response).ConfigureAwait(false);
+        }
+        return 0;
     }
 
     /// <summary>Reads frames from one stream and answers on the other until it ends.</summary>
