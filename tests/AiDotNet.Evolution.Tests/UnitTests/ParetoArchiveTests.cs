@@ -518,6 +518,161 @@ public sealed class ParetoArchiveTests
     private static EvolutionParetoDefinition Exploring(int capacity = 2) => new(Definition().Objectives, 8,
         EvolutionParetoRepresentative.ClosestToIdeal, capacity);
 
+    private sealed class FrontView : IEvolutionParetoArchiveView<TestGenome>
+    {
+        private readonly EvolutionParetoDefinition _definition;
+        private readonly IReadOnlyList<EvolutionArchiveEntry<TestGenome>> _entries;
+        public FrontView(EvolutionParetoDefinition definition, IReadOnlyList<EvolutionArchiveEntry<TestGenome>> entries)
+        { _definition = definition; _entries = entries; }
+        public EvolutionParetoDefinition? ParetoDefinition => _definition;
+        public IReadOnlyList<EvolutionArchiveEntry<TestGenome>>? InfeasibleEntries => null;
+        public IReadOnlyList<EvolutionDescriptorDefinition> Descriptors =>
+            Array.AsReadOnly(new[] { new EvolutionDescriptorDefinition("__pareto_slot", 0, _definition.Capacity, _definition.Capacity) });
+        public string DefinitionHash => "front-view-v1";
+        public EvolutionOptimizationDirection Direction => EvolutionOptimizationDirection.Maximize;
+        public int Count => _entries.Count;
+        public long Version => 100;
+        public IReadOnlyList<EvolutionArchiveEntry<TestGenome>> Entries => _entries;
+        public EvolutionArchiveEntry<TestGenome>? Best => _entries.Count == 0 ? null : _entries[0];
+        public EvolutionArchiveEntry<TestGenome>? Get(EvolutionCellKey cell) => null;
+    }
+
+    private static EvolutionArchiveEntry<TestGenome> Member(int slot, long id, string name, double x, double y)
+    {
+        var pair = Pair(id, name, 1, new[] { x, y });
+        return new EvolutionArchiveEntry<TestGenome>(new EvolutionCellKey(new[] { slot }), pair.Item1, pair.Item2);
+    }
+
+    [Fact]
+    public void SnapshotRejectsDominatedAndOverCapacityFrontViews()
+    {
+        var dominated = new FrontView(Definition(), new[] { Member(0, 0, "ideal", .1, .1), Member(1, 1, "dominated", .5, .5) });
+        Assert.Throws<ArgumentException>(() => new EvolutionArchiveSnapshot<TestGenome>(dominated));
+        var overCapacity = new FrontView(Definition(2),
+            new[] { Member(0, 0, "a", .1, .9), Member(1, 1, "b", .5, .5), Member(2, 2, "c", .9, .1) });
+        Assert.Throws<ArgumentException>(() => new EvolutionArchiveSnapshot<TestGenome>(overCapacity));
+        var valid = new FrontView(Definition(), new[] { Member(0, 0, "a", .1, .9), Member(1, 1, "c", .9, .1) });
+        Assert.Equal(2, new EvolutionArchiveSnapshot<TestGenome>(valid).Entries.Count);
+    }
+
+    [Fact]
+    public void ExplorationRankingPrefersTheSmallestLargestViolationNotTheFewestViolations()
+    {
+        static (EvolutionCandidate<TestGenome>, EvolutionEvaluation) Multi(long id, string name, double[] violations)
+        {
+            var pair = MapElitesArchiveTests.Create(id, name, 1, 0.5, EvolutionOptimizationDirection.Maximize);
+            return (pair.Item1, new EvolutionEvaluation(id, name, EvolutionEvaluationStatus.Completed, 1,
+                EvolutionOptimizationDirection.Maximize, pair.Item2.Descriptors, new[] { .5, .5 }, violations,
+                pair.Item2.Cost, pair.Item2.Lineage, EvolutionCacheStatus.Miss, Array.Empty<EvolutionDiagnostic>(),
+                "task", "eval", "config"));
+        }
+
+        // One large violation against three small ones: retention minimizes the largest violation first, so the
+        // candidate that is closest to feasible on every constraint wins even though it violates more of them.
+        foreach (bool reverse in new[] { false, true })
+        {
+            var archive = new ParetoArchive<TestGenome>(Exploring(1));
+            var pairs = new[] { Multi(0, "one-far", new[] { 5d, 0, 0 }), Multi(1, "three-near", new[] { 1d, 1, 1 }) };
+            var results = (reverse ? Enumerable.Reverse(pairs) : pairs)
+                .Select(pair => archive.TryAdd(pair.Item1, pair.Item2)).ToArray();
+            Assert.Equal("three-near", Assert.Single(archive.InfeasibleEntries!).Evaluation.GenomeId);
+            Assert.Contains(EvolutionArchiveInsertionResult.RetainedForExploration, results);
+        }
+    }
+
+    private sealed class ScaledViolationTask : IEvolutionTask<TestGenome>
+    {
+        private readonly double _scale;
+        public ScaledViolationTask(double scale) => _scale = scale;
+
+        // One identity for both scales on purpose: the runs must differ in nothing but the retained pool contents.
+        public string Id => "scaled-violation";
+        public string VersionHash => "scaled-violation-v1";
+        public string EvaluatorVersionHash => "scaled-violation-eval-v1";
+        public ValueTask<EvolutionCanonicalGenome<TestGenome>> CanonicalizeAsync(TestGenome genome, CancellationToken cancellationToken = default) =>
+            new(new EvolutionCanonicalGenome<TestGenome>(genome, genome.Value.ToString(System.Globalization.CultureInfo.InvariantCulture)));
+        public ValueTask<EvolutionTaskResult> EvaluateAsync(EvolutionCandidate<TestGenome> candidate, EvolutionEvaluationContext context,
+            CancellationToken cancellationToken = default)
+        {
+            int value = candidate.CanonicalGenome.Genome.Value;
+            double x = Math.Min(1, value / 20d);
+            return new(new EvolutionTaskResult(EvolutionEvaluationStatus.Completed, 1 - x, objectives: new[] { x, 1 - x },
+                constraintViolations: new[] { value < 4 ? _scale * (4 - value) : 0 }));
+        }
+    }
+
+    [Fact]
+    public async Task StateHashCoversTheRetainedExplorationPool()
+    {
+        static Task<EvolutionRunResult<TestGenome>> RunAsync(double scale) =>
+            new EvolutionEngine<TestGenome>(new ScaledViolationTask(scale), new SequentialVariation(),
+                _ => new ParetoArchive<TestGenome>(Exploring()), new EvolutionEngineOptions
+                {
+                    RunId = "pool-state-hash",
+                    Seed = 5,
+                    MaxEvaluationAttempts = 8,
+                    MaxProposals = 40,
+                    MaxGenerations = 40,
+                    ProposalBatchSize = 1,
+                    MaxDegreeOfParallelism = 1,
+                    MigrationInterval = 0,
+                    EnableEvaluationCache = false
+                }).RunAsync(new[] { new TestGenome(1) });
+
+        var narrow = await RunAsync(1);
+        var wide = await RunAsync(7);
+
+        // Identical feasible fronts, counters and identities; only the violation magnitudes of the separately
+        // retained exploration entries differ, so the state hash must still separate the two runs.
+        Assert.Equal(narrow.ParetoFront!.Entries.Select(entry => entry.Evaluation.GenomeId),
+            wide.ParetoFront!.Entries.Select(entry => entry.Evaluation.GenomeId));
+        Assert.Equal(narrow.Counters.CompletedEvaluations, wide.Counters.CompletedEvaluations);
+        Assert.Equal(narrow.InfeasibleExploration!.Select(entry => entry.Entry.Evaluation.GenomeId),
+            wide.InfeasibleExploration!.Select(entry => entry.Entry.Evaluation.GenomeId));
+        Assert.NotEmpty(narrow.InfeasibleExploration!);
+        Assert.NotEqual(narrow.StateHash, wide.StateHash);
+    }
+
+    [Fact]
+    public void DefaultExplorationProbabilityStaysTheDocumentedTenPercent()
+    {
+        static string Hash(int infeasibleCapacity, ISelectionPolicy<TestGenome>? selection)
+        {
+            var definition = new EvolutionParetoDefinition(Definition().Objectives, 8,
+                EvolutionParetoRepresentative.ClosestToIdeal, infeasibleCapacity);
+            return new EvolutionEngine<TestGenome>(new ReachFeasibilityTask(), new IncrementVariation(),
+                _ => new ParetoArchive<TestGenome>(definition), new EvolutionEngineOptions
+                {
+                    RunId = "exploration-probability",
+                    Seed = 7,
+                    MaxEvaluationAttempts = 4,
+                    MaxProposals = 10,
+                    MaxGenerations = 10,
+                    ProposalBatchSize = 1,
+                    MaxDegreeOfParallelism = 1,
+                    MigrationInterval = 0
+                }, selection: selection).CompatibilityHash;
+        }
+
+        // The selection policy's version hash is part of checkpoint compatibility, so the engine's default
+        // probability is observable: an enabled pool must default to the documented 0.1, not to fallback-only.
+        Assert.Equal(Hash(2, new ParetoEvolutionSelectionPolicy<TestGenome>(.1)), Hash(2, null));
+        Assert.NotEqual(Hash(2, new ParetoEvolutionSelectionPolicy<TestGenome>(0)), Hash(2, null));
+        Assert.Equal(Hash(0, new ParetoEvolutionSelectionPolicy<TestGenome>(0)), Hash(0, null));
+    }
+
+    [Fact]
+    public void DominanceIsStrictSoAnIdenticalVectorNeverDominatesItself()
+    {
+        var definition = Definition();
+        var vector = new[] { .3, .7 };
+        Assert.False(definition.Dominates(vector, new[] { .3, .7 }));
+        Assert.False(definition.Dominates(vector, vector));
+        Assert.True(definition.Dominates(new[] { .3, .6 }, vector));
+        var boxed = Definition(resolution: .25);
+        Assert.False(boxed.Dominates(new[] { .3, .7 }, new[] { .2, .6 }));
+    }
+
     [Fact]
     public void SnapshotRejectsExplorationMetadataWhenThePoolIsNotEnabled()
     {
