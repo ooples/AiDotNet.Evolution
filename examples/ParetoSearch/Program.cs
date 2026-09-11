@@ -21,8 +21,7 @@ foreach (bool constrained in new[] { false, true })
             var task = new QuadraticTask(constrained);
             IEvolutionArchive<Point> Archive(int _) => method == "pareto-32"
                 ? new ParetoArchive<Point>(definition, EvolutionOptimizationDirection.Minimize)
-                : new MapElitesArchive<Point>(new[] { new EvolutionDescriptorDefinition("x", 0, 1,
-                    method == "scalar-grid-32" ? 32 : 1) }, EvolutionOptimizationDirection.Minimize);
+                : new FeasibleScalarArchive(method == "scalar-grid-32" ? 32 : 1);
             var engine = new EvolutionEngine<Point>(task, new LocalVariation(), Archive, new EvolutionEngineOptions
             {
                 Seed = seed,
@@ -90,7 +89,7 @@ File.WriteAllText(reportPath, JsonSerializer.Serialize(new
     EvaluationBudget = evaluationBudget,
     SeedCount = seedCount,
     CostUnitsPerEvaluation = 1,
-    SharedControls = "Identical initial genomes, evaluation budget, local-variation code, seed list, worker count and scalar weights (0.5, 0.5). Grid uses 32 x-axis bins; single-best uses one.",
+    SharedControls = "Identical initial genomes, evaluation budget, local-variation code, seed list, worker count, feasible-only admission and scalar weights (0.5, 0.5). Scalar comparators explicitly guard positive constraint violations because legacy MAP-Elites does not. Grid uses 32 x-axis bins; single-best uses one.",
     Interpretation = "Higher hypervolume and lower individual minima/scalar quality are better. Confidence intervals are paired-seed percentile bootstrap (2000 resamples, seed 73), descriptive and not multiplicity adjusted. Wall time is observational, not a controlled performance claim. This does not compare OpenEvolve or establish general superiority.",
     Comparisons = comparisons,
     Runs = rows
@@ -117,6 +116,25 @@ internal sealed record Point(double X, double Y) : IImmutableEvolutionGenome<Poi
 internal sealed record PointRow(string GenomeId, Point Genome, double[] Objectives, double ScalarQuality);
 internal sealed record RunRow(string Task, ulong Seed, string Method, int Capacity, long Evaluations, long Proposals,
     double WallMilliseconds, string StateHash, double Hypervolume, double MinimumF1, double MinimumF2, double BestScalar, PointRow[] Front);
+
+// Apply the same deployment feasibility rule to both scalar baselines without altering legacy archive semantics.
+internal sealed class FeasibleScalarArchive(int capacity) : IEvolutionArchive<Point>, IEvolutionArchiveCellCount
+{
+    private readonly MapElitesArchive<Point> _inner = new(new[] { new EvolutionDescriptorDefinition("x", 0, 1, capacity) },
+        EvolutionOptimizationDirection.Minimize);
+    public IReadOnlyList<EvolutionDescriptorDefinition> Descriptors => _inner.Descriptors;
+    public string DefinitionHash => "feasible-only-v1:" + _inner.DefinitionHash;
+    public EvolutionOptimizationDirection Direction => _inner.Direction;
+    public int Count => _inner.Count;
+    public long Version => _inner.Version;
+    public long TotalCells => capacity;
+    public IReadOnlyList<EvolutionArchiveEntry<Point>> Entries => _inner.Entries;
+    public EvolutionArchiveEntry<Point>? Best => _inner.Best;
+    public EvolutionArchiveEntry<Point>? Get(EvolutionCellKey cell) => _inner.Get(cell);
+    public EvolutionArchiveEntry<Point>? Sample(StableRandom random) => _inner.Sample(random);
+    public EvolutionArchiveInsertionResult TryAdd(EvolutionCandidate<Point> candidate, EvolutionEvaluation evaluation) =>
+        evaluation.ConstraintViolations.Any(value => value > 0) ? EvolutionArchiveInsertionResult.Rejected : _inner.TryAdd(candidate, evaluation);
+}
 
 internal sealed class LocalVariation : IVariationOperator<Point>
 {
