@@ -78,6 +78,8 @@ powershell -ExecutionPolicy Bypass -File eng/Test-SurrogateSearch.ps1
 An independent rebuild can have a different assembly hash; exact replay above used the same pinned build.
 Inspect runtime/assembly metadata before comparing raw digests across environments. The compressed raw hash
 can be verified after decompression; gzip container bytes are not a semantic identity for a rebuilt campaign.
+The generated summary is exempt from Git line-ending conversion: `InputSummarySha256` binds its exact bytes.
+A post-commit audit caught and corrected CRLF-to-LF normalization; this changed no measurement or analysis value.
 
 ## Limits and failed development attempts
 
@@ -91,4 +93,3 @@ Initial full-suite verification before this campaign had two Windows file-move t
 retry and subsequent full runs. A test-only array `Reverse()` expression compiled under net10 but failed under
 net8; explicit `Enumerable.Reverse` resolved the overload and preserved non-mutating intent. Neither was hidden
 as a discarded search result. The final audited suite passed 703 tests on each of net10/net8/net471.
-
