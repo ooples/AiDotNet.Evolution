@@ -244,8 +244,8 @@ public sealed partial class EvolutionEngine<TGenome>
         var faults = new List<Exception>();
         foreach (Task task in settledTasks)
         {
-            if (!task.IsFaulted) continue;
-            foreach (Exception fault in task.Exception!.InnerExceptions)
+            if (task.Exception is not AggregateException taskFailure) continue;
+            foreach (Exception fault in taskFailure.InnerExceptions)
             {
                 if (fault is OperationCanceledException || faults.Contains(fault)) continue;
                 faults.Add(fault);

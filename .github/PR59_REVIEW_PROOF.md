@@ -84,3 +84,25 @@ FullyQualifiedName~DrainReturnsAnObservedOutcomeInsteadOfSilentlyDiscardingIt|Fu
 Those tests reflect the actual private helper, so they compile against its former Task-only result. Require the specific four failures, not a build/discovery failure. Do not remove or filter any tests in the final branch's normal suite. The intermediate lifecycle negative control is separately identified above; it is not misrepresented as an original-head scan.
 
 These are local correctness and lifecycle results. No fresh hosted CodeQL success, release/merge, new pipeline timing benchmark, competitor/model-performance result, or zero-overhead claim is made. The prior pilot/default-profile performance evidence remains historical and was not rerun as part of this cleanup fix.
+
+## Follow-up verification after collaborator commit 34872a1
+
+The collaborator added first-round and retry-round fault-during-cancellation
+controls in `34872a1a2029b3e3cd6da994ccdc218ba63d0c0d`. After fast-forwarding to that
+revision, this follow-up replaced its new null-forgiving Task.Exception access
+with an explicit AggregateException pattern. No pipeline outcome policy changed.
+
+The actual pipeline, drain, and cleanup suites passed **43/43 on each of net10.0,
+net8.0, and net471**, with zero failures/skips. These include the collaborator's
+three new cancellation/fault controls. Evidence is in
+`TestResults/pr59-review-cancellation/review-cancellation-final-<TFM>.trx`.
+
+```powershell
+foreach ($framework in @('net10.0','net8.0','net471')) {
+    dotnet test tests/AiDotNet.Evolution.Tests/AiDotNet.Evolution.Tests.csproj -c Release -f $framework -m:1 -p:UseSharedCompilation=false -p:GeneratePackageOnBuild=false --logger "trx;LogFileName=review-cancellation-final-$framework.trx" --results-directory TestResults/pr59-review-cancellation --filter 'FullyQualifiedName~EvolutionPipelineTests|FullyQualifiedName~PipelineDrainReviewTests|FullyQualifiedName~PipelineCleanupLifecycleReviewTests' -v minimal
+    if ($LASTEXITCODE -ne 0) { throw "Pipeline review tests failed: $framework" }
+}
+```
+
+This is bounded local verification of the follow-up, not a rerun of the earlier
+701-case full suite or a claim that the queued hosted scanner has passed.
