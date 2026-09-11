@@ -76,6 +76,8 @@ jobs:
       - name: Verify gain and all-stage operator credit
         shell: pwsh
         run: ./eng/Test-OperatorCredit.ps1
+      - name: Verify adaptive island replay and evaluation accounting
+        run: dotnet run --project examples/AdaptiveIslandSearch -c Release -- 1 64 "${{ github.workspace }}/TestResults/adaptive-islands-smoke.json"
       - name: Verify performance fixture contracts
         run: dotnet run --project benchmarks/AiDotNet.Evolution.Performance -c Release -- --smoke
       - name: Verify paired analysis contracts
