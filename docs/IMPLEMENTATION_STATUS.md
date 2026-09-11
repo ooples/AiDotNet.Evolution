@@ -3,6 +3,8 @@
 Updated September 11, 2026. The [26-story roadmap](COMPETITIVE_ANALYSIS_AND_ROADMAP.md) remains the target.
 Implementation is continuing across the core and companion PRs. **The roadmap is not complete and no competitive win is claimed.**
 
+Track the full plan through the [26 user-story issues and PR delivery index](USER_STORY_DELIVERY.md).
+
 ## Implemented in the initial core PR
 
 - `IOutcomeAwareVariationOperator<TGenome>` receives terminal committed outcomes, including proposal failures,
