@@ -80,6 +80,45 @@ A pending `ask()` does not prevent `tell()` or `close()` from being processed. C
 cancels pending asks with an error, not an empty successful batch. The native protocol
 permits up to 32 waiting asks and returns a correlated error when that bound is exceeded.
 
+## Strict external-work identity
+
+For new external integrations, enable strict mode and return the whole issued ticket:
+
+```ts
+const session = await openSession({
+  parameters, descriptors,
+  taskIdentity: {
+    taskId: 'training-search',
+    taskVersionHash: 'task-data-and-canonicalization-v1',
+    evaluatorVersionHash: 'training-protocol-v1',
+  },
+  evaluationTimeoutMs: 60_000,
+  maxRetries: 1,
+});
+const batch = await session.ask(8);
+await session.tell(batch.map(candidate => ({
+  evaluationId: candidate.evaluationId,
+  workIdentity: candidate.workIdentity,
+  quality: score(candidate.parameters),
+  descriptors: describe(candidate.parameters),
+})));
+await session.close();
+```
+
+The example supplies domain-specific `parameters`, `descriptors`, `score` and `describe`.
+For a complete search, place ask/tell inside the loop above, or use `evolve` with the same
+ticket-preserving result mapping. Handle close failures as shown above.
+
+Strict mode verifies the host's fencing capability at open; an old host cannot silently
+ignore the new fields. `session.compatibilityHash` pins the task, evaluator, parameter codec,
+archive and engine contract. Version fingerprints are the caller's responsibility.
+
+A retry reuses the evaluation ID but gets a different ticket. Never substitute the newest
+ticket for an old worker's result. Stale and duplicate results return zero acceptance;
+missing/malformed tickets are rejected. Timeout does not kill remote work or refund its cost.
+Configurations without `taskIdentity` preserve the legacy numeric-ID mode; retries require
+strict mode. Neither mode currently persists host sessions across process restarts.
+
 ## Reporting a failure
 
 A candidate that could not be evaluated is not a candidate that scored zero.

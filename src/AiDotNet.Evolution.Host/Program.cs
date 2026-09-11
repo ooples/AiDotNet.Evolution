@@ -254,8 +254,16 @@ internal static class Program
                         return Fail("a run is already open on this process");
                     if (request.Config is null)
                         return Fail("open needs a 'config'");
-                    setSession(HostSession.Open(request.Config));
-                    return new Response { Ok = true, Version = Version };
+                    HostSession opened = HostSession.Open(request.Config);
+                    setSession(opened);
+                    return new Response
+                    {
+                        Ok = true,
+                        Version = Version,
+                        WorkIdentityVersion = 1,
+                        RequiresWorkIdentity = opened.RequiresWorkIdentity,
+                        CompatibilityHash = opened.CompatibilityHash,
+                    };
 
                 // Ask and close have bodies rather than expressions, and the .editorconfig
                 // indents a braced case block twice. They are methods instead: the same code,

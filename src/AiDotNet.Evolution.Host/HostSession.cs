@@ -12,17 +12,21 @@ internal sealed class HostSession : IDisposable
     private readonly ParameterSpace _space;
     private readonly EvolutionOptimizationDirection _direction;
     private readonly List<string> _descriptorNames;
+    internal bool RequiresWorkIdentity { get; }
+    internal string CompatibilityHash => _session.CompatibilityHash;
 
     private HostSession(
         EvolutionSession<ParameterGenome> session,
         ParameterSpace space,
         EvolutionOptimizationDirection direction,
-        List<string> descriptorNames)
+        List<string> descriptorNames,
+        bool requiresWorkIdentity)
     {
         _session = session;
         _space = space;
         _direction = direction;
         _descriptorNames = descriptorNames;
+        RequiresWorkIdentity = requiresWorkIdentity;
     }
 
     internal bool IsComplete => _session.IsComplete;
@@ -57,6 +61,11 @@ internal sealed class HostSession : IDisposable
             throw new ArgumentException("config.maxGenerations must be non-negative.", nameof(config));
         if (config.BatchSize <= 0)
             throw new ArgumentException("config.batchSize must be positive.", nameof(config));
+        if (config.EvaluationTimeoutMs <= 0 || config.MaxRetries < 0)
+            throw new ArgumentException("evaluationTimeoutMs must be positive and maxRetries non-negative.", nameof(config));
+        if (config.MaxRetries > 0 && config.TaskIdentity is null)
+            throw new ArgumentException("Retries require taskIdentity and full workIdentity tells.", nameof(config));
+        EvolutionExternalTaskIdentity? taskIdentity = config.TaskIdentity?.ToIdentity();
 
         var definitions = new List<ParameterDefinition>(config.Parameters.Count);
         foreach (ParameterConfig parameter in config.Parameters)
@@ -106,12 +115,14 @@ internal sealed class HostSession : IDisposable
             MaxGenerations = config.MaxGenerations,
             ProposalBatchSize = config.BatchSize,
             CheckpointInterval = 0,
+            EvaluationTimeout = config.EvaluationTimeoutMs is int timeout ? TimeSpan.FromMilliseconds(timeout) : null,
+            MaxRetries = config.MaxRetries,
         };
 
         List<ParameterGenome> seeds = BuildSeeds(config, space);
 
-        var session = new EvolutionSession<ParameterGenome>(
-            task => new EvolutionEngine<ParameterGenome>(
+        var codec = new ParameterGenomeCodec(space);
+        EvolutionEngine<ParameterGenome> CreateEngine(IEvolutionTask<ParameterGenome> task) => new(
                 task,
                 new ParameterVariation(),
                 // THE ARCHIVE MUST BE TOLD THE DIRECTION TOO. MapElitesArchive defaults to
@@ -120,13 +131,15 @@ internal sealed class HostSession : IDisposable
                 // elites to breed from, and stops after the seed batch with
                 // StopReason.NoCandidates -- a silent empty result, not an error.
                 _ => new MapElitesArchive<ParameterGenome>(descriptorDefinitions, direction),
-                options),
-            seeds,
+                options, genomeCodec: codec);
+
+        var session = taskIdentity is null
+            ? new EvolutionSession<ParameterGenome>(CreateEngine, seeds, genome => genome.CanonicalId())
             // The genome's own canonical text, which IS its content rather than a type
             // name -- see ParameterGenome.CanonicalId.
-            genome => genome.CanonicalId());
+            : new EvolutionSession<ParameterGenome>(CreateEngine, seeds, genome => genome.CanonicalId(), taskIdentity);
 
-        return new HostSession(session, space, direction, descriptorNames);
+        return new HostSession(session, space, direction, descriptorNames, taskIdentity is not null);
     }
 
     private static List<ParameterGenome> BuildSeeds(RunConfig config, ParameterSpace space)
@@ -157,6 +170,7 @@ internal sealed class HostSession : IDisposable
             candidates.Add(new Candidate
             {
                 EvaluationId = item.EvaluationId,
+                WorkIdentity = WorkIdentityDto.From(item.WorkIdentity!),
                 Parameters = _space.ToMap(genome),
             });
         }
@@ -166,9 +180,14 @@ internal sealed class HostSession : IDisposable
     /// <summary>Applies scored results, returning how many were actually outstanding.</summary>
     internal int Tell(IReadOnlyList<TellResult> results)
     {
+        // Validate the whole envelope before any side effect: an invalid later ticket must not
+        // turn an already committed prefix into an unacknowledged protocol error.
+        var identities = new EvolutionWorkIdentity?[results.Count];
+        for (int i = 0; i < results.Count; i++) identities[i] = results[i].WorkIdentity?.ToIdentity();
         int accepted = 0;
-        foreach (TellResult result in results)
+        for (int i = 0; i < results.Count; i++)
         {
+            TellResult result = results[i];
             EvolutionTaskResult outcome = ReportedOutcome(result);
 
             // NOTHING IS REMEMBERED PER ASK. A dictionary of asked genomes used to be
@@ -176,7 +195,11 @@ internal sealed class HostSession : IDisposable
             // outstanding set, so this was a second copy that nobody read and that only
             // an accepted tell would shrink. A client that asked and never told grew it
             // for the life of the run.
-            if (_session.Tell(result.EvaluationId, outcome)) accepted += 1;
+            EvolutionWorkIdentity? identity = identities[i];
+            bool committed = identity is null
+                ? _session.Tell(result.EvaluationId, outcome)
+                : identity.EvaluationId == result.EvaluationId && _session.TellAttempt(identity, outcome);
+            if (committed) accepted += 1;
         }
         return accepted;
     }

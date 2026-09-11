@@ -56,7 +56,9 @@ createInterface({ input: process.stdin }).on('line', (line) => {
         say({ id: request.id, ok: false, error: 'the fake host refuses to open' });
         return;
       }
-      say({ id: request.id, ok: true, version: 'fake' });
+      say({ id: request.id, ok: true, version: 'fake', ...(mode.startsWith('strict') ? {
+        workIdentityVersion: 1, requiresWorkIdentity: true, compatibilityHash: 'a'.repeat(64),
+      } : {}) });
       return;
 
     case 'ask': {
@@ -88,13 +90,20 @@ createInterface({ input: process.stdin }).on('line', (line) => {
       remaining -= count;
       const candidates = [];
       for (let index = 0; index < count; index += 1) {
-        candidates.push({ evaluationId: nextEvaluationId++, parameters: { x: index } });
+        const evaluationId = nextEvaluationId++;
+        candidates.push({ evaluationId, parameters: { x: index }, ...(mode === 'strict' ? {
+          workIdentity: { runId: 'fake', evaluationId, attempt: 1, leaseId: 'a'.repeat(32) },
+        } : {}) });
       }
       say({ id: request.id, ok: true, candidates, complete: candidates.length === 0 });
       return;
     }
 
     case 'tell':
+      if (mode === 'strict' && request.results.some(result => result.workIdentity?.leaseId !== 'a'.repeat(32))) {
+        say({ id: request.id, ok: false, error: 'ticket lost in transit' });
+        return;
+      }
       if (mode === 'invalid-payload-before-tell') {
         say({ id: request.id, ok: true, ...invalidPayload });
       }

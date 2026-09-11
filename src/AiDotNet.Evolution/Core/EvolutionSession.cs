@@ -29,11 +29,10 @@ namespace AiDotNet.Evolution;
 /// different way to reach the same engine, not a second engine.
 /// </para>
 /// <para>
-/// <b>Determinism is preserved but not free.</b> The engine's own ordering is unchanged, and results are applied
-/// through the same code path as a direct evaluation. What the caller controls is when a result arrives: telling
-/// two outstanding candidates in a different order across two runs produces the same archive content, because
-/// placement is keyed on canonical identity rather than arrival, but observer event ORDER will differ. Reproduce a
-/// run by replaying the same asks and tells, not by assuming any interleaving is equivalent.
+/// <b>Determinism follows the engine's dispatch and commit contracts.</b> Canonical identity does not make arbitrary
+/// arrival orders equivalent: opportunistic commits can change feedback, future proposals, and the final archive.
+/// Exact replay requires the same external responses and applicable scheduling provenance; timeouts and retries
+/// can change the trajectory even when the random seed is unchanged.
 /// </para>
 /// <para><b>For Beginners:</b> Normally you give the engine a judge and it runs the whole contest. Here you take
 /// the organizer's clipboard instead: you call <see cref="AskAsync"/> to get the next few entries that need

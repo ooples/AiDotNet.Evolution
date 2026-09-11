@@ -53,12 +53,18 @@ export interface DescriptorSpec {
 }
 
 export interface RunConfig {
+  /** Enables strict fenced tells. Version hashes must cover caller task and evaluator semantics. */
+  readonly taskIdentity?: ExternalTaskIdentity;
+  /** Cooperative timeout per evaluation attempt; does not stop external physical work. */
+  readonly evaluationTimeoutMs?: number;
+  /** Retries after the first attempt; requires taskIdentity. Budget counts every attempt. */
+  readonly maxRetries?: number;
   readonly parameters: readonly ParameterSpec[];
   readonly descriptors: readonly DescriptorSpec[];
   /** Starting points. Defaults to one genome at the midpoint of every range. */
   readonly seeds?: readonly Record<string, number>[];
   /**
-   * Anything derived from this is reproducible; the same seed replays the same search.
+   * Random seed. Replay also requires identical evaluator responses and timeout/retry behavior.
    *
    * A NON-NEGATIVE SAFE INTEGER. The host holds it as a 64-bit unsigned value, but it
    * arrives through `JSON.stringify`, and a JavaScript number above
@@ -105,8 +111,25 @@ export interface RunConfig {
 }
 
 /** One candidate to score. */
+export interface ExternalTaskIdentity {
+  readonly taskId: string;
+  readonly taskVersionHash: string;
+  readonly evaluatorVersionHash: string;
+}
+
+/** Echo this entire ticket unchanged; it is correlation, not authentication. */
+export interface WorkIdentity {
+  readonly runId: string;
+  readonly evaluationId: number;
+  readonly attempt: number;
+  readonly leaseId: string;
+}
+
+/** One candidate to score. */
 export interface Candidate {
   readonly evaluationId: number;
+  /** Present on asks from a fencing-capable host, absent on an archived best summary. */
+  readonly workIdentity?: WorkIdentity;
   readonly parameters: Record<string, number>;
   readonly quality?: number;
 }
@@ -114,6 +137,8 @@ export interface Candidate {
 /** What you report back for one candidate. */
 export interface Evaluation {
   readonly evaluationId: number;
+  /** Required in strict mode. Copy from the candidate; never look up a replacement by numeric id. */
+  readonly workIdentity?: WorkIdentity;
   /**
    * Higher is better under `maximize`.
    *
@@ -141,7 +166,7 @@ enum HostOperation {
 }
 
 interface ResponsePayloads {
-  [HostOperation.Open]: { version: string };
+  [HostOperation.Open]: { version: string; workIdentityVersion?: number; requiresWorkIdentity?: boolean; compatibilityHash?: string };
   [HostOperation.Ask]: { candidates: Candidate[]; complete: boolean };
   [HostOperation.Tell]: { accepted: number };
   [HostOperation.Close]: { best?: Candidate | null; stopReason: string };
@@ -158,13 +183,25 @@ function isRecord(value: unknown): value is Record<string, unknown> {
 function isCandidate(value: unknown): value is Candidate {
   if (!isRecord(value) || typeof value.evaluationId !== 'number' ||
       !Number.isSafeInteger(value.evaluationId) || value.evaluationId < 0 ||
-      !isRecord(value.parameters)) return false;
+      !isRecord(value.parameters) || (value.workIdentity !== undefined &&
+        (!isWorkIdentity(value.workIdentity) || value.workIdentity.evaluationId !== value.evaluationId))) return false;
   for (const name in value.parameters) {
     const parameter = value.parameters[name];
     if (typeof parameter !== 'number' || !Number.isFinite(parameter)) return false;
   }
   return value.quality === undefined ||
     (typeof value.quality === 'number' && Number.isFinite(value.quality));
+}
+
+function isIdentityText(value: unknown): value is string {
+  return typeof value === 'string' && value.trim().length > 0 && value.length <= 1024;
+}
+
+function isWorkIdentity(value: unknown): value is WorkIdentity {
+  return isRecord(value) && isIdentityText(value.runId) &&
+    typeof value.evaluationId === 'number' && Number.isSafeInteger(value.evaluationId) && value.evaluationId >= 0 &&
+    typeof value.attempt === 'number' && Number.isInteger(value.attempt) && value.attempt >= 1 && value.attempt <= MAX_INT32 &&
+    typeof value.leaseId === 'string' && /^[0-9a-f]{32}$/.test(value.leaseId);
 }
 
 /** A syntactically valid reply must also carry the payload for the operation awaiting it. */
@@ -225,6 +262,16 @@ function validate(config: RunConfig): void {
   validateInteger(config.maxGenerations, 'maxGenerations', 0, MAX_INT32);
   validateInteger(config.batchSize, 'batchSize', 1, MAX_INT32);
   validateInteger(config.requestTimeoutMs, 'requestTimeoutMs', 1, MAX_INT32);
+  validateInteger(config.evaluationTimeoutMs, 'evaluationTimeoutMs', 1, MAX_INT32);
+  validateInteger(config.maxRetries, 'maxRetries', 0, MAX_INT32);
+  if (config.taskIdentity !== undefined && (!isRecord(config.taskIdentity) ||
+      !isIdentityText(config.taskIdentity.taskId) || !isIdentityText(config.taskIdentity.taskVersionHash) ||
+      !isIdentityText(config.taskIdentity.evaluatorVersionHash))) {
+    throw new EvolutionError('taskIdentity requires nonempty taskId, taskVersionHash and evaluatorVersionHash, each at most 1024 characters.');
+  }
+  if ((config.maxRetries ?? 0) > 0 && config.taskIdentity === undefined) {
+    throw new EvolutionError('maxRetries requires taskIdentity and full workIdentity tells.');
+  }
   if (config.parameters.length === 0) {
     throw new EvolutionError('config.parameters must declare at least one parameter');
   }
@@ -259,6 +306,11 @@ export class EvolutionSession {
   #exitError: Error | null = null;
   #stderr = '';
   readonly #timeoutMs: number;
+  #requiresWorkIdentity = false;
+  #compatibilityHash: string | undefined;
+
+  /** Pinned engine, representation, task and evaluator contract; not a durable resume token. */
+  get compatibilityHash(): string | undefined { return this.#compatibilityHash; }
 
   private constructor(child: ChildProcessWithoutNullStreams, timeoutMs: number) {
     this.#child = child;
@@ -367,6 +419,9 @@ export class EvolutionSession {
         maxGenerations: config.maxGenerations ?? 1000,
         batchSize: config.batchSize ?? 8,
         direction: config.direction ?? 'maximize',
+        taskIdentity: config.taskIdentity,
+        evaluationTimeoutMs: config.evaluationTimeoutMs,
+        maxRetries: config.maxRetries,
       },
     });
     if (!response.ok) {
@@ -376,6 +431,14 @@ export class EvolutionSession {
       session.#teardown();
       throw new EvolutionError(response.error ?? 'the host refused to open the run');
     }
+    session.#requiresWorkIdentity = config.taskIdentity !== undefined;
+    if (session.#requiresWorkIdentity && (response.workIdentityVersion !== 1 || response.requiresWorkIdentity !== true ||
+        typeof response.compatibilityHash !== 'string' || !/^[0-9a-f]{64}$/.test(response.compatibilityHash))) {
+      session.#closed = true;
+      session.#teardown();
+      throw new EvolutionError('the host did not confirm strict workIdentity version 1; refusing a protocol downgrade.');
+    }
+    session.#compatibilityHash = response.compatibilityHash;
     return session;
   }
 
@@ -388,12 +451,23 @@ export class EvolutionSession {
   async ask(max = 8): Promise<Candidate[]> {
     const response = await this.#send(HostOperation.Ask, { max });
     if (!response.ok) throw new EvolutionError(response.error ?? 'ask failed');
+    if (this.#requiresWorkIdentity && response.candidates.some(candidate => candidate.workIdentity === undefined)) {
+      this.#die('the strict host returned a candidate without workIdentity');
+      this.#teardown();
+      throw this.#exitError;
+    }
     return response.candidates;
   }
 
   /** Reports scores. Returns how many were actually outstanding. */
   async tell(results: readonly Evaluation[]): Promise<number> {
     if (results.length === 0) return 0;
+    for (const result of results) {
+      if ((this.#requiresWorkIdentity || result.workIdentity !== undefined) &&
+          (!isWorkIdentity(result.workIdentity) || result.workIdentity.evaluationId !== result.evaluationId)) {
+        throw new EvolutionError('tell requires the original candidate workIdentity and matching evaluationId.');
+      }
+    }
     const response = await this.#send(HostOperation.Tell, { results });
     if (!response.ok) throw new EvolutionError(response.error ?? 'tell failed');
     return response.accepted;
