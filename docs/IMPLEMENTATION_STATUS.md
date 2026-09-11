@@ -69,6 +69,15 @@ failure-inclusive evidence. The retained four-run export contains all 96 worker 
 and unchanged listed binary hashes. This fixed authored catalog uses no model calls; timings include startup,
 compilation, execution and cleanup. It is not an isolated algorithm benchmark, sealed suite or competitive win.
 
+Companion `367fce237` adds opt-in [evidence-verified persistent program fitness](https://github.com/ooples/AiDotNet/blob/367fce237ac000873f4749e5fcfa6ada4002e9cb/docs/evolution-persistent-fitness.md)
+below fresh correctness checks. Producer origin survives descriptors/gating; unsupported LLM score blending fails
+before model calls. Exact source/scope, raw-evidence verification, age/uncertainty rules, force-fresh and metered
+logical store calls are integrated through custom fitness. Acceptance-time age is rechecked after verification.
+The facade refuses bypassing outer memoization and uncoordinated resume. Independent engines use distinct run
+ledgers with shared evidence stores; campaign-wide allocation and production raw-evidence providers remain explicit.
+Its checked-in focused suite runs in the source-pinned workflow. These are scripted control-flow contracts,
+not a representative runtime campaign or a new competitive result.
+
 Hosted source validation at `d0c4039ac` failed NU1008 because the nested core checkout inherited consumer Central
 Package Management; the companion workflow now uses sibling checkouts. The normal package-path wiki build also
 failed on missing `EvolutionResourceLedger`, confirming the published-preview gap. Neither failure is hidden by
@@ -113,13 +122,20 @@ Durable evaluation identities and leases must be developed against its eventual 
 | US-20 proposal concurrency | Not implemented | Immutable proposal contexts, bounded scheduling and deterministic policy. |
 | US-21 durable external work | Pending API integration | Run/evaluation/attempt identity, leases, heartbeats, stale results and pending-work persistence. |
 | US-22 centroid archive | Partial | Fixed-K routing, immutable geometry, transactional offline projection and engine/checkpoint coverage implemented; matched common-reference runner available; controlled memory/latency and representative quality confirmation remain. |
-| US-23 warm starts | Partial | Bounded [seed repertoires](WARM_START_REPERTOIRES.md), twelve-facet revalidation, [sample provenance](MEASUREMENT_ORIGIN.md), [persistent evaluation storage](PERSISTENT_EVALUATION_REUSE.md), age/uncertainty/force-fresh decisions and store accounting implemented. Real-engine deterministic cold/warm/force-fresh example passes; consumer facades and representative fair warm/cold/freshness campaigns remain. |
+| US-23 warm starts | Partial | Bounded [seed repertoires](WARM_START_REPERTOIRES.md), twelve-facet revalidation, [sample provenance](MEASUREMENT_ORIGIN.md), [persistent evaluation storage](PERSISTENT_EVALUATION_REUSE.md), age/uncertainty/force-fresh decisions and store accounting implemented. Real-engine deterministic cold/warm/force-fresh example and AiDotNet fitness-facade integration pass; production raw-evidence providers, other consumer integrations and representative fair warm/cold/freshness campaigns remain. |
 | US-24 CLI/dashboard | Partial | Core numeric CLI plus consumer authored-C# pilot and existing YAML commands; broader lifecycle/provider/dashboard integration remains. |
 | US-25 promotion/retuning | Partial, companion | Tensors persistent quarantine, guarded publication and explicit validated rollback implemented; automatic drift/bounded retuning, coordinated cross-process revocation and program/AutoML registry remain. |
 | US-26 policy meta-evolution | Not implemented | Opt-in declarative policy search, held-out outer loop and complete inner/outer cost accounting. |
 
 ## Validation evidence
 
+- AiDotNet companion `367fce237`: 941 focused consumer tests and 79 optional compiler/worker tests pass separately
+  on net8.0/net10.0. The focused suite is now checked in and wired to pinned-source CI. Changed production C#:
+  111/112 executable lines covered; new reuse evaluator 89/90; selected evolution namespace 5,672/6,095.
+  Normal net8/net10/net471 builds pass with existing warnings, matching production/test-copy hashes; no net471
+  test claim. Old hosted ddad CLI tests passed 42/42 but the gate counted duplicate TRX attachment paths; both
+  downloaded reports have identical SHA256 and the fixed gate passes their 268/270 benchmark lines. Ten gate
+  regressions pass. Current-head hosted review/package integration remains outstanding.
 - Persistent evaluation slice: 594 tests pass on each of net10.0/net8.0/net471 (28 new cases). Final net10 coverage:
   8,172/8,884 lines (91.99%), 4,866/6,242 branches (77.96%); new source files 255/257 executable lines.
   Final real-engine cold/warm/force-fresh example checks evaluator calls 8/0/8, store calls 16/8/8, validation
