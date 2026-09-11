@@ -75,8 +75,10 @@ public sealed partial class EvolutionFidelityScheduler<TGenome>
                 item.StopReason is not (EvolutionReplicationStopReason.Completed or EvolutionReplicationStopReason.InvalidMeasurement or EvolutionReplicationStopReason.UnknownCost))
                 throw new ArgumentException("Invalid settled batch checkpoint.", nameof(checkpoint));
             bool confirmation = item.Confirmation.Value, complete = item.StopReason == EvolutionReplicationStopReason.Completed;
-            if ((complete && item.Samples.Length != _plan.Replicates) || (!complete && item.AcceptedTokens != 0) ||
-                (confirmation && (item.Rung != _plan.Levels.Count - 1 || item.AcceptedTokens != 0 || item.RejectedTokens != 0 || item.PriorSamples.Any(value => value is not null))))
+            bool invalidCompletion = complete ? item.Samples.Length != _plan.Replicates : item.AcceptedTokens != 0;
+            bool invalidConfirmation = confirmation && (item.Rung != _plan.Levels.Count - 1 || item.AcceptedTokens != 0 ||
+                item.RejectedTokens != 0 || item.PriorSamples.Any(value => value is not null));
+            if (invalidCompletion || invalidConfirmation)
                 throw new ArgumentException("Invalid completion or confirmation checkpoint.", nameof(checkpoint));
             var level = _plan.Levels[item.Rung];
             var purpose = confirmation ? EvolutionReplicationPurpose.Confirmation : EvolutionReplicationPurpose.Search;
@@ -96,9 +98,11 @@ public sealed partial class EvolutionFidelityScheduler<TGenome>
             {
                 var sample = item.Samples[i];
                 if (sample is null || !sample.Status.HasValue || !Enum.IsDefined(typeof(EvolutionEvaluationStatus), sample.Status.Value) ||
-                    !sample.Charged.HasValue || sample.Charged < 0 || sample.Charged > level.MaximumCostPerReplicate || !sample.Unknown.HasValue ||
-                    (sample.Quality.HasValue && !EvolutionDescriptorDefinition.IsFinite(sample.Quality.Value)) ||
-                    (sample.Reported.HasValue && (!EvolutionDescriptorDefinition.IsFinite(sample.Reported.Value) || sample.Reported < 0)))
+                    !sample.Charged.HasValue || sample.Charged < 0 || sample.Charged > level.MaximumCostPerReplicate || !sample.Unknown.HasValue)
+                    throw new ArgumentException("Invalid checkpoint sample.", nameof(checkpoint));
+                if (sample.Quality is { } qualityValue && !EvolutionDescriptorDefinition.IsFinite(qualityValue))
+                    throw new ArgumentException("Invalid checkpoint sample.", nameof(checkpoint));
+                if (sample.Reported is { } reportedValue && (!EvolutionDescriptorDefinition.IsFinite(reportedValue) || reportedValue < 0))
                     throw new ArgumentException("Invalid checkpoint sample.", nameof(checkpoint));
                 var sampleContext = new EvolutionReplicateContext(batchId, i, purpose, context);
                 var receipt = _ledger.FindReceipt("replicate/" + sampleContext.SampleIdentity);
@@ -108,22 +112,44 @@ public sealed partial class EvolutionFidelityScheduler<TGenome>
                     receipt.Maximum.Amounts.Count != 1 || receipt.Estimated.Amounts.Count != 1 || receipt.Charged.Amounts.Count != 1 ||
                     receipt.Estimated["cost_units"] != level.MaximumCostPerReplicate ||
                     receipt.Attempt != 1 || receipt.Maximum["cost_units"] != level.MaximumCostPerReplicate || receipt.Charged["cost_units"] != sample.Charged ||
-                    receipt.Outcome != expectedOutcome || (sample.Unknown.Value && sample.Charged != level.MaximumCostPerReplicate) ||
-                    (!sample.Unknown.Value && (!sample.Reported.HasValue || sample.Reported > (double)EvolutionResources.MaximumAmount ||
-                        (sample.Reported > 0 && (decimal)sample.Reported.Value == 0) || (decimal)sample.Reported.Value != sample.Charged)))
+                    receipt.Outcome != expectedOutcome)
                     throw new ArgumentException("Checkpoint sample does not match its settled ledger receipt.", nameof(checkpoint));
+                if (sample.Unknown.Value)
+                {
+                    if (sample.Charged != level.MaximumCostPerReplicate)
+                        throw new ArgumentException("Checkpoint sample does not match its settled ledger receipt.", nameof(checkpoint));
+                }
+                else
+                {
+                    // The earlier finite/nonnegative check and this upper bound must precede
+                    // decimal conversion, including for a rechecksummed untrusted payload.
+                    if (sample.Reported is not { } reportedCost || reportedCost > (double)EvolutionResources.MaximumAmount)
+                        throw new ArgumentException("Checkpoint sample does not match its settled ledger receipt.", nameof(checkpoint));
+                    decimal reportedCharge = (decimal)reportedCost;
+                    if ((reportedCost > 0 && reportedCharge == 0) || reportedCharge != sample.Charged)
+                        throw new ArgumentException("Checkpoint sample does not match its settled ledger receipt.", nameof(checkpoint));
+                }
                 if (item.PriorSamples[i] is { } source && (previous is null || !previous.Measurements.IsComplete ||
                     previous.Purpose != EvolutionReplicationPurpose.Search || previous.Level.ResourceLevel >= level.ResourceLevel ||
                     source != previous.Measurements.Samples[i].Context.SampleIdentity))
                     throw new ArgumentException("Continuation source sample differs.", nameof(checkpoint));
                 var origin = sample.OriginJson is null ? null : EvolutionMeasurementOrigin.FromJson(sample.OriginJson);
                 bool accepted = complete || i < item.Samples.Length - 1;
-                if (accepted && (sample.Status != EvolutionEvaluationStatus.Completed || !sample.Quality.HasValue || sample.Quality < _plan.MinimumQuality ||
-                    sample.Quality > _plan.MaximumQuality || sample.Unknown.Value || (origin is not null && (origin.Kind != EvolutionMeasurementOriginKind.Measured ||
-                        origin.SampleCount != 1 || origin.SampleIds[0] != sampleContext.SampleIdentity || (originScope is not null && originScope != origin.ScopeKey)))))
-                    throw new ArgumentException("Invalid sample cannot contribute to restored statistics.", nameof(checkpoint));
+                if (accepted)
+                {
+                    if (sample.Status != EvolutionEvaluationStatus.Completed || sample.Quality is not { } quality || quality < _plan.MinimumQuality ||
+                        quality > _plan.MaximumQuality || sample.Unknown.Value)
+                        throw new ArgumentException("Invalid sample cannot contribute to restored statistics.", nameof(checkpoint));
+                    if (origin is not null)
+                    {
+                        if (origin.Kind != EvolutionMeasurementOriginKind.Measured || origin.SampleCount != 1 || origin.SampleIds[0] != sampleContext.SampleIdentity)
+                            throw new ArgumentException("Invalid sample cannot contribute to restored statistics.", nameof(checkpoint));
+                        if (originScope is not null && originScope != origin.ScopeKey)
+                            throw new ArgumentException("Invalid sample cannot contribute to restored statistics.", nameof(checkpoint));
+                    }
+                    moments.Add(quality);
+                }
                 if (origin is not null) originScope = origin.ScopeKey;
-                if (accepted) moments.Add(sample.Quality!.Value);
                 if (!accepted && (sample.Unknown.Value != (item.StopReason == EvolutionReplicationStopReason.UnknownCost)))
                     throw new ArgumentException("Failure reason differs from its receipt.", nameof(checkpoint));
                 samples.Add(new(sampleContext, sample.Status.Value, sample.Quality, sample.Charged.Value, sample.Unknown.Value, sample.Reported, origin));
