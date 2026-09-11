@@ -11,7 +11,7 @@ public sealed class EvolutionSurrogateObservation<TGenome>
         Guard.NotNull(candidate); Guard.NotNull(evaluation);
         if (candidate.EvaluationId != evaluation.EvaluationId || candidate.CanonicalGenome.Id != evaluation.GenomeId ||
             evaluation.Status != EvolutionEvaluationStatus.Completed || !evaluation.Quality.HasValue ||
-            evaluation.CacheStatus == EvolutionCacheStatus.Hit || evaluation.Cost.AttemptCount == 0 ||
+            evaluation.IsMeasurementReuse || evaluation.Cost.AttemptCount == 0 ||
             evaluation.ConstraintViolations.Any(value => value > 0))
             throw new ArgumentException("Surrogate observations require matching fresh feasible measured outcomes.", nameof(evaluation));
         Candidate = candidate.CanonicalGenome; Evaluation = evaluation;
