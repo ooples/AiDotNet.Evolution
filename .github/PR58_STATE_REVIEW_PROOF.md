@@ -46,6 +46,12 @@ A fresh-process focused replay also passed 126/126 on net10.0:
 `pr58-final-focused-after-net10.0.trx`. This is behavior-preservation evidence;
 the old implementation was not claimed to fail these valid/invalid contracts.
 
+An independent reviewer replayed the final net10.0 assembly in another process:
+**126 passed, zero failed, zero skipped**, recorded in
+`artifacts/pr58-review/pr58-root-independent.trx`. The production diff, typed
+corruption fixtures, validation/error ordering and child-restore boundaries were
+also reviewed independently before publication.
+
 | Loaded net10.0 artifact | Before SHA-256 | After SHA-256 |
 | --- | --- | --- |
 | `AiDotNet.Evolution.dll` | `9972778743FCC293634193E1095B6BEFACF0EF36E0E50C5214666B6937BC15F7` | `11B815772E2CE1A55AAA500A141230EFB02D4AF9A24EF5E26D7ADEE591EC71B9` |
