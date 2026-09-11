@@ -184,6 +184,67 @@ public sealed class EvolutionPipelineTests
     }
 
     [Fact]
+    public async Task ConcurrentEvaluationFaultIsNotHiddenWhenTheWaveAbortsForCancellation()
+    {
+        // Seed 1's evaluation faults outside the evaluator boundary while seed 2's preparation cancels the run. The
+        // wave abort must surface that fault rather than drain it into a counter and report a clean cancellation.
+        var task = new FaultingStageCountCascadeTask(faultingRead: 2, cancelWhenFaulting: false, failFirstAttempt: false);
+        var options = Options(); options.MaxProposals = 2;
+        options.Cascade.Enabled = true; options.Cascade.Thresholds = new[] { 1d };
+        var engine = Engine(task, new ProbeVariation(true), options);
+        using var cancellation = new CancellationTokenSource(TimeSpan.FromSeconds(20));
+        task.CancelRun = cancellation.Cancel;
+        var run = engine.RunAsync(new[] { new TestGenome(1), new TestGenome(2) }, cancellation.Token);
+        var fault = await Assert.ThrowsAsync<InvalidOperationException>(() => run);
+        Assert.Equal(FaultingStageCountCascadeTask.Message, fault.Message);
+        Assert.True(cancellation.IsCancellationRequested);
+        var report = Assert.IsType<EvolutionPipelineReport>(engine.PipelineReport);
+        Assert.Equal(1, report.AbortedWaves);
+        Assert.Equal(1, report.FaultedTaskDrains);
+        Assert.Equal("faulted", Assert.Single(report.Schedule, entry => entry.Kind == EvolutionPipelineScheduleKind.WaveAborted).Identity);
+    }
+
+    [Fact]
+    public async Task RetryRoundFaultIsNotHiddenWhenTheRoundAbortsForCancellation()
+    {
+        // All three first attempts fail and retry. With one evaluator slot and one queued evaluation, the retry round
+        // blocks on its first retry; that retry faults outside the evaluator boundary and cancels the run, so the round
+        // aborts for cancellation after draining the fault. The wave abort must still surface it.
+        var task = new FaultingStageCountCascadeTask(faultingRead: 5, cancelWhenFaulting: true, failFirstAttempt: true);
+        var options = Options(); options.MaxProposals = 3; options.MaxRetries = 1; options.MaxDegreeOfParallelism = 1;
+        options.Pipeline.EvaluationQueueCapacity = 1;
+        options.Cascade.Enabled = true; options.Cascade.Thresholds = new[] { 1d };
+        var engine = Engine(task, new ProbeVariation(true), options);
+        using var cancellation = new CancellationTokenSource(TimeSpan.FromSeconds(20));
+        task.CancelRun = cancellation.Cancel;
+        var run = engine.RunAsync(new[] { new TestGenome(1), new TestGenome(2), new TestGenome(3) }, cancellation.Token);
+        var fault = await Assert.ThrowsAsync<InvalidOperationException>(() => run);
+        Assert.Equal(FaultingStageCountCascadeTask.Message, fault.Message);
+        Assert.True(cancellation.IsCancellationRequested);
+        var report = Assert.IsType<EvolutionPipelineReport>(engine.PipelineReport);
+        Assert.Equal(1, report.AbortedWaves);
+        Assert.Equal(1, report.FaultedTaskDrains);
+        Assert.Equal("faulted", Assert.Single(report.Schedule, entry => entry.Kind == EvolutionPipelineScheduleKind.WaveAborted).Identity);
+    }
+
+    [Fact]
+    public void OnlyCancellationIsTreatedAsTheExpectedEndOfOwnedWork()
+    {
+        Task canceled = Task.FromCanceled(new CancellationToken(true));
+        Task faultedByCancellation = Task.FromException(new OperationCanceledException());
+        Assert.Null(EvolutionEngine<TestGenome>.FindFaultBehindCancellation(new[] { Task.CompletedTask, canceled, faultedByCancellation }));
+
+        var escaped = new InvalidOperationException("escaped");
+        Task faulted = Task.FromException(escaped);
+        Assert.Same(escaped, EvolutionEngine<TestGenome>.FindFaultBehindCancellation(new[] { canceled, faulted, faulted }));
+
+        var second = new ArgumentException("second");
+        var both = Assert.IsType<AggregateException>(EvolutionEngine<TestGenome>.FindFaultBehindCancellation(
+            new[] { faulted, faultedByCancellation, Task.FromException(second) }));
+        Assert.Equal(new Exception[] { escaped, second }, both.InnerExceptions);
+    }
+
+    [Fact]
     public async Task TightRetryBudgetsDoNotFavorDifferentCandidatesAtDifferentWorkerCounts()
     {
         string? expected = null;
@@ -536,6 +597,50 @@ public sealed class EvolutionPipelineTests
         public ValueTask<EvolutionTaskResult> EvaluateStageAsync(int stage, EvolutionCandidate<TestGenome> candidate, EvolutionEvaluationContext context, CancellationToken cancellationToken = default) =>
             new(EvolutionTaskResult.Completed(stage == 0 ? candidate.CanonicalGenome.Genome.Value % 2 : candidate.CanonicalGenome.Genome.Value,
                 new Dictionary<string, double> { ["x"] = candidate.CanonicalGenome.Genome.Value }, costUnits: stage == 0 ? 0.25 : 1));
+    }
+
+    /// <summary>
+    /// Reports two stages until the <c>faultingRead</c>-th read of <see cref="StageCount"/>, which then throws. The cascade
+    /// path reads the stage count outside the evaluator boundary, so that evaluation task itself faults instead of
+    /// producing a failed result. The run is canceled either from inside that read or by seed 2's preparation once the
+    /// fault has happened, so the abort that follows is a cancellation while the fault is still undelivered.
+    /// </summary>
+    private sealed class FaultingStageCountCascadeTask(int faultingRead, bool cancelWhenFaulting, bool failFirstAttempt)
+        : ICascadeEvolutionTask<TestGenome>
+    {
+        public const string Message = "Stage count is unavailable.";
+        private readonly TaskCompletionSource<bool> _faulted = new(TaskCreationOptions.RunContinuationsAsynchronously);
+        private int _stageCountReads;
+        public Action CancelRun { get; set; } = () => { };
+        public string Id => "pipeline-faulting-cascade";
+        public string VersionHash => "v1";
+        public string EvaluatorVersionHash => "v1";
+        public int StageCount
+        {
+            get
+            {
+                if (Interlocked.Increment(ref _stageCountReads) != faultingRead) return 2;
+                _faulted.TrySetResult(true);
+                if (cancelWhenFaulting) CancelRun();
+                throw new InvalidOperationException(Message);
+            }
+        }
+        public async ValueTask<EvolutionCanonicalGenome<TestGenome>> CanonicalizeAsync(TestGenome genome, CancellationToken cancellationToken = default)
+        {
+            if (!cancelWhenFaulting && genome.Value == 2)
+            {
+                await _faulted.Task;
+                CancelRun();
+                await Task.Delay(Timeout.Infinite, cancellationToken);
+            }
+            return new EvolutionCanonicalGenome<TestGenome>(genome, genome.Value.ToString(CultureInfo.InvariantCulture));
+        }
+        public ValueTask<EvolutionTaskResult> EvaluateAsync(EvolutionCandidate<TestGenome> candidate, EvolutionEvaluationContext context, CancellationToken cancellationToken = default) =>
+            throw new InvalidOperationException("Cascade must use its stages.");
+        public ValueTask<EvolutionTaskResult> EvaluateStageAsync(int stage, EvolutionCandidate<TestGenome> candidate, EvolutionEvaluationContext context, CancellationToken cancellationToken = default) =>
+            new(failFirstAttempt && context.AttemptCount == 1
+                ? EvolutionTaskResult.Failed("retry", "first attempt")
+                : EvolutionTaskResult.Completed(candidate.CanonicalGenome.Genome.Value, new Dictionary<string, double> { ["x"] = candidate.CanonicalGenome.Genome.Value }));
     }
 
     private sealed class InvalidReceiptTask(string mode) : IEvolutionTask<TestGenome>

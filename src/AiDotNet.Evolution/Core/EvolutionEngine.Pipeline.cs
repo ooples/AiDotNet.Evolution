@@ -1,4 +1,5 @@
 using System.Diagnostics;
+using System.Runtime.ExceptionServices;
 
 namespace AiDotNet.Evolution;
 
@@ -42,6 +43,7 @@ public sealed partial class EvolutionEngine<TGenome>
                 var proposals = new Queue<PipelineProposal>();
                 var allProposals = new List<Task>();
                 var evaluations = new List<Task>();
+                var retryEvaluations = new List<Task>();
                 var activeEvaluations = new List<Task>();
                 var snapshots = new Dictionary<int, PipelineArchiveContext>();
                 using var waveCancellation = CancellationTokenSource.CreateLinkedTokenSource(cancellationToken);
@@ -105,11 +107,12 @@ public sealed partial class EvolutionEngine<TGenome>
                         item.RequiresEvaluation = IsRetryable(item.Result) && item.AttemptCount <= _options.MaxRetries;
                     }
                     // Retries are separate settled rounds; feedback cannot race proposal preparation or backend learning.
-                    await EvaluatePipelineRetriesAsync(batch, evaluatorSlots, waveToken).ConfigureAwait(false);
+                    await EvaluatePipelineRetriesAsync(batch, evaluatorSlots, retryEvaluations, waveToken).ConfigureAwait(false);
                     waveToken.ThrowIfCancellationRequested();
                 }
                 catch (Exception exception)
                 {
+                    Exception? faultBehindCancellation = null;
                     try
                     {
                         try { waveCancellation.Cancel(); }
@@ -124,14 +127,21 @@ public sealed partial class EvolutionEngine<TGenome>
                         try
                         {
                             _pipelineStatistics.RecordDrain(await DrainPipelineTasksAsync(allProposals.Concat(evaluations)).ConfigureAwait(false));
+                            // Retry rounds drain their own tasks before rethrowing, so every task inspected here has settled.
+                            if (exception is OperationCanceledException)
+                                faultBehindCancellation = FindFaultBehindCancellation(allProposals.Concat(evaluations).Concat(retryEvaluations));
                         }
                         finally
                         {
                             // Fatal drain failures still require settled callbacks before restoring cursors.
-                            _pipelineStatistics.WaveAborted(transaction.NextEvaluationId, transaction.Generation, exception is OperationCanceledException);
+                            _pipelineStatistics.WaveAborted(transaction.NextEvaluationId, transaction.Generation,
+                                exception is OperationCanceledException && faultBehindCancellation is null);
                             RestoreBatchTransaction(transaction, batch);
                         }
                     }
+                    // A real wave failure is preserved as-is, with sibling faults counted by the drain. A cancellation is
+                    // not a failure, so when owned work faulted during it, that fault is the actual outcome of the wave.
+                    if (faultBehindCancellation is not null) ExceptionDispatchInfo.Capture(faultBehindCancellation).Throw();
                     throw;
                 }
                 finally
@@ -217,7 +227,39 @@ public sealed partial class EvolutionEngine<TGenome>
         return EvolutionPipelineDrainStatus.Completed;
     }
 
-    private async Task EvaluatePipelineRetriesAsync(List<WorkItem> batch, SemaphoreSlim slots, CancellationToken cancellationToken)
+    /// <summary>Finds owned-task faults that a cancellation abort would otherwise report as a clean cancellation.</summary>
+    /// <param name="settledTasks">Proposal and evaluation tasks of the aborted wave; every one must already have settled.</param>
+    /// <returns>
+    /// <c>null</c> when every task completed or stopped by cancellation; the single fault when exactly one task failed
+    /// otherwise; or an <see cref="AggregateException"/> of every distinct fault.
+    /// </returns>
+    /// <remarks>
+    /// Cancellation is the only expected way for owned work to end once a wave is canceled. Proposal and evaluator
+    /// callback failures are already converted into failed results at their boundaries, so a task that still faulted
+    /// with anything else escaped that failure path. Rethrowing the cancellation would make the run report
+    /// <see cref="EvolutionStopReason.Canceled"/> (or a time limit) with the fault reduced to a drain counter.
+    /// </remarks>
+    internal static Exception? FindFaultBehindCancellation(IEnumerable<Task> settledTasks)
+    {
+        var faults = new List<Exception>();
+        foreach (Task task in settledTasks)
+        {
+            if (!task.IsFaulted) continue;
+            foreach (Exception fault in task.Exception!.InnerExceptions)
+            {
+                if (fault is OperationCanceledException || faults.Contains(fault)) continue;
+                faults.Add(fault);
+            }
+        }
+        return faults.Count switch
+        {
+            0 => null,
+            1 => faults[0],
+            _ => new AggregateException("Owned pipeline work faulted while the wave was being canceled.", faults)
+        };
+    }
+
+    private async Task EvaluatePipelineRetriesAsync(List<WorkItem> batch, SemaphoreSlim slots, List<Task> started, CancellationToken cancellationToken)
     {
         var pending = batch.Where(item => item.RequiresEvaluation).OrderBy(item => item.EvaluationId).ToList();
         while (pending.Count > 0 && _evaluationAttempts < _options.MaxEvaluationAttempts)
@@ -249,7 +291,7 @@ public sealed partial class EvolutionEngine<TGenome>
                         cancellationToken.ThrowIfCancellationRequested(); active.RemoveAll(task => task.IsCompleted);
                     }
                     Task task = EvaluateWithSlotAsync(item, slots, cancellationToken);
-                    tasks.Add(task); active.Add(task);
+                    tasks.Add(task); active.Add(task); started.Add(task);
                 }
                 await Task.WhenAll(tasks).ConfigureAwait(false);
             }
