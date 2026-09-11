@@ -15,6 +15,7 @@
     <Project Path="src/AiDotNet.Evolution/AiDotNet.Evolution.csproj" />
   </Folder>
   <Folder Name="/tests/">
+    <Project Path="tests/AiDotNet.Evolution.Performance.Tests/AiDotNet.Evolution.Performance.Tests.csproj" />
     <Project Path="tests/AiDotNet.Evolution.Tests/AiDotNet.Evolution.Tests.csproj" />
   </Folder>
 </Solution>
