@@ -74,10 +74,13 @@ Package Management; the companion workflow now uses sibling checkouts. The norma
 failed on missing `EvolutionResourceLedger`, confirming the published-preview gap. Neither failure is hidden by
 the local source-path tests; current-head hosted validation remains pending.
 
-[AiDotNet.Tensors companion PR #1024](https://github.com/ooples/AiDotNet.Tensors/pull/1024): compare-and-deactivate of an observed kernel deployment, enabling built-in fallback
-without allowing stale runtime evidence to remove a newer snapshot. This adds to the validated promotion machinery
-already present on Tensors `main` at `67ceb6ed`; it is not a new promotion system. Deactivation is in-memory only,
-not a persistent quarantine, cancellation of in-flight work, or automatic performance-drift detector.
+[AiDotNet.Tensors companion PR #1024](https://github.com/ooples/AiDotNet.Tensors/pull/1024), `665cb3c8`: exact-observation
+deactivation plus opt-in persistent configuration quarantine and explicit rollback to a retained validated prior
+snapshot. Publication admission shares the journal gate with quarantine, so a previously loaded winner cannot
+race past deactivation. Bounded regression receipts, corrupt-record rejection, independent persistence outcomes
+and conservative process-local blocking on write failure are implemented without adding disk work to dispatch.
+This extends the existing validated promotion machinery, not a replacement promotion system. Cross-process active
+revocation, automatic drift detection, bounded retuning and program/AutoML registries remain open.
 
 The existing [ask/tell PR #14](https://github.com/ooples/AiDotNet.Evolution/pull/14) is not merged or duplicated here.
 Durable evaluation identities and leases must be developed against its eventual agreed API.
@@ -112,7 +115,7 @@ Durable evaluation identities and leases must be developed against its eventual 
 | US-22 centroid archive | Partial | Fixed-K routing, immutable geometry, transactional offline projection and engine/checkpoint coverage implemented; matched common-reference runner available; controlled memory/latency and representative quality confirmation remain. |
 | US-23 warm starts | Not implemented | Applicability-keyed repertoire/evaluation reuse, noisy-sample freshness and fair warm/cold reporting. |
 | US-24 CLI/dashboard | Partial | Core numeric CLI plus consumer authored-C# pilot and existing YAML commands; broader lifecycle/provider/dashboard integration remains. |
-| US-25 promotion/retuning | Partial, companion | Persistent quarantine, retuning/drift policy and program/AutoML deployment registry. |
+| US-25 promotion/retuning | Partial, companion | Tensors persistent quarantine, guarded publication and explicit validated rollback implemented; automatic drift/bounded retuning, coordinated cross-process revocation and program/AutoML registry remain. |
 | US-26 policy meta-evolution | Not implemented | Opt-in declarative policy search, held-out outer loop and complete inner/outer cost accounting. |
 
 ## Validation evidence
@@ -233,8 +236,17 @@ Durable evaluation identities and leases must be developed against its eventual 
 - [Diagonal CMA comparison](benchmarks/DIAGONAL_CMA_PILOT.md): 240 runs / 61,440 calls, no failures. The emitter's
   median final loss beats hill climbing on three development fixtures and loses on the rippled fixture. All six
   methods share the complete initial population and evaluator cap; proposal/evaluator ledger totals are retained.
-- Hosted validation remains incomplete for Evolution/AiDotNet (build/security checks queued). Tensors current head
-  `77d16869` now has successful build, AVX-512 verification and returned GPU-parity checks; earlier duplicate title
+- Tensors companion `665cb3c8`: 191 main-project autotuning tests pass separately on net10.0 and net471; 64 focused
+  linked-source tests pass on net8.0 (the main test project has no net8.0 target). Normal library builds across all
+  three targets succeed with zero warnings/errors. Test-project rebuilds retain existing warnings and disable
+  diagnostic analyzers; no entire-suite/GPU execution claim is made. Coverage: quarantine file 174/175 executable
+  lines; changed tuner lines 28/30; changed cache write line covered. The broader selected files are 615/733 lines
+  and 291/359 branches, not 99%. An unsuppressed net471 cache probe first failed because a temporary suffix made a
+  224-character final path 263 characters long; short sibling temporary filenames fixed the original and new
+  persistence tests without shortening fixtures. Final production/test-copy DLL hashes were checked.
+- Hosted validation remains incomplete for Evolution/AiDotNet (build/security checks queued). Tensors historical head
+  `77d16869` had successful build, AVX-512 verification and returned GPU-parity checks; new head `665cb3c8` requires
+  fresh hosted results. Earlier duplicate title
   runs were cancelled. AiDotNet's CodeRabbit approval applies only to historical head `75aa6b1d`; its later review
   was skipped because 175 files exceeded the 100-file limit. No current-head CodeRabbit or Copilot approval is claimed. All PRs remain drafts;
   no full-roadmap or merge-readiness claim.
