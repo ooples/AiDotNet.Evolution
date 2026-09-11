@@ -80,6 +80,9 @@ jobs:
         run: dotnet run --project benchmarks/AiDotNet.Evolution.Performance -c Release -- --smoke
       - name: Test performance evidence contracts
         run: dotnet test tests/AiDotNet.Evolution.Performance.Tests -c Release --no-restore --verbosity normal
+      - name: Verify published performance tables regenerate from committed evidence
+        shell: pwsh
+        run: ./eng/Test-EvidenceTables.ps1
       - name: Verify isolated performance profiling and worker determinism
         run: dotnet run --project benchmarks/AiDotNet.Evolution.Performance -c Release --no-build -- --profile TestResults/performance '${{ github.sha }}' --smoke
       - name: Verify paired analysis contracts
