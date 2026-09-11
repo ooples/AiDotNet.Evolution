@@ -103,6 +103,12 @@ public sealed class EvolutionResourceLedger
                 _settled, _denied, _unknown, _maximumViolated);
     }
 
+    // Checkpoint validators need settled tombstones even when the diagnostic receipt queue was truncated.
+    internal EvolutionResourceReceipt? FindReceipt(string operationId)
+    {
+        lock (_sync) return _operations.TryGetValue(operationId, out var operation) ? operation.Receipt : null;
+    }
+
     internal bool Complete(string operationId, EvolutionResources actual, EvolutionResourceOutcome outcome, bool onlyIfPending = false)
     {
         ValidateAmounts(actual);

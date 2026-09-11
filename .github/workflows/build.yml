@@ -73,6 +73,12 @@ jobs:
       - name: Verify multi-fidelity promotion and independent confirmation
         shell: pwsh
         run: ./eng/Test-MultiFidelity.ps1
+      - name: Verify actual incremental model training and full-fidelity confirmation
+        shell: pwsh
+        run: ./eng/Test-RegressionFidelity.ps1
+      - name: Verify persisted model training recovery across separate processes
+        shell: pwsh
+        run: ./eng/Test-FidelityRecovery.ps1
       - name: Verify gain and all-stage operator credit
         shell: pwsh
         run: ./eng/Test-OperatorCredit.ps1
