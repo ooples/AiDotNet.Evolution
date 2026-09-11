@@ -111,8 +111,11 @@ public sealed class ResourceMeteredEvolutionTask<TGenome> : ICascadeEvolutionTas
         return result;
     }
 
-    private static EvolutionTaskResult InvalidReceipt(EvolutionTaskResult result, double chargedCost, string code, string message) =>
-        new(EvolutionEvaluationStatus.Failed, result.Quality, result.Direction, result.Descriptors, result.Objectives,
+    private static EvolutionTaskResult InvalidReceipt(EvolutionTaskResult result, double chargedCost, string code, string message)
+    {
+        var failed = new EvolutionTaskResult(EvolutionEvaluationStatus.Failed, result.Quality, result.Direction, result.Descriptors, result.Objectives,
             result.ConstraintViolations, chargedCost,
             new[] { new EvolutionDiagnostic(code, message) }.Concat(result.Diagnostics).Take(EvolutionTaskResult.MaximumDiagnostics), result.Metrics, result.Artifacts);
+        return result.MeasurementOrigin is null ? failed : failed.WithMeasurementOrigin(result.MeasurementOrigin);
+    }
 }

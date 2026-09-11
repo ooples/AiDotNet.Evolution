@@ -1,6 +1,6 @@
 # Competitive roadmap implementation
 
-Updated September 10, 2026. The [26-story roadmap](COMPETITIVE_ANALYSIS_AND_ROADMAP.md) remains the target.
+Updated September 11, 2026. The [26-story roadmap](COMPETITIVE_ANALYSIS_AND_ROADMAP.md) remains the target.
 Implementation is continuing across the core and companion PRs. **The roadmap is not complete and no competitive win is claimed.**
 
 ## Implemented in the initial core PR
@@ -113,12 +113,19 @@ Durable evaluation identities and leases must be developed against its eventual 
 | US-20 proposal concurrency | Not implemented | Immutable proposal contexts, bounded scheduling and deterministic policy. |
 | US-21 durable external work | Pending API integration | Run/evaluation/attempt identity, leases, heartbeats, stale results and pending-work persistence. |
 | US-22 centroid archive | Partial | Fixed-K routing, immutable geometry, transactional offline projection and engine/checkpoint coverage implemented; matched common-reference runner available; controlled memory/latency and representative quality confirmation remain. |
-| US-23 warm starts | Partial | Bounded [seed repertoires](WARM_START_REPERTOIRES.md), twelve-facet applicability, current-task revalidation, source/current decisions and prior-cost provenance implemented; persistent evaluation/sample reuse, noisy-sample freshness and controlled fair warm/cold campaigns remain. |
+| US-23 warm starts | Partial | Bounded [seed repertoires](WARM_START_REPERTOIRES.md), twelve-facet applicability, revalidation and [sample provenance](MEASUREMENT_ORIGIN.md) across cache/migration/checkpoint/trace implemented; replication rejects declared reuse as fresh evidence. Persistent evaluation storage, noisy-sample freshness, consumer integration and fair warm/cold campaigns remain. |
 | US-24 CLI/dashboard | Partial | Core numeric CLI plus consumer authored-C# pilot and existing YAML commands; broader lifecycle/provider/dashboard integration remains. |
 | US-25 promotion/retuning | Partial, companion | Tensors persistent quarantine, guarded publication and explicit validated rollback implemented; automatic drift/bounded retuning, coordinated cross-process revocation and program/AutoML registry remain. |
 | US-26 policy meta-evolution | Not implemented | Opt-in declarative policy search, held-out outer loop and complete inner/outer cost accounting. |
 
 ## Validation evidence
+
+- Measurement-origin slice: 566 tests pass on each of net10.0/net8.0/net471 (35 new cases). Net10 coverage:
+  7,916/8,627 lines (91.76%), 4,708/6,074 branches (77.51%); new origin class has 100% executable-line coverage.
+  Tests cover zero-cost cache copies after restart, migration, checkpoint pre-decode rejection, both compressed
+  trace formats, provenance-preserving invalid receipts and replication refusal of reused/aggregate samples.
+  Normal all-target library build: zero warnings/errors. This is provenance infrastructure, not persistent reuse
+  or a completed US-23 campaign; legacy trace readers may silently discard new provenance.
 
 - Warm-start repertoire slice: all 531 core tests pass separately on net10.0/net8.0/net471, including 53 new
   repertoire cases. The final suite covers changed constraints/evaluator behavior, fresh engine evaluation,

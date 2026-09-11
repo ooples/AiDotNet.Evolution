@@ -48,6 +48,17 @@ public sealed partial class EvolutionEngine<TGenome>
             foreach (EvolutionDiagnostic diagnostic in stageResult.Diagnostics) AddCascadeDiagnostic(diagnostics, diagnostic);
             item.StageCostUnits = stageCosts.ToArray();
 
+            // A merged cascade needs stage-specific origin semantics. Never drop sample identity silently.
+            if (stageResult.MeasurementOrigin is not null)
+            {
+                item.CascadeRejectedStage = null;
+                AddCascadeDiagnostic(diagnostics, new EvolutionDiagnostic("cascade_measurement_origin_unsupported",
+                    "Measurement-origin results require a non-cascade evaluation until stage-specific provenance is configured."));
+                return new EvolutionTaskResult(EvolutionEvaluationStatus.Failed, stageResult.Quality, stageResult.Direction,
+                    descriptors, stageResult.Objectives, stageResult.ConstraintViolations, totalCost, diagnostics, metrics, BoundArtifacts(artifacts))
+                    .WithMeasurementOrigin(stageResult.MeasurementOrigin);
+            }
+
             if (stageResult.Status != EvolutionEvaluationStatus.Completed)
             {
                 item.CascadeRejectedStage = null;

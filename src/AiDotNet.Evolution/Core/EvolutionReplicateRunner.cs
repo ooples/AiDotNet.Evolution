@@ -9,6 +9,9 @@ namespace AiDotNet.Evolution;
 /// It must not hide caching or meter the same cost a second time. Pseudorandom stream separation does not prove physical
 /// independence. Confirmation uses separate identities and accounting; this API never inserts evidence into an archive
 /// or sends confirmation feedback to a proposer. Changing batchId requests new work, not a statistical multiplicity fix.
+/// Supplied measurement origins must declare one newly measured observation whose id equals the supplied
+/// EvolutionReplicateContext.SampleIdentity; all origins in a batch must share one scope. Reuse and aggregates
+/// invalidate the batch after retaining the receipt and its current cost, never increasing statistical precision.
 /// </remarks>
 public sealed class EvolutionReplicateRunner<TGenome>
 {
@@ -27,7 +30,7 @@ public sealed class EvolutionReplicateRunner<TGenome>
         Guard.NotNullOrWhiteSpace(evaluatorVersionHash); Guard.NotNull(plan); Guard.NotNull(ledger); Guard.NotNull(evaluate);
         if (!ledger.Limits.Amounts.ContainsKey("cost_units")) throw new ArgumentException("The ledger must declare cost_units.", nameof(ledger));
         _plan = plan; _ledger = ledger; _evaluate = evaluate;
-        VersionHash = EvolutionHash.Combine(new[] { "fresh-replicate-runner-v1", evaluatorVersionHash, plan.VersionHash });
+        VersionHash = EvolutionHash.Combine(new[] { "fresh-replicate-runner-v2", evaluatorVersionHash, plan.VersionHash });
     }
     /// <summary>Gets the evaluator and policy semantic identity.</summary>
     public string VersionHash { get; }
@@ -47,6 +50,7 @@ public sealed class EvolutionReplicateRunner<TGenome>
             context.EvaluationId.ToString(CultureInfo.InvariantCulture), context.RootSeed.ToString(CultureInfo.InvariantCulture),
             context.SeedStream.ToString(CultureInfo.InvariantCulture), context.AttemptCount.ToString(CultureInfo.InvariantCulture) });
         var samples = new List<EvolutionReplicateMeasurement>();
+        string? originScope = null;
         double mean = 0, deviationScale = 0, scaledSquares = 0;
         var maximum = EvolutionResources.Of("cost_units", _plan.MaximumCostPerSample);
         EvolutionReplicationReport Report(EvolutionReplicationStopReason reason) => new(identity, _plan, reason, samples, mean, deviationScale, scaledSquares);
@@ -76,16 +80,21 @@ public sealed class EvolutionReplicateRunner<TGenome>
                 (result.CostUnits > 0 && (decimal)result.CostUnits == 0))
             {
                 reservation.Dispose();
-                samples.Add(new(sampleContext, result.Status, result.Quality, _plan.MaximumCostPerSample, true, result.CostUnits));
+                samples.Add(new(sampleContext, result.Status, result.Quality, _plan.MaximumCostPerSample, true, result.CostUnits, result.MeasurementOrigin));
                 return Report(EvolutionReplicationStopReason.UnknownCost);
             }
             decimal actual = (decimal)result.CostUnits;
+            EvolutionMeasurementOrigin? origin = result.MeasurementOrigin;
+            bool validOrigin = origin is null || (origin.Kind == EvolutionMeasurementOriginKind.Measured &&
+                origin.SampleCount == 1 && origin.SampleIds[0] == sampleContext.SampleIdentity &&
+                (originScope is null || originScope == origin.ScopeKey));
+            if (origin is not null) originScope = origin.ScopeKey;
             bool valid = result.Status == EvolutionEvaluationStatus.Completed && result.Quality.HasValue &&
                 result.Direction == _plan.Direction && !result.ConstraintViolations.Any(value => value > 0) &&
-                result.Quality.Value >= _plan.MinimumQuality && result.Quality.Value <= _plan.MaximumQuality;
+                result.Quality.Value >= _plan.MinimumQuality && result.Quality.Value <= _plan.MaximumQuality && validOrigin;
             reservation.Complete(EvolutionResources.Of("cost_units", actual),
                 valid && actual <= _plan.MaximumCostPerSample ? EvolutionResourceOutcome.Completed : EvolutionResourceOutcome.Failed);
-            samples.Add(new(sampleContext, result.Status, result.Quality, actual, false, result.CostUnits));
+            samples.Add(new(sampleContext, result.Status, result.Quality, actual, false, result.CostUnits, origin));
             if (actual > _plan.MaximumCostPerSample) return Report(EvolutionReplicationStopReason.MaximumCostExceeded);
             if (!valid) return Report(EvolutionReplicationStopReason.InvalidMeasurement);
             double quality = result.Quality!.Value;

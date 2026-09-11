@@ -1,6 +1,7 @@
 using System.Globalization;
 using System.Text;
 using System.Text.Json;
+using System.Text.Json.Serialization;
 
 namespace AiDotNet.Evolution;
 
@@ -8,6 +9,8 @@ public sealed partial class EvolutionEngine<TGenome>
 {
     // 6 added the incremental early-stopping archive aggregate so QD-score arithmetic resumes bit-for-bit.
     private const int EngineStateSchemaVersion = 6;
+    // Optional sample provenance requires an explicit newer envelope, so old readers cannot silently drop it.
+    private const int EngineMeasurementOriginSchemaVersion = 7;
     private string? _safePayload;
     private long _safeSequence;
 
@@ -70,6 +73,7 @@ public sealed partial class EvolutionEngine<TGenome>
                 }).ToList(),
             Islands = _islands.Select(archive => ArchiveDocument.From(archive, SerializeGenome)).ToList()
         };
+        if (HasMeasurementOrigins(document)) document.SchemaVersion = EngineMeasurementOriginSchemaVersion;
         string payload = JsonSerializer.Serialize(document, EvolutionJson.Compact);
         if (payload.Length > EvolutionCollectionLimits.MaximumCheckpointBytes ||
             Encoding.UTF8.GetByteCount(payload) > EvolutionCollectionLimits.MaximumCheckpointBytes)
@@ -556,13 +560,21 @@ public sealed partial class EvolutionEngine<TGenome>
         // The outer checkpoint version and the engine-state version are different things, and only the latter says
         // whether the fields this reader expects are present. Without this check a payload from an older engine
         // deserializes into an all-default document and reads back as a complete record of a run that found nothing.
-        if (state is null || state.SchemaVersion != EngineStateSchemaVersion)
+        if (state is null || (state.SchemaVersion != EngineStateSchemaVersion && state.SchemaVersion != EngineMeasurementOriginSchemaVersion))
             throw new InvalidDataException(
                 "The evolution engine state schema is invalid; the checkpoint was written by a different engine version.");
 
         ValidatePackageCheckpointBounds(state);
+        if (HasMeasurementOrigins(state) && state.SchemaVersion != EngineMeasurementOriginSchemaVersion)
+            throw new InvalidDataException("Measurement-origin metadata requires the versioned checkpoint schema.");
         return state;
     }
+
+    private static bool HasMeasurementOrigins(EngineStateDocument state) =>
+        (state.Cache?.Any(item => item?.Result?.MeasurementOriginJson is not null) ?? false) ||
+        (state.Islands?.Any(island => island?.Entries?.Any(entry => entry?.Evaluation?.MeasurementOriginJson is not null) == true) ?? false) ||
+        (state.GlobalElites?.Any(item => item?.Entry?.Evaluation?.MeasurementOriginJson is not null) ?? false) ||
+        (state.IslandHistories?.Any(history => history?.Any(entry => entry?.Evaluation?.MeasurementOriginJson is not null) == true) ?? false);
 
     private static byte[] GetCheckpointPayloadBytes(EvolutionCheckpoint checkpoint)
     {
@@ -705,6 +717,7 @@ public sealed partial class EvolutionEngine<TGenome>
 
     private static void ValidateEvaluationBounds(EvaluationDocument evaluation)
     {
+        ValidateMeasurementOriginBounds(evaluation.MeasurementOriginJson);
         ValidateResultCollections(
             evaluation.Descriptors,
             evaluation.Objectives,
@@ -719,13 +732,27 @@ public sealed partial class EvolutionEngine<TGenome>
             throw new InvalidDataException("A checkpoint evaluation artifact is missing.");
     }
 
-    private static void ValidateTaskResultBounds(TaskResultDocument result) =>
+    private static void ValidateTaskResultBounds(TaskResultDocument result)
+    {
+        ValidateMeasurementOriginBounds(result.MeasurementOriginJson);
         ValidateResultCollections(
             result.Descriptors,
             result.Objectives,
             result.ConstraintViolations,
             result.Diagnostics,
             result.Metrics);
+    }
+
+    private static void ValidateMeasurementOriginBounds(string? json)
+    {
+        if (json is null) return;
+        try { EvolutionMeasurementOrigin.FromJson(json); }
+        catch (Exception exception) when (exception is ArgumentException or FormatException or OverflowException or
+            InvalidOperationException or JsonException)
+        {
+            throw new InvalidDataException("A checkpoint measurement origin is not valid.", exception);
+        }
+    }
 
     private static void ValidateResultCollections(
         IReadOnlyDictionary<string, double>? descriptors,
@@ -982,6 +1009,7 @@ public sealed partial class EvolutionEngine<TGenome>
         Append(builder, "metrics");
         AppendNamedValues(builder, result.Metrics);
         AppendArtifacts(builder, result.Artifacts);
+        AppendMeasurementOrigin(builder, result.MeasurementOrigin);
     }
 
     private static void AppendEvaluation(StringBuilder builder, EvolutionEvaluation evaluation)
@@ -1010,6 +1038,7 @@ public sealed partial class EvolutionEngine<TGenome>
         Append(builder, "metrics");
         AppendNamedValues(builder, evaluation.Metrics);
         AppendArtifacts(builder, evaluation.Artifacts);
+        AppendMeasurementOrigin(builder, evaluation.MeasurementOrigin);
         Append(builder, evaluation.Lineage.VariationOperatorId);
         Append(builder, evaluation.Lineage.RefinerId ?? "none");
         Append(builder, evaluation.Lineage.Generation);
@@ -1036,6 +1065,14 @@ public sealed partial class EvolutionEngine<TGenome>
             Append(builder, value.Key);
             Append(builder, EvolutionHash.EncodeDouble(value.Value));
         }
+    }
+
+    private static void AppendMeasurementOrigin(StringBuilder builder, EvolutionMeasurementOrigin? origin)
+    {
+        // Preserve legacy hashes byte-for-byte when the optional metadata is absent.
+        if (origin is null) return;
+        Append(builder, "measurement-origin-v1");
+        Append(builder, origin.ToJson());
     }
 
     private static void AppendDiagnostics(StringBuilder builder, IReadOnlyList<EvolutionDiagnostic> diagnostics)
@@ -1308,6 +1345,8 @@ public sealed partial class EvolutionEngine<TGenome>
         public string TaskVersionHash { get; set; } = string.Empty;
         public string EvaluatorVersionHash { get; set; } = string.Empty;
         public string ConfigurationHash { get; set; } = string.Empty;
+        [JsonIgnore(Condition = JsonIgnoreCondition.WhenWritingNull)]
+        public string? MeasurementOriginJson { get; set; }
 
         public static EvaluationDocument From(EvolutionEvaluation evaluation) => new()
         {
@@ -1328,10 +1367,13 @@ public sealed partial class EvolutionEngine<TGenome>
             Artifacts = evaluation.Artifacts.Select(ArtifactDocument.From).ToList(),
             TaskVersionHash = evaluation.TaskVersionHash,
             EvaluatorVersionHash = evaluation.EvaluatorVersionHash,
-            ConfigurationHash = evaluation.ConfigurationHash
+            ConfigurationHash = evaluation.ConfigurationHash,
+            MeasurementOriginJson = evaluation.MeasurementOrigin?.ToJson()
         };
 
-        public EvolutionEvaluation ToEvaluation(long evaluationId, string genomeId, EvolutionLineage lineage) => new(
+        public EvolutionEvaluation ToEvaluation(long evaluationId, string genomeId, EvolutionLineage lineage)
+        {
+            var result = new EvolutionEvaluation(
             evaluationId, genomeId, Status, Quality, Direction,
             Descriptors ?? new Dictionary<string, double>(), Objectives ?? new List<double>(),
             ConstraintViolations ?? new List<double>(),
@@ -1341,6 +1383,8 @@ public sealed partial class EvolutionEngine<TGenome>
             TaskVersionHash, EvaluatorVersionHash, ConfigurationHash,
             Metrics ?? new Dictionary<string, double>(),
             (Artifacts ?? new List<ArtifactDocument>()).Select(item => item.ToArtifact()));
+            return MeasurementOriginJson is null ? result : result.WithMeasurementOrigin(EvolutionMeasurementOrigin.FromJson(MeasurementOriginJson));
+        }
     }
 
     private sealed class TaskResultDocument
@@ -1354,6 +1398,8 @@ public sealed partial class EvolutionEngine<TGenome>
         public double CostUnits { get; set; }
         public List<DiagnosticDocument>? Diagnostics { get; set; }
         public Dictionary<string, double>? Metrics { get; set; }
+        [JsonIgnore(Condition = JsonIgnoreCondition.WhenWritingNull)]
+        public string? MeasurementOriginJson { get; set; }
 
         public static TaskResultDocument From(EvolutionTaskResult result) => new()
         {
@@ -1365,14 +1411,19 @@ public sealed partial class EvolutionEngine<TGenome>
             ConstraintViolations = result.ConstraintViolations.ToList(),
             CostUnits = result.CostUnits,
             Diagnostics = result.Diagnostics.Select(DiagnosticDocument.From).ToList(),
-            Metrics = result.Metrics.ToDictionary(item => item.Key, item => item.Value, StringComparer.Ordinal)
+            Metrics = result.Metrics.ToDictionary(item => item.Key, item => item.Value, StringComparer.Ordinal),
+            MeasurementOriginJson = result.MeasurementOrigin?.ToJson()
         };
 
-        public EvolutionTaskResult ToTaskResult() => new(Status, Quality, Direction,
+        public EvolutionTaskResult ToTaskResult()
+        {
+            var result = new EvolutionTaskResult(Status, Quality, Direction,
             Descriptors ?? new Dictionary<string, double>(), Objectives ?? new List<double>(),
             ConstraintViolations ?? new List<double>(), CostUnits,
             (Diagnostics ?? new List<DiagnosticDocument>()).Select(item => item.ToDiagnostic()),
             Metrics ?? new Dictionary<string, double>());
+            return MeasurementOriginJson is null ? result : result.WithMeasurementOrigin(EvolutionMeasurementOrigin.FromJson(MeasurementOriginJson));
+        }
     }
 
     private sealed class DiagnosticDocument

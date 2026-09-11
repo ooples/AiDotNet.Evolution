@@ -1,4 +1,5 @@
 using System.Globalization;
+using System.Text.Json.Serialization;
 
 namespace AiDotNet.Evolution;
 
@@ -131,8 +132,9 @@ public sealed class EvolutionReplicateContext
 public sealed class EvolutionReplicateMeasurement
 {
     internal EvolutionReplicateMeasurement(EvolutionReplicateContext context, EvolutionEvaluationStatus status,
-        double? quality, decimal chargedCostUnits, bool unknownCost, double? reportedCostUnits = null)
-    { Context = context; Status = status; Quality = quality; ChargedCostUnits = chargedCostUnits; UnknownCost = unknownCost; ReportedCostUnits = reportedCostUnits; }
+        double? quality, decimal chargedCostUnits, bool unknownCost, double? reportedCostUnits = null,
+        EvolutionMeasurementOrigin? measurementOrigin = null)
+    { Context = context; Status = status; Quality = quality; ChargedCostUnits = chargedCostUnits; UnknownCost = unknownCost; ReportedCostUnits = reportedCostUnits; MeasurementOrigin = measurementOrigin; }
     /// <summary>Gets the sample identity and stream.</summary>
     public EvolutionReplicateContext Context { get; }
     /// <summary>Gets the reported measurement status, or Failed/Canceled when no result returned.</summary>
@@ -145,6 +147,9 @@ public sealed class EvolutionReplicateMeasurement
     public bool UnknownCost { get; }
     /// <summary>Gets the returned cost, including values that the decimal ledger cannot represent; null means no receipt.</summary>
     public double? ReportedCostUnits { get; }
+    /// <summary>Gets supplied provenance, including invalid/reused receipts excluded from successful statistics.</summary>
+    [JsonIgnore(Condition = JsonIgnoreCondition.WhenWritingNull)]
+    public EvolutionMeasurementOrigin? MeasurementOrigin { get; }
 }
 
 /// <summary>Bounded batch evidence. Failed, canceled and under-budget batches never expose a successful mean or interval.</summary>

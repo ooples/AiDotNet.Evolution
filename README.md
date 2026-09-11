@@ -29,6 +29,9 @@ compiler, and correctness-policy fingerprints.
 and prior-cost provenance. Import revalidates seeds under the current task and never imports old fitness;
 persistent evaluation reuse is a separate contract, not checkpoint resume or a deployment-cache hit.
 
+[Measurement origin](docs/MEASUREMENT_ORIGIN.md) preserves original sample identities, uncertainty and acquisition
+cost through cache copies, migration, checkpoints and traces; fresh replication rejects declared reused samples.
+
 ## Integration boundaries
 
 The engine intentionally knows nothing about models, prompts, compilers, or hardware. Integrations keep those domain
