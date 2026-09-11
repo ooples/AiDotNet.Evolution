@@ -1,0 +1,53 @@
+{
+  "name": "@aidotnet/evolution",
+  "version": "0.1.0",
+  "description": "Quality-diversity evolutionary search for TypeScript, over the AiDotNet.Evolution engine.",
+  "license": "Apache-2.0",
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/ooples/AiDotNet.Evolution.git",
+    "directory": "bindings/typescript"
+  },
+  "type": "module",
+  "main": "./dist/index.js",
+  "types": "./dist/index.d.ts",
+  "exports": {
+    ".": {
+      "types": "./dist/index.d.ts",
+      "default": "./dist/index.js"
+    }
+  },
+  "files": [
+    "dist",
+    "README.md"
+  ],
+  "engines": {
+    "node": ">=18.17.0"
+  },
+  "scripts": {
+    "build": "tsc -p tsconfig.json",
+    "host": "node scripts/build-host.mjs",
+    "pretest": "npm run build",
+    "test": "node --test --test-reporter=tap test/*.test.mjs",
+    "lint": "tsc -p tsconfig.json --noEmit",
+    "prepack": "npm run build",
+    "package": "node scripts/make-platform-package.mjs"
+  },
+  "optionalDependencies": {
+    "@aidotnet/evolution-host-win-x64": "0.1.0",
+    "@aidotnet/evolution-host-linux-x64": "0.1.0",
+    "@aidotnet/evolution-host-osx-arm64": "0.1.0"
+  },
+  "devDependencies": {
+    "typescript": "^5.6.0",
+    "@types/node": "^20.14.0"
+  },
+  "keywords": [
+    "evolution",
+    "genetic-algorithm",
+    "quality-diversity",
+    "map-elites",
+    "optimization",
+    "hyperparameter"
+  ]
+}

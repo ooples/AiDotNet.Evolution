@@ -48,7 +48,7 @@ jobs:
           --blame-hang --blame-hang-timeout 120s --blame-crash
           --collect:"XPlat Code Coverage" --results-directory ./coverage
           --
-          DataCollectionRunSettings.DataCollectors.DataCollector.Configuration.Format=cobertura
+          DataCollectionRunSettings.DataCollectors.DataCollector.Configuration.Format=cobertura DataCollectionRunSettings.DataCollectors.DataCollector.Configuration.ExcludeByAttribute=GeneratedCodeAttribute
       - name: Test net8.0
         run: >
           dotnet test tests/AiDotNet.Evolution.Tests/AiDotNet.Evolution.Tests.csproj
@@ -90,6 +90,12 @@ jobs:
       - name: Verify archive partition accounting and replay
         shell: pwsh
         run: ./eng/Test-ArchivePartition.ps1 -SourceRevision '${{ github.sha }}'
+      # GENERATED CODE IS EXCLUDED FROM THE RATCHET, and that is a like-for-like
+      # correction rather than a relaxation. The baseline was recorded on a solution
+      # with one project and no source generators. AiDotNet.Evolution.Host uses
+      # System.Text.Json source generation because NativeAOT trims the reflection
+      # path. Only GeneratedCodeAttribute is excluded: CompilerGeneratedAttribute
+      # also marks user-written closures and must remain in the measured surface.
       - name: Enforce coverage ratchet
         shell: pwsh
         run: |
