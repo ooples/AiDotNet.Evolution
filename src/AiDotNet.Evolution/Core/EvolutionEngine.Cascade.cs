@@ -300,6 +300,33 @@ public sealed partial class EvolutionEngine<TGenome>
         _evaluationsSinceImprovement += committedEvaluations;
     }
 
+    /// <summary>The island versions the cached union hypervolume was measured at, or null before any measurement.</summary>
+    private long[]? _paretoMetricVersions;
+    private double? _paretoMetricValue;
+
+    /// <summary>Measures the union front's dominated volume, reusing the last value while no island changed.</summary>
+    /// <remarks>
+    /// The union of every island front is rebuilt only when an archive version moved, so a batch that inserted
+    /// nothing - and a second read within one batch - does not pay for a full front rebuild again. An empty feasible
+    /// union is an unmeasured front, not a front whose volume happens to be zero: reporting zero makes a run that has
+    /// not reached feasibility look like an immediate plateau and ends exploration before a feasible point exists.
+    /// </remarks>
+    private double? ParetoHypervolumeMetric()
+    {
+        bool reusable = _paretoMetricVersions is not null;
+        _paretoMetricVersions ??= new long[_islands.Length];
+        for (int island = 0; island < _islands.Length; island++)
+        {
+            if (_paretoMetricVersions[island] != _islands[island].Version) reusable = false;
+            _paretoMetricVersions[island] = _islands[island].Version;
+        }
+        if (reusable) return _paretoMetricValue;
+        var definition = ((IEvolutionParetoArchiveView<TGenome>)_islands[0]).ParetoDefinition!;
+        var front = new EvolutionParetoFront<TGenome>(definition, _islands.SelectMany(archive => archive.Entries));
+        _paretoMetricValue = front.Entries.Count == 0 ? (double?)null : front.Hypervolume();
+        return _paretoMetricValue;
+    }
+
     /// <summary>Returns whether the early-stopping patience has been exhausted.</summary>
     private bool IsEarlyStopped() => _options.EarlyStopping.PatienceEvaluations > 0 &&
         _evaluationsSinceImprovement >= _options.EarlyStopping.PatienceEvaluations;
@@ -329,15 +356,7 @@ public sealed partial class EvolutionEngine<TGenome>
         switch (_options.EarlyStopping.Metric)
         {
             case EvolutionEarlyStoppingMetric.ParetoHypervolume:
-                {
-                    var definition = ((IEvolutionParetoArchiveView<TGenome>)_islands[0]).ParetoDefinition!;
-                    var front = new EvolutionParetoFront<TGenome>(definition, _islands.SelectMany(archive => archive.Entries));
-
-                    // An empty feasible union is an unmeasured front, not a front whose volume happens to be zero.
-                    // Reporting zero makes a run that has not reached feasibility yet look like an immediate plateau,
-                    // which ends exploration before the first feasible point can exist.
-                    return front.Entries.Count == 0 ? (double?)null : front.Hypervolume();
-                }
+                return ParetoHypervolumeMetric();
             case EvolutionEarlyStoppingMetric.Coverage:
                 {
                     long occupied = 0;

@@ -85,8 +85,40 @@ public sealed class EvolutionParetoDefinition
         for (int i = 0; i < values.Count; i++) Objectives[i].Normalize(values[i]);
     }
 
-    internal bool SameBox(EvolutionEvaluation a, EvolutionEvaluation b) => Objectives.Select((axis, i) =>
-        axis.CompareValue(a.Objectives[i]) == axis.CompareValue(b.Objectives[i])).All(same => same);
+    /// <summary>Computes the comparison coordinates of one validated objective vector, exact or epsilon-box.</summary>
+    internal double[] CompareVector(IReadOnlyList<double> values)
+    {
+        var vector = new double[Objectives.Count];
+        for (int i = 0; i < Objectives.Count; i++) vector[i] = Objectives[i].CompareValue(values[i]);
+        return vector;
+    }
+
+    /// <summary>Computes the normalized losses of one validated objective vector; zero is ideal and one is worst.</summary>
+    internal double[] NormalizedVector(IReadOnlyList<double> values)
+    {
+        var vector = new double[Objectives.Count];
+        for (int i = 0; i < Objectives.Count; i++) vector[i] = Objectives[i].Normalize(values[i]);
+        return vector;
+    }
+
+    /// <summary>Tests strict dominance between two comparison vectors produced by <see cref="CompareVector"/>.</summary>
+    internal static bool DominatesCompared(double[] left, double[] right)
+    {
+        bool better = false;
+        for (int i = 0; i < left.Length; i++)
+        {
+            if (left[i] > right[i]) return false;
+            if (left[i] < right[i]) better = true;
+        }
+        return better;
+    }
+
+    /// <summary>Tests whether two comparison vectors occupy the same exact point or epsilon box.</summary>
+    internal static bool SameCompared(double[] left, double[] right)
+    {
+        for (int i = 0; i < left.Length; i++) if (left[i] != right[i]) return false;
+        return true;
+    }
 
     internal int CompareRepresentative<T>(EvolutionArchiveEntry<T> a, EvolutionArchiveEntry<T> b)
     {
@@ -110,8 +142,14 @@ public sealed class EvolutionParetoDefinition
         return identity != 0 ? identity : a.Evaluation.EvaluationId.CompareTo(b.Evaluation.EvaluationId);
     }
 
-    private double IdealDistance(EvolutionEvaluation evaluation) => Objectives.Select((axis, i) =>
+    private double IdealDistance(EvolutionEvaluation evaluation)
     {
-        double value = axis.Normalize(evaluation.Objectives[i]); return value * value;
-    }).Sum();
+        double sum = 0;
+        for (int i = 0; i < Objectives.Count; i++)
+        {
+            double value = Objectives[i].Normalize(evaluation.Objectives[i]);
+            sum += value * value;
+        }
+        return sum;
+    }
 }
