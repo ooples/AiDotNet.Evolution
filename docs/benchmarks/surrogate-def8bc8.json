@@ -1,0 +1,2253 @@
+{
+    "SchemaVersion":  1,
+    "Kind":  "compact-surrogate-example-evidence",
+    "Protocol":  "synthetic-surrogate-example-v1",
+    "SourceRevision":  "def8bc8bce7786c88cd923182f8dea265b84f068",
+    "AssemblyVersion":  "1.0.0+def8bc8bce7786c88cd923182f8dea265b84f068",
+    "AssemblySha256":  "c3d3e1129d1640e0a7bff46318691f44720f1393829da998cd2d0274dd7591b7",
+    "FullTraceSha256":  "c8af38d24c0c38f24945180974612528d2e39fe8316b036c75985e64adb6edc2",
+    "Seeds":  10,
+    "CostCap":  128,
+    "Interpretation":  "Development example only. Explicit synthetic work-unit prices, not measured runtime or real evaluator/model cost ratios. KNN residual/distance uncertainty is not a confidence interval. No confirmation or deployment claim.",
+    "Runs":  [
+                 {
+                     "Task":  "ShiftedQuadratic4",
+                     "Method":  "Ordinary",
+                     "Seed":  0,
+                     "Status":  "completed",
+                     "StopReason":  "cost-cap",
+                     "InitialPopulationHash":  "382fb2a210b3cd6de8152b9576e78e69b99e5b2dd434d05933ac4a2b44d4c0d6",
+                     "EvaluatorCalls":  126,
+                     "GeneratedProposals":  119,
+                     "FinalLoss":  0.001481737361499107,
+                     "ReasonCounts":  {
+                                          "Exploration":  119
+                                      },
+                     "StageCostUnits":  {
+                                            "Setup":  0.08,
+                                            "Evaluation":  126,
+                                            "Proposal":  1.19
+                                        },
+                     "Resources":  {
+                                       "Spent":  {
+                                                     "cost_units":  127.27
+                                                 },
+                                       "Reserved":  {
+                                                        "cost_units":  0.00
+                                                    },
+                                       "Admitted":  246,
+                                       "Settled":  246,
+                                       "Denied":  1,
+                                       "Unknown":  0,
+                                       "MaximumViolated":  false,
+                                       "DroppedReceipts":  0
+                                   },
+                     "MeasurementCount":  126,
+                     "DecisionCount":  119,
+                     "UnmeasuredSelections":  1
+                 },
+                 {
+                     "Task":  "ShiftedQuadratic4",
+                     "Method":  "Ordinary",
+                     "Seed":  1,
+                     "Status":  "completed",
+                     "StopReason":  "cost-cap",
+                     "InitialPopulationHash":  "cba960e210a71c05e2a6e50ca8a29300ca6a570aec02f8ca0a865a3918703f9f",
+                     "EvaluatorCalls":  126,
+                     "GeneratedProposals":  119,
+                     "FinalLoss":  0.0017508903413421574,
+                     "ReasonCounts":  {
+                                          "Exploration":  119
+                                      },
+                     "StageCostUnits":  {
+                                            "Setup":  0.08,
+                                            "Evaluation":  126,
+                                            "Proposal":  1.19
+                                        },
+                     "Resources":  {
+                                       "Spent":  {
+                                                     "cost_units":  127.27
+                                                 },
+                                       "Reserved":  {
+                                                        "cost_units":  0.00
+                                                    },
+                                       "Admitted":  246,
+                                       "Settled":  246,
+                                       "Denied":  1,
+                                       "Unknown":  0,
+                                       "MaximumViolated":  false,
+                                       "DroppedReceipts":  0
+                                   },
+                     "MeasurementCount":  126,
+                     "DecisionCount":  119,
+                     "UnmeasuredSelections":  1
+                 },
+                 {
+                     "Task":  "ShiftedQuadratic4",
+                     "Method":  "Ordinary",
+                     "Seed":  2,
+                     "Status":  "completed",
+                     "StopReason":  "cost-cap",
+                     "InitialPopulationHash":  "6d92fc8ce292bc8ed17386947c3d387951481d439897c4e3dad04be7b09cbfe1",
+                     "EvaluatorCalls":  126,
+                     "GeneratedProposals":  119,
+                     "FinalLoss":  0.002262425617257757,
+                     "ReasonCounts":  {
+                                          "Exploration":  119
+                                      },
+                     "StageCostUnits":  {
+                                            "Setup":  0.08,
+                                            "Evaluation":  126,
+                                            "Proposal":  1.19
+                                        },
+                     "Resources":  {
+                                       "Spent":  {
+                                                     "cost_units":  127.27
+                                                 },
+                                       "Reserved":  {
+                                                        "cost_units":  0.00
+                                                    },
+                                       "Admitted":  246,
+                                       "Settled":  246,
+                                       "Denied":  1,
+                                       "Unknown":  0,
+                                       "MaximumViolated":  false,
+                                       "DroppedReceipts":  0
+                                   },
+                     "MeasurementCount":  126,
+                     "DecisionCount":  119,
+                     "UnmeasuredSelections":  1
+                 },
+                 {
+                     "Task":  "ShiftedQuadratic4",
+                     "Method":  "Ordinary",
+                     "Seed":  3,
+                     "Status":  "completed",
+                     "StopReason":  "cost-cap",
+                     "InitialPopulationHash":  "e7ee4fd1be7591979c19ac662f187696e9329b4cdd7e2f7cbde07af4daa3148c",
+                     "EvaluatorCalls":  126,
+                     "GeneratedProposals":  119,
+                     "FinalLoss":  0.0014652000472924942,
+                     "ReasonCounts":  {
+                                          "Exploration":  119
+                                      },
+                     "StageCostUnits":  {
+                                            "Setup":  0.08,
+                                            "Evaluation":  126,
+                                            "Proposal":  1.19
+                                        },
+                     "Resources":  {
+                                       "Spent":  {
+                                                     "cost_units":  127.27
+                                                 },
+                                       "Reserved":  {
+                                                        "cost_units":  0.00
+                                                    },
+                                       "Admitted":  246,
+                                       "Settled":  246,
+                                       "Denied":  1,
+                                       "Unknown":  0,
+                                       "MaximumViolated":  false,
+                                       "DroppedReceipts":  0
+                                   },
+                     "MeasurementCount":  126,
+                     "DecisionCount":  119,
+                     "UnmeasuredSelections":  1
+                 },
+                 {
+                     "Task":  "ShiftedQuadratic4",
+                     "Method":  "Ordinary",
+                     "Seed":  4,
+                     "Status":  "completed",
+                     "StopReason":  "cost-cap",
+                     "InitialPopulationHash":  "16b4e698fe1e0907fc308584d04c9e3b1e7e3874cf3c1b335fbfcf3113121517",
+                     "EvaluatorCalls":  126,
+                     "GeneratedProposals":  119,
+                     "FinalLoss":  0.001304038628909917,
+                     "ReasonCounts":  {
+                                          "Exploration":  119
+                                      },
+                     "StageCostUnits":  {
+                                            "Setup":  0.08,
+                                            "Evaluation":  126,
+                                            "Proposal":  1.19
+                                        },
+                     "Resources":  {
+                                       "Spent":  {
+                                                     "cost_units":  127.27
+                                                 },
+                                       "Reserved":  {
+                                                        "cost_units":  0.00
+                                                    },
+                                       "Admitted":  246,
+                                       "Settled":  246,
+                                       "Denied":  1,
+                                       "Unknown":  0,
+                                       "MaximumViolated":  false,
+                                       "DroppedReceipts":  0
+                                   },
+                     "MeasurementCount":  126,
+                     "DecisionCount":  119,
+                     "UnmeasuredSelections":  1
+                 },
+                 {
+                     "Task":  "ShiftedQuadratic4",
+                     "Method":  "Ordinary",
+                     "Seed":  5,
+                     "Status":  "completed",
+                     "StopReason":  "cost-cap",
+                     "InitialPopulationHash":  "538fbe4e2423c22d2a9f2667eed5fecbbdc67ccfc9b4be035a436444b01d4fce",
+                     "EvaluatorCalls":  126,
+                     "GeneratedProposals":  119,
+                     "FinalLoss":  0.00029910226119645475,
+                     "ReasonCounts":  {
+                                          "Exploration":  119
+                                      },
+                     "StageCostUnits":  {
+                                            "Setup":  0.08,
+                                            "Evaluation":  126,
+                                            "Proposal":  1.19
+                                        },
+                     "Resources":  {
+                                       "Spent":  {
+                                                     "cost_units":  127.27
+                                                 },
+                                       "Reserved":  {
+                                                        "cost_units":  0.00
+                                                    },
+                                       "Admitted":  246,
+                                       "Settled":  246,
+                                       "Denied":  1,
+                                       "Unknown":  0,
+                                       "MaximumViolated":  false,
+                                       "DroppedReceipts":  0
+                                   },
+                     "MeasurementCount":  126,
+                     "DecisionCount":  119,
+                     "UnmeasuredSelections":  1
+                 },
+                 {
+                     "Task":  "ShiftedQuadratic4",
+                     "Method":  "Ordinary",
+                     "Seed":  6,
+                     "Status":  "completed",
+                     "StopReason":  "cost-cap",
+                     "InitialPopulationHash":  "22c2d529f839d55c43ad3cc7dcb81303d79143e7f97ee4de5cce93945b223183",
+                     "EvaluatorCalls":  126,
+                     "GeneratedProposals":  119,
+                     "FinalLoss":  0.0016910023042492994,
+                     "ReasonCounts":  {
+                                          "Exploration":  119
+                                      },
+                     "StageCostUnits":  {
+                                            "Setup":  0.08,
+                                            "Evaluation":  126,
+                                            "Proposal":  1.19
+                                        },
+                     "Resources":  {
+                                       "Spent":  {
+                                                     "cost_units":  127.27
+                                                 },
+                                       "Reserved":  {
+                                                        "cost_units":  0.00
+                                                    },
+                                       "Admitted":  246,
+                                       "Settled":  246,
+                                       "Denied":  1,
+                                       "Unknown":  0,
+                                       "MaximumViolated":  false,
+                                       "DroppedReceipts":  0
+                                   },
+                     "MeasurementCount":  126,
+                     "DecisionCount":  119,
+                     "UnmeasuredSelections":  1
+                 },
+                 {
+                     "Task":  "ShiftedQuadratic4",
+                     "Method":  "Ordinary",
+                     "Seed":  7,
+                     "Status":  "completed",
+                     "StopReason":  "cost-cap",
+                     "InitialPopulationHash":  "f1d4979f816b7e8f025576f3c71b528e64753cfaefe8fc99afc2b43d45470f12",
+                     "EvaluatorCalls":  126,
+                     "GeneratedProposals":  119,
+                     "FinalLoss":  0.002444826451837887,
+                     "ReasonCounts":  {
+                                          "Exploration":  119
+                                      },
+                     "StageCostUnits":  {
+                                            "Setup":  0.08,
+                                            "Evaluation":  126,
+                                            "Proposal":  1.19
+                                        },
+                     "Resources":  {
+                                       "Spent":  {
+                                                     "cost_units":  127.27
+                                                 },
+                                       "Reserved":  {
+                                                        "cost_units":  0.00
+                                                    },
+                                       "Admitted":  246,
+                                       "Settled":  246,
+                                       "Denied":  1,
+                                       "Unknown":  0,
+                                       "MaximumViolated":  false,
+                                       "DroppedReceipts":  0
+                                   },
+                     "MeasurementCount":  126,
+                     "DecisionCount":  119,
+                     "UnmeasuredSelections":  1
+                 },
+                 {
+                     "Task":  "ShiftedQuadratic4",
+                     "Method":  "Ordinary",
+                     "Seed":  8,
+                     "Status":  "completed",
+                     "StopReason":  "cost-cap",
+                     "InitialPopulationHash":  "d5e930f30aac4e4419559843d00dfdc337fe5ea229acbe3bd2e56a1f3e6be153",
+                     "EvaluatorCalls":  126,
+                     "GeneratedProposals":  119,
+                     "FinalLoss":  0.0022507854753297256,
+                     "ReasonCounts":  {
+                                          "Exploration":  119
+                                      },
+                     "StageCostUnits":  {
+                                            "Setup":  0.08,
+                                            "Evaluation":  126,
+                                            "Proposal":  1.19
+                                        },
+                     "Resources":  {
+                                       "Spent":  {
+                                                     "cost_units":  127.27
+                                                 },
+                                       "Reserved":  {
+                                                        "cost_units":  0.00
+                                                    },
+                                       "Admitted":  246,
+                                       "Settled":  246,
+                                       "Denied":  1,
+                                       "Unknown":  0,
+                                       "MaximumViolated":  false,
+                                       "DroppedReceipts":  0
+                                   },
+                     "MeasurementCount":  126,
+                     "DecisionCount":  119,
+                     "UnmeasuredSelections":  1
+                 },
+                 {
+                     "Task":  "ShiftedQuadratic4",
+                     "Method":  "Ordinary",
+                     "Seed":  9,
+                     "Status":  "completed",
+                     "StopReason":  "cost-cap",
+                     "InitialPopulationHash":  "39b469b41cf29ff7815fa1fdb83781888b71acaa1a9fdb737facb5c96c752be6",
+                     "EvaluatorCalls":  126,
+                     "GeneratedProposals":  119,
+                     "FinalLoss":  0.0030998402439769445,
+                     "ReasonCounts":  {
+                                          "Exploration":  119
+                                      },
+                     "StageCostUnits":  {
+                                            "Setup":  0.08,
+                                            "Evaluation":  126,
+                                            "Proposal":  1.19
+                                        },
+                     "Resources":  {
+                                       "Spent":  {
+                                                     "cost_units":  127.27
+                                                 },
+                                       "Reserved":  {
+                                                        "cost_units":  0.00
+                                                    },
+                                       "Admitted":  246,
+                                       "Settled":  246,
+                                       "Denied":  1,
+                                       "Unknown":  0,
+                                       "MaximumViolated":  false,
+                                       "DroppedReceipts":  0
+                                   },
+                     "MeasurementCount":  126,
+                     "DecisionCount":  119,
+                     "UnmeasuredSelections":  1
+                 },
+                 {
+                     "Task":  "ShiftedQuadratic4",
+                     "Method":  "UniformPool",
+                     "Seed":  0,
+                     "Status":  "completed",
+                     "StopReason":  "cost-cap",
+                     "InitialPopulationHash":  "382fb2a210b3cd6de8152b9576e78e69b99e5b2dd434d05933ac4a2b44d4c0d6",
+                     "EvaluatorCalls":  123,
+                     "GeneratedProposals":  464,
+                     "FinalLoss":  0.0007965383048026112,
+                     "ReasonCounts":  {
+                                          "Exploration":  116
+                                      },
+                     "StageCostUnits":  {
+                                            "Setup":  0.08,
+                                            "Evaluation":  123,
+                                            "Proposal":  4.64
+                                        },
+                     "Resources":  {
+                                       "Spent":  {
+                                                     "cost_units":  127.72
+                                                 },
+                                       "Reserved":  {
+                                                        "cost_units":  0.00
+                                                    },
+                                       "Admitted":  240,
+                                       "Settled":  240,
+                                       "Denied":  1,
+                                       "Unknown":  0,
+                                       "MaximumViolated":  false,
+                                       "DroppedReceipts":  0
+                                   },
+                     "MeasurementCount":  123,
+                     "DecisionCount":  116,
+                     "UnmeasuredSelections":  1
+                 },
+                 {
+                     "Task":  "ShiftedQuadratic4",
+                     "Method":  "UniformPool",
+                     "Seed":  1,
+                     "Status":  "completed",
+                     "StopReason":  "cost-cap",
+                     "InitialPopulationHash":  "cba960e210a71c05e2a6e50ca8a29300ca6a570aec02f8ca0a865a3918703f9f",
+                     "EvaluatorCalls":  123,
+                     "GeneratedProposals":  464,
+                     "FinalLoss":  0.0026245328194197583,
+                     "ReasonCounts":  {
+                                          "Exploration":  116
+                                      },
+                     "StageCostUnits":  {
+                                            "Setup":  0.08,
+                                            "Evaluation":  123,
+                                            "Proposal":  4.64
+                                        },
+                     "Resources":  {
+                                       "Spent":  {
+                                                     "cost_units":  127.72
+                                                 },
+                                       "Reserved":  {
+                                                        "cost_units":  0.00
+                                                    },
+                                       "Admitted":  240,
+                                       "Settled":  240,
+                                       "Denied":  1,
+                                       "Unknown":  0,
+                                       "MaximumViolated":  false,
+                                       "DroppedReceipts":  0
+                                   },
+                     "MeasurementCount":  123,
+                     "DecisionCount":  116,
+                     "UnmeasuredSelections":  1
+                 },
+                 {
+                     "Task":  "ShiftedQuadratic4",
+                     "Method":  "UniformPool",
+                     "Seed":  2,
+                     "Status":  "completed",
+                     "StopReason":  "cost-cap",
+                     "InitialPopulationHash":  "6d92fc8ce292bc8ed17386947c3d387951481d439897c4e3dad04be7b09cbfe1",
+                     "EvaluatorCalls":  123,
+                     "GeneratedProposals":  464,
+                     "FinalLoss":  0.0010623574428695324,
+                     "ReasonCounts":  {
+                                          "Exploration":  116
+                                      },
+                     "StageCostUnits":  {
+                                            "Setup":  0.08,
+                                            "Evaluation":  123,
+                                            "Proposal":  4.64
+                                        },
+                     "Resources":  {
+                                       "Spent":  {
+                                                     "cost_units":  127.72
+                                                 },
+                                       "Reserved":  {
+                                                        "cost_units":  0.00
+                                                    },
+                                       "Admitted":  240,
+                                       "Settled":  240,
+                                       "Denied":  1,
+                                       "Unknown":  0,
+                                       "MaximumViolated":  false,
+                                       "DroppedReceipts":  0
+                                   },
+                     "MeasurementCount":  123,
+                     "DecisionCount":  116,
+                     "UnmeasuredSelections":  1
+                 },
+                 {
+                     "Task":  "ShiftedQuadratic4",
+                     "Method":  "UniformPool",
+                     "Seed":  3,
+                     "Status":  "completed",
+                     "StopReason":  "cost-cap",
+                     "InitialPopulationHash":  "e7ee4fd1be7591979c19ac662f187696e9329b4cdd7e2f7cbde07af4daa3148c",
+                     "EvaluatorCalls":  123,
+                     "GeneratedProposals":  464,
+                     "FinalLoss":  0.0015976166426338613,
+                     "ReasonCounts":  {
+                                          "Exploration":  116
+                                      },
+                     "StageCostUnits":  {
+                                            "Setup":  0.08,
+                                            "Evaluation":  123,
+                                            "Proposal":  4.64
+                                        },
+                     "Resources":  {
+                                       "Spent":  {
+                                                     "cost_units":  127.72
+                                                 },
+                                       "Reserved":  {
+                                                        "cost_units":  0.00
+                                                    },
+                                       "Admitted":  240,
+                                       "Settled":  240,
+                                       "Denied":  1,
+                                       "Unknown":  0,
+                                       "MaximumViolated":  false,
+                                       "DroppedReceipts":  0
+                                   },
+                     "MeasurementCount":  123,
+                     "DecisionCount":  116,
+                     "UnmeasuredSelections":  1
+                 },
+                 {
+                     "Task":  "ShiftedQuadratic4",
+                     "Method":  "UniformPool",
+                     "Seed":  4,
+                     "Status":  "completed",
+                     "StopReason":  "cost-cap",
+                     "InitialPopulationHash":  "16b4e698fe1e0907fc308584d04c9e3b1e7e3874cf3c1b335fbfcf3113121517",
+                     "EvaluatorCalls":  123,
+                     "GeneratedProposals":  464,
+                     "FinalLoss":  0.002031919121581296,
+                     "ReasonCounts":  {
+                                          "Exploration":  116
+                                      },
+                     "StageCostUnits":  {
+                                            "Setup":  0.08,
+                                            "Evaluation":  123,
+                                            "Proposal":  4.64
+                                        },
+                     "Resources":  {
+                                       "Spent":  {
+                                                     "cost_units":  127.72
+                                                 },
+                                       "Reserved":  {
+                                                        "cost_units":  0.00
+                                                    },
+                                       "Admitted":  240,
+                                       "Settled":  240,
+                                       "Denied":  1,
+                                       "Unknown":  0,
+                                       "MaximumViolated":  false,
+                                       "DroppedReceipts":  0
+                                   },
+                     "MeasurementCount":  123,
+                     "DecisionCount":  116,
+                     "UnmeasuredSelections":  1
+                 },
+                 {
+                     "Task":  "ShiftedQuadratic4",
+                     "Method":  "UniformPool",
+                     "Seed":  5,
+                     "Status":  "completed",
+                     "StopReason":  "cost-cap",
+                     "InitialPopulationHash":  "538fbe4e2423c22d2a9f2667eed5fecbbdc67ccfc9b4be035a436444b01d4fce",
+                     "EvaluatorCalls":  123,
+                     "GeneratedProposals":  464,
+                     "FinalLoss":  0.0033639629026164844,
+                     "ReasonCounts":  {
+                                          "Exploration":  116
+                                      },
+                     "StageCostUnits":  {
+                                            "Setup":  0.08,
+                                            "Evaluation":  123,
+                                            "Proposal":  4.64
+                                        },
+                     "Resources":  {
+                                       "Spent":  {
+                                                     "cost_units":  127.72
+                                                 },
+                                       "Reserved":  {
+                                                        "cost_units":  0.00
+                                                    },
+                                       "Admitted":  240,
+                                       "Settled":  240,
+                                       "Denied":  1,
+                                       "Unknown":  0,
+                                       "MaximumViolated":  false,
+                                       "DroppedReceipts":  0
+                                   },
+                     "MeasurementCount":  123,
+                     "DecisionCount":  116,
+                     "UnmeasuredSelections":  1
+                 },
+                 {
+                     "Task":  "ShiftedQuadratic4",
+                     "Method":  "UniformPool",
+                     "Seed":  6,
+                     "Status":  "completed",
+                     "StopReason":  "cost-cap",
+                     "InitialPopulationHash":  "22c2d529f839d55c43ad3cc7dcb81303d79143e7f97ee4de5cce93945b223183",
+                     "EvaluatorCalls":  123,
+                     "GeneratedProposals":  464,
+                     "FinalLoss":  0.0006191913958839719,
+                     "ReasonCounts":  {
+                                          "Exploration":  116
+                                      },
+                     "StageCostUnits":  {
+                                            "Setup":  0.08,
+                                            "Evaluation":  123,
+                                            "Proposal":  4.64
+                                        },
+                     "Resources":  {
+                                       "Spent":  {
+                                                     "cost_units":  127.72
+                                                 },
+                                       "Reserved":  {
+                                                        "cost_units":  0.00
+                                                    },
+                                       "Admitted":  240,
+                                       "Settled":  240,
+                                       "Denied":  1,
+                                       "Unknown":  0,
+                                       "MaximumViolated":  false,
+                                       "DroppedReceipts":  0
+                                   },
+                     "MeasurementCount":  123,
+                     "DecisionCount":  116,
+                     "UnmeasuredSelections":  1
+                 },
+                 {
+                     "Task":  "ShiftedQuadratic4",
+                     "Method":  "UniformPool",
+                     "Seed":  7,
+                     "Status":  "completed",
+                     "StopReason":  "cost-cap",
+                     "InitialPopulationHash":  "f1d4979f816b7e8f025576f3c71b528e64753cfaefe8fc99afc2b43d45470f12",
+                     "EvaluatorCalls":  123,
+                     "GeneratedProposals":  464,
+                     "FinalLoss":  0.0025811685882481594,
+                     "ReasonCounts":  {
+                                          "Exploration":  116
+                                      },
+                     "StageCostUnits":  {
+                                            "Setup":  0.08,
+                                            "Evaluation":  123,
+                                            "Proposal":  4.64
+                                        },
+                     "Resources":  {
+                                       "Spent":  {
+                                                     "cost_units":  127.72
+                                                 },
+                                       "Reserved":  {
+                                                        "cost_units":  0.00
+                                                    },
+                                       "Admitted":  240,
+                                       "Settled":  240,
+                                       "Denied":  1,
+                                       "Unknown":  0,
+                                       "MaximumViolated":  false,
+                                       "DroppedReceipts":  0
+                                   },
+                     "MeasurementCount":  123,
+                     "DecisionCount":  116,
+                     "UnmeasuredSelections":  1
+                 },
+                 {
+                     "Task":  "ShiftedQuadratic4",
+                     "Method":  "UniformPool",
+                     "Seed":  8,
+                     "Status":  "completed",
+                     "StopReason":  "cost-cap",
+                     "InitialPopulationHash":  "d5e930f30aac4e4419559843d00dfdc337fe5ea229acbe3bd2e56a1f3e6be153",
+                     "EvaluatorCalls":  123,
+                     "GeneratedProposals":  464,
+                     "FinalLoss":  0.0021479775480480025,
+                     "ReasonCounts":  {
+                                          "Exploration":  116
+                                      },
+                     "StageCostUnits":  {
+                                            "Setup":  0.08,
+                                            "Evaluation":  123,
+                                            "Proposal":  4.64
+                                        },
+                     "Resources":  {
+                                       "Spent":  {
+                                                     "cost_units":  127.72
+                                                 },
+                                       "Reserved":  {
+                                                        "cost_units":  0.00
+                                                    },
+                                       "Admitted":  240,
+                                       "Settled":  240,
+                                       "Denied":  1,
+                                       "Unknown":  0,
+                                       "MaximumViolated":  false,
+                                       "DroppedReceipts":  0
+                                   },
+                     "MeasurementCount":  123,
+                     "DecisionCount":  116,
+                     "UnmeasuredSelections":  1
+                 },
+                 {
+                     "Task":  "ShiftedQuadratic4",
+                     "Method":  "UniformPool",
+                     "Seed":  9,
+                     "Status":  "completed",
+                     "StopReason":  "cost-cap",
+                     "InitialPopulationHash":  "39b469b41cf29ff7815fa1fdb83781888b71acaa1a9fdb737facb5c96c752be6",
+                     "EvaluatorCalls":  123,
+                     "GeneratedProposals":  464,
+                     "FinalLoss":  0.001919655362505824,
+                     "ReasonCounts":  {
+                                          "Exploration":  116
+                                      },
+                     "StageCostUnits":  {
+                                            "Setup":  0.08,
+                                            "Evaluation":  123,
+                                            "Proposal":  4.64
+                                        },
+                     "Resources":  {
+                                       "Spent":  {
+                                                     "cost_units":  127.72
+                                                 },
+                                       "Reserved":  {
+                                                        "cost_units":  0.00
+                                                    },
+                                       "Admitted":  240,
+                                       "Settled":  240,
+                                       "Denied":  1,
+                                       "Unknown":  0,
+                                       "MaximumViolated":  false,
+                                       "DroppedReceipts":  0
+                                   },
+                     "MeasurementCount":  123,
+                     "DecisionCount":  116,
+                     "UnmeasuredSelections":  1
+                 },
+                 {
+                     "Task":  "ShiftedQuadratic4",
+                     "Method":  "SurrogatePool",
+                     "Seed":  0,
+                     "Status":  "completed",
+                     "StopReason":  "cost-cap",
+                     "InitialPopulationHash":  "382fb2a210b3cd6de8152b9576e78e69b99e5b2dd434d05933ac4a2b44d4c0d6",
+                     "EvaluatorCalls":  120,
+                     "GeneratedProposals":  452,
+                     "FinalLoss":  0.003011069280477004,
+                     "ReasonCounts":  {
+                                          "Exploration":  19,
+                                          "Acquisition":  90,
+                                          "UnfamiliarPool":  4
+                                      },
+                     "StageCostUnits":  {
+                                            "Setup":  0.08,
+                                            "Evaluation":  120,
+                                            "Proposal":  4.52,
+                                            "SurrogateTraining":  2.578864,
+                                            "SurrogateInference":  0.560432
+                                        },
+                     "Resources":  {
+                                       "Spent":  {
+                                                     "cost_units":  127.739296
+                                                 },
+                                       "Reserved":  {
+                                                        "cost_units":  0.000
+                                                    },
+                                       "Admitted":  422,
+                                       "Settled":  422,
+                                       "Denied":  1,
+                                       "Unknown":  0,
+                                       "MaximumViolated":  false,
+                                       "DroppedReceipts":  0
+                                   },
+                     "MeasurementCount":  120,
+                     "DecisionCount":  113,
+                     "UnmeasuredSelections":  1
+                 },
+                 {
+                     "Task":  "ShiftedQuadratic4",
+                     "Method":  "SurrogatePool",
+                     "Seed":  1,
+                     "Status":  "completed",
+                     "StopReason":  "cost-cap",
+                     "InitialPopulationHash":  "cba960e210a71c05e2a6e50ca8a29300ca6a570aec02f8ca0a865a3918703f9f",
+                     "EvaluatorCalls":  120,
+                     "GeneratedProposals":  452,
+                     "FinalLoss":  0.0010657605455421989,
+                     "ReasonCounts":  {
+                                          "Acquisition":  84,
+                                          "Exploration":  27,
+                                          "UnfamiliarPool":  2
+                                      },
+                     "StageCostUnits":  {
+                                            "Setup":  0.08,
+                                            "Evaluation":  120,
+                                            "Proposal":  4.52,
+                                            "SurrogateTraining":  2.329320,
+                                            "SurrogateInference":  0.509904
+                                        },
+                     "Resources":  {
+                                       "Spent":  {
+                                                     "cost_units":  127.439224
+                                                 },
+                                       "Reserved":  {
+                                                        "cost_units":  0.000
+                                                    },
+                                       "Admitted":  406,
+                                       "Settled":  406,
+                                       "Denied":  1,
+                                       "Unknown":  0,
+                                       "MaximumViolated":  false,
+                                       "DroppedReceipts":  0
+                                   },
+                     "MeasurementCount":  120,
+                     "DecisionCount":  113,
+                     "UnmeasuredSelections":  1
+                 },
+                 {
+                     "Task":  "ShiftedQuadratic4",
+                     "Method":  "SurrogatePool",
+                     "Seed":  2,
+                     "Status":  "completed",
+                     "StopReason":  "cost-cap",
+                     "InitialPopulationHash":  "6d92fc8ce292bc8ed17386947c3d387951481d439897c4e3dad04be7b09cbfe1",
+                     "EvaluatorCalls":  120,
+                     "GeneratedProposals":  452,
+                     "FinalLoss":  0.0019602210752285494,
+                     "ReasonCounts":  {
+                                          "Acquisition":  76,
+                                          "Exploration":  33,
+                                          "UnfamiliarPool":  4
+                                      },
+                     "StageCostUnits":  {
+                                            "Setup":  0.08,
+                                            "Evaluation":  120,
+                                            "Proposal":  4.52,
+                                            "SurrogateTraining":  2.163936,
+                                            "SurrogateInference":  0.474240
+                                        },
+                     "Resources":  {
+                                       "Spent":  {
+                                                     "cost_units":  127.238176
+                                                 },
+                                       "Reserved":  {
+                                                        "cost_units":  0.000
+                                                    },
+                                       "Admitted":  394,
+                                       "Settled":  394,
+                                       "Denied":  1,
+                                       "Unknown":  0,
+                                       "MaximumViolated":  false,
+                                       "DroppedReceipts":  0
+                                   },
+                     "MeasurementCount":  120,
+                     "DecisionCount":  113,
+                     "UnmeasuredSelections":  1
+                 },
+                 {
+                     "Task":  "ShiftedQuadratic4",
+                     "Method":  "SurrogatePool",
+                     "Seed":  3,
+                     "Status":  "completed",
+                     "StopReason":  "cost-cap",
+                     "InitialPopulationHash":  "e7ee4fd1be7591979c19ac662f187696e9329b4cdd7e2f7cbde07af4daa3148c",
+                     "EvaluatorCalls":  120,
+                     "GeneratedProposals":  452,
+                     "FinalLoss":  0.0004948709910853392,
+                     "ReasonCounts":  {
+                                          "Exploration":  24,
+                                          "Acquisition":  89
+                                      },
+                     "StageCostUnits":  {
+                                            "Setup":  0.08,
+                                            "Evaluation":  120,
+                                            "Proposal":  4.52,
+                                            "SurrogateTraining":  2.408736,
+                                            "SurrogateInference":  0.527752
+                                        },
+                     "Resources":  {
+                                       "Spent":  {
+                                                     "cost_units":  127.536488
+                                                 },
+                                       "Reserved":  {
+                                                        "cost_units":  0.000
+                                                    },
+                                       "Admitted":  412,
+                                       "Settled":  412,
+                                       "Denied":  1,
+                                       "Unknown":  0,
+                                       "MaximumViolated":  false,
+                                       "DroppedReceipts":  0
+                                   },
+                     "MeasurementCount":  120,
+                     "DecisionCount":  113,
+                     "UnmeasuredSelections":  1
+                 },
+                 {
+                     "Task":  "ShiftedQuadratic4",
+                     "Method":  "SurrogatePool",
+                     "Seed":  4,
+                     "Status":  "completed",
+                     "StopReason":  "cost-cap",
+                     "InitialPopulationHash":  "16b4e698fe1e0907fc308584d04c9e3b1e7e3874cf3c1b335fbfcf3113121517",
+                     "EvaluatorCalls":  120,
+                     "GeneratedProposals":  452,
+                     "FinalLoss":  0.00018159682858804864,
+                     "ReasonCounts":  {
+                                          "Acquisition":  91,
+                                          "Exploration":  19,
+                                          "UnfamiliarPool":  3
+                                      },
+                     "StageCostUnits":  {
+                                            "Setup":  0.08,
+                                            "Evaluation":  120,
+                                            "Proposal":  4.52,
+                                            "SurrogateTraining":  2.542520,
+                                            "SurrogateInference":  0.557200
+                                        },
+                     "Resources":  {
+                                       "Spent":  {
+                                                     "cost_units":  127.699720
+                                                 },
+                                       "Reserved":  {
+                                                        "cost_units":  0.000
+                                                    },
+                                       "Admitted":  422,
+                                       "Settled":  422,
+                                       "Denied":  1,
+                                       "Unknown":  0,
+                                       "MaximumViolated":  false,
+                                       "DroppedReceipts":  0
+                                   },
+                     "MeasurementCount":  120,
+                     "DecisionCount":  113,
+                     "UnmeasuredSelections":  1
+                 },
+                 {
+                     "Task":  "ShiftedQuadratic4",
+                     "Method":  "SurrogatePool",
+                     "Seed":  5,
+                     "Status":  "completed",
+                     "StopReason":  "cost-cap",
+                     "InitialPopulationHash":  "538fbe4e2423c22d2a9f2667eed5fecbbdc67ccfc9b4be035a436444b01d4fce",
+                     "EvaluatorCalls":  120,
+                     "GeneratedProposals":  452,
+                     "FinalLoss":  0.0005240516600348027,
+                     "ReasonCounts":  {
+                                          "Acquisition":  81,
+                                          "Exploration":  29,
+                                          "UnfamiliarPool":  3
+                                      },
+                     "StageCostUnits":  {
+                                            "Setup":  0.08,
+                                            "Evaluation":  120,
+                                            "Proposal":  4.52,
+                                            "SurrogateTraining":  2.281544,
+                                            "SurrogateInference":  0.498752
+                                        },
+                     "Resources":  {
+                                       "Spent":  {
+                                                     "cost_units":  127.380296
+                                                 },
+                                       "Reserved":  {
+                                                        "cost_units":  0.000
+                                                    },
+                                       "Admitted":  402,
+                                       "Settled":  402,
+                                       "Denied":  1,
+                                       "Unknown":  0,
+                                       "MaximumViolated":  false,
+                                       "DroppedReceipts":  0
+                                   },
+                     "MeasurementCount":  120,
+                     "DecisionCount":  113,
+                     "UnmeasuredSelections":  1
+                 },
+                 {
+                     "Task":  "ShiftedQuadratic4",
+                     "Method":  "SurrogatePool",
+                     "Seed":  6,
+                     "Status":  "completed",
+                     "StopReason":  "cost-cap",
+                     "InitialPopulationHash":  "22c2d529f839d55c43ad3cc7dcb81303d79143e7f97ee4de5cce93945b223183",
+                     "EvaluatorCalls":  120,
+                     "GeneratedProposals":  452,
+                     "FinalLoss":  0.00033316064548841396,
+                     "ReasonCounts":  {
+                                          "Acquisition":  85,
+                                          "UnfamiliarPool":  3,
+                                          "Exploration":  25
+                                      },
+                     "StageCostUnits":  {
+                                            "Setup":  0.08,
+                                            "Evaluation":  120,
+                                            "Proposal":  4.52,
+                                            "SurrogateTraining":  2.375824,
+                                            "SurrogateInference":  0.521152
+                                        },
+                     "Resources":  {
+                                       "Spent":  {
+                                                     "cost_units":  127.496976
+                                                 },
+                                       "Reserved":  {
+                                                        "cost_units":  0.000
+                                                    },
+                                       "Admitted":  410,
+                                       "Settled":  410,
+                                       "Denied":  1,
+                                       "Unknown":  0,
+                                       "MaximumViolated":  false,
+                                       "DroppedReceipts":  0
+                                   },
+                     "MeasurementCount":  120,
+                     "DecisionCount":  113,
+                     "UnmeasuredSelections":  1
+                 },
+                 {
+                     "Task":  "ShiftedQuadratic4",
+                     "Method":  "SurrogatePool",
+                     "Seed":  7,
+                     "Status":  "completed",
+                     "StopReason":  "cost-cap",
+                     "InitialPopulationHash":  "f1d4979f816b7e8f025576f3c71b528e64753cfaefe8fc99afc2b43d45470f12",
+                     "EvaluatorCalls":  120,
+                     "GeneratedProposals":  452,
+                     "FinalLoss":  0.002267195219475506,
+                     "ReasonCounts":  {
+                                          "Acquisition":  89,
+                                          "Exploration":  21,
+                                          "UnfamiliarPool":  3
+                                      },
+                     "StageCostUnits":  {
+                                            "Setup":  0.08,
+                                            "Evaluation":  120,
+                                            "Proposal":  4.52,
+                                            "SurrogateTraining":  2.502168,
+                                            "SurrogateInference":  0.546496
+                                        },
+                     "Resources":  {
+                                       "Spent":  {
+                                                     "cost_units":  127.648664
+                                                 },
+                                       "Reserved":  {
+                                                        "cost_units":  0.000
+                                                    },
+                                       "Admitted":  418,
+                                       "Settled":  418,
+                                       "Denied":  1,
+                                       "Unknown":  0,
+                                       "MaximumViolated":  false,
+                                       "DroppedReceipts":  0
+                                   },
+                     "MeasurementCount":  120,
+                     "DecisionCount":  113,
+                     "UnmeasuredSelections":  1
+                 },
+                 {
+                     "Task":  "ShiftedQuadratic4",
+                     "Method":  "SurrogatePool",
+                     "Seed":  8,
+                     "Status":  "completed",
+                     "StopReason":  "cost-cap",
+                     "InitialPopulationHash":  "d5e930f30aac4e4419559843d00dfdc337fe5ea229acbe3bd2e56a1f3e6be153",
+                     "EvaluatorCalls":  120,
+                     "GeneratedProposals":  452,
+                     "FinalLoss":  0.001187790676906004,
+                     "ReasonCounts":  {
+                                          "Acquisition":  90,
+                                          "Exploration":  19,
+                                          "UnfamiliarPool":  4
+                                      },
+                     "StageCostUnits":  {
+                                            "Setup":  0.08,
+                                            "Evaluation":  120,
+                                            "Proposal":  4.52,
+                                            "SurrogateTraining":  2.574656,
+                                            "SurrogateInference":  0.560048
+                                        },
+                     "Resources":  {
+                                       "Spent":  {
+                                                     "cost_units":  127.734704
+                                                 },
+                                       "Reserved":  {
+                                                        "cost_units":  0.000
+                                                    },
+                                       "Admitted":  422,
+                                       "Settled":  422,
+                                       "Denied":  1,
+                                       "Unknown":  0,
+                                       "MaximumViolated":  false,
+                                       "DroppedReceipts":  0
+                                   },
+                     "MeasurementCount":  120,
+                     "DecisionCount":  113,
+                     "UnmeasuredSelections":  1
+                 },
+                 {
+                     "Task":  "ShiftedQuadratic4",
+                     "Method":  "SurrogatePool",
+                     "Seed":  9,
+                     "Status":  "completed",
+                     "StopReason":  "cost-cap",
+                     "InitialPopulationHash":  "39b469b41cf29ff7815fa1fdb83781888b71acaa1a9fdb737facb5c96c752be6",
+                     "EvaluatorCalls":  120,
+                     "GeneratedProposals":  452,
+                     "FinalLoss":  0.0025986159364996993,
+                     "ReasonCounts":  {
+                                          "Acquisition":  91,
+                                          "Exploration":  18,
+                                          "UnfamiliarPool":  4
+                                      },
+                     "StageCostUnits":  {
+                                            "Setup":  0.08,
+                                            "Evaluation":  120,
+                                            "Proposal":  4.52,
+                                            "SurrogateTraining":  2.589232,
+                                            "SurrogateInference":  0.564856
+                                        },
+                     "Resources":  {
+                                       "Spent":  {
+                                                     "cost_units":  127.754088
+                                                 },
+                                       "Reserved":  {
+                                                        "cost_units":  0.000
+                                                    },
+                                       "Admitted":  424,
+                                       "Settled":  424,
+                                       "Denied":  1,
+                                       "Unknown":  0,
+                                       "MaximumViolated":  false,
+                                       "DroppedReceipts":  0
+                                   },
+                     "MeasurementCount":  120,
+                     "DecisionCount":  113,
+                     "UnmeasuredSelections":  1
+                 },
+                 {
+                     "Task":  "RippledQuadratic4",
+                     "Method":  "Ordinary",
+                     "Seed":  0,
+                     "Status":  "completed",
+                     "StopReason":  "cost-cap",
+                     "InitialPopulationHash":  "382fb2a210b3cd6de8152b9576e78e69b99e5b2dd434d05933ac4a2b44d4c0d6",
+                     "EvaluatorCalls":  126,
+                     "GeneratedProposals":  119,
+                     "FinalLoss":  0.2958949163510838,
+                     "ReasonCounts":  {
+                                          "Exploration":  119
+                                      },
+                     "StageCostUnits":  {
+                                            "Setup":  0.08,
+                                            "Evaluation":  126,
+                                            "Proposal":  1.19
+                                        },
+                     "Resources":  {
+                                       "Spent":  {
+                                                     "cost_units":  127.27
+                                                 },
+                                       "Reserved":  {
+                                                        "cost_units":  0.00
+                                                    },
+                                       "Admitted":  246,
+                                       "Settled":  246,
+                                       "Denied":  1,
+                                       "Unknown":  0,
+                                       "MaximumViolated":  false,
+                                       "DroppedReceipts":  0
+                                   },
+                     "MeasurementCount":  126,
+                     "DecisionCount":  119,
+                     "UnmeasuredSelections":  1
+                 },
+                 {
+                     "Task":  "RippledQuadratic4",
+                     "Method":  "Ordinary",
+                     "Seed":  1,
+                     "Status":  "completed",
+                     "StopReason":  "cost-cap",
+                     "InitialPopulationHash":  "cba960e210a71c05e2a6e50ca8a29300ca6a570aec02f8ca0a865a3918703f9f",
+                     "EvaluatorCalls":  126,
+                     "GeneratedProposals":  119,
+                     "FinalLoss":  0.1521367757848267,
+                     "ReasonCounts":  {
+                                          "Exploration":  119
+                                      },
+                     "StageCostUnits":  {
+                                            "Setup":  0.08,
+                                            "Evaluation":  126,
+                                            "Proposal":  1.19
+                                        },
+                     "Resources":  {
+                                       "Spent":  {
+                                                     "cost_units":  127.27
+                                                 },
+                                       "Reserved":  {
+                                                        "cost_units":  0.00
+                                                    },
+                                       "Admitted":  246,
+                                       "Settled":  246,
+                                       "Denied":  1,
+                                       "Unknown":  0,
+                                       "MaximumViolated":  false,
+                                       "DroppedReceipts":  0
+                                   },
+                     "MeasurementCount":  126,
+                     "DecisionCount":  119,
+                     "UnmeasuredSelections":  1
+                 },
+                 {
+                     "Task":  "RippledQuadratic4",
+                     "Method":  "Ordinary",
+                     "Seed":  2,
+                     "Status":  "completed",
+                     "StopReason":  "cost-cap",
+                     "InitialPopulationHash":  "6d92fc8ce292bc8ed17386947c3d387951481d439897c4e3dad04be7b09cbfe1",
+                     "EvaluatorCalls":  126,
+                     "GeneratedProposals":  119,
+                     "FinalLoss":  0.1492919395279483,
+                     "ReasonCounts":  {
+                                          "Exploration":  119
+                                      },
+                     "StageCostUnits":  {
+                                            "Setup":  0.08,
+                                            "Evaluation":  126,
+                                            "Proposal":  1.19
+                                        },
+                     "Resources":  {
+                                       "Spent":  {
+                                                     "cost_units":  127.27
+                                                 },
+                                       "Reserved":  {
+                                                        "cost_units":  0.00
+                                                    },
+                                       "Admitted":  246,
+                                       "Settled":  246,
+                                       "Denied":  1,
+                                       "Unknown":  0,
+                                       "MaximumViolated":  false,
+                                       "DroppedReceipts":  0
+                                   },
+                     "MeasurementCount":  126,
+                     "DecisionCount":  119,
+                     "UnmeasuredSelections":  1
+                 },
+                 {
+                     "Task":  "RippledQuadratic4",
+                     "Method":  "Ordinary",
+                     "Seed":  3,
+                     "Status":  "completed",
+                     "StopReason":  "cost-cap",
+                     "InitialPopulationHash":  "e7ee4fd1be7591979c19ac662f187696e9329b4cdd7e2f7cbde07af4daa3148c",
+                     "EvaluatorCalls":  126,
+                     "GeneratedProposals":  119,
+                     "FinalLoss":  0.16165526595479804,
+                     "ReasonCounts":  {
+                                          "Exploration":  119
+                                      },
+                     "StageCostUnits":  {
+                                            "Setup":  0.08,
+                                            "Evaluation":  126,
+                                            "Proposal":  1.19
+                                        },
+                     "Resources":  {
+                                       "Spent":  {
+                                                     "cost_units":  127.27
+                                                 },
+                                       "Reserved":  {
+                                                        "cost_units":  0.00
+                                                    },
+                                       "Admitted":  246,
+                                       "Settled":  246,
+                                       "Denied":  1,
+                                       "Unknown":  0,
+                                       "MaximumViolated":  false,
+                                       "DroppedReceipts":  0
+                                   },
+                     "MeasurementCount":  126,
+                     "DecisionCount":  119,
+                     "UnmeasuredSelections":  1
+                 },
+                 {
+                     "Task":  "RippledQuadratic4",
+                     "Method":  "Ordinary",
+                     "Seed":  4,
+                     "Status":  "completed",
+                     "StopReason":  "cost-cap",
+                     "InitialPopulationHash":  "16b4e698fe1e0907fc308584d04c9e3b1e7e3874cf3c1b335fbfcf3113121517",
+                     "EvaluatorCalls":  126,
+                     "GeneratedProposals":  119,
+                     "FinalLoss":  0.11568809252190423,
+                     "ReasonCounts":  {
+                                          "Exploration":  119
+                                      },
+                     "StageCostUnits":  {
+                                            "Setup":  0.08,
+                                            "Evaluation":  126,
+                                            "Proposal":  1.19
+                                        },
+                     "Resources":  {
+                                       "Spent":  {
+                                                     "cost_units":  127.27
+                                                 },
+                                       "Reserved":  {
+                                                        "cost_units":  0.00
+                                                    },
+                                       "Admitted":  246,
+                                       "Settled":  246,
+                                       "Denied":  1,
+                                       "Unknown":  0,
+                                       "MaximumViolated":  false,
+                                       "DroppedReceipts":  0
+                                   },
+                     "MeasurementCount":  126,
+                     "DecisionCount":  119,
+                     "UnmeasuredSelections":  1
+                 },
+                 {
+                     "Task":  "RippledQuadratic4",
+                     "Method":  "Ordinary",
+                     "Seed":  5,
+                     "Status":  "completed",
+                     "StopReason":  "cost-cap",
+                     "InitialPopulationHash":  "538fbe4e2423c22d2a9f2667eed5fecbbdc67ccfc9b4be035a436444b01d4fce",
+                     "EvaluatorCalls":  126,
+                     "GeneratedProposals":  119,
+                     "FinalLoss":  0.07585721296652266,
+                     "ReasonCounts":  {
+                                          "Exploration":  119
+                                      },
+                     "StageCostUnits":  {
+                                            "Setup":  0.08,
+                                            "Evaluation":  126,
+                                            "Proposal":  1.19
+                                        },
+                     "Resources":  {
+                                       "Spent":  {
+                                                     "cost_units":  127.27
+                                                 },
+                                       "Reserved":  {
+                                                        "cost_units":  0.00
+                                                    },
+                                       "Admitted":  246,
+                                       "Settled":  246,
+                                       "Denied":  1,
+                                       "Unknown":  0,
+                                       "MaximumViolated":  false,
+                                       "DroppedReceipts":  0
+                                   },
+                     "MeasurementCount":  126,
+                     "DecisionCount":  119,
+                     "UnmeasuredSelections":  1
+                 },
+                 {
+                     "Task":  "RippledQuadratic4",
+                     "Method":  "Ordinary",
+                     "Seed":  6,
+                     "Status":  "completed",
+                     "StopReason":  "cost-cap",
+                     "InitialPopulationHash":  "22c2d529f839d55c43ad3cc7dcb81303d79143e7f97ee4de5cce93945b223183",
+                     "EvaluatorCalls":  126,
+                     "GeneratedProposals":  119,
+                     "FinalLoss":  0.214286271166617,
+                     "ReasonCounts":  {
+                                          "Exploration":  119
+                                      },
+                     "StageCostUnits":  {
+                                            "Setup":  0.08,
+                                            "Evaluation":  126,
+                                            "Proposal":  1.19
+                                        },
+                     "Resources":  {
+                                       "Spent":  {
+                                                     "cost_units":  127.27
+                                                 },
+                                       "Reserved":  {
+                                                        "cost_units":  0.00
+                                                    },
+                                       "Admitted":  246,
+                                       "Settled":  246,
+                                       "Denied":  1,
+                                       "Unknown":  0,
+                                       "MaximumViolated":  false,
+                                       "DroppedReceipts":  0
+                                   },
+                     "MeasurementCount":  126,
+                     "DecisionCount":  119,
+                     "UnmeasuredSelections":  1
+                 },
+                 {
+                     "Task":  "RippledQuadratic4",
+                     "Method":  "Ordinary",
+                     "Seed":  7,
+                     "Status":  "completed",
+                     "StopReason":  "cost-cap",
+                     "InitialPopulationHash":  "f1d4979f816b7e8f025576f3c71b528e64753cfaefe8fc99afc2b43d45470f12",
+                     "EvaluatorCalls":  126,
+                     "GeneratedProposals":  119,
+                     "FinalLoss":  0.2151363366887549,
+                     "ReasonCounts":  {
+                                          "Exploration":  119
+                                      },
+                     "StageCostUnits":  {
+                                            "Setup":  0.08,
+                                            "Evaluation":  126,
+                                            "Proposal":  1.19
+                                        },
+                     "Resources":  {
+                                       "Spent":  {
+                                                     "cost_units":  127.27
+                                                 },
+                                       "Reserved":  {
+                                                        "cost_units":  0.00
+                                                    },
+                                       "Admitted":  246,
+                                       "Settled":  246,
+                                       "Denied":  1,
+                                       "Unknown":  0,
+                                       "MaximumViolated":  false,
+                                       "DroppedReceipts":  0
+                                   },
+                     "MeasurementCount":  126,
+                     "DecisionCount":  119,
+                     "UnmeasuredSelections":  1
+                 },
+                 {
+                     "Task":  "RippledQuadratic4",
+                     "Method":  "Ordinary",
+                     "Seed":  8,
+                     "Status":  "completed",
+                     "StopReason":  "cost-cap",
+                     "InitialPopulationHash":  "d5e930f30aac4e4419559843d00dfdc337fe5ea229acbe3bd2e56a1f3e6be153",
+                     "EvaluatorCalls":  126,
+                     "GeneratedProposals":  119,
+                     "FinalLoss":  0.3745820606240566,
+                     "ReasonCounts":  {
+                                          "Exploration":  119
+                                      },
+                     "StageCostUnits":  {
+                                            "Setup":  0.08,
+                                            "Evaluation":  126,
+                                            "Proposal":  1.19
+                                        },
+                     "Resources":  {
+                                       "Spent":  {
+                                                     "cost_units":  127.27
+                                                 },
+                                       "Reserved":  {
+                                                        "cost_units":  0.00
+                                                    },
+                                       "Admitted":  246,
+                                       "Settled":  246,
+                                       "Denied":  1,
+                                       "Unknown":  0,
+                                       "MaximumViolated":  false,
+                                       "DroppedReceipts":  0
+                                   },
+                     "MeasurementCount":  126,
+                     "DecisionCount":  119,
+                     "UnmeasuredSelections":  1
+                 },
+                 {
+                     "Task":  "RippledQuadratic4",
+                     "Method":  "Ordinary",
+                     "Seed":  9,
+                     "Status":  "completed",
+                     "StopReason":  "cost-cap",
+                     "InitialPopulationHash":  "39b469b41cf29ff7815fa1fdb83781888b71acaa1a9fdb737facb5c96c752be6",
+                     "EvaluatorCalls":  126,
+                     "GeneratedProposals":  119,
+                     "FinalLoss":  0.1512133361406548,
+                     "ReasonCounts":  {
+                                          "Exploration":  119
+                                      },
+                     "StageCostUnits":  {
+                                            "Setup":  0.08,
+                                            "Evaluation":  126,
+                                            "Proposal":  1.19
+                                        },
+                     "Resources":  {
+                                       "Spent":  {
+                                                     "cost_units":  127.27
+                                                 },
+                                       "Reserved":  {
+                                                        "cost_units":  0.00
+                                                    },
+                                       "Admitted":  246,
+                                       "Settled":  246,
+                                       "Denied":  1,
+                                       "Unknown":  0,
+                                       "MaximumViolated":  false,
+                                       "DroppedReceipts":  0
+                                   },
+                     "MeasurementCount":  126,
+                     "DecisionCount":  119,
+                     "UnmeasuredSelections":  1
+                 },
+                 {
+                     "Task":  "RippledQuadratic4",
+                     "Method":  "UniformPool",
+                     "Seed":  0,
+                     "Status":  "completed",
+                     "StopReason":  "cost-cap",
+                     "InitialPopulationHash":  "382fb2a210b3cd6de8152b9576e78e69b99e5b2dd434d05933ac4a2b44d4c0d6",
+                     "EvaluatorCalls":  123,
+                     "GeneratedProposals":  464,
+                     "FinalLoss":  0.09567583832392522,
+                     "ReasonCounts":  {
+                                          "Exploration":  116
+                                      },
+                     "StageCostUnits":  {
+                                            "Setup":  0.08,
+                                            "Evaluation":  123,
+                                            "Proposal":  4.64
+                                        },
+                     "Resources":  {
+                                       "Spent":  {
+                                                     "cost_units":  127.72
+                                                 },
+                                       "Reserved":  {
+                                                        "cost_units":  0.00
+                                                    },
+                                       "Admitted":  240,
+                                       "Settled":  240,
+                                       "Denied":  1,
+                                       "Unknown":  0,
+                                       "MaximumViolated":  false,
+                                       "DroppedReceipts":  0
+                                   },
+                     "MeasurementCount":  123,
+                     "DecisionCount":  116,
+                     "UnmeasuredSelections":  1
+                 },
+                 {
+                     "Task":  "RippledQuadratic4",
+                     "Method":  "UniformPool",
+                     "Seed":  1,
+                     "Status":  "completed",
+                     "StopReason":  "cost-cap",
+                     "InitialPopulationHash":  "cba960e210a71c05e2a6e50ca8a29300ca6a570aec02f8ca0a865a3918703f9f",
+                     "EvaluatorCalls":  123,
+                     "GeneratedProposals":  464,
+                     "FinalLoss":  0.2008652684522917,
+                     "ReasonCounts":  {
+                                          "Exploration":  116
+                                      },
+                     "StageCostUnits":  {
+                                            "Setup":  0.08,
+                                            "Evaluation":  123,
+                                            "Proposal":  4.64
+                                        },
+                     "Resources":  {
+                                       "Spent":  {
+                                                     "cost_units":  127.72
+                                                 },
+                                       "Reserved":  {
+                                                        "cost_units":  0.00
+                                                    },
+                                       "Admitted":  240,
+                                       "Settled":  240,
+                                       "Denied":  1,
+                                       "Unknown":  0,
+                                       "MaximumViolated":  false,
+                                       "DroppedReceipts":  0
+                                   },
+                     "MeasurementCount":  123,
+                     "DecisionCount":  116,
+                     "UnmeasuredSelections":  1
+                 },
+                 {
+                     "Task":  "RippledQuadratic4",
+                     "Method":  "UniformPool",
+                     "Seed":  2,
+                     "Status":  "completed",
+                     "StopReason":  "cost-cap",
+                     "InitialPopulationHash":  "6d92fc8ce292bc8ed17386947c3d387951481d439897c4e3dad04be7b09cbfe1",
+                     "EvaluatorCalls":  123,
+                     "GeneratedProposals":  464,
+                     "FinalLoss":  0.16367548712724167,
+                     "ReasonCounts":  {
+                                          "Exploration":  116
+                                      },
+                     "StageCostUnits":  {
+                                            "Setup":  0.08,
+                                            "Evaluation":  123,
+                                            "Proposal":  4.64
+                                        },
+                     "Resources":  {
+                                       "Spent":  {
+                                                     "cost_units":  127.72
+                                                 },
+                                       "Reserved":  {
+                                                        "cost_units":  0.00
+                                                    },
+                                       "Admitted":  240,
+                                       "Settled":  240,
+                                       "Denied":  1,
+                                       "Unknown":  0,
+                                       "MaximumViolated":  false,
+                                       "DroppedReceipts":  0
+                                   },
+                     "MeasurementCount":  123,
+                     "DecisionCount":  116,
+                     "UnmeasuredSelections":  1
+                 },
+                 {
+                     "Task":  "RippledQuadratic4",
+                     "Method":  "UniformPool",
+                     "Seed":  3,
+                     "Status":  "completed",
+                     "StopReason":  "cost-cap",
+                     "InitialPopulationHash":  "e7ee4fd1be7591979c19ac662f187696e9329b4cdd7e2f7cbde07af4daa3148c",
+                     "EvaluatorCalls":  123,
+                     "GeneratedProposals":  464,
+                     "FinalLoss":  0.15677749282454628,
+                     "ReasonCounts":  {
+                                          "Exploration":  116
+                                      },
+                     "StageCostUnits":  {
+                                            "Setup":  0.08,
+                                            "Evaluation":  123,
+                                            "Proposal":  4.64
+                                        },
+                     "Resources":  {
+                                       "Spent":  {
+                                                     "cost_units":  127.72
+                                                 },
+                                       "Reserved":  {
+                                                        "cost_units":  0.00
+                                                    },
+                                       "Admitted":  240,
+                                       "Settled":  240,
+                                       "Denied":  1,
+                                       "Unknown":  0,
+                                       "MaximumViolated":  false,
+                                       "DroppedReceipts":  0
+                                   },
+                     "MeasurementCount":  123,
+                     "DecisionCount":  116,
+                     "UnmeasuredSelections":  1
+                 },
+                 {
+                     "Task":  "RippledQuadratic4",
+                     "Method":  "UniformPool",
+                     "Seed":  4,
+                     "Status":  "completed",
+                     "StopReason":  "cost-cap",
+                     "InitialPopulationHash":  "16b4e698fe1e0907fc308584d04c9e3b1e7e3874cf3c1b335fbfcf3113121517",
+                     "EvaluatorCalls":  123,
+                     "GeneratedProposals":  464,
+                     "FinalLoss":  0.16324210367875375,
+                     "ReasonCounts":  {
+                                          "Exploration":  116
+                                      },
+                     "StageCostUnits":  {
+                                            "Setup":  0.08,
+                                            "Evaluation":  123,
+                                            "Proposal":  4.64
+                                        },
+                     "Resources":  {
+                                       "Spent":  {
+                                                     "cost_units":  127.72
+                                                 },
+                                       "Reserved":  {
+                                                        "cost_units":  0.00
+                                                    },
+                                       "Admitted":  240,
+                                       "Settled":  240,
+                                       "Denied":  1,
+                                       "Unknown":  0,
+                                       "MaximumViolated":  false,
+                                       "DroppedReceipts":  0
+                                   },
+                     "MeasurementCount":  123,
+                     "DecisionCount":  116,
+                     "UnmeasuredSelections":  1
+                 },
+                 {
+                     "Task":  "RippledQuadratic4",
+                     "Method":  "UniformPool",
+                     "Seed":  5,
+                     "Status":  "completed",
+                     "StopReason":  "cost-cap",
+                     "InitialPopulationHash":  "538fbe4e2423c22d2a9f2667eed5fecbbdc67ccfc9b4be035a436444b01d4fce",
+                     "EvaluatorCalls":  123,
+                     "GeneratedProposals":  464,
+                     "FinalLoss":  0.18624289097910177,
+                     "ReasonCounts":  {
+                                          "Exploration":  116
+                                      },
+                     "StageCostUnits":  {
+                                            "Setup":  0.08,
+                                            "Evaluation":  123,
+                                            "Proposal":  4.64
+                                        },
+                     "Resources":  {
+                                       "Spent":  {
+                                                     "cost_units":  127.72
+                                                 },
+                                       "Reserved":  {
+                                                        "cost_units":  0.00
+                                                    },
+                                       "Admitted":  240,
+                                       "Settled":  240,
+                                       "Denied":  1,
+                                       "Unknown":  0,
+                                       "MaximumViolated":  false,
+                                       "DroppedReceipts":  0
+                                   },
+                     "MeasurementCount":  123,
+                     "DecisionCount":  116,
+                     "UnmeasuredSelections":  1
+                 },
+                 {
+                     "Task":  "RippledQuadratic4",
+                     "Method":  "UniformPool",
+                     "Seed":  6,
+                     "Status":  "completed",
+                     "StopReason":  "cost-cap",
+                     "InitialPopulationHash":  "22c2d529f839d55c43ad3cc7dcb81303d79143e7f97ee4de5cce93945b223183",
+                     "EvaluatorCalls":  123,
+                     "GeneratedProposals":  464,
+                     "FinalLoss":  0.22211860442164497,
+                     "ReasonCounts":  {
+                                          "Exploration":  116
+                                      },
+                     "StageCostUnits":  {
+                                            "Setup":  0.08,
+                                            "Evaluation":  123,
+                                            "Proposal":  4.64
+                                        },
+                     "Resources":  {
+                                       "Spent":  {
+                                                     "cost_units":  127.72
+                                                 },
+                                       "Reserved":  {
+                                                        "cost_units":  0.00
+                                                    },
+                                       "Admitted":  240,
+                                       "Settled":  240,
+                                       "Denied":  1,
+                                       "Unknown":  0,
+                                       "MaximumViolated":  false,
+                                       "DroppedReceipts":  0
+                                   },
+                     "MeasurementCount":  123,
+                     "DecisionCount":  116,
+                     "UnmeasuredSelections":  1
+                 },
+                 {
+                     "Task":  "RippledQuadratic4",
+                     "Method":  "UniformPool",
+                     "Seed":  7,
+                     "Status":  "completed",
+                     "StopReason":  "cost-cap",
+                     "InitialPopulationHash":  "f1d4979f816b7e8f025576f3c71b528e64753cfaefe8fc99afc2b43d45470f12",
+                     "EvaluatorCalls":  123,
+                     "GeneratedProposals":  464,
+                     "FinalLoss":  0.06537709290035874,
+                     "ReasonCounts":  {
+                                          "Exploration":  116
+                                      },
+                     "StageCostUnits":  {
+                                            "Setup":  0.08,
+                                            "Evaluation":  123,
+                                            "Proposal":  4.64
+                                        },
+                     "Resources":  {
+                                       "Spent":  {
+                                                     "cost_units":  127.72
+                                                 },
+                                       "Reserved":  {
+                                                        "cost_units":  0.00
+                                                    },
+                                       "Admitted":  240,
+                                       "Settled":  240,
+                                       "Denied":  1,
+                                       "Unknown":  0,
+                                       "MaximumViolated":  false,
+                                       "DroppedReceipts":  0
+                                   },
+                     "MeasurementCount":  123,
+                     "DecisionCount":  116,
+                     "UnmeasuredSelections":  1
+                 },
+                 {
+                     "Task":  "RippledQuadratic4",
+                     "Method":  "UniformPool",
+                     "Seed":  8,
+                     "Status":  "completed",
+                     "StopReason":  "cost-cap",
+                     "InitialPopulationHash":  "d5e930f30aac4e4419559843d00dfdc337fe5ea229acbe3bd2e56a1f3e6be153",
+                     "EvaluatorCalls":  123,
+                     "GeneratedProposals":  464,
+                     "FinalLoss":  0.2661382149430847,
+                     "ReasonCounts":  {
+                                          "Exploration":  116
+                                      },
+                     "StageCostUnits":  {
+                                            "Setup":  0.08,
+                                            "Evaluation":  123,
+                                            "Proposal":  4.64
+                                        },
+                     "Resources":  {
+                                       "Spent":  {
+                                                     "cost_units":  127.72
+                                                 },
+                                       "Reserved":  {
+                                                        "cost_units":  0.00
+                                                    },
+                                       "Admitted":  240,
+                                       "Settled":  240,
+                                       "Denied":  1,
+                                       "Unknown":  0,
+                                       "MaximumViolated":  false,
+                                       "DroppedReceipts":  0
+                                   },
+                     "MeasurementCount":  123,
+                     "DecisionCount":  116,
+                     "UnmeasuredSelections":  1
+                 },
+                 {
+                     "Task":  "RippledQuadratic4",
+                     "Method":  "UniformPool",
+                     "Seed":  9,
+                     "Status":  "completed",
+                     "StopReason":  "cost-cap",
+                     "InitialPopulationHash":  "39b469b41cf29ff7815fa1fdb83781888b71acaa1a9fdb737facb5c96c752be6",
+                     "EvaluatorCalls":  123,
+                     "GeneratedProposals":  464,
+                     "FinalLoss":  0.11561981168105345,
+                     "ReasonCounts":  {
+                                          "Exploration":  116
+                                      },
+                     "StageCostUnits":  {
+                                            "Setup":  0.08,
+                                            "Evaluation":  123,
+                                            "Proposal":  4.64
+                                        },
+                     "Resources":  {
+                                       "Spent":  {
+                                                     "cost_units":  127.72
+                                                 },
+                                       "Reserved":  {
+                                                        "cost_units":  0.00
+                                                    },
+                                       "Admitted":  240,
+                                       "Settled":  240,
+                                       "Denied":  1,
+                                       "Unknown":  0,
+                                       "MaximumViolated":  false,
+                                       "DroppedReceipts":  0
+                                   },
+                     "MeasurementCount":  123,
+                     "DecisionCount":  116,
+                     "UnmeasuredSelections":  1
+                 },
+                 {
+                     "Task":  "RippledQuadratic4",
+                     "Method":  "SurrogatePool",
+                     "Seed":  0,
+                     "Status":  "completed",
+                     "StopReason":  "cost-cap",
+                     "InitialPopulationHash":  "382fb2a210b3cd6de8152b9576e78e69b99e5b2dd434d05933ac4a2b44d4c0d6",
+                     "EvaluatorCalls":  120,
+                     "GeneratedProposals":  452,
+                     "FinalLoss":  0.27928949601018216,
+                     "ReasonCounts":  {
+                                          "Exploration":  19,
+                                          "Acquisition":  92,
+                                          "UnfamiliarPool":  2
+                                      },
+                     "StageCostUnits":  {
+                                            "Setup":  0.08,
+                                            "Evaluation":  120,
+                                            "Proposal":  4.52,
+                                            "SurrogateTraining":  2.578864,
+                                            "SurrogateInference":  0.560432
+                                        },
+                     "Resources":  {
+                                       "Spent":  {
+                                                     "cost_units":  127.739296
+                                                 },
+                                       "Reserved":  {
+                                                        "cost_units":  0.000
+                                                    },
+                                       "Admitted":  422,
+                                       "Settled":  422,
+                                       "Denied":  1,
+                                       "Unknown":  0,
+                                       "MaximumViolated":  false,
+                                       "DroppedReceipts":  0
+                                   },
+                     "MeasurementCount":  120,
+                     "DecisionCount":  113,
+                     "UnmeasuredSelections":  1
+                 },
+                 {
+                     "Task":  "RippledQuadratic4",
+                     "Method":  "SurrogatePool",
+                     "Seed":  1,
+                     "Status":  "completed",
+                     "StopReason":  "cost-cap",
+                     "InitialPopulationHash":  "cba960e210a71c05e2a6e50ca8a29300ca6a570aec02f8ca0a865a3918703f9f",
+                     "EvaluatorCalls":  120,
+                     "GeneratedProposals":  452,
+                     "FinalLoss":  0.14226640157413634,
+                     "ReasonCounts":  {
+                                          "Acquisition":  83,
+                                          "Exploration":  27,
+                                          "UnfamiliarPool":  3
+                                      },
+                     "StageCostUnits":  {
+                                            "Setup":  0.08,
+                                            "Evaluation":  120,
+                                            "Proposal":  4.52,
+                                            "SurrogateTraining":  2.329320,
+                                            "SurrogateInference":  0.509904
+                                        },
+                     "Resources":  {
+                                       "Spent":  {
+                                                     "cost_units":  127.439224
+                                                 },
+                                       "Reserved":  {
+                                                        "cost_units":  0.000
+                                                    },
+                                       "Admitted":  406,
+                                       "Settled":  406,
+                                       "Denied":  1,
+                                       "Unknown":  0,
+                                       "MaximumViolated":  false,
+                                       "DroppedReceipts":  0
+                                   },
+                     "MeasurementCount":  120,
+                     "DecisionCount":  113,
+                     "UnmeasuredSelections":  1
+                 },
+                 {
+                     "Task":  "RippledQuadratic4",
+                     "Method":  "SurrogatePool",
+                     "Seed":  2,
+                     "Status":  "completed",
+                     "StopReason":  "cost-cap",
+                     "InitialPopulationHash":  "6d92fc8ce292bc8ed17386947c3d387951481d439897c4e3dad04be7b09cbfe1",
+                     "EvaluatorCalls":  120,
+                     "GeneratedProposals":  452,
+                     "FinalLoss":  0.23192887247026822,
+                     "ReasonCounts":  {
+                                          "Acquisition":  76,
+                                          "Exploration":  33,
+                                          "UnfamiliarPool":  4
+                                      },
+                     "StageCostUnits":  {
+                                            "Setup":  0.08,
+                                            "Evaluation":  120,
+                                            "Proposal":  4.52,
+                                            "SurrogateTraining":  2.163936,
+                                            "SurrogateInference":  0.474240
+                                        },
+                     "Resources":  {
+                                       "Spent":  {
+                                                     "cost_units":  127.238176
+                                                 },
+                                       "Reserved":  {
+                                                        "cost_units":  0.000
+                                                    },
+                                       "Admitted":  394,
+                                       "Settled":  394,
+                                       "Denied":  1,
+                                       "Unknown":  0,
+                                       "MaximumViolated":  false,
+                                       "DroppedReceipts":  0
+                                   },
+                     "MeasurementCount":  120,
+                     "DecisionCount":  113,
+                     "UnmeasuredSelections":  1
+                 },
+                 {
+                     "Task":  "RippledQuadratic4",
+                     "Method":  "SurrogatePool",
+                     "Seed":  3,
+                     "Status":  "completed",
+                     "StopReason":  "cost-cap",
+                     "InitialPopulationHash":  "e7ee4fd1be7591979c19ac662f187696e9329b4cdd7e2f7cbde07af4daa3148c",
+                     "EvaluatorCalls":  120,
+                     "GeneratedProposals":  452,
+                     "FinalLoss":  0.2523231158669197,
+                     "ReasonCounts":  {
+                                          "Exploration":  24,
+                                          "Acquisition":  84,
+                                          "UnfamiliarPool":  5
+                                      },
+                     "StageCostUnits":  {
+                                            "Setup":  0.08,
+                                            "Evaluation":  120,
+                                            "Proposal":  4.52,
+                                            "SurrogateTraining":  2.408736,
+                                            "SurrogateInference":  0.527752
+                                        },
+                     "Resources":  {
+                                       "Spent":  {
+                                                     "cost_units":  127.536488
+                                                 },
+                                       "Reserved":  {
+                                                        "cost_units":  0.000
+                                                    },
+                                       "Admitted":  412,
+                                       "Settled":  412,
+                                       "Denied":  1,
+                                       "Unknown":  0,
+                                       "MaximumViolated":  false,
+                                       "DroppedReceipts":  0
+                                   },
+                     "MeasurementCount":  120,
+                     "DecisionCount":  113,
+                     "UnmeasuredSelections":  1
+                 },
+                 {
+                     "Task":  "RippledQuadratic4",
+                     "Method":  "SurrogatePool",
+                     "Seed":  4,
+                     "Status":  "completed",
+                     "StopReason":  "cost-cap",
+                     "InitialPopulationHash":  "16b4e698fe1e0907fc308584d04c9e3b1e7e3874cf3c1b335fbfcf3113121517",
+                     "EvaluatorCalls":  120,
+                     "GeneratedProposals":  452,
+                     "FinalLoss":  0.16818810178536694,
+                     "ReasonCounts":  {
+                                          "Acquisition":  87,
+                                          "Exploration":  19,
+                                          "UnfamiliarPool":  7
+                                      },
+                     "StageCostUnits":  {
+                                            "Setup":  0.08,
+                                            "Evaluation":  120,
+                                            "Proposal":  4.52,
+                                            "SurrogateTraining":  2.542520,
+                                            "SurrogateInference":  0.557200
+                                        },
+                     "Resources":  {
+                                       "Spent":  {
+                                                     "cost_units":  127.699720
+                                                 },
+                                       "Reserved":  {
+                                                        "cost_units":  0.000
+                                                    },
+                                       "Admitted":  422,
+                                       "Settled":  422,
+                                       "Denied":  1,
+                                       "Unknown":  0,
+                                       "MaximumViolated":  false,
+                                       "DroppedReceipts":  0
+                                   },
+                     "MeasurementCount":  120,
+                     "DecisionCount":  113,
+                     "UnmeasuredSelections":  1
+                 },
+                 {
+                     "Task":  "RippledQuadratic4",
+                     "Method":  "SurrogatePool",
+                     "Seed":  5,
+                     "Status":  "completed",
+                     "StopReason":  "cost-cap",
+                     "InitialPopulationHash":  "538fbe4e2423c22d2a9f2667eed5fecbbdc67ccfc9b4be035a436444b01d4fce",
+                     "EvaluatorCalls":  120,
+                     "GeneratedProposals":  452,
+                     "FinalLoss":  0.12543465372570525,
+                     "ReasonCounts":  {
+                                          "Acquisition":  75,
+                                          "Exploration":  29,
+                                          "UnfamiliarPool":  9
+                                      },
+                     "StageCostUnits":  {
+                                            "Setup":  0.08,
+                                            "Evaluation":  120,
+                                            "Proposal":  4.52,
+                                            "SurrogateTraining":  2.281544,
+                                            "SurrogateInference":  0.498752
+                                        },
+                     "Resources":  {
+                                       "Spent":  {
+                                                     "cost_units":  127.380296
+                                                 },
+                                       "Reserved":  {
+                                                        "cost_units":  0.000
+                                                    },
+                                       "Admitted":  402,
+                                       "Settled":  402,
+                                       "Denied":  1,
+                                       "Unknown":  0,
+                                       "MaximumViolated":  false,
+                                       "DroppedReceipts":  0
+                                   },
+                     "MeasurementCount":  120,
+                     "DecisionCount":  113,
+                     "UnmeasuredSelections":  1
+                 },
+                 {
+                     "Task":  "RippledQuadratic4",
+                     "Method":  "SurrogatePool",
+                     "Seed":  6,
+                     "Status":  "completed",
+                     "StopReason":  "cost-cap",
+                     "InitialPopulationHash":  "22c2d529f839d55c43ad3cc7dcb81303d79143e7f97ee4de5cce93945b223183",
+                     "EvaluatorCalls":  120,
+                     "GeneratedProposals":  452,
+                     "FinalLoss":  0.303767470604619,
+                     "ReasonCounts":  {
+                                          "Acquisition":  85,
+                                          "UnfamiliarPool":  3,
+                                          "Exploration":  25
+                                      },
+                     "StageCostUnits":  {
+                                            "Setup":  0.08,
+                                            "Evaluation":  120,
+                                            "Proposal":  4.52,
+                                            "SurrogateTraining":  2.375824,
+                                            "SurrogateInference":  0.521152
+                                        },
+                     "Resources":  {
+                                       "Spent":  {
+                                                     "cost_units":  127.496976
+                                                 },
+                                       "Reserved":  {
+                                                        "cost_units":  0.000
+                                                    },
+                                       "Admitted":  410,
+                                       "Settled":  410,
+                                       "Denied":  1,
+                                       "Unknown":  0,
+                                       "MaximumViolated":  false,
+                                       "DroppedReceipts":  0
+                                   },
+                     "MeasurementCount":  120,
+                     "DecisionCount":  113,
+                     "UnmeasuredSelections":  1
+                 },
+                 {
+                     "Task":  "RippledQuadratic4",
+                     "Method":  "SurrogatePool",
+                     "Seed":  7,
+                     "Status":  "completed",
+                     "StopReason":  "cost-cap",
+                     "InitialPopulationHash":  "f1d4979f816b7e8f025576f3c71b528e64753cfaefe8fc99afc2b43d45470f12",
+                     "EvaluatorCalls":  120,
+                     "GeneratedProposals":  452,
+                     "FinalLoss":  0.058767527158963405,
+                     "ReasonCounts":  {
+                                          "Acquisition":  86,
+                                          "Exploration":  21,
+                                          "UnfamiliarPool":  6
+                                      },
+                     "StageCostUnits":  {
+                                            "Setup":  0.08,
+                                            "Evaluation":  120,
+                                            "Proposal":  4.52,
+                                            "SurrogateTraining":  2.502168,
+                                            "SurrogateInference":  0.546496
+                                        },
+                     "Resources":  {
+                                       "Spent":  {
+                                                     "cost_units":  127.648664
+                                                 },
+                                       "Reserved":  {
+                                                        "cost_units":  0.000
+                                                    },
+                                       "Admitted":  418,
+                                       "Settled":  418,
+                                       "Denied":  1,
+                                       "Unknown":  0,
+                                       "MaximumViolated":  false,
+                                       "DroppedReceipts":  0
+                                   },
+                     "MeasurementCount":  120,
+                     "DecisionCount":  113,
+                     "UnmeasuredSelections":  1
+                 },
+                 {
+                     "Task":  "RippledQuadratic4",
+                     "Method":  "SurrogatePool",
+                     "Seed":  8,
+                     "Status":  "completed",
+                     "StopReason":  "cost-cap",
+                     "InitialPopulationHash":  "d5e930f30aac4e4419559843d00dfdc337fe5ea229acbe3bd2e56a1f3e6be153",
+                     "EvaluatorCalls":  120,
+                     "GeneratedProposals":  452,
+                     "FinalLoss":  0.44453912354097086,
+                     "ReasonCounts":  {
+                                          "Acquisition":  90,
+                                          "Exploration":  19,
+                                          "UnfamiliarPool":  4
+                                      },
+                     "StageCostUnits":  {
+                                            "Setup":  0.08,
+                                            "Evaluation":  120,
+                                            "Proposal":  4.52,
+                                            "SurrogateTraining":  2.574656,
+                                            "SurrogateInference":  0.560048
+                                        },
+                     "Resources":  {
+                                       "Spent":  {
+                                                     "cost_units":  127.734704
+                                                 },
+                                       "Reserved":  {
+                                                        "cost_units":  0.000
+                                                    },
+                                       "Admitted":  422,
+                                       "Settled":  422,
+                                       "Denied":  1,
+                                       "Unknown":  0,
+                                       "MaximumViolated":  false,
+                                       "DroppedReceipts":  0
+                                   },
+                     "MeasurementCount":  120,
+                     "DecisionCount":  113,
+                     "UnmeasuredSelections":  1
+                 },
+                 {
+                     "Task":  "RippledQuadratic4",
+                     "Method":  "SurrogatePool",
+                     "Seed":  9,
+                     "Status":  "completed",
+                     "StopReason":  "cost-cap",
+                     "InitialPopulationHash":  "39b469b41cf29ff7815fa1fdb83781888b71acaa1a9fdb737facb5c96c752be6",
+                     "EvaluatorCalls":  120,
+                     "GeneratedProposals":  452,
+                     "FinalLoss":  0.1874672033305243,
+                     "ReasonCounts":  {
+                                          "Acquisition":  86,
+                                          "Exploration":  18,
+                                          "UnfamiliarPool":  9
+                                      },
+                     "StageCostUnits":  {
+                                            "Setup":  0.08,
+                                            "Evaluation":  120,
+                                            "Proposal":  4.52,
+                                            "SurrogateTraining":  2.589232,
+                                            "SurrogateInference":  0.564856
+                                        },
+                     "Resources":  {
+                                       "Spent":  {
+                                                     "cost_units":  127.754088
+                                                 },
+                                       "Reserved":  {
+                                                        "cost_units":  0.000
+                                                    },
+                                       "Admitted":  424,
+                                       "Settled":  424,
+                                       "Denied":  1,
+                                       "Unknown":  0,
+                                       "MaximumViolated":  false,
+                                       "DroppedReceipts":  0
+                                   },
+                     "MeasurementCount":  120,
+                     "DecisionCount":  113,
+                     "UnmeasuredSelections":  1
+                 }
+             ]
+}

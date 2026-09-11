@@ -4,7 +4,7 @@ on:
   push:
     branches: [main]
   pull_request:
-    branches: [main]
+    branches: [main, feat/competitive-evolution-platform]
 
 concurrency:
   group: ${{ github.workflow }}-${{ github.ref }}
@@ -54,6 +54,35 @@ jobs:
           dotnet test tests/AiDotNet.Evolution.Tests/AiDotNet.Evolution.Tests.csproj
           --configuration Release --framework net8.0 --no-restore --verbosity normal
           --blame-hang --blame-hang-timeout 120s --blame-crash
+      - name: Verify numeric quality harness contracts
+        shell: pwsh
+        env:
+          QUALITY_SOURCE_REVISION: ${{ github.sha }}
+        run: ./eng/Test-QualityHarness.ps1 -SourceRevision $env:QUALITY_SOURCE_REVISION
+      - name: Verify typed search example
+        shell: pwsh
+        run: ./eng/Test-TypedSearch.ps1
+      - name: Verify replication accounting and confirmation
+        shell: pwsh
+        run: ./eng/Test-Replication.ps1
+      - name: Verify persistent evaluation reuse and force-fresh accounting
+        run: dotnet run --project examples/PersistentEvaluation -c Release -- "${{ github.workspace }}/TestResults/persistent-evaluation"
+      - name: Verify surrogate backend and measured-only selection
+        shell: pwsh
+        run: ./eng/Test-SurrogateSearch.ps1
+      - name: Verify multi-fidelity promotion and independent confirmation
+        shell: pwsh
+        run: ./eng/Test-MultiFidelity.ps1
+      - name: Verify gain and all-stage operator credit
+        shell: pwsh
+        run: ./eng/Test-OperatorCredit.ps1
+      - name: Verify performance fixture contracts
+        run: dotnet run --project benchmarks/AiDotNet.Evolution.Performance -c Release -- --smoke
+      - name: Verify paired analysis contracts
+        run: python3 -m unittest discover -s benchmarks/analysis -v
+      - name: Verify archive partition accounting and replay
+        shell: pwsh
+        run: ./eng/Test-ArchivePartition.ps1 -SourceRevision '${{ github.sha }}'
       - name: Enforce coverage ratchet
         shell: pwsh
         run: |
@@ -66,6 +95,9 @@ jobs:
         with:
           name: coverage-and-diagnostics
           path: |
+            TestResults/quality/**/*.json
+            TestResults/persistent-evaluation/**/*.json
+            TestResults/persistent-evaluation/*.jsonl
             coverage/**/coverage.cobertura.xml
             coverage/**/*.dmp
             coverage/**/Sequence_*.xml
@@ -81,6 +113,23 @@ jobs:
           verbose: true
         env:
           CODECOV_TOKEN: ${{ secrets.CODECOV_TOKEN }}
+
+  external-baseline:
+    name: External numeric baseline contracts
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+      - uses: actions/setup-dotnet@a98b56852c35b8e3190ac28c8c2271da59106c68 # v6.0.0
+        with:
+          dotnet-version: '10.0.x'
+      - name: Install isolated baseline dependencies
+        run: |
+          python3 -m venv .local/external-env
+          .local/external-env/bin/python -m pip install -r benchmarks/external/requirements.txt
+      - name: Verify shared evaluator and matched baseline
+        shell: pwsh
+        run: ./eng/Test-ExternalBaseline.ps1 -Python .local/external-env/bin/python
 
   legacy:
     name: Build and test net471

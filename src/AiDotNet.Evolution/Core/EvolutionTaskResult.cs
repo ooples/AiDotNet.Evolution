@@ -1,4 +1,5 @@
 using System.Collections.ObjectModel;
+using System.Text.Json.Serialization;
 
 namespace AiDotNet.Evolution;
 
@@ -45,6 +46,7 @@ public sealed class EvolutionTaskResult
     private readonly ReadOnlyCollection<double> _constraintViolations;
     private readonly ReadOnlyCollection<EvolutionDiagnostic> _diagnostics;
     private readonly ReadOnlyCollection<EvolutionArtifact> _artifacts;
+    private EvolutionMeasurementOrigin? _measurementOrigin;
 
     /// <summary>Initializes a task result.</summary>
     /// <param name="status">The terminal evaluation status.</param>
@@ -138,6 +140,19 @@ public sealed class EvolutionTaskResult
 
     /// <summary>Gets task-defined resource units charged by this evaluation.</summary>
     public double CostUnits { get; }
+
+    /// <summary>Gets optional durable sample identity and uncertainty, independent of optional diagnostic artifacts.</summary>
+    [JsonIgnore(Condition = JsonIgnoreCondition.WhenWritingNull)]
+    public EvolutionMeasurementOrigin? MeasurementOrigin => _measurementOrigin;
+
+    /// <summary>Returns an immutable copy with explicit sample origin; acquisition cost does not replace current CostUnits.</summary>
+    public EvolutionTaskResult WithMeasurementOrigin(EvolutionMeasurementOrigin origin)
+    {
+        Guard.NotNull(origin);
+        return new EvolutionTaskResult(Status, Quality, Direction, Descriptors, Objectives, ConstraintViolations,
+            CostUnits, Diagnostics, Metrics, Artifacts)
+        { _measurementOrigin = origin };
+    }
 
     /// <summary>Gets bounded diagnostics.</summary>
     public IReadOnlyList<EvolutionDiagnostic> Diagnostics => _diagnostics;

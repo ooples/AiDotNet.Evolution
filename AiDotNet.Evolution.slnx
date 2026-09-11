@@ -1,4 +1,16 @@
 <Solution>
+  <Folder Name="/benchmarks/">
+    <Project Path="benchmarks/AiDotNet.Evolution.Performance/AiDotNet.Evolution.Performance.csproj" />
+    <Project Path="benchmarks/AiDotNet.Evolution.Quality/AiDotNet.Evolution.Quality.csproj" />
+  </Folder>
+  <Folder Name="/examples/">
+    <Project Path="examples/MultiFidelitySearch/MultiFidelitySearch.csproj" />
+    <Project Path="examples/OperatorCreditSearch/OperatorCreditSearch.csproj" />
+    <Project Path="examples/PersistentEvaluation/PersistentEvaluation.csproj" />
+    <Project Path="examples/ReplicatedEvaluation/ReplicatedEvaluation.csproj" />
+    <Project Path="examples/SurrogateSearch/SurrogateSearch.csproj" />
+    <Project Path="examples/TypedParameterSearch/TypedParameterSearch.csproj" />
+  </Folder>
   <Folder Name="/src/">
     <Project Path="src/AiDotNet.Evolution/AiDotNet.Evolution.csproj" />
   </Folder>
