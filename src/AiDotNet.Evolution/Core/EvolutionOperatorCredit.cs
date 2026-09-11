@@ -1,3 +1,5 @@
+using System.Text.Json.Serialization;
+
 namespace AiDotNet.Evolution;
 
 /// <summary>Detached attribution for one terminal committed proposal; diagnostic evidence, never hidden learning input.</summary>
@@ -10,7 +12,7 @@ public sealed class EvolutionOperatorCredit
         Generation = generation; OperatorId = operatorId; OperatorVersionHash = operatorVersion; PolicyVersionHash = policyVersion;
         ParentQuality = parentQuality; Quality = evaluation.Quality; Direction = evaluation.Direction; Status = evaluation.Status;
         CacheStatus = evaluation.CacheStatus; Insertion = insertion; EvaluationCostUnits = evaluation.Cost.CostUnits;
-        ProposalCost = proposalCost; Reward = reward;
+        ProposalCost = proposalCost; Reward = reward; MeasurementOrigin = evaluation.MeasurementOrigin;
     }
     /// <summary>Gets the proposal generation, independent of worker completion order.</summary>
     public long Generation { get; }
@@ -28,8 +30,11 @@ public sealed class EvolutionOperatorCredit
     public EvolutionOptimizationDirection Direction { get; }
     /// <summary>Gets the terminal outcome, including failures and rejected work.</summary>
     public EvolutionEvaluationStatus Status { get; }
-    /// <summary>Gets cache provenance; cached successes never receive credit.</summary>
+    /// <summary>Gets engine run-local cache provenance; producer reuse is recorded separately.</summary>
     public EvolutionCacheStatus CacheStatus { get; }
+    /// <summary>Gets optional original sample provenance; declared reuse earns no fresh reward.</summary>
+    [JsonIgnore(Condition = JsonIgnoreCondition.WhenWritingNull)]
+    public EvolutionMeasurementOrigin? MeasurementOrigin { get; }
     /// <summary>Gets the committed archive insertion decision, if applicable.</summary>
     public EvolutionArchiveInsertionResult? Insertion { get; }
     /// <summary>Gets accumulated evaluator attempt charges, including any declared conservative charges.</summary>

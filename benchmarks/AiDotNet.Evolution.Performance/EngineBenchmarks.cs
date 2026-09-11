@@ -16,15 +16,18 @@ public class EngineBenchmarks
     [Params(EvolutionDispatchMode.Batch, EvolutionDispatchMode.Continuous)] public EvolutionDispatchMode Dispatch { get; set; }
     [Params(0, 1)] public int EvaluatorDelayMilliseconds { get; set; }
     [Params(false, true)] public bool Checkpoint { get; set; }
+    [Params(2, 8)] public int Dimensions { get; set; } = 8;
+    [Params(100, 1000)] public int ArchiveCells { get; set; } = 100;
+    [Params(1, 4)] public int Islands { get; set; } = 1;
 
     [GlobalSetup]
     public void Setup()
     {
         var builder = new EvolutionSearchSpaceBuilder();
-        for (int i = 0; i < 8; i++) builder.Add(EvolutionParameter.Real("x" + i, -5, 5));
+        for (int i = 0; i < Dimensions; i++) builder.Add(EvolutionParameter.Real("x" + i, -5, 5));
         _space = builder.Build();
         _inputs = Enumerable.Range(0, Budget).Select(i => _space.Sample(StableRandom.CreateStream(42, (ulong)i))).ToArray();
-        _descriptors = new[] { new EvolutionDescriptorDefinition("x", -5, 5, 100) };
+        _descriptors = new[] { new EvolutionDescriptorDefinition("x", -5, 5, ArchiveCells) };
         _task = new EvolutionSearchTask(_space, "overhead", "v1", "delay-" + EvaluatorDelayMilliseconds,
             (genome, _, token) => Evaluate(genome, token));
     }
@@ -58,6 +61,7 @@ public class EngineBenchmarks
                 MaxProposals = Budget * 2,
                 ProposalBatchSize = 8,
                 MaxDegreeOfParallelism = Workers,
+                IslandCount = Islands,
                 Dispatch = Dispatch,
                 MaxInFlight = 8,
                 MigrationInterval = 0,

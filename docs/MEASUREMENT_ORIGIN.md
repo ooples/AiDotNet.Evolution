@@ -58,6 +58,28 @@ Given origin in a cascade stage, when cascade merging runs, then it fails with
 `cascade_measurement_origin_unsupported`, retaining the received origin, diagnostics and current costs.
 Stage-specific combined provenance is not implemented; do not silently erase it or claim cascade reuse support.
 
+## Learning from measurements
+
+Given an engine cache hit or producer-declared `PersistentReuse`, `RunLocalReuse` or `MigrationCopy`,
+when `EvolutionEvaluation.IsMeasurementReuse` is queried, then it is true even if engine `CacheStatus` is
+`Miss` or `NotChecked`. The derived property is excluded from JSON; engine cache counters keep their
+existing engine-only meaning.
+
+Given declared reuse, when adaptive portfolio feedback commits, then every reward mode earns zero fresh
+credit while the terminal outcome and current costs remain counted exactly once. `LastCredit.MeasurementOrigin`
+retains the original sample identity and acquisition cost separately from the current operation's charges.
+Surrogate observation intake rejects reused evidence, and diagonal CMA does not rank it as a measured
+population member. A population with insufficient valid fresh members cannot update the distribution.
+
+Given a fresh `Measured` result or a legacy result without origin, when existing learning guards pass,
+then learning remains available. A false reuse flag does not prove independent sampling or an honest producer.
+These guards do not audit physical observations or deduplicate sample IDs mislabeled as fresh.
+
+Given an old learned portfolio/CMA checkpoint, when restored under these revised learning rules, then its
+semantic version is rejected: already inflated credit/distribution updates cannot be reconstructed safely.
+Reward and surrogate selection identities are also versioned. Constructor signatures and no-origin JSON shape
+are retained; backward compatibility with old learned checkpoints is explicitly not promised.
+
 ## Independent replication
 
 Given an origin-bearing callback receipt, when `EvolutionReplicateRunner` executes a fresh batch, then it accepts

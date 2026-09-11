@@ -13,11 +13,15 @@ public class CheckpointBenchmarks
     private InMemoryEvolutionCheckpointStore _store = null!;
     private string _stateHash = null!;
     [Params(32, 256, 2048)] public int Evaluations { get; set; }
+    [Params(1, 4)] public int Islands { get; set; } = 1;
+    [Params(1, 8)] public int Dimensions { get; set; } = 1;
 
     [GlobalSetup]
     public async Task Setup()
     {
-        _space = new EvolutionSearchSpaceBuilder().Add(EvolutionParameter.Real("x", 0, 1)).Build();
+        var builder = new EvolutionSearchSpaceBuilder().Add(EvolutionParameter.Real("x", 0, 1));
+        for (int dimension = 1; dimension < Dimensions; dimension++) builder.Add(EvolutionParameter.Real("d" + dimension, 0, 1));
+        _space = builder.Build();
         _task = new EvolutionSearchTask(_space, "checkpoint", "v1", "v1", (genome, _, _) => new ValueTask<EvolutionTaskResult>(
             EvolutionTaskResult.Completed(genome.Number("x"), new Dictionary<string, double> { ["x"] = genome.Number("x") }, costUnits: 1)));
         _seed = _space.Sample(StableRandom.CreateStream(1, 0)); _store = new InMemoryEvolutionCheckpointStore(1);
@@ -38,6 +42,7 @@ public class CheckpointBenchmarks
             MaxProposals = Evaluations * 2,
             MaxGenerations = Evaluations * 2,
             ProposalBatchSize = 8,
+            IslandCount = Islands,
             MigrationInterval = 0,
             Resume = resume
         }, checkpointStore: store, genomeCodec: _space);
