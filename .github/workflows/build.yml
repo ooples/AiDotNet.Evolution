@@ -19,6 +19,25 @@ env:
   DOTNET_NOLOGO: true
 
 jobs:
+  archive-resources:
+    name: Archive memory budgets and paired replay
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+      - uses: actions/setup-dotnet@a98b56852c35b8e3190ac28c8c2271da59106c68 # v6.0.0
+        with:
+          dotnet-version: '10.0.x'
+      - name: Verify fresh-process archive resource contracts
+        shell: pwsh
+        run: ./eng/Test-ArchiveResources.ps1 -SourceRevision '${{ github.sha }}'
+      - uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02 # v4
+        if: always()
+        with:
+          name: archive-resource-contracts
+          path: TestResults/archive-resources/**
+          if-no-files-found: error
+
   modern:
     name: Build, test, coverage, and format
     if: "${{ !(github.event_name == 'push' && startsWith(github.event.head_commit.message, 'chore(main): release')) && !startsWith(github.head_ref, 'release-please--') }}"

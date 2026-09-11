@@ -38,6 +38,13 @@ new archive with versioned geometry and deterministic collision resolution, leav
 unplaceable elite rejects the whole projection. This is an offline operation, not live engine reconfiguration.
 It cannot recover candidates discarded earlier or transfer old evaluation validity to a different task.
 
+`ProjectWithReport` also returns immutable remap provenance: source/target definition hashes,
+mutation versions, offered/retained elite counts, and collision discards. No target/report is
+returned on validation or version-overflow failure. The report remains a snapshot if the
+caller later changes the returned archive. Store it alongside the full target geometry and
+checkpoint configuration; the target definition hash is the engine's compatibility boundary.
+This is traceable offline remapping, not live reconfiguration or a proof of fitness validity.
+
 `IEvolutionArchiveCellCount` lets non-grid archives declare their physical cell count. Engine status, coverage-based
 stopping and immutable snapshots preserve K instead of multiplying irrelevant grid bin counts. Existing archives
 without that optional contract retain the grid interpretation. Occupancy under different partitions is not directly
@@ -60,3 +67,41 @@ Equal elite-slot caps do **not** establish equal measured RAM: centroid coordina
 The pilot uses frozen uniform Voronoi sites, not fitted CVT. Common-reference utility sees retained elites only.
 Controlled memory/latency scaling and representative quality confirmation remain open; no default change is justified
 by execution smoke tests alone.
+
+## Measured resource-budget comparison
+
+`eng/Test-ArchiveResources.ps1` exercises a fresh worker process for every paired case and
+replay. It also forces a 1 MiB failure before evaluation and retains 64-dimensional grid
+configuration failures separately. The default grid guard limits the logical product to
+10 million cells; it is not evidence of a dense memory allocation. The paired quality plan
+uses 12 and 20 dimensions, where both defaults are valid, with 32 elite slots and identical
+evaluation/proposal limits. The centroid route uses all dimensions, including a separate
+64-dimensional support probe.
+
+The full development campaign is fixed at 32 seeds, two tasks, two dimensions, 256 evaluations
+per case, and a declared 256 MiB observed peak-resident budget for both methods. Each case has
+its own process; the runner records the plan before execution, alternates method order and
+retains failures/timeouts. Replay incurs new physical evaluations and is accounted separately.
+No extra seeds are added in response to significance. A single primary endpoint averages
+paired common-reference utility differences over the four contexts within each seed, then
+bootstraps those seed blocks. Per-context/resource summaries are descriptive.
+
+[Process.PeakWorkingSet64](https://learn.microsoft.com/en-us/dotnet/api/system.diagnostics.process.peakworkingset64?view=net-10.0)
+measures process-lifetime peak resident memory, including shared pages and startup. It is
+not retained archive bytes or total allocated bytes. The worker observes it during engine
+events and after common-reference projection, stops admission on an observed overrun, and
+assigns the failed case zero utility while preserving actual charges. This is an observed
+budget gate, **not an OS-enforced allocation ceiling**; an overrun can happen before it is
+observed. Artifact metadata hashing/JSON serialization is outside the measured boundary.
+The grid worker does not allocate unused search centroids to hide their cost. Runtime,
+binary hashes, GC mode, CPU/wall time, allocations and memory observations are retained.
+
+```powershell
+dotnet build benchmarks/AiDotNet.Evolution.Quality -c Release
+python benchmarks/analysis/run_archive_resources.py --worker benchmarks/AiDotNet.Evolution.Quality/bin/Release/net10.0/AiDotNet.Evolution.Quality.dll --output TestResults/archive-primary --revision <full-built-source-revision>
+python benchmarks/analysis/run_archive_resources.py --verify TestResults/archive-primary
+```
+
+The resource runner and immutable remap reports are implemented; the pinned full campaign,
+final review and acceptance evidence are still in progress. Smoke results do not justify a
+default change, claim representative superiority, or establish equal actual memory usage.
