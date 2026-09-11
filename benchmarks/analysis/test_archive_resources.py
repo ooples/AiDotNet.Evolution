@@ -2,18 +2,21 @@ import copy
 import hashlib
 from pathlib import Path
 import tempfile
+import subprocess
 import unittest
-from run_archive_resources import METHODS, dump, plan, quality_fingerprint, summarize, validate_case, verify_directory
+from unittest import mock
+from run_archive_resources import METHODS, dump, plan, quality_fingerprint, run, summarize, validate_case, verify_directory
 
 
 def report(spec, configuration):
     task, dimension, seed, method = spec
     budget = configuration["EvaluationBudget"]
-    return {"SchemaVersion": 2, "Protocol": "archive-resource-case-development-v1", "SourceRevision": configuration["SourceRevision"],
+    return {"SchemaVersion": 3, "Protocol": "archive-resource-case-development-v2", "SourceRevision": configuration["SourceRevision"],
             "Budget": budget, "Dimensions": dimension, "Seeds": 1, "SelectedSeed": seed, "EliteCapacity": 32,
             "MaximumGridCells": 10_000_000, "ReferenceDefinition": {"DefinitionHash": "reference-" + str(dimension)},
             "Measurement": {"PeakResidentBudgetBytes": 256 * 1024 * 1024, "PeakResidentBytes": 64 * 1024 * 1024,
                 "MemoryBudgetExceeded": False, "ElapsedMilliseconds": 10, "CpuMilliseconds": 5, "AllocatedBytes": 1000,
+                "MemoryObservationStride": 16, "MemoryObservationCount": 3 + budget // 16,
                 "WorkerSha256": "a" * 64, "CoreSha256": "b" * 64},
             "Runs": [{"Task": task + str(dimension), "Method": method, "Seed": seed, "Status": "completed",
                 "InitialPopulationHash": "initial-" + str(seed), "StateHash": "state-" + str(seed),
@@ -105,6 +108,40 @@ class ArchiveResourceTests(unittest.TestCase):
         self.assertEqual(32, configuration["SeedCount"])
         self.assertEqual([12, 20], configuration["Dimensions"])
         self.assertEqual(256, configuration["EvaluationBudget"])
+
+    def test_memory_observation_cadence_and_count_are_verified(self):
+        configuration, records = fixture()
+        for key, value in (("MemoryObservationStride", 1), ("MemoryObservationCount", 2)):
+            invalid = copy.deepcopy(records[0]["Report"])
+            invalid["Measurement"][key] = value
+            with self.subTest(key=key), self.assertRaises(ValueError):
+                validate_case(invalid, records[0]["Case"], configuration)
+
+    def test_timeout_and_partial_report_failures_are_both_retained(self):
+        configuration = plan("working-tree-smoke", True)
+        children = []
+
+        def launch(command, **kwargs):
+            Path(command[-1]).write_bytes(b"{")
+            child = mock.Mock(pid=12345)
+            child.wait.side_effect = [subprocess.TimeoutExpired(command, 60), -1]
+            children.append(child)
+            return child
+
+        with tempfile.TemporaryDirectory(prefix="archive-resource-timeout-") as directory:
+            root = Path(directory) / "campaign"
+            with mock.patch("run_archive_resources.subprocess.Popen", side_effect=launch), mock.patch("builtins.print"):
+                result = run(configuration, Path("unused.dll"), root)
+            self.assertEqual(32, result["UnknownPhysicalCallCases"])
+            self.assertEqual({"primary": 0, "replay": 0}, result["MeasuredPhysicalEvaluationsByPhase"])
+            import json
+            for path in root.glob("*.record.json"):
+                record = json.loads(path.read_text(encoding="utf-8"))
+                self.assertTrue(record["Failure"].startswith("worker-timeout;"))
+                self.assertTrue(record["ReportFailure"].startswith("invalid-report:"))
+            for child in children:
+                child.kill.assert_called_once_with()
+            self.assertEqual(result, verify_directory(root))
 
     def test_offline_verifier_checks_raw_bytes_and_recomputed_summary(self):
         configuration, records = fixture()

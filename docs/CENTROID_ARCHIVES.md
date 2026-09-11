@@ -88,11 +88,17 @@ bootstraps those seed blocks. Per-context/resource summaries are descriptive.
 
 [Process.PeakWorkingSet64](https://learn.microsoft.com/en-us/dotnet/api/system.diagnostics.process.peakworkingset64?view=net-10.0)
 measures process-lifetime peak resident memory, including shared pages and startup. It is
-not retained archive bytes or total allocated bytes. The worker observes it during engine
-events and after common-reference projection, stops admission on an observed overrun, and
+not retained archive bytes or total allocated bytes. The v2 worker observes it at construction,
+before search, every 16 `Evaluated` events and after common-reference projection,
+records the observation count/cadence, stops admission on an observed overrun, and
 assigns the failed case zero utility while preserving actual charges. This is an observed
 budget gate, **not an OS-enforced allocation ceiling**; an overrun can happen before it is
 observed. Artifact metadata hashing/JSON serialization is outside the measured boundary.
+The OS retains the lifetime peak between observations; admission may continue between
+checks, and the final observation determines the memory verdict. Per-event `Process.Refresh`
+polling was rejected after the first pinned campaign hit 60-second worker timeouts on Windows
+(100 diagnostic observations took 3.98 seconds). That interrupted campaign is retained as
+failed instrumentation evidence; v2 keeps its tasks, seeds, budgets and analysis unchanged.
 The grid worker does not allocate unused search centroids to hide their cost. Runtime,
 binary hashes, GC mode, CPU/wall time, allocations and memory observations are retained.
 

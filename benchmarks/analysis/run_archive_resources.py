@@ -23,11 +23,12 @@ def dump(path, value):
 
 def plan(revision, smoke=False):
     require(re.fullmatch(r"[0-9a-f]{40}", revision) or (smoke and revision == "working-tree-smoke"), "Pin source for a primary campaign.")
-    return {"SchemaVersion": 1, "Protocol": "archive-resource-development-v1", "SourceRevision": revision,
+    return {"SchemaVersion": 2, "Protocol": "archive-resource-development-v2", "SourceRevision": revision,
             "Purpose": "authored-development-smoke" if smoke else "fixed-plan-authored-development",
             "Tasks": list(TASKS), "Methods": list(METHODS), "Dimensions": [12, 20], "SeedCount": 2 if smoke else 32,
             "EvaluationBudget": 32 if smoke else 256, "PeakResidentBudgetMiB": 256,
             "EliteCapacity": 32, "MaximumGridCells": 10_000_000, "WorkerTimeoutSeconds": 60,
+            "MemoryObservationStride": 16,
             "Phases": ["primary", "replay"], "BootstrapSamples": 10000, "BootstrapSeed": 20260911,
             "PrimaryEndpoint": "Per-seed mean across the four task/dimension contexts of FixedCentroid minus SparseGrid common-reference utility; zero utility for failed/over-budget cases.",
             "MemoryEndpoint": "Same declared 256 MiB observed process-lifetime peak resident budget through setup/search/projection, not equal actual bytes or an OS hard limit.",
@@ -37,7 +38,7 @@ def plan(revision, smoke=False):
 
 def validate_case(report, specification, configuration):
     task, dimension, seed, method = specification
-    require(report["Protocol"] == "archive-resource-case-development-v1" and report["SchemaVersion"] == 2, "Worker protocol mismatch.")
+    require(report["Protocol"] == "archive-resource-case-development-v2" and report["SchemaVersion"] == 3, "Worker protocol mismatch.")
     require(report["SourceRevision"] == configuration["SourceRevision"], "Worker source label mismatch.")
     require(report["Budget"] == configuration["EvaluationBudget"] and report["Dimensions"] == dimension and report["Seeds"] == 1 and report["SelectedSeed"] == seed, "Case budget/dimensions/seed mismatch.")
     require(report["EliteCapacity"] == 32 and report["MaximumGridCells"] == configuration["MaximumGridCells"], "Archive capacity/guard mismatch.")
@@ -45,6 +46,8 @@ def validate_case(report, specification, configuration):
     row = report["Runs"][0]
     require((row["Task"], row["Method"], row["Seed"]) == (task + str(dimension), method, seed), "Case identity mismatch.")
     measure = report["Measurement"]
+    require(measure["MemoryObservationStride"] == configuration["MemoryObservationStride"], "Memory observation cadence mismatch.")
+    require(type(measure["MemoryObservationCount"]) is int and measure["MemoryObservationCount"] >= 2, "Missing memory observations.")
     cap = configuration["PeakResidentBudgetMiB"] * 1024 * 1024
     require(measure["PeakResidentBudgetBytes"] == cap and type(measure["PeakResidentBytes"]) is int and measure["PeakResidentBytes"] > 0, "Missing measured RSS or mismatched cap.")
     require(type(measure["MemoryBudgetExceeded"]) is bool and measure["MemoryBudgetExceeded"] == (measure["PeakResidentBytes"] > cap), "Memory gate mismatch.")
@@ -64,6 +67,7 @@ def validate_case(report, specification, configuration):
     require(sum(sample["Attempts"] for sample in row["Samples"]) == calls and sum(sample["CostUnits"] for sample in row["Samples"]) == calls, "Trace omits physical work.")
     require(0 <= row["ReferenceUtility"] <= 1 and 0 <= row["OccupiedSearchCells"] <= 32 and 0 <= row["OccupiedReferenceCells"] <= 32, "Invalid quality/retention bounds.")
     if row["Status"] == "completed":
+        require(measure["MemoryObservationCount"] == 3 + row["Proposals"] // configuration["MemoryObservationStride"], "Memory observation count mismatch.")
         require(not measure["MemoryBudgetExceeded"] and calls == configuration["EvaluationBudget"], "Completed case exceeded a resource cap or stopped early.")
         require(resources["Spent"].get("proposal_calls", 0) == row["Proposals"] - 8, "Proposal work is not charged.")
         projection = row["Projection"]
@@ -187,7 +191,8 @@ def run(configuration, worker, output):
                                 record["Report"] = report
                                 record["ReportSha256"] = report_hash
                             except (ValueError, KeyError, TypeError) as error:
-                                record["Failure"] = f"invalid-report: {error}"
+                                record["ReportFailure"] = f"invalid-report: {error}"
+                                record.setdefault("Failure", record["ReportFailure"])
                         records.append(record)
                         dump(output / (name + ".record.json"), record)
                         if len(records) % 16 == 0:

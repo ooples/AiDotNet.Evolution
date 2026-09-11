@@ -32,11 +32,14 @@ internal sealed record ArchiveCase(string Task, string Method, ulong Seed, int D
 // OS process-lifetime peak includes startup/shared pages; one fresh child is mandatory per case.
 internal sealed class ArchiveMemoryProbe : IDisposable
 {
+    internal const int ObservationStride = 16;
     private readonly Process _process = Process.GetCurrentProcess();
     private readonly long _started = Stopwatch.GetTimestamp();
     private readonly long _allocated = GC.GetTotalAllocatedBytes(precise: true);
     private readonly double _cpu;
     private long _peak;
+    private int _observations;
+    private int _evaluatedEvents;
     internal ArchiveMemoryProbe(long budget)
     {
         Budget = budget;
@@ -47,10 +50,16 @@ internal sealed class ArchiveMemoryProbe : IDisposable
     internal long Budget { get; }
     internal bool Exceeded { get; private set; }
     internal Action? Stop { get; set; }
+    internal void ObserveEvaluation()
+    {
+        // Refresh can be expensive; the OS retains the lifetime peak between observations.
+        if (++_evaluatedEvents % ObservationStride == 0) Check();
+    }
     internal void Check()
     {
         _process.Refresh();
         _peak = Math.Max(_peak, _process.PeakWorkingSet64);
+        _observations++;
         if (_peak <= 0) throw new InvalidOperationException("Process peak resident memory is unavailable; do not substitute elite count.");
         Exceeded |= _peak > Budget;
         if (Exceeded) Stop?.Invoke();
@@ -64,6 +73,8 @@ internal sealed class ArchiveMemoryProbe : IDisposable
             PeakResidentBudgetBytes = Budget,
             PeakResidentBytes = _peak,
             MemoryBudgetExceeded = Exceeded,
+            MemoryObservationStride = ObservationStride,
+            MemoryObservationCount = _observations,
             AllocatedBytes = GC.GetTotalAllocatedBytes(precise: true) - _allocated,
             ElapsedMilliseconds = Stopwatch.GetElapsedTime(_started).TotalMilliseconds,
             CpuMilliseconds = _process.TotalProcessorTime.TotalMilliseconds - _cpu,
@@ -72,7 +83,7 @@ internal sealed class ArchiveMemoryProbe : IDisposable
             ProcessorCount = Environment.ProcessorCount,
             ServerGc = GCSettings.IsServerGC,
             GcHeapHardLimit = Environment.GetEnvironmentVariable("DOTNET_GCHeapHardLimit"),
-            MeasurementBoundary = "Process-lifetime peak resident memory through setup, search and common-reference projection, before artifact metadata hashing/JSON serialization. Wall/CPU/allocation deltas start at worker probe construction. Event-level observations stop admission after an observed overrun; not an OS-enforced hard cap.",
+            MeasurementBoundary = "Process-lifetime peak resident memory through setup, search and common-reference projection, before artifact metadata hashing/JSON serialization. Wall/CPU/allocation deltas start at worker probe construction. Observations at construction, before search, every 16 Evaluated events and after projection stop admission after an observed overrun; not an OS-enforced hard cap. Admission can continue between observations; the final lifetime peak is authoritative.",
             CoreInformationalVersion = typeof(EvolutionEngineOptions).Assembly.GetCustomAttribute<AssemblyInformationalVersionAttribute>()?.InformationalVersion,
             WorkerSha256 = Hash(typeof(ArchiveResourceCase).Assembly.Location),
             CoreSha256 = Hash(typeof(EvolutionEngineOptions).Assembly.Location)

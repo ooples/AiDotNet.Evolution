@@ -47,8 +47,8 @@ internal static class ArchivePartitionPilot
 
         await JsonSerializer.SerializeAsync(output, new
         {
-            SchemaVersion = single is null ? 1 : 2,
-            Protocol = single is null ? "archive-partition-development-v1" : "archive-resource-case-development-v1",
+            SchemaVersion = single is null ? 1 : 3,
+            Protocol = single is null ? "archive-partition-development-v1" : "archive-resource-case-development-v2",
             SourceRevision = args[2],
             Partition = "development",
             Dimensions = dimensions,
@@ -163,8 +163,8 @@ internal static class ArchivePartitionPilot
         private double? _best;
         public ValueTask OnEventAsync(EvolutionEvent<EvolutionSearchGenome> item, CancellationToken cancellationToken = default)
         {
-            probe?.Check();
             if (item.Kind != EvolutionEventKind.Evaluated || item.Evaluation is not { } evaluation) return default;
+            probe?.ObserveEvaluation();
             if (evaluation.Status == EvolutionEvaluationStatus.Completed && evaluation.Quality.HasValue)
                 _best = !_best.HasValue ? -evaluation.Quality.Value : Math.Min(_best.Value, -evaluation.Quality.Value);
             Samples.Add(new SampleRecord(evaluation.EvaluationId, evaluation.Status, _best, evaluation.Cost.AttemptCount,
