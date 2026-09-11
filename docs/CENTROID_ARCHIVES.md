@@ -38,6 +38,13 @@ new archive with versioned geometry and deterministic collision resolution, leav
 unplaceable elite rejects the whole projection. This is an offline operation, not live engine reconfiguration.
 It cannot recover candidates discarded earlier or transfer old evaluation validity to a different task.
 
+`ProjectWithReport` also returns immutable remap provenance: source/target definition hashes,
+mutation versions, offered/retained elite counts, and collision discards. No target/report is
+returned on validation or version-overflow failure. The report remains a snapshot if the
+caller later changes the returned archive. Store it alongside the full target geometry and
+checkpoint configuration; the target definition hash is the engine's compatibility boundary.
+This is traceable offline remapping, not live reconfiguration or a proof of fitness validity.
+
 `IEvolutionArchiveCellCount` lets non-grid archives declare their physical cell count. Engine status, coverage-based
 stopping and immutable snapshots preserve K instead of multiplying irrelevant grid bin counts. Existing archives
 without that optional contract retain the grid interpretation. Occupancy under different partitions is not directly
@@ -60,3 +67,61 @@ Equal elite-slot caps do **not** establish equal measured RAM: centroid coordina
 The pilot uses frozen uniform Voronoi sites, not fitted CVT. Common-reference utility sees retained elites only.
 Controlled memory/latency scaling and representative quality confirmation remain open; no default change is justified
 by execution smoke tests alone.
+
+## Measured resource-budget comparison
+
+`eng/Test-ArchiveResources.ps1` exercises a fresh worker process for every paired case and
+replay. It also forces a 1 MiB failure before evaluation and retains 64-dimensional grid
+configuration failures separately. The default grid guard limits the logical product to
+10 million cells; it is not evidence of a dense memory allocation. The paired quality plan
+uses 12 and 20 dimensions, where both defaults are valid, with 32 elite slots and identical
+evaluation/proposal limits. The centroid route uses all dimensions, including a separate
+64-dimensional support probe.
+
+The full development campaign is fixed at 32 seeds, two tasks, two dimensions, 256 evaluations
+per case, and a declared 256 MiB observed peak-resident budget for both methods. Each case has
+its own process; the runner records the plan before execution, alternates method order and
+retains failures/timeouts. Replay incurs new physical evaluations and is accounted separately.
+No extra seeds are added in response to significance. A single primary endpoint averages
+paired common-reference utility differences over the four contexts within each seed, then
+bootstraps those seed blocks. Per-context/resource summaries are descriptive.
+
+[Process.PeakWorkingSet64](https://learn.microsoft.com/en-us/dotnet/api/system.diagnostics.process.peakworkingset64?view=net-10.0)
+measures process-lifetime peak resident memory, including shared pages and startup. It is
+not retained archive bytes or total allocated bytes. The v2 worker observes it at construction,
+before search, every 16 `Evaluated` events and after common-reference projection,
+records the observation count/cadence, stops admission on an observed overrun, and
+assigns the failed case zero utility while preserving actual charges. This is an observed
+budget gate, **not an OS-enforced allocation ceiling**; an overrun can happen before it is
+observed. Artifact metadata hashing/JSON serialization is outside the measured boundary.
+The OS retains the lifetime peak between observations; admission may continue between
+checks, and the final observation determines the memory verdict. Per-event `Process.Refresh`
+polling was rejected after the first pinned campaign hit 60-second worker timeouts on Windows
+(100 diagnostic observations took 3.98 seconds). That interrupted campaign is retained as
+failed instrumentation evidence; v2 keeps its tasks, seeds, budgets and analysis unchanged.
+The grid worker does not allocate unused search centroids to hide their cost. Runtime,
+binary hashes, GC mode, CPU/wall time, allocations and memory observations are retained.
+
+```powershell
+dotnet build benchmarks/AiDotNet.Evolution.Quality -c Release
+python benchmarks/analysis/run_archive_resources.py --worker benchmarks/AiDotNet.Evolution.Quality/bin/Release/net10.0/AiDotNet.Evolution.Quality.dll --output TestResults/archive-primary --revision <full-built-source-revision>
+python benchmarks/analysis/run_archive_resources.py --verify TestResults/archive-primary
+```
+
+The pinned full campaign at `f990516a31c5e6c9f2e7f7110373581a9d460cfc` completed
+all 512 cases with no failures or unknown calls: 65,536 primary evaluations and 65,536
+additional replay evaluations. Quality replay was exact. The pooled centroid-minus-grid
+utility difference was **-0.00058978**, with paired-seed bootstrap 95% interval
+**[-0.00504834, 0.00419849]**: inconclusive, not equivalence or superiority.
+Median process peak RSS across the four contexts was 44.95–46.09 MB for the grid and
+44.80–45.37 MB for centroids (decimal MB); both stayed within the declared 256 MiB cap.
+These descriptive process measurements include instrumentation/runtime overhead, not
+isolated retained archive memory. The host was not exclusive; latency is not a controlled
+performance claim. No default change is justified.
+
+[Raw primary/replay, failed instrumentation and verification evidence](../benchmarks/evidence/archive-resources/f990516/README.md)
+retains the fixed plans, all observations/traces, immutable remap reports, byte checksums,
+low-memory/64D support probes and source-pinned test/package receipts. Representative
+held-out tasks, fitted CVT sites and competitor comparisons remain separate validation
+work; this authored campaign establishes the implementation's paired-budget reporting,
+not a general quality advantage.
