@@ -9,7 +9,7 @@
     <ContinuousIntegrationBuild Condition="'$(CI)' == 'true'">true</ContinuousIntegrationBuild>
     <GenerateDocumentationFile>true</GenerateDocumentationFile>
     <GeneratePackageOnBuild>true</GeneratePackageOnBuild>
-    <Version>0.1.0-preview.1</Version>
+    <Version>0.1.0-preview.2</Version>
     <PackageId>AiDotNet.Evolution</PackageId>
     <Title>AiDotNet.Evolution</Title>
     <Description>Deterministic, task-agnostic quality-diversity evolution for .NET with typed genomes, MAP-Elites archives, checkpointing, migration, and reproducible parallel evaluation.</Description>
@@ -30,16 +30,16 @@
   </PropertyGroup>
 
   <ItemGroup>
-    <InternalsVisibleTo Include="AiDotNet.Evolution.Tests" />
-    <None Include="..\..\README.md" Pack="true" PackagePath="\" />
-    <None Include="..\..\THIRD-PARTY-NOTICES.md" Pack="true" PackagePath="\" />
+    <InternalsVisibleTo Include="AiDotNet.Evolution.Tests"/>
+    <None Include="..\..\README.md" Pack="true" PackagePath="\"/>
+    <None Include="..\..\THIRD-PARTY-NOTICES.md" Pack="true" PackagePath="\"/>
   </ItemGroup>
 
   <ItemGroup Condition="'$(TargetFramework)' == 'net471'">
-    <PackageReference Include="System.Text.Json" Version="10.0.11" />
+    <PackageReference Include="System.Text.Json" Version="10.0.11"/>
   </ItemGroup>
 
   <ItemGroup>
-    <PackageReference Include="Microsoft.SourceLink.GitHub" Version="10.0.400" PrivateAssets="All" />
+    <PackageReference Include="Microsoft.SourceLink.GitHub" Version="10.0.400" PrivateAssets="All"/>
   </ItemGroup>
 </Project>

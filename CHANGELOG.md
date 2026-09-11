@@ -1,5 +1,12 @@
 # Changelog
 
+## [0.1.0-preview.2](https://github.com/ooples/AiDotNet.Evolution/compare/v0.1.0-preview.1...v0.1.0-preview.2) (2026-09-11)
+
+
+### Features
+
+* **options:** make EvolutionEngineOptions.Copy public ([#16](https://github.com/ooples/AiDotNet.Evolution/issues/16)) ([b7fbc30](https://github.com/ooples/AiDotNet.Evolution/commit/b7fbc301259994b46c79e4b57e376366f8af8b86))
+
 ## 0.1.0-preview.1 (2026-09-08)
 
 - Extract the deterministic quality-diversity engine from AiDotNet with its original Git history.
