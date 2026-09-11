@@ -27,7 +27,7 @@ var task = new EvolutionSearchTask(space, "mixed-api-example", "v1", "synthetic-
     new ValueTask<EvolutionTaskResult>(EvolutionTaskResult.Completed(Score(genome),
         new Dictionary<string, double> { ["family"] = genome.Category("family") == "tree" ? 0 : 1 }, costUnits: 1)));
 var ledger = new EvolutionResourceLedger("mixed-example", EvolutionResources.Of("cost_units", budget));
-var variation = (AdaptiveVariationPortfolio<EvolutionSearchGenome>)EvolutionSearchPresets.Create(space, EvolutionSearchPreset.AdaptiveMixed);
+var variation = EvolutionSearchPresets.CreateAdaptiveMixed(space);
 var initial = new[] { space.Sample(StableRandom.CreateStream(42, 0)), space.Sample(StableRandom.CreateStream(42, 1)) };
 var engine = new EvolutionEngine<EvolutionSearchGenome>(new ResourceMeteredEvolutionTask<EvolutionSearchGenome>(task, ledger, new[] { 1m }), variation,
     _ => new MapElitesArchive<EvolutionSearchGenome>(new[] { new EvolutionDescriptorDefinition("family", 0, 2, 2) }),

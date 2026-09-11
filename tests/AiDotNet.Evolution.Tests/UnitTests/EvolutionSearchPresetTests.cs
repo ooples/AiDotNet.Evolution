@@ -118,6 +118,34 @@ public sealed class EvolutionSearchPresetTests
         Assert.IsType<DiagonalCmaEmitter>(maximize);
     }
 
+    // The typed factories exist so callers can reach concrete members, such as portfolio statistics, without
+    // downcasting the interface Create returns, and so a direction cannot be passed where it does nothing.
+    [Fact]
+    public void TypedFactoriesReturnConcreteOperatorsAndADirectionIsRefusedWhereItIsUnused()
+    {
+        var space = EvolutionSearchSpaceTests.Mixed();
+        var continuous = EvolutionSearchSpaceTests.Continuous(2);
+        SearchSpaceMutation mutation = EvolutionSearchPresets.CreateMutation(space);
+        AdaptiveVariationPortfolio<EvolutionSearchGenome> uniform = EvolutionSearchPresets.CreateUniformMixed(space);
+        AdaptiveVariationPortfolio<EvolutionSearchGenome> adaptive = EvolutionSearchPresets.CreateAdaptiveMixed(space);
+        DiagonalCmaEmitter emitter = EvolutionSearchPresets.CreateDiagonalCma(continuous, EvolutionOptimizationDirection.Minimize);
+        Assert.Equal(3, uniform.Statistics.Count); Assert.Equal(3, adaptive.Statistics.Count);
+        Assert.Equal(EvolutionSearchPresets.Create(space).VersionHash, mutation.VersionHash);
+        Assert.Equal(EvolutionSearchPresets.Create(space, EvolutionSearchPreset.UniformMixed).VersionHash, uniform.VersionHash);
+        Assert.Equal(EvolutionSearchPresets.Create(space, EvolutionSearchPreset.AdaptiveMixed).VersionHash, adaptive.VersionHash);
+        Assert.Equal(EvolutionSearchPresets.Create(continuous, EvolutionSearchPreset.DiagonalCma, EvolutionOptimizationDirection.Minimize).VersionHash,
+            emitter.VersionHash);
+        Assert.NotSame(uniform, EvolutionSearchPresets.CreateUniformMixed(space));
+        Assert.Throws<ArgumentNullException>(() => EvolutionSearchPresets.CreateMutation(null!));
+        Assert.Throws<ArgumentNullException>(() => EvolutionSearchPresets.CreateUniformMixed(null!));
+        Assert.Throws<ArgumentNullException>(() => EvolutionSearchPresets.CreateAdaptiveMixed(null!));
+        Assert.Throws<ArgumentNullException>(() => EvolutionSearchPresets.CreateDiagonalCma(null!));
+        Assert.Throws<ArgumentOutOfRangeException>(() => EvolutionSearchPresets.CreateDiagonalCma(continuous, (EvolutionOptimizationDirection)99));
+        Assert.Throws<ArgumentException>(() => EvolutionSearchPresets.CreateDiagonalCma(space));
+        foreach (EvolutionSearchPreset preset in new[] { EvolutionSearchPreset.Mutation, EvolutionSearchPreset.UniformMixed, EvolutionSearchPreset.AdaptiveMixed })
+            Assert.Throws<ArgumentException>(() => EvolutionSearchPresets.Create(space, preset, EvolutionOptimizationDirection.Minimize));
+    }
+
     [Theory]
     [InlineData(EvolutionSearchPreset.Mutation)]
     [InlineData(EvolutionSearchPreset.UniformMixed)]
