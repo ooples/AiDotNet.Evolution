@@ -117,3 +117,23 @@ fault without waiting indefinitely for an uncooperative borrowed reader. It does
 claim to forcibly cancel arbitrary operating-system I/O.
 
 No npm/NuGet publication or PR merge is part of this validation.
+# Overnight review follow-up (2026-09-11)
+
+Implementation commit: `5b4c89c44034df69e42b67cf60eebe0ad0ebb61e`.
+
+- All .NET tests: net10.0 497/497, net8.0 497/497, net471 305/305; zero skips/failures.
+- TypeScript: 108/108 on Node 18.17, 22.23.2, and 25.9, each against the **current managed net8 host**.
+  The primary reviewer independently reran net8.0 (497/497) and the binding (108/108), including its TAP guard.
+- Coverage: 89.76% lines / 75.28% branches, with only GeneratedCodeAttribute excluded and the baseline unchanged.
+- Before controls reproduced 21 host-boundary failures, eight client configuration failures, four real-host
+  budget/descriptor failures, and three wire-null settlement failures. Raw results are preserved under
+  `tests/AiDotNet.Evolution.Tests/TestResults` and `artifacts/pr14-review-coverage-final`.
+- New invariants include field-specific budgets (zero evaluations and seed-only zero generations remain
+  valid), bounded parsing before object-graph allocation, immutable parameter layout, explicit stop tokens,
+  invalid descriptor settlement including JavaScript NaN/Infinity becoming JSON null, and a complete TAP
+  summary with pass count equal to test count and no missing/skipped outcomes.
+- Managed host DLL SHA-256: `E7884DF24A8D33F8A264FC237CED3BA68494450F83AB0229265BF44B0233420C`.
+  Fresh NativeAOT CI on this commit is still required; the earlier native artifact is before evidence,
+  not proof of the new parser. Node 18 local Windows invocation expands test filenames explicitly;
+  the CI minimum-version lane uses Linux. The existing native-package publication prerequisite for a
+  complete npm lockfile remains documented in `bindings/typescript/README.md`; no package was published.
