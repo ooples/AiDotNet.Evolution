@@ -28,7 +28,7 @@
     "build": "tsc -p tsconfig.json",
     "host": "node scripts/build-host.mjs",
     "pretest": "npm run build",
-    "test": "node --test test/*.test.mjs",
+    "test": "node --test --test-reporter=tap test/*.test.mjs",
     "lint": "tsc -p tsconfig.json --noEmit",
     "prepack": "npm run build",
     "package": "node scripts/make-platform-package.mjs"

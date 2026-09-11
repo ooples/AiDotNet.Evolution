@@ -67,20 +67,26 @@ export interface RunConfig {
    * same run, so anything unrepresentable is rejected rather than quietly rounded.
    */
   readonly seed?: number;
+  /** Positive 32-bit integer. A run always includes at least one seed proposal. */
   readonly maxProposals?: number;
   /**
    * Evaluation budget, a SEPARATE cap from proposals.
    *
    * Defaults to `maxProposals`. Left unset on the engine it silently caps a run at 100 and
-   * reports a stop reason naming no setting you could raise.
+   * reports a stop reason naming no setting you could raise. A non-negative 32-bit
+   * integer; zero ends without evaluating candidates.
    */
   readonly maxEvaluations?: number;
+  /** Non-negative 32-bit integer. Zero evaluates the seeds without generating variations. */
   readonly maxGenerations?: number;
+  /** Positive 32-bit integer. */
   readonly batchSize?: number;
   readonly direction?: 'maximize' | 'minimize';
   /**
    * How long any single request may take before the session is considered wedged.
    *
+   * An integer from 1 through 2,147,483,647 milliseconds, inclusive. Larger values
+   * overflow Node's timer and are otherwise silently reduced to one millisecond.
    * Defaults to two minutes. A timeout is FATAL to the session, not to the one request:
    * a host that stopped answering has no reason to start again, and leaving it alive
    * would leak a process nobody holds a reference to.
@@ -116,6 +122,7 @@ export interface Evaluation {
    * is recorded as one and competes with nothing.
    */
   readonly quality?: number;
+  /** Every declared descriptor must be finite; missing/non-finite measurements fail the evaluation. */
   readonly descriptors?: Record<string, number>;
   /** Why the evaluation failed, when it did. */
   readonly reason?: string;
@@ -189,6 +196,19 @@ function isResponse<Operation extends HostOperation>(
 
 /** How long any single request may take before the session is considered wedged. */
 const DEFAULT_REQUEST_TIMEOUT_MS = 120_000;
+const MAX_INT32 = 2_147_483_647;
+
+function validateInteger(
+  value: number | undefined,
+  name: keyof RunConfig,
+  minimum: number,
+  maximum: number
+): void {
+  if (value !== undefined &&
+      (!Number.isSafeInteger(value) || value < minimum || value > maximum)) {
+    throw new EvolutionError(`${name} must be an integer from ${minimum} through ${maximum}, not ${value}.`);
+  }
+}
 
 /**
  * Rejects configuration that cannot survive the wire.
@@ -197,26 +217,14 @@ const DEFAULT_REQUEST_TIMEOUT_MS = 120_000;
  * field rather than surfacing as a host-side parse error with no context.
  */
 function validate(config: RunConfig): void {
-  const counts: readonly (readonly [string, number | undefined])[] = [
-    ['seed', config.seed],
-    ['maxProposals', config.maxProposals],
-    ['maxEvaluations', config.maxEvaluations],
-    ['maxGenerations', config.maxGenerations],
-    ['batchSize', config.batchSize],
-    ['requestTimeoutMs', config.requestTimeoutMs],
-  ];
-  for (const [name, value] of counts) {
-    if (value === undefined) continue;
-    if (!Number.isSafeInteger(value) || value < 0) {
-      // Number.isSafeInteger is the exact test: it is false for a non-integer, for a
-      // non-finite value, and for anything JSON.stringify would round on the way out.
-      throw new EvolutionError(
-        `${name} must be a non-negative integer no larger than ${Number.MAX_SAFE_INTEGER}, ` +
-          `not ${value}. Larger values are rounded by JSON, so two seeds you believe are ` +
-          `different would produce the same run.`
-      );
-    }
-  }
+  // Bounds follow the wire/runtime type, not the field's diagnostic name. The seed
+  // is unsigned 64-bit on the host; the budgets are Int32 and Node's timer is Int32.
+  validateInteger(config.seed, 'seed', 0, Number.MAX_SAFE_INTEGER);
+  validateInteger(config.maxProposals, 'maxProposals', 1, MAX_INT32);
+  validateInteger(config.maxEvaluations, 'maxEvaluations', 0, MAX_INT32);
+  validateInteger(config.maxGenerations, 'maxGenerations', 0, MAX_INT32);
+  validateInteger(config.batchSize, 'batchSize', 1, MAX_INT32);
+  validateInteger(config.requestTimeoutMs, 'requestTimeoutMs', 1, MAX_INT32);
   if (config.parameters.length === 0) {
     throw new EvolutionError('config.parameters must declare at least one parameter');
   }

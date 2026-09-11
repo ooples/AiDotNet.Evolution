@@ -192,6 +192,70 @@ test('a failed evaluation is not scored zero', { skip }, async () => {
   assert.equal(summary.best, null);
 });
 
+for (const [name, descriptors] of [
+  ['missing descriptor map', undefined],
+  ['missing descriptor key', { x: 0 }],
+]) {
+  test(`${name} cannot fabricate an elite coordinate`, { skip }, async () => {
+    let evaluated = 0;
+    const summary = await evolve({ ...CONFIG, maxProposals: 1, maxEvaluations: 1 }, (candidates) => {
+      evaluated += candidates.length;
+      return candidates.map((candidate) => ({
+        evaluationId: candidate.evaluationId, quality: 123, descriptors,
+      }));
+    });
+    assert.equal(evaluated, 1, 'a real candidate must have reached the evaluator');
+    assert.equal(summary.best, null, 'incomplete measurements cannot enter the archive');
+  });
+}
+
+for (const value of [NaN, Infinity, -Infinity, 0]) {
+  test(`descriptor ${value} settles without inventing or losing its measurement`, { skip, timeout: 5000 }, async () => {
+    const session = await openSession({ ...CONFIG, maxProposals: 1, maxEvaluations: 1 });
+    try {
+      const batch = await session.ask(1);
+      assert.equal(batch.length, 1);
+      const result = { evaluationId: batch[0].evaluationId, quality: 123, descriptors: { x: value, y: 0 } };
+      assert.equal(JSON.parse(JSON.stringify(result)).descriptors.x, Number.isFinite(value) ? value : null);
+      assert.equal(await session.tell([result]), 1, 'the requested evaluation must settle, not remain outstanding');
+      assert.deepEqual(await session.ask(1), [], 'the settled run must complete');
+      const summary = await session.close();
+      if (Number.isFinite(value)) assert.equal(summary.best?.quality, 123, 'finite zero remains a genuine coordinate');
+      else assert.equal(summary.best, null, 'a null wire measurement must fail evaluation, never enter the archive');
+    } finally {
+      await session.close();
+    }
+  });
+}
+
+test('zero evaluation budget ends without evaluating a candidate', { skip }, async () => {
+  let evaluated = 0;
+  const summary = await evolve({ ...CONFIG, maxEvaluations: 0 }, (candidates) => {
+    evaluated += candidates.length;
+    return candidates.map((candidate) => ({
+      evaluationId: candidate.evaluationId, quality: 123, descriptors: candidate.parameters,
+    }));
+  });
+  assert.equal(evaluated, 0);
+  assert.equal(summary.best, null);
+  assert.equal(summary.stopReason, 'EvaluationBudgetReached');
+});
+
+test('zero generation budget evaluates every seed and no variation', { skip }, async () => {
+  const seeds = [{ x: 0, y: 0 }, { x: 2, y: 1 }];
+  const seen = [];
+  const summary = await evolve({ ...CONFIG, seeds, maxGenerations: 0, batchSize: 1 }, (candidates) => {
+    seen.push(...candidates.map((candidate) => candidate.parameters));
+    return candidates.map((candidate) => ({
+      evaluationId: candidate.evaluationId, quality: candidate.parameters.x,
+      descriptors: candidate.parameters,
+    }));
+  });
+  assert.deepEqual(seen, seeds);
+  assert.deepEqual(summary.best?.parameters, seeds[1]);
+  assert.equal(summary.stopReason, 'GenerationLimitReached');
+});
+
 test('minimize inverts which candidate wins', { skip }, async () => {
   const summary = await evolve(
     { ...CONFIG, direction: 'minimize', maxProposals: 200, maxEvaluations: 200 },

@@ -77,8 +77,9 @@ internal sealed class ParameterSpace
         if (parameters is null || parameters.Count == 0)
             throw new ArgumentException("A parameter space needs at least one parameter.", nameof(parameters));
 
+        ParameterDefinition[] snapshot = parameters.ToArray();
         _names = new HashSet<string>(StringComparer.Ordinal);
-        foreach (ParameterDefinition parameter in parameters)
+        foreach (ParameterDefinition parameter in snapshot)
         {
             if (!_names.Add(parameter.Name))
             {
@@ -87,7 +88,9 @@ internal sealed class ParameterSpace
                     nameof(parameters));
             }
         }
-        Parameters = parameters;
+        // Keep both the source list and the exposed read-only view from changing the
+        // dimension order after names and existing genomes have been bound to it.
+        Parameters = Array.AsReadOnly(snapshot);
     }
 
     /// <summary>Declared names, kept so a seed can be checked against them.</summary>

@@ -46,6 +46,18 @@ internal sealed class HostSession : IDisposable
         if (config.Seeds is { Count: > ProtocolLimits.MaxSeeds })
             throw new ArgumentException($"config.seeds carries {config.Seeds.Count} seeds, more than the {ProtocolLimits.MaxSeeds} limit.");
 
+        // The host always supplies a seed, so it needs a positive proposal budget.
+        // Zero evaluations does no work; zero generations evaluates seeds only.
+        // Preserve those engine contracts instead of silently buying one unit.
+        if (config.MaxProposals <= 0)
+            throw new ArgumentException("config.maxProposals must be positive because a run includes at least one seed.", nameof(config));
+        if (config.MaxEvaluations < 0)
+            throw new ArgumentException("config.maxEvaluations must be non-negative.", nameof(config));
+        if (config.MaxGenerations < 0)
+            throw new ArgumentException("config.maxGenerations must be non-negative.", nameof(config));
+        if (config.BatchSize <= 0)
+            throw new ArgumentException("config.batchSize must be positive.", nameof(config));
+
         var definitions = new List<ParameterDefinition>(config.Parameters.Count);
         foreach (ParameterConfig parameter in config.Parameters)
         {
@@ -89,10 +101,10 @@ internal sealed class HostSession : IDisposable
         {
             RunId = "host",
             Seed = config.Seed,
-            MaxProposals = Math.Max(1, config.MaxProposals),
-            MaxEvaluationAttempts = Math.Max(1, config.MaxEvaluations ?? config.MaxProposals),
-            MaxGenerations = Math.Max(1, config.MaxGenerations),
-            ProposalBatchSize = Math.Max(1, config.BatchSize),
+            MaxProposals = config.MaxProposals,
+            MaxEvaluationAttempts = config.MaxEvaluations ?? config.MaxProposals,
+            MaxGenerations = config.MaxGenerations,
+            ProposalBatchSize = config.BatchSize,
             CheckpointInterval = 0,
         };
 
@@ -157,17 +169,7 @@ internal sealed class HostSession : IDisposable
         int accepted = 0;
         foreach (TellResult result in results)
         {
-            EvolutionTaskResult outcome = result.Quality is double quality && double.IsFinite(quality)
-                ? EvolutionTaskResult.Completed(
-                    quality,
-                    Descriptors(result),
-                    _direction)
-                // A non-finite or absent quality is a FAILED evaluation, not a zero. Scoring
-                // it zero would place a broken run in the archive as a genuinely poor result
-                // and let it out-compete nothing, which hides the failure.
-                : EvolutionTaskResult.Failed(
-                    "evaluation_failed",
-                    result.Reason ?? "the client reported no usable quality");
+            EvolutionTaskResult outcome = ReportedOutcome(result);
 
             // NOTHING IS REMEMBERED PER ASK. A dictionary of asked genomes used to be
             // kept here and only ever written to: the session already owns the
@@ -179,21 +181,25 @@ internal sealed class HostSession : IDisposable
         return accepted;
     }
 
-    private Dictionary<string, double> Descriptors(TellResult result)
+    private EvolutionTaskResult ReportedOutcome(TellResult result)
     {
-        var descriptors = new Dictionary<string, double>(StringComparer.Ordinal);
+        if (result.Quality is not double quality || !double.IsFinite(quality))
+            return EvolutionTaskResult.Failed("evaluation_failed",
+                result.Reason ?? "the client reported no usable quality");
+
+        var descriptors = new Dictionary<string, double>(_descriptorNames.Count, StringComparer.Ordinal);
         foreach (string name in _descriptorNames)
         {
-            // A descriptor the client omitted defaults to zero rather than throwing: a
-            // partial report should place the candidate somewhere in the archive rather
-            // than fail the whole batch.
-            descriptors[name] = result.Descriptors is not null
-                && result.Descriptors.TryGetValue(name, out double value)
-                && double.IsFinite(value)
-                    ? value
-                    : 0.0;
+            // A fabricated coordinate is as misleading as a fabricated quality: it can
+            // displace a real elite and change future parents. Settle this evaluation as
+            // failed without inserting it; an explicitly reported finite zero is valid.
+            if (result.Descriptors is null || !result.Descriptors.TryGetValue(name, out double? measurement)
+                || measurement is not double value || !double.IsFinite(value))
+                return EvolutionTaskResult.Failed("invalid_descriptors",
+                    $"the client reported no finite value for descriptor '{name}'");
+            descriptors[name] = value;
         }
-        return descriptors;
+        return EvolutionTaskResult.Completed(quality, descriptors, _direction);
     }
 
     /// <summary>The best entry across islands, or null before anything has been archived.</summary>
@@ -221,7 +227,7 @@ internal sealed class HostSession : IDisposable
             if (best is null || Better(candidate, best)) best = candidate;
         }
 
-        if (best is null) return (null, result.StopReason.ToString());
+        if (best is null) return (null, Protocol.StopReasonToWire(result.StopReason));
 
         return (
             new Candidate
@@ -230,7 +236,7 @@ internal sealed class HostSession : IDisposable
                 Parameters = _space.ToMap(best.Candidate.CanonicalGenome.Genome),
                 Quality = best.Evaluation.Quality,
             },
-            result.StopReason.ToString());
+            Protocol.StopReasonToWire(result.StopReason));
     }
 
     private bool Better(EvolutionArchiveEntry<ParameterGenome> a, EvolutionArchiveEntry<ParameterGenome> b)

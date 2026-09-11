@@ -164,7 +164,7 @@ public sealed class HostServeLoopTests
                     {
                         EvaluationId = first.EvaluationId,
                         Quality = 1,
-                        Descriptors = new Dictionary<string, double>(first.Parameters, StringComparer.Ordinal),
+                        Descriptors = first.Parameters.ToDictionary(pair => pair.Key, pair => (double?)pair.Value, StringComparer.Ordinal),
                     },
                 },
             });

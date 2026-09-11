@@ -1,3 +1,4 @@
+using System.Text;
 using System.Text.Json;
 using System.Text.Json.Serialization;
 
@@ -37,6 +38,11 @@ internal static class Protocol
     {
         error = null;
         id = 0;
+        if (line.Length > ProtocolLimits.MaxFrameChars)
+        {
+            error = $"frame exceeds the {ProtocolLimits.MaxFrameChars} character limit";
+            return null;
+        }
 
         Request? request;
         try
@@ -47,8 +53,8 @@ internal static class Protocol
         {
             // A DTO conversion error is not necessarily malformed JSON. Recover a
             // valid envelope id even when another field has the wrong JSON type.
-            // Only this failure path needs a DOM; valid requests retain the direct,
-            // source-generated deserialization path without a second parse.
+            // Scan only on failure, without constructing a DOM for a rejected object
+            // graph. Valid requests retain one source-generated deserialization pass.
             error = ClassifyDeserializationFailure(line, ex, out id);
             return null;
         }
@@ -75,18 +81,31 @@ internal static class Protocol
         id = 0;
         try
         {
-            using JsonDocument document = JsonDocument.Parse(line);
-            JsonElement root = document.RootElement;
-            if (root.ValueKind != JsonValueKind.Object)
+            // A limit may be encountered before the id. Scan the remaining valid JSON
+            // without materializing its lists/maps, preserving correlation even then.
+            var reader = new Utf8JsonReader(Encoding.UTF8.GetBytes(line));
+            bool first = true;
+            bool isObject = false;
+            long recoveredId = 0;
+            while (reader.Read())
             {
-                return "a request must be a JSON object";
+                if (first)
+                {
+                    isObject = reader.TokenType == JsonTokenType.StartObject;
+                    first = false;
+                }
+                if (isObject && reader.CurrentDepth == 1 && reader.TokenType == JsonTokenType.PropertyName
+                    && reader.ValueTextEquals("id"u8))
+                {
+                    // Match last-property-wins deserialization, including an invalid last id.
+                    recoveredId = 0;
+                    if (reader.Read() && reader.TokenType == JsonTokenType.Number
+                        && reader.TryGetInt64(out long value)) recoveredId = value;
+                }
             }
-
-            if (root.TryGetProperty("id", out JsonElement idElement) &&
-                idElement.ValueKind == JsonValueKind.Number && idElement.TryGetInt64(out long recoveredId))
-            {
-                id = recoveredId;
-            }
+            if (first) throw new JsonException("The input contains no JSON value.");
+            if (!isObject) return "a request must be a JSON object";
+            id = recoveredId;
             return $"invalid request: {conversionError.Message}";
         }
         catch (JsonException syntaxError)
@@ -122,6 +141,21 @@ internal static class Protocol
         "status" => Op.Status,
         "close" => Op.Close,
         _ => null,
+    };
+
+    /// <summary>Stable protocol tokens, independent of future enum member renames.</summary>
+    internal static string StopReasonToWire(EvolutionStopReason reason) => reason switch
+    {
+        EvolutionStopReason.EvaluationBudgetReached => "EvaluationBudgetReached",
+        EvolutionStopReason.ProposalBudgetReached => "ProposalBudgetReached",
+        EvolutionStopReason.NoCandidates => "NoCandidates",
+        EvolutionStopReason.Canceled => "Canceled",
+        EvolutionStopReason.TimeLimitReached => "TimeLimitReached",
+        EvolutionStopReason.CandidateFailure => "CandidateFailure",
+        EvolutionStopReason.GenerationLimitReached => "GenerationLimitReached",
+        EvolutionStopReason.TargetReached => "TargetReached",
+        EvolutionStopReason.EarlyStopped => "EarlyStopped",
+        _ => throw new ArgumentOutOfRangeException(nameof(reason), reason, "No wire token is defined for this stop reason."),
     };
 
     internal static string Serialize(Response response) =>
@@ -175,6 +209,7 @@ internal sealed class Request
 
     /// <summary>`tell`: the outcomes of previously asked candidates.</summary>
     [JsonPropertyName("results")]
+    [JsonConverter(typeof(BoundedResultListConverter))]
     public List<TellResult>? Results { get; set; }
 }
 
@@ -182,19 +217,23 @@ internal sealed class Request
 internal sealed class RunConfig
 {
     [JsonPropertyName("parameters")]
+    [JsonConverter(typeof(BoundedParameterListConverter))]
     public List<ParameterConfig> Parameters { get; set; } = new();
 
     /// <summary>Behaviour dimensions the archive is organised by. Names the client reports in `tell`.</summary>
     [JsonPropertyName("descriptors")]
+    [JsonConverter(typeof(BoundedDescriptorListConverter))]
     public List<DescriptorConfig> Descriptors { get; set; } = new();
 
     /// <summary>Starting points. Absent or empty means one genome at the midpoint of every range.</summary>
     [JsonPropertyName("seeds")]
+    [JsonConverter(typeof(BoundedSeedListConverter))]
     public List<Dictionary<string, double>>? Seeds { get; set; }
 
     [JsonPropertyName("seed")]
     public ulong Seed { get; set; } = 1234UL;
 
+    /// <summary>Positive proposal budget: this host always supplies at least one seed.</summary>
     [JsonPropertyName("maxProposals")]
     public int MaxProposals { get; set; } = 200;
 
@@ -204,13 +243,16 @@ internal sealed class RunConfig
     /// asking for 300 proposals got 100 evaluations and a `stopReason` of
     /// `EvaluationBudgetReached` that named no setting it could raise. Defaults to the
     /// proposal budget, so raising one raises both unless the caller separates them.
+    /// Zero is supported and ends the run without evaluating candidates.
     /// </remarks>
     [JsonPropertyName("maxEvaluations")]
     public int? MaxEvaluations { get; set; }
 
+    /// <summary>Non-negative variation budget. Zero evaluates seeds only.</summary>
     [JsonPropertyName("maxGenerations")]
     public int MaxGenerations { get; set; } = 1000;
 
+    /// <summary>Positive proposal batch capacity.</summary>
     [JsonPropertyName("batchSize")]
     public int BatchSize { get; set; } = 8;
 
@@ -264,7 +306,8 @@ internal sealed class TellResult
     public double? Quality { get; set; }
 
     [JsonPropertyName("descriptors")]
-    public Dictionary<string, double>? Descriptors { get; set; }
+    [JsonConverter(typeof(BoundedDescriptorMapConverter))]
+    public Dictionary<string, double?>? Descriptors { get; set; }
 
     [JsonPropertyName("reason")]
     public string? Reason { get; set; }
@@ -318,5 +361,6 @@ internal sealed class Candidate
 
 [JsonSerializable(typeof(Request))]
 [JsonSerializable(typeof(Response))]
+[JsonSerializable(typeof(Dictionary<string, double>), TypeInfoPropertyName = "NumericMap")]
 [JsonSourceGenerationOptions(DefaultIgnoreCondition = JsonIgnoreCondition.WhenWritingNull)]
 internal sealed partial class HostJsonContext : JsonSerializerContext;

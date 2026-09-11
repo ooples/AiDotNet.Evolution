@@ -6,4 +6,5 @@ packages/
 # NOT COMMITTED, deliberately. The lockfile records the three per-platform host packages
 # as unresolved optional dependencies until they are first published; committing that
 # would keep them unresolved for everyone even after they exist on the registry.
+# Remove this bootstrap exception using the first-publication checklist in README.md.
 package-lock.json

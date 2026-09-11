@@ -197,7 +197,7 @@ public sealed class HostDispatchTests
                 {
                     EvaluationId = candidate.EvaluationId,
                     Quality = 1.0,
-                    Descriptors = new Dictionary<string, double>(candidate.Parameters, StringComparer.Ordinal),
+                    Descriptors = candidate.Parameters.ToDictionary(pair => pair.Key, pair => (double?)pair.Value, StringComparer.Ordinal),
                 });
             }
             Response accepted = await Dispatch(told, session);

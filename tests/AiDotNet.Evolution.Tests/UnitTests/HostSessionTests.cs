@@ -75,7 +75,7 @@ public sealed class HostSessionTests
                 {
                     EvaluationId = candidate.EvaluationId,
                     Quality = minimizing ? loss : -loss,
-                    Descriptors = new Dictionary<string, double>(candidate.Parameters, StringComparer.Ordinal),
+                    Descriptors = candidate.Parameters.ToDictionary(pair => pair.Key, pair => (double?)pair.Value, StringComparer.Ordinal),
                 });
             }
             // ASSERTED, NOT IGNORED. Tell returns how many ids were actually outstanding;

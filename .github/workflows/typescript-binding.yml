@@ -97,13 +97,7 @@ jobs:
         shell: bash
         run: |
           npm test 2>&1 | tee test-output.txt
-          # '|| true' because grep exits non-zero on no match, and the shell here runs
-          # with -e: a missing line would abort the step instead of reaching the check.
-          skipped=$(grep -E '^# skipped ' test-output.txt | tr -dc '0-9' || true)
-          if [ "${skipped:-1}" != "0" ]; then
-            echo "::error::${skipped} tests skipped; the engine tests skip when no host binary is found."
-            exit 1
-          fi
+          node scripts/check-test-output.mjs test-output.txt
 
       # ONLY THE PRIMARY NODE VERSION PUBLISHES. Two jobs now build linux-x64, and
       # uploading from both would collide on the artifact name -- the extra job exists

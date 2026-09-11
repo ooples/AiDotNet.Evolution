@@ -149,6 +149,22 @@ AIDOTNET_EVOLUTION_HOST=/path/to/host npm test
 NativeAOT does not cross-compile, so each platform's binary is built on that platform.
 Published: `win-x64`, `linux-x64`, `osx-arm64`.
 
+## Maintainer: first-publication lockfile transition
+
+The three optional native packages must exist on npm before recording their resolved
+versions in the binding's lockfile. Until then, CI deliberately uses `npm install` and
+the bootstrap lockfile remains ignored; this is not a fully reproducible install.
+
+After publishing the three packages at the versions in `optionalDependencies`:
+
+1. Verify each version with `npm view <package>@<version> version`.
+2. From a clean binding checkout, run `npm install --package-lock-only` and confirm the
+   lockfile contains resolved URLs and integrity hashes for all three native packages.
+3. Remove the `package-lock.json` ignore entry, commit the generated lockfile, and change
+   the dependency-install step in `.github/workflows/typescript-binding.yml` to `npm ci`.
+4. Run the workflow's full platform/Node matrix; each run must execute its real-host
+   engine tests, and `scripts/check-test-output.mjs` must report no missing or skipped tests.
+
 ## Licence
 
 Apache-2.0.
