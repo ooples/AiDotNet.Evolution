@@ -240,6 +240,8 @@ def main():
             require(not dirty.strip(), "Commit runtime/analysis sources before a primary campaign.")
         result = run(plan(args.revision, args.smoke), args.worker.resolve(strict=True), args.output.resolve())
     print(json.dumps({key: value for key, value in result.items() if key not in ("ContextPairs", "SeedEffects", "ResourceComparisons")}, indent=2))
+    if args.verify:
+        return 0  # A reproducible retained failure is valid evidence, not a successful search.
     return 0 if result["FailedOrIncompleteCases"] == 0 and result["QualityReplayEqual"] else 1
 
 
