@@ -79,7 +79,9 @@ dotnet build AiDotNet.Evolution.slnx -c Release --no-restore -m:1
 ./eng/Test-Package.ps1 -PackagePath src/AiDotNet.Evolution/bin/Release/AiDotNet.Evolution.0.1.0-preview.1.nupkg -ExpectedVersion 0.1.0-preview.1
 dotnet build AiDotNet.Evolution.slnx -c Release --no-restore -m:1 -p:Version=0.1.0 -p:PackageVersion=0.1.0
 foreach ($targetFramework in @('net10.0', 'net8.0', 'net471')) {
-    dotnet test tests/AiDotNet.Evolution.Tests/AiDotNet.Evolution.Tests.csproj -c Release -f $targetFramework --no-build --no-restore
+    dotnet test tests/AiDotNet.Evolution.Tests/AiDotNet.Evolution.Tests.csproj -c Release -f $targetFramework --no-build --no-restore `
+        --logger "trx;LogFileName=candidate-$targetFramework.trx" `
+        --results-directory artifacts/stable-promotion/test-results
     if ($LASTEXITCODE -ne 0) { throw "Candidate tests failed on $targetFramework." }
 }
 dotnet pack src/AiDotNet.Evolution/AiDotNet.Evolution.csproj -c Release --no-build --no-restore --output artifacts/stable-promotion/candidate -p:Version=0.1.0 -p:PackageVersion=0.1.0
