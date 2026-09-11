@@ -320,6 +320,49 @@ public sealed class ParetoArchiveTests
             _ => MapElitesArchiveTests.Archive(), options));
     }
 
+    private sealed class InvalidObjectiveTask : IEvolutionTask<TestGenome>
+    {
+        private readonly string _scenario;
+        public InvalidObjectiveTask(string scenario) => _scenario = scenario;
+        public string Id => "invalid-objectives";
+        public string VersionHash => "invalid-objectives-v1";
+        public string EvaluatorVersionHash => "invalid-objectives-eval-v1";
+        public ValueTask<EvolutionCanonicalGenome<TestGenome>> CanonicalizeAsync(TestGenome genome, CancellationToken cancellationToken = default) =>
+            new(new EvolutionCanonicalGenome<TestGenome>(genome, genome.Value.ToString(System.Globalization.CultureInfo.InvariantCulture)));
+        public ValueTask<EvolutionTaskResult> EvaluateAsync(EvolutionCandidate<TestGenome> candidate, EvolutionEvaluationContext context,
+            CancellationToken cancellationToken = default) => new(new EvolutionTaskResult(EvolutionEvaluationStatus.Completed, 1,
+                _scenario == "direction" ? EvolutionOptimizationDirection.Minimize : EvolutionOptimizationDirection.Maximize,
+                objectives: _scenario == "wrong-count" ? new[] { .5 }
+                    : new[] { .5, _scenario == "out-of-bounds" ? 1.0000001 : .5 }));
+    }
+
+    [Theory]
+    [InlineData("out-of-bounds", "out_of_bounds")]
+    [InlineData("wrong-count", "objective_count")]
+    [InlineData("direction", "direction_mismatch")]
+    public async Task RefusedObjectiveVectorsAreDiagnosedInsteadOfSilentlyDropped(string scenario, string expectedReason)
+    {
+        var options = Options(4); options.IslandCount = 1; options.ProposalBatchSize = 1;
+        options.MaxDegreeOfParallelism = 1; options.MigrationInterval = 0;
+        var run = await new EvolutionEngine<TestGenome>(new InvalidObjectiveTask(scenario), new IncrementVariation(),
+            _ => new ParetoArchive<TestGenome>(Definition()), options).RunAsync(new[] { new TestGenome(1) });
+
+        Assert.Empty(run.ParetoFront!.Entries);
+        Assert.Null(run.Best);
+        var failure = Assert.Single(run.RetainedFailures, diagnostic => diagnostic.Code == "objective_invalid");
+        Assert.Equal(expectedReason, failure.Data["reason"]);
+        Assert.Equal("2", failure.Data["expected_objectives"]);
+        if (scenario == "out-of-bounds")
+        {
+            Assert.Equal("1", failure.Data["objective_index"]);
+            Assert.Equal("memory", failure.Data["objective"]);
+            Assert.Equal("1.0000001", failure.Data["value"]);
+            Assert.Equal("1", failure.Data["maximum"]);
+        }
+        if (scenario == "wrong-count") Assert.Equal("1", failure.Data["objectives"]);
+        if (scenario == "direction") Assert.Equal("Maximize", failure.Data["archive_direction"]);
+    }
+
     [Fact]
     public void ScalarSnapshotJsonDoesNotAcquireParetoMetadata()
     {

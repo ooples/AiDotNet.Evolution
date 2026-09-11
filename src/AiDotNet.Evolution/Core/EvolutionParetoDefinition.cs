@@ -42,14 +42,26 @@ public sealed class EvolutionParetoDefinition
         return HasValidObjectives(evaluation) && !evaluation.ConstraintViolations.Any(value => value > 0);
     }
 
-    internal bool HasValidObjectives(EvolutionEvaluation evaluation)
+    internal bool HasValidObjectives(EvolutionEvaluation evaluation) => DescribeObjectiveProblem(evaluation, out _) is null;
+
+    /// <summary>Names the first reason an evaluation cannot enter the front, or null when the vector is admissible.</summary>
+    /// <remarks>
+    /// Feasibility is deliberately not a problem: a positive constraint violation is a reported outcome, while an
+    /// unusable objective vector is a contract mistake the engine must surface instead of dropping silently.
+    /// </remarks>
+    internal string? DescribeObjectiveProblem(EvolutionEvaluation evaluation, out int index)
     {
-        if (evaluation.Status != EvolutionEvaluationStatus.Completed || !evaluation.Quality.HasValue ||
-            evaluation.Objectives.Count != Objectives.Count) return false;
+        index = -1;
+        if (evaluation.Status != EvolutionEvaluationStatus.Completed) return "not_completed";
+        if (!evaluation.Quality.HasValue) return "missing_quality";
+        if (evaluation.Objectives.Count != Objectives.Count) return "objective_count";
         for (int i = 0; i < Objectives.Count; i++)
-            if (!EvolutionDescriptorDefinition.IsFinite(evaluation.Objectives[i]) ||
-                evaluation.Objectives[i] < Objectives[i].Minimum || evaluation.Objectives[i] > Objectives[i].Maximum) return false;
-        return true;
+        {
+            if (!EvolutionDescriptorDefinition.IsFinite(evaluation.Objectives[i])) { index = i; return "not_finite"; }
+            if (evaluation.Objectives[i] < Objectives[i].Minimum || evaluation.Objectives[i] > Objectives[i].Maximum)
+            { index = i; return "out_of_bounds"; }
+        }
+        return null;
     }
 
     /// <summary>Tests strict Pareto dominance under the fixed exact or epsilon-box objective order.</summary>

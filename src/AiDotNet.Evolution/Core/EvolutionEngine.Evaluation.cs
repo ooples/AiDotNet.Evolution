@@ -489,7 +489,11 @@ public sealed partial class EvolutionEngine<TGenome>
     private void RecordCompletedEvaluation(int island, EvolutionCandidate<TGenome> candidate, EvolutionEvaluation evaluation)
     {
         IEvolutionArchive<TGenome> archive = _islands[island];
-        if ((archive as IEvolutionParetoArchiveView<TGenome>)?.ParetoDefinition is not null) return;
+        if ((archive as IEvolutionParetoArchiveView<TGenome>)?.ParetoDefinition is { } paretoDefinition)
+        {
+            RetainInvalidObjectiveDiagnostic(paretoDefinition, archive.Direction, evaluation);
+            return;
+        }
         EvolutionCellKey? cell = TryCreateCellKey(archive, evaluation.Descriptors);
         if (cell is null)
         {
@@ -533,6 +537,44 @@ public sealed partial class EvolutionEngine<TGenome>
             }
         }
         return new EvolutionCellKey(bins);
+    }
+
+    /// <summary>
+    /// Reports an objective vector a Pareto front refused, so a run that retains no tradeoff at all always says why.
+    /// </summary>
+    /// <remarks>
+    /// This is the front's counterpart of the scalar <c>descriptor_missing</c> diagnostic. An out-of-bounds value, a
+    /// vector of the wrong length, a non-finite value, and a scalar reporting direction that disagrees with the
+    /// archive all reject every candidate, which would otherwise appear as an empty front and zero retained failures.
+    /// </remarks>
+    private void RetainInvalidObjectiveDiagnostic(EvolutionParetoDefinition definition,
+        EvolutionOptimizationDirection direction, EvolutionEvaluation evaluation)
+    {
+        string? reason = definition.DescribeObjectiveProblem(evaluation, out int index);
+        if (reason is null && evaluation.Direction != direction) reason = "direction_mismatch";
+        if (reason is null) return;
+        var data = new Dictionary<string, string>(StringComparer.Ordinal)
+        {
+            ["reason"] = reason,
+            ["objectives"] = evaluation.Objectives.Count.ToString(CultureInfo.InvariantCulture),
+            ["expected_objectives"] = definition.Objectives.Count.ToString(CultureInfo.InvariantCulture)
+        };
+        if (index >= 0)
+        {
+            data["objective_index"] = index.ToString(CultureInfo.InvariantCulture);
+            data["objective"] = Truncate(definition.Objectives[index].Name, EvolutionDiagnostic.MaximumDataValueLength);
+            data["value"] = evaluation.Objectives[index].ToString("R", CultureInfo.InvariantCulture);
+            data["minimum"] = definition.Objectives[index].Minimum.ToString("R", CultureInfo.InvariantCulture);
+            data["maximum"] = definition.Objectives[index].Maximum.ToString("R", CultureInfo.InvariantCulture);
+        }
+        if (reason == "direction_mismatch")
+        {
+            data["archive_direction"] = direction.ToString();
+            data["evaluation_direction"] = evaluation.Direction.ToString();
+        }
+        RetainFailure(new EvolutionDiagnostic("objective_invalid",
+            "A completed evaluation's objective vector was refused by the Pareto front and retained no tradeoff.",
+            isRedacted: false, data: data));
     }
 
     private static bool HasSelectionCandidates(IEvolutionArchive<TGenome> archive) => archive.Count > 0 ||
