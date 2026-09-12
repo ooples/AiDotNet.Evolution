@@ -50,7 +50,16 @@ no-prior cold search or general quality superiority. The v3 smoke also passed:
 72 runs and **22,400** physical observations, including 800 independently streamed
 confirmation observations per execution and fully repeated replay acquisition.
 All 22,400 original sample IDs are distinct; reuse does not add samples.
-The 32-seed source-pinned campaign and final acceptance artifact remain pending.
+The full source-pinned campaign passed at `3c0a6803d02bd0b6848a02a47137dec6db703ac4`:
+**1,152 runs and 358,400 distinct physical observations**, including 161,280 search,
+5,120 prior and 12,800 confirmation observations per execution. Replay matched all
+compared quality/accounting fields. Warm reuse saved 40 observations per run on every
+seed (paired-seed bootstrap interval [40, 40]); the eight imported five-observation
+records make this a controlled work-saving check, not evidence of general search
+quality improvement or net cold-start savings. An adversarial audit follow-up at
+`1f41623e0e44f6abf580d112e20b1bdce9fe486f` rejects hidden charged resources and invalid
+confirmation receipts; it reproduces the original campaign summary unchanged.
+See [retained evidence and offline verification](../benchmarks/evidence/noisy-reuse/3c0a680/README.md).
 
 These objectives use procedural random noise, not real elapsed-time noise or
 representative held-out production tasks. Best observed quality and fresh confirmation

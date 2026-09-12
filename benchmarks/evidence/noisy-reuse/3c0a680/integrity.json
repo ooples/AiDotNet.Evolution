@@ -1,0 +1,28 @@
+{
+  "SourceRevision": "3c0a6803d02bd0b6848a02a47137dec6db703ac4",
+  "ArchiveSha256": "2bbf8ee6a658aa00806de9c09bcf32b03d690b360fdc549469b2983756666214",
+  "ArchiveBytes": 140227474,
+  "Entries": 124359,
+  "Parts": [
+    {
+      "File": "verification.zip.001",
+      "Bytes": 41943040,
+      "Sha256": "1982de0f6a265dfedb5341cf2d5a9a3d2006f10e5b768a2e2b9df41f0a9d68ca"
+    },
+    {
+      "File": "verification.zip.002",
+      "Bytes": 41943040,
+      "Sha256": "63553f5c5ae4104071d5c9656ae9266fdabbcf6807b3e4522b352a090452bdef"
+    },
+    {
+      "File": "verification.zip.003",
+      "Bytes": 41943040,
+      "Sha256": "b7cadcb46925d60360a42167621d6ae94d05aacc11a0fba62141b0299ce2b43d"
+    },
+    {
+      "File": "verification.zip.004",
+      "Bytes": 14398354,
+      "Sha256": "de92cb97994188751b0d805db7b5bdabcc90ba7d7a33e67f205ba4e8e6543194"
+    }
+  ]
+}

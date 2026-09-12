@@ -111,6 +111,11 @@ The [noisy equivalent-prior campaign](NOISY_REUSE_CAMPAIGN.md) now implements th
 core ablation runner, raw sample/receipt audit, separated acquisition/reuse costs,
 force-fresh/expiration checks and fresh-stream winner confirmation. The companion
 AiDotNet provider adds production raw scalar evidence validation to the existing
-fitness facade. Full pinned campaign and cross-target consumer verification are
-in progress; neither these authored tasks nor deterministic replay establish
-representative competitor superiority.
+fitness facade. The pinned campaign now passes 1,152 runs and 358,400 distinct acquired
+observations; current core tests pass 661/661 on all three targets. The companion
+[AiDotNet PR #2182](https://github.com/ooples/AiDotNet/pull/2182) passes 963 integration
+tests each on .NET 10/.NET 8 and 22 provider tests against the actual legacy assembly.
+The [evidence](../benchmarks/evidence/noisy-reuse/3c0a680/README.md) includes fresh confirmation,
+equivalent priors and hardened receipt auditing. CLI wiring, representative cross-system
+comparisons and published-package integration remain separate roadmap/dependency work;
+neither these authored tasks nor deterministic replay establish competitor superiority.
