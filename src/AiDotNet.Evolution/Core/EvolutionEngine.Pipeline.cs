@@ -232,12 +232,13 @@ public sealed partial class EvolutionEngine<TGenome>
             var tasks = new List<Task>(count);
             var active = new List<Task>();
             var meteredTask = _task as ResourceMeteredEvolutionTask<TGenome>;
-            bool resourcePhase = false;
+            ResourceMeteredEvolutionTask<TGenome>? activeResourcePhase = null;
             try
             {
                 if (meteredTask is not null)
                 {
-                    meteredTask.BeginPipelinePhase(); resourcePhase = true;
+                    meteredTask.BeginPipelinePhase();
+                    activeResourcePhase = meteredTask;
                     foreach (WorkItem item in round) meteredTask.ReservePipelineAttempt(item.EvaluationId, item.AttemptCount, _options.Cascade.Enabled);
                 }
                 foreach (WorkItem item in round)
@@ -262,7 +263,7 @@ public sealed partial class EvolutionEngine<TGenome>
                 }
                 finally
                 {
-                    if (resourcePhase && meteredTask is not null) meteredTask.EndPipelinePhase();
+                    activeResourcePhase?.EndPipelinePhase();
                 }
             }
             cancellationToken.ThrowIfCancellationRequested();

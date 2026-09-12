@@ -160,6 +160,20 @@ public sealed partial class EvolutionWorkProtocol : IDisposable
     /// <summary>Closes this endpoint. Borrowed coordinators remain alive; owned ones release their store lock.</summary>
     public void Dispose()
     {
-        lock (_sync) { if (_closed) return; _closed = true; if (_ownsCoordinator) _coordinator?.Dispose(); _coordinator = null; }
+        lock (_sync)
+        {
+            if (_closed)
+            {
+                return;
+            }
+
+            _closed = true;
+            if (_ownsCoordinator)
+            {
+                _coordinator?.Dispose();
+            }
+
+            _coordinator = null;
+        }
     }
 }
