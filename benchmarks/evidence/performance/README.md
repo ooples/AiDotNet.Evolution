@@ -17,8 +17,11 @@ The complete raw report is 5.2 MB, so the repository commits a compact, regenera
 
 | Committed file | Bytes | Contents |
 | --- | ---: | --- |
-| [`b6303d6-summary.json`](b6303d6-summary.json) | 442,352 | Every per-attempt scalar and state hash for all 142 attempts, per-bucket measured delays, per-attempt foreign-CPU share, the environment block, all case summaries, and columnar quality curves for the 18 mixed-duration dispatch attempts the tables below slice |
-| [`0bed72d-failed-summary.json`](0bed72d-failed-summary.json) | 3,332 | The superseded failed campaign reduced to its two diverging state-hash groups |
+| [`b6303d6-summary.json`](b6303d6-summary.json) | 425,232 | Every per-attempt scalar and state hash for all 142 attempts, per-bucket measured delays, per-attempt foreign-CPU share, the environment block, all case summaries, and columnar quality curves for the 18 mixed-duration dispatch attempts the tables below slice |
+| [`0bed72d-failed-summary.json`](0bed72d-failed-summary.json) | 3,251 | The superseded failed campaign reduced to its two diverging state-hash groups |
+
+Sizes are as committed, with the LF line endings `.gitattributes` enforces, so a fresh checkout reproduces them.
+With this README the whole directory is 445,338 bytes, against 8.81 MB of raw JSON before.
 
 The raw reports are published as assets of the [`evidence-us-10-b6303d6`](https://github.com/ooples/AiDotNet.Evolution/releases/tag/evidence-us-10-b6303d6)
 prerelease. That tag is deliberately not a version tag, and no workflow in this repository triggers on tags or on
