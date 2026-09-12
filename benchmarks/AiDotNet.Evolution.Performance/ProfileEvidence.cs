@@ -153,7 +153,9 @@ public static class ProfileEvidence
     {
         ArgumentNullException.ThrowIfNull(summary);
         var builder = new StringBuilder();
-        builder.Append("| Dispatch / workers | Median run ms | Median evaluator-slot utilization | Median ms to quality ≥ −25 | Median quality at 500 ms |\n");
+        // Deliberately ASCII: these tables are rendered through a Windows console into a file comparison, and
+        // non-ASCII glyphs there depend on the active code page rather than on the data.
+        builder.Append("| Dispatch / workers | Median run ms | Median evaluator-slot utilization | Median ms to quality >= -25 | Median quality at 500 ms |\n");
         builder.Append("| --- | ---: | ---: | ---: | ---: |\n");
         foreach (var item in summary.Summaries.Where(item => item.Kind == "engine" && item.MixedDuration && !item.Checkpoint)
             .OrderBy(item => item.Workers).ThenBy(item => item.Dispatch))
@@ -166,7 +168,7 @@ public static class ProfileEvidence
             builder.Append(CultureInfo.InvariantCulture,
                 $"| {item.Dispatch} / {item.Workers} | {Format(item.MedianMillisecondsPerIteration, 3)} | {item.MedianEvaluatorSlotUtilization * 100:F2}% | {threshold} | {atFiveHundred} |\n");
         }
-        builder.Append("\n| Case | Operations/s | Iterations | Ms/iteration | Min–max ms/iteration | Managed KiB/op | Max lifetime peak MiB | Max foreign CPU |\n");
+        builder.Append("\n| Case | Operations/s | Iterations | Ms/iteration | Min-max ms/iteration | Managed KiB/op | Max lifetime peak MiB | Max foreign CPU |\n");
         builder.Append("| --- | ---: | ---: | ---: | ---: | ---: | ---: | ---: |\n");
         foreach (var item in summary.Summaries)
         {
@@ -174,7 +176,7 @@ public static class ProfileEvidence
             double maximumPerIteration = item.MaximumElapsedMilliseconds / Math.Max(1, item.MedianIterations);
             double kibPerOperation = item.MedianAllocatedBytes / Math.Max(1, item.MedianIterations * item.OperationsPerIteration) / 1024d;
             builder.Append(CultureInfo.InvariantCulture,
-                $"| {item.CaseId} | {Format(item.MedianOperationsPerSecond, 2)} | {Format(item.MedianIterations, 0)} | {Format(item.MedianMillisecondsPerIteration, 3)} | {Format(minimumPerIteration, 3)}–{Format(maximumPerIteration, 3)} | {Format(kibPerOperation, 3)} | {Format(item.MaximumLifetimePeakWorkingSetBytes / 1048576d, 2)} | {item.MaximumForeignCpuFraction * 100:F2}% |\n");
+                $"| {item.CaseId} | {Format(item.MedianOperationsPerSecond, 2)} | {Format(item.MedianIterations, 0)} | {Format(item.MedianMillisecondsPerIteration, 3)} | {Format(minimumPerIteration, 3)}-{Format(maximumPerIteration, 3)} | {Format(kibPerOperation, 3)} | {Format(item.MaximumLifetimePeakWorkingSetBytes / 1048576d, 2)} | {item.MaximumForeignCpuFraction * 100:F2}% |\n");
         }
         return builder.ToString();
     }

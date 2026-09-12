@@ -20,7 +20,10 @@ Set-StrictMode -Version Latest
 
 $repository = Split-Path -Parent $PSScriptRoot
 Push-Location $repository
+$previousEncoding = [Console]::OutputEncoding
 try {
+    # Decode the profiler's stdout as UTF-8 regardless of the host's active code page.
+    [Console]::OutputEncoding = [System.Text.UTF8Encoding]::new($false)
     $readmePath = Join-Path $EvidenceDirectory 'README.md'
     if (-not (Test-Path -LiteralPath $readmePath)) { throw "Evidence README not found at $readmePath." }
     $summaries = @(Get-ChildItem -Path $EvidenceDirectory -Filter '*-summary.json' |
@@ -33,7 +36,7 @@ try {
     $rendered = (& dotnet @arguments) -join "`n"
     if ($LASTEXITCODE -ne 0) { throw "Rendering the evidence tables failed with exit code $LASTEXITCODE." }
 
-    $readme = Get-Content -LiteralPath $readmePath -Raw
+    $readme = Get-Content -LiteralPath $readmePath -Raw -Encoding utf8
     $begin = '<!-- BEGIN GENERATED TABLES -->'
     $end = '<!-- END GENERATED TABLES -->'
     $startIndex = $readme.IndexOf($begin, [System.StringComparison]::Ordinal)
@@ -59,5 +62,6 @@ try {
     Write-Host "Published performance tables regenerate exactly from $($summaries[0].Name)."
 }
 finally {
+    [Console]::OutputEncoding = $previousEncoding
     Pop-Location
 }
