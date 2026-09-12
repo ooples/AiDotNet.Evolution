@@ -14,7 +14,8 @@ namespace AiDotNet.Evolution;
 /// retain pending attribution and child state. Use a fresh instance for each run; methods are serialized by the
 /// engine and are not intended for concurrent external callers. Child identities and configuration must stay fixed.
 /// Supplying an explicit reward policy opts into versioned parent-relative gains and/or proposal-plus-evaluator costs.
-/// The default constructor retains the original archive-success semantics and checkpoint representation.
+/// Declared measurement reuse earns no fresh reward. The default constructor retains its binary signature;
+/// measurement-origin-aware versions reject older learned checkpoints instead of trusting possibly inflated credit.
 /// </remarks>
 public sealed class AdaptiveVariationPortfolio<TGenome> : IOutcomeAwareVariationOperator<TGenome>
 {
@@ -28,7 +29,7 @@ public sealed class AdaptiveVariationPortfolio<TGenome> : IOutcomeAwareVariation
     private SortedDictionary<long, int> _pending = new();
     private SortedDictionary<long, ParentCredit>? _credit;
 
-    /// <summary>Creates the original archive-success/evaluator-cost portfolio without changing its binary or checkpoint contract.</summary>
+    /// <summary>Creates the archive-success/evaluator-cost portfolio with measurement-origin-aware learning.</summary>
     public AdaptiveVariationPortfolio(IEnumerable<IVariationOperator<TGenome>> operators, double explorationProbability = 0.1)
         : this(operators, explorationProbability, null) { }
 
@@ -60,9 +61,9 @@ public sealed class AdaptiveVariationPortfolio<TGenome> : IOutcomeAwareVariation
             throw new ArgumentException("Every operator must supply checkpointed proposal costs using the policy's declared units.", nameof(operators));
         if (rewardPolicy is not null) _credit = new();
         _arms = _operators.Select(_ => new ArmState()).ToArray();
-        VersionHash = EvolutionHash.Combine(new[] { "adaptive-variation-v1", EvolutionHash.EncodeDouble(explorationProbability) }
+        VersionHash = EvolutionHash.Combine(new[] { "adaptive-variation-v2-measurement-origin", EvolutionHash.EncodeDouble(explorationProbability) }
             .Concat(_operators.SelectMany(op => new[] { op.Id, op.VersionHash })));
-        if (rewardPolicy is not null) VersionHash = EvolutionHash.Combine(new[] { "adaptive-variation-credit-v2", VersionHash, rewardPolicy.VersionHash });
+        if (rewardPolicy is not null) VersionHash = EvolutionHash.Combine(new[] { "adaptive-variation-credit-v3-measurement-origin", VersionHash, rewardPolicy.VersionHash });
     }
 
     /// <inheritdoc/>
@@ -119,7 +120,7 @@ public sealed class AdaptiveVariationPortfolio<TGenome> : IOutcomeAwareVariation
         bool improved = insertionResult is EvolutionArchiveInsertionResult.Inserted or
             EvolutionArchiveInsertionResult.Replaced or EvolutionArchiveInsertionResult.InsertedWithEviction;
         double reward = evaluation.Status == EvolutionEvaluationStatus.Completed &&
-            evaluation.CacheStatus != EvolutionCacheStatus.Hit && improved
+            !evaluation.IsMeasurementReuse && improved
             ? 1 / Math.Max(1, evaluation.Cost.CostUnits) : 0;
         ParentCredit? baseline = null;
         EvolutionProposalCost? cost = null;
@@ -137,7 +138,7 @@ public sealed class AdaptiveVariationPortfolio<TGenome> : IOutcomeAwareVariation
         _arms[index].Outcomes = checked(_arms[index].Outcomes + 1);
         _arms[index].RewardSum += reward;
         LastCredit = new(evaluation.Lineage.Generation, _operators[index].Id, _operators[index].VersionHash,
-            _rewardPolicy?.VersionHash ?? "legacy-archive-success-evaluator-cost-v1", baseline?.Quality, evaluation, insertionResult, cost, reward);
+            _rewardPolicy?.VersionHash ?? "archive-success-evaluator-cost-v2-measurement-origin", baseline?.Quality, evaluation, insertionResult, cost, reward);
     }
 
     /// <inheritdoc/>

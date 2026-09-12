@@ -1,5 +1,30 @@
 using AiDotNet.Evolution.Performance;
 using BenchmarkDotNet.Running;
+using System.Globalization;
+using System.Text.Json;
+
+if (args.Length > 0 && args[0] == "--profile-worker")
+{
+    if (args.Length != 5) throw new ArgumentException("Internal worker expects case, new output file, affinity mask and processor group.");
+    var input = new FileInfo(args[1]);
+    if (!input.Exists || input.Length > 16384) throw new InvalidDataException("Worker case input is missing or oversized.");
+    var scenario = JsonSerializer.Deserialize<ProfileCase>(await File.ReadAllTextAsync(input.FullName), ProfileCampaign.JsonOptions)
+        ?? throw new InvalidDataException("Worker case cannot be null.");
+    var result = await ProfileRunner.MeasureAsync(scenario, ulong.Parse(args[3], NumberStyles.HexNumber, CultureInfo.InvariantCulture),
+        ushort.Parse(args[4], CultureInfo.InvariantCulture));
+    await ProfileCampaign.WriteNewAsync(args[2], result);
+    return;
+}
+
+if (args.Length > 0 && args[0] == "--profile")
+{
+    if (args.Length is < 3 or > 4 || (args.Length == 4 && args[3] != "--smoke"))
+        throw new ArgumentException("Usage: --profile <new-output-directory> <40-character-source-revision> [--smoke]");
+    var report = await ProfileCampaign.RunAsync(args[1], args[2], args.Length == 4);
+    Console.WriteLine($"Profile {report.Status}: {report.Attempts.Count} attempts; {report.DeterministicWorkerGroups} deterministic worker groups. See report.json.");
+    Environment.ExitCode = report.Status == "passed" ? 0 : 1;
+    return;
+}
 
 if (args.Length == 1 && args[0] == "--smoke")
 {

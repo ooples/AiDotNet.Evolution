@@ -150,6 +150,7 @@ public sealed partial class EvolutionEngine<TGenome>
         }
         _task = task;
         _variation = variation;
+        _pipelineConcurrentProposals = _options.Dispatch == EvolutionDispatchMode.Pipeline && SupportsConcurrentPipelineProposals();
         _selection = selection ?? CreateSelectionPolicy(_options);
         _refiner = refiner;
         _migration = migration ?? new TopologyMigrationPolicy<TGenome>(_options.MigrationTopology,
@@ -173,6 +174,9 @@ public sealed partial class EvolutionEngine<TGenome>
         if (_options.Cascade.Enabled && _cascadeTask is null)
             throw new ArgumentException("Cascade evaluation requires a task that implements ICascadeEvolutionTask<TGenome>.", nameof(task));
         _cascadeStageCount = _options.Cascade.Enabled && _cascadeTask is not null ? _cascadeTask.StageCount : 0;
+        if (_options.Dispatch == EvolutionDispatchMode.Pipeline && task is ResourceMeteredEvolutionTask<TGenome> &&
+            (long)Math.Max(1, _cascadeStageCount) * _options.Pipeline.WaveSize > 65536)
+            throw new ArgumentException("The pipeline wave/stage product exceeds the bounded resource reservation plan.", nameof(options));
 
         _islands = new IEvolutionArchive<TGenome>[_options.IslandCount];
         for (int i = 0; i < _islands.Length; i++)
@@ -208,7 +212,9 @@ public sealed partial class EvolutionEngine<TGenome>
             _cascadeStageCount.ToString(CultureInfo.InvariantCulture),
             archiveDefinition,
             _configurationHash
-        });
+        }.Concat(_options.Dispatch == EvolutionDispatchMode.Pipeline
+            ? new[] { "pipeline-concurrency-capability", _pipelineConcurrentProposals ? "concurrent" : "serialized" }
+            : Array.Empty<string>()));
     }
 
     /// <summary>Gets the checkpoint compatibility hash for this exact engine configuration.</summary>
@@ -220,6 +226,11 @@ public sealed partial class EvolutionEngine<TGenome>
     /// selection policy is still refused.
     /// </remarks>
     public string CompatibilityHash => _compatibilityHash;
+
+    /// <summary>Gets the owned run identity used by external-work correlation.</summary>
+    public string RunId => _options.RunId;
+
+    internal IEvolutionGenomeCodec<TGenome>? ExternalWorkCodec => _codec;
 
     /// <summary>Asks a running or not-yet-started run to finish its current batch and return a result.</summary>
     /// <remarks>
@@ -286,7 +297,9 @@ public sealed partial class EvolutionEngine<TGenome>
         {
             try
             {
-                stopReason = _options.Dispatch == EvolutionDispatchMode.Continuous
+                stopReason = _options.Dispatch == EvolutionDispatchMode.Pipeline
+                    ? await RunPipelineLoopAsync(seeds, seedIndex, runTimer, runToken).ConfigureAwait(false)
+                    : _options.Dispatch == EvolutionDispatchMode.Continuous
                     ? await RunContinuousLoopAsync(seeds, seedIndex, runTimer, runToken).ConfigureAwait(false)
                     : await RunLoopAsync(seeds, seedIndex, runTimer, runToken).ConfigureAwait(false);
             }

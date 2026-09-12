@@ -8,7 +8,7 @@ Track the full plan through the [26 user-story issues and PR delivery index](USE
 ## Dependent story delivery
 
 The user chose to retain #15, AiDotNet #2148 and Tensors #1024 as shared foundations.
-All 26 stories now have individual open issues and dependent draft PRs, with reciprocal links and original
+All 26 stories now have individual open issues and dependent PRs, with reciprocal links and original
 Given/When/Then checklists. Initial story commits were documentation-only, not completed implementation.
 
 [US-08 / PR #51](https://github.com/ooples/AiDotNet.Evolution/pull/51) adds the first subsequent story-owned
@@ -17,6 +17,14 @@ surrogate training as new evidence or train CMA as fresh population members. Cre
 from current cost; semantic versions reject older learned checkpoints. This fix is on the dependent branch,
 not yet in this shared foundation or consumer source/package pins. US-13, US-14 and US-23 require integration.
 Full story acceptance and independent current-head review remain open.
+
+## US-10 story-owned performance evidence
+
+[PR #53](https://github.com/ooples/AiDotNet.Evolution/pull/53) adds fresh-process profiling and expanded BenchmarkDotNet factors.
+At `4a7b50e`, all 132 attempts and eight worker-determinism groups pass; 47 profiling contracts and all 661 core tests
+on each supported target pass locally. [Results](../benchmarks/evidence/performance/README.md) include memory,
+checkpoint overhead, utilization and quality-over-time, plus the original failed campaign. This is engine overhead,
+not an optimized-algorithm speedup. Host load/frequency/power are not controlled; release thresholds remain separate.
 
 ## Implemented in the initial core PR
 
@@ -123,8 +131,8 @@ Durable evaluation identities and leases must be developed against its eventual 
 | US-06 noisy evaluation | Partial | Fresh bounded replicate runner, per-sample costs, finite-look uncertainty and separate confirmation identities implemented; archive resampling policy, cascade-rejection audit and representative noisy comparisons remain. |
 | US-07 ablations | Partial | Same-operator uniform/adaptive allocation is available; representative island, migration, novelty and dispatch ablations remain. |
 | US-08 adaptive operators | Partial | Parent-improvement/archive-success policies, proposal-plus-evaluator credit and typed attribution implemented; full consumer-stage integration and representative held-out comparisons before default promotion remain. |
-| US-09 Pareto pipeline | Not implemented | Feasibility, objective definitions, archive/snapshot/selection/stopping/migration semantics together. |
-| US-10 engine performance | Partial | BenchmarkDotNet engine/archive/checkpoint suite and fixture validation implemented; controlled repeated baselines, peak memory, dimension/island scaling and regression thresholds remain. |
+| US-09 Pareto pipeline | Implemented on #52 | Feasible fronts, separate infeasible exploration, metadata/checkpoints/query/selection/migration/stopping and retained 180-run comparison; review and dependencies remain. |
+| US-10 engine performance | Local acceptance verified on #53 | 44 cases × three isolated repetitions, peak memory/allocation/checkpoint scaling, quality-over-time/utilization and eight deterministic worker groups; current-head CI/review and representative release thresholds remain separate. |
 | US-11 application examples | Partial, companion | Executable authored-C# facade/worker/timing/confirmation example exists; representative program, AutoML, kernel and external-session examples remain. |
 | US-12 quality release gates | Partial | Representative measured quality thresholds, confidence and release artifacts. |
 | US-13 typed search spaces | Implemented | Mixed/conditional domains, owned canonical genomes, operators/refinement, checkpointed diagonal CMA and pinned simpler-baseline comparison; no universal-quality claim. |
@@ -134,8 +142,8 @@ Durable evaluation identities and leases must be developed against its eventual 
 | US-17 compiler-guided edits | Partial, companion | Exact identity/boundaries plus bounded C# syntax edits, real emit, compiler repair, reference/assembly fingerprints, attempt evidence and a real console worker/facade integration implemented; correctness-driven repair, OS isolation, public-API/target validation, multi-file evolution and representative performance confirmation remain. |
 | US-18 reusable experience | Not implemented | Provenance-backed retrieval, lessons and calibrated semantic novelty. |
 | US-19 model/prompt routing | Not implemented | Consumer routing policy, end-to-end costs, replay and fixed-routing comparisons. |
-| US-20 proposal concurrency | Not implemented | Immutable proposal contexts, bounded scheduling and deterministic policy. |
-| US-21 durable external work | Pending API integration | Run/evaluation/attempt identity, leases, heartbeats, stale results and pending-work persistence. |
+| US-20 proposal concurrency | Implemented; local acceptance verified, review/CI/dependencies pending | Opt-in bounded feedback-wave pipeline, immutable semantic snapshots, explicit concurrency capability, rate limits/cancellation, deterministic resource phases/retries and bounded queue/utilization/commit/abort diagnostics. 691 tests per TFM; 576 authored live cases with exact offline response replay; 132 matched default-profile pairs plus retained hardware-mismatch campaign. [Contract](PROPOSAL_PIPELINE.md), [raw evidence and limitations](../benchmarks/evidence/pipeline/9c3441d/README.md). Pipeline remains off by default; representative model/competitor validation is not established. |
+| US-21 durable external work | Implementation acceptance verified; CI/review/dependency merge gates remain | Strict tickets, engine codec/context bridge, schema-2 work/ledger persistence, hardware matching, heartbeat/cancel/idempotent receipts, JSON/native IPC, TypeScript/Python and C ABI. 1,000/1,000/800 core tests, 139 native TypeScript tests, six Python cases on each host and six C ABI cases pass; 92.96%/79.64% coverage; strict .NET 10 native engine/checkpoint probes and package-byte checks pass. [Pinned raw evidence and failed approaches](../benchmarks/evidence/external-work/8aaef1e/README.md). Delivery recovery retains unresolved liabilities; lost partial-batch search state requires an explicit fork, not automatic reconstruction or budget reset. No network authentication/exactly-once physical-execution claim. [Contracts](DURABLE_EXTERNAL_WORK.md). |
 | US-22 centroid archive | Partial | Fixed-K routing, immutable geometry, transactional offline projection and engine/checkpoint coverage implemented; matched common-reference runner available; controlled memory/latency and representative quality confirmation remain. |
 | US-23 warm starts | Partial | Bounded [seed repertoires](WARM_START_REPERTOIRES.md), twelve-facet revalidation, [sample provenance](MEASUREMENT_ORIGIN.md), [persistent evaluation storage](PERSISTENT_EVALUATION_REUSE.md), age/uncertainty/force-fresh decisions and store accounting implemented. Real-engine deterministic cold/warm/force-fresh example and AiDotNet fitness-facade integration pass; production raw-evidence providers, other consumer integrations and representative fair warm/cold/freshness campaigns remain. |
 | US-24 CLI/dashboard | Partial | Core numeric CLI plus consumer authored-C# pilot and existing YAML commands; broader lifecycle/provider/dashboard integration remains. |
@@ -300,8 +308,8 @@ Durable evaluation identities and leases must be developed against its eventual 
   `77d16869` had successful build, AVX-512 verification and returned GPU-parity checks; new head `665cb3c8` requires
   fresh hosted results. Earlier duplicate title
   runs were cancelled. AiDotNet's CodeRabbit approval applies only to historical head `75aa6b1d`; its later review
-  was skipped because 175 files exceeded the 100-file limit. No current-head CodeRabbit or Copilot approval is claimed. All PRs remain drafts;
-  no full-roadmap or merge-readiness claim.
+  was skipped because 175 files exceeded the 100-file limit. No current-head CodeRabbit or Copilot approval is claimed. This historical validation does not describe current draft/readiness states;
+  consult the delivery index and individual PRs. No full-roadmap or merge-readiness claim.
 
 ## Experiment access policy
 

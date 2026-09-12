@@ -28,5 +28,8 @@ public enum EvolutionDispatchMode
     Batch = 0,
 
     /// <summary>Keep a window of evaluations in flight, committing and refilling as each one completes.</summary>
-    Continuous = 1
+    Continuous = 1,
+
+    /// <summary>Overlap bounded proposal and evaluator queues inside fixed, snapshot-based feedback waves.</summary>
+    Pipeline = 2
 }

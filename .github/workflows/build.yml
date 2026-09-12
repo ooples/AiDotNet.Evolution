@@ -48,7 +48,7 @@ jobs:
           --blame-hang --blame-hang-timeout 120s --blame-crash
           --collect:"XPlat Code Coverage" --results-directory ./coverage
           --
-          DataCollectionRunSettings.DataCollectors.DataCollector.Configuration.Format=cobertura
+          DataCollectionRunSettings.DataCollectors.DataCollector.Configuration.Format=cobertura DataCollectionRunSettings.DataCollectors.DataCollector.Configuration.ExcludeByAttribute=GeneratedCodeAttribute
       - name: Test net8.0
         run: >
           dotnet test tests/AiDotNet.Evolution.Tests/AiDotNet.Evolution.Tests.csproj
@@ -73,16 +73,41 @@ jobs:
       - name: Verify multi-fidelity promotion and independent confirmation
         shell: pwsh
         run: ./eng/Test-MultiFidelity.ps1
+      - name: Verify concurrent proposal pipeline and recorded-response replay
+        shell: pwsh
+        run: ./eng/Test-ProposalPipeline.ps1
+      - name: Verify durable delivery across coordinator and worker process crashes
+        run: |
+          dotnet build examples/DurableWork -c Release
+          dotnet examples/DurableWork/bin/Release/net10.0/DurableWork.dll verify TestResults/durable-work
+      - name: Verify durable worker protocol against a live engine session
+        run: |
+          dotnet build examples/DurableSession -c Release
+          dotnet examples/DurableSession/bin/Release/net10.0/DurableSession.dll TestResults/durable-session
       - name: Verify gain and all-stage operator credit
         shell: pwsh
         run: ./eng/Test-OperatorCredit.ps1
       - name: Verify performance fixture contracts
         run: dotnet run --project benchmarks/AiDotNet.Evolution.Performance -c Release -- --smoke
+      - name: Test performance evidence contracts
+        run: dotnet test tests/AiDotNet.Evolution.Performance.Tests -c Release --no-restore --verbosity normal
+      - name: Verify isolated performance profiling and worker determinism
+        run: dotnet run --project benchmarks/AiDotNet.Evolution.Performance -c Release --no-build -- --profile TestResults/performance '${{ github.sha }}' --smoke
       - name: Verify paired analysis contracts
         run: python3 -m unittest discover -s benchmarks/analysis -v
+      - name: Verify retained proposal pipeline and default-profile evidence
+        run: |
+          python3 benchmarks/analysis/analyze_pipeline.py --verify-evidence benchmarks/evidence/pipeline/9c3441d/pilot
+          python3 benchmarks/analysis/compare_pipeline_defaults.py --archive benchmarks/evidence/pipeline/9c3441d/default-profiles.zip --verify-comparison benchmarks/evidence/pipeline/9c3441d/default-comparison.json
       - name: Verify archive partition accounting and replay
         shell: pwsh
         run: ./eng/Test-ArchivePartition.ps1 -SourceRevision '${{ github.sha }}'
+      # GENERATED CODE IS EXCLUDED FROM THE RATCHET, and that is a like-for-like
+      # correction rather than a relaxation. The baseline was recorded on a solution
+      # with one project and no source generators. The host and durable-work ledger use
+      # System.Text.Json source generation because NativeAOT trims the reflection
+      # path. Only GeneratedCodeAttribute is excluded: CompilerGeneratedAttribute
+      # also marks user-written closures and must remain in the measured surface.
       - name: Enforce coverage ratchet
         shell: pwsh
         run: |
@@ -96,8 +121,11 @@ jobs:
           name: coverage-and-diagnostics
           path: |
             TestResults/quality/**/*.json
+            TestResults/performance/**
             TestResults/persistent-evaluation/**/*.json
             TestResults/persistent-evaluation/*.jsonl
+            TestResults/durable-work/**
+            TestResults/durable-session/**
             coverage/**/coverage.cobertura.xml
             coverage/**/*.dmp
             coverage/**/Sequence_*.xml

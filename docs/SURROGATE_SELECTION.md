@@ -7,7 +7,7 @@ insertion, correctness acceptance or deployment. This opt-in contract has no mod
 ## Contract
 
 - Supply at most 256 measured search observations with matching candidate/evaluation identity, task/evaluator
-  versions and direction. Failures, infeasible records, cache hits, zero-attempt records and duplicate measured
+  versions and direction. Failures, infeasible records, cache hits, producer-declared reuse, zero-attempt records and duplicate measured
   identities are rejected. Record validation cannot prove evaluator correctness or enforce hidden-data isolation.
 - Supply a proposal factory returning 1–64 unique owned canonical genomes and actual cost for **all** generated
   candidates, including rejected/unselected work. Maxima are reserved before proposal generation, fitting and inference.

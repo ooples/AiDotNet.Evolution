@@ -4,6 +4,11 @@ AiDotNet.Evolution is a dependency-light, task-agnostic quality-diversity engine
 
 The package does not depend on AiDotNet or AiDotNet.Tensors. Domain integrations—such as model search, program evolution, and hardware-kernel autotuning—supply typed genomes, validation, variation, and evaluation through the public contracts.
 
+[External sessions](docs/EXTERNAL_WORK_IDENTITY.md) support canonicalization/version fingerprints and fenced work tickets,
+including strict native-host/TypeScript mode. The optional [durable delivery coordinator](docs/DURABLE_EXTERNAL_WORK.md)
+persists work, leases and resource receipts together. Durable engine/binding integration remains in progress;
+delivery recovery is not exact partial-batch search continuation.
+
 The initial package version is `0.1.0-preview.1` and targets .NET 10, .NET 8, and .NET Framework 4.7.1.
 
 ## Core contracts

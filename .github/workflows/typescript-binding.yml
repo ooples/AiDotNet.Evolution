@@ -1,0 +1,147 @@
+name: TypeScript binding
+
+on:
+  push:
+    branches: [main]
+    paths:
+      - 'bindings/typescript/**'
+      - 'bindings/python/**'
+      - 'bindings/c/**'
+      - 'src/AiDotNet.Evolution.Native/**'
+      - 'src/AiDotNet.Evolution.Host/**'
+      - 'src/AiDotNet.Evolution/**'
+      - '.github/workflows/typescript-binding.yml'
+  pull_request:
+    branches: [main, feat/competitive-evolution-platform]
+    paths:
+      - 'bindings/typescript/**'
+      - 'bindings/python/**'
+      - 'bindings/c/**'
+      - 'src/AiDotNet.Evolution.Native/**'
+      - 'src/AiDotNet.Evolution.Host/**'
+      - 'src/AiDotNet.Evolution/**'
+      - '.github/workflows/typescript-binding.yml'
+
+concurrency:
+  group: ${{ github.workflow }}-${{ github.ref }}
+  cancel-in-progress: true
+
+permissions:
+  contents: read
+
+env:
+  DOTNET_SKIP_FIRST_TIME_EXPERIENCE: true
+  DOTNET_CLI_TELEMETRY_OPTOUT: true
+  DOTNET_NOLOGO: true
+
+jobs:
+  host:
+    # ONE JOB PER PLATFORM, NOT A CROSS-COMPILE MATRIX. NativeAOT does not cross-compile:
+    # it invokes the platform linker, so each runtime identifier has to be built on a
+    # runner of that platform. That is also why the binding's own tests run here rather
+    # than in a separate job -- this is the only place a binary for this platform exists.
+    name: ${{ matrix.rid }} (node ${{ matrix.node }})
+    runs-on: ${{ matrix.runner }}
+    timeout-minutes: 25
+    strategy:
+      fail-fast: false
+      matrix:
+        include:
+          - rid: win-x64
+            runner: windows-latest
+            node: '22'
+          - rid: linux-x64
+            runner: ubuntu-latest
+            node: '22'
+          - rid: osx-arm64
+            runner: macos-14
+            node: '22'
+          # THE DECLARED MINIMUM, TESTED. package.json says node >= 18.17.0, and a
+          # matrix that only ever ran 22 would let a syntax or API regression reach
+          # every supported user while CI stayed green. One platform is enough for
+          # this: the binding is plain JavaScript, and what differs between Node
+          # versions is the runtime, not the operating system.
+          - rid: linux-x64
+            runner: ubuntu-latest
+            node: '18.17.0'
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+
+      - uses: actions/setup-dotnet@a98b56852c35b8e3190ac28c8c2271da59106c68 # v6.0.0
+        with:
+          dotnet-version: |
+            8.0.x
+            10.0.x
+
+      - uses: actions/setup-node@49933ea5288caeca8642d1e84afbd3f7d6820020 # v4
+        with:
+          node-version: ${{ matrix.node }}
+
+      - uses: actions/setup-python@a26af69be951a213d495a4c3e4e4022e16d87065 # v5
+        with:
+          python-version: '3.10'
+
+      # The AOT compiler links with the platform toolchain, which is present on the
+      # Windows and macOS images but needs the objcopy/ld pieces installed on Ubuntu.
+      - name: Install the Linux AOT prerequisites
+        if: matrix.rid == 'linux-x64'
+        run: |
+          sudo apt-get update
+          sudo apt-get install --yes clang zlib1g-dev
+
+      - name: Install the binding's dependencies
+        working-directory: bindings/typescript
+        run: npm install
+
+      - name: Publish the NativeAOT host
+        working-directory: bindings/typescript
+        run: npm run host
+
+      - name: Build the binding
+        working-directory: bindings/typescript
+        run: npm run build
+
+      # Runs against the REAL binary published above. Without it the engine tests skip
+      # themselves, so the count is asserted: a silent skip here would turn this whole
+      # job into a build check that proves nothing about behaviour.
+      - name: Test the binding
+        working-directory: bindings/typescript
+        shell: bash
+        run: |
+          npm test 2>&1 | tee test-output.txt
+          node scripts/check-test-output.mjs test-output.txt
+
+      - name: Test Python durable binding against the real native host
+        shell: pwsh
+        run: |
+          $suffix = if ($IsWindows) { '.exe' } else { '' }
+          $env:AIDOTNET_DURABLE_HOST_PATH = Join-Path $PWD "bindings/typescript/bin/${{ matrix.rid }}/aidotnet-evolution-host$suffix"
+          python -W error::ResourceWarning -m unittest discover -s bindings/python/tests -v
+          if ($LASTEXITCODE -ne 0) { exit $LASTEXITCODE }
+
+      - name: Publish and test the durable C ABI
+        if: matrix.node == '22'
+        shell: pwsh
+        run: |
+          dotnet publish src/AiDotNet.Evolution.Native -c Release -r '${{ matrix.rid }}' -o TestResults/native-library
+          if ($LASTEXITCODE -ne 0) { exit $LASTEXITCODE }
+          $suffix = if ($IsWindows) { '.dll' } elseif ($IsMacOS) { '.dylib' } else { '.so' }
+          python -W error::ResourceWarning bindings/c/test_native.py "TestResults/native-library/aidotnet-evolution-native$suffix"
+          if ($LASTEXITCODE -ne 0) { exit $LASTEXITCODE }
+
+      # ONLY THE PRIMARY NODE VERSION PUBLISHES. Two jobs now build linux-x64, and
+      # uploading from both would collide on the artifact name -- the extra job exists
+      # to test the declared Node minimum, not to produce a second copy of the same
+      # binary.
+      - name: Package the platform binary
+        if: matrix.node == '22'
+        working-directory: bindings/typescript
+        run: npm run package -- ${{ matrix.rid }}
+
+      - uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02 # v4
+        if: matrix.node == '22'
+        with:
+          name: evolution-host-${{ matrix.rid }}
+          path: bindings/typescript/packages/${{ matrix.rid }}
+          if-no-files-found: error
+          retention-days: 7
