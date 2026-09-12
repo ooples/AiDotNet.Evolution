@@ -408,6 +408,43 @@ public sealed class ParetoArchiveTests
         Assert.Equal(12, run.Counters.EvaluationAttempts);
         Assert.True(run.ParetoFront!.Entries.Count > 1);
         Assert.True(run.ParetoFront.Hypervolume() > 0);
+
+        // The infeasible phase is reported as unmeasurable rather than silently skipped.
+        EvolutionEarlyStoppingReport report = run.EarlyStopping;
+        Assert.Equal("ParetoHypervolume", report.Criterion);
+        Assert.Equal(5, report.UnmeasurableReadings);
+        Assert.Equal(5, report.UnmeasurableEvaluations);
+        Assert.Equal(5, report.UnmeasurableReasons[EvolutionEarlyStoppingUnmeasurableReason.EmptyFeasibleFront]);
+        Assert.True(report.WasEverMeasurable);
+    }
+
+    [Fact]
+    public async Task HypervolumeStoppingFailsARunWhoseFrontIsNeverFeasible()
+    {
+        var options = new EvolutionEngineOptions
+        {
+            RunId = "never-feasible",
+            Seed = 7,
+            MaxEvaluationAttempts = 4,
+            MaxProposals = 40,
+            MaxGenerations = 40,
+            ProposalBatchSize = 1,
+            MaxDegreeOfParallelism = 1,
+            MigrationInterval = 0,
+            EarlyStopping = new EvolutionEarlyStoppingOptions
+            {
+                Metric = EvolutionEarlyStoppingMetric.ParetoHypervolume,
+                PatienceEvaluations = 3
+            }
+        };
+        var engine = new EvolutionEngine<TestGenome>(new LateFeasibilityTask(), new SequentialVariation(),
+            _ => new ParetoArchive<TestGenome>(Exploring(4)), options);
+
+        // Asking for hypervolume stopping on a search that never produces a feasible point is a configuration
+        // mistake: patience is never charged, so the run would quietly behave as though stopping were switched off.
+        var failure = await Assert.ThrowsAsync<InvalidOperationException>(() => engine.RunAsync(new[] { new TestGenome(1) }));
+        Assert.Contains("ParetoHypervolume", failure.Message, StringComparison.Ordinal);
+        Assert.Contains(nameof(EvolutionEarlyStoppingUnmeasurableReason.EmptyFeasibleFront), failure.Message, StringComparison.Ordinal);
     }
 
     private sealed class AlternatingFeasibilityTask : IEvolutionTask<TestGenome>

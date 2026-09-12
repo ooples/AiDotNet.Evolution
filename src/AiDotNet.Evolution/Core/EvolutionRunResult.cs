@@ -41,6 +41,9 @@ public sealed class EvolutionRunResult<TGenome>
     /// Evaluator artifacts still queued for delivery to a future proposal, keyed by canonical genome identifier, or
     /// <c>null</c> when none are queued.
     /// </param>
+    /// <param name="earlyStopping">
+    /// What the early-stopping criterion did during the run, or <c>null</c> for a result built without one.
+    /// </param>
     /// <exception cref="ArgumentNullException">
     /// <paramref name="islands"/>, <paramref name="counters"/>, or <paramref name="stateHash"/> is <c>null</c>.
     /// </exception>
@@ -53,8 +56,11 @@ public sealed class EvolutionRunResult<TGenome>
         IReadOnlyList<EvolutionEliteRecord<TGenome>>? globalElites = null,
         IReadOnlyList<EvolutionIslandStatus>? islandStatuses = null,
         IReadOnlyList<EvolutionDiagnostic>? retainedFailures = null,
-        IReadOnlyDictionary<string, IReadOnlyList<EvolutionArtifact>>? pendingArtifacts = null)
+        IReadOnlyDictionary<string, IReadOnlyList<EvolutionArtifact>>? pendingArtifacts = null,
+        EvolutionEarlyStoppingReport? earlyStopping = null)
     {
+        EarlyStopping = earlyStopping ?? new EvolutionEarlyStoppingReport(false,
+            EvolutionEarlyStoppingMetric.BestQuality, null, 0, 0, 0, 0);
         if (!Enum.IsDefined(typeof(EvolutionStopReason), stopReason))
             throw new ArgumentOutOfRangeException(nameof(stopReason));
         StopReason = stopReason;
@@ -155,6 +161,18 @@ public sealed class EvolutionRunResult<TGenome>
     public EvolutionRunCounters Counters { get; }
     /// <summary>Gets a deterministic hash that excludes wall-clock timing and observer behavior.</summary>
     public string StateHash { get; }
+
+    /// <summary>Gets what the early-stopping criterion did during this run.</summary>
+    /// <remarks>
+    /// Each committed batch takes one reading, which improved, did not improve, or could not be measured. Only a
+    /// measured non-improvement charges patience, so
+    /// <see cref="EvolutionEarlyStoppingReport.UnmeasurableReadings"/> and
+    /// <see cref="EvolutionEarlyStoppingReport.UnmeasurableReasons"/> are how a caller sees that the criterion was
+    /// skipped and why. A run whose criterion was never measurable at all throws instead of returning a result, so a
+    /// report reached through this property was either disabled or measured at least once. The report covers this
+    /// run's readings only and is deliberately excluded from <see cref="StateHash"/>.
+    /// </remarks>
+    public EvolutionEarlyStoppingReport EarlyStopping { get; }
 
     /// <summary>Gets the nondominated union of retained island fronts, or null for scalar runs.</summary>
     /// <remarks>Best is this front's explicit representative; it does not replace this set of deployment choices.</remarks>

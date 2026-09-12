@@ -336,8 +336,13 @@ public sealed partial class EvolutionEngine<TGenome>
         await NotifyAsync(new EvolutionEvent<TGenome>(EvolutionEventKind.Stopped, NextEventSequence(),
             message: stopReason.ToString()),
             runCancellation.IsCancellationRequested ? CancellationToken.None : cancellationToken).ConfigureAwait(false);
+        EvolutionEarlyStoppingReport earlyStopping = BuildEarlyStoppingReport();
+
+        // A stopping criterion that was never once measurable is a configuration mistake, and a result that reported
+        // it as though the criterion had been watched would hide that. Observers still see the run stop first.
+        ValidateEarlyStoppingWasMeasurable(earlyStopping);
         return new EvolutionRunResult<TGenome>(stopReason, Array.AsReadOnly(_islands), CreateCounters(), stateHash,
-            _globalElites.Entries, CreateIslandStatuses(), _failures.ToArray(), PendingArtifactView());
+            _globalElites.Entries, CreateIslandStatuses(), _failures.ToArray(), PendingArtifactView(), earlyStopping);
     }
 
     /// <summary>Builds one exact status snapshot per island from the live archives and per-island counters.</summary>

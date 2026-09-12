@@ -278,40 +278,92 @@ public sealed partial class EvolutionEngine<TGenome>
         return best;
     }
 
+    private long _earlyStoppingImprovedReadings;
+    private long _earlyStoppingNotImprovedReadings;
+    private long _earlyStoppingUnmeasurableReadings;
+    private long _earlyStoppingUnmeasurableEvaluations;
+    private readonly Dictionary<EvolutionEarlyStoppingUnmeasurableReason, long> _earlyStoppingUnmeasurableReasons = new();
+
     /// <summary>
-    /// Updates the early-stopping plateau counters after a committed batch, resetting them when the configured
-    /// metric improved by at least the configured minimum and otherwise charging the batch's evaluations to patience.
+    /// Takes one reading of the configured early-stopping criterion after a committed batch and applies its outcome.
     /// </summary>
+    /// <remarks>
+    /// A reading is <see cref="EvolutionEarlyStoppingOutcome.Improved"/>,
+    /// <see cref="EvolutionEarlyStoppingOutcome.NotImproved"/> or <see cref="EvolutionEarlyStoppingOutcome.Unmeasurable"/>.
+    /// Only a measured non-improvement charges the batch's evaluations to patience. "Nothing to measure" - a metric no
+    /// evaluation reported, an empty feasible front, an empty archive, archives with no cells - is neither improvement
+    /// nor stagnation, so it charges nothing and is counted with its reason for the run's report.
+    /// </remarks>
     private void UpdateEarlyStopping(long committedEvaluations)
     {
         if (_options.EarlyStopping.PatienceEvaluations <= 0) return;
-        double? metric = CurrentEarlyStoppingMetric();
+        EvolutionEarlyStoppingReading reading = ReadEarlyStoppingCriterion();
+        EvolutionEarlyStoppingOutcome outcome = !reading.IsMeasured
+            ? EvolutionEarlyStoppingOutcome.Unmeasurable
+            : !_earlyStoppingBest.HasValue ||
+              reading.Value - _earlyStoppingBest.Value >= _options.EarlyStopping.MinimumImprovement
+                ? EvolutionEarlyStoppingOutcome.Improved
+                : EvolutionEarlyStoppingOutcome.NotImproved;
 
-        // No value means the configured criterion has not been measured yet - an evaluator metric no evaluation has
-        // reported, or a feasible front that is still empty. That is neither improvement nor stagnation, so patience
-        // is not charged: a run stops early only after the criterion was observed and then stopped improving.
-        if (!metric.HasValue) return;
-        if (!_earlyStoppingBest.HasValue || metric.Value - _earlyStoppingBest.Value >= _options.EarlyStopping.MinimumImprovement)
+        switch (outcome)
         {
-            _earlyStoppingBest = metric;
-            _evaluationsSinceImprovement = 0;
-            return;
+            case EvolutionEarlyStoppingOutcome.Improved:
+                _earlyStoppingImprovedReadings = checked(_earlyStoppingImprovedReadings + 1);
+                _earlyStoppingBest = reading.Value;
+                _evaluationsSinceImprovement = 0;
+                break;
+            case EvolutionEarlyStoppingOutcome.NotImproved:
+                _earlyStoppingNotImprovedReadings = checked(_earlyStoppingNotImprovedReadings + 1);
+                _evaluationsSinceImprovement += committedEvaluations;
+                break;
+            default:
+                _earlyStoppingUnmeasurableReadings = checked(_earlyStoppingUnmeasurableReadings + 1);
+                _earlyStoppingUnmeasurableEvaluations =
+                    checked(_earlyStoppingUnmeasurableEvaluations + committedEvaluations);
+                _earlyStoppingUnmeasurableReasons.TryGetValue(reading.Reason, out long occurrences);
+                _earlyStoppingUnmeasurableReasons[reading.Reason] = checked(occurrences + 1);
+                break;
         }
-        _evaluationsSinceImprovement += committedEvaluations;
+    }
+
+    /// <summary>Builds this run's early-stopping report; the counts describe this run's readings only.</summary>
+    private EvolutionEarlyStoppingReport BuildEarlyStoppingReport() =>
+        _options.EarlyStopping.PatienceEvaluations <= 0
+            ? EvolutionEarlyStoppingReport.Disabled(_options.EarlyStopping)
+            : new EvolutionEarlyStoppingReport(true, _options.EarlyStopping.Metric, _options.EarlyStopping.MetricName,
+                _earlyStoppingImprovedReadings, _earlyStoppingNotImprovedReadings, _earlyStoppingUnmeasurableReadings,
+                _earlyStoppingUnmeasurableEvaluations, _earlyStoppingUnmeasurableReasons);
+
+    /// <summary>Refuses to report a run whose stopping criterion was never once measurable.</summary>
+    /// <remarks>
+    /// Asking for a criterion the run can never evaluate is a configuration mistake, not a result: patience is never
+    /// charged, so the run silently behaves as though early stopping had been switched off, and nothing in the result
+    /// would say so. A run that took no reading at all, because it committed no batch, is left to its own stop reason,
+    /// which already reports that nothing ran.
+    /// </remarks>
+    private void ValidateEarlyStoppingWasMeasurable(EvolutionEarlyStoppingReport report)
+    {
+        if (!report.Enabled || report.Readings == 0 || report.WasEverMeasurable) return;
+        throw new InvalidOperationException(string.Concat(
+            "Early stopping was configured on criterion '", report.Criterion, "' with patience ",
+            _options.EarlyStopping.PatienceEvaluations.ToString(CultureInfo.InvariantCulture),
+            ", but the criterion was never measurable in ",
+            report.Readings.ToString(CultureInfo.InvariantCulture), " readings (", report.DescribeReasons(),
+            "). Configure a criterion this run can measure, or disable early stopping."));
     }
 
     /// <summary>The island versions the cached union hypervolume was measured at, or null before any measurement.</summary>
     private long[]? _paretoMetricVersions;
-    private double? _paretoMetricValue;
+    private EvolutionEarlyStoppingReading _paretoMetricReading;
 
-    /// <summary>Measures the union front's dominated volume, reusing the last value while no island changed.</summary>
+    /// <summary>Reads the union front's dominated volume, reusing the last reading while no island changed.</summary>
     /// <remarks>
     /// The union of every island front is rebuilt only when an archive version moved, so a batch that inserted
     /// nothing - and a second read within one batch - does not pay for a full front rebuild again. An empty feasible
-    /// union is an unmeasured front, not a front whose volume happens to be zero: reporting zero makes a run that has
-    /// not reached feasibility look like an immediate plateau and ends exploration before a feasible point exists.
+    /// union is an unmeasurable front, not a front whose volume happens to be zero: reporting zero makes a run that
+    /// has not reached feasibility look like an immediate plateau and ends exploration before a feasible point exists.
     /// </remarks>
-    private double? ParetoHypervolumeMetric()
+    private EvolutionEarlyStoppingReading ParetoHypervolumeReading()
     {
         bool reusable = _paretoMetricVersions is not null;
         _paretoMetricVersions ??= new long[_islands.Length];
@@ -320,11 +372,13 @@ public sealed partial class EvolutionEngine<TGenome>
             if (_paretoMetricVersions[island] != _islands[island].Version) reusable = false;
             _paretoMetricVersions[island] = _islands[island].Version;
         }
-        if (reusable) return _paretoMetricValue;
+        if (reusable) return _paretoMetricReading;
         var definition = ((IEvolutionParetoArchiveView<TGenome>)_islands[0]).ParetoDefinition!;
         var front = new EvolutionParetoFront<TGenome>(definition, _islands.SelectMany(archive => archive.Entries));
-        _paretoMetricValue = front.Entries.Count == 0 ? (double?)null : front.Hypervolume();
-        return _paretoMetricValue;
+        _paretoMetricReading = front.Entries.Count == 0
+            ? EvolutionEarlyStoppingReading.Unmeasurable(EvolutionEarlyStoppingUnmeasurableReason.EmptyFeasibleFront)
+            : EvolutionEarlyStoppingReading.Measured(front.Hypervolume());
+        return _paretoMetricReading;
     }
 
     /// <summary>Returns whether the early-stopping patience has been exhausted.</summary>
@@ -332,31 +386,35 @@ public sealed partial class EvolutionEngine<TGenome>
         _evaluationsSinceImprovement >= _options.EarlyStopping.PatienceEvaluations;
 
     /// <summary>
-    /// Reads the configured early-stopping metric, normalized so that a larger value is always better. Archive-wide
-    /// quality sums and named-metric extrema are maintained from exact insertion deltas, so this method is O(islands)
-    /// for coverage and O(1) for every other metric.
+    /// Reads the configured early-stopping criterion, normalized so that a larger value is always better, or reports
+    /// why there was nothing to measure. Archive-wide quality sums and named-metric extrema are maintained from exact
+    /// insertion deltas, so this method is O(islands) for coverage and O(1) for every other criterion.
     /// </summary>
-    private double? CurrentEarlyStoppingMetric()
+    /// <remarks>
+    /// Every path returns a reason rather than a bare "no value", so the four criteria are reported alike: a named
+    /// metric no evaluation carried, an empty Pareto front, an empty archive, and archives with no cells.
+    /// </remarks>
+    private EvolutionEarlyStoppingReading ReadEarlyStoppingCriterion()
     {
         bool maximize = _islands[0].Direction == EvolutionOptimizationDirection.Maximize;
 
         // A named evaluator metric wins over the three built-in views of the search, because a run often plateaus
-        // on something only the evaluator can see. Absent from every evaluation, it yields null and the run simply
-        // never stops early, which is safer than treating "not reported" as "no progress".
+        // on something only the evaluator can see. Absent from every evaluation it is unmeasurable, which is safer
+        // than treating "not reported" as "no progress" - and, unlike a silent skip, it is recorded and audited.
         if (_options.EarlyStopping.MetricName is not null)
         {
             // A named evaluator metric has its own direction, which has nothing to do with the archive's. Taking the
             // sign from the archive would negate a validation accuracy in a loss-minimising run, so a metric climbing
             // steadily would read as one falling steadily and stop the run exactly when it was working.
             return _earlyStoppingArchiveValueCount == 0
-                ? (double?)null
-                : _earlyStoppingArchiveMetric;
+                ? EvolutionEarlyStoppingReading.Unmeasurable(EvolutionEarlyStoppingUnmeasurableReason.MetricNotReported)
+                : EvolutionEarlyStoppingReading.Measured(_earlyStoppingArchiveMetric);
         }
 
         switch (_options.EarlyStopping.Metric)
         {
             case EvolutionEarlyStoppingMetric.ParetoHypervolume:
-                return ParetoHypervolumeMetric();
+                return ParetoHypervolumeReading();
             case EvolutionEarlyStoppingMetric.Coverage:
                 {
                     long occupied = 0;
@@ -367,16 +425,20 @@ public sealed partial class EvolutionEngine<TGenome>
                         long cells = TotalGridCells(archive);
                         total = cells > long.MaxValue - total ? long.MaxValue : total + cells;
                     }
-                    return total == 0 ? null : occupied / (double)total;
+                    return total == 0
+                        ? EvolutionEarlyStoppingReading.Unmeasurable(EvolutionEarlyStoppingUnmeasurableReason.NoArchiveCells)
+                        : EvolutionEarlyStoppingReading.Measured(occupied / (double)total);
                 }
             case EvolutionEarlyStoppingMetric.QdScore:
                 return _earlyStoppingArchiveValueCount == 0
-                    ? (double?)null
-                    : _earlyStoppingArchiveMetric;
+                    ? EvolutionEarlyStoppingReading.Unmeasurable(EvolutionEarlyStoppingUnmeasurableReason.EmptyArchive)
+                    : EvolutionEarlyStoppingReading.Measured(_earlyStoppingArchiveMetric);
             default:
                 {
                     double? best = BestQualityAcrossIslands();
-                    return best.HasValue ? (maximize ? best.Value : -best.Value) : (double?)null;
+                    return best.HasValue
+                        ? EvolutionEarlyStoppingReading.Measured(maximize ? best.Value : -best.Value)
+                        : EvolutionEarlyStoppingReading.Unmeasurable(EvolutionEarlyStoppingUnmeasurableReason.EmptyArchive);
                 }
         }
     }
