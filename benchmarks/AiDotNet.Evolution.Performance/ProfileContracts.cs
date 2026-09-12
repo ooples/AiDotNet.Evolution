@@ -221,9 +221,13 @@ public static class ProfileValidation
     {
         double resolution = measurement.Environment.ProcessorTimeResolutionMilliseconds;
         if (!double.IsFinite(resolution) || resolution < 0) throw new InvalidDataException("Process CPU-time resolution was not recorded.");
-        double bound = measurement.Environment.LogicalProcessors * measurement.ElapsedMilliseconds + resolution;
+        // The CPU counter is sampled just outside the measured window and each endpoint is quantized to the
+        // platform's clock resolution, so the physical bound carries two resolution units of measurement slack.
+        double bound = (measurement.Environment.LogicalProcessors * measurement.ElapsedMilliseconds) + (2 * resolution);
         if (measurement.ProcessCpuMilliseconds > bound)
-            throw new InvalidDataException("Process CPU time exceeds processors times elapsed time plus the recorded clock resolution.");
+            throw new InvalidDataException(
+                $"Process CPU time {measurement.ProcessCpuMilliseconds:F3} ms exceeds {measurement.Environment.LogicalProcessors} processors " +
+                $"times {measurement.ElapsedMilliseconds:F3} ms elapsed plus two {resolution:F3} ms clock-resolution units.");
         if (measurement.ProcessCpuFineMilliseconds is { } fine && (!double.IsFinite(fine) || fine < 0 || fine > bound))
             throw new InvalidDataException("Fine-grained process CPU time exceeds its physical bound.");
     }

@@ -94,7 +94,10 @@ Because other processes may still run on those CPUs, the controller samples syst
 before and after each attempt, subtracts the owned child's own CPU time, and records the remaining foreign share of
 the pinned capacity. Above 5% an attempt is flagged; above 25% it fails. This is an aggregate counter read, not a
 per-process enumeration, and it cannot attribute load to a particular owner, and the subtracted worker CPU time
-carries the platform's coarse clock resolution, so a short attempt's foreign share is an estimate.
+carries the platform's coarse clock resolution, so a short attempt's foreign share is an estimate. The estimate is
+clamped at zero: when the owned worker's own recorded CPU time covers all the busy time on its pinned processors,
+the attempt reports 0.00%, which means "no foreign load detected", not "provably none". It is therefore evidence
+that a campaign was contended, and weaker evidence that one was not.
 
 Host contention is the **only** retryable attempt failure. A contended attempt is retained in the report with its
 measured load and status `contended`, the controller then waits (bounded, up to 60 s) for the pinned CPUs to fall
@@ -140,7 +143,8 @@ is a high-water mark, not an allocation counter. Observer instrumentation is inc
 
 Process CPU time comes from the platform's coarse clock (15.625 ms on this Windows host, USER_HZ ticks on Linux);
 that resolution is recorded in `processorTimeResolutionMilliseconds`, and a measurement whose CPU time exceeds
-processors x elapsed + one resolution unit fails. Windows attempts additionally record unhalted process cycles from
+processors x elapsed plus two resolution units fails. The counter is sampled immediately around the measured window
+and each endpoint is quantized, which is exactly the two units of slack the bound allows. Windows attempts additionally record unhalted process cycles from
 `QueryProcessCycleTime` and Linux attempts record nanosecond CPU time from `/proc/self/schedstat`, so the coarse
 field is never the only evidence.
 

@@ -248,7 +248,7 @@ public sealed class ProfileTests
         yield return new object[] { value with { ProcessLifetimePeakWorkingSetBytes = 0 } };
         yield return new object[] { value with { ProcessCpuMilliseconds = double.NaN } };
         // Four logical processors cannot accumulate more than four times the elapsed time plus one clock tick.
-        yield return new object[] { value with { ProcessCpuMilliseconds = (4 * 500) + 20 } };
+        yield return new object[] { value with { ProcessCpuMilliseconds = (4 * 500) + 40 } };
         yield return new object[] { value with { ProcessCpuFineMilliseconds = -1 } };
         yield return new object[] { value with { CheckpointStoreMilliseconds = double.NaN } };
         yield return new object[] { value with { CheckpointSaves = -1 } };

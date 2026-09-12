@@ -61,11 +61,13 @@ public static class ProfileRunner
         GC.Collect(); GC.WaitForPendingFinalizers(); GC.Collect();
         using var process = Process.GetCurrentProcess(); process.Refresh();
         long workingBefore = process.WorkingSet64, peakBefore = process.PeakWorkingSet64;
+        var probe = new Probe(scenario.Workers);
+        long allocatedBefore = GC.GetTotalAllocatedBytes(precise: true);
+        // Sample processor time last: a precise allocation read is itself charged CPU, and anything between this
+        // sample and the stopwatch would land inside the CPU window but outside the measured window.
         double cpuBefore = process.TotalProcessorTime.TotalMilliseconds;
         ulong? cyclesBefore = ProfileHost.ProcessCycles();
         double? fineCpuBefore = ProfileHost.ProcessFineCpuMilliseconds();
-        var probe = new Probe(scenario.Workers);
-        long allocatedBefore = GC.GetTotalAllocatedBytes(precise: true);
         long started = Stopwatch.GetTimestamp(); probe.Started = started;
         string? stateHash = null;
         double? bestQuality = null;
@@ -103,14 +105,16 @@ public static class ProfileRunner
             if (iterations >= ProfileProtocol.MaximumIterations)
                 throw new InvalidOperationException("The measured phase never reached the declared minimum measured time.");
         }
-        long allocated = GC.GetTotalAllocatedBytes(precise: true) - allocatedBefore;
+        // Close the CPU window before the allocation read, for the same reason it was opened after it.
         process.Refresh();
+        double processorMilliseconds = process.TotalProcessorTime.TotalMilliseconds - cpuBefore;
         ulong? cycles = ProfileHost.ProcessCycles() is { } after && cyclesBefore is { } before ? after - before : null;
         double? fineCpu = ProfileHost.ProcessFineCpuMilliseconds() is { } afterFine && fineCpuBefore is { } beforeFine ? afterFine - beforeFine : null;
+        long allocated = GC.GetTotalAllocatedBytes(precise: true) - allocatedBefore;
         var measurement = new ProfileMeasurement(scenario, CaptureEnvironment(processorGroup), iterations, operationsPerIteration,
             iterations * operationsPerIteration, elapsed, elapsed / iterations, iterations * operationsPerIteration * 1000d / elapsed,
             warmup, warmupOperations, allocated, workingBefore, process.WorkingSet64, process.PeakWorkingSet64, peakBefore,
-            process.TotalProcessorTime.TotalMilliseconds - cpuBefore, cycles, fineCpu,
+            processorMilliseconds, cycles, fineCpu,
             scenario.Kind is "engine" or "evaluation-only" ? probe.OccupiedTicks * 1000d / Stopwatch.Frequency / (scenario.Workers * elapsed) : null,
             probe.PeakConcurrency, probe.Calls, occupied, stateHash, bestQuality,
             probe.CheckpointSaves, probe.CheckpointBytes, probe.CheckpointTicks * 1000d / Stopwatch.Frequency,
