@@ -15,6 +15,18 @@ namespace AiDotNet.Evolution;
 /// state hash, so a resumed run continues counting from exactly where it stopped.
 /// </para>
 /// <para>
+/// A reading has three outcomes, not two. <see cref="EvolutionEarlyStoppingOutcome.Improved"/> resets patience and
+/// <see cref="EvolutionEarlyStoppingOutcome.NotImproved"/> charges it, but a criterion with nothing to measure yet -
+/// a named metric no evaluation reported, an empty feasible Pareto front, an empty archive, or archives with no
+/// cells - is <see cref="EvolutionEarlyStoppingOutcome.Unmeasurable"/> and charges no patience at all. That is the
+/// contract, not an implementation detail: "not measured" is not evidence of a plateau, and treating it as one ends
+/// a run before it has produced anything to judge. Every unmeasurable reading is counted with its
+/// <see cref="EvolutionEarlyStoppingUnmeasurableReason"/> in
+/// <see cref="EvolutionRunResult{TGenome}.EarlyStopping"/>, and a run that took at least one reading and never once
+/// measured its criterion throws instead of returning a result, because a criterion that can never be evaluated is a
+/// configuration mistake rather than a search outcome.
+/// </para>
+/// <para>
 /// Two differences from OpenEvolve matter. It offers an "event" mode in which a negative patience makes the stop
 /// condition an exact floating-point equality against the convergence threshold (process_parallel.py:792-801), which
 /// almost never fires for a computed score; this engine has no equality mode and always uses a tolerance comparison.
@@ -48,7 +60,10 @@ public sealed class EvolutionEarlyStoppingOptions
     /// can see, such as a validation score that stops improving while overall quality still drifts, and the
     /// reference implementation watches any metric key for exactly that reason. Naming one here watches the best
     /// value of that metric across every island, normalised so larger is better under either optimization
-    /// direction, and a run whose evaluations never report it simply never stops early.
+    /// direction. While no evaluation has reported it the criterion is unmeasurable: patience is not charged, the
+    /// skipped readings are counted under
+    /// <see cref="EvolutionEarlyStoppingUnmeasurableReason.MetricNotReported"/>, and a run that never reports it at
+    /// all fails rather than quietly behaving as though early stopping had been switched off.
     /// </para>
     /// <para><b>For Beginners:</b> Use this when the number you actually care about is one your own scoring code
     /// reports, rather than the archive's overall best.</para>

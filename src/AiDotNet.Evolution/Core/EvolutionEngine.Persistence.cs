@@ -11,6 +11,7 @@ public sealed partial class EvolutionEngine<TGenome>
     private const int EngineStateSchemaVersion = 6;
     // Optional sample provenance requires an explicit newer envelope, so old readers cannot silently drop it.
     private const int EngineMeasurementOriginSchemaVersion = 7;
+    private const int EngineParetoSchemaVersion = 8;
     private string? _safePayload;
     private long _safeSequence;
 
@@ -74,6 +75,7 @@ public sealed partial class EvolutionEngine<TGenome>
             Islands = _islands.Select(archive => ArchiveDocument.From(archive, SerializeGenome)).ToList()
         };
         if (HasMeasurementOrigins(document)) document.SchemaVersion = EngineMeasurementOriginSchemaVersion;
+        if (document.Islands.Any(island => island.Pareto is not null)) document.SchemaVersion = EngineParetoSchemaVersion;
         string payload = JsonSerializer.Serialize(document, EvolutionJson.Compact);
         if (payload.Length > EvolutionCollectionLimits.MaximumCheckpointBytes ||
             Encoding.UTF8.GetByteCount(payload) > EvolutionCollectionLimits.MaximumCheckpointBytes)
@@ -227,7 +229,8 @@ public sealed partial class EvolutionEngine<TGenome>
                 ReadArchiveDescriptors(restorable, archiveDocument);
             var entries = new List<EvolutionArchiveEntry<TGenome>>();
             var islandGenomeIds = new HashSet<string>(StringComparer.Ordinal);
-            foreach (ArchiveEntryDocument entryDocument in archiveDocument.Entries ?? new List<ArchiveEntryDocument>())
+            foreach (ArchiveEntryDocument entryDocument in (archiveDocument.Entries ?? new List<ArchiveEntryDocument>())
+                .Concat(archiveDocument.InfeasibleEntries ?? new List<ArchiveEntryDocument>()))
             {
                 EvolutionArchiveEntry<TGenome> entry = RestoreArchiveEntry(entryDocument);
                 // Naming which invariant broke, and on which entry, is what turns a failed resume from a dead end into
@@ -247,7 +250,13 @@ public sealed partial class EvolutionEngine<TGenome>
                         $"{island}; each genome may hold at most one cell.");
                 entries.Add(entry);
             }
-            restorable.Restore(entries, restoredDescriptors, archiveDocument.Version);
+            int feasibleCount = archiveDocument.Entries?.Count ?? 0;
+            if (restorable is ICheckpointableParetoArchive<TGenome> paretoArchive)
+                paretoArchive.RestoreWithExploration(entries.Take(feasibleCount).ToArray(), entries.Skip(feasibleCount).ToArray(),
+                    restoredDescriptors, archiveDocument.Version);
+            else if (archiveDocument.InfeasibleEntries is not null)
+                throw new InvalidDataException("Exploration checkpoints require ICheckpointableParetoArchive.");
+            else restorable.Restore(entries, restoredDescriptors, archiveDocument.Version);
         }
 
         RestoreEarlyStoppingArchiveMetric(state);
@@ -273,6 +282,9 @@ public sealed partial class EvolutionEngine<TGenome>
         ICheckpointableEvolutionArchive<TGenome> archive,
         ArchiveDocument document)
     {
+        string? expectedPareto = (archive as IEvolutionParetoArchiveView<TGenome>)?.ParetoDefinition?.DefinitionHash;
+        if (document.Pareto?.ToDefinition().DefinitionHash != expectedPareto)
+            throw new InvalidDataException("Checkpoint Pareto objective semantics do not match the archive factory.");
         if (document.Descriptors is null)
             throw new InvalidDataException("Checkpoint archive descriptors are missing.");
 
@@ -514,6 +526,9 @@ public sealed partial class EvolutionEngine<TGenome>
                 entries.Add(new EvolutionCheckpointEntry<TGenome>(island,
                     EvolutionCheckpointEntrySource.IslandArchive, ReadArchiveEntry(document, genomeCodec)));
             }
+            foreach (ArchiveEntryDocument document in archive.InfeasibleEntries ?? new List<ArchiveEntryDocument>())
+                entries.Add(new EvolutionCheckpointEntry<TGenome>(island,
+                    EvolutionCheckpointEntrySource.InfeasibleExploration, ReadArchiveEntry(document, genomeCodec)));
         }
 
         foreach (EliteRecordDocument record in state.GlobalElites ?? new List<EliteRecordDocument>())
@@ -537,8 +552,18 @@ public sealed partial class EvolutionEngine<TGenome>
             }
         }
 
+        EvolutionParetoFront<TGenome>? front = null;
+        if (islands.Any(island => island.Pareto is not null))
+        {
+            try
+            {
+                front = new EvolutionParetoFront<TGenome>(islands[0].Pareto!.ToDefinition(),
+                    entries.Where(entry => entry.Source == EvolutionCheckpointEntrySource.IslandArchive).Select(entry => entry.Entry));
+            }
+            catch (ArgumentException exception) { throw new InvalidDataException("Invalid checkpoint Pareto front.", exception); }
+        }
         return new EvolutionCheckpointContents<TGenome>(
-            checkpoint.RunId, checkpoint.Sequence, checkpoint.CompatibilityHash, entries);
+            checkpoint.RunId, checkpoint.Sequence, checkpoint.CompatibilityHash, entries, front);
     }
 
     /// <summary>Deserializes and bounds an engine-state document before any task codec is invoked.</summary>
@@ -560,20 +585,63 @@ public sealed partial class EvolutionEngine<TGenome>
         // The outer checkpoint version and the engine-state version are different things, and only the latter says
         // whether the fields this reader expects are present. Without this check a payload from an older engine
         // deserializes into an all-default document and reads back as a complete record of a run that found nothing.
-        if (state is null || (state.SchemaVersion != EngineStateSchemaVersion && state.SchemaVersion != EngineMeasurementOriginSchemaVersion))
+        if (state is null || (state.SchemaVersion != EngineStateSchemaVersion && state.SchemaVersion != EngineMeasurementOriginSchemaVersion &&
+            state.SchemaVersion != EngineParetoSchemaVersion))
             throw new InvalidDataException(
                 "The evolution engine state schema is invalid; the checkpoint was written by a different engine version.");
 
         ValidatePackageCheckpointBounds(state);
-        if (HasMeasurementOrigins(state) && state.SchemaVersion != EngineMeasurementOriginSchemaVersion)
+        if (HasMeasurementOrigins(state) && state.SchemaVersion < EngineMeasurementOriginSchemaVersion)
             throw new InvalidDataException("Measurement-origin metadata requires the versioned checkpoint schema.");
+        var paretoIslands = state.Islands!;
+        if (paretoIslands.Any(island => island.Pareto is not null))
+        {
+            if (state.SchemaVersion != EngineParetoSchemaVersion)
+                throw new InvalidDataException("Pareto metadata requires the versioned checkpoint schema.");
+            var definition = paretoIslands.First(island => island.Pareto is not null).Pareto!.ToDefinition();
+            if ((long)paretoIslands.Count * (definition.Capacity + definition.InfeasibleCapacity) > 4096 ||
+                paretoIslands.Any(island => island.Pareto?.ToDefinition().DefinitionHash != definition.DefinitionHash) ||
+                state.GlobalElites!.Count != 0 || state.IslandHistories!.Any(history => history.Count != 0))
+                throw new InvalidDataException("Pareto checkpoints require compatible bounded fronts without scalar auxiliary indexes.");
+            foreach (var island in paretoIslands) ValidateParetoCheckpointArchive(island, definition);
+        }
+        else if (state.SchemaVersion == EngineParetoSchemaVersion)
+            throw new InvalidDataException("The Pareto checkpoint schema requires objective metadata.");
+        else if (paretoIslands.Any(island => island.InfeasibleEntries is not null))
+            throw new InvalidDataException("Infeasible exploration requires versioned Pareto metadata.");
         return state;
+    }
+
+    // Validate front invariants without invoking a task-owned genome codec. The serialized genome is opaque here.
+    private static void ValidateParetoCheckpointArchive(ArchiveDocument archive, EvolutionParetoDefinition definition)
+    {
+        try
+        {
+            if ((definition.InfeasibleCapacity > 0) != (archive.InfeasibleEntries is not null))
+                throw new InvalidDataException("Exploration entries must be present exactly when exploration is enabled.");
+            var entries = archive.Entries!.Concat(archive.InfeasibleEntries ?? new List<ArchiveEntryDocument>()).Select(document =>
+            {
+                if (document.Lineage is null || document.Evaluation is null || document.CellBins is null || document.GenomePayload is null)
+                    throw new InvalidDataException("Incomplete Pareto checkpoint entry.");
+                var lineage = document.Lineage.ToLineage();
+                var candidate = new EvolutionCandidate<string>(document.EvaluationId,
+                    new EvolutionCanonicalGenome<string>(document.GenomePayload, document.GenomeId), lineage);
+                return new EvolutionArchiveEntry<string>(new EvolutionCellKey(document.CellBins), candidate,
+                    document.Evaluation.ToEvaluation(document.EvaluationId, document.GenomeId, lineage));
+            }).ToArray();
+            var restored = new ParetoArchive<string>(definition, entries.Length == 0 ? EvolutionOptimizationDirection.Maximize : entries[0].Evaluation.Direction);
+            restored.RestoreWithExploration(entries.Take(archive.Entries!.Count).ToArray(), entries.Skip(archive.Entries.Count).ToArray(),
+                archive.Descriptors!.Select(axis => axis.ToDefinition()).ToArray(), archive.Version);
+        }
+        catch (ArgumentException exception) { throw new InvalidDataException("Invalid Pareto checkpoint archive.", exception); }
     }
 
     private static bool HasMeasurementOrigins(EngineStateDocument state)
     {
         if (state.Cache?.Any(item => item?.Result?.MeasurementOriginJson is not null) == true) return true;
         if (state.Islands?.Any(island => island?.Entries?.Any(entry => entry?.Evaluation?.MeasurementOriginJson is not null) == true) == true)
+            return true;
+        if (state.Islands?.Any(island => island?.InfeasibleEntries?.Any(entry => entry?.Evaluation?.MeasurementOriginJson is not null) == true) == true)
             return true;
         if (state.GlobalElites?.Any(item => item?.Entry?.Evaluation?.MeasurementOriginJson is not null) == true) return true;
         return state.IslandHistories?.Any(history => history?.Any(entry => entry?.Evaluation?.MeasurementOriginJson is not null) == true) == true;
@@ -626,6 +694,13 @@ public sealed partial class EvolutionEngine<TGenome>
                 throw new InvalidDataException("A checkpoint archive entry is missing.");
             foreach (ArchiveEntryDocument entry in archiveEntries)
                 ValidateArchiveEntryBounds(entry);
+            if (archive.InfeasibleEntries is not null)
+            {
+                if (archive.InfeasibleEntries.Count > 256 || archive.InfeasibleEntries.Any(entry => entry is null))
+                    throw new InvalidDataException("Invalid or oversized exploration entry collection.");
+                foreach (var entry in archive.InfeasibleEntries) ValidateArchiveEntryBounds(entry);
+                totalEntries = AddCheckpointEntryCount(totalEntries, archive.InfeasibleEntries.Count, "infeasible exploration");
+            }
             totalEntries = AddCheckpointEntryCount(
                 totalEntries,
                 archiveEntries.Count,
@@ -939,6 +1014,11 @@ public sealed partial class EvolutionEngine<TGenome>
             Append(builder, island);
             Append(builder, _islands[island].Version);
             Append(builder, _islandGenerations[island]);
+            if ((_islands[island] as IEvolutionParetoArchiveView<TGenome>)?.ParetoDefinition is { } pareto)
+            {
+                Append(builder, "pareto-definition");
+                Append(builder, pareto.DefinitionHash);
+            }
             Append(builder, "descriptors");
             Append(builder, _islands[island].Descriptors.Count);
             foreach (EvolutionDescriptorDefinition descriptor in _islands[island].Descriptors)
@@ -948,6 +1028,16 @@ public sealed partial class EvolutionEngine<TGenome>
             {
                 Append(builder, entry.Cell.StableKey);
                 AppendEvaluation(builder, entry.Evaluation);
+            }
+            if ((_islands[island] as IEvolutionParetoArchiveView<TGenome>)?.InfeasibleEntries is { } exploration)
+            {
+                Append(builder, "infeasible-exploration");
+                Append(builder, exploration.Count);
+                foreach (var entry in exploration.OrderBy(entry => entry.Cell.StableKey, StringComparer.Ordinal))
+                {
+                    Append(builder, entry.Cell.StableKey);
+                    AppendEvaluation(builder, entry.Evaluation);
+                }
             }
         }
         Append(builder, "last-migration-generation");
@@ -1223,13 +1313,67 @@ public sealed partial class EvolutionEngine<TGenome>
         /// <summary>The descriptor ranges in force at checkpoint time, which a Grow axis widens during a run.</summary>
         public List<DescriptorDocument>? Descriptors { get; set; }
 
+        [System.Text.Json.Serialization.JsonIgnore(Condition = System.Text.Json.Serialization.JsonIgnoreCondition.WhenWritingNull)]
+        public ParetoDocument? Pareto { get; set; }
+
+        [System.Text.Json.Serialization.JsonIgnore(Condition = System.Text.Json.Serialization.JsonIgnoreCondition.WhenWritingNull)]
+        public List<ArchiveEntryDocument>? InfeasibleEntries { get; set; }
+
         public static ArchiveDocument From(IEvolutionArchive<TGenome> archive, Func<TGenome, string> serializeGenome) => new()
         {
             Version = archive.Version,
+            Pareto = (archive as IEvolutionParetoArchiveView<TGenome>)?.ParetoDefinition is { } definition ? ParetoDocument.From(definition) : null,
+            InfeasibleEntries = (archive as IEvolutionParetoArchiveView<TGenome>)?.InfeasibleEntries?
+                .OrderBy(entry => entry.Cell.StableKey, StringComparer.Ordinal).Select(entry => ArchiveEntryDocument.From(entry, serializeGenome)).ToList(),
             Descriptors = archive.Descriptors.Select(DescriptorDocument.From).ToList(),
             Entries = archive.Entries.OrderBy(item => item.Cell.StableKey, StringComparer.Ordinal)
                 .Select(entry => ArchiveEntryDocument.From(entry, serializeGenome)).ToList()
         };
+    }
+
+    private sealed class ParetoDocument
+    {
+        public int Capacity { get; set; }
+        [System.Text.Json.Serialization.JsonIgnore(Condition = System.Text.Json.Serialization.JsonIgnoreCondition.WhenWritingDefault)]
+        public int InfeasibleCapacity { get; set; }
+        public EvolutionParetoRepresentative Representative { get; set; }
+        public List<ObjectiveDocument>? Objectives { get; set; }
+
+        public static ParetoDocument From(EvolutionParetoDefinition definition) => new()
+        {
+            Capacity = definition.Capacity,
+            InfeasibleCapacity = definition.InfeasibleCapacity,
+            Representative = definition.Representative,
+            Objectives = definition.Objectives.Select(axis => new ObjectiveDocument
+            {
+                Name = axis.Name,
+                Direction = axis.Direction,
+                Minimum = axis.Minimum,
+                Maximum = axis.Maximum,
+                Resolution = axis.Resolution
+            }).ToList()
+        };
+
+        public EvolutionParetoDefinition ToDefinition()
+        {
+            if (Objectives is null || Objectives.Count > 8 || Objectives.Any(axis => axis is null))
+                throw new InvalidDataException("Checkpoint objective definitions are missing or exceed the bound.");
+            try
+            {
+                return new EvolutionParetoDefinition(Objectives.Select(axis => new EvolutionObjectiveDefinition(
+                    axis.Name, axis.Direction, axis.Minimum, axis.Maximum, axis.Resolution)), Capacity, Representative, InfeasibleCapacity);
+            }
+            catch (ArgumentException exception) { throw new InvalidDataException("Invalid checkpoint objective definition.", exception); }
+        }
+    }
+
+    private sealed class ObjectiveDocument
+    {
+        public string Name { get; set; } = string.Empty;
+        public EvolutionOptimizationDirection Direction { get; set; }
+        public double Minimum { get; set; }
+        public double Maximum { get; set; }
+        public double Resolution { get; set; }
     }
 
     private sealed class DescriptorDocument

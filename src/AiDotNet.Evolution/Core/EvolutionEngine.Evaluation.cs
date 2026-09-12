@@ -27,14 +27,27 @@ public sealed partial class EvolutionEngine<TGenome>
         int island = (int)(evaluationId % _islands.Length);
         int sourceIsland = FindSelectionIsland(island);
         if (sourceIsland < 0) return null;
-        IEvolutionArchive<TGenome> sourceArchive = _islands[sourceIsland];
-        if (_options.IslandAssignment == EvolutionIslandAssignmentStrategy.InheritParent) island = sourceIsland;
 
         StableRandom proposalRandom = StableRandom.CreateStream(_options.Seed, unchecked((ulong)evaluationId * 8UL));
         if (_selection is IEliteIndexAwareEvolutionSelectionPolicy<TGenome> eliteAwareSelection)
             eliteAwareSelection.UseEliteIndex(_globalElites.Entries, island);
-        EvolutionSelection<TGenome>? selection = _selection.Select(sourceArchive, proposalRandom, _options.InspirationCount);
+
+        // A policy may decline an island the engine considers occupied, so the remaining occupied islands are tried
+        // before the run is declared out of candidates. The single-island and always-succeeding cases are unchanged.
+        EvolutionSelection<TGenome>? selection = null;
+        IEvolutionArchive<TGenome> sourceArchive = _islands[sourceIsland];
+        for (int offset = 0; offset < _islands.Length; offset++)
+        {
+            int candidateIsland = (sourceIsland + offset) % _islands.Length;
+            if (offset > 0 && !HasSelectionCandidates(_islands[candidateIsland])) continue;
+            sourceArchive = _islands[candidateIsland];
+            selection = _selection.Select(sourceArchive, proposalRandom, _options.InspirationCount);
+            if (selection is null) continue;
+            sourceIsland = candidateIsland;
+            break;
+        }
         if (selection is null) return null;
+        if (_options.IslandAssignment == EvolutionIslandAssignmentStrategy.InheritParent) island = sourceIsland;
         long allocatedId = AllocateProposalId();
         if (allocatedId != evaluationId) throw new InvalidOperationException("Proposal identity allocation was not sequential.");
         long generation = ++_generation;
@@ -204,11 +217,11 @@ public sealed partial class EvolutionEngine<TGenome>
     /// </summary>
     private int FindSelectionIsland(int preferredIsland)
     {
-        if (_islands[preferredIsland].Count > 0) return preferredIsland;
+        if (HasSelectionCandidates(_islands[preferredIsland])) return preferredIsland;
         for (int offset = 1; offset < _islands.Length; offset++)
         {
             int island = (preferredIsland + offset) % _islands.Length;
-            if (_islands[island].Count > 0) return island;
+            if (HasSelectionCandidates(_islands[island])) return island;
         }
         return -1;
     }
@@ -470,7 +483,8 @@ public sealed partial class EvolutionEngine<TGenome>
                 item.Candidate, evaluation, insertion), cancellationToken).ConfigureAwait(false);
             if (insertion == EvolutionArchiveInsertionResult.Inserted ||
                 insertion == EvolutionArchiveInsertionResult.Replaced ||
-                insertion == EvolutionArchiveInsertionResult.InsertedWithEviction)
+                insertion == EvolutionArchiveInsertionResult.InsertedWithEviction ||
+                insertion == EvolutionArchiveInsertionResult.RetainedForExploration)
             {
                 await NotifyAsync(new EvolutionEvent<TGenome>(EvolutionEventKind.ArchiveChanged, NextEventSequence(),
                     item.Candidate, evaluation, insertion), cancellationToken).ConfigureAwait(false);
@@ -488,6 +502,11 @@ public sealed partial class EvolutionEngine<TGenome>
     private void RecordCompletedEvaluation(int island, EvolutionCandidate<TGenome> candidate, EvolutionEvaluation evaluation)
     {
         IEvolutionArchive<TGenome> archive = _islands[island];
+        if ((archive as IEvolutionParetoArchiveView<TGenome>)?.ParetoDefinition is { } paretoDefinition)
+        {
+            RetainInvalidObjectiveDiagnostic(paretoDefinition, archive.Direction, evaluation);
+            return;
+        }
         EvolutionCellKey? cell = TryCreateCellKey(archive, evaluation.Descriptors);
         if (cell is null)
         {
@@ -532,6 +551,56 @@ public sealed partial class EvolutionEngine<TGenome>
         }
         return new EvolutionCellKey(bins);
     }
+
+    /// <summary>
+    /// Reports an objective vector a Pareto front refused, so a run that retains no tradeoff at all always says why.
+    /// </summary>
+    /// <remarks>
+    /// This is the front's counterpart of the scalar <c>descriptor_missing</c> diagnostic. An out-of-bounds value, a
+    /// vector of the wrong length, a non-finite value, and a scalar reporting direction that disagrees with the
+    /// archive all reject every candidate, which would otherwise appear as an empty front and zero retained failures.
+    /// </remarks>
+    private void RetainInvalidObjectiveDiagnostic(EvolutionParetoDefinition definition,
+        EvolutionOptimizationDirection direction, EvolutionEvaluation evaluation)
+    {
+        string? reason = definition.DescribeObjectiveProblem(evaluation, out int index);
+        if (reason is null && evaluation.Direction != direction) reason = "direction_mismatch";
+        if (reason is null) return;
+        var data = new Dictionary<string, string>(StringComparer.Ordinal)
+        {
+            ["reason"] = reason,
+            ["objectives"] = evaluation.Objectives.Count.ToString(CultureInfo.InvariantCulture),
+            ["expected_objectives"] = definition.Objectives.Count.ToString(CultureInfo.InvariantCulture)
+        };
+        if (index >= 0)
+        {
+            data["objective_index"] = index.ToString(CultureInfo.InvariantCulture);
+            data["objective"] = Truncate(definition.Objectives[index].Name, EvolutionDiagnostic.MaximumDataValueLength);
+            data["value"] = evaluation.Objectives[index].ToString("R", CultureInfo.InvariantCulture);
+            data["minimum"] = definition.Objectives[index].Minimum.ToString("R", CultureInfo.InvariantCulture);
+            data["maximum"] = definition.Objectives[index].Maximum.ToString("R", CultureInfo.InvariantCulture);
+        }
+        if (reason == "direction_mismatch")
+        {
+            data["archive_direction"] = direction.ToString();
+            data["evaluation_direction"] = evaluation.Direction.ToString();
+        }
+        RetainFailure(new EvolutionDiagnostic("objective_invalid",
+            "A completed evaluation's objective vector was refused by the Pareto front and retained no tradeoff.",
+            isRedacted: false, data: data));
+    }
+
+    /// <summary>
+    /// Reports whether the configured policy could draw a parent from this island: the feasible archive always
+    /// counts, and a separate infeasible exploration pool counts only for a policy that declares it samples one.
+    /// </summary>
+    /// <remarks>
+    /// Counting the pool for every policy made an explicit non-Pareto policy fail on the island it was handed: the
+    /// island looked occupied, the policy found no feasible elite, and the batch ended with <c>NoCandidates</c>.
+    /// </remarks>
+    private bool HasSelectionCandidates(IEvolutionArchive<TGenome> archive) => archive.Count > 0 ||
+        (_selection is IInfeasibleExplorationSelectionPolicy<TGenome> &&
+         ((archive as IEvolutionParetoArchiveView<TGenome>)?.InfeasibleEntries?.Count ?? 0) > 0);
 
     /// <summary>Builds the immutable evaluation record for a work item from its terminal result and attempt metadata.</summary>
     private EvolutionEvaluation BuildEvaluation(WorkItem item, EvolutionTaskResult result)
