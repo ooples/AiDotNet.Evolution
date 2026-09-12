@@ -106,3 +106,16 @@ Hosted current-head validation and independent review remain separate from these
 Remaining US-23 work includes public consumer-facade/CLI integration and representative, predeclared warm/cold
 campaigns with equivalent admissible priors, acquisition cost, stochastic freshness checks and independent final
 confirmation. Seed repertoires plus this deterministic example are not a substitute for that evidence.
+
+The [noisy equivalent-prior campaign](NOISY_REUSE_CAMPAIGN.md) now implements the
+core ablation runner, raw sample/receipt audit, separated acquisition/reuse costs,
+force-fresh/expiration checks and fresh-stream winner confirmation. The companion
+AiDotNet provider adds production raw scalar evidence validation to the existing
+fitness facade. The pinned campaign now passes 1,152 runs and 358,400 distinct acquired
+observations; current core tests pass 661/661 on all three targets. The companion
+[AiDotNet PR #2182](https://github.com/ooples/AiDotNet/pull/2182) passes 963 integration
+tests each on .NET 10/.NET 8 and 22 provider tests against the actual legacy assembly.
+The [evidence](../benchmarks/evidence/noisy-reuse/3c0a680/README.md) includes fresh confirmation,
+equivalent priors and hardened receipt auditing. CLI wiring, representative cross-system
+comparisons and published-package integration remain separate roadmap/dependency work;
+neither these authored tasks nor deterministic replay establish competitor superiority.
