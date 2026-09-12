@@ -8,7 +8,7 @@ Track the full plan through the [26 user-story issues and PR delivery index](USE
 ## Dependent story delivery
 
 The user chose to retain #15, AiDotNet #2148 and Tensors #1024 as shared foundations.
-All 26 stories now have individual open issues and dependent draft PRs, with reciprocal links and original
+All 26 stories now have individual open issues and dependent PRs, with reciprocal links and original
 Given/When/Then checklists. Initial story commits were documentation-only, not completed implementation.
 
 [US-08 / PR #51](https://github.com/ooples/AiDotNet.Evolution/pull/51) adds the first subsequent story-owned
@@ -17,6 +17,14 @@ surrogate training as new evidence or train CMA as fresh population members. Cre
 from current cost; semantic versions reject older learned checkpoints. This fix is on the dependent branch,
 not yet in this shared foundation or consumer source/package pins. US-13, US-14 and US-23 require integration.
 Full story acceptance and independent current-head review remain open.
+
+## US-10 story-owned performance evidence
+
+[PR #53](https://github.com/ooples/AiDotNet.Evolution/pull/53) adds fresh-process profiling and expanded BenchmarkDotNet factors.
+At `4a7b50e`, all 132 attempts and eight worker-determinism groups pass; 47 profiling contracts and all 661 core tests
+on each supported target pass locally. [Results](../benchmarks/evidence/performance/README.md) include memory,
+checkpoint overhead, utilization and quality-over-time, plus the original failed campaign. This is engine overhead,
+not an optimized-algorithm speedup. Host load/frequency/power are not controlled; release thresholds remain separate.
 
 ## Implemented in the initial core PR
 
@@ -124,7 +132,7 @@ Durable evaluation identities and leases must be developed against its eventual 
 | US-07 ablations | Partial | Same-operator uniform/adaptive allocation is available; representative island, migration, novelty and dispatch ablations remain. |
 | US-08 adaptive operators | Partial | Parent-improvement/archive-success policies, proposal-plus-evaluator credit and typed attribution implemented; full consumer-stage integration and representative held-out comparisons before default promotion remain. |
 | US-09 Pareto pipeline | Not implemented | Feasibility, objective definitions, archive/snapshot/selection/stopping/migration semantics together. |
-| US-10 engine performance | Partial | BenchmarkDotNet engine/archive/checkpoint suite and fixture validation implemented; controlled repeated baselines, peak memory, dimension/island scaling and regression thresholds remain. |
+| US-10 engine performance | Partial | 47 cases × three isolated repetitions on one host measure throughput, allocation, peak memory, checkpoint cost, utilization and quality-over-time, with measured delays, measured pinned-CPU contention and worker-determinism groups; frequency/power are recorded not pinned, islands and archive capacity are one-factor contrasts at one worker, and representative workloads plus release thresholds remain with US-01/US-04/US-12. |
 | US-11 application examples | Partial, companion | Executable authored-C# facade/worker/timing/confirmation example exists; representative program, AutoML, kernel and external-session examples remain. |
 | US-12 quality release gates | Partial | Representative measured quality thresholds, confidence and release artifacts. |
 | US-13 typed search spaces | Implemented | Mixed/conditional domains, owned canonical genomes, operators/refinement, checkpointed diagonal CMA and pinned simpler-baseline comparison; no universal-quality claim. |
@@ -300,8 +308,8 @@ Durable evaluation identities and leases must be developed against its eventual 
   `77d16869` had successful build, AVX-512 verification and returned GPU-parity checks; new head `665cb3c8` requires
   fresh hosted results. Earlier duplicate title
   runs were cancelled. AiDotNet's CodeRabbit approval applies only to historical head `75aa6b1d`; its later review
-  was skipped because 175 files exceeded the 100-file limit. No current-head CodeRabbit or Copilot approval is claimed. All PRs remain drafts;
-  no full-roadmap or merge-readiness claim.
+  was skipped because 175 files exceeded the 100-file limit. No current-head CodeRabbit or Copilot approval is claimed. This historical validation does not describe current draft/readiness states;
+  consult the delivery index and individual PRs. No full-roadmap or merge-readiness claim.
 
 ## Experiment access policy
 

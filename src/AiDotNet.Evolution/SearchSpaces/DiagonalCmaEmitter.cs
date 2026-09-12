@@ -61,7 +61,7 @@ public sealed class DiagonalCmaEmitter : IOutcomeAwareVariationOperator<Evolutio
         _c1 = 2 / ((n + 1.3) * (n + 1.3) + _effectiveParents);
         _cmu = Math.Min(1 - _c1, 2 * (_effectiveParents - 2 + 1 / _effectiveParents) / ((n + 2d) * (n + 2d) + _effectiveParents));
         _chi = Math.Sqrt(n) * (1 - 1d / (4d * n) + 1d / (21d * n * n));
-        VersionHash = EvolutionHash.Combine(new[] { "diagonal-cma-v1", space.VersionHash, PopulationSize.ToString(CultureInfo.InvariantCulture),
+        VersionHash = EvolutionHash.Combine(new[] { "diagonal-cma-v2-measurement-origin", space.VersionHash, PopulationSize.ToString(CultureInfo.InvariantCulture),
             EvolutionParameterValue.Numeric(initialStepSize).Canonical, direction.ToString() });
     }
 
@@ -131,7 +131,7 @@ public sealed class DiagonalCmaEmitter : IOutcomeAwareVariationOperator<Evolutio
         _pending.Remove(evaluation.Lineage.Generation);
         Sample sample = pending.Sample; sample.Settled = true;
         if (evaluation.Status == EvolutionEvaluationStatus.Completed && evaluation.Quality.HasValue &&
-            evaluation.Direction == _direction && evaluation.CacheStatus != EvolutionCacheStatus.Hit && evaluation.Cost.AttemptCount > 0 &&
+            evaluation.Direction == _direction && !evaluation.IsMeasurementReuse && evaluation.Cost.AttemptCount > 0 &&
             !evaluation.ConstraintViolations.Any(violation => violation > 0)) sample.Score = evaluation.Quality;
         Cohort cohort = pending.Cohort;
         if (cohort.Samples.Count < PopulationSize || cohort.Samples.Any(item => !item.Settled)) return;

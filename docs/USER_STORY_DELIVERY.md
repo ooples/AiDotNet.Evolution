@@ -1,9 +1,13 @@
 # User-story delivery index
 
 The [research roadmap](COMPETITIVE_ANALYSIS_AND_ROADMAP.md) has **26 open issues and 26 separate dependent PRs**:
-US-08 / #51 is ready for review of its completed learning-correctness slice; the other 25 remain tracking drafts.
+US-08 / #51 is ready for review of its completed learning-correctness slice, and US-10 / #53 adds story-owned
+performance measurement evidence; the other 24 remain tracking drafts and still require their own
+implementation/acceptance verification.
 Each issue includes the original Given/When/Then criteria, dependency checklist, partial evidence and remaining work.
-All initial story PR commits were **tracking-only checklists**. US-08 / #51 now adds a tested partial implementation slice; the other 25 story PRs remain tracking-only.
+All initial story PR commits were **tracking-only checklists**. US-08 / #51 added a tested partial implementation slice and
+US-10 / #53 added measured performance evidence; every other story PR's state belongs to that story's own PR.
+See each branch's evidence instead of treating creation as completion.
 Creating a PR or inheriting a foundation does not complete a story.
 
 ## Agreed delivery structure
@@ -33,7 +37,7 @@ Retargeting after squash/rebase merging needs special care to avoid reintroducin
 | US-07: Identify which existing features improve search | [#25](https://github.com/ooples/AiDotNet.Evolution/issues/25) | Partial | [AiDotNet.Evolution#50](https://github.com/ooples/AiDotNet.Evolution/pull/50) |
 | US-08: Adapt proposal strategies using measured outcomes | [#26](https://github.com/ooples/AiDotNet.Evolution/issues/26) | Partial story; completed fix ready for review | [AiDotNet.Evolution#51](https://github.com/ooples/AiDotNet.Evolution/pull/51) |
 | US-09: Preserve useful tradeoffs between objectives | [#27](https://github.com/ooples/AiDotNet.Evolution/issues/27) | Not implemented | [AiDotNet.Evolution#52](https://github.com/ooples/AiDotNet.Evolution/pull/52) |
-| US-10: Measure engine overhead and scaling | [#28](https://github.com/ooples/AiDotNet.Evolution/issues/28) | Partial | [AiDotNet.Evolution#53](https://github.com/ooples/AiDotNet.Evolution/pull/53) |
+| US-10: Measure engine overhead and scaling | [#28](https://github.com/ooples/AiDotNet.Evolution/issues/28) | Partial; local measurement evidence, review/dependencies open | [AiDotNet.Evolution#53](https://github.com/ooples/AiDotNet.Evolution/pull/53) |
 | US-11: Demonstrate value in consumer workloads | [#29](https://github.com/ooples/AiDotNet.Evolution/issues/29) | Partial, companion | [AiDotNet#2164](https://github.com/ooples/AiDotNet/pull/2164) |
 | US-12: Gate releases on demonstrated improvement | [#30](https://github.com/ooples/AiDotNet.Evolution/issues/30) | Partial | [AiDotNet.Evolution#54](https://github.com/ooples/AiDotNet.Evolution/pull/54) |
 | US-13: Supply typed search spaces and useful operators | [#31](https://github.com/ooples/AiDotNet.Evolution/issues/31) | Partial; reused-learning regression open | [AiDotNet.Evolution#55](https://github.com/ooples/AiDotNet.Evolution/pull/55) |
