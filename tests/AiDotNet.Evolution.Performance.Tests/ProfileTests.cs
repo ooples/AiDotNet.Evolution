@@ -16,8 +16,8 @@ public sealed class ProfileTests
     private static ProfileMeasurement Valid(ProfileCase? scenario = null)
     {
         var item = scenario ?? Case();
-        return new ProfileMeasurement(item, Environment(), 2, item.Budget, 2 * item.Budget, 200, 100,
-            2 * item.Budget * 1000d / 200, 5, 16, 1024, 2048, 4096, 4096, 2048, 10, 1000, null, .1, 1, 2 * item.Budget,
+        return new ProfileMeasurement(item, Environment(), 2, item.Budget, 2 * item.Budget, 500, 250,
+            2 * item.Budget * 1000d / 500, 5, 16, 1024, 2048, 4096, 4096, 2048, 10, 1000, null, .1, 1, 2 * item.Budget,
             8, "stable-hash", -1, 0, 0, 0, Array.Empty<ProfileDelayBucket>(),
             Enumerable.Range(0, item.Budget).Select(i => new ProfileQualityPoint(i, i + 1, i * 10, -8 + i)).ToArray());
     }
@@ -139,7 +139,7 @@ public sealed class ProfileTests
         Assert.Equal(3000, summary.MaximumLifetimePeakWorkingSetBytes);
         Assert.Equal(1.8, summary.ElapsedMaxMinRatio, 6);
         ProfileValidation.ValidateDispersion([summary]);
-        Assert.Throws<InvalidDataException>(() => ProfileValidation.ValidateDispersion([summary with { ElapsedMaxMinRatio = 2.5 }]));
+        Assert.Throws<InvalidDataException>(() => ProfileValidation.ValidateDispersion([summary with { ElapsedMaxMinRatio = 3.0 }]));
     }
 
     [Fact]
@@ -155,7 +155,9 @@ public sealed class ProfileTests
         var busy = ProfileCampaign.Contention(before, new ProfileCpuLoadSample(1300, 4400, "fixture"), 0xF, 100, 0)!;
         Assert.Equal(0.75, busy.ForeignBusyFraction, 6);
         Assert.True(busy.Flagged);
-        Assert.Throws<InvalidDataException>(() => ProfileValidation.ValidateContention(busy));
+        // Contention is its own exception type: it is the only retryable attempt failure.
+        Assert.Throws<ProfileContentionException>(() => ProfileValidation.ValidateContention(busy));
+        ProfileValidation.ValidateContention(busy, ProfileCampaign.SmokeForeignCpuFraction);
         Assert.Null(ProfileCampaign.Contention(null, null, 0xF, 100, 0));
     }
 
@@ -246,7 +248,7 @@ public sealed class ProfileTests
         yield return new object[] { value with { ProcessLifetimePeakWorkingSetBytes = 0 } };
         yield return new object[] { value with { ProcessCpuMilliseconds = double.NaN } };
         // Four logical processors cannot accumulate more than four times the elapsed time plus one clock tick.
-        yield return new object[] { value with { ProcessCpuMilliseconds = 4 * 200 + 20 } };
+        yield return new object[] { value with { ProcessCpuMilliseconds = (4 * 500) + 20 } };
         yield return new object[] { value with { ProcessCpuFineMilliseconds = -1 } };
         yield return new object[] { value with { CheckpointStoreMilliseconds = double.NaN } };
         yield return new object[] { value with { CheckpointSaves = -1 } };
@@ -264,7 +266,7 @@ public sealed class ProfileTests
         yield return new object[] { value with { Case = value.Case with { Checkpoint = true } } };
         yield return new object[] { value with { QualityByElapsed = value.QualityByElapsed.Select((p, i) => i == 1 ? p with { ElapsedMilliseconds = double.NaN } : p).ToArray() } };
         yield return new object[] { value with { QualityByElapsed = value.QualityByElapsed.Select((p, i) => i == 1 ? p with { ElapsedMilliseconds = -1 } : p).ToArray() } };
-        yield return new object[] { value with { QualityByElapsed = value.QualityByElapsed.Select((p, i) => i == 1 ? p with { ElapsedMilliseconds = 400 } : p).ToArray() } };
+        yield return new object[] { value with { QualityByElapsed = value.QualityByElapsed.Select((p, i) => i == 1 ? p with { ElapsedMilliseconds = 900 } : p).ToArray() } };
         yield return new object[] { value with { QualityByElapsed = value.QualityByElapsed.Select((p, i) => i == 1 ? p with { BestQuality = -100 } : p).ToArray() } };
         yield return new object[] { value with { QualityByElapsed = value.QualityByElapsed.Select((p, i) => i == 1 ? p with { Completed = 8 } : p).ToArray() } };
         yield return new object[] { value with { QualityByElapsed = value.QualityByElapsed.Select((p, i) => i == 1 ? p with { EvaluationId = 0 } : p).ToArray() } };
@@ -320,7 +322,12 @@ public sealed class ProfileTests
         Assert.Throws<InvalidDataException>(() => ProfileCampaign.ValidateComplete(cases, 1, [attempts[0], attempts[1] with { Status = "failed" }]));
         Assert.Throws<InvalidDataException>(() => ProfileCampaign.ValidateComplete(cases, 1, [attempts[0], attempts[1] with { Measurement = null }]));
         Assert.Throws<InvalidDataException>(() => ProfileCampaign.ValidateComplete(cases, 1, [attempts[0], attempts[1] with { Contention = null }]));
-        Assert.Throws<InvalidDataException>(() => ProfileCampaign.ValidateComplete(cases, 1, [attempts[0], attempts[1] with { Contention = Contention(0.9) }]));
+        Assert.Throws<ProfileContentionException>(() => ProfileCampaign.ValidateComplete(cases, 1, [attempts[0], attempts[1] with { Contention = Contention(0.9) }]));
+        // A retained contended attempt is evidence, not a gap: the retry that replaced it still has to pass.
+        Assert.Equal(1, ProfileCampaign.ValidateComplete(cases, 1,
+            [attempts[0], attempts[1] with { Status = "contended", Contention = Contention(0.9) }, attempts[1]]));
+        Assert.Throws<InvalidDataException>(() => ProfileCampaign.ValidateComplete(cases, 1,
+            [attempts[0], attempts[1] with { Status = "contended", Contention = Contention(0.9) }]));
         Assert.Throws<InvalidDataException>(() => ProfileCampaign.ValidateComplete(cases, 1, [attempts[0], Attempt(second with { StateHash = "different" })]));
         Assert.Throws<InvalidDataException>(() => ProfileCampaign.ValidateComplete(cases, 1,
             [attempts[0], Attempt(second with { Environment = second.Environment with { Runtime = "changed-runtime" } })]));

@@ -93,10 +93,18 @@ Because other processes may still run on those CPUs, the controller samples syst
 (`NtQuerySystemInformation`/`SystemProcessorPerformanceInformation` on Windows, `/proc/stat` on Linux) immediately
 before and after each attempt, subtracts the owned child's own CPU time, and records the remaining foreign share of
 the pinned capacity. Above 5% an attempt is flagged; above 25% it fails. This is an aggregate counter read, not a
-per-process enumeration, and it cannot attribute load to a particular owner.
+per-process enumeration, and it cannot attribute load to a particular owner, and the subtracted worker CPU time
+carries the platform's coarse clock resolution, so a short attempt's foreign share is an estimate.
+
+Host contention is the **only** retryable attempt failure. A contended attempt is retained in the report with its
+measured load and status `contended`, the controller then waits (bounded, up to 60 s) for the pinned CPUs to fall
+back below the flag threshold, and retries at most twice. Every other failure fails the campaign immediately.
+A campaign is complete only when each declared case and repetition has exactly one passed attempt.
 
 Each case reports the median, minimum and maximum of its repetitions and the slowest-to-fastest ratio; a ratio above
-2.00x fails the campaign rather than publishing a median that hides it.
+2.50x fails the campaign rather than publishing a median that hides it. That threshold is declared for a shared
+developer workstation, where fresh-process repetitions of a short cheap case were measured spreading up to about
+2.0x; a dedicated quiet host should tighten it.
 
 `DOTNET_PROCESSOR_COUNT` matches the mask and tiered compilation is disabled before runtime startup. Disabling
 tiered compilation also disables Dynamic PGO, which is built on tiering: these measurements describe fully
@@ -120,7 +128,7 @@ Measurement starts after fixture setup, one warmup invocation and a full GC. The
 operations it actually executed** are recorded, and a measurement that reports no warmup work is rejected.
 
 Sub-millisecond single-shot timing is not published: every case repeats its whole measured body until at least
-**100 ms** of wall time has been measured (`ProfileProtocol.MinimumMeasuredMilliseconds`), and reports
+**250 ms** of wall time has been measured (`ProfileProtocol.MinimumMeasuredMilliseconds`), and reports
 `iterations`, `millisecondsPerIteration` and per-operation throughput/allocation. Engine cases keep the first
 iteration's complete quality curve and assert that every repeated iteration produced the identical state hash.
 

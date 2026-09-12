@@ -7,7 +7,7 @@ namespace AiDotNet.Evolution.Performance;
 public static class ProfileProtocol
 {
     /// <summary>Each measured phase repeats its case until at least this much wall time is measured.</summary>
-    public const double MinimumMeasuredMilliseconds = 100;
+    public const double MinimumMeasuredMilliseconds = 250;
 
     /// <summary>An upper bound on repetitions inside one measured phase; exceeding it fails instead of reporting a sub-resolution time.</summary>
     public const int MaximumIterations = 1_000_000;
@@ -22,7 +22,14 @@ public static class ProfileProtocol
     public const double ForeignCpuFlagFraction = 0.05;
 
     /// <summary>Slowest-to-fastest elapsed ratio across repetitions of one case that fails the campaign.</summary>
-    public const double MaximumElapsedMaxMinRatio = 2.0;
+    /// <remarks>Declared for a shared developer workstation, where fresh-process repetitions of a short cheap case
+    /// were measured spreading up to about 2.0x. A dedicated, quiet host should tighten this.</remarks>
+    public const double MaximumElapsedMaxMinRatio = 2.5;
+
+    /// <summary>How often one attempt may be repeated after it failed for host contention alone.</summary>
+    /// <remarks>The contended attempt is retained in the report with its measured foreign load; only contention is
+    /// retryable, and a retry waits for the pinned CPUs to go quiet first.</remarks>
+    public const int MaximumContentionRetries = 2;
 
     /// <summary>Canonical values for factors a case kind does not apply, so an unused field can never imply a contrast.</summary>
     public const int CanonicalCells = 256, CanonicalIslands = 1, CanonicalWorkers = 1, CanonicalMaxInFlight = 8;
@@ -161,6 +168,15 @@ public sealed record ProfileMeasurement(ProfileCase Case, ProfileEnvironment Env
     double? BestQuality, long CheckpointSaves, long CheckpointPayloadBytes, double CheckpointStoreMilliseconds,
     IReadOnlyList<ProfileDelayBucket> DelayBuckets, IReadOnlyList<ProfileQualityPoint> QualityByElapsed);
 
+/// <summary>Other processes used more of the pinned CPUs than the protocol permits: the host, not the code, failed.</summary>
+/// <remarks>Its own type because host contention is the only retryable attempt failure; every other failure is final.</remarks>
+public sealed class ProfileContentionException : Exception
+{
+    public ProfileContentionException() { }
+    public ProfileContentionException(string message) : base(message) { }
+    public ProfileContentionException(string message, Exception innerException) : base(message, innerException) { }
+}
+
 public static class ProfileValidation
 {
     /// <summary>Rejects missing work, nonsensical metrics and worker-dependent search state rather than dropping a case.</summary>
@@ -284,7 +300,7 @@ public static class ProfileValidation
         if (contention.PinnedProcessors <= 0 || !double.IsFinite(contention.ForeignBusyFraction) || contention.ForeignBusyFraction < 0)
             throw new InvalidDataException("Pinned-CPU contention was not measured for this attempt.");
         if (contention.ForeignBusyFraction > maximumForeignFraction)
-            throw new InvalidDataException(
+            throw new ProfileContentionException(
                 $"Other processes used {contention.ForeignBusyFraction:P2} of the pinned CPUs, above the declared " +
                 $"{maximumForeignFraction:P0} limit; the host was not idle enough to measure.");
     }

@@ -75,40 +75,52 @@ public static class ProfileCampaign
             foreach (int index in CaseOrder(cases.Count, repetition, 4711))
             {
                 var scenario = cases[index];
-                string stem = scenario.Id + "-r" + repetition.ToString(CultureInfo.InvariantCulture);
-                string input = stem + "-case.json", output = stem + "-measurement.json", log = stem + ".log";
-                await WriteNewAsync(Path.Combine(root, input), scenario);
-                string status = "failed"; string? error = null; ProfileMeasurement? measurement = null; ProfileContention? contention = null;
-                try
+                // Only host contention is retryable, and every contended attempt is retained with its measured load.
+                for (int retry = 0; ; retry++)
                 {
-                    contention = await RunChildAsync(Path.Combine(root, input), Path.Combine(root, output), Path.Combine(root, log), affinity, processorGroup);
-                    var info = new FileInfo(Path.Combine(root, output));
-                    if (!info.Exists || info.Length > 8 * 1024 * 1024) throw new InvalidDataException("The worker result is missing or oversized.");
-                    measurement = JsonSerializer.Deserialize<ProfileMeasurement>(await File.ReadAllTextAsync(info.FullName), JsonOptions)
-                        ?? throw new InvalidDataException("The worker emitted a null result.");
-                    if (measurement.Case != scenario) throw new InvalidDataException("The worker measured a different case from the predeclared plan.");
-                    ProfileValidation.Validate(measurement);
-                    ProfileValidation.ValidateRuntimeControls(measurement.Environment, affinity, processorGroup);
-                    ProfileValidation.ValidateContention(contention ?? throw new InvalidDataException("Pinned-CPU load could not be sampled for this attempt."),
-                        smoke ? SmokeForeignCpuFraction : ProfileProtocol.MaximumForeignCpuFraction);
-                    status = "passed";
+                    string stem = scenario.Id + "-r" + repetition.ToString(CultureInfo.InvariantCulture) +
+                        (retry == 0 ? string.Empty : "-retry" + retry.ToString(CultureInfo.InvariantCulture));
+                    string input = stem + "-case.json", output = stem + "-measurement.json", log = stem + ".log";
+                    await WriteNewAsync(Path.Combine(root, input), scenario);
+                    string status = "failed"; string? error = null; ProfileMeasurement? measurement = null; ProfileContention? contention = null;
+                    try
+                    {
+                        contention = await RunChildAsync(Path.Combine(root, input), Path.Combine(root, output), Path.Combine(root, log), affinity, processorGroup);
+                        var info = new FileInfo(Path.Combine(root, output));
+                        if (!info.Exists || info.Length > 8 * 1024 * 1024) throw new InvalidDataException("The worker result is missing or oversized.");
+                        measurement = JsonSerializer.Deserialize<ProfileMeasurement>(await File.ReadAllTextAsync(info.FullName), JsonOptions)
+                            ?? throw new InvalidDataException("The worker emitted a null result.");
+                        if (measurement.Case != scenario) throw new InvalidDataException("The worker measured a different case from the predeclared plan.");
+                        ProfileValidation.Validate(measurement);
+                        ProfileValidation.ValidateRuntimeControls(measurement.Environment, affinity, processorGroup);
+                        ProfileValidation.ValidateContention(contention ?? throw new InvalidDataException("Pinned-CPU load could not be sampled for this attempt."),
+                            smoke ? SmokeForeignCpuFraction : ProfileProtocol.MaximumForeignCpuFraction);
+                        status = "passed";
+                    }
+                    catch (ProfileContentionException exception) when (retry < ProfileProtocol.MaximumContentionRetries)
+                    {
+                        status = "contended"; error = exception.ToString();
+                    }
+                    catch (Exception exception) when (exception is not OutOfMemoryException)
+                    {
+                        error = exception.ToString();
+                    }
+                    var attempt = new ProfileAttempt(scenario.Id, repetition, input, output, log, status, error, contention, measurement);
+                    attempts.Add(attempt);
+                    // An interrupted campaign still has its full plan plus durable per-attempt outcomes.
+                    await WriteNewAsync(Path.Combine(root, stem + "-attempt.json"), attempt);
+                    Console.WriteLine($"{attempts.Count}/{cases.Count * repetitions} {stem}: {status}" +
+                        (contention is null ? string.Empty : $" (foreign CPU {contention.ForeignBusyFraction:P2})"));
+                    if (status != "contended") break;
+                    await WaitForQuietPinnedCpusAsync(affinity, processorGroup);
                 }
-                catch (Exception exception) when (exception is not OutOfMemoryException)
-                {
-                    error = exception.ToString();
-                }
-                var attempt = new ProfileAttempt(scenario.Id, repetition, input, output, log, status, error, contention, measurement);
-                attempts.Add(attempt);
-                // An interrupted campaign still has its full plan plus durable per-attempt outcomes.
-                await WriteNewAsync(Path.Combine(root, stem + "-attempt.json"), attempt);
-                Console.WriteLine($"{attempts.Count}/{cases.Count * repetitions} {stem}: {status}" +
-                    (contention is null ? string.Empty : $" (foreign CPU {contention.ForeignBusyFraction:P2})"));
             }
         int deterministicGroups = 0;
         string campaignStatus = "passed";
         var summaries = cases.Select(scenario => Summarize(scenario, attempts)).Where(item => item is not null).Cast<ProfileSummary>().ToArray();
         try { deterministicGroups = ValidateComplete(cases, repetitions, attempts, smoke ? SmokeForeignCpuFraction : ProfileProtocol.MaximumForeignCpuFraction); }
-        catch (InvalidDataException exception) { campaignStatus = "failed"; Console.Error.WriteLine(exception.Message); }
+        catch (Exception exception) when (exception is InvalidDataException or ProfileContentionException)
+        { campaignStatus = "failed"; Console.Error.WriteLine(exception.Message); }
         var report = new ProfileReport("engine-profile-v2", revision.Supplied, revision.InformationalVersion, revision.WorkingTree,
             smoke, started, DateTimeOffset.UtcNow, affinityHex, topology, repetitions, cases, attempts, deterministicGroups, summaries, campaignStatus,
             new[] {
@@ -129,6 +141,19 @@ public static class ProfileCampaign
             });
         await WriteNewAsync(Path.Combine(root, "report.json"), report);
         return report;
+    }
+
+    /// <summary>Waits, bounded, for the pinned CPUs to fall back below the flag threshold before a contention retry.</summary>
+    private static async Task WaitForQuietPinnedCpusAsync(ulong affinity, ushort processorGroup, int maximumSeconds = 60)
+    {
+        for (int second = 0; second < maximumSeconds; second++)
+        {
+            ProfileCpuLoadSample? before = ProfileHost.SampleCpuLoad(affinity, processorGroup);
+            await Task.Delay(TimeSpan.FromSeconds(1));
+            ProfileCpuLoadSample? after = ProfileHost.SampleCpuLoad(affinity, processorGroup);
+            var sample = Contention(before, after, affinity, 1000, 0);
+            if (sample is null || sample.ForeignBusyFraction <= ProfileProtocol.ForeignCpuFlagFraction) return;
+        }
     }
 
     /// <summary>Deterministic, seeded case order per repetition, so no dispatcher always runs on the coldest host.</summary>
@@ -154,20 +179,23 @@ public static class ProfileCampaign
     {
         ArgumentNullException.ThrowIfNull(cases);
         ArgumentNullException.ThrowIfNull(attempts);
+        if (attempts.FirstOrDefault(item => item.Status is not ("passed" or "contended")) is { } broken)
+            throw new InvalidDataException("An attempt failed for a reason other than retryable host contention: " + broken.CaseId);
         if (repetitions < 1 || cases.Count == 0 || cases.Select(item => item.Id).Distinct(StringComparer.Ordinal).Count() != cases.Count ||
-            attempts.Count != cases.Count * repetitions) throw new InvalidDataException("Campaign evidence does not cover the entire declared plan.");
+            attempts.Count(item => item.Status == "passed") != cases.Count * repetitions)
+            throw new InvalidDataException("Campaign evidence does not cover the entire declared plan.");
         foreach (var scenario in cases)
             for (int repetition = 0; repetition < repetitions; repetition++)
             {
-                var matching = attempts.Where(item => item.CaseId == scenario.Id && item.Repetition == repetition).ToArray();
-                if (matching.Length != 1 || matching[0].Status != "passed" || matching[0].Measurement is not { } result || result.Case != scenario)
+                var matching = attempts.Where(item => item.CaseId == scenario.Id && item.Repetition == repetition && item.Status == "passed").ToArray();
+                if (matching.Length != 1 || matching[0].Measurement is not { } result || result.Case != scenario)
                     throw new InvalidDataException("A planned attempt failed, was omitted, duplicated or substituted: " + scenario.Id);
                 ProfileValidation.Validate(result);
                 if (matching[0].Contention is not { } contention)
                     throw new InvalidDataException("An attempt has no pinned-CPU contention evidence: " + scenario.Id);
                 ProfileValidation.ValidateContention(contention, maximumForeignFraction);
             }
-        var measurements = attempts.Select(item => item.Measurement!).ToArray();
+        var measurements = attempts.Where(item => item.Status == "passed").Select(item => item.Measurement!).ToArray();
         if (measurements.Select(item => item.Environment).Distinct().Count() != 1)
             throw new InvalidDataException("Runtime or machine controls changed across the campaign.");
         ProfileValidation.ValidateDispersion(cases.Select(scenario => Summarize(scenario, attempts)).Where(item => item is not null).Cast<ProfileSummary>());
