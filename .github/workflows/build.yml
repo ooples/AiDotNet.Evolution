@@ -4,7 +4,7 @@ on:
   push:
     branches: [main]
   pull_request:
-    branches: [main]
+    branches: [main, feat/competitive-evolution-platform]
 
 concurrency:
   group: ${{ github.workflow }}-${{ github.ref }}
@@ -113,6 +113,39 @@ jobs:
           verbose: true
         env:
           CODECOV_TOKEN: ${{ secrets.CODECOV_TOKEN }}
+
+  representative-suite:
+    name: Representative numeric and AlgoTune suite contracts
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          persist-credentials: false
+      - uses: actions/setup-dotnet@a98b56852c35b8e3190ac28c8c2271da59106c68 # v6.0.0
+        with:
+          dotnet-version: '10.0.x'
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          repository: oripress/AlgoTune
+          ref: dff9914c10800c7a031c9e8c3d4d1c8cd1b38906
+          path: .local/algotune-upstream
+          sparse-checkout: AlgoTuneTasks
+          persist-credentials: false
+      - name: Install isolated reference dependencies
+        run: |
+          python3 -m venv .local/suite-env
+          .local/suite-env/bin/python -m pip install -r benchmarks/suite/requirements.txt
+      - name: Verify all partition contracts and starting implementations
+        shell: pwsh
+        run: ./eng/Test-RepresentativeSuite.ps1 -Python .local/suite-env/bin/python -Upstream .local/algotune-upstream -SourceRevision '${{ github.sha }}'
+      - name: Retain failed and successful suite evidence
+        if: always()
+        uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02 # v4
+        with:
+          name: representative-suite-evidence
+          path: TestResults/representative-suite/**
+          if-no-files-found: warn
 
   external-baseline:
     name: External numeric baseline contracts

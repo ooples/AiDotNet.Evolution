@@ -5,6 +5,19 @@ Implementation is continuing across the core and companion PRs. **The roadmap is
 
 Track the full plan through the [26 user-story issues and PR delivery index](USER_STORY_DELIVERY.md).
 
+## Dependent story delivery
+
+The user chose to retain #15, AiDotNet #2148 and Tensors #1024 as shared foundations.
+All 26 stories now have individual open issues and dependent draft PRs, with reciprocal links and original
+Given/When/Then checklists. Initial story commits were documentation-only, not completed implementation.
+
+[US-08 / PR #51](https://github.com/ooples/AiDotNet.Evolution/pull/51) adds the first subsequent story-owned
+implementation slice: producer-declared reused measurements cannot earn fresh portfolio credit, enter
+surrogate training as new evidence or train CMA as fresh population members. Credit retains origin separately
+from current cost; semantic versions reject older learned checkpoints. This fix is on the dependent branch,
+not yet in this shared foundation or consumer source/package pins. US-13, US-14 and US-23 require integration.
+Full story acceptance and independent current-head review remain open.
+
 ## Implemented in the initial core PR
 
 - `IOutcomeAwareVariationOperator<TGenome>` receives terminal committed outcomes, including proposal failures,
@@ -102,7 +115,7 @@ Durable evaluation identities and leases must be developed against its eventual 
 
 | Story | State | Work still required |
 | --- | --- | --- |
-| US-01 representative suites | Partial | Authored C# end-to-end pilot now runs; representative program/kernel/AutoML tasks, AlgoTune subset and sealed task partitions remain. |
+| US-01 representative suites | Implemented and locally verified; review/merge gates remain | [Nine numeric families and an 11-task pinned AlgoTune reference subset](../benchmarks/suite/README.md), independent generated instances, disjoint partitions, frozen-method final execution, one-use final receipts and reproducible source/runtime/resource manifests. 631 net10 tests, 608 each net8/net471, 17 Python protocol tests and all starting implementations verified. Contract evidence is not competitive superiority or a full AlgoTuner reproduction. |
 | US-02 fair baselines | Partial | Matched-population SciPy differential evolution now uses the shared C# evaluator and independent counters; native-default/tuned controls, OpenEvolve and consistent model access remain. |
 | US-03 correctness gates | Partial, companion | Real C# worker/facade checks and fail-closed truncated-output/owned-case contracts exist; trusted OS isolation, reference integrations and held-out validation remain. |
 | US-04 statistical evidence | Partial | Paired task/run analysis, failure-inclusive effects/intervals and trace checks implemented; prospective sample-size/power design and representative confirmation remain. |
