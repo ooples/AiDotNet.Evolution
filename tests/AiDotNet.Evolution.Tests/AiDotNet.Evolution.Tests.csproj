@@ -26,4 +26,12 @@
   <ItemGroup>
     <ProjectReference Include="..\..\src\AiDotNet.Evolution\AiDotNet.Evolution.csproj" />
   </ItemGroup>
+
+  <!--
+    The host is net8.0 only, so it is referenced only from the TFMs that can load it.
+    net471 runs the same suite minus the host tests rather than losing the whole target.
+  -->
+  <ItemGroup Condition="'$(TargetFramework)' != 'net471'">
+    <ProjectReference Include="..\..\src\AiDotNet.Evolution.Host\AiDotNet.Evolution.Host.csproj" />
+  </ItemGroup>
 </Project>
