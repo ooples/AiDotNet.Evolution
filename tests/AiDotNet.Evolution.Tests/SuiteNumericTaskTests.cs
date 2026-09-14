@@ -1,5 +1,6 @@
 #if NET10_0
 using AiDotNet.Evolution.Quality;
+using System.Text.Json;
 using Xunit;
 
 namespace AiDotNet.Evolution.Tests;
@@ -96,6 +97,94 @@ public sealed class SuiteNumericTaskTests
             Assert.Equal(16m * task.WorkUnits, value.Resources.Spent["cost_units"]);
             Assert.NotNull(value.FinalLoss);
         });
+    }
+
+    private static string Request(string partition, string[]? methods = null, bool crossFamily = false)
+    {
+        string[] ids = partition switch
+        {
+            "development" => ["block-trap", "knapsack", "rastrigin"],
+            "selection" => ["coupled-absolute", "diffusion-control", "stochastic-regression"],
+            _ => ["inventory-risk", "robust-design", "spin-glass"]
+        };
+        if (crossFamily) ids[0] = "matrix-missing";
+        return JsonSerializer.Serialize(new
+        {
+            schema = "aidotnet-numeric-suite-request-v1",
+            partition,
+            mode = "contract-smoke",
+            plan_hash = new string('a', 64),
+            configuration_hash = new string('b', 64),
+            source_revision = new string('c', 40),
+            budget = 8,
+            instances = ids.Select(id => new { id, seed = 42, search_seeds = new[] { 72 } }).ToArray(),
+            methods = methods ?? ["RandomSearch", "HillClimb", "FixedMapElites"]
+        });
+    }
+
+    [Theory]
+    [InlineData("development")]
+    [InlineData("selection")]
+    [InlineData("final")]
+    public async Task RunnerExecutesExactlyDeclaredMethodsAndRetainsEnvironmentAndRawMeasurements(string partition)
+    {
+        string directory = Directory.CreateTempSubdirectory("us01-runner-tests-").FullName;
+        try
+        {
+            string request = Path.Combine(directory, "request.json"), output = Path.Combine(directory, "output.json");
+            File.WriteAllText(request, Request(partition));
+            Assert.Equal(0, await RepresentativeSuite.RunAsync([request, output]));
+            using var report = JsonDocument.Parse(File.ReadAllText(output));
+            var root = report.RootElement;
+            Assert.Equal("completed", root.GetProperty("status").GetString());
+            Assert.Equal(9, root.GetProperty("runs").GetArrayLength());
+            Assert.Equal(64, root.GetProperty("environment").GetProperty("benchmark_assembly_hash").GetString()!.Length);
+            Assert.Equal(JsonValueKind.Object, root.GetProperty("environment").GetProperty("dependency_manifest").ValueKind);
+            foreach (var run in root.GetProperty("runs").EnumerateArray())
+            {
+                var measurement = run.GetProperty("measurement");
+                Assert.Contains(measurement.GetProperty("method").GetString(), new[] { "RandomSearch", "HillClimb", "FixedMapElites" });
+                Assert.Equal(8, measurement.GetProperty("samples").GetArrayLength());
+                foreach (var sample in measurement.GetProperty("samples").EnumerateArray())
+                {
+                    Assert.Equal(JsonValueKind.Number, sample.GetProperty("quality").ValueKind);
+                    Assert.Equal(JsonValueKind.Array, sample.GetProperty("constraint_violations").ValueKind);
+                    Assert.Equal(2, sample.GetProperty("descriptors").EnumerateObject().Count());
+                }
+            }
+        }
+        finally { Directory.Delete(directory, recursive: true); }
+    }
+
+    [Theory]
+    [InlineData(false)]
+    [InlineData(true)]
+    public async Task InvalidRequestCannotCreateAnOutputOrDispatchAnExperiment(bool unknownTask)
+    {
+        string directory = Directory.CreateTempSubdirectory("us01-request-tests-").FullName;
+        try
+        {
+            string request = Path.Combine(directory, "request.json"), output = Path.Combine(directory, "output.json");
+            File.WriteAllText(request, Request("development", unknownTask ? null : ["RandomSearch", "HillClimb", "invented"], unknownTask));
+            await Assert.ThrowsAnyAsync<Exception>(() => RepresentativeSuite.RunAsync([request, output]));
+            Assert.False(File.Exists(output));
+        }
+        finally { Directory.Delete(directory, recursive: true); }
+    }
+
+    [Fact]
+    public async Task ExistingEvidenceIsNeverOverwritten()
+    {
+        string directory = Directory.CreateTempSubdirectory("us01-overwrite-tests-").FullName;
+        try
+        {
+            string request = Path.Combine(directory, "request.json"), output = Path.Combine(directory, "output.json");
+            File.WriteAllText(request, Request("development"));
+            File.WriteAllText(output, "retained original");
+            await Assert.ThrowsAsync<IOException>(() => RepresentativeSuite.RunAsync([request, output]));
+            Assert.Equal("retained original", File.ReadAllText(output));
+        }
+        finally { Directory.Delete(directory, recursive: true); }
     }
 }
 #endif
