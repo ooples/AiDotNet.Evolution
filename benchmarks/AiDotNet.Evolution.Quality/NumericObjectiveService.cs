@@ -67,7 +67,12 @@ internal static class NumericObjectiveService
                 double loss = QualityExperiment.Loss(task, QualityExperiment.ToCoordinates(units));
                 reservation.Complete(cost);
                 best = Math.Min(best ?? double.MaxValue, loss);
-                samples.Add(new(calls - 1, EvolutionEvaluationStatus.Completed, best, 1, 1, Array.Empty<string>()));
+                samples.Add(new(calls - 1, EvolutionEvaluationStatus.Completed, best, 1, 1, Array.Empty<string>(), -loss,
+                    Array.Empty<double>(), new Dictionary<string, double>
+                    {
+                        ["coordinate-0"] = -5 + 10 * units[0],
+                        ["coordinate-1"] = -5 + 10 * units[1]
+                    }, genomeHash));
                 Write(new { Kind = "measurement", EvaluationId = calls - 1, Loss = loss, GenomeHash = genomeHash, CostUnits = 1 });
             }
         }
