@@ -5,6 +5,19 @@ Implementation is continuing across the core and companion PRs. **The roadmap is
 
 Track the full plan through the [26 user-story issues and PR delivery index](USER_STORY_DELIVERY.md).
 
+## Dependent story delivery
+
+The user chose to retain #15, AiDotNet #2148 and Tensors #1024 as shared foundations.
+All 26 stories now have individual open issues and dependent draft PRs, with reciprocal links and original
+Given/When/Then checklists. Initial story commits were documentation-only, not completed implementation.
+
+[US-08 / PR #51](https://github.com/ooples/AiDotNet.Evolution/pull/51) adds the first subsequent story-owned
+implementation slice: producer-declared reused measurements cannot earn fresh portfolio credit, enter
+surrogate training as new evidence or train CMA as fresh population members. Credit retains origin separately
+from current cost; semantic versions reject older learned checkpoints. This fix is on the dependent branch,
+not yet in this shared foundation or consumer source/package pins. US-13, US-14 and US-23 require integration.
+Full story acceptance and independent current-head review remain open.
+
 ## Implemented in the initial core PR
 
 - `IOutcomeAwareVariationOperator<TGenome>` receives terminal committed outcomes, including proposal failures,
