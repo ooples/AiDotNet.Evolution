@@ -76,6 +76,8 @@ jobs:
       - name: Verify gain and all-stage operator credit
         shell: pwsh
         run: ./eng/Test-OperatorCredit.ps1
+      - name: Verify bounded offline policy search
+        run: dotnet run --project examples/PolicySearch -c Release -- "${{ github.workspace }}/TestResults/policy-search/report.json"
       - name: Verify performance fixture contracts
         run: dotnet run --project benchmarks/AiDotNet.Evolution.Performance -c Release -- --smoke
       - name: Verify paired analysis contracts
@@ -98,6 +100,7 @@ jobs:
             TestResults/quality/**/*.json
             TestResults/persistent-evaluation/**/*.json
             TestResults/persistent-evaluation/*.jsonl
+            TestResults/policy-search/*.json
             coverage/**/coverage.cobertura.xml
             coverage/**/*.dmp
             coverage/**/Sequence_*.xml
