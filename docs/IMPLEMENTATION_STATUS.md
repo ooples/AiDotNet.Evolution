@@ -140,7 +140,7 @@ Durable evaluation identities and leases must be developed against its eventual 
 | US-23 warm starts | Partial | Bounded [seed repertoires](WARM_START_REPERTOIRES.md), twelve-facet revalidation, [sample provenance](MEASUREMENT_ORIGIN.md), [persistent evaluation storage](PERSISTENT_EVALUATION_REUSE.md), age/uncertainty/force-fresh decisions and store accounting implemented. Real-engine deterministic cold/warm/force-fresh example and AiDotNet fitness-facade integration pass; production raw-evidence providers, other consumer integrations and representative fair warm/cold/freshness campaigns remain. |
 | US-24 CLI/dashboard | Partial | Core numeric CLI plus consumer authored-C# pilot and existing YAML commands; broader lifecycle/provider/dashboard integration remains. |
 | US-25 promotion/retuning | Partial, companion | Tensors persistent quarantine, guarded publication and explicit validated rollback implemented; automatic drift/bounded retuning, coordinated cross-process revocation and program/AutoML registry remain. |
-| US-26 policy meta-evolution | Not implemented | Opt-in declarative policy search, held-out outer loop and complete inner/outer cost accounting. |
+| US-26 policy meta-evolution | Offline implementation verified; research validation gates open | [Bounded policy optimizer](OFFLINE_POLICY_SEARCH.md), real-engine adapter, held-out family protocol, explicit manual baseline provenance, complete new/historical cost accounting, conservative timeout containment and CPU example. 646 tests pass on each net10/net8/net471 target. No competitive superiority or production promotion claim. |
 
 ## Validation evidence
 
