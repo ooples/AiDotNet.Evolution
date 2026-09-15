@@ -60,12 +60,12 @@ public sealed class ResourceBudgetWorkflowTests
         {
             var ledger = Ledger(6);
             var requests = new[] { Request("03"), Request("01"), Request("02") };
-            var wave = ledger.ReserveBatch(reverse ? requests.Reverse() : requests);
+            var wave = ledger.ReserveBatch(reverse ? Enumerable.Reverse(requests) : requests);
             Assert.Equal(new[] { "01", "02", "03" }, wave.Select(row => row.Request.OperationId));
             Assert.Equal(new[] { true, true, false }, wave.Select(row => row.Reservation is not null));
             Assert.Equal(6, ledger.Snapshot().Reserved["cost_units"]);
             var accepted = wave.Where(row => row.Reservation is not null).ToArray();
-            await Task.WhenAll((reverse ? accepted.Reverse() : accepted).Select(row => Task.Run(() => row.Reservation!.Complete(Cost(1)))));
+            await Task.WhenAll((reverse ? Enumerable.Reverse(accepted) : accepted).Select(row => Task.Run(() => row.Reservation!.Complete(Cost(1)))));
             Assert.Equal(2, ledger.Snapshot().Spent["cost_units"]);
             Assert.Null(wave[2].Reservation); // released maxima do not retroactively backfill this wave
             using var next = ledger.TryReserve("04", EvolutionResourceStage.Proposal, Cost(1), Cost(3));
