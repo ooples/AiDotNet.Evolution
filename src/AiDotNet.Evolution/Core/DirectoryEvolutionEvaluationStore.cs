@@ -29,10 +29,7 @@ public sealed class DirectoryEvolutionEvaluationStore : IEvolutionEvaluationStor
     public DirectoryEvolutionEvaluationStore(string directory, int maximumEntries = 4096)
     {
         Guard.NotNullOrWhiteSpace(directory);
-        if (!Path.IsPathRooted(directory) || (Path.DirectorySeparatorChar == '\\' &&
-            !directory.StartsWith("\\\\", StringComparison.Ordinal) &&
-            !(directory.Length >= 3 && char.IsLetter(directory[0]) && directory[1] == ':' &&
-              (directory[2] == '\\' || directory[2] == '/'))))
+        if (!IsFullyQualifiedDirectory(directory))
             throw new ArgumentException("Use a fully qualified private store directory.", nameof(directory));
         if (maximumEntries < 1 || maximumEntries > 1_000_000) throw new ArgumentOutOfRangeException(nameof(maximumEntries));
         string fullPath = Path.GetFullPath(directory);
@@ -78,7 +75,7 @@ public sealed class DirectoryEvolutionEvaluationStore : IEvolutionEvaluationStor
 
             string destination = RecordPath(record.Key);
             // Short sibling names avoid the net471 temporary-path overflow of finalName + Guid suffixes.
-            string temporary = Path.Combine(DirectoryPath, ".eval-" + Guid.NewGuid().ToString("N") + ".tmp");
+            string temporary = JoinFileName(".eval-" + Guid.NewGuid().ToString("N") + ".tmp");
             try
             {
                 using (var stream = new FileStream(temporary, FileMode.CreateNew, FileAccess.Write, FileShare.None))
@@ -93,13 +90,39 @@ public sealed class DirectoryEvolutionEvaluationStore : IEvolutionEvaluationStor
             finally
             {
                 try { if (File.Exists(temporary)) File.Delete(temporary); }
-                catch (IOException) { }
-                catch (UnauthorizedAccessException) { }
+                catch (IOException)
+                {
+                    // Best-effort cleanup must not replace the original write, replacement or cancellation failure.
+                }
+                catch (UnauthorizedAccessException)
+                {
+                    // Losing permission to delete a private temporary file must not mask the publication result.
+                }
             }
         }
     }
 
-    private string RecordPath(EvolutionEvaluationCacheKey key) => Path.Combine(DirectoryPath, key.StableKey + ".json");
+    private static bool IsFullyQualifiedDirectory(string directory)
+    {
+        if (!Path.IsPathRooted(directory)) return false;
+        if (Path.DirectorySeparatorChar != '\\') return true;
+        if (directory.StartsWith("\\\\", StringComparison.Ordinal)) return true;
+        if (directory.Length < 3 || !char.IsLetter(directory[0]) || directory[1] != ':') return false;
+        return directory[2] is '\\' or '/';
+    }
+
+    private string RecordPath(EvolutionEvaluationCacheKey key) => JoinFileName(key.StableKey + ".json");
+
+    private string JoinFileName(string fileName)
+    {
+        // Only generated GUID names and immutable SHA-256 keys reach here, never caller-supplied paths.
+#if NETFRAMEWORK
+        // Path.Join is unavailable on net471. DirectoryPath is canonical and has no trailing separator.
+        return DirectoryPath + Path.DirectorySeparatorChar + fileName;
+#else
+        return Path.Join(DirectoryPath, fileName);
+#endif
+    }
 
     private EvolutionEvaluationCacheRecord? Read(EvolutionEvaluationCacheKey key, CancellationToken cancellationToken)
     {
