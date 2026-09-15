@@ -38,7 +38,7 @@ def run_child(command, environment, directory, timeout):
 
 
 def run_campaign(output, aidotnet_dll, upstream, initial, task, model, generate, evaluate, *,
-                 iterations=2, seed=37, evidence_class, evaluator_manifest):
+                 iterations=2, seed=37, model_tokens=100000, evidence_class, evaluator_manifest):
     if (type(iterations) is not int or not 1 <= iterations <= 64 or type(seed) is not int or not 0 <= seed < 2**32
             or evidence_class not in ("contract-only", "development-experiment")):
         raise ValueError("Invalid bounded program campaign")
@@ -65,9 +65,10 @@ def run_campaign(output, aidotnet_dll, upstream, initial, task, model, generate,
     for index, (mode, method) in enumerate(schedule):
         directory = root / f"{index}-{mode}-{method}"
         directory.mkdir()
-        row = dict(mode=mode, method=method, status="failed", model_call_cap=iterations, evaluation_cap=iterations + 1)
+        row = dict(mode=mode, method=method, status="failed", model_call_cap=iterations, evaluation_cap=iterations + 1,
+                   model_token_cap=model_tokens)
         with ProgramBroker(generate, evaluate, model_calls=iterations, evaluations=iterations + 1,
-                           seconds=300, initial=initial) as broker:
+                           seconds=300, initial=initial, model_tokens=model_tokens) as broker:
             try:
                 if method in ("one-shot", "single-parent"):
                     row["control"] = run_control(method, task, initial,
@@ -98,6 +99,8 @@ def run_campaign(output, aidotnet_dll, upstream, initial, task, model, generate,
                 models = [receipt for receipt in broker.rows if receipt["operation"] == "model"]
                 if len(models) != (1 if method == "one-shot" else iterations):
                     raise ValueError("Scheduled model calls were not delivered")
+                if evidence_class == "contract-only" and sum(receipt["operation"] == "evaluate" for receipt in broker.rows) != len(models) + 1:
+                    raise ValueError("The valid contract fixture did not deliver every candidate evaluation")
                 if mode == "controlled":
                     expected_system, expected_messages = controlled_prompt(task, initial, None)
                     if models[0]["request"] != {"system": expected_system, "messages": expected_messages}:
@@ -107,7 +110,10 @@ def run_campaign(output, aidotnet_dll, upstream, initial, task, model, generate,
                 if isinstance(error, MemoryError):
                     raise
                 row["error"] = type(error).__name__ + ": " + str(error)[:400]
-            row["receipts"] = broker.rows
+        # Join in-flight broker work before copying scalar totals; late receipts
+        # must not be retained beside a stale, pre-shutdown token count.
+        row["receipts"] = broker.rows
+        row["actual_model_tokens"] = broker.model_tokens
         report["runs"].append(row)
         (directory / "receipts.json").write_text(json.dumps(row, indent=2, allow_nan=False), encoding="utf-8")
     report["status"] = "completed" if all(row["status"] == "completed" for row in report["runs"]) else "failed"
@@ -122,13 +128,19 @@ def main():
     parser.add_argument("--output", required=True, type=Path)
     args = parser.parse_args()
     initial = "def solve(x):\n    return x + 1\n"
-    evolved = "def solve(x):\n    return 1 + x\n"
+    def generate(system, messages):
+        # Deterministic for identical inputs, but changes with the parent so the
+        # valid-proposal fixture does not exercise duplicate rejection instead.
+        name = "one_" + candidate_hash(json.dumps(messages, sort_keys=True))[:16]
+        evolved = f"def solve(x):\n    {name} = 1\n    return {name} + x\n"
+        return {"text": "```python\n" + evolved + "```", "cost_units": 0,
+                "cost_metric": "reported_input_plus_output_tokens"}
 
     def evaluate(code):
         return dict(candidate_hash=candidate_hash(code), status="valid", quality=1.0, work_units=1, unknown_work=False)
 
     report = run_campaign(args.output, args.aidotnet, args.upstream, initial, "Contract fixture only.",
-                          "contract-fixture-no-provider", lambda system, messages: "```python\n" + evolved + "```", evaluate,
+                          "contract-fixture-no-provider", generate, evaluate,
                           evidence_class="contract-only", evaluator_manifest={"identity": "nonexecuting-fixture-v1",
                           "isolation": "Candidate code is not executed; all fixed fixture scores are 1.0", "libraries": []})
     print(json.dumps({"status": report["status"], "runs": len(report["runs"])}))

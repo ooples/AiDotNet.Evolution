@@ -25,6 +25,7 @@ class SuiteBaselineTests(unittest.TestCase):
             self.assertEqual("completed", report["status"], report["failures"])
             self.assertEqual(15, len(report["core"]["runs"]))
             self.assertEqual(9, len(report["external"]))
+            self.assertIn("ribs_baseline.py", report["adapters"])
             self.assertEqual({"controlled", "native-sized"}, {row["mode"] for row in report["external"]})
             with self.assertRaises(FileExistsError):
                 run(path, DLL, root / "result")

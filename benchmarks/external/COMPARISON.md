@@ -32,6 +32,10 @@ controlled OpenEvolve, one-shot, single-parent, native-bounded AiDotNet and
 native-bounded OpenEvolve. Each receives the same initial source, task, provider
 instance, evaluator callback and independently declared model/evaluator caps.
 The first controlled prompts must match exactly; later parents depend on search.
+Every run also declares the same token-cost cap (`input_tokens + output_tokens`,
+including cached input once, not a monetary conversion). Missing cost receipts
+fail closed. An overrun is charged, retained, and makes the result inadmissible;
+the CLI cannot guarantee preemptive termination at an exact token boundary.
 The one-shot baseline deliberately uses one call, retaining its unused allowance.
 
 The AiDotNet companion executable uses its real program task and LLM variation
@@ -72,9 +76,11 @@ generation closes subsequent admission; no automatic retries spend allowance.
 
 OpenAI documents [saved authentication for noninteractive runs](https://learn.chatgpt.com/docs/non-interactive-mode)
 and [ChatGPT versus API-key authentication](https://learn.chatgpt.com/docs/auth).
-The installed CLI reported `Logged in using ChatGPT` during implementation.
-That is not a live-generation test or a guarantee of remaining subscription
-allowance. The provider's resolved model snapshot is unknown when the CLI does
+Two bounded live generations used ChatGPT authentication and requested `gpt-6-astra`.
+Both produced valid text; the first wrapper failed during Windows temporary-directory
+cleanup, and the repaired wrapper passed. Each reported 8,707 input tokens (6,784
+cached, included in input) and 19 output tokens. This is not a guarantee of remaining
+subscription allowance. The provider's resolved model snapshot is unknown when the CLI does
 not report it; requested model names must not be presented as verified snapshots.
 Token usage is not converted to invented monetary costs.
 
@@ -83,11 +89,17 @@ not equal algorithmic CPU time. Task work units are not FLOPs or money. Failed,
 unstarted and unknown-work rows remain in reports. No published winner or
 statistical generalization claim follows from adapter contract tests.
 
-## Remaining verification / scope
+## Verified scope and remaining evidence
 
-Implementation is not yet verified. Final gates must include all three .NET
-targets, raw numeric reconciliation, the actual pinned OpenEvolve process path,
-the companion AiDotNet executable, prompt matching, and adverse protocol tests.
-No paid model calls have been made. Registered competitor
+The final local Release build passed with zero warnings/errors. Tests passed on
+net10.0 (648), net8.0 (608), and net471 (608), with no skips. Coverage was 90.57%
+line / 76.07% branch; formatting and the coverage ratchet passed. Numeric tests
+passed all nine families, actual pyribs adaptation, and a 15-core/9-external
+comparison fixture. All six program tracks passed with 11 model calls and 17
+evaluations, including the real AiDotNet executable, pinned OpenEvolve controller,
+exact first controlled prompts, and independent receipts. Program/broker tests
+(11), transport tests (7), and the pinned OpenEvolve integration test passed.
+The unchanged representative-suite and analysis gates also passed.
+No API-key-backed model calls have been made. Registered competitor
 holdout integration, real isolated task experiments, and equally budgeted
 tuning/selection evidence are not delivered by these fixtures.

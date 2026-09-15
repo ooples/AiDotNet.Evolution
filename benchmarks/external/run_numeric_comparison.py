@@ -44,7 +44,7 @@ def run(request_path, dll, output_directory, modes=("controlled",)):
                             for path in (dll, dll.with_name("AiDotNet.Evolution.dll"), dll.with_suffix(".deps.json"))},
                   adapters={path.name: hashlib.sha256(path.read_bytes()).hexdigest()
                             for path in (Path(__file__), Path(__file__).with_name("suite_baseline.py"),
-                                         Path(__file__).with_name("scipy_baseline.py"))},
+                                         Path(__file__).with_name("scipy_baseline.py"), Path(__file__).with_name("ribs_baseline.py"))},
                   limitations=["Native-sized is not untouched SciPy defaults and is reported separately",
                                "DiagonalCma is the repository's diagonal control, not an external CMA-ME implementation",
                                "No OpenEvolve/program/LLM comparison or superiority claim is made by this numeric runner",

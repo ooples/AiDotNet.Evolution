@@ -46,10 +46,11 @@ def request(endpoint, capability, operation, payload):
 
 
 class ProgramBroker:
-    def __init__(self, generate, evaluate, *, model_calls, evaluations, seconds, initial):
+    def __init__(self, generate, evaluate, *, model_calls, evaluations, seconds, initial, model_tokens=100000):
         if (type(model_calls) is not int or not 1 <= model_calls <= 64
                 or type(evaluations) is not int or not 2 <= evaluations <= 65
-                or type(seconds) not in (int, float) or not math.isfinite(seconds) or not 0 < seconds <= 3600):
+                or type(seconds) not in (int, float) or not math.isfinite(seconds) or not 0 < seconds <= 3600
+                or type(model_tokens) is not int or not 1 <= model_tokens <= 10000000):
             raise ValueError("Invalid broker budget")
         self.initial_hash = candidate_hash(initial)
         self.generate, self.evaluate = generate, evaluate
@@ -58,6 +59,8 @@ class ProgramBroker:
         self.started = time.monotonic()
         self.rows = []
         self.closed = False
+        self.model_tokens = 0
+        self.model_token_cap = model_tokens
         self.capability = secrets.token_hex(32)
         broker = self
 
@@ -117,15 +120,25 @@ class ProgramBroker:
                 raise ValueError("Optimizer changed the initial program")
         elif (not any(row["operation"] == "evaluate" and row["status"] == "completed"
                       and row["result"]["status"] == "valid" for row in self.rows)
-              or sum(row["operation"] == "evaluate" for row in self.rows) >= self.limits["evaluate"]):
+              or sum(row["operation"] == "evaluate" for row in self.rows) >= self.limits["evaluate"]
+              or self.model_tokens >= self.model_token_cap):
             raise ValueError("A valid shared start and remaining evaluation capacity are required")
         row = {"operation": operation, "request": payload, "status": "dispatched", "result": None}
         self.rows.append(row)
         try:
             if operation == "model":
-                result = self.generate(payload["system"], payload["messages"])
-                if not isinstance(result, str) or len(result.encode()) > 64 * 1024:
-                    raise ValueError("Invalid bounded model response")
+                measured = self.generate(payload["system"], payload["messages"])
+                if (not isinstance(measured, dict) or not isinstance(measured.get("text"), str)
+                        or len(measured["text"].encode()) > 64 * 1024
+                        or type(measured.get("cost_units")) is not int or measured["cost_units"] < 0
+                        or measured.get("cost_metric") != "reported_input_plus_output_tokens"):
+                    raise ValueError("Missing bounded model response or independently reported token cost")
+                self.model_tokens += measured["cost_units"]
+                row["model_usage"] = {"cost_units": measured["cost_units"], "cost_metric": measured["cost_metric"]}
+                result = measured["text"]
+                if self.model_tokens > self.model_token_cap:
+                    row.update(status="budget-exceeded", result=result)
+                    raise ValueError("Actual token cost exceeded the declared cap; result is not admissible")
             else:
                 result = self.evaluate(payload["code"])
                 if (result.get("candidate_hash") != identity or result.get("unknown_work") is not False
@@ -140,5 +153,6 @@ class ProgramBroker:
             return result
         except Exception:
             self.closed = True
-            row["status"] = "unknown"
+            if row["status"] == "dispatched":
+                row["status"] = "unknown"
             raise

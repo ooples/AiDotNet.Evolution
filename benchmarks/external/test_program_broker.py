@@ -11,7 +11,7 @@ class ProgramBrokerTests(unittest.TestCase):
         return dict(candidate_hash=candidate_hash(code), status="valid", quality=1.0, work_units=1, unknown_work=False)
 
     def test_authenticated_loopback_initialization_and_independent_caps(self):
-        generate = Mock(return_value="```python\npass\n```")
+        generate = Mock(return_value={"text": "```python\npass\n```", "cost_units": 5, "cost_metric": "reported_input_plus_output_tokens"})
         with ProgramBroker(generate, self.evaluator, model_calls=1, evaluations=2, seconds=30, initial="pass") as broker:
             def call(operation, payload):
                 return request(broker.endpoint, broker.capability, operation, payload)
@@ -30,6 +30,21 @@ class ProgramBrokerTests(unittest.TestCase):
             with self.assertRaises(urllib.error.HTTPError):
                 call("evaluate", {"code": "pass\n"})
             self.assertEqual(3, len(broker.rows))
+            generate.assert_called_once()
+            self.assertEqual(5, broker.model_tokens)
+
+    def test_token_overrun_is_charged_and_cannot_produce_an_admissible_result(self):
+        generate = Mock(return_value={"text": "candidate", "cost_units": 11, "cost_metric": "reported_input_plus_output_tokens"})
+        with ProgramBroker(generate, self.evaluator, model_calls=2, evaluations=3, seconds=30,
+                           initial="pass", model_tokens=10) as broker:
+            request(broker.endpoint, broker.capability, "evaluate", {"code": "pass"})
+            with self.assertRaises(urllib.error.HTTPError):
+                request(broker.endpoint, broker.capability, "model", {"system": "s", "messages": []})
+            self.assertEqual(11, broker.model_tokens)
+            self.assertEqual("budget-exceeded", broker.rows[-1]["status"])
+            self.assertTrue(broker.closed)
+            with self.assertRaises(urllib.error.HTTPError):
+                request(broker.endpoint, broker.capability, "model", {"system": "s", "messages": []})
             generate.assert_called_once()
 
     def test_unknown_work_stops_all_later_dispatch(self):

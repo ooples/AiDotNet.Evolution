@@ -77,6 +77,7 @@ async def run(upstream, initial, output, model, iterations, seed, task, mode):
         native_system = (upstream / "openevolve/prompts/defaults/system_message.txt").read_text(encoding="utf-8")
         config.prompt.system_message = native_system + "\nTask:\n" + description
     config.llm = LLMConfig(models=[LLMModelConfig(name=model, init_client=init_broker_model)],
+                           api_base=os.environ["EVOLUTION_BROKER_ENDPOINT"] + "/disabled-provider-api",
                            api_key="unused-local-broker", retries=0, timeout=300)
     config.evaluator.parallel_evaluations = 1
     config.evaluator.max_retries = 0

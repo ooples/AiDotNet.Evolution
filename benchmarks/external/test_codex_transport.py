@@ -2,6 +2,7 @@
 import copy
 import json
 from pathlib import Path
+from types import SimpleNamespace
 import subprocess
 import sys
 import tempfile
@@ -76,6 +77,34 @@ class CodexTransportTests(unittest.TestCase):
                 finally:
                     transport._lock.release()
                 run.assert_not_called()
+
+    def test_success_retains_workspace_and_forces_subscription_without_retry(self):
+        with tempfile.TemporaryDirectory() as directory:
+            transport = CodexTransport(sys.executable, "explicit-fixture-model", Path(directory) / "evidence", 1)
+            auth = subprocess.CompletedProcess([], 0, b"Logged in using ChatGPT", b"")
+            version = subprocess.CompletedProcess([], 0, b"codex-cli 0.154.0", b"")
+
+            def completed(command, **kwargs):
+                self.assertIn('forced_login_method="chatgpt"', command)
+                self.assertIn("--ignore-user-config", command)
+                kwargs["stdout"].write(self.encode(self.events()))
+                return SimpleNamespace(poll=lambda: 0, returncode=0)
+
+            with patch("codex_transport.subprocess.run", side_effect=[auth, version]), \
+                    patch("codex_transport.subprocess.Popen", side_effect=completed) as spawn, \
+                    patch("codex_transport.tempfile.TemporaryDirectory") as workspace:
+                workspace.return_value.__enter__.return_value = directory
+                measured = transport.generate_metered("system", [{"role": "user", "content": "fixture"}])
+                self.assertEqual("candidate", measured["text"])
+                self.assertEqual(23, measured["cost_units"])
+                self.assertEqual("reported_input_plus_output_tokens", measured["cost_metric"])
+                self.assertFalse(workspace.call_args.kwargs["delete"])
+                spawn.assert_called_once()
+            receipt = json.loads((Path(directory) / "evidence/0/receipt.json").read_text())
+            self.assertEqual("completed", receipt["status"])
+            self.assertFalse(receipt["unknown_usage"])
+            self.assertEqual(directory, receipt["retained_workspace"])
+            self.assertEqual(3, receipt["usage"]["output_tokens"])
 
 
 if __name__ == "__main__":

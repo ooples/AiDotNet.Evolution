@@ -178,7 +178,7 @@ jobs:
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1
         with:
           repository: ooples/AiDotNet
-          ref: dca3c48caba5757342eae2b5be1a2f23a733ebc8
+          ref: 9343d45907342eabd1f24cffa4724e7817855bf4
           path: .local/aidotnet-companion
           persist-credentials: false
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1

@@ -84,6 +84,7 @@ class CodexTransport:
                 del self.environment[name]
         self.calls = 0
         self.failed = False
+        self._last_usage = None
         self._lock = threading.Lock()
 
     def generate(self, system_message, messages):
@@ -91,6 +92,16 @@ class CodexTransport:
             raise ValueError("Concurrent model calls are outside the sequential benchmark contract")
         try:
             return self._generate(system_message, messages)
+        finally:
+            self._lock.release()
+
+    def generate_metered(self, system_message, messages):
+        if not self._lock.acquire(blocking=False):
+            raise ValueError("Concurrent model calls are outside the sequential benchmark contract")
+        try:
+            text = self._generate(system_message, messages)
+            return {"text": text, "cost_units": self._last_usage["input_tokens"] + self._last_usage["output_tokens"],
+                    "cost_metric": "reported_input_plus_output_tokens"}
         finally:
             self._lock.release()
 
@@ -119,7 +130,11 @@ class CodexTransport:
         process = None
         started = time.monotonic()
         try:
-            with tempfile.TemporaryDirectory(prefix="evolution-model-") as workspace:
+            # Codex may leave a helper holding cwd on Windows after the CLI exits.
+            # Retain this bounded workspace as evidence instead of letting cleanup
+            # failure mask a completed generation or trigger another model call.
+            with tempfile.TemporaryDirectory(prefix="evolution-model-", delete=False) as workspace:
+                receipt["retained_workspace"] = workspace
                 command = [self.executable, "exec", "--ignore-user-config", "--ephemeral", "--skip-git-repo-check",
                            "--sandbox", "read-only", "--json", "--color", "never", "--model", self.model,
                            "-c", 'web_search="disabled"', "-c", 'approval_policy="never"',
@@ -147,6 +162,7 @@ class CodexTransport:
                 with (directory / "events.jsonl").open("rb") as events:
                     text, usage = parse_events(events.read(MAX_OUTPUT + 1))
                 receipt.update(status="completed", unknown_usage=False, usage=usage)
+                self._last_usage = dict(usage)
                 return text
         except Exception:
             self.failed = True

@@ -33,7 +33,8 @@ class OpenEvolveAdapterTests(unittest.TestCase):
             source.write_text(initial, encoding="utf-8")
             task = root / "task.txt"
             task.write_text("Contract fixture only.", encoding="utf-8")
-            with ProgramBroker(lambda system, messages: "```python\n" + evolved + "```", evaluate,
+            with ProgramBroker(lambda system, messages: {"text": "```python\n" + evolved + "```", "cost_units": 0,
+                               "cost_metric": "reported_input_plus_output_tokens"}, evaluate,
                                model_calls=2, evaluations=3, seconds=120, initial=initial) as broker:
                 environment = dict(os.environ)
                 environment.update(EVOLUTION_BROKER_ENDPOINT=broker.endpoint,
