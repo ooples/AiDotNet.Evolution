@@ -31,7 +31,7 @@ public sealed class EvolutionIncumbentChallenge<TGenome>
         var searchPlan = new EvolutionReplicationPlan(searchSamples, searchSamples, minimumQuality, maximumQuality,
             maximumCostPerSample, direction: direction);
         var confirmationPlan = new EvolutionReplicationPlan(confirmationSamples, confirmationSamples, minimumQuality, maximumQuality,
-            maximumCostPerSample, confidence: 1 - (1 - confidence) / (2 * maximumChallenges), direction: direction);
+            maximumCostPerSample, confidence: 1 - (1 - confidence) / (2d * maximumChallenges), direction: direction);
         _search = new(searchVersion, searchPlan, ledger, search);
         _confirm = new(confirmationVersion, confirmationPlan, ledger, confirm);
         _ledger = ledger; _minimumImprovement = minimumImprovement; _direction = direction; _maximumChallenges = maximumChallenges;

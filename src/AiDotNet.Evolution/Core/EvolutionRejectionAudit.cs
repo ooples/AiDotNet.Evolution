@@ -26,7 +26,7 @@ public sealed class EvolutionRejectionAudit<TGenome>
         if (!EvolutionDescriptorDefinition.IsFinite(usefulThreshold) || usefulThreshold < minimumQuality || usefulThreshold > maximumQuality)
             throw new ArgumentOutOfRangeException(nameof(usefulThreshold));
         var plan = new EvolutionReplicationPlan(samplesPerCandidate, samplesPerCandidate, minimumQuality, maximumQuality,
-            maximumCostPerSample, confidence: 1 - (1 - confidence) / (2 * auditCandidates), direction: direction);
+            maximumCostPerSample, confidence: 1 - (1 - confidence) / (2d * auditCandidates), direction: direction);
         _runner = new(evaluatorVersion, plan, ledger, evaluateFull);
         _ledger = ledger; _auditCount = auditCandidates; _threshold = usefulThreshold; _confidence = confidence; _direction = direction;
         VersionHash = EvolutionHash.Combine(new[] { "screen-rejection-audit-v1", _runner.VersionHash,
@@ -104,7 +104,7 @@ public sealed class EvolutionRejectionAuditReport
         double upper = (double)Entries.Count(row => row.DefinitelyUseful || row.Unresolved) / Entries.Count;
         // Half alpha was allocated across candidate full-mean intervals; the
         // remaining half bounds sampling of bounded useful/not-useful labels.
-        double radius = Entries.Count == population ? 0 : Math.Sqrt(Math.Log(4 / (1 - confidence)) / (2 * Entries.Count));
+        double radius = Entries.Count == population ? 0 : Math.Sqrt(Math.Log(4 / (1 - confidence)) / (2d * Entries.Count));
         FalseRejectionRateLower = Math.Max(0, lower - radius);
         FalseRejectionRateUpper = Math.Min(1, upper + radius);
     }
