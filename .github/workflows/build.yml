@@ -4,7 +4,7 @@ on:
   push:
     branches: [main]
   pull_request:
-    branches: [main]
+    branches: [main, feat/competitive-evolution-platform, 'feat/evolution-us-*']
 
 concurrency:
   group: ${{ github.workflow }}-${{ github.ref }}
@@ -65,6 +65,11 @@ jobs:
       - name: Verify replication accounting and confirmation
         shell: pwsh
         run: ./eng/Test-Replication.ps1
+      - name: Verify incumbent challenges and screen-rejection audits
+        shell: pwsh
+        run: |
+          dotnet run --project examples/ReplicatedEvaluation -c Release --no-build -- --noise-policies > TestResults/noise-policies.json
+          if ($LASTEXITCODE -ne 0) { throw 'Noise policy contract failed.' }
       - name: Verify persistent evaluation reuse and force-fresh accounting
         run: dotnet run --project examples/PersistentEvaluation -c Release -- "${{ github.workspace }}/TestResults/persistent-evaluation"
       - name: Verify surrogate backend and measured-only selection
@@ -80,6 +85,8 @@ jobs:
         run: dotnet run --project benchmarks/AiDotNet.Evolution.Performance -c Release -- --smoke
       - name: Verify paired analysis contracts
         run: python3 -m unittest discover -s benchmarks/analysis -v
+      - name: Verify fixed-sample reporting with actual numeric search
+        run: python3 benchmarks/analysis/verify_reports.py --evaluator benchmarks/AiDotNet.Evolution.Quality/bin/Release/net10.0/AiDotNet.Evolution.Quality.dll --source-revision '${{ github.sha }}' --output TestResults/experiment-reports
       - name: Verify archive partition accounting and replay
         shell: pwsh
         run: ./eng/Test-ArchivePartition.ps1 -SourceRevision '${{ github.sha }}'
@@ -96,6 +103,8 @@ jobs:
           name: coverage-and-diagnostics
           path: |
             TestResults/quality/**/*.json
+            TestResults/experiment-reports/**
+            TestResults/noise-policies.json
             TestResults/persistent-evaluation/**/*.json
             TestResults/persistent-evaluation/*.jsonl
             coverage/**/coverage.cobertura.xml
@@ -114,6 +123,39 @@ jobs:
         env:
           CODECOV_TOKEN: ${{ secrets.CODECOV_TOKEN }}
 
+  representative-suite:
+    name: Representative numeric and AlgoTune suite contracts
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          persist-credentials: false
+      - uses: actions/setup-dotnet@a98b56852c35b8e3190ac28c8c2271da59106c68 # v6.0.0
+        with:
+          dotnet-version: '10.0.x'
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          repository: oripress/AlgoTune
+          ref: dff9914c10800c7a031c9e8c3d4d1c8cd1b38906
+          path: .local/algotune-upstream
+          sparse-checkout: AlgoTuneTasks
+          persist-credentials: false
+      - name: Install isolated reference dependencies
+        run: |
+          python3 -m venv .local/suite-env
+          .local/suite-env/bin/python -m pip install -r benchmarks/suite/requirements.txt
+      - name: Verify all partition contracts and starting implementations
+        shell: pwsh
+        run: ./eng/Test-RepresentativeSuite.ps1 -Python .local/suite-env/bin/python -Upstream .local/algotune-upstream -SourceRevision '${{ github.sha }}'
+      - name: Retain failed and successful suite evidence
+        if: always()
+        uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02 # v4
+        with:
+          name: representative-suite-evidence
+          path: TestResults/representative-suite/**
+          if-no-files-found: warn
+
   external-baseline:
     name: External numeric baseline contracts
     runs-on: ubuntu-latest
@@ -130,6 +172,51 @@ jobs:
       - name: Verify shared evaluator and matched baseline
         shell: pwsh
         run: ./eng/Test-ExternalBaseline.ps1 -Python .local/external-env/bin/python
+
+  program-comparison:
+    name: Shared program comparison contract
+    runs-on: ubuntu-latest
+    timeout-minutes: 30
+    env:
+      DOTNET_PROCESSOR_COUNT: '2'
+      EVOLUTION_OPENEVOLVE_CHECKOUT: ${{ github.workspace }}/.local/openevolve-upstream
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1
+        with:
+          persist-credentials: false
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1
+        with:
+          repository: ooples/AiDotNet
+          ref: 9343d45907342eabd1f24cffa4724e7817855bf4
+          path: .local/aidotnet-companion
+          persist-credentials: false
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1
+        with:
+          repository: algorithmicsuperintelligence/openevolve
+          ref: 411fb59c886c18704caaffb611e17cf9e7d824d2
+          path: .local/openevolve-upstream
+          persist-credentials: false
+      - uses: actions/setup-dotnet@a98b56852c35b8e3190ac28c8c2271da59106c68
+        with:
+          dotnet-version: '10.0.x'
+      - name: Install isolated pinned program dependencies
+        run: |
+          python3 -m venv .local/program-env
+          .local/program-env/bin/python -m pip install -r benchmarks/external/requirements-program.txt
+          .local/program-env/bin/python -m pip install --no-deps -e .local/openevolve-upstream
+      - name: Final companion build and program contract gates
+        run: |
+          dotnet build .local/aidotnet-companion/benchmarks/EvolutionComparison/EvolutionComparison.csproj -c Release -m:1 -p:UseSharedCompilation=false -p:UseLocalEvolution=true -p:EvolutionProjectPath="$GITHUB_WORKSPACE/src/AiDotNet.Evolution/AiDotNet.Evolution.csproj"
+          .local/program-env/bin/python -m unittest discover -s benchmarks/external -p 'test_program*.py' -v
+          .local/program-env/bin/python -m unittest discover -s benchmarks/external -p test_codex_transport.py -v
+          .local/program-env/bin/python -m unittest discover -s benchmarks/external -p test_openevolve_adapter.py -v
+          .local/program-env/bin/python benchmarks/external/run_program_comparison.py --aidotnet .local/aidotnet-companion/benchmarks/EvolutionComparison/bin/Release/net10.0/EvolutionComparison.dll --upstream .local/openevolve-upstream --output TestResults/program-comparison
+      - uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02
+        if: always()
+        with:
+          name: program-comparison-contract
+          path: TestResults/program-comparison
+          if-no-files-found: warn
 
   legacy:
     name: Build and test net471
@@ -181,7 +268,7 @@ jobs:
 
   ci-gate:
     name: CI Gate
-    needs: [modern, legacy, package]
+    needs: [modern, legacy, package, representative-suite, external-baseline, program-comparison]
     if: "${{ always() && !startsWith(github.head_ref, 'release-please--') && !(github.event_name == 'push' && startsWith(github.event.head_commit.message, 'chore(main): release')) }}"
     runs-on: ubuntu-latest
     timeout-minutes: 5
@@ -191,6 +278,9 @@ jobs:
           MODERN_RESULT: ${{ needs.modern.result }}
           LEGACY_RESULT: ${{ needs.legacy.result }}
           PACKAGE_RESULT: ${{ needs.package.result }}
+          SUITE_RESULT: ${{ needs.representative-suite.result }}
+          EXTERNAL_RESULT: ${{ needs.external-baseline.result }}
+          PROGRAM_RESULT: ${{ needs.program-comparison.result }}
         shell: bash
         run: |
           set -euo pipefail
@@ -198,7 +288,10 @@ jobs:
           for result in \
             "modern:$MODERN_RESULT" \
             "legacy:$LEGACY_RESULT" \
-            "package:$PACKAGE_RESULT"; do
+            "package:$PACKAGE_RESULT" \
+            "representative-suite:$SUITE_RESULT" \
+            "external-baseline:$EXTERNAL_RESULT" \
+            "program-comparison:$PROGRAM_RESULT"; do
             job="${result%%:*}"
             conclusion="${result#*:}"
             if [ "$conclusion" != success ]; then

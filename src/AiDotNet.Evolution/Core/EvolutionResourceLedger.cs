@@ -95,12 +95,63 @@ public sealed class EvolutionResourceLedger
         }
     }
 
+    /// <summary>Reserves a complete wave in ordinal operation-ID order before any worker can settle within that wave.</summary>
+    /// <remarks>All requests are validated before mutation. A denied item does not invoke a producer or consume resources.
+    /// Decisions are deterministic for the same starting ledger and wave, not across independently racing waves.
+    /// Completion savings are available to the next wave, never backfilled into the current one.</remarks>
+    public IReadOnlyList<EvolutionResourceAdmission> ReserveBatch(IEnumerable<EvolutionResourceRequest> requests)
+    {
+        Guard.NotNull(requests);
+        var items = requests.Take(1025).ToArray();
+        if (items.Length is < 1 or > 1024) throw new ArgumentException("A wave must contain 1..1024 requests.", nameof(requests));
+        var identities = new HashSet<string>(StringComparer.Ordinal);
+        foreach (var item in items)
+        {
+            if (item is null) throw new ArgumentException("Missing batch request.", nameof(requests));
+            ValidateId(item.OperationId, nameof(requests));
+            ValidateAmounts(item.Estimated); ValidateAmounts(item.Maximum);
+            if (!identities.Add(item.OperationId) || !Enum.IsDefined(typeof(EvolutionResourceStage), item.Stage) || item.Attempt < 1 ||
+                item.Estimated.Amounts.Any(pair => pair.Value > item.Maximum[pair.Key]))
+                throw new ArgumentException("Invalid or duplicate batch request.", nameof(requests));
+        }
+        lock (_sync)
+        {
+            if (items.Any(item => _operations.ContainsKey(item.OperationId)))
+                throw new InvalidOperationException("A batch identity was already reserved.");
+            return Array.AsReadOnly(items.OrderBy(item => item.OperationId, StringComparer.Ordinal)
+                .Select(item => new EvolutionResourceAdmission(item, TryReserve(item.OperationId, item.Stage,
+                    item.Estimated, item.Maximum, item.Attempt))).ToArray());
+        }
+    }
+
+    internal EvolutionResourceBoundary CaptureBoundary(Func<string> captureEngine)
+    {
+        lock (_sync)
+        {
+            if (_operations.Values.Any(operation => operation.Receipt is null))
+                throw new InvalidOperationException("A coordinated boundary requires all dispatched work to be settled.");
+            int admitted = _operations.Count;
+            long settled = _settled, denied = _denied;
+            string engine = captureEngine();
+            // A reentrant capture callback must not start new metered work.
+            if (_operations.Count != admitted || _settled != settled || _denied != denied)
+                throw new InvalidOperationException("The capture callback dispatched work.");
+            return new EvolutionResourceBoundary(RunId, engine, CaptureState());
+        }
+    }
+
     /// <summary>Returns a detached accounting snapshot; complete counters survive receipt-detail truncation.</summary>
     public EvolutionResourceSnapshot Snapshot()
     {
         lock (_sync)
             return new EvolutionResourceSnapshot(_spent, _reserved, _receipts.ToArray(), _operations.Count,
-                _settled, _denied, _unknown, _maximumViolated);
+                _settled, _denied, _unknown, _maximumViolated,
+                _operations.Values.GroupBy(operation => operation.Stage).OrderBy(group => group.Key).Select(group =>
+                    new EvolutionResourceStageSnapshot(group.Key,
+                        Limits.Amounts.Keys.ToDictionary(key => key, key => group.Sum(operation => operation.Receipt?.Charged[key] ?? 0)),
+                        Limits.Amounts.Keys.ToDictionary(key => key, key => group.Sum(operation => operation.Receipt is null ? operation.Maximum[key] : 0)),
+                        group.LongCount(), group.LongCount(operation => operation.Receipt is not null),
+                        group.LongCount(operation => operation.Receipt?.Outcome == EvolutionResourceOutcome.Unknown))).ToArray());
     }
 
     internal bool Complete(string operationId, EvolutionResources actual, EvolutionResourceOutcome outcome, bool onlyIfPending = false)
@@ -281,12 +332,14 @@ public sealed class EvolutionResourceReservation : IDisposable
 public sealed class EvolutionResourceSnapshot
 {
     internal EvolutionResourceSnapshot(IDictionary<string, decimal> spent, IDictionary<string, decimal> reserved,
-        EvolutionResourceReceipt[] receipts, long admitted, long settled, long denied, long unknown, bool maximumViolated)
+        EvolutionResourceReceipt[] receipts, long admitted, long settled, long denied, long unknown, bool maximumViolated,
+        EvolutionResourceStageSnapshot[] stages)
     {
         Spent = new ReadOnlyDictionary<string, decimal>(new Dictionary<string, decimal>(spent, StringComparer.Ordinal));
         Reserved = new ReadOnlyDictionary<string, decimal>(new Dictionary<string, decimal>(reserved, StringComparer.Ordinal));
         Receipts = Array.AsReadOnly(receipts);
         Admitted = admitted; Settled = settled; Denied = denied; Unknown = unknown; MaximumViolated = maximumViolated;
+        Stages = Array.AsReadOnly(stages);
     }
     /// <summary>Gets actual charges plus explicitly unknown conservative charges.</summary>
     public IReadOnlyDictionary<string, decimal> Spent { get; }
@@ -306,4 +359,30 @@ public sealed class EvolutionResourceSnapshot
     public bool MaximumViolated { get; }
     /// <summary>Gets the number of settled receipts whose details are not in this snapshot.</summary>
     public long DroppedReceipts => Settled - Receipts.Count;
+    /// <summary>Gets complete per-stage totals reconstructed from the bounded operation ledger, not retained receipts.</summary>
+    public IReadOnlyList<EvolutionResourceStageSnapshot> Stages { get; }
+}
+
+/// <summary>Complete stage accounting, including pending reservations and unknown conservative charges.</summary>
+public sealed class EvolutionResourceStageSnapshot
+{
+    internal EvolutionResourceStageSnapshot(EvolutionResourceStage stage, Dictionary<string, decimal> spent,
+        Dictionary<string, decimal> reserved, long admitted, long settled, long unknown)
+    {
+        Stage = stage; Spent = new ReadOnlyDictionary<string, decimal>(spent);
+        Reserved = new ReadOnlyDictionary<string, decimal>(reserved);
+        Admitted = admitted; Settled = settled; Unknown = unknown;
+    }
+    /// <summary>Gets the work category.</summary>
+    public EvolutionResourceStage Stage { get; }
+    /// <summary>Gets actual plus explicitly unknown conservative charges.</summary>
+    public IReadOnlyDictionary<string, decimal> Spent { get; }
+    /// <summary>Gets outstanding producer maxima.</summary>
+    public IReadOnlyDictionary<string, decimal> Reserved { get; }
+    /// <summary>Gets all admitted stage operations.</summary>
+    public long Admitted { get; }
+    /// <summary>Gets settled stage operations independent of receipt retention.</summary>
+    public long Settled { get; }
+    /// <summary>Gets stage operations conservatively charged without measured receipts.</summary>
+    public long Unknown { get; }
 }

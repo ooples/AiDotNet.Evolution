@@ -28,10 +28,14 @@ SETTINGS = dict(strategy="best1bin", mutation=[0.5, 1.0], recombination=0.7, tol
 class Bridge:
     """One local evaluator process per run; no shell, model credentials or candidate code execution."""
 
-    def __init__(self, dll, task, seed, budget, timeout=30):
+    def __init__(self, dll, task, seed, budget, timeout=30, instance_seed=None):
         self.timeout = timeout
         self.deadline = time.monotonic() + 180
-        self.process = subprocess.Popen(["dotnet", str(dll), "--numeric-service", task, str(seed), str(budget)],
+        command = ["dotnet", str(dll), "--numeric-service" if instance_seed is None else "--suite-numeric-service",
+                   task, str(seed), str(budget)]
+        if instance_seed is not None:
+            command.append(str(instance_seed))
+        self.process = subprocess.Popen(command,
                                         stdin=subprocess.PIPE, stdout=subprocess.PIPE, stderr=subprocess.DEVNULL,
                                         text=True, encoding="utf-8", bufsize=1)
         self.messages = queue.Queue()
@@ -126,7 +130,10 @@ def run_one(dll, task, seed, budget, expected_hash, optimizer=None, source_revis
             if len(losses) < 8:
                 require(response.get("GenomeHash") == manifest["InitialGenomeHashes"][len(losses)], "Initialization round-trip changed.")
             losses.append(loss)
-            samples.append(dict(EvaluationId=len(losses) - 1, Status="Completed", BestLoss=min(losses), Attempts=1, CostUnits=1, DiagnosticCodes=[]))
+            samples.append(dict(EvaluationId=len(losses) - 1, Status="Completed", BestLoss=min(losses), Attempts=1,
+                                CostUnits=1, DiagnosticCodes=[], Quality=-loss, ConstraintViolations=[],
+                                Descriptors={"coordinate-0": -5 + 10 * float(units[0]),
+                                             "coordinate-1": -5 + 10 * float(units[1])}, GenomeId=response["GenomeHash"]))
             return loss
 
         result = optimizer(objective, [(0, 1)] * 8, init=initial, maxiter=budget // 8 - 1,
