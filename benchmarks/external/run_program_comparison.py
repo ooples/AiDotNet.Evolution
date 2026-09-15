@@ -39,8 +39,9 @@ def run_child(command, environment, directory, timeout):
 
 
 def run_campaign(output, aidotnet_dll, upstream, initial, task, model, generate, evaluate, *,
-                 iterations=2, seed=37, model_tokens=100000, evidence_class, evaluator_manifest):
+                 iterations=2, seed=37, model_tokens=100000, evolution_profile="uniform", evidence_class, evaluator_manifest):
     if (type(iterations) is not int or not 1 <= iterations <= 64 or type(seed) is not int or not 0 <= seed < 2**32
+            or evolution_profile not in ("uniform", "best")
             or evidence_class not in ("contract-only", "development-experiment")):
         raise ValueError("Invalid bounded program campaign")
     if not isinstance(evaluator_manifest, dict) or not evaluator_manifest.get("identity"):
@@ -54,6 +55,7 @@ def run_campaign(output, aidotnet_dll, upstream, initial, task, model, generate,
     description.write_text(task, encoding="utf-8", newline="")
     report = dict(schema="aidotnet-program-comparison-v1", evidence_class=evidence_class, status="running",
                   requested_model=model, initial_program_hash=initial_hash, seed=seed, iterations=iterations,
+                  evolution_profile=evolution_profile,
                   language="python", evaluator=evaluator_manifest, tuning={"trials": 0, "work": 0},
                   hardware={"os": platform.platform(), "machine": platform.machine(), "processors": os.cpu_count()},
                   consumer_binary_sha256=hashlib.sha256(dll.read_bytes()).hexdigest(), runs=[],
@@ -89,7 +91,7 @@ def run_campaign(output, aidotnet_dll, upstream, initial, task, model, generate,
                         environment.pop(name, None)
                     if method == "aidotnet":
                         command = ["dotnet", str(dll), str(source.resolve()), str((directory / "adapter-result.json").resolve()),
-                                   model, str(iterations), str(seed), str(description.resolve()), mode]
+                                   model, str(iterations), str(seed), str(description.resolve()), mode, evolution_profile]
                     else:
                         command = [sys.executable, "-X", "utf8", str(Path(__file__).with_name("openevolve_adapter.py")),
                                    "--upstream", str(Path(upstream).resolve()), "--initial", str(source.resolve()),
