@@ -1,5 +1,15 @@
 # US-02 verification evidence
 
+## Current real-program evidence
+
+[2026-09-15 real program pilot](REAL_PROGRAM_PILOT.md): 18 completed tracks,
+33 subscription-backed model calls, 252 measured container executions and
+18/18 selections passing a separate 900-output adversarial audit. The new host
+and isolated evaluator are entirely Evolution-owned. This is development evidence,
+not final comparative significance or full empirical story completion.
+
+## Earlier adapter-only verification (historical)
+
 Core C# implementation/test build: `4f35ebd2e0dba803d13359a9b1d6a821b5b691bd`.
 Final companion host: `9343d45907342eabd1f24cffa4724e7817855bf4`.
 Python final-gate repairs are in the enclosing commit; no core C# changed after

@@ -2,6 +2,7 @@ import json
 import os
 from pathlib import Path
 import tempfile
+import threading
 import unittest
 from unittest.mock import patch
 
@@ -11,6 +12,17 @@ from program_tasks import expected, problems
 
 
 class ProtocolTests(unittest.TestCase):
+    def test_infrastructure_failure_forbids_later_dispatch(self):
+        sandbox = DockerSandbox.__new__(DockerSandbox)
+        sandbox.failed = False
+        sandbox._lock = threading.Lock()
+        with patch.object(sandbox, "_run", side_effect=RuntimeError("cleanup failed")) as dispatch:
+            with self.assertRaisesRegex(RuntimeError, "cleanup failed"):
+                sandbox.run("source", {}, phase="search")
+            with self.assertRaisesRegex(RuntimeError, "further execution is forbidden"):
+                sandbox.run("source", {}, phase="search")
+            self.assertEqual(1, dispatch.call_count)
+
     def test_rejects_duplicate_and_nonfinite_receipts(self):
         for raw in ('{"a":1,"a":2}', '[NaN]', '[Infinity]'):
             with self.assertRaises(ValueError):
@@ -51,6 +63,11 @@ class ContainerTests(unittest.TestCase):
 
     def run_source(self, code):
         return self.sandbox.run(code, {"class": "Solver", "problems": [{}]}, phase="adversarial")
+
+    def test_deep_invalid_json_is_rejected_without_poisoning_infrastructure(self):
+        result = self.run_source("print('[' * 10000 + ']' * 10000)\nclass Solver:\n def solve(self, p): return 0")
+        self.assertEqual("invalid-output", result["status"])
+        self.assertFalse(self.sandbox.failed)
 
     def test_kernel_enforces_nonroot_no_privileges_no_network_and_readonly_files(self):
         code = '''import os, socket

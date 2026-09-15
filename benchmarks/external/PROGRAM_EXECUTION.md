@@ -68,6 +68,25 @@ remains in sandbox evidence. Tuning is zero and actual tokens, setup/oracle work
 reported; **equal per-track caps are not equal reconciled total search cost**. No dollar conversion is invented.
 Repeated diagnostic timings do not increase the count of independent search runs.
 
+After a stopped full-panel pilot, run `run_program_audit.py --pilot <pilot-directory>
+--output <new-audit-directory> --image <same-image-id>` for a separate correctness-only
+audit of every selected track. It adds byte lengths 0–65 and large boundary cases,
+plus cyclic, dense, disconnected and duplicate-edge graphs. It binds selections
+before evaluation, makes no model calls, never feeds results back into search and
+requires an original-program fallback for any failed candidate. It is not a sealed
+final performance test. Per-pair oracle-setup metadata in the pilot refers to the
+same shared task setup; do not sum that repeated metadata as separately incurred work.
+
+`eng/Export-ProgramEvidence.ps1` losslessly packages a stopped evidence directory:
+`index.json` maps every relative path to its byte length and SHA-256; `blobs/<sha256>`
+stores each distinct byte sequence once. The exporter verifies both source and
+archived hashes. This avoids committing hundreds of duplicate input/output files
+without discarding raw failed attempts or model/evaluator receipts.
+For solid compression of repeated fragments inside otherwise distinct JSON files,
+bsdtar can losslessly repack the verified ZIP with
+`tar -cJf evidence.tar.xz @evidence.zip`. The committed pilot archive uses this form;
+verify each `blobs/<sha256>` payload against the unchanged index after repacking.
+
 ## What remains before empirical story completion
 
 This pilot must not be relabeled as a sealed final campaign. Its purpose is to discover integration failures, resource
@@ -79,3 +98,5 @@ paired uncertainty and regression reporting; and reconciliation with US-12's exa
 work, failed controls, insufficient statistical power or nonmatching costs cannot be converted into a competitive win.
 US-02 remains empirically incomplete until that work is delivered. User handles reviews and merging; no release or
 superiority claim is authorized by this runner.
+
+See [empirical acceptance and feature-attribution boundaries](../../docs/benchmarks/US02_EMPIRICAL_ACCEPTANCE.md).

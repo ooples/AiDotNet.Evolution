@@ -74,6 +74,7 @@ class DockerSandbox:
         }
         (self.root / "environment.json").write_bytes(encode(self.identity))
         self.rows = []
+        self.failed = False
         self._lock = threading.Lock()
 
     def command(self, name, bundle):
@@ -90,7 +91,12 @@ class DockerSandbox:
         if not self._lock.acquire(blocking=False):
             raise RuntimeError("Benchmark execution must be serial")
         try:
+            if self.failed:
+                raise RuntimeError("Sandbox infrastructure previously failed; further execution is forbidden")
             return self._run(source, request, phase)
+        except Exception:
+            self.failed = True
+            raise
         finally:
             self._lock.release()
 
@@ -164,7 +170,7 @@ class DockerSandbox:
             if row["status"] == "completed":
                 try:
                     row["output"] = unique_json(bytes(collected[0]))
-                except (ValueError, UnicodeError):
+                except (ValueError, UnicodeError, RecursionError):
                     row["status"] = "invalid-output"
             return row
         except Exception as error:
