@@ -8,6 +8,14 @@ and readiness updates supersede those initial labels. The historical table below
 not an authoritative live draft count.
 Creating a PR or inheriting a foundation does not complete a story.
 
+## September 15: US-05
+
+[PR #48](https://github.com/ooples/AiDotNet.Evolution/pull/48) adds the verified
+core resource workflow on #47. [Evidence](evidence/us05/README.md): all 678/632/632
+.NET tests, analysis contracts, external accounting/replay and fixed-run regression
+passed. Consumer metering and dependency/review/merge gates remain open in #23.
+No companion source change is required for these generic core APIs.
+
 ## September 14: US-04
 
 [PR #47](https://github.com/ooples/AiDotNet.Evolution/pull/47) adds verified experiment

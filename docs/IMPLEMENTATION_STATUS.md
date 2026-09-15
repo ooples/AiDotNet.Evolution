@@ -5,6 +5,17 @@ Implementation is continuing across the core and companion PRs. **The roadmap is
 
 Track the full plan through the [26 user-story issues and PR delivery index](USER_STORY_DELIVERY.md).
 
+## September 15: US-05 core resource workflow
+
+[PR #48](https://github.com/ooples/AiDotNet.Evolution/pull/48), based on #47,
+adds deterministic wave reservation, complete per-stage totals, rejection of
+over-budget stage values and coordinated quiescent engine/ledger envelopes.
+[Final evidence](evidence/us05/README.md): 678/632/632 tests, 36 analysis tests,
+external accounting/replay and 1,320 fixed runs passed; coverage 90.76%/76.23%.
+Consumer-specific instrumentation/hard limits and currency conversion remain
+explicit responsibilities. No companion source changes or full-roadmap completion
+are claimed by this core scope; issue #23 stays open.
+
 ## September 14: US-04 reporting implementation
 
 [PR #47](https://github.com/ooples/AiDotNet.Evolution/pull/47) now implements fixed-sample
