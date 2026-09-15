@@ -9,20 +9,27 @@ internal sealed class AblationWorkload
     internal static readonly string[] Names = ["x0", "x1", "x2", "x3"];
     private readonly string _family;
     private readonly bool _confirmation;
+    private readonly bool _portfolio;
     internal string Id { get; }
     internal sealed record Observation(string Genome, double Quality, double[] TimingsMilliseconds, long PrimitiveCases);
     internal ConcurrentQueue<Observation> Observations { get; } = new();
 
-    internal AblationWorkload(string family, string partition)
+    internal AblationWorkload(string family, string partition, bool portfolio = false)
     {
         if (family is not ("numeric" or "program" or "kernel") || partition is not ("development" or "confirmation"))
             throw new ArgumentException("Unknown workload.");
-        _family = family; _confirmation = partition == "confirmation";
+        _family = family; _confirmation = partition == "confirmation"; _portfolio = portfolio;
         Id = family switch
         {
             "numeric" => _confirmation ? "coupled-absolute" : "rippled-quadratic",
             "program" => _confirmation ? "symbolic-absolute-sine" : "symbolic-quadratic-cosine",
             _ => _confirmation ? "blocked-distance-matrix" : "blocked-matrix-product"
+        };
+        if (portfolio) Id = family switch
+        {
+            "numeric" => _confirmation ? "maximum-coupled-square" : "rosenbrock-chain",
+            "program" => _confirmation ? "symbolic-frequency-absolute" : "symbolic-quartic-cosine",
+            _ => _confirmation ? "blocked-l1-distance" : "blocked-gram-product"
         };
     }
 
@@ -53,6 +60,13 @@ internal sealed class AblationWorkload
 
     private double Numeric(double[] x)
     {
+        if (_portfolio)
+        {
+            double objective = _confirmation
+                ? Enumerable.Range(0, 4).Max(i => Math.Pow(x[i] + 0.4 * x[(i + 1) % 4] - 0.3, 2))
+                : Enumerable.Range(0, 3).Sum(i => 5 * Math.Pow(x[i + 1] - x[i] * x[i], 2) + Math.Pow(0.7 - x[i], 2));
+            return 1 / (1 + objective);
+        }
         double loss = _confirmation
             ? Enumerable.Range(0, 4).Sum(i => Math.Abs(x[i] + 0.35 * x[(i + 1) % 4] - 0.2))
             : x.Sum(v => v * v + 0.1 * (1 - Math.Cos(12 * v)));
@@ -68,6 +82,7 @@ internal sealed class AblationWorkload
         {
             double x = -2 + 4 * (i + 0.5) / 2048;
             double target = _confirmation ? 0.7 * Math.Abs(x) - 0.4 * Math.Sin(x) : 0.6 * x * x + 0.3 * Math.Cos(x);
+            if (_portfolio) target = _confirmation ? 0.5 * Math.Abs(x) + 0.4 * Math.Cos(2 * x) : 0.2 * Math.Pow(x, 4) + 0.4 * Math.Cos(x);
             double prediction = 2 * parameters[0] * EvaluateBasis(Basis(parameters[2]), x) +
                 2 * parameters[1] * EvaluateBasis(Basis(parameters[3]), x);
             loss += Math.Pow(prediction - target, 2);
@@ -118,8 +133,9 @@ internal sealed class AblationWorkload
         Observations.Enqueue(new(identity, quality, times.ToArray(), 5L * size * size * size));
         return quality;
     }
-    private double Term(double[,] a, double[,] b, int i, int j, int k) => _confirmation
-        ? Math.Pow(a[i, k] - b[j, k], 2) : a[i, k] * b[k, j];
+    private double Term(double[,] a, double[,] b, int i, int j, int k) => _portfolio
+        ? (_confirmation ? Math.Abs(a[i, k] - b[j, k]) : a[i, k] * a[j, k])
+        : (_confirmation ? Math.Pow(a[i, k] - b[j, k], 2) : a[i, k] * b[k, j]);
     private static int Tile(double x) => Math.Clamp((int)Math.Round((x + 1) * 3.5) + 1, 1, 8);
     private static int Basis(double x) => Math.Clamp((int)Math.Round((x + 1) * 1.5), 0, 3);
     private static double EvaluateBasis(int basis, double x) => basis switch { 0 => x * x, 1 => Math.Cos(x), 2 => Math.Abs(x), _ => Math.Sin(x) };
