@@ -17,6 +17,7 @@ jobs:
     steps:
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1
         with:
+          fetch-depth: 0
           persist-credentials: false
       - run: python3 -m unittest discover -s benchmarks/analysis -p 'test_release_gate.py' -v
       - run: python3 benchmarks/analysis/release_gate.py --release release --output release-evidence.json

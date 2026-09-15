@@ -106,6 +106,7 @@ class GateTests(unittest.TestCase):
         self.assertIn("-Seeds 8 -Budget 128", workflow)
         self.assertNotIn("id-token: write", workflow)
         self.assertIn("contents: read", workflow)
+        self.assertIn("fetch-depth: 0", workflow)
 
     def test_release_directory_does_not_unignore_private_keys(self):
         root = Path(__file__).resolve().parents[2]
