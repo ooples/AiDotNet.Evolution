@@ -1,5 +1,9 @@
 # US-04 final verification
 
+Latest: [completed real-program study and acceptance](PROGRAM_STUDY.md), including
+72 audited selections, 132 model calls, 85 analysis tests and verified archives.
+The numeric campaign evidence below is retained unchanged as historical evidence.
+
 Implementation/build source: `1c4d6b49dbac27d71b23e72481c2165e01ed9ab5`.
 Stacked on US-02 #46, retaining US-01 #45 and foundation #15.
 

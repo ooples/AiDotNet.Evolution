@@ -35,6 +35,8 @@ def verify_artifacts(plan):
 
 def validate_registration(plan):
     require(plan.get("schema") == "evolution-program-estimation-registration-v1", "Invalid registration schema.")
+    require(plan.get("iterations", 2) == 2 and plan.get("target_utility", 0.5) == 0.5 and
+            plan.get("tuning_trials", 0) == 0, "Registration differs from fixed driver behavior.")
     require(names(list(plan["tasks"]), 3) and set(plan["tasks"]) == set(plan["scales_seconds"]) and
             all(finite(v) and v > 0 for v in plan["scales_seconds"].values()), "Invalid fixed task scales.")
     schedule = plan["schedule"]
@@ -253,7 +255,8 @@ def summarize(plan, blocks, phase):
                 independent_search_runs_per_task_method=n, timing_repeats_are_not_runs=True,
                 failed_missing_or_fallback=sum(r["status"] != "validated" for r in rows),
                 known_model_tokens=sum(r.get("model_tokens") or 0 for r in rows),
-                unknown_cost_rows=sum(r.get("model_tokens") is None or r.get("search_evaluator_seconds") is None for r in rows),
+                unknown_cost_rows=sum(r.get("model_tokens") is None or r.get("search_evaluator_seconds") is None or
+                                      bool(r.get("unknown_model_attempts")) or bool(r.get("unknown_evaluator_attempts")) for r in rows),
                 claim="none")
 
 
@@ -261,11 +264,13 @@ def sample_advice(plan, calibration):
     variances = [t["variance"] for c in calibration["comparisons"] for t in c["tasks"]]
     alpha, power, effect = plan["alpha"], plan["planning_power"], plan["planning_utility_effect"]
     t, c = len(plan["tasks"]), len(COMPARISONS)
-    required = math.ceil(2 * (math.sqrt(math.log(t * c / alpha)) + math.sqrt(math.log(t / (1 - power))))**2 / effect**2)
+    # Match summarize's two-sided interval, not the numeric planner's one-sided test.
+    required = math.ceil(2 * (math.sqrt(math.log(2 * t * c / alpha)) + math.sqrt(math.log(t / (1 - power))))**2 / effect**2)
     normal = statistics.NormalDist()
-    z = normal.inv_cdf(1 - alpha / c) + normal.inv_cdf(power)
+    z = normal.inv_cdf(1 - alpha / (2 * c)) + normal.inv_cdf(power)
     advisory = max(2, math.ceil(z * z * max(variances) / effect**2)) if all(v is not None for v in variances) else None
-    return dict(schema="program-sample-advice-v1", paired_variances=variances, advisory_normal_runs=advisory,
+    return dict(schema="program-sample-advice-v2", paired_variances=variances, advisory_normal_runs=advisory,
+                power_scope="per-comparison power for the fixed-task mean effect; simultaneous two-sided type-I coverage across tasks/comparisons",
                 conservative_powered_runs=required, fixed_confirmation_runs=plan["confirmation_search_runs_per_task_method"],
                 powered_design_feasible=required <= plan["confirmation_search_runs_per_task_method"],
                 decision="execute pre-registered budget-limited estimation, NOT truncated powered confirmation",

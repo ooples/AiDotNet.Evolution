@@ -89,3 +89,37 @@ python benchmarks/analysis/program_study.py execute --root <same-directory> --re
 
 Omitting `--codex` uses scripted fixtures only; those must never be presented as
 model efficacy. The frozen analysis and executable hashes bind the actual run.
+
+## Offline verification and descriptive expansion
+
+`program_scorecard.py` expands a stopped study without models or evaluators. It
+checks frozen block/phase summaries, imports independent counters, and adds
+left-step AUC on four observed resource domains. It invents no values before
+the first valid observation or after stopping. Different/censored domains are
+not fixed-budget efficacy rankings. Unmeasured scorecard fields remain explicit.
+
+Program advice v2 matches the **two-sided** interval:
+`ceil(2 * (sqrt(log(2*T*C/alpha)) + sqrt(log(T/(1-power))))^2 / effect^2)`.
+This is a conservative sufficient bound for per-comparison power of a fixed-task
+mean effect, with simultaneous type-I coverage across tasks/comparisons, not the
+minimum necessary count or joint power to win every comparison. Normal advice
+still relies on unstable calibration variance. Calibration and confirmation
+intervals are separate reporting families; calibration is not a second chance
+to select a winning claim.
+
+The September 15 frozen run used advice v1, which copied the numeric one-sided
+formula: 12,715 runs rather than the matching two-sided 13,648. The correction
+does not change its precommitted two-run estimation schedule, observations,
+effects, intervals or infeasible-power decision. Original advice remains in
+the evidence; the expanded report labels corrected advice as prospective.
+
+```powershell
+python benchmarks/analysis/program_evidence.py --archive <evidence.tar.xz> --sha256 <externally-retained-hash> --output <new-restored-directory>
+python benchmarks/analysis/program_scorecard.py --root <restored-study> --output <new-report-directory>
+```
+
+The archive verifier checks every blob before restoration, refuses links,
+traversal, Windows aliases, duplicates and existing destinations, and creates
+separate files for deduplicated blobs. Evidence authenticity still depends on
+externally retained hashes and trusted filesystem custody. Neither command
+dispatches model/evaluator calls.

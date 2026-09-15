@@ -1,5 +1,9 @@
 # US-04: reporting the real US-02 program pilot
 
+Historical single-pilot bridge. Its remaining reporting gaps were addressed by
+the [completed four-block program study and final acceptance](PROGRAM_STUDY.md).
+The measurements and test counts below remain the original bridge's evidence.
+
 Sandbox failure handling was completed in US-02 PR #46, including the cross-track
 failure latch and adversarial tests. It does not need a separate user story.
 

@@ -8,6 +8,15 @@ and readiness updates supersede those initial labels. The historical table below
 not an authoritative live draft count.
 Creating a PR or inheriting a foundation does not complete a story.
 
+## September 15: US-04 reporting acceptance complete locally
+
+[PR #47](https://github.com/ooples/AiDotNet.Evolution/pull/47) is non-draft and
+contains the [completed program-study evidence](evidence/us04/PROGRAM_STUDY.md):
+72 audited selections, 132 model calls, complete independent accounting and
+85 passing analysis tests. Reporting is implemented and verified; competitive
+efficacy is not established. Issue #22 stays open for CI/dependency/review and
+merge verification. All changes for this delivery are in AiDotNet.Evolution.
+
 ## September 14: US-04
 
 [PR #47](https://github.com/ooples/AiDotNet.Evolution/pull/47) adds verified experiment
@@ -37,7 +46,7 @@ Retargeting after squash/rebase merging needs special care to avoid reintroducin
 | US-01: Establish a representative benchmark suite | [#19](https://github.com/ooples/AiDotNet.Evolution/issues/19) | Implemented; local acceptance verified, review/merge gates remain | [AiDotNet.Evolution#45](https://github.com/ooples/AiDotNet.Evolution/pull/45) |
 | US-02: Make fair comparisons against competitors | [#20](https://github.com/ooples/AiDotNet.Evolution/issues/20) | Evolution-owned real program pilot and adversarial audit verified; full empirical acceptance remains open | [AiDotNet.Evolution#46](https://github.com/ooples/AiDotNet.Evolution/pull/46) |
 | US-03: Prevent invalid improvements from winning | [#21](https://github.com/ooples/AiDotNet.Evolution/issues/21) | Partial, companion | [AiDotNet#2163](https://github.com/ooples/AiDotNet/pull/2163) |
-| US-04: Turn traces into trustworthy experiment reports | [#22](https://github.com/ooples/AiDotNet.Evolution/issues/22) | Partial | [AiDotNet.Evolution#47](https://github.com/ooples/AiDotNet.Evolution/pull/47) |
+| US-04: Turn traces into trustworthy experiment reports | [#22](https://github.com/ooples/AiDotNet.Evolution/issues/22) | Implemented and verified; CI/review/merge pending | [AiDotNet.Evolution#47](https://github.com/ooples/AiDotNet.Evolution/pull/47) |
 | US-05: Account for and enforce the real search budget | [#23](https://github.com/ooples/AiDotNet.Evolution/issues/23) | Partial | [AiDotNet.Evolution#48](https://github.com/ooples/AiDotNet.Evolution/pull/48) |
 | US-06: Handle noisy measurements and expensive evaluation | [#24](https://github.com/ooples/AiDotNet.Evolution/issues/24) | Partial | [AiDotNet.Evolution#49](https://github.com/ooples/AiDotNet.Evolution/pull/49) |
 | US-07: Identify which existing features improve search | [#25](https://github.com/ooples/AiDotNet.Evolution/issues/25) | Partial | [AiDotNet.Evolution#50](https://github.com/ooples/AiDotNet.Evolution/pull/50) |

@@ -47,6 +47,19 @@ def duration(receipt):
     return value
 
 
+def independent_counters(raw):
+    if raw is None or "independent_counters" not in raw:
+        return None
+    counters = raw["independent_counters"]
+    require(isinstance(counters, dict) and all(isinstance(counters.get(k), dict) and
+            set(counters[k]) == {"model", "evaluate"} and all(type(v) is int and v >= 0 for v in counters[k].values())
+            for k in ("attempted", "unknown")), "Invalid independent attempt counters.")
+    require(all(counters["unknown"][k] <= counters["attempted"][k] for k in ("model", "evaluate")) and
+            type(counters.get("model_tokens")) is int and counters["model_tokens"] >= 0 and
+            finite(counters.get("evaluation_seconds")), "Invalid independent work counters.")
+    return counters
+
+
 def report(pilot, audit):
     pilot, audit = Path(pilot), Path(audit)
     plan, campaign = read(pilot / "plan.json"), read(pilot / "report.json")
@@ -66,13 +79,23 @@ def report(pilot, audit):
     require(set(audit_rows).issubset({(task, *track) for task in tasks for track in TRACKS}), "Unplanned audit observation.")
     rows = []
     for task in tasks:
+        comparison_path = pilot / task / "comparison.json"
+        raw_runs = {}
+        if comparison_path.exists():
+            raw = read(comparison_path)
+            require(raw.get("schema") == "aidotnet-program-comparison-v1" and
+                    raw.get("seed") == plan["search_seeds"][0] and
+                    raw.get("initial_program_hash") == plan["tasks"][task]["source_sha256"], "Raw comparison identity changed.")
+            raw_runs = indexed(raw["runs"], lambda row: (row["mode"], row["method"]))
+            require(set(raw_runs).issubset(TRACKS), "Unplanned raw comparison track.")
         pairs = indexed(observed.get(task, {}).get("pairs", []), lambda row: (row["mode"], row["method"]))
         require(set(pairs).issubset(TRACKS), "Unplanned comparison track.")
         for mode, method in TRACKS:
             pair = pairs.get((mode, method))
             row = dict(task=task, mode=mode, method=method, search_seed=plan["search_seeds"][0],
                        status="missing", original_seconds=None, deployed_seconds=None, speedup=None,
-                       model_tokens=None, search_evaluator_seconds=None, timing_samples=0)
+                       model_tokens=None, search_evaluator_seconds=None, timing_samples=0,
+                       cost_provenance="legacy-summary-only", unknown_model_attempts=None, unknown_evaluator_attempts=None)
             if pair is not None:
                 original, selected = pair["original"], pair["selected"]
                 require(original.get("phase") == selected.get("phase") == "confirmation" and
@@ -95,6 +118,15 @@ def report(pilot, audit):
                            speedup=before / deployed if deployed is not None else None,
                            model_tokens=tokens, search_evaluator_seconds=work,
                            timing_samples=len(original.get("samples", [])) + len(selected.get("samples", [])))
+            raw = raw_runs.get((mode, method))
+            if raw is not None and pair is not None:
+                require(raw.get("selected_hash") == pair["selected"]["candidate_hash"] and
+                        raw.get("status") == pair["search_status"], "Raw selection/search identity changed.")
+            counters = independent_counters(raw)
+            if counters is not None:
+                row.update(model_tokens=counters["model_tokens"], search_evaluator_seconds=counters["evaluation_seconds"],
+                           cost_provenance="independent-counters", unknown_model_attempts=counters["unknown"]["model"],
+                           unknown_evaluator_attempts=counters["unknown"]["evaluate"])
             rows.append(row)
     by_track = {(r["task"], r["mode"], r["method"]): r for r in rows}
     comparisons = []
@@ -114,15 +146,18 @@ def report(pilot, audit):
     return dict(schema="evolution-program-analysis-v1", claim="none", purpose="retrospective-development",
                 pilot_report_sha256=audit_plan["pilot_report_sha256"], audit_report_sha256=hashlib.sha256((audit / "report.json").read_bytes()).hexdigest(),
                 independent_search_runs_per_task_method=1, rows=rows, comparisons=comparisons,
-                known_model_tokens=sum(r["model_tokens"] or 0 for r in rows), unknown_token_rows=sum(r["model_tokens"] is None for r in rows),
+                known_model_tokens=sum(r["model_tokens"] or 0 for r in rows),
+                unknown_token_rows=sum(r["model_tokens"] is None or bool(r["unknown_model_attempts"]) for r in rows),
                 known_search_evaluator_seconds=sum(r["search_evaluator_seconds"] or 0 for r in rows),
-                unknown_evaluator_rows=sum(r["search_evaluator_seconds"] is None for r in rows),
+                unknown_evaluator_rows=sum(r["search_evaluator_seconds"] is None or bool(r["unknown_evaluator_attempts"]) for r in rows),
+                independently_accounted_rows=sum(r["cost_provenance"] == "independent-counters" for r in rows),
                 sample_size_plan=None, superiority_established=False,
                 progress_curves=None, progress_curve_status="not-reconstructed-from-summary-only-input",
                 limitations=["Fresh-process batch latency includes startup/imports/serialization, not kernel latency.",
                              "Timing repeats and different tasks cannot replace independent paired search runs.",
                              "Ratios compare selected/deployed runtimes directly, not ratios with different noisy baseline denominators.",
                              "Known cost subtotals are not complete totals when any cost is unknown; equal caps do not imply equal cost.",
+                             "Independent counters take precedence over retained trace summaries, even when outcomes are missing; legacy summary-only costs do not establish accounting completeness.",
                              "No numeric-protocol conversion, final registration, power guarantee or exact provider snapshot is invented.",
                              "Hash consistency is not authentication; source evidence and externally retained hashes require trusted custody."])
 

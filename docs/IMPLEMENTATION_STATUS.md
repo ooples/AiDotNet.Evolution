@@ -5,6 +5,16 @@ Implementation is continuing across the core and companion PRs. **The roadmap is
 
 Track the full plan through the [26 user-story issues and PR delivery index](USER_STORY_DELIVERY.md).
 
+## September 15: US-04 acceptance complete locally
+
+[PR #47](https://github.com/ooples/AiDotNet.Evolution/pull/47) now includes the
+[completed 72-cell real-program study](evidence/us04/PROGRAM_STUDY.md), independent
+cost accounting under trace loss, paired conditional intervals, fixed prospective
+planning, four-axis progress/AUC and reproducible offline scorecards. All 85
+analysis tests passed, alongside the final build, 654/608/608 .NET tests and 37
+external Python tests. All feature work is in AiDotNet.Evolution. CI, dependencies,
+independent review and user merging remain gates; no competitive win is claimed.
+
 ## September 14: US-04 reporting implementation
 
 [PR #47](https://github.com/ooples/AiDotNet.Evolution/pull/47) now implements fixed-sample
