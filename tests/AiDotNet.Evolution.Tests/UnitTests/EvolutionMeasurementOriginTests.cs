@@ -203,6 +203,51 @@ public sealed class EvolutionMeasurementOriginTests
         Assert.Throws<InvalidDataException>(() => EvolutionTraceFile.FromJson(json));
     }
 
+    public enum CheckpointOriginLocation
+    {
+        Cache,
+        IslandArchive,
+        GlobalElite,
+        IslandHistory
+    }
+
+    [Theory]
+    [InlineData(CheckpointOriginLocation.Cache)]
+    [InlineData(CheckpointOriginLocation.IslandArchive)]
+    [InlineData(CheckpointOriginLocation.GlobalElite)]
+    [InlineData(CheckpointOriginLocation.IslandHistory)]
+    public async Task Every_origin_location_independently_requires_the_versioned_schema(CheckpointOriginLocation location)
+    {
+        var store = new InMemoryEvolutionCheckpointStore();
+        await Engine(new OriginTask { IncludeOrigin = false }, Options(2), store).RunAsync(new[] { new TestGenome(1) });
+        var checkpoint = Assert.IsType<EvolutionCheckpoint>(await store.LoadLatestAsync("origin-run"));
+        var node = Assert.IsType<JsonObject>(JsonNode.Parse(checkpoint.Payload));
+        Assert.DoesNotContain("MeasurementOrigin", checkpoint.Payload);
+
+        JsonObject target = location switch
+        {
+            CheckpointOriginLocation.Cache => Object(First(node["Cache"])["Result"]),
+            CheckpointOriginLocation.IslandArchive => Object(First(First(node["Islands"])["Entries"])["Evaluation"]),
+            CheckpointOriginLocation.GlobalElite => Object(Object(First(node["GlobalElites"])["Entry"])["Evaluation"]),
+            CheckpointOriginLocation.IslandHistory => Object(First(Array(node["IslandHistories"])[0])["Evaluation"]),
+            _ => throw new ArgumentOutOfRangeException(nameof(location))
+        };
+        target["MeasurementOriginJson"] = Origin().ToJson();
+        var codec = new CountingCodec();
+        var legacySchema = new EvolutionCheckpoint(checkpoint.RunId, checkpoint.Sequence, checkpoint.CompatibilityHash, node.ToJsonString());
+        Assert.Throws<InvalidDataException>(() => EvolutionEngine<TestGenome>.ReadCheckpoint(legacySchema, codec));
+        Assert.Equal(0, codec.DecodeCalls);
+
+        node["SchemaVersion"] = 7;
+        var versioned = new EvolutionCheckpoint(checkpoint.RunId, checkpoint.Sequence, checkpoint.CompatibilityHash, node.ToJsonString());
+        Assert.NotEmpty(EvolutionEngine<TestGenome>.ReadCheckpoint(versioned, codec).Entries);
+        Assert.True(codec.DecodeCalls > 0);
+
+        static JsonObject Object(JsonNode? value) => Assert.IsType<JsonObject>(value);
+        static JsonArray Array(JsonNode? value) => Assert.IsType<JsonArray>(value);
+        static JsonObject First(JsonNode? value) => Object(Array(value)[0]);
+    }
+
     [Theory]
     [InlineData("fresh", true)]
     [InlineData("reused", false)]
