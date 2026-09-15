@@ -8,6 +8,13 @@ and readiness updates supersede those initial labels. The historical table below
 not an authoritative live draft count.
 Creating a PR or inheriting a foundation does not complete a story.
 
+## September 15: US-08 operator feedback and consumer portfolios
+
+[Core #51](https://github.com/ooples/AiDotNet.Evolution/pull/51) and [consumer #2212](https://github.com/ooples/AiDotNet/pull/2212)
+now deliver typed outcome notifications, shared-ledger program arms, compiler/facade integration and checkpoint validation.
+[Evidence](evidence/us08/README.md): core 792/719/719 tests, 50 Python tests, consumer 83+954 tests per modern target,
+and 1,152 fixed study runs. No adaptive policy earned default promotion. Reviews and dependency/publication-aware merges remain with the user.
+
 ## September 15: US-07 ablation implementation
 
 [PR #50](https://github.com/ooples/AiDotNet.Evolution/pull/50) implements the fixed matrix on US-06 #49.
@@ -72,7 +79,7 @@ Retargeting after squash/rebase merging needs special care to avoid reintroducin
 | US-05: Account for and enforce the real search budget | [#23](https://github.com/ooples/AiDotNet.Evolution/issues/23) | Partial | [AiDotNet.Evolution#48](https://github.com/ooples/AiDotNet.Evolution/pull/48) |
 | US-06: Handle noisy measurements and expensive evaluation | [#24](https://github.com/ooples/AiDotNet.Evolution/issues/24) | Core/consumer implementation verified; dependency/package gate open | [AiDotNet.Evolution#49](https://github.com/ooples/AiDotNet.Evolution/pull/49), [AiDotNet#2210](https://github.com/ooples/AiDotNet/pull/2210) |
 | US-07: Identify which existing features improve search | [#25](https://github.com/ooples/AiDotNet.Evolution/issues/25) | Local implementation verified; review/merge pending; no default promotion | [AiDotNet.Evolution#50](https://github.com/ooples/AiDotNet.Evolution/pull/50) |
-| US-08: Adapt proposal strategies using measured outcomes | [#26](https://github.com/ooples/AiDotNet.Evolution/issues/26) | Partial story; completed fix ready for review | [AiDotNet.Evolution#51](https://github.com/ooples/AiDotNet.Evolution/pull/51) |
+| US-08: Adapt proposal strategies using measured outcomes | [#26](https://github.com/ooples/AiDotNet.Evolution/issues/26) | Implementation verified; review/dependency merge pending; no default promotion | [AiDotNet.Evolution#51](https://github.com/ooples/AiDotNet.Evolution/pull/51), [AiDotNet#2212](https://github.com/ooples/AiDotNet/pull/2212) |
 | US-09: Preserve useful tradeoffs between objectives | [#27](https://github.com/ooples/AiDotNet.Evolution/issues/27) | Not implemented | [AiDotNet.Evolution#52](https://github.com/ooples/AiDotNet.Evolution/pull/52) |
 | US-10: Measure engine overhead and scaling | [#28](https://github.com/ooples/AiDotNet.Evolution/issues/28) | Partial | [AiDotNet.Evolution#53](https://github.com/ooples/AiDotNet.Evolution/pull/53) |
 | US-11: Demonstrate value in consumer workloads | [#29](https://github.com/ooples/AiDotNet.Evolution/issues/29) | Partial, companion | [AiDotNet#2164](https://github.com/ooples/AiDotNet/pull/2164) |
