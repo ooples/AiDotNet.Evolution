@@ -91,7 +91,7 @@ def run_campaign(output, aidotnet_dll, upstream, initial, task, model, generate,
                         command = ["dotnet", str(dll), str(source.resolve()), str((directory / "adapter-result.json").resolve()),
                                    model, str(iterations), str(seed), str(description.resolve()), mode]
                     else:
-                        command = [sys.executable, str(Path(__file__).with_name("openevolve_adapter.py")),
+                        command = [sys.executable, "-X", "utf8", str(Path(__file__).with_name("openevolve_adapter.py")),
                                    "--upstream", str(Path(upstream).resolve()), "--initial", str(source.resolve()),
                                    "--output", str((directory / "upstream").resolve()), "--model", model,
                                    "--iterations", str(iterations), "--seed", str(seed), "--task", str(description.resolve()), "--mode", mode]
