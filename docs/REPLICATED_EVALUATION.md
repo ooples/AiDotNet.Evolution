@@ -115,7 +115,9 @@ dotnet run --project examples/ReplicatedEvaluation -c Release -- --noise-policie
 The executable preset exercises bounded synthetic noise, a real improvement, a search-only optimistic candidate,
 preselected rejection audits and trusted sorting with explicit warmup. It checks fresh identities and exact shared
 ledger charges. It validates software contracts, not competitor superiority, representative training/runtime gains,
-production cascade presets or OS isolation. Those empirical consumer studies remain separate work.
+production cascade presets or OS isolation. The subsequent [consumer completion study](evidence/us06/COMPLETION.md)
+adds actual RidgeRegression fits and trusted sorting, a validated conservative ridge screening preset and retained
+failed negative-control presets. Its evidence is workload-specific, not universal production approval.
 
 Purpose separation is a logical identity/accounting boundary, **not a security sandbox**: callers
 must keep hidden test data and confirmation feedback outside the proposing process. The runner is not a transparent

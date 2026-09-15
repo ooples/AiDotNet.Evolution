@@ -5,7 +5,16 @@ Implementation is continuing across the core and companion PRs. **The roadmap is
 
 Track the full plan through the [26 user-story issues and PR delivery index](USER_STORY_DELIVERY.md).
 
-## September 15: US-06 noise policies
+## September 15: US-06 consumer completion work
+
+[AiDotNet #2210](https://github.com/ooples/AiDotNet/pull/2210) now supplies the consumer
+workflow and actual regression-training/trusted-runtime validation. [Completion evidence](evidence/us06/COMPLETION.md):
+954/954 consumer tests, net471 compilation, 18 fixed runs and 14,056 reconciled calls.
+Conservative ridge screening passed; aggressive ridge/timing presets were rejected.
+Matching-source hosted integration passed. Ordinary package-path CI remains blocked on
+the older published core; issue #24 stays open and no next story is started.
+
+## September 15: US-06 noise policies (initial core handoff)
 
 [PR #49](https://github.com/ooples/AiDotNet.Evolution/pull/49), based on #48,
 implements fresh incumbent challenges with finite-slot confirmation, preselected
