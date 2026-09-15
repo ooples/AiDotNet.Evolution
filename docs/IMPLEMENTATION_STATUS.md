@@ -5,6 +5,61 @@ Implementation is continuing across the core and companion PRs. **The roadmap is
 
 Track the full plan through the [26 user-story issues and PR delivery index](USER_STORY_DELIVERY.md).
 
+## September 15: US-06 consumer completion work
+
+[AiDotNet #2210](https://github.com/ooples/AiDotNet/pull/2210) now supplies the consumer
+workflow and actual regression-training/trusted-runtime validation. [Completion evidence](evidence/us06/COMPLETION.md):
+954/954 consumer tests, net471 compilation, 18 fixed runs and 14,056 reconciled calls.
+Conservative ridge screening passed; aggressive ridge/timing presets were rejected.
+Matching-source hosted integration passed. Ordinary package-path CI remains blocked on
+the older published core; issue #24 stays open and no next story is started.
+
+## September 15: US-06 noise policies (initial core handoff)
+
+[PR #49](https://github.com/ooples/AiDotNet.Evolution/pull/49), based on #48,
+implements fresh incumbent challenges with finite-slot confirmation, preselected
+full-evaluation rejection audits and explicit charged warmup/timing protocols.
+[Final evidence](evidence/us06/README.md): 704/658/658 tests, clean build/format,
+90.84%/76.32% coverage and a bounded-noise executable with 537 charged calls passed.
+This core scope is ready for review; production consumer studies, validated production
+cascade presets and dependency/review/merge gates remain open in issue #24.
+
+## September 15: US-05 core resource workflow
+
+[PR #48](https://github.com/ooples/AiDotNet.Evolution/pull/48), based on #47,
+adds deterministic wave reservation, complete per-stage totals, rejection of
+over-budget stage values and coordinated quiescent engine/ledger envelopes.
+[Final evidence](evidence/us05/README.md): 678/632/632 tests, 36 analysis tests,
+external accounting/replay and 1,320 fixed runs passed; coverage 90.76%/76.23%.
+Consumer-specific instrumentation/hard limits and currency conversion remain
+explicit responsibilities. No companion source changes or full-roadmap completion
+are claimed by this core scope; issue #23 stays open.
+
+## September 14: US-04 reporting implementation
+
+[PR #47](https://github.com/ooples/AiDotNet.Evolution/pull/47) now implements fixed-sample
+planning and one-use artifact-pinned execution, failure-aware scorecards, declared
+target censoring and offline HTML/SVG reports. Final verification: 654/608/608 .NET
+tests, 36 Python tests, 1,320 actual fixed numeric runs, repeated-use refusal,
+90.68%/76.20% coverage and clean build/format. [Raw evidence](evidence/us04/README.md).
+Base is US-02 #46, preserving US-01 #45 and foundation #15 transitively. No companion
+change is needed. Review readiness is not representative competitive confirmation,
+US-03 isolation approval, merge readiness, or completion of the entire roadmap.
+The following initial-delivery sections are historical, not a current count of drafts.
+
+## Dependent story delivery
+
+The user chose to retain #15, AiDotNet #2148 and Tensors #1024 as shared foundations.
+All 26 stories now have individual open issues and dependent draft PRs, with reciprocal links and original
+Given/When/Then checklists. Initial story commits were documentation-only, not completed implementation.
+
+[US-08 / PR #51](https://github.com/ooples/AiDotNet.Evolution/pull/51) adds the first subsequent story-owned
+implementation slice: producer-declared reused measurements cannot earn fresh portfolio credit, enter
+surrogate training as new evidence or train CMA as fresh population members. Credit retains origin separately
+from current cost; semantic versions reject older learned checkpoints. This fix is on the dependent branch,
+not yet in this shared foundation or consumer source/package pins. US-13, US-14 and US-23 require integration.
+Full story acceptance and independent current-head review remain open.
+
 ## Implemented in the initial core PR
 
 - `IOutcomeAwareVariationOperator<TGenome>` receives terminal committed outcomes, including proposal failures,
@@ -102,14 +157,14 @@ Durable evaluation identities and leases must be developed against its eventual 
 
 | Story | State | Work still required |
 | --- | --- | --- |
-| US-01 representative suites | Partial | Authored C# end-to-end pilot now runs; representative program/kernel/AutoML tasks, AlgoTune subset and sealed task partitions remain. |
+| US-01 representative suites | Implemented and locally verified; review/merge gates remain | [Nine numeric families and an 11-task pinned AlgoTune reference subset](../benchmarks/suite/README.md), independent generated instances, disjoint partitions, frozen-method final execution, one-use final receipts and reproducible source/runtime/resource manifests. 631 net10 tests, 608 each net8/net471, 17 Python protocol tests and all starting implementations verified. Contract evidence is not competitive superiority or a full AlgoTuner reproduction. |
 | US-02 fair baselines | Partial | Matched-population SciPy differential evolution now uses the shared C# evaluator and independent counters; native-default/tuned controls, OpenEvolve and consistent model access remain. |
 | US-03 correctness gates | Partial, companion | Real C# worker/facade checks and fail-closed truncated-output/owned-case contracts exist; trusted OS isolation, reference integrations and held-out validation remain. |
 | US-04 statistical evidence | Partial | Paired task/run analysis, failure-inclusive effects/intervals and trace checks implemented; prospective sample-size/power design and representative confirmation remain. |
 | US-05 resource ledger | Partial | Generic ledger and adapters plus bounded C# consumer model/compiler/setup/audit/evaluation integration implemented; other consumer stages, coordinated persistence and deterministic concurrent admission remain. |
 | US-06 noisy evaluation | Partial | Fresh bounded replicate runner, per-sample costs, finite-look uncertainty and separate confirmation identities implemented; archive resampling policy, cascade-rejection audit and representative noisy comparisons remain. |
-| US-07 ablations | Partial | Same-operator uniform/adaptive allocation is available; representative island, migration, novelty and dispatch ablations remain. |
-| US-08 adaptive operators | Partial | Parent-improvement/archive-success policies, proposal-plus-evaluator credit and typed attribution implemented; full consumer-stage integration and representative held-out comparisons before default promotion remain. |
+| US-07 ablations | Local implementation verified; review/merge pending | Fixed 19-condition matrix; 2,208 registered local numeric/symbolic-program/kernel runs and 141,312 calls. Frozen confirmation was inconclusive: defaults unchanged. Not unrestricted LLM-program or production-speedup evidence. [Evidence](evidence/us07/README.md). |
+| US-08 adaptive operators | Implementation verified; review/dependency merge pending | Typed commit notifications, valid-evidence credit, metered program portfolio/compiler companion #2212, checkpoint replay and 1,152 fixed comparisons. All promotion gates inconclusive; adaptation remains optional. [Evidence](evidence/us08/README.md). |
 | US-09 Pareto pipeline | Not implemented | Feasibility, objective definitions, archive/snapshot/selection/stopping/migration semantics together. |
 | US-10 engine performance | Partial | BenchmarkDotNet engine/archive/checkpoint suite and fixture validation implemented; controlled repeated baselines, peak memory, dimension/island scaling and regression thresholds remain. |
 | US-11 application examples | Partial, companion | Executable authored-C# facade/worker/timing/confirmation example exists; representative program, AutoML, kernel and external-session examples remain. |
