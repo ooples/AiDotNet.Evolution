@@ -65,6 +65,11 @@ jobs:
       - name: Verify replication accounting and confirmation
         shell: pwsh
         run: ./eng/Test-Replication.ps1
+      - name: Verify incumbent challenges and screen-rejection audits
+        shell: pwsh
+        run: |
+          dotnet run --project examples/ReplicatedEvaluation -c Release --no-build -- --noise-policies > TestResults/noise-policies.json
+          if ($LASTEXITCODE -ne 0) { throw 'Noise policy contract failed.' }
       - name: Verify persistent evaluation reuse and force-fresh accounting
         run: dotnet run --project examples/PersistentEvaluation -c Release -- "${{ github.workspace }}/TestResults/persistent-evaluation"
       - name: Verify surrogate backend and measured-only selection
@@ -99,6 +104,7 @@ jobs:
           path: |
             TestResults/quality/**/*.json
             TestResults/experiment-reports/**
+            TestResults/noise-policies.json
             TestResults/persistent-evaluation/**/*.json
             TestResults/persistent-evaluation/*.jsonl
             coverage/**/coverage.cobertura.xml
