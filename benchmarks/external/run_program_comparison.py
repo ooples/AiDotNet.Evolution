@@ -11,6 +11,7 @@ import json
 import os
 from pathlib import Path
 import platform
+import random
 import subprocess
 import sys
 import time
@@ -62,6 +63,9 @@ def run_campaign(output, aidotnet_dll, upstream, initial, task, model, generate,
                                "No registered holdout or competitive superiority claim follows from this controller"])
     schedule = [("controlled", "aidotnet"), ("controlled", "openevolve"), ("controlled", "one-shot"),
                 ("controlled", "single-parent"), ("native-bounded", "aidotnet"), ("native-bounded", "openevolve")]
+    if evidence_class == "development-experiment":
+        random.Random(seed).shuffle(schedule)
+    report["schedule"] = schedule
     for index, (mode, method) in enumerate(schedule):
         directory = root / f"{index}-{mode}-{method}"
         directory.mkdir()
@@ -105,6 +109,19 @@ def run_campaign(output, aidotnet_dll, upstream, initial, task, model, generate,
                     expected_system, expected_messages = controlled_prompt(task, initial, None)
                     if models[0]["request"] != {"system": expected_system, "messages": expected_messages}:
                         raise ValueError("Controlled first prompts differ despite identical initial information")
+                if method in ("one-shot", "single-parent"):
+                    selected = row["control"]["best"]["code"]
+                elif method == "aidotnet":
+                    selected = json.loads((directory / "adapter-result.json").read_text())["best"]
+                else:
+                    selected = json.loads((directory / "upstream/adapter-result.json").read_text())["best"]["code"]
+                if not isinstance(selected, str) or not any(
+                        receipt["operation"] == "evaluate" and receipt["status"] == "completed" and
+                        receipt["result"]["status"] == "valid" and receipt["request"]["code"] == selected
+                        for receipt in broker.rows):
+                    raise ValueError("The selected program has no matching valid search receipt")
+                row["selected_code"] = selected
+                row["selected_hash"] = candidate_hash(selected)
                 row["status"] = "completed"
             except Exception as error:
                 if isinstance(error, MemoryError):
@@ -114,6 +131,9 @@ def run_campaign(output, aidotnet_dll, upstream, initial, task, model, generate,
         # must not be retained beside a stale, pre-shutdown token count.
         row["receipts"] = broker.rows
         row["actual_model_tokens"] = broker.model_tokens
+        if row["status"] != "completed":
+            row["selected_code"], row["selected_hash"] = initial, initial_hash
+            row["fallback"] = "original-after-failed-search"
         report["runs"].append(row)
         (directory / "receipts.json").write_text(json.dumps(row, indent=2, allow_nan=False), encoding="utf-8")
     report["status"] = "completed" if all(row["status"] == "completed" for row in report["runs"]) else "failed"
