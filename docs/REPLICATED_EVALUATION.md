@@ -63,7 +63,60 @@ powershell -ExecutionPolicy Bypass -File eng/Test-Replication.ps1
 dotnet run --project examples/ReplicatedEvaluation -c Release -- 32
 ```
 
-Remaining US-06 work includes archive-incumbent resampling policy, cascade-rejection audits and representative noisy
-quality comparisons. Purpose separation is a logical identity/accounting boundary, **not a security sandbox**: callers
+## Incumbent challenges
+
+`EvolutionIncumbentChallenge<TGenome>` measures both challenger and incumbent afresh, screens their mean improvement,
+then requests two separately owned confirmation batches. It confirms only when the directional lower improvement
+bound exceeds the predeclared minimum. Confirmation allocates error across both candidates and every declared
+challenge slot. Freeze policy, support, minimum improvement, versions and slot count before outcomes are available.
+Persist the shared ledger: its one-use slot tombstones prevent retrying a slot with a different candidate or context.
+Changing policy identity or replacing the ledger resets that protection; neither is a legitimate way to extend a
+claimed statistical family. Extremely small allocated error outside the replication plan's supported range is rejected.
+
+The report names the incumbent actually measured. A trusted caller must recheck its identity, correctness and
+applicability before replacement. No automatic archive insertion or hidden confirmation feedback is performed.
+Measurements are sequential, not randomized paired/ABBA trials; drift, shared training state and correlated timing
+require a domain-specific protocol. Separate callbacks and streams alone do not establish physical independence.
+
+## Screen-rejection audits
+
+`EvolutionRejectionAudit<TGenome>` samples without replacement from a frozen canonical rejected set using a separately
+chosen seed, before any full-evaluation callback. Canonical sorting makes selection independent of input enumeration.
+Every selected candidate receives fresh full-fidelity replication in the Confirmation stage. Usefulness means its
+true full-fidelity mean strictly beats the declared threshold, not merely that a single observed score looks promising.
+
+Half the error budget covers all selected candidates' mean intervals; half covers finite-population sampling using
+the bounded-variable Hoeffding inequality cited above. With n selected candidates the sampling radius is
+`sqrt(log(4/alpha)/(2*n))`, or zero for a census. Definitely useful candidates form the lower sample proportion;
+useful plus unresolved candidates form the upper. Failed, canceled and budget-short audits remain unresolved, never
+successful rejections. The resulting interval concerns **useful candidates among rejects**, not the fraction of all
+useful candidates rejected. Small audits can correctly return an uninformative [0,1] interval.
+
+This is a conditional single-audit statement: freeze population/threshold/protocol and choose the seed independently
+of candidate generation. Seed shopping, repeated audits without additional error allocation, adaptive thresholds or
+uncontrolled dependencies invalidate the interpretation. Reports retain population hash, seed, selected identities
+and measurement receipts; a ledger tombstone prevents rerunning an audit identity with a more favorable seed.
+Callers explicitly supply the rejected set; the audit does not train a screen or silently change cascade decisions.
+
+## Controlled timing and runnable policy preset
+
+`EvolutionTimingProtocol` runs explicit warmups followed by one elapsed-time observation. Warmups are excluded from
+fitness but included in callback-call cost. Wrap it in a fresh replicate runner with support `[0, maximumMillisecondsPerCall]`,
+Minimize direction and `MaximumCostPerSample`. Include its version in the evaluator fingerprint. Each timing observation
+contains exactly one fitness sample, regardless of warmup count. Raw results report separate warmup/measurement times.
+Exceptions, cancellation and elapsed-time overruns invalidate rather than clip observations. Deadlines are cooperative:
+untrusted or noncooperative work needs caller-owned process isolation and termination. Callback-call units are not CPU
+time or money; correctness checks and environment resets belong to the supplied callback.
+
+```powershell
+dotnet run --project examples/ReplicatedEvaluation -c Release -- --noise-policies
+```
+
+The executable preset exercises bounded synthetic noise, a real improvement, a search-only optimistic candidate,
+preselected rejection audits and trusted sorting with explicit warmup. It checks fresh identities and exact shared
+ledger charges. It validates software contracts, not competitor superiority, representative training/runtime gains,
+production cascade presets or OS isolation. Those empirical consumer studies remain separate work.
+
+Purpose separation is a logical identity/accounting boundary, **not a security sandbox**: callers
 must keep hidden test data and confirmation feedback outside the proposing process. The runner is not a transparent
 task decorator and does not silently choose aggregation rules for task metrics, artifacts or noisy descriptors.
