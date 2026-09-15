@@ -5,6 +5,16 @@ Implementation is continuing across the core and companion PRs. **The roadmap is
 
 Track the full plan through the [26 user-story issues and PR delivery index](USER_STORY_DELIVERY.md).
 
+## September 15: US-06 noise policies
+
+[PR #49](https://github.com/ooples/AiDotNet.Evolution/pull/49), based on #48,
+implements fresh incumbent challenges with finite-slot confirmation, preselected
+full-evaluation rejection audits and explicit charged warmup/timing protocols.
+[Final evidence](evidence/us06/README.md): 704/658/658 tests, clean build/format,
+90.84%/76.32% coverage and a bounded-noise executable with 537 charged calls passed.
+This core scope is ready for review; production consumer studies, validated production
+cascade presets and dependency/review/merge gates remain open in issue #24.
+
 ## September 15: US-05 core resource workflow
 
 [PR #48](https://github.com/ooples/AiDotNet.Evolution/pull/48), based on #47,
