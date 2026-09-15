@@ -131,6 +131,8 @@ def run_campaign(output, aidotnet_dll, upstream, initial, task, model, generate,
         # must not be retained beside a stale, pre-shutdown token count.
         row["receipts"] = broker.rows
         row["actual_model_tokens"] = broker.model_tokens
+        row["independent_counters"] = {"attempted": dict(broker.attempted), "unknown": dict(broker.unknown_attempts),
+                                       "model_tokens": broker.model_tokens, "evaluation_seconds": broker.evaluation_seconds}
         if row["status"] != "completed":
             row["selected_code"], row["selected_hash"] = initial, initial_hash
             row["fallback"] = "original-after-failed-search"

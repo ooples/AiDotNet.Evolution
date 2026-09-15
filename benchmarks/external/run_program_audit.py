@@ -33,7 +33,9 @@ def cases(task, seed):
     return result
 
 
-def run(pilot, output, image):
+def run(pilot, output, image, *, seed=863791):
+    if type(seed) is not int or not 0 <= seed < 2**32:
+        raise ValueError("Invalid audit instance seed")
     pilot, root = Path(pilot).resolve(), Path(output).resolve()
     report_path = pilot / "report.json"
     report = json.loads(report_path.read_bytes())
@@ -52,8 +54,8 @@ def run(pilot, output, image):
             raise ValueError("Audit requires every scheduled comparison track, including failures")
         selected[task["task"]] = comparison["runs"]
     # Binding all selected hashes and input hashes precedes any candidate audit execution.
-    problems = {task: cases(task, 863791) for task in selected}
-    plan = {"schema": "evolution-post-selection-audit-v1", "claim": "correctness-only",
+    problems = {task: cases(task, seed) for task in selected}
+    plan = {"schema": "evolution-post-selection-audit-v1", "claim": "correctness-only", "instance_seed": seed,
             "pilot_report_sha256": hashlib.sha256(report_path.read_bytes()).hexdigest(),
             "script_sha256": hashlib.sha256(Path(__file__).read_bytes()).hexdigest(),
             "case_counts": {task: len(value) for task, value in problems.items()},
