@@ -107,6 +107,12 @@ class GateTests(unittest.TestCase):
         self.assertNotIn("id-token: write", workflow)
         self.assertIn("contents: read", workflow)
 
+    def test_release_directory_does_not_unignore_private_keys(self):
+        root = Path(__file__).resolve().parents[2]
+        result = subprocess.run(["git", "-C", str(root), "check-ignore", "--no-index", "release/private_key.pem"], capture_output=True, text=True)
+        self.assertEqual(result.returncode, 0)
+        self.assertIn("private_key.pem", result.stdout)
+
     def test_supported_runtime_fixture(self):
         p = protocol()
         result = assess(p, observations(p))

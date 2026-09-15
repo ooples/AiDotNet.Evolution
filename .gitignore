@@ -98,4 +98,3 @@ __pycache__/
 
 # Reviewed release evidence is source-controlled, unlike compiler Release output.
 !/release/
-!/release/**
