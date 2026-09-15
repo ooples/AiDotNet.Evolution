@@ -19,8 +19,8 @@ class OpenEvolveAdapterTests(unittest.TestCase):
         upstream = os.environ.get("EVOLUTION_OPENEVOLVE_CHECKOUT")
         if not upstream:
             raise RuntimeError("Set EVOLUTION_OPENEVOLVE_CHECKOUT to the pinned checkout for this integration gate")
-        initial = "def solve(x):\n    return x + 1\n"
-        evolved = "def solve(x):\n    return 1 + x\n"
+        initial = "# Erdős–Rényi “reference”\ndef solve(x):\n    return x + 1\n"
+        evolved = "# Erdős–Rényi “candidate”\ndef solve(x):\n    return 1 + x\n"
 
         def evaluate(code):
             # Contract fixture does not execute or claim optimization of candidate code.
@@ -41,7 +41,7 @@ class OpenEvolveAdapterTests(unittest.TestCase):
                                    EVOLUTION_BROKER_CAPABILITY=broker.capability)
                 for key in ("OPENAI_API_KEY", "CODEX_API_KEY"):
                     environment.pop(key, None)
-                result = subprocess.run([sys.executable, str(Path(__file__).with_name("openevolve_adapter.py")),
+                result = subprocess.run([sys.executable, "-X", "utf8", str(Path(__file__).with_name("openevolve_adapter.py")),
                                          "--upstream", upstream, "--initial", str(source), "--output", str(root / "result"),
                                          "--model", "contract-fixture-no-provider", "--iterations", "2", "--seed", "37",
                                          "--task", str(task), "--mode", "native-bounded"],
@@ -53,7 +53,7 @@ class OpenEvolveAdapterTests(unittest.TestCase):
                 self.assertEqual(2, sum(row["operation"] == "model" for row in rows))
                 self.assertEqual(3, sum(row["operation"] == "evaluate" for row in rows))
                 self.assertEqual(initial, rows[0]["request"]["code"])
-                report = json.loads((root / "result/adapter-result.json").read_text())
+                report = json.loads((root / "result/adapter-result.json").read_text(encoding="utf-8"))
                 self.assertEqual("native-bounded", report["mode"])
 
 

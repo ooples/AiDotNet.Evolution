@@ -35,7 +35,7 @@ Retargeting after squash/rebase merging needs special care to avoid reintroducin
 | Story | Issue | Implementation status | Dependent PR |
 | --- | --- | --- | --- |
 | US-01: Establish a representative benchmark suite | [#19](https://github.com/ooples/AiDotNet.Evolution/issues/19) | Implemented; local acceptance verified, review/merge gates remain | [AiDotNet.Evolution#45](https://github.com/ooples/AiDotNet.Evolution/pull/45) |
-| US-02: Make fair comparisons against competitors | [#20](https://github.com/ooples/AiDotNet.Evolution/issues/20) | Partial | [AiDotNet.Evolution#46](https://github.com/ooples/AiDotNet.Evolution/pull/46) |
+| US-02: Make fair comparisons against competitors | [#20](https://github.com/ooples/AiDotNet.Evolution/issues/20) | Evolution-owned real program pilot and adversarial audit verified; full empirical acceptance remains open | [AiDotNet.Evolution#46](https://github.com/ooples/AiDotNet.Evolution/pull/46) |
 | US-03: Prevent invalid improvements from winning | [#21](https://github.com/ooples/AiDotNet.Evolution/issues/21) | Partial, companion | [AiDotNet#2163](https://github.com/ooples/AiDotNet/pull/2163) |
 | US-04: Turn traces into trustworthy experiment reports | [#22](https://github.com/ooples/AiDotNet.Evolution/issues/22) | Partial | [AiDotNet.Evolution#47](https://github.com/ooples/AiDotNet.Evolution/pull/47) |
 | US-05: Account for and enforce the real search budget | [#23](https://github.com/ooples/AiDotNet.Evolution/issues/23) | Partial | [AiDotNet.Evolution#48](https://github.com/ooples/AiDotNet.Evolution/pull/48) |
