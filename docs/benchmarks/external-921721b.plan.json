@@ -1,0 +1,21 @@
+{
+  "SchemaVersion": 1,
+  "Purpose": "retrospective-development",
+  "SourceRevision": "921721bbfa88c15be4bbfe703b0222e0eea9966d",
+  "Protocol": "numeric-development-v4-external",
+  "Tasks": [
+    {"Name": "Sphere", "Scale": 1},
+    {"Name": "ShiftedQuadratic", "Scale": 1},
+    {"Name": "AnisotropicQuadratic", "Scale": 1},
+    {"Name": "RippledQuadratic", "Scale": 1}
+  ],
+  "Methods": ["RandomSearch", "HillClimb", "FixedMapElites", "AdaptiveMapElites", "UniformPortfolioMapElites", "DiagonalCma", "ScipyDifferentialEvolutionMatched8"],
+  "SeedCount": 10,
+  "Budget": 256,
+  "PrimaryMethod": "DiagonalCma",
+  "Comparators": ["ScipyDifferentialEvolutionMatched8", "HillClimb"],
+  "BootstrapSamples": 5000,
+  "BootstrapSeed": 20260910,
+  "ResampleTasks": false,
+  "ConfidenceLevel": 0.95
+}

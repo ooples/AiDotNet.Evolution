@@ -455,6 +455,10 @@ public sealed partial class EvolutionEngine<TGenome>
             if (_selection is IOutcomeAwareEvolutionSelectionPolicy<TGenome> adaptiveSelection)
                 adaptiveSelection.Observe(evaluation, insertion);
 
+            if (evaluation.Lineage.Generation > 0 &&
+                _variation is IOutcomeAwareVariationOperator<TGenome> adaptiveVariation)
+                adaptiveVariation.Observe(evaluation, insertion);
+
             if (IsFailureLike(evaluation.Status))
             {
                 foreach (EvolutionDiagnostic diagnostic in evaluation.Diagnostics) RetainFailure(diagnostic);
@@ -538,7 +542,7 @@ public sealed partial class EvolutionEngine<TGenome>
         IReadOnlyList<EvolutionDiagnostic> diagnostics = item.AttemptCount == 0
             ? result.Diagnostics
             : item.AttemptDiagnostics;
-        return new EvolutionEvaluation(
+        var evaluation = new EvolutionEvaluation(
             item.EvaluationId,
             genomeId,
             result.Status,
@@ -557,6 +561,8 @@ public sealed partial class EvolutionEngine<TGenome>
             _configurationHash,
             result.Metrics,
             BoundArtifacts(result.Artifacts));
+        return result.MeasurementOrigin is null ? evaluation : evaluation.WithMeasurementOrigin(
+            cacheHit ? result.MeasurementOrigin.AsReused(EvolutionMeasurementOriginKind.RunLocalReuse) : result.MeasurementOrigin);
     }
 
     /// <summary>
@@ -717,6 +723,9 @@ public sealed partial class EvolutionEngine<TGenome>
             evaluation.ConfigurationHash,
             evaluation.Metrics,
             evaluation.Artifacts);
+        if (evaluation.MeasurementOrigin is not null)
+            migrantEvaluation = migrantEvaluation.WithMeasurementOrigin(
+                evaluation.MeasurementOrigin.AsReused(EvolutionMeasurementOriginKind.MigrationCopy));
         return new EvolutionArchiveEntry<TGenome>(source.Cell, candidate, migrantEvaluation);
     }
 
@@ -812,9 +821,12 @@ public sealed partial class EvolutionEngine<TGenome>
     }
 
     /// <summary>Copies a cached result with zero cost units so cache hits do not re-bill the original evaluation.</summary>
-    private static EvolutionTaskResult CopyWithZeroCost(EvolutionTaskResult result) => new(
-        result.Status, result.Quality, result.Direction, result.Descriptors, result.Objectives,
-        result.ConstraintViolations, 0, result.Diagnostics, result.Metrics);
+    private static EvolutionTaskResult CopyWithZeroCost(EvolutionTaskResult result)
+    {
+        var copy = new EvolutionTaskResult(result.Status, result.Quality, result.Direction, result.Descriptors, result.Objectives,
+            result.ConstraintViolations, 0, result.Diagnostics, result.Metrics);
+        return result.MeasurementOrigin is null ? copy : copy.WithMeasurementOrigin(result.MeasurementOrigin);
+    }
 
     /// <summary>Strips artifacts from a result before it enters the evaluation cache.</summary>
     /// <remarks>
@@ -823,8 +835,11 @@ public sealed partial class EvolutionEngine<TGenome>
     /// them at the point of caching also keeps the checkpoint small and keeps the cached result byte-identical across a
     /// checkpoint round trip, which the run state hash depends on.
     /// </remarks>
-    private static EvolutionTaskResult WithoutArtifacts(EvolutionTaskResult result) => result.Artifacts.Count == 0
-        ? result
-        : new EvolutionTaskResult(result.Status, result.Quality, result.Direction, result.Descriptors,
+    private static EvolutionTaskResult WithoutArtifacts(EvolutionTaskResult result)
+    {
+        if (result.Artifacts.Count == 0) return result;
+        var clean = new EvolutionTaskResult(result.Status, result.Quality, result.Direction, result.Descriptors,
             result.Objectives, result.ConstraintViolations, result.CostUnits, result.Diagnostics, result.Metrics);
+        return result.MeasurementOrigin is null ? clean : clean.WithMeasurementOrigin(result.MeasurementOrigin);
+    }
 }
