@@ -85,6 +85,12 @@ jobs:
         run: dotnet run --project benchmarks/AiDotNet.Evolution.Performance -c Release -- --smoke
       - name: Verify paired analysis contracts
         run: python3 -m unittest discover -s benchmarks/analysis -v
+      - name: Verify frozen feature-ablation campaign
+        run: |
+          python3 benchmarks/analysis/ablation.py register benchmarks/AiDotNet.Evolution.Quality/bin/Release/net10.0/AiDotNet.Evolution.Quality.dll TestResults/ablation-plan.json --seeds 2 --budget 16
+          python3 benchmarks/analysis/ablation.py execute TestResults/ablation-plan.json TestResults/ablations development
+          python3 benchmarks/analysis/ablation.py execute TestResults/ablation-plan.json TestResults/ablations confirmation
+          python3 benchmarks/analysis/ablation.py report TestResults/ablation-plan.json TestResults/ablations TestResults/ablation-report.json
       - name: Verify fixed-sample reporting with actual numeric search
         run: python3 benchmarks/analysis/verify_reports.py --evaluator benchmarks/AiDotNet.Evolution.Quality/bin/Release/net10.0/AiDotNet.Evolution.Quality.dll --source-revision '${{ github.sha }}' --output TestResults/experiment-reports
       - name: Verify archive partition accounting and replay
@@ -104,6 +110,8 @@ jobs:
           path: |
             TestResults/quality/**/*.json
             TestResults/experiment-reports/**
+            TestResults/ablations/**
+            TestResults/ablation-*
             TestResults/noise-policies.json
             TestResults/persistent-evaluation/**/*.json
             TestResults/persistent-evaluation/*.jsonl

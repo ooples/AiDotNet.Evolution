@@ -8,13 +8,20 @@ and readiness updates supersede those initial labels. The historical table below
 not an authoritative live draft count.
 Creating a PR or inheriting a foundation does not complete a story.
 
+## September 15: US-07 ablation implementation
+
+[PR #50](https://github.com/ooples/AiDotNet.Evolution/pull/50) implements the fixed matrix on US-06 #49.
+[Evidence](evidence/us07/README.md): 2,208 runs, 141,312 calls, 720/658/658 .NET tests and 45 Python tests.
+All three nominees were inconclusive on different confirmation tasks; baseline presets and library defaults remain unchanged.
+Evidence is scoped to local numeric, bounded-expression and CPU-kernel workloads. Reviews/merges remain with the user.
+
 ## September 15: US-06 consumer completion work
 
 Core #49 plus [AiDotNet #2210](https://github.com/ooples/AiDotNet/pull/2210) now deliver
 the consumer workflow and 18 fixed real training/timing runs. [Evidence](evidence/us06/COMPLETION.md):
 954/954 consumer tests, net471 compilation and 14,056 charged calls. Ordinary consumer
 CI still requires the unpublished core dependency chain; issue #24 stays open for that
-integration/review gate. US-07 is not started.
+integration/review gate. The US-07 update above supersedes its earlier not-started status.
 
 ## September 15: US-06 (initial core handoff)
 
@@ -64,7 +71,7 @@ Retargeting after squash/rebase merging needs special care to avoid reintroducin
 | US-04: Turn traces into trustworthy experiment reports | [#22](https://github.com/ooples/AiDotNet.Evolution/issues/22) | Partial | [AiDotNet.Evolution#47](https://github.com/ooples/AiDotNet.Evolution/pull/47) |
 | US-05: Account for and enforce the real search budget | [#23](https://github.com/ooples/AiDotNet.Evolution/issues/23) | Partial | [AiDotNet.Evolution#48](https://github.com/ooples/AiDotNet.Evolution/pull/48) |
 | US-06: Handle noisy measurements and expensive evaluation | [#24](https://github.com/ooples/AiDotNet.Evolution/issues/24) | Core/consumer implementation verified; dependency/package gate open | [AiDotNet.Evolution#49](https://github.com/ooples/AiDotNet.Evolution/pull/49), [AiDotNet#2210](https://github.com/ooples/AiDotNet/pull/2210) |
-| US-07: Identify which existing features improve search | [#25](https://github.com/ooples/AiDotNet.Evolution/issues/25) | Partial | [AiDotNet.Evolution#50](https://github.com/ooples/AiDotNet.Evolution/pull/50) |
+| US-07: Identify which existing features improve search | [#25](https://github.com/ooples/AiDotNet.Evolution/issues/25) | Local implementation verified; review/merge pending; no default promotion | [AiDotNet.Evolution#50](https://github.com/ooples/AiDotNet.Evolution/pull/50) |
 | US-08: Adapt proposal strategies using measured outcomes | [#26](https://github.com/ooples/AiDotNet.Evolution/issues/26) | Partial story; completed fix ready for review | [AiDotNet.Evolution#51](https://github.com/ooples/AiDotNet.Evolution/pull/51) |
 | US-09: Preserve useful tradeoffs between objectives | [#27](https://github.com/ooples/AiDotNet.Evolution/issues/27) | Not implemented | [AiDotNet.Evolution#52](https://github.com/ooples/AiDotNet.Evolution/pull/52) |
 | US-10: Measure engine overhead and scaling | [#28](https://github.com/ooples/AiDotNet.Evolution/issues/28) | Partial | [AiDotNet.Evolution#53](https://github.com/ooples/AiDotNet.Evolution/pull/53) |
