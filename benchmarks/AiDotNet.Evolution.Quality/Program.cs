@@ -11,6 +11,7 @@ internal static class Program
     {
         if (args.Length > 0 && args[0] == "--archive-partition") return await ArchivePartitionPilot.RunAsync(args.Skip(1).ToArray());
         if (args.Length > 0 && args[0] == "--numeric-service") return NumericObjectiveService.Run(args.Skip(1).ToArray());
+        if (args.Length > 0 && args[0] == "--suite-numeric-service") return NumericObjectiveService.Run(args.Skip(1).ToArray(), suite: true);
         if (args.Length > 0 && args[0] == "--suite") return await RepresentativeSuite.RunAsync(args.Skip(1).ToArray());
         int methodCount = Enum.GetValues<QualityMethod>().Length;
         int taskCount = Enum.GetValues<QualityTask>().Length;
@@ -84,13 +85,8 @@ internal static class QualityExperiment
         var ledger = new EvolutionResourceLedger($"{taskKind}-{method}-{seed}", new EvolutionResources(
             new Dictionary<string, decimal> { ["cost_units"] = budget * evaluationWork, ["proposal_calls"] = budget * 4 }),
             retainedReceiptLimit: 64, maximumOperations: Math.Min(1_000_000, budget * 5));
-        NumericGenome[] seeds = InitialUnits(seed).Select(values => new NumericGenome(ToCoordinates(values))).ToArray();
-        if (suiteTask is not null)
-        {
-            // Shared feasible anchors for the two constrained families; identical for every method.
-            seeds[0] = new NumericGenome(Enumerable.Repeat(-5d, Dimensions));
-            seeds[1] = new NumericGenome(Enumerable.Repeat(5d, Dimensions));
-        }
+        NumericGenome[] seeds = SharedInitialUnits(seed, suiteTask is not null)
+            .Select(values => new NumericGenome(ToCoordinates(values))).ToArray();
         string initialHash = EvolutionHash.Combine(seeds.Select(genome => genome.Identity));
         var task = new NumericTask(taskKind, suiteTask);
         var observer = new Progress();
@@ -158,6 +154,17 @@ internal static class QualityExperiment
 
     private static NumericGenome RandomGenome(StableRandom random) =>
         new(Enumerable.Range(0, Dimensions).Select(_ => -5 + 10 * random.NextDouble()));
+
+    internal static double[][] SharedInitialUnits(ulong seed, bool suite)
+    {
+        double[][] units = InitialUnits(seed);
+        if (suite)
+        {
+            units[0] = new double[Dimensions];
+            units[1] = Enumerable.Repeat(1d, Dimensions).ToArray();
+        }
+        return units;
+    }
 
     internal static double[][] InitialUnits(ulong seed)
     {
