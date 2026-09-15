@@ -54,6 +54,16 @@ jobs:
           dotnet-version: '10.0.x'
           dotnet-quality: preview
       - run: dotnet restore AiDotNet.Evolution.slnx
+      - name: Enforce declared release evidence
+        run: python3 benchmarks/analysis/release_gate.py --release release --output release-evidence.json
+      - name: Retain complete declared evidence and assessment
+        if: always()
+        uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02
+        with:
+          name: declared-release-evidence
+          path: |
+            release-evidence.json
+            release/**
       - name: Verify release workflow security contract
         shell: pwsh
         run: ./eng/Test-ReleaseWorkflow.ps1 -NoRestore
