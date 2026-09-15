@@ -1,10 +1,20 @@
 # User-story delivery index
 
-The [research roadmap](COMPETITIVE_ANALYSIS_AND_ROADMAP.md) has **26 open issues and 26 separate dependent PRs**:
-US-08 / #51 is ready for review of its completed learning-correctness slice; the other 25 remain tracking drafts.
+The [research roadmap](COMPETITIVE_ANALYSIS_AND_ROADMAP.md) is tracked through 26 user-story
+issues and separate dependent PRs, with additional companion PRs as needed.
 Each issue includes the original Given/When/Then criteria, dependency checklist, partial evidence and remaining work.
-All initial story PR commits were **tracking-only checklists**. US-08 / #51 now adds a tested partial implementation slice; the other 25 story PRs remain tracking-only.
+All initial story PR commits were **tracking-only checklists**; subsequent implementation
+and readiness updates supersede those initial labels. The historical table below is
+not an authoritative live draft count.
 Creating a PR or inheriting a foundation does not complete a story.
+
+## September 14: US-04
+
+[PR #47](https://github.com/ooples/AiDotNet.Evolution/pull/47) adds verified experiment
+reporting and fixed-design execution on top of US-02 #46. [Evidence](evidence/us04/README.md):
+654/608/608 .NET tests, 36 Python tests and 1,320 fresh fixed numeric runs passed.
+No companion is needed for this scope. Issue #22 remains open for dependencies,
+review/merge and representative confirmation; no competitive superiority is claimed.
 
 ## Agreed delivery structure
 

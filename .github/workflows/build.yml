@@ -80,6 +80,8 @@ jobs:
         run: dotnet run --project benchmarks/AiDotNet.Evolution.Performance -c Release -- --smoke
       - name: Verify paired analysis contracts
         run: python3 -m unittest discover -s benchmarks/analysis -v
+      - name: Verify fixed-sample reporting with actual numeric search
+        run: python3 benchmarks/analysis/verify_reports.py --evaluator benchmarks/AiDotNet.Evolution.Quality/bin/Release/net10.0/AiDotNet.Evolution.Quality.dll --source-revision '${{ github.sha }}' --output TestResults/experiment-reports
       - name: Verify archive partition accounting and replay
         shell: pwsh
         run: ./eng/Test-ArchivePartition.ps1 -SourceRevision '${{ github.sha }}'
@@ -96,6 +98,7 @@ jobs:
           name: coverage-and-diagnostics
           path: |
             TestResults/quality/**/*.json
+            TestResults/experiment-reports/**
             TestResults/persistent-evaluation/**/*.json
             TestResults/persistent-evaluation/*.jsonl
             coverage/**/coverage.cobertura.xml
