@@ -62,7 +62,7 @@ public sealed class AdaptiveVariationPortfolio<TGenome> : IOutcomeAwareVariation
             throw new ArgumentException("Every operator must supply checkpointed proposal costs using the policy's declared units.", nameof(operators));
         if (rewardPolicy is not null) _credit = new();
         _arms = _operators.Select(_ => new ArmState()).ToArray();
-        VersionHash = EvolutionHash.Combine(new[] { "adaptive-variation-v2-measurement-origin", EvolutionHash.EncodeDouble(explorationProbability) }
+        VersionHash = EvolutionHash.Combine(new[] { "adaptive-variation-v3-valid-measurement", EvolutionHash.EncodeDouble(explorationProbability) }
             .Concat(_operators.SelectMany(op => new[] { op.Id, op.VersionHash })));
         if (rewardPolicy is not null) VersionHash = EvolutionHash.Combine(new[] { "adaptive-variation-credit-v3-measurement-origin", VersionHash, rewardPolicy.VersionHash });
     }
@@ -145,7 +145,9 @@ public sealed class AdaptiveVariationPortfolio<TGenome> : IOutcomeAwareVariation
         bool improved = insertionResult is EvolutionArchiveInsertionResult.Inserted or
             EvolutionArchiveInsertionResult.Replaced or EvolutionArchiveInsertionResult.InsertedWithEviction;
         double reward = evaluation.Status == EvolutionEvaluationStatus.Completed &&
-            !evaluation.IsMeasurementReuse && improved
+            !evaluation.IsMeasurementReuse && improved && evaluation.Cost.AttemptCount > 0 && evaluation.Quality.HasValue &&
+            evaluation.ConstraintViolations.All(value => value <= 0) &&
+            !evaluation.Diagnostics.Any(diagnostic => diagnostic.Code is "resource_cost_unknown" or "resource_cost_unrepresentable" or "resource_maximum_exceeded")
             ? 1 / Math.Max(1, evaluation.Cost.CostUnits) : 0;
         ParentCredit? baseline = null;
         EvolutionProposalCost? cost = null;
@@ -163,7 +165,7 @@ public sealed class AdaptiveVariationPortfolio<TGenome> : IOutcomeAwareVariation
         _arms[index].Outcomes = checked(_arms[index].Outcomes + 1);
         _arms[index].RewardSum += reward;
         LastCredit = new(evaluation.Lineage.Generation, _operators[index].Id, _operators[index].VersionHash,
-            _rewardPolicy?.VersionHash ?? "archive-success-evaluator-cost-v2-measurement-origin", baseline?.Quality, evaluation, insertionResult, cost, reward);
+            _rewardPolicy?.VersionHash ?? "archive-success-evaluator-cost-v3-valid-measurement", baseline?.Quality, evaluation, insertionResult, cost, reward);
         if (CreditCommitted is { } notification)
         {
             EvolutionOperatorCredit committed = LastCredit;

@@ -207,6 +207,22 @@ public sealed class EvolutionOperatorCreditTests
         Assert.InRange(portfolio.Statistics[0].RewardSum, 0, 1); Assert.False(double.IsNaN(portfolio.Statistics[0].RewardSum));
     }
 
+    [Theory]
+    [InlineData("infeasible")]
+    [InlineData("no-attempt")]
+    [InlineData("resource_cost_unknown")]
+    [InlineData("resource_cost_unrepresentable")]
+    [InlineData("resource_maximum_exceeded")]
+    public async Task Default_policy_also_rejects_invalid_or_unmeasured_archive_credit(string reason)
+    {
+        var portfolio = new AdaptiveVariationPortfolio<TestGenome>(new[] { new IncrementVariation() });
+        await portfolio.ProposeAsync(Context(1));
+        portfolio.Observe(Evaluation(1, 1, infeasible: reason == "infeasible", attempts: reason == "no-attempt" ? 0 : 1,
+            diagnostic: reason.StartsWith("resource_", StringComparison.Ordinal) ? reason : null), EvolutionArchiveInsertionResult.Inserted);
+        Assert.Equal(0, portfolio.LastCredit!.Reward);
+        Assert.Equal(1, portfolio.Statistics[0].Outcomes);
+    }
+
     [Fact]
     public async Task Credit_notifications_identify_out_of_order_commits_once_without_recharging()
     {
