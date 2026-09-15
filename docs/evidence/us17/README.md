@@ -20,4 +20,9 @@ improvements are **not representative speedup estimates, a preregistered release
 The `.dll` files inside the example evidence are authored fixture images only, never automatically loaded by this
 report. The example itself is not a hostile-code security sandbox. See [trust boundaries](../../COMPILER_GUIDED_PROGRAMS.md).
 
-Archive SHA-256 and size are recorded in the PR after creation (not inside the archive itself).
+`verification-followup.zip` adds the final **32-test** suite on each modern target (two automated process-example
+regressions) and OpenCover/Cobertura output. It corrects the workflow omission that otherwise collected only core
+coverage. Final rates: CSharp 94.40% line/74.56% branch, Programs 96.04%/74.69%, example 99.05%/68.91%.
+These newer results supersede the 30-test counts above; both are retained as an auditable progression.
+
+Archive SHA-256 and size are recorded in the PR after creation (not inside the archives themselves).

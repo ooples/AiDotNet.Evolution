@@ -13,5 +13,8 @@
     <PackageReference Include="xunit.runner.visualstudio" Version="2.8.2" PrivateAssets="all" />
     <PackageReference Include="coverlet.collector" Version="10.0.1" PrivateAssets="all" />
     <ProjectReference Include="../../src/AiDotNet.Evolution.CSharp/AiDotNet.Evolution.CSharp.csproj" />
+    <ProjectReference Include="../../examples/CompilerGuidedSearch/CompilerGuidedSearch.csproj" />
+    <None Include="../../examples/CompilerGuidedSearch/bin/$(Configuration)/$(TargetFramework)/CompilerGuidedSearch.runtimeconfig.json" Link="CompilerGuidedSearch.runtimeconfig.json" CopyToOutputDirectory="PreserveNewest" />
+    <None Include="../../examples/CompilerGuidedSearch/bin/$(Configuration)/$(TargetFramework)/CompilerGuidedSearch.deps.json" Link="CompilerGuidedSearch.deps.json" CopyToOutputDirectory="PreserveNewest" />
   </ItemGroup>
 </Project>
