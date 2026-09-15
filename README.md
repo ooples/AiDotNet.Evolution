@@ -1,5 +1,9 @@
 # AiDotNet.Evolution
 
+Optional [compiler-guided program improvement](docs/COMPILER_GUIDED_PROGRAMS.md) provides Evolution-owned multi-file
+C# edits, bounded compiler/public-test repair, shared resource accounting and exact-artifact promotion gates.
+It does not require AiDotNet or AiDotNet.Tensors.
+
 AiDotNet.Evolution is a dependency-light, task-agnostic quality-diversity engine for .NET. It provides deterministic parallel evaluation, typed genome contracts, MAP-Elites archives, island migration, bounded diagnostics, trace output, and checkpoint/resume support.
 
 The package does not depend on AiDotNet or AiDotNet.Tensors. Domain integrations—such as model search, program evolution, and hardware-kernel autotuning—supply typed genomes, validation, variation, and evaluation through the public contracts.
