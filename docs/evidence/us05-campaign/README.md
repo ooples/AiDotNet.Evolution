@@ -17,3 +17,15 @@ Release build: zero warnings/errors. 2,134 local tests passed with no failures o
 skips; detailed breakdown and limitations: [US-05](../../evolution-stories/US-05.md).
 The archive contains raw TRX/container evidence, not a complete shell transcript.
 Hosted CI is the independent published-revision gate. No model calls were made.
+
+## Hosted memory-test finding
+
+Initial hosted run `35101599078` failed the existing cold-container memory test:
+the retained receipt reported exit137 and `OOMKilled=false` after allocation.
+Exit137 alone does not prove memory-limit enforcement. The test now keeps a small
+fixture parent alive, checks `memory.max` equals the configured limit, observes a
+child killed by SIGKILL and requires the kernel `memory.events:oom_kill` counter to
+increase. No sandbox privileges or production limits changed. All11 cold-container
+tests passed in a targeted local rerun. `oom-verification.zip` retains the initial
+hosted failure receipt and the revised local container proof; the original full
+verification archive remains unchanged. Current-head hosted CI must pass as well.
