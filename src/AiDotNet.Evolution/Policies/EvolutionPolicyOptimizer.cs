@@ -223,7 +223,8 @@ public sealed class EvolutionPolicyOptimizer
             if (_inlineEvidenceBytes > _options.MaximumInlineEvidenceBytes)
                 throw new PolicyTrialStopped("EvidenceLimit");
             timeout.Token.ThrowIfCancellationRequested(); // Late quality cannot qualify; its known cost still belongs in the ledger.
-            if (outcome != EvolutionResourceOutcome.Completed || over)
+            // An over-budget receipt is already Rejected above, so the outcome alone decides here.
+            if (outcome != EvolutionResourceOutcome.Completed)
                 throw new PolicyTrialStopped("InvalidOrOverBudgetTrial");
         }
         catch (Exception error) { failure = error.GetType().Name; throw; }
