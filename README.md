@@ -55,10 +55,14 @@ paired quality, diversity, success and cost metrics, plus independent confirmati
 The engine intentionally knows nothing about models, prompts, compilers, or hardware. Integrations keep those domain
 objects in their owning repository and implement the typed contracts above:
 
-- AiDotNet uses it for MAP-Elites AutoML and program evolution. Facade builders, model materialization, LLM clients,
-  prompt templates, and sandboxed execution stay in AiDotNet.
-- AiDotNet.Tensors uses it for offline, startup, and background kernel search. Device benchmarks, correctness oracles,
-  launch configurations, hardware fingerprints, and deployment caches stay in AiDotNet.Tensors.
+- Evolution-specific program/compiler, AutoML orchestration, and kernel-search integrations belong in this repository.
+  General model, chat-client, and tensor/device primitives remain in AiDotNet and AiDotNet.Tensors.
+- Optional `AiDotNet.Evolution.Programs` and `AiDotNet.Evolution.CSharp` projects target .NET 8 and .NET 10.
+  They provide standalone program contracts, metered portfolios, correctness-gated fitness reuse and compiler-guided
+  improvement without an AiDotNet dependency. See the [migration contract](docs/migration/PROGRAM_RUNTIME_MIGRATION.md).
+  Other old consumer integrations are still being ported; the [PR audit](docs/migration/AIDOTNET_PR_CLEANUP.md)
+  records what remains. Old AiModelBuilder evolution APIs will be removed in a separate breaking-removal PR,
+  without obsolete forwarding APIs.
 - Compiler schedule search, fusion-policy search, quantization-policy search, optimizer selection, feature selection,
   architecture search, and prompt/program search can share the engine without sharing domain-specific genomes.
 

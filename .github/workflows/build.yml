@@ -4,7 +4,7 @@ on:
   push:
     branches: [main]
   pull_request:
-    branches: [main, feat/competitive-evolution-platform, 'feat/evolution-us-*', feat/evolution-us02-efficacy, feat/evolution-us03-correctness, feat/evolution-us05-campaign-budget, feat/evolution-us06-noise-integration, feat/evolution-us07-ablation-integration]
+    branches: [main, feat/competitive-evolution-platform, 'feat/evolution-us-*', feat/evolution-us02-efficacy, feat/evolution-us03-correctness, feat/evolution-us05-campaign-budget, feat/evolution-us06-noise-integration, feat/evolution-us07-ablation-integration, feat/evolution-us08-portfolio-integration, chore/evolution-pr-consolidation]
 
 concurrency:
   group: ${{ github.workflow }}-${{ github.ref }}
@@ -54,6 +54,11 @@ jobs:
           dotnet test tests/AiDotNet.Evolution.Tests/AiDotNet.Evolution.Tests.csproj
           --configuration Release --framework net8.0 --no-restore --verbosity normal
           --blame-hang --blame-hang-timeout 120s --blame-crash
+      - name: Verify standalone program and compiler contracts
+        shell: pwsh
+        run: |
+          dotnet test tests/AiDotNet.Evolution.CSharp.Tests/AiDotNet.Evolution.CSharp.Tests.csproj -c Release --no-restore
+          if ($LASTEXITCODE -ne 0) { throw 'Standalone program migration tests failed.' }
       - name: Verify numeric quality harness contracts
         shell: pwsh
         env:
