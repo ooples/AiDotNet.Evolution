@@ -16,6 +16,16 @@ class ProgramProfileTests(unittest.TestCase):
                              evolution_profile="unknown",evidence_class="contract-only",evaluator_manifest={"identity":"fixture"})
             self.assertFalse(root.exists())
 
+    def test_invalid_openevolve_profile_and_partial_track_declarations_fail_before_work(self):
+        for kwargs in (dict(openevolve_profile="unknown"), dict(tracks=[]),
+                       dict(tracks=[("controlled","aidotnet")]*2), dict(tracks=[("unknown","aidotnet")])):
+            with tempfile.TemporaryDirectory() as directory:
+                root = Path(directory)/"must-not-exist"
+                with self.assertRaises(ValueError):
+                    run_campaign(root,"missing.dll","missing","x=1","task","fixture",None,None,
+                                 evidence_class="contract-only",evaluator_manifest={"identity":"fixture"},**kwargs)
+                self.assertFalse(root.exists())
+
     @unittest.skipUnless(os.environ.get("EVOLUTION_PROFILE_DLL") and os.environ.get("EVOLUTION_PROFILE_UPSTREAM"), "Requires built host and pinned OpenEvolve")
     def test_best_profile_actual_controllers_exploit_after_first_improvement(self):
         with tempfile.TemporaryDirectory() as directory:
@@ -31,9 +41,11 @@ class ProgramProfileTests(unittest.TestCase):
                 return dict(candidate_hash=candidate_hash(code),status="valid",quality=score,work_units=1,unknown_work=False)
             value=run_campaign(Path(directory)/"campaign",os.environ["EVOLUTION_PROFILE_DLL"],os.environ["EVOLUTION_PROFILE_UPSTREAM"],
                                initial,"nonexecuting score fixture","fixture",generate,evaluate,iterations=4,evolution_profile="best",
-                               evidence_class="contract-only",evaluator_manifest={"identity":"nonexecuting-fixture"})
+                               openevolve_profile="best",evidence_class="contract-only",evaluator_manifest={"identity":"nonexecuting-fixture"})
             self.assertEqual("completed",value["status"])
             self.assertEqual(21,calls)
+            self.assertEqual("best",value["openevolve_profile"])
+            self.assertTrue(all(r["search_wall_seconds"] > 0 for r in value["runs"]))
             for row in value["runs"]:
                 if row["method"] == "aidotnet":
                     models=[r for r in row["receipts"] if r["operation"] == "model"]

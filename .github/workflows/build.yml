@@ -207,6 +207,7 @@ jobs:
           export EVOLUTION_SANDBOX_IMAGE="$(docker image inspect evolution-program-sandbox:ci --format '{{.Id}}')"
           export EVOLUTION_SANDBOX_EVIDENCE="$PWD/TestResults/program-isolation"
           .local/program-env/bin/python -m unittest discover -s benchmarks/external -p test_docker_sandbox.py -v
+          .local/program-env/bin/python -m unittest discover -s benchmarks/external -p 'test_warm*.py' -v
       - uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02
         if: always()
         with:

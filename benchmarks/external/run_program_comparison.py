@@ -39,13 +39,20 @@ def run_child(command, environment, directory, timeout):
 
 
 def run_campaign(output, aidotnet_dll, upstream, initial, task, model, generate, evaluate, *,
-                 iterations=2, seed=37, model_tokens=100000, evolution_profile="uniform", evidence_class, evaluator_manifest):
+                 iterations=2, seed=37, model_tokens=100000, evolution_profile="uniform", openevolve_profile="default",
+                 tracks=None, evidence_class, evaluator_manifest):
     if (type(iterations) is not int or not 1 <= iterations <= 64 or type(seed) is not int or not 0 <= seed < 2**32
             or evolution_profile not in ("uniform", "best")
+            or openevolve_profile not in ("default", "best")
             or evidence_class not in ("contract-only", "development-experiment")):
         raise ValueError("Invalid bounded program campaign")
     if not isinstance(evaluator_manifest, dict) or not evaluator_manifest.get("identity"):
         raise ValueError("Declare the evaluator identity and isolation contract")
+    allowed = [("controlled", "aidotnet"), ("controlled", "openevolve"), ("controlled", "one-shot"),
+               ("controlled", "single-parent"), ("native-bounded", "aidotnet"), ("native-bounded", "openevolve")]
+    schedule = allowed if tracks is None else [tuple(t) for t in tracks]
+    if not schedule or len(schedule) != len(set(schedule)) or any(t not in allowed for t in schedule):
+        raise ValueError("Invalid declared controller panel")
     initial_hash = candidate_hash(initial)
     dll = Path(aidotnet_dll).resolve(strict=True)
     root = Path(output)
@@ -55,7 +62,7 @@ def run_campaign(output, aidotnet_dll, upstream, initial, task, model, generate,
     description.write_text(task, encoding="utf-8", newline="")
     report = dict(schema="aidotnet-program-comparison-v1", evidence_class=evidence_class, status="running",
                   requested_model=model, initial_program_hash=initial_hash, seed=seed, iterations=iterations,
-                  evolution_profile=evolution_profile,
+                  evolution_profile=evolution_profile, openevolve_profile=openevolve_profile,
                   language="python", evaluator=evaluator_manifest, tuning={"trials": 0, "work": 0},
                   hardware={"os": platform.platform(), "machine": platform.machine(), "processors": os.cpu_count()},
                   consumer_binary_sha256=hashlib.sha256(dll.read_bytes()).hexdigest(), runs=[],
@@ -63,12 +70,11 @@ def run_campaign(output, aidotnet_dll, upstream, initial, task, model, generate,
                                "Same provider instance/evaluator callback for every system; caller owns evaluator isolation",
                                "One-shot intentionally consumes one model call; unused allowance is not silently spent",
                                "No registered holdout or competitive superiority claim follows from this controller"])
-    schedule = [("controlled", "aidotnet"), ("controlled", "openevolve"), ("controlled", "one-shot"),
-                ("controlled", "single-parent"), ("native-bounded", "aidotnet"), ("native-bounded", "openevolve")]
     if evidence_class == "development-experiment":
         random.Random(seed).shuffle(schedule)
     report["schedule"] = schedule
     for index, (mode, method) in enumerate(schedule):
+        track_started = time.monotonic()
         directory = root / f"{index}-{mode}-{method}"
         directory.mkdir()
         row = dict(mode=mode, method=method, status="failed", model_call_cap=iterations, evaluation_cap=iterations + 1,
@@ -96,7 +102,8 @@ def run_campaign(output, aidotnet_dll, upstream, initial, task, model, generate,
                         command = [sys.executable, "-X", "utf8", str(Path(__file__).with_name("openevolve_adapter.py")),
                                    "--upstream", str(Path(upstream).resolve()), "--initial", str(source.resolve()),
                                    "--output", str((directory / "upstream").resolve()), "--model", model,
-                                   "--iterations", str(iterations), "--seed", str(seed), "--task", str(description.resolve()), "--mode", mode]
+                                   "--iterations", str(iterations), "--seed", str(seed), "--task", str(description.resolve()), "--mode", mode,
+                                   "--selection-profile", openevolve_profile]
                     row["exit_code"] = run_child(command, environment, directory, 315)
                     if row["exit_code"]:
                         raise ValueError("Optimizer exited unsuccessfully")
@@ -133,6 +140,7 @@ def run_campaign(output, aidotnet_dll, upstream, initial, task, model, generate,
         # must not be retained beside a stale, pre-shutdown token count.
         row["receipts"] = broker.rows
         row["actual_model_tokens"] = broker.model_tokens
+        row["search_wall_seconds"] = time.monotonic() - track_started
         row["independent_counters"] = {"attempted": dict(broker.attempted), "unknown": dict(broker.unknown_attempts),
                                        "model_tokens": broker.model_tokens, "evaluation_seconds": broker.evaluation_seconds}
         if row["status"] != "completed":
