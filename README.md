@@ -41,6 +41,9 @@ for the Evolution-owned program benchmark. Correctness alone does not establish 
 [Opt-in cheap screening](docs/SCREENING.md) advances candidates to full evaluation, audits a frozen
 sample of rejects and charges every stage; local screening-on/off controls expose savings and overhead.
 
+[Feature ablations](docs/evolution-stories/US-07.md) compare 19 search configurations with
+paired quality, diversity, success and cost metrics, plus independent confirmation gates for presets.
+
 ## Integration boundaries
 
 The engine intentionally knows nothing about models, prompts, compilers, or hardware. Integrations keep those domain

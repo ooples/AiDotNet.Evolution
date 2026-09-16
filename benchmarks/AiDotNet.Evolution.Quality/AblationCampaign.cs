@@ -9,7 +9,7 @@ namespace AiDotNet.Evolution.Quality;
 // This is an experiment runner, not a new set of library defaults.
 internal static class AblationCampaign
 {
-    internal const string Protocol = "feature-ablation-v1";
+    internal const string Protocol = "feature-ablation-v2";
     internal static readonly JsonSerializerOptions Json = new()
     {
         WriteIndented = true,
@@ -23,7 +23,9 @@ internal static class AblationCampaign
     internal sealed record Row(string Task, string Family, string Configuration, ulong Seed, string InitialHash,
         string Status, string? Error, double Quality, double Diversity, bool Success, long Calls, long Proposals,
         double Seconds, string? StateHash, EvolutionResourceSnapshot Resources, int MigrationEvents, int NoveltyRejections,
-        long InspirationUses, string[] InitialDefinitions, string[] FinalDefinitions, AblationWorkload.Observation[] Observations, string? StopReason);
+        long InspirationUses, string[] InitialDefinitions, string[] FinalDefinitions, AblationWorkload.Observation[] Observations, string? StopReason,
+        double CpuSeconds, long? CallsToTarget, double? SecondsToTarget, FinalElite[] FinalElites);
+    internal sealed record FinalElite(string Genome, double Quality, int[] Bins);
 
     internal static Configuration[] Matrix()
     {
@@ -49,7 +51,7 @@ internal static class AblationCampaign
     internal static void Validate(Request request)
     {
         if (request.Protocol != Protocol || request.Partition is not ("development" or "confirmation") ||
-            request.Budget is < 16 or > 1024 || request.Seeds is null || request.Seeds.Length is < 2 or > 100 ||
+            request.Budget is < 16 or > 1024 || request.Seeds is null || request.Seeds.Length is < 2 or > 1024 ||
             request.Seeds.Distinct().Count() != request.Seeds.Length || request.Configurations is null ||
             request.Configurations.Length is < 2 or > 19 || request.Configurations.Any(c => c is null) ||
             request.Configurations.Select(c => c.Name).Distinct(StringComparer.Ordinal).Count() != request.Configurations.Length ||
@@ -100,7 +102,10 @@ internal static class AblationCampaign
 
     internal static async Task<Row> RunCase(string family, string partition, Configuration config, ulong seed, int budget)
     {
-        var workload = new AblationWorkload(family, partition);
+        using var process = Process.GetCurrentProcess();
+        var cpuStart = process.TotalProcessorTime;
+        var clock = Stopwatch.StartNew();
+        var workload = new AblationWorkload(family, partition, seed);
         var space = new EvolutionSearchSpaceBuilder();
         foreach (string name in AblationWorkload.Names) space.Add(EvolutionParameter.Real(name, -1, 1));
         var domain = space.Build();
@@ -126,8 +131,7 @@ internal static class AblationCampaign
         var archives = Enumerable.Range(0, islandCount).Select(_ => new MapElitesArchive<EvolutionSearchGenome>(axes, capacity: 64 / islandCount)).ToArray();
         var initialDefinitions = archives.Select(a => EvolutionHash.Combine(a.Descriptors.Select(d => d.ToCanonicalString()))).ToArray();
         var variation = new Variation(domain, ledger, workload);
-        var observer = new Observer();
-        var clock = Stopwatch.StartNew();
+        var observer = new Observer(clock);
         EvolutionRunResult<EvolutionSearchGenome>? result = null;
         string? error = null;
         try
@@ -156,7 +160,6 @@ internal static class AblationCampaign
             result = await engine.RunAsync(initial);
         }
         catch (Exception exception) when (exception is not OutOfMemoryException) { error = exception.ToString(); }
-        clock.Stop();
         var resources = ledger.Snapshot();
         bool valid = error is null && calls <= budget && resources.Spent["cost_units"] == calls &&
             resources.Spent["proposal_calls"] == variation.Calls && resources.Unknown == 0 && !resources.MaximumViolated &&
@@ -167,11 +170,15 @@ internal static class AblationCampaign
             .Select(name => new EvolutionDescriptorDefinition(name, -1, 1, 8)));
         foreach (var elite in archives.SelectMany(a => a.Entries)) reference.TryAdd(elite.Candidate, elite.Evaluation);
         double quality = valid ? reference.Best?.Evaluation.Quality ?? 0 : 0;
+        clock.Stop();
         return new(workload.Id, family, config.Name, seed, initialHash, valid ? "completed" : "failed",
             error ?? (valid ? null : "Resource or evaluation invariant failed"), quality, valid ? reference.Count / 64d : 0,
             valid && quality >= 0.8, calls, result?.Counters.Proposals ?? observer.Proposals, clock.Elapsed.TotalSeconds,
             result?.StateHash, resources, observer.Migrations, observer.Rejections, variation.InspirationUses,
-            initialDefinitions, archives.Select(a => EvolutionHash.Combine(a.Descriptors.Select(d => d.ToCanonicalString()))).ToArray(), workload.Observations.ToArray(), result?.StopReason.ToString());
+            initialDefinitions, archives.Select(a => EvolutionHash.Combine(a.Descriptors.Select(d => d.ToCanonicalString()))).ToArray(), workload.Observations.ToArray(), result?.StopReason.ToString(),
+            (process.TotalProcessorTime - cpuStart).TotalSeconds, valid ? observer.CallsToTarget : null,
+            valid ? observer.SecondsToTarget : null, valid ? reference.Entries.Select(e =>
+                new FinalElite(e.Candidate.CanonicalGenome.Genome.Identity, e.Evaluation.Quality!.Value, e.Cell.Bins.ToArray())).ToArray() : []);
     }
 
     internal static Dictionary<string, double> Descriptors(EvolutionSearchGenome genome) =>
@@ -220,8 +227,10 @@ internal static class AblationCampaign
         public double Distance(EvolutionSearchGenome first, EvolutionSearchGenome second) =>
             Math.Sqrt(AblationWorkload.Names.Average(name => Math.Pow(first.Number(name) - second.Number(name), 2)));
     }
-    private sealed class Observer : IEvolutionObserver<EvolutionSearchGenome>
+    private sealed class Observer(Stopwatch clock) : IEvolutionObserver<EvolutionSearchGenome>
     {
+        public long? CallsToTarget { get; private set; }
+        public double? SecondsToTarget { get; private set; }
         public long Proposals { get; private set; }
         public long Attempts { get; private set; }
         public int Migrations { get; private set; }
@@ -233,6 +242,11 @@ internal static class AblationCampaign
             if (value.Kind == EvolutionEventKind.Evaluated && value.Evaluation is { } e)
             {
                 Proposals++; Attempts += e.Cost.AttemptCount;
+                if (CallsToTarget is null && e.Status == EvolutionEvaluationStatus.Completed && e.Quality >= 0.8)
+                {
+                    CallsToTarget = Attempts;
+                    SecondsToTarget = clock.Elapsed.TotalSeconds;
+                }
                 if (e.Diagnostics.Any(d => d.Code == "not_novel")) Rejections++;
                 Failed |= e.Status is not (EvolutionEvaluationStatus.Completed or EvolutionEvaluationStatus.Duplicate or EvolutionEvaluationStatus.Rejected);
             }

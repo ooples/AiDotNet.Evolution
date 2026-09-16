@@ -38,6 +38,17 @@ public sealed class AblationCampaignTests
             Assert.Equal(row.Proposals - 8, row.Resources.Spent["proposal_calls"]);
             Assert.InRange(row.Quality, 0, 1);
             Assert.InRange(row.Diversity, 0, 1);
+            Assert.True(double.IsFinite(row.CpuSeconds) && row.CpuSeconds >= 0);
+            Assert.Equal(row.Diversity, row.FinalElites.Length / 64d);
+            Assert.Equal(row.Quality, row.FinalElites.Max(e => e.Quality));
+            Assert.All(row.FinalElites, elite => Assert.Contains(row.Observations,
+                o => o.Genome == elite.Genome && o.Quality == elite.Quality));
+            Assert.Equal(row.CallsToTarget is not null, row.Observations.Any(o => o.Quality >= 0.8));
+            if (row.CallsToTarget is { } attempts)
+            {
+                Assert.InRange(attempts, 1, row.Calls);
+                Assert.InRange(row.SecondsToTarget!.Value, 0, row.Seconds);
+            }
             Assert.All(row.Observations, observation => Assert.Equal(family == "kernel" ? 4 : 0, observation.TimingsMilliseconds.Length));
         }
     }
@@ -102,6 +113,22 @@ public sealed class AblationCampaignTests
             _ => request with { Partition = "unregistered" }
         };
         Assert.Throws<InvalidDataException>(() => AblationCampaign.Validate(request));
+    }
+
+    [Fact]
+    public void FreshWorkloadsAreDisjointAndTaskInstancesArePairedBySeed()
+    {
+        var builder = new EvolutionSearchSpaceBuilder();
+        foreach (string name in AblationWorkload.Names) builder.Add(EvolutionParameter.Real(name, -1, 1));
+        var space = builder.Build();
+        var genome = space.Sample(StableRandom.CreateStream(3, 7));
+        var first = new AblationWorkload("numeric", "development", 170001);
+        var same = new AblationWorkload("numeric", "development", 170001);
+        var different = new AblationWorkload("numeric", "development", 170002);
+        var confirmation = new AblationWorkload("numeric", "confirmation", 1910001);
+        Assert.Equal(first.Measure(genome), same.Measure(genome));
+        Assert.NotEqual(first.Measure(genome), different.Measure(genome));
+        Assert.NotEqual(first.Id, confirmation.Id);
     }
 }
 #endif
