@@ -28,8 +28,15 @@ AiDotNet PR2182 is now closed as relocated to non-draft
 [Evolution PR81](https://github.com/ooples/AiDotNet.Evolution/pull/81), dependent on
 PR80. Its complete eight-file change is accounted for in the
 [runtime migration contract](PROGRAM_RUNTIME_MIGRATION.md). Source history remains.
-The other six code-bearing PRs below remain open until their unique implementation
-is accounted for; PR81 is not evidence that those complete ports are done.
+AiDotNet PR2210 and PR2212 are closed as relocated to non-draft
+[Evolution PR88](https://github.com/ooples/AiDotNet.Evolution/pull/88), dependent on
+[PR87](https://github.com/ooples/AiDotNet.Evolution/pull/87) and its foundation stack.
+Their complete disposition is in [the consumer migration map](PROGRAM_CONSUMER_MIGRATION.md).
+Fresh validation: 3,733 core/program/compiler test executions, 18 consumer-study
+runs, six corruption controls, output refusal checks, and byte-verified original
+evidence. Hosted checks were pending at publication; closure is relocation, not merge.
+The remaining four code-bearing PRs below stay open until their unique implementation
+is accounted for. PR81/88 do not prove those complete ports are done.
 
 | AiDotNet PR | Files | Work requiring preservation/port review |
 |---|---:|---|
@@ -38,8 +45,8 @@ is accounted for; PR81 is not evidence that those complete ports are done.
 | 2182 (closed) | 8 | Fully relocated and tested in Evolution PR81; original raw-evidence files preserved |
 | 2202 | 18 | US-25 deployment registry, validated selection/rollback/retuning and model/program adapters |
 | 2203 | 3 | US-02 C# program comparison host, not just the newer generic/Python comparison |
-| 2210 | 11 | US-06 typed C# program noise session and benchmark/verification scripts |
-| 2212 | 17 | US-08 program-specific portfolio, compiler-arm factory, usage aggregation and benchmark verification |
+| 2210 (closed) | 11 | Relocated to Evolution PR88; standalone noise session, fresh model/sorting benchmark, verifiers, and original evidence |
+| 2212 (closed) | 17 | Relocated to Evolution PR88; portfolio, standalone compiler-arm factory/provider contract, integration tests, usage aggregation and benchmark verification |
 
 Current Evolution PR74–79 replace or extend several generic/benchmark capabilities,
 but their presence does not prove all C# consumer contracts were ported.
@@ -64,4 +71,5 @@ public API transition. The user explicitly approved a **clean breaking removal**
 entry points, and remove the old AiDotNet APIs in the separate removal PR.
 
 No source PR is marked complete or closed merely because its diff is inventoried.
-No merge, publication, branch deletion or protection change is part of this cleanup.
+Cleanup PR publication and superseded source-PR closure are authorized. No merge,
+package publication, branch deletion or protection change is part of this cleanup.
