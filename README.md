@@ -6,6 +6,12 @@ The package does not depend on AiDotNet or AiDotNet.Tensors. Domain integrations
 
 The initial package version is `0.1.0-preview.1` and targets .NET 10, .NET 8, and .NET Framework 4.7.1.
 
+Optional [cost-aware operator portfolios](docs/OPERATOR_PORTFOLIOS.md) share admission
+budgets across mutation, refinement and consumer-provided model strategies, with
+typed outcome credit and checkpointed learning. The
+[registered local comparison](benchmarks/analysis/PORTFOLIOS.md) requires evidence
+against both a strong static strategy and a uniform mixture before default promotion.
+
 ## Core contracts
 
 - `IEvolutionTask<TGenome>` owns canonical identity, validation, and evaluation.

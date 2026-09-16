@@ -4,7 +4,7 @@ on:
   push:
     branches: [main]
   pull_request:
-    branches: [main, feat/competitive-evolution-platform, 'feat/evolution-us-*', feat/evolution-us02-efficacy, feat/evolution-us03-correctness, feat/evolution-us05-campaign-budget, feat/evolution-us06-noise-integration]
+    branches: [main, feat/competitive-evolution-platform, 'feat/evolution-us-*', feat/evolution-us02-efficacy, feat/evolution-us03-correctness, feat/evolution-us05-campaign-budget, feat/evolution-us06-noise-integration, feat/evolution-us07-ablation-integration]
 
 concurrency:
   group: sonar-${{ github.ref }}

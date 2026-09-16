@@ -13,6 +13,9 @@ public sealed class PortfolioCampaignTests
     [InlineData("numeric", "refinement")]
     [InlineData("numeric", "adaptive-parent")]
     [InlineData("numeric", "adaptive-archive")]
+    [InlineData("numeric", "uniform-portfolio")]
+    [InlineData("program", "uniform-portfolio")]
+    [InlineData("kernel", "uniform-portfolio")]
     [InlineData("program", "refinement")]
     [InlineData("program", "adaptive-parent")]
     [InlineData("kernel", "refinement")]
@@ -25,11 +28,16 @@ public sealed class PortfolioCampaignTests
         Assert.Equal(row.ProposalCalls + row.ObjectiveCalls, row.Resources.Spent["cost_units"]);
         Assert.Equal(row.ObjectiveCalls, row.Observations.Length);
         Assert.InRange(row.Resources.Spent["cost_units"], 29, 32);
-        if (method.StartsWith("adaptive-", StringComparison.Ordinal))
+        Assert.NotEmpty(row.Terminals);
+        Assert.Equal(row.Quality, row.Elites.Max(e => e.Quality));
+        Assert.Equal(row.Diversity, row.Elites.Length / 64.0);
+        if (method.StartsWith("adaptive-", StringComparison.Ordinal) || method == "uniform-portfolio")
         {
             Assert.True(row.Credits.Length >= row.ProposalCalls);
             Assert.Equal(row.Credits.Length, row.Credits.Select(c => c.Generation).Distinct().Count());
             Assert.All(row.Credits, c => Assert.NotNull(c.ProposalCost));
+            Assert.Equal(row.Terminals.Count(t => t.Generation > 0), row.Credits.Length);
+            Assert.All(row.Credits, c => Assert.Contains(row.Terminals, t => t.EvaluationId == c.EvaluationId && t.GenomeId == c.GenomeId));
         }
     }
 

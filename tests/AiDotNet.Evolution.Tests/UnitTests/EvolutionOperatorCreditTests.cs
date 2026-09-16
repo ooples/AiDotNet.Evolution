@@ -7,6 +7,30 @@ namespace AiDotNet.Evolution.Tests;
 public sealed class EvolutionOperatorCreditTests
 {
     private const string Units = "deterministic-work-units-v1";
+
+    [Fact]
+    public async Task Costed_factory_shares_admission_across_all_strategies_including_scripted_model()
+    {
+        var sources = new[] { "mutation", "crossover", "restart", "refinement", "scripted-model" }.Select(id => new Source(id, 1)).ToArray();
+        var ledger = Ledger(5);
+        var arms = sources.Select(s => new EvolutionCostedPortfolioArm<TestGenome>(s, EvolutionResources.Of("cost_units", 1))).ToArray();
+        var portfolio = EvolutionCostedPortfolio.Create(arms, ledger, Policy(), 0.2);
+        for (int generation = 1; generation <= 5; generation++)
+        {
+            await portfolio.ProposeAsync(Context(generation));
+            portfolio.Observe(Evaluation(generation, 0.5), EvolutionArchiveInsertionResult.Replaced);
+        }
+        Assert.All(sources, source => { Assert.Equal(1, source.Proposals); Assert.Equal(1, source.Outcomes); });
+        Assert.Equal(5, ledger.Snapshot().Spent["cost_units"]);
+        await Assert.ThrowsAsync<EvolutionResourceBudgetException>(async () => await portfolio.ProposeAsync(Context(6)));
+        portfolio.Observe(Evaluation(6, 0, status: EvolutionEvaluationStatus.Failed, attempts: 0), null);
+        Assert.Equal(0, portfolio.LastCredit!.Reward);
+        Assert.Equal(5, sources.Sum(s => s.Proposals));
+        Assert.Throws<ArgumentException>(() => EvolutionCostedPortfolio.Create(arms, Ledger(),
+            Policy(cost: EvolutionOperatorCostBasis.Evaluation)));
+        Assert.Throws<ArgumentException>(() => EvolutionCostedPortfolio.Create(new[] { arms[0], arms[0] }, Ledger(), Policy()));
+        Assert.Throws<ArgumentException>(() => EvolutionCostedPortfolio.Create(Array.Empty<EvolutionCostedPortfolioArm<TestGenome>>(), Ledger(), Policy()));
+    }
     private static EvolutionResourceLedger Ledger(decimal cap = 10000) => new("operator-credit-test", EvolutionResources.Of("cost_units", cap));
     private static EvolutionOperatorRewardPolicy Policy(EvolutionOperatorRewardKind kind = EvolutionOperatorRewardKind.ParentImprovement,
         EvolutionOperatorCostBasis cost = EvolutionOperatorCostBasis.ProposalAndEvaluation, double scale = 1) => new(kind, cost, Units, scale);
