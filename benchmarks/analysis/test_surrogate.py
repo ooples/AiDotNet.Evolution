@@ -21,7 +21,12 @@ def campaign():
 
 class SurrogateAnalysisTests(unittest.TestCase):
     def test_checked_in_evidence_hash_chain_survives_git_checkout(self):
-        evidence = Path(__file__).resolve().parents[1] / "evidence" / "surrogates" / "c770896"
+        for revision, expected_size in (("c770896", 38307179), ("7ce6f9a", 38777725)):
+            with self.subTest(revision=revision):
+                self.assert_evidence_hash_chain(revision, expected_size)
+
+    def assert_evidence_hash_chain(self, revision, expected_size):
+        evidence = Path(__file__).resolve().parents[1] / "evidence" / "surrogates" / revision
         summary_bytes = (evidence / "summary.json").read_bytes()
         summary = json.loads(summary_bytes)
         analysis = json.loads((evidence / "analysis.json").read_bytes())
@@ -35,7 +40,7 @@ class SurrogateAnalysisTests(unittest.TestCase):
                 self.assertLessEqual(size, 64 * 1024 * 1024)
                 raw_hash.update(block)
         self.assertEqual(summary["FullTraceSha256"], raw_hash.hexdigest())
-        self.assertEqual(38307179, size)
+        self.assertEqual(expected_size, size)
 
     def test_pairs_are_stratified_by_tariff_and_task(self):
         result = analyze(campaign())
