@@ -8,6 +8,12 @@ and readiness updates supersede those initial labels. The historical table below
 not an authoritative live draft count.
 Creating a PR or inheriting a foundation does not complete a story.
 
+## September 16: local tracking requested
+
+The user requested keeping all work tracked locally after US-09 publication encountered GitHub authorization errors. Retain implementation, tests, evidence, review notes and intended PR descriptions locally; do not retry publication unless requested. US-09 is committed on `feat/evolution-us09-integration`, with 3,838 passing tests; no new PR or hosted-CI result is claimed.
+
+Recommended next: US-11, starting with reproducible CPU-only program-optimization workloads, independent correctness, original-implementation fallback, and measured runtime/allocation/cost regressions. All implementation belongs in AiDotNet.Evolution. This recommendation does not authorize starting the next story or expensive competitor campaigns; full US-11 comparative acceptance still requires its declared OpenEvolve comparison.
+
 ## September 15: US-04 reporting acceptance complete locally
 
 [PR #47](https://github.com/ooples/AiDotNet.Evolution/pull/47) is non-draft and
