@@ -11,6 +11,7 @@ from run_warm_study import execute, predecessor, prepare, verify
 from warm_evaluator import WarmEvaluator
 from warm_study_design import call_cap, choose_profiles, digest, grid, power_requirement
 from warm_study_report import interval, summarize
+from warm_budget import requirements, validate_accounting
 
 
 def fixture(phase="selection", count=4):
@@ -26,6 +27,12 @@ def fixture(phase="selection", count=4):
                               audits=[value],fallback=True,model_tokens=10,model_calls=4,search_wall_seconds=2,search_evaluation_seconds=1))
         rows.append(dict(**cell,status="completed",pairs=pairs))
     return dict(plan=plan,plan_sha256=digest(plan),phase=phase,status="completed",unknown_work=0,rows=rows)
+
+
+def budget_plan(plan):
+    limits = requirements(plan["grid"], plan["iterations"], plan["samples"])
+    return dict(plan, schema="warm-head-to-head-v3", resource_limits=limits, call_limit=limits["model_calls"],
+                container_limit=limits["search_containers"] + limits["confirmation_containers"], cumulative_containers_before=0)
 
 
 class WarmDesignTests(unittest.TestCase):
@@ -95,7 +102,7 @@ class WarmDesignTests(unittest.TestCase):
     def test_bad_hash_and_one_use_marker_prevent_model_dispatch(self):
         with tempfile.TemporaryDirectory() as folder:
             path = Path(folder)/"plan.json"
-            plan = dict(phase="development",schema="warm-head-to-head-v2",correctness_contract="strict-upstream-v1",final_audit_policy="both-executables-v1")
+            plan = budget_plan(dict(fixture("development",1)["plan"], iterations=1, samples=1, cumulative_calls_before=0))
             path.write_bytes(encode(plan))
             with self.assertRaises(ValueError):
                 execute(path,"wrong")
@@ -134,11 +141,37 @@ class WarmDesignTests(unittest.TestCase):
         evaluator = WarmEvaluator(Sandbox(),"Solver",[1],lambda x:True,identity="test",samples=1)
         self.assertEqual("invalid",evaluator("class Solver: pass")["status"])
 
+    def test_insufficient_audit_capacity_is_rejected_before_output_or_dispatch(self):
+        with tempfile.TemporaryDirectory() as folder:
+            root = Path(folder)/"not-created"
+            with self.assertRaisesRegex(ValueError,"reserved final audits"):
+                prepare(root,"unused","unused","unused","unused","unused",container_limit=1)
+            self.assertFalse(root.exists())
+
+    def test_old_unbudgeted_protocol_is_not_executable(self):
+        with tempfile.TemporaryDirectory() as folder:
+            path = Path(folder)/"plan.json"
+            plan = fixture("development",1)["plan"]
+            path.write_bytes(encode(plan))
+            with patch("run_warm_study.CodexTransport") as provider:
+                with self.assertRaisesRegex(ValueError,"new registration"):
+                    execute(path,digest(plan))
+                provider.assert_not_called()
+
+    def test_changed_container_cap_needs_approval_before_partition(self):
+        prior = dict(cumulative_model_calls=0,cumulative_container_attempts=0,rows=[],
+                     plan=dict(call_limit=1000,container_limit=1000,profiles=dict(aidotnet="uniform",openevolve="default")))
+        with patch("run_warm_study.predecessor",return_value=prior), patch("run_warm_study.power_requirement",return_value={"searches_per_task":12}):
+            with self.assertRaisesRegex(ValueError,"approval reference"):
+                prepare("unused","unused","unused","unused","unused","unused",phase="final",previous="fixture",
+                        call_limit=1000,container_limit=10000)
+
     def test_failed_dispatch_retains_planned_cells_and_attempted_calls(self):
         from types import SimpleNamespace
         value = fixture("development",1)
         plan = dict(value["plan"], cumulative_calls_before=0,image="fixture",upstream="fixture",openevolve="fixture",
                     codex="fixture",model="fixture",dll="fixture",search_instance_seeds=[1,2],scale_multiplier=1,iterations=4,samples=3)
+        plan = budget_plan(plan)
         task = dict(metadata={"class":"Solver"},cases=[1],validate=lambda x:True,initial="class Solver: pass")
         transport = SimpleNamespace(calls=1,failed=True,generate_metered=None)
         with tempfile.TemporaryDirectory() as folder:
@@ -167,6 +200,7 @@ class WarmDesignTests(unittest.TestCase):
                     codex="fixture-no-provider",model="contract-no-provider",dll=os.environ["EVOLUTION_PROFILE_DLL"],
                     search_instance_seeds=[1,2],diagnostic_instance_seeds=[3,4],audit_instance_seeds=list(range(5,13)),
                     scale_multiplier=1,iterations=1,samples=1)
+        plan = budget_plan(plan)
         initial = "class Solver:\n def solve(self,p): return p['x']+1\n"
         def task(*args,**kwargs):
             seeds = kwargs["seeds"]
@@ -194,6 +228,20 @@ class WarmDesignTests(unittest.TestCase):
         self.assertTrue(all(p["selected"]["status"] == "valid" and all(a["status"] == "valid" for a in p["audits"])
                             for p in report["rows"][0]["pairs"]))
         self.assertEqual(72,report["evaluator_attempts"])
+        accounting = validate_accounting(report)
+        self.assertEqual(dict(model_calls=6,search_containers=12,confirmation_containers=60), accounting["spent"])
+        self.assertEqual(72,report["cumulative_container_attempts"])
+        # Recompute the digest to test semantic validation, not just hash mismatch.
+        for change in (lambda r:r["accounting"]["rows"].pop(),
+                       lambda r:r["rows"][0]["pairs"][0]["original_audits"].pop(),
+                       lambda r:r["rows"][0]["pairs"][0].update(model_tokens=1),
+                       lambda r:r.update(cumulative_container_attempts=0),
+                       lambda r:r["rows"][0]["pairs"][0]["original"]["budget_operation_ids"].clear()):
+            damaged = copy.deepcopy(report)
+            change(damaged)
+            damaged["accounting"]["sha256"] = digest({k:v for k,v in damaged["accounting"].items() if k != "sha256"})
+            with self.assertRaises((ValueError, KeyError)):
+                validate_accounting(damaged)
 
 
 if __name__ == "__main__":

@@ -40,7 +40,7 @@ def run_child(command, environment, directory, timeout):
 
 def run_campaign(output, aidotnet_dll, upstream, initial, task, model, generate, evaluate, *,
                  iterations=2, seed=37, model_tokens=100000, evolution_profile="uniform", openevolve_profile="default",
-                 tracks=None, evidence_class, evaluator_manifest):
+                 tracks=None, evidence_class, evaluator_manifest, accounting=None, accounting_owner="shared"):
     if (type(iterations) is not int or not 1 <= iterations <= 64 or type(seed) is not int or not 0 <= seed < 2**32
             or evolution_profile not in ("uniform", "best")
             or openevolve_profile not in ("default", "best")
@@ -79,14 +79,23 @@ def run_campaign(output, aidotnet_dll, upstream, initial, task, model, generate,
         directory.mkdir()
         row = dict(mode=mode, method=method, status="failed", model_call_cap=iterations, evaluation_cap=iterations + 1,
                    model_token_cap=model_tokens)
-        with ProgramBroker(generate, evaluate, model_calls=iterations, evaluations=iterations + 1,
+        owner = f"{accounting_owner}/{mode}/{method}"
+        if accounting is not None:
+            from warm_budget import model_observations
+            metered_generate = lambda system, messages: accounting.run("model", lambda: generate(system, messages),
+                resource="model_calls", owner=owner, measure=model_observations)
+            metered_evaluate = lambda code: evaluate(code, owner=owner)
+        else:
+            metered_generate, metered_evaluate = generate, evaluate
+        with ProgramBroker(metered_generate, metered_evaluate, model_calls=iterations, evaluations=iterations + 1,
                            seconds=300, initial=initial, model_tokens=model_tokens) as broker:
             try:
                 if method in ("one-shot", "single-parent"):
-                    row["control"] = run_control(method, task, initial,
+                    control = lambda: run_control(method, task, initial,
                         lambda system, messages: request(broker.endpoint, broker.capability, "model", {"system": system, "messages": messages}),
                         lambda code: request(broker.endpoint, broker.capability, "evaluate", {"code": code}),
                         model_calls=iterations, evaluations=iterations + 1, seconds=300)
+                    row["control"] = accounting.run("controller", control, owner=owner) if accounting else control()
                     if row["control"]["status"] not in ("completed", "evaluation-cap"):
                         raise ValueError("Population ablation did not complete")
                 else:
@@ -104,7 +113,8 @@ def run_campaign(output, aidotnet_dll, upstream, initial, task, model, generate,
                                    "--output", str((directory / "upstream").resolve()), "--model", model,
                                    "--iterations", str(iterations), "--seed", str(seed), "--task", str(description.resolve()), "--mode", mode,
                                    "--selection-profile", openevolve_profile]
-                    row["exit_code"] = run_child(command, environment, directory, 315)
+                    child = lambda: run_child(command, environment, directory, 315)
+                    row["exit_code"] = accounting.run("controller", child, owner=owner) if accounting else child()
                     if row["exit_code"]:
                         raise ValueError("Optimizer exited unsuccessfully")
                 if broker.closed or any(receipt["status"] != "completed" for receipt in broker.rows):
