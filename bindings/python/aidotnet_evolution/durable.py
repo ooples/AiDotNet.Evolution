@@ -213,9 +213,13 @@ class DurableWorkClient:
                 raise DurableWorkError(value["error"])
             return value
 
-    def _checked(self, value: Any, condition: bool, message: str) -> Any:
+    def _checked(self, value: Any, condition: bool, message: str, received: Any = None) -> Any:
         if not condition:
-            self._fatal(message + " Reconcile the original store.")
+            # Name what arrived. A refusal that says only "invalid" leaves the reader to guess which
+            # member the host stopped sending, and the same message covers a dozen predicates -- the
+            # payload is the only thing that distinguishes them, so it belongs in the failure.
+            detail = "" if received is None else " Received: " + json.dumps(received, default=str)[:512]
+            self._fatal(message + " Reconcile the original store." + detail)
         return value
 
     def _validate_status(self, value: dict[str, Any]) -> dict[str, Any]:
@@ -242,7 +246,7 @@ class DurableWorkClient:
         valid = (value.get("available") is False and "lease" in value and lease is None) or (
             value.get("available") is True and _lease(lease) and lease["workerId"] == worker.get("workerId")
             and lease["identity"]["runId"] == self._run_id)
-        return self._checked(lease, valid, "Invalid claim response.")
+        return self._checked(lease, valid, "Invalid claim response.", received=value)
 
     def heartbeat(self, identity: Mapping[str, Any], worker_id: str) -> str:
         _require(_identity(identity), "The original complete durable identity is required.")
