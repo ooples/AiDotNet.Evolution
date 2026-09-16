@@ -1,5 +1,18 @@
 # Changelog
 
+## [0.1.0](https://github.com/ooples/AiDotNet.Evolution/compare/v0.1.0-preview.2...v0.1.0) (2026-09-16)
+
+
+### Features
+
+* **core:** add adaptive variation and reproducible quality experiments ([#15](https://github.com/ooples/AiDotNet.Evolution/issues/15)) ([7d56ab6](https://github.com/ooples/AiDotNet.Evolution/commit/7d56ab64e59b2cf30ff811ad601dbc417bebcc8e))
+* drive evolution from the outside, with a NativeAOT host and a TypeScript binding ([#14](https://github.com/ooples/AiDotNet.Evolution/issues/14)) ([bdbefbf](https://github.com/ooples/AiDotNet.Evolution/commit/bdbefbf686fcfd69d0431672a78f770fdd503c37))
+
+
+### Bug Fixes
+
+* **release:** graduate Evolution to stable publishing ([#18](https://github.com/ooples/AiDotNet.Evolution/issues/18)) ([f79f3e3](https://github.com/ooples/AiDotNet.Evolution/commit/f79f3e3425e1db0ec3d25c051f7f6ec05735ae68))
+
 ## [0.1.0-preview.2](https://github.com/ooples/AiDotNet.Evolution/compare/v0.1.0-preview.1...v0.1.0-preview.2) (2026-09-11)
 
 
