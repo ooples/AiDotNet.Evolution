@@ -2,14 +2,16 @@
 from program_controls import candidate_hash
 
 
-def promote(initial, selected, diagnostics, selected_audits, original_audits, *, search_failed=False):
-    if not original_audits or len(original_audits) != len(selected_audits):
+def promote(initial, selected, diagnostics, selected_audits, original_audits, *, expected, search_failed=False):
+    if not original_audits or len(original_audits) != len(selected_audits) or len(original_audits) != len(expected["audits"]):
         raise ValueError("Missing paired final audits")
     for role,code,rows in (("original",initial,original_audits),("selected",selected,selected_audits)):
         identity = candidate_hash(code)
-        for receipt in [diagnostics[role],*rows]:
+        for receipt, binding in zip([diagnostics[role],*rows],[expected["diagnostic"],*expected["audits"]]):
             if receipt.get("candidate_hash") != identity or receipt.get("unknown_work") is not False or receipt.get("phase") != "confirmation":
                 raise ValueError("Unbound or unreconciled final acceptance receipt")
+            if any(not binding.get(k) or receipt.get(k) != binding[k] for k in ("input_sha256","evaluator_sha256")):
+                raise ValueError("Receipt does not match planned inputs/evaluator")
     diagnostic_hash = diagnostics["original"].get("input_sha256")
     if not diagnostic_hash or diagnostic_hash != diagnostics["selected"].get("input_sha256"):
         raise ValueError("Unpaired diagnostic inputs")

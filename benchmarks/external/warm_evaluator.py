@@ -36,5 +36,6 @@ class WarmEvaluator:
                     work_metric="supervisor_wall_seconds", unknown_work=any(r["unknown_work"] for r in rows),
                     samples=times, sample_ids=[r["id"] for r in rows], phase=self.phase,
                     input_sha256=self.manifest["input_sha256"], resources=[r["resources"] for r in rows],
+                    evaluator_sha256=hashlib.sha256(encode(self.manifest)).hexdigest(),
                     startup_samples=[r["startup_seconds"] for r in rows],
                     throughput_cases_per_second=len(self.cases)/duration if valid and duration else None)

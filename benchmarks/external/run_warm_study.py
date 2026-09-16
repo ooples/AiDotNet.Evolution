@@ -191,15 +191,17 @@ def execute(plan_path, registered_sha256):
                 values = {role:confirmation(task["initial"] if role == "original" else track["selected_code"]) for role in order}
                 if values["original"]["status"] != "valid":
                     raise RuntimeError("Original failed fresh validation; retain the failed planned grid")
-                audit_rows, original_audits = [], []
+                audit_rows, original_audits, audit_bindings = [], [], []
                 for audit in audits:
                     check = WarmEvaluator(sandbox, audit["metadata"]["class"], audit["cases"], audit["validate"],
                                           identity=digest(audit["metadata"]), samples=1, phase="confirmation")
                     original_audits.append(check(task["initial"]))
                     audit_rows.append(check(track["selected_code"]))
+                    audit_bindings.append(dict(input_sha256=check.manifest["input_sha256"],evaluator_sha256=digest(check.manifest)))
                 # Persist even when the baseline audit fails and promotion aborts.
                 (cell / f"acceptance-{track_index}.json").write_bytes(encode(dict(diagnostics=values,original_audits=original_audits,selected_audits=audit_rows)))
-                decision = promote(task["initial"],track["selected_code"],values,audit_rows,original_audits,search_failed=bool(track.get("fallback")))
+                expected = dict(diagnostic=dict(input_sha256=confirmation.manifest["input_sha256"],evaluator_sha256=digest(confirmation.manifest)),audits=audit_bindings)
+                decision = promote(task["initial"],track["selected_code"],values,audit_rows,original_audits,expected=expected,search_failed=bool(track.get("fallback")))
                 fallback, deployed = decision["fallback"],decision["deployed"]
                 row["pairs"].append(dict(mode=track["mode"], method=track["method"], order=order, **values, audits=audit_rows,original_audits=original_audits,
                                          deployed_hash=decision["deployed_hash"],

@@ -14,6 +14,7 @@ import numpy as np
 
 CONTRACTS = ("strict-upstream-v1", "mathematical-v1")
 RTOL, ATOL = 1e-6, 1e-8
+MAX_NODES = 1_000_000
 
 
 def integer(value):
@@ -34,11 +35,17 @@ def array(value, shape):
     if not isinstance(value, (list, tuple, np.ndarray)):
         raise ValueError("Expected numeric array, not scalar")
     if not isinstance(value,np.ndarray):
-        pending = [value]
+        pending = [(value,0)]
+        visited = 0
         while pending:
-            item = pending.pop()
+            item,depth = pending.pop()
+            visited += 1
+            if depth > 4 or visited > MAX_NODES:
+                raise ValueError("Output nesting/size exceeds validation bound")
             if isinstance(item,(list,tuple)):
-                pending.extend(item)
+                if visited+len(pending)+len(item) > MAX_NODES:
+                    raise ValueError("Output size exceeds validation bound")
+                pending.extend((child,depth+1) for child in item)
             elif not number(item):
                 raise ValueError("Non-numeric array element")
     a = np.asarray(value)
@@ -48,6 +55,8 @@ def array(value, shape):
 
 
 def close(value, expected):
+    if not np.all(np.isfinite(expected)):
+        return False
     actual = array(value, expected.shape)
     with np.errstate(over="ignore", invalid="ignore"):
         return bool(np.all(np.abs(actual-expected) <= ATOL + RTOL*np.abs(expected)))
@@ -94,7 +103,6 @@ def mathematical_check(task, problem):
         for (a,b),w in sorted(weights.items(),key=lambda item:item[1]):
             if groups.join(a,b):
                 optimum.append(w)
-        optimum_weight = math.fsum(optimum)
         def mst(value):
             edges = field(value,"mst_edges")
             if not isinstance(edges,list) or len(edges) != len(optimum):
@@ -110,7 +118,10 @@ def mathematical_check(task, problem):
                 if key not in weights or float(w) != weights[key] or not chosen.join(a,b):
                     return False
                 values.append(float(w))
-            return math.isclose(math.fsum(values),optimum_weight,rel_tol=RTOL,abs_tol=ATOL)
+            # All minimum spanning forests have the same sorted edge-weight
+            # multiset. Exact input weights avoid hiding suboptimal edges behind
+            # relative tolerances or rounded sums at large common offsets.
+            return sorted(values) == sorted(optimum)
         return mst
     if task == "shortest_path_dijkstra":
         n = problem["shape"][0]
@@ -190,6 +201,11 @@ def mathematical_check(task, problem):
         y = np.asarray(problem["y"],dtype=float)
         if y.ndim != 1 or not len(y) or not np.all(np.isfinite(y)):
             raise ValueError("Simplex input requires a nonempty finite vector")
+        # Projection is invariant to a common shift. Values below max(y)-2 are
+        # necessarily inactive (the shifted threshold lies in [-1,0]); clipping
+        # them also avoids overflow when subtracting opposite finite extremes.
+        with np.errstate(over="ignore"):
+            y = np.maximum(y-y.max(),-2.0)
         def simplex(value):
             x = array(field(value,"solution"),y.shape)
             if np.any(x < 0) or not math.isclose(math.fsum(x),1,rel_tol=0,abs_tol=ATOL+RTOL):

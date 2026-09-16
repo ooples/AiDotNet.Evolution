@@ -1,5 +1,6 @@
 """Hand-written public contract fixtures, never sealed performance instances."""
 import copy
+import os
 import unittest
 from unittest.mock import patch
 
@@ -99,6 +100,38 @@ class CorrectnessTests(unittest.TestCase):
         self.assertFalse(check({"solution":[.5,.5]}))
         self.assertFalse(check({"solution":[1.1,-.1]}))
 
+    def test_large_offsets_cannot_hide_wrong_simplex_or_nonminimal_tree(self):
+        for offset in (1e9,1e308):
+            check = validator("unit_simplex_projection",{"y":[offset,offset]},PermissiveUpstream(),contract="mathematical-v1")
+            self.assertTrue(check({"solution":[.5,.5]}))
+            self.assertFalse(check({"solution":[.9,.1]}))
+        p = {"num_nodes":3,"edges":[[0,1,1e12],[0,2,1e12],[1,2,1e12+1]]}
+        check = validator("minimum_spanning_tree",p,PermissiveUpstream(),contract="mathematical-v1")
+        self.assertFalse(check({"mst_edges":[[0,1,1e12],[1,2,1e12+1]]}))
+
+    def test_nonfinite_reference_cannot_make_any_finite_output_pass(self):
+        from program_correctness import close
+        self.assertFalse(close([1.],np.array([float("inf")])))
+
+    def test_cyclic_or_over_nested_direct_values_terminate_as_invalid(self):
+        check = validator("convolve_1d",([1.],[1.]),PermissiveUpstream(),contract="mathematical-v1")
+        cycle = []
+        cycle.append(cycle)
+        self.assertFalse(check(cycle))
+        self.assertFalse(check([[[[[[1.]]]]]]))
+
+    def test_real_pinned_references_pass_public_fixtures(self):
+        from warm_panel import DEFINITIONS, load_task
+        root = os.environ.get("EVOLUTION_CORRECTNESS_UPSTREAM")
+        if not root:
+            self.fail("Set EVOLUTION_CORRECTNESS_UPSTREAM to pinned AlgoTune for this required gate")
+        for task,(problem,_) in fixtures().items():
+            with self.subTest(task=task):
+                upstream,_ = load_task(root,DEFINITIONS[task])
+                answer = upstream.solve(copy.deepcopy(problem))
+                check = validator(task,problem,upstream,contract="strict-upstream-v1")
+                self.assertTrue(check(answer))
+
     def test_search_answer_hardcoding_fails_a_different_public_fixture(self):
         old = fixtures()["base64_encoding"][1]
         check = validator("base64_encoding",{"plaintext":b"abcd"},PermissiveUpstream(),contract="mathematical-v1")
@@ -137,7 +170,7 @@ class CorrectnessTests(unittest.TestCase):
 
 
 def receipt(code,inputs,status="valid"):
-    return dict(candidate_hash=candidate_hash(code),input_sha256=inputs,status=status,unknown_work=False,phase="confirmation")
+    return dict(candidate_hash=candidate_hash(code),input_sha256=inputs,evaluator_sha256="oracle-"+inputs,status=status,unknown_work=False,phase="confirmation")
 
 
 class PromotionTests(unittest.TestCase):
@@ -145,9 +178,10 @@ class PromotionTests(unittest.TestCase):
         self.diagnostics = {role:receipt(code,"diagnostic") for role,code in (("original","original"),("selected","selected"))}
         self.original = [receipt("original","audit-1"),receipt("original","audit-2")]
         self.selected = [receipt("selected","audit-1"),receipt("selected","audit-2")]
+        self.expected = dict(diagnostic=self.diagnostics["original"],audits=copy.deepcopy(self.original))
 
     def decide(self):
-        return promote("original","selected",self.diagnostics,self.selected,self.original)
+        return promote("original","selected",self.diagnostics,self.selected,self.original,expected=self.expected)
 
     def test_valid_selected_and_fully_audited_fallback(self):
         self.assertFalse(self.decide()["fallback"])
@@ -167,11 +201,18 @@ class PromotionTests(unittest.TestCase):
                 original = copy.deepcopy(self.original)
                 original[0][key] = value
                 with self.assertRaises(ValueError):
-                    promote("original","selected",self.diagnostics,self.selected,original)
+                    promote("original","selected",self.diagnostics,self.selected,original,expected=self.expected)
         with self.assertRaises(ValueError):
-            promote("original","selected",self.diagnostics,[],[])
+            promote("original","selected",self.diagnostics,[],[],expected=self.expected)
         with self.assertRaises(ValueError):
-            promote("original","selected",self.diagnostics,[self.selected[0]]*2,[self.original[0]]*2)
+            promote("original","selected",self.diagnostics,[self.selected[0]]*2,[self.original[0]]*2,expected=self.expected)
+
+    def test_dropping_both_audits_or_swapping_both_evaluators_is_rejected(self):
+        with self.assertRaises(ValueError):
+            promote("original","selected",self.diagnostics,self.selected[:1],self.original[:1],expected=self.expected)
+        self.selected[0]["evaluator_sha256"] = self.original[0]["evaluator_sha256"] = "different-contract"
+        with self.assertRaises(ValueError):
+            self.decide()
 
 
 if __name__ == "__main__":
