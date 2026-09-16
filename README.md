@@ -38,6 +38,8 @@ force-fresh policies, metered store calls and a runnable cold/warm/force-fresh e
 [Noise-aware confirmation](docs/evolution-stories/US-06.md) adds finite incumbent challenges,
 audits of screen-rejected candidates, charged warmups and independent paired timing confirmation
 for the Evolution-owned program benchmark. Correctness alone does not establish a performance win.
+[Opt-in cheap screening](docs/SCREENING.md) advances candidates to full evaluation, audits a frozen
+sample of rejects and charges every stage; local screening-on/off controls expose savings and overhead.
 
 ## Integration boundaries
 

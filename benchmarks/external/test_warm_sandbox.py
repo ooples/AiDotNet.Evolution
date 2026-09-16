@@ -34,7 +34,10 @@ class WarmContainerTests(unittest.TestCase):
         if parent:
             Path(parent).mkdir(parents=True,exist_ok=True)
         self.root = Path(tempfile.mkdtemp(prefix="warm-proof-",dir=parent))
-        self.sandbox = WarmDockerSandbox(os.environ["EVOLUTION_SANDBOX_IMAGE"],self.root / "receipts",seconds=5)
+        # Permission/protocol assertions use the production timeout. Only the
+        # deadline-specific adversary needs the shorter five-second allowance.
+        seconds = 5 if self._testMethodName == "test_nonreading_candidate_cannot_block_host_stdin_indefinitely" else 15
+        self.sandbox = WarmDockerSandbox(os.environ["EVOLUTION_SANDBOX_IMAGE"],self.root / "receipts",seconds=seconds)
 
     def run_source(self, code, problems=None):
         return self.sandbox.run(code,{"class":"Solver","problems":[{"x":7}] if problems is None else problems},phase="adversarial")

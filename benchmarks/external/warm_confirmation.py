@@ -100,6 +100,9 @@ def validate_report(report):
         raise ValueError("Changed registered confirmation family")
     all_ids = []
     for cell in report["rows"]:
+        from warm_screening import audit_receipts
+        for receipt in audit_receipts(cell):
+            all_ids.extend(receipt["sample_ids"])
         for track in cell["search_runs"]:
             for receipt in track["receipts"]:
                 if receipt["operation"] == "evaluate" and receipt["status"] == "completed":
