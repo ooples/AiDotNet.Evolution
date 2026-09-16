@@ -207,6 +207,80 @@ public sealed class EvolutionOperatorCreditTests
         Assert.InRange(portfolio.Statistics[0].RewardSum, 0, 1); Assert.False(double.IsNaN(portfolio.Statistics[0].RewardSum));
     }
 
+    [Theory]
+    [InlineData("infeasible")]
+    [InlineData("no-attempt")]
+    [InlineData("resource_cost_unknown")]
+    [InlineData("resource_cost_unrepresentable")]
+    [InlineData("resource_maximum_exceeded")]
+    public async Task Default_policy_also_rejects_invalid_or_unmeasured_archive_credit(string reason)
+    {
+        var portfolio = new AdaptiveVariationPortfolio<TestGenome>(new[] { new IncrementVariation() });
+        await portfolio.ProposeAsync(Context(1));
+        portfolio.Observe(Evaluation(1, 1, infeasible: reason == "infeasible", attempts: reason == "no-attempt" ? 0 : 1,
+            diagnostic: reason.StartsWith("resource_", StringComparison.Ordinal) ? reason : null), EvolutionArchiveInsertionResult.Inserted);
+        Assert.Equal(0, portfolio.LastCredit!.Reward);
+        Assert.Equal(1, portfolio.Statistics[0].Outcomes);
+    }
+
+    [Fact]
+    public async Task Credit_notifications_identify_out_of_order_commits_once_without_recharging()
+    {
+        var ledger = Ledger();
+        var source = new Source();
+        var portfolio = new AdaptiveVariationPortfolio<TestGenome>(new[] { Meter(source, ledger) }, rewardPolicy: Policy());
+        var credits = new List<EvolutionOperatorCredit>();
+        portfolio.CreditCommitted += credits.Add;
+        await portfolio.ProposeAsync(Context(1)); await portfolio.ProposeAsync(Context(2));
+        Assert.Equal(2, portfolio.GetProposalCost(1).Charged["cost_units"]);
+        portfolio.Observe(Evaluation(2, 1), EvolutionArchiveInsertionResult.Inserted);
+        portfolio.Observe(Evaluation(1, 0.5), EvolutionArchiveInsertionResult.Replaced);
+        Assert.Equal(new long[] { 2, 1 }, credits.Select(c => c.EvaluationId));
+        Assert.Equal(new[] { "g2", "g1" }, credits.Select(c => c.GenomeId));
+        Assert.All(credits, c => Assert.Equal(1, c.EvaluationAttempts));
+        Assert.Equal(4, ledger.Snapshot().Spent["cost_units"]);
+        Assert.Throws<InvalidOperationException>(() => portfolio.GetProposalCost(1));
+        Assert.Throws<InvalidOperationException>(() => portfolio.Observe(Evaluation(1, 1), EvolutionArchiveInsertionResult.Inserted));
+        Assert.Equal(2, credits.Count);
+    }
+
+    [Fact]
+    public async Task Notification_failures_and_reentry_cannot_change_learning_or_duplicate_delivery()
+    {
+        var portfolio = new AdaptiveVariationPortfolio<TestGenome>(new[] { Meter(new Source(), Ledger()) }, rewardPolicy: Policy());
+        var credits = new List<EvolutionOperatorCredit>();
+        portfolio.CreditCommitted += _ => throw new IOException("sink failure");
+        portfolio.CreditCommitted += _ => portfolio.CaptureState();
+        portfolio.CreditCommitted += _ => portfolio.ProposeAsync(Context(2));
+        portfolio.CreditCommitted += _ => portfolio.Observe(Evaluation(1, 1), EvolutionArchiveInsertionResult.Inserted);
+        portfolio.CreditCommitted += credits.Add;
+        await portfolio.ProposeAsync(Context(1));
+        portfolio.Observe(Evaluation(1, 1), EvolutionArchiveInsertionResult.Inserted);
+        Assert.Equal(4, portfolio.CreditNotificationFailures);
+        Assert.Single(credits);
+        Assert.Equal(1, portfolio.Statistics[0].Proposals);
+        Assert.Equal(1, portfolio.Statistics[0].Outcomes);
+        Assert.Equal(0.25, portfolio.Statistics[0].RewardSum);
+        string state = portfolio.CaptureState();
+        portfolio.RestoreState(state);
+        Assert.Null(portfolio.LastCredit);
+        Assert.Equal(0, portfolio.CreditNotificationFailures);
+        Assert.Single(credits);
+        portfolio.CreditCommitted -= credits.Add;
+        await portfolio.ProposeAsync(Context(2));
+        portfolio.Observe(Evaluation(2, 1), EvolutionArchiveInsertionResult.Inserted);
+        Assert.Single(credits);
+    }
+
+    [Fact]
+    public void Proposal_receipts_require_explicit_inclusive_policy_and_pending_identity()
+    {
+        var original = new AdaptiveVariationPortfolio<TestGenome>(new[] { new IncrementVariation() });
+        Assert.Throws<InvalidOperationException>(() => original.GetProposalCost(1));
+        var explicitPolicy = new AdaptiveVariationPortfolio<TestGenome>(new[] { Meter(new Source(), Ledger()) }, rewardPolicy: Policy());
+        Assert.Throws<InvalidOperationException>(() => explicitPolicy.GetProposalCost(1));
+    }
+
     [Fact]
     public async Task Engine_boundary_resume_restores_credit_backend_and_ledger_together()
     {

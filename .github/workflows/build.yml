@@ -91,6 +91,12 @@ jobs:
           python3 benchmarks/analysis/ablation.py execute TestResults/ablation-plan.json TestResults/ablations development
           python3 benchmarks/analysis/ablation.py execute TestResults/ablation-plan.json TestResults/ablations confirmation
           python3 benchmarks/analysis/ablation.py report TestResults/ablation-plan.json TestResults/ablations TestResults/ablation-report.json
+      - name: Verify registered portfolio comparison
+        run: |
+          python3 benchmarks/analysis/portfolio_study.py register benchmarks/AiDotNet.Evolution.Quality/bin/Release/net10.0/AiDotNet.Evolution.Quality.dll TestResults/portfolio-plan.json --count 2 --budget 32
+          python3 benchmarks/analysis/portfolio_study.py execute TestResults/portfolio-plan.json TestResults/portfolio-study development
+          python3 benchmarks/analysis/portfolio_study.py execute TestResults/portfolio-plan.json TestResults/portfolio-study confirmation
+          python3 benchmarks/analysis/portfolio_study.py report TestResults/portfolio-plan.json TestResults/portfolio-study TestResults/portfolio-report.json
       - name: Verify fixed-sample reporting with actual numeric search
         run: python3 benchmarks/analysis/verify_reports.py --evaluator benchmarks/AiDotNet.Evolution.Quality/bin/Release/net10.0/AiDotNet.Evolution.Quality.dll --source-revision '${{ github.sha }}' --output TestResults/experiment-reports
       - name: Verify archive partition accounting and replay
@@ -111,6 +117,8 @@ jobs:
             TestResults/quality/**/*.json
             TestResults/ablations/**
             TestResults/ablation-*
+            TestResults/portfolio-*
+            TestResults/portfolio-study/**
             TestResults/noise-policies.json
             TestResults/experiment-reports/**
             TestResults/persistent-evaluation/**/*.json

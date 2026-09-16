@@ -38,7 +38,7 @@ public sealed class EvolutionSurrogateSelector<TGenome>
         _trainer = trainer; _ledger = ledger; _taskVersion = taskVersionHash; _evaluatorVersion = evaluatorVersionHash;
         _trainerVersion = trainer.VersionHash; _proposalMaximum = proposalMaximum; _trainingMaximum = trainingMaximum; _inferenceMaximum = inferenceMaximum;
         _minimumSamples = minimumSamples; _exploration = explorationProbability; _optimism = optimism; _direction = direction;
-        VersionHash = EvolutionHash.Combine(new[] { "surrogate-selector-v1", _trainerVersion, _taskVersion, _evaluatorVersion,
+        VersionHash = EvolutionHash.Combine(new[] { "surrogate-selector-v2-measurement-origin", _trainerVersion, _taskVersion, _evaluatorVersion,
             minimumSamples.ToString(CultureInfo.InvariantCulture), Bits(explorationProbability), Bits(optimism), direction.ToString(),
             ResourceHash(proposalMaximum), ResourceHash(trainingMaximum), ResourceHash(inferenceMaximum) });
     }
