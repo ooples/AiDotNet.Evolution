@@ -1,0 +1,5 @@
+{
+  "schema": "evolution-release-claim-v1",
+  "claim": "none",
+  "reason": "Engineering release only. US-11 migration and qualifying independent competitive evidence remain incomplete; no claim of exceeding OpenEvolve is authorized by this manifest."
+}

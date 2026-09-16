@@ -1,0 +1,52 @@
+name: Release evidence
+on:
+  pull_request:
+    branches: [main, feat/competitive-evolution-platform, 'feat/evolution-us-*']
+  schedule:
+    - cron: '23 4 * * 1'
+  workflow_dispatch:
+permissions:
+  contents: read
+concurrency:
+  group: release-evidence-${{ github.ref }}
+  cancel-in-progress: true
+jobs:
+  claim-contracts:
+    runs-on: ubuntu-latest
+    timeout-minutes: 5
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1
+        with:
+          fetch-depth: 0
+          persist-credentials: false
+      - run: python3 -m unittest discover -s benchmarks/analysis -p 'test_release_gate.py' -v
+      - run: python3 benchmarks/analysis/release_gate.py --release release --output release-evidence.json
+      - uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02
+        if: always()
+        with:
+          name: release-claim-assessment
+          path: |
+            release-evidence.json
+            release/**
+  bounded-comparison:
+    # No expensive campaigns or model calls on pull requests. Fixed CPU budget only.
+    if: github.event_name == 'schedule' || github.event_name == 'workflow_dispatch'
+    runs-on: ubuntu-latest
+    timeout-minutes: 25
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1
+        with:
+          persist-credentials: false
+      - uses: actions/setup-dotnet@a98b56852c35b8e3190ac28c8c2271da59106c68
+        with:
+          dotnet-version: '10.0.x'
+      - run: |
+          python3 -m venv .local/comparison-env
+          .local/comparison-env/bin/python -m pip install -r benchmarks/external/requirements.txt
+      - shell: pwsh
+        run: ./eng/Run-BudgetedComparison.ps1 -Python .local/comparison-env/bin/python -Seeds 8 -Budget 128
+      - uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02
+        if: always()
+        with:
+          name: bounded-cpu-comparison
+          path: TestResults/release-comparison/**
