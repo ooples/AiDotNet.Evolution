@@ -338,17 +338,9 @@ public sealed partial class EvolutionEngine<TGenome>
         return Array.AsReadOnly(statuses);
     }
 
-    /// <summary>Computes the physical cell count implied by an archive's descriptor definitions.</summary>
-    private static long TotalGridCells(IEvolutionArchiveView<TGenome> archive)
-    {
-        long cells = 1;
-        foreach (EvolutionDescriptorDefinition descriptor in archive.Descriptors)
-        {
-            if (cells > long.MaxValue / descriptor.EffectiveBinCount) return long.MaxValue;
-            cells *= descriptor.EffectiveBinCount;
-        }
-        return Math.Max(1, cells);
-    }
+    /// <summary>Reads explicit partition geometry, falling back to descriptor-bin products for existing grids.</summary>
+    private static long TotalGridCells(IEvolutionArchiveView<TGenome> archive) =>
+        EvolutionArchiveGeometry.CellCount(archive);
 
     private async Task<EvolutionStopReason> RunLoopAsync(TGenome[] seeds, int seedIndex, Stopwatch runTimer,
         CancellationToken cancellationToken)

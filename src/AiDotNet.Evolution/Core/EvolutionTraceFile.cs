@@ -279,6 +279,8 @@ public static class EvolutionTraceFile
         };
 
         if (record.Quality.HasValue) json["quality"] = record.Quality.Value;
+        if (record.MeasurementOrigin is not null)
+            json["measurementOrigin"] = JsonNode.Parse(record.MeasurementOrigin.ToJson());
         if (record.InsertionResult.HasValue) json["insertionResult"] = record.InsertionResult.Value.ToString();
         if (record.Cell is not null) json["cell"] = record.Cell;
         if (record.Descriptors.Count > 0) json["descriptors"] = ValuesToJson(record.Descriptors);
@@ -309,6 +311,14 @@ public static class EvolutionTraceFile
         Guard.NotNull(json);
         try
         {
+            long schema = json.ContainsKey("schemaVersion")
+                ? RequireLong(json, "schemaVersion") : EvolutionTraceRecord.CurrentSchemaVersion;
+            JsonNode? origin = json["measurementOrigin"];
+            if (schema != EvolutionTraceRecord.CurrentSchemaVersion &&
+                schema != EvolutionTraceRecord.MeasurementOriginSchemaVersion)
+                throw new InvalidDataException("Unsupported evolution trace record schema.");
+            if ((origin is not null) != (schema == EvolutionTraceRecord.MeasurementOriginSchemaVersion))
+                throw new InvalidDataException("The trace record schema does not match its measurement origin.");
             return new EvolutionTraceRecord(
                 RequireLong(json, "sequence"),
                 RequireLong(json, "evaluationId"),
@@ -340,6 +350,7 @@ public static class EvolutionTraceFile
                 SeedStream = OptionalSeedStream(json),
                 AttemptCount = (int)OptionalLong(json, "attemptCount"),
                 CostUnits = OptionalDouble(json, "costUnits") ?? 0,
+                MeasurementOrigin = origin is null ? null : EvolutionMeasurementOrigin.FromJson(origin.ToJsonString()),
                 Elapsed = TimeSpan.FromTicks(OptionalLong(json, "elapsedTicks")),
                 RejectedStage = OptionalInt(json, "rejectedStage"),
                 Diagnostics = DiagnosticsFromJson(json)

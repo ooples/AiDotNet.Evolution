@@ -233,6 +233,7 @@ public sealed class EvolutionTraceObserver<TGenome> : IEvolutionObserver<TGenome
             SeedStream = _options.IncludeLineage ? lineage.SeedStream : 0UL,
             AttemptCount = evaluation.Cost.AttemptCount,
             CostUnits = evaluation.Cost.CostUnits,
+            MeasurementOrigin = evaluation.MeasurementOrigin,
             Elapsed = evaluation.Cost.Elapsed,
             RejectedStage = evaluation.Cost.RejectedStage,
             Diagnostics = _options.IncludeDiagnostics ? evaluation.Diagnostics : EmptyDiagnostics

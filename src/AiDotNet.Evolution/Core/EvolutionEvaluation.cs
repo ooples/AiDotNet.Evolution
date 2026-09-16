@@ -1,4 +1,5 @@
 using System.Collections.ObjectModel;
+using System.Text.Json.Serialization;
 
 namespace AiDotNet.Evolution;
 
@@ -29,6 +30,7 @@ public sealed class EvolutionEvaluation
     private readonly ReadOnlyCollection<double> _constraintViolations;
     private readonly ReadOnlyCollection<EvolutionDiagnostic> _diagnostics;
     private readonly ReadOnlyCollection<EvolutionArtifact> _artifacts;
+    private EvolutionMeasurementOrigin? _measurementOrigin;
 
     /// <summary>Initializes a complete evaluation.</summary>
     /// <param name="evaluationId">The nonnegative stable evaluation identifier.</param>
@@ -136,6 +138,19 @@ public sealed class EvolutionEvaluation
     public EvolutionLineage Lineage { get; }
     /// <summary>Gets cache metadata.</summary>
     public EvolutionCacheStatus CacheStatus { get; }
+    /// <summary>Gets optional measurement provenance; CacheStatus describes only the engine's run-local memo.</summary>
+    [JsonIgnore(Condition = JsonIgnoreCondition.WhenWritingNull)]
+    public EvolutionMeasurementOrigin? MeasurementOrigin => _measurementOrigin;
+
+    /// <summary>Returns an immutable evaluation copy retaining original sample identity independently of artifacts.</summary>
+    public EvolutionEvaluation WithMeasurementOrigin(EvolutionMeasurementOrigin origin)
+    {
+        Guard.NotNull(origin);
+        return new EvolutionEvaluation(EvaluationId, GenomeId, Status, Quality, Direction, Descriptors, Objectives,
+            ConstraintViolations, Cost, Lineage, CacheStatus, Diagnostics, TaskVersionHash, EvaluatorVersionHash,
+            ConfigurationHash, Metrics, Artifacts)
+        { _measurementOrigin = origin };
+    }
     /// <summary>Gets bounded diagnostics.</summary>
     public IReadOnlyList<EvolutionDiagnostic> Diagnostics => _diagnostics;
     /// <summary>Gets the bounded, untrusted text artifacts the engine retained for this evaluation.</summary>
@@ -163,7 +178,7 @@ public sealed class EvolutionEvaluation
     public EvolutionEvaluation WithDescriptors(IReadOnlyDictionary<string, double> descriptors)
     {
         Guard.NotNull(descriptors);
-        return new EvolutionEvaluation(
+        var copy = new EvolutionEvaluation(
             EvaluationId,
             GenomeId,
             Status,
@@ -181,5 +196,6 @@ public sealed class EvolutionEvaluation
             ConfigurationHash,
             Metrics,
             Artifacts);
+        return MeasurementOrigin is null ? copy : copy.WithMeasurementOrigin(MeasurementOrigin);
     }
 }

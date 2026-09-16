@@ -37,8 +37,11 @@ namespace AiDotNet.Evolution;
 /// </remarks>
 public sealed class EvolutionTraceRecord
 {
-    /// <summary>The schema version stamped on records written by this build.</summary>
+    /// <summary>The baseline record schema, retained for records without sample provenance.</summary>
     public const int CurrentSchemaVersion = 1;
+
+    /// <summary>The record schema required when sample provenance is present.</summary>
+    public const int MeasurementOriginSchemaVersion = 2;
 
     private readonly ReadOnlyDictionary<string, double> _descriptors =
         new(new Dictionary<string, double>(StringComparer.Ordinal));
@@ -125,7 +128,10 @@ public sealed class EvolutionTraceRecord
     }
 
     /// <summary>Gets the schema version this record conforms to.</summary>
-    public int SchemaVersion => CurrentSchemaVersion;
+    public int SchemaVersion => MeasurementOrigin is null ? CurrentSchemaVersion : MeasurementOriginSchemaVersion;
+
+    /// <summary>Gets original sample provenance; copies are not independent measurements.</summary>
+    public EvolutionMeasurementOrigin? MeasurementOrigin { get; init; }
 
     /// <summary>Gets the observer event sequence, which totally orders every record of one run.</summary>
     public long Sequence { get; }

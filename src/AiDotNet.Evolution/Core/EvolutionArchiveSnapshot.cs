@@ -27,7 +27,7 @@ namespace AiDotNet.Evolution;
 /// in a snapshot and store it; the stored copy stays exactly as it was even after the search moves on. This is also
 /// the type behind each island in <see cref="EvolutionRunResult{TGenome}.Islands"/> once a run finishes.</para>
 /// </remarks>
-public sealed class EvolutionArchiveSnapshot<TGenome> : IEvolutionArchiveView<TGenome>
+public sealed class EvolutionArchiveSnapshot<TGenome> : IEvolutionArchiveView<TGenome>, IEvolutionArchiveCellCount
 {
     private readonly ReadOnlyCollection<EvolutionDescriptorDefinition> _descriptors;
     private readonly ReadOnlyCollection<EvolutionArchiveEntry<TGenome>> _entries;
@@ -71,6 +71,7 @@ public sealed class EvolutionArchiveSnapshot<TGenome> : IEvolutionArchiveView<TG
         DefinitionHash = source.DefinitionHash.Trim();
         Direction = source.Direction;
         Version = source.Version;
+        TotalCells = EvolutionArchiveGeometry.CellCount(source);
         Best = entries.OrderBy(entry => entry, EvolutionEntryOrdering.BestFirst<TGenome>(Direction)).FirstOrDefault();
     }
 
@@ -88,6 +89,9 @@ public sealed class EvolutionArchiveSnapshot<TGenome> : IEvolutionArchiveView<TG
 
     /// <inheritdoc/>
     public long Version { get; }
+
+    /// <inheritdoc/>
+    public long TotalCells { get; }
 
     /// <inheritdoc/>
     public IReadOnlyList<EvolutionArchiveEntry<TGenome>> Entries => _entries;
