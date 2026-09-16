@@ -1,9 +1,21 @@
 # US-02 empirical acceptance: pilot versus proof
 
 This is a continuation of issue #20 / PR #46, not a new story or a claim that the
-roadmap is finished. All new implementation is in AiDotNet.Evolution. The live
-pilot uses the Evolution-owned host at `d5d2aa2`; it does not silently import newer
+roadmap is finished. All new implementation is in AiDotNet.Evolution. The original
+live pilot uses the Evolution-owned host at `d5d2aa2`; it does not silently import newer
 story branches or prove their adaptive/Pareto/scheduling policies effective.
+
+## Subsequent evidence
+
+The [US-04 fixed-budget study](../evidence/us04/PROGRAM_STUDY.md) added repeated
+searches, independent work accounting and uncertainty reporting without proving
+superiority. The [US-02 selection ablation](../evidence/us02/SELECTION_DEVELOPMENT.md)
+then compared uniform and elite selection at four proposals over two paired seeds:
+252 model calls, 72 validated selections, 3,600 passing output checks, and zero
+unknown model/container attempts. It did not establish consistent gains or a win
+over OpenEvolve on every task. Uniform remains the default. This supplies one
+explicit policy ablation, not proof for the other roadmap features or closure of
+the remaining empirical acceptance below.
 
 ## What the real-program pilot can establish
 
