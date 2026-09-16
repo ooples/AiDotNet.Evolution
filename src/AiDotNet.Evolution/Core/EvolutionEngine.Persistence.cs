@@ -12,6 +12,7 @@ public sealed partial class EvolutionEngine<TGenome>
     // Optional sample provenance requires an explicit newer envelope, so old readers cannot silently drop it.
     private const int EngineMeasurementOriginSchemaVersion = 7;
     private const int EngineParetoSchemaVersion = 8;
+    private const int EngineParetoConstraintSchemaVersion = 9;
     private string? _safePayload;
     private long _safeSequence;
 
@@ -76,6 +77,7 @@ public sealed partial class EvolutionEngine<TGenome>
         };
         if (HasMeasurementOrigins(document)) document.SchemaVersion = EngineMeasurementOriginSchemaVersion;
         if (document.Islands.Any(island => island.Pareto is not null)) document.SchemaVersion = EngineParetoSchemaVersion;
+        if (document.Islands.Any(island => island.Pareto?.ConstraintCount is not null)) document.SchemaVersion = EngineParetoConstraintSchemaVersion;
         string payload = JsonSerializer.Serialize(document, EvolutionJson.Compact);
         if (payload.Length > EvolutionCollectionLimits.MaximumCheckpointBytes ||
             Encoding.UTF8.GetByteCount(payload) > EvolutionCollectionLimits.MaximumCheckpointBytes)
@@ -586,7 +588,7 @@ public sealed partial class EvolutionEngine<TGenome>
         // whether the fields this reader expects are present. Without this check a payload from an older engine
         // deserializes into an all-default document and reads back as a complete record of a run that found nothing.
         if (state is null || (state.SchemaVersion != EngineStateSchemaVersion && state.SchemaVersion != EngineMeasurementOriginSchemaVersion &&
-            state.SchemaVersion != EngineParetoSchemaVersion))
+            state.SchemaVersion != EngineParetoSchemaVersion && state.SchemaVersion != EngineParetoConstraintSchemaVersion))
             throw new InvalidDataException(
                 "The evolution engine state schema is invalid; the checkpoint was written by a different engine version.");
 
@@ -596,7 +598,8 @@ public sealed partial class EvolutionEngine<TGenome>
         var paretoIslands = state.Islands!;
         if (paretoIslands.Any(island => island.Pareto is not null))
         {
-            if (state.SchemaVersion != EngineParetoSchemaVersion)
+            bool declaredConstraints = paretoIslands.Any(island => island.Pareto?.ConstraintCount is not null);
+            if (state.SchemaVersion != (declaredConstraints ? EngineParetoConstraintSchemaVersion : EngineParetoSchemaVersion))
                 throw new InvalidDataException("Pareto metadata requires the versioned checkpoint schema.");
             var definition = paretoIslands.First(island => island.Pareto is not null).Pareto!.ToDefinition();
             if ((long)paretoIslands.Count * (definition.Capacity + definition.InfeasibleCapacity) > 4096 ||
@@ -605,7 +608,7 @@ public sealed partial class EvolutionEngine<TGenome>
                 throw new InvalidDataException("Pareto checkpoints require compatible bounded fronts without scalar auxiliary indexes.");
             foreach (var island in paretoIslands) ValidateParetoCheckpointArchive(island, definition);
         }
-        else if (state.SchemaVersion == EngineParetoSchemaVersion)
+        else if (state.SchemaVersion == EngineParetoSchemaVersion || state.SchemaVersion == EngineParetoConstraintSchemaVersion)
             throw new InvalidDataException("The Pareto checkpoint schema requires objective metadata.");
         else if (paretoIslands.Any(island => island.InfeasibleEntries is not null))
             throw new InvalidDataException("Infeasible exploration requires versioned Pareto metadata.");

@@ -43,7 +43,7 @@ The crowding retention rule follows the diversity principle described in [pymoo'
 
 ## Checkpoints and compatibility
 
-Pareto runs write inner engine-state schema 8, carrying the complete objective order, bounds, directions, resolution, capacities and representative policy. Enabled exploration is saved in a separate collection, with disjoint genome/evaluation identities and storage slots; restored entries cannot be relabeled between the two populations. Legacy scalar state remains schema 6, or schema 7 when measurement provenance is present. New optional JSON fields are omitted for scalar results/snapshots/checkpoints.
+Pareto runs write inner engine-state schema 8, or schema 9 when a constraint count is declared, carrying the complete objective order, bounds, directions, resolution, capacities and representative policy. Schema 9 prevents older readers from silently dropping the required violation-vector shape. Enabled exploration is saved in a separate collection, with disjoint genome/evaluation identities and storage slots; restored entries cannot be relabeled between the two populations. Legacy scalar state remains schema 6, or schema 7 when measurement provenance is present. New optional JSON fields are omitted for scalar results/snapshots/checkpoints.
 
 Restore validates the same archive definition, exact storage slots, version, feasibility, uniqueness and nondominance transactionally. Offline `EvolutionEngine<TGenome>.ReadCheckpoint` returns front metadata through `EvolutionCheckpointContents<TGenome>.ParetoFront`. Corrupt front metadata and front invariants are rejected **before any task-owned genome codec executes**. Definition changes invalidate resume rather than reinterpret old objectives.
 

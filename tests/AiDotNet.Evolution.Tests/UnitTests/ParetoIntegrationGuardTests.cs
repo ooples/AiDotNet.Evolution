@@ -1,4 +1,5 @@
 using System.Globalization;
+using System.Text.Json.Nodes;
 using Xunit;
 
 namespace AiDotNet.Evolution.Tests;
@@ -54,6 +55,26 @@ public sealed class ParetoIntegrationGuardTests
         Assert.Equal(2, result.Counters.EvaluationAttempts);
     }
 
+    [Theory]
+    [InlineData("downgrade")]
+    [InlineData("missing-count")]
+    [InlineData("missing-violation")]
+    public async Task ConstraintMetadataCannotBeDroppedBeforeOfflineCodecValidation(string corruption)
+    {
+        var store = new InMemoryEvolutionCheckpointStore();
+        await Engine(Definition(), 2, store).RunAsync(new[] { .2, .6 });
+        var checkpoint = (await store.LoadLatestAsync("pareto-guards"))!;
+        var payload = JsonNode.Parse(checkpoint.Payload)!;
+        Assert.Equal(9, payload["SchemaVersion"]!.GetValue<int>());
+        if (corruption == "downgrade") payload["SchemaVersion"] = 8;
+        if (corruption == "missing-count") payload["Islands"]![0]!["Pareto"]!.AsObject().Remove("ConstraintCount");
+        if (corruption == "missing-violation") payload["Islands"]![0]!["Entries"]![0]!["Evaluation"]!["ConstraintViolations"] = new JsonArray();
+        var corrupt = new EvolutionCheckpoint(checkpoint.RunId, checkpoint.Sequence, checkpoint.CompatibilityHash, payload.ToJsonString());
+        var codec = new Codec();
+        Assert.Throws<System.IO.InvalidDataException>(() => EvolutionEngine<double>.ReadCheckpoint(corrupt, codec));
+        Assert.Equal(0, codec.Reads);
+    }
+
     private static EvolutionEngineOptions Options(int budget, bool resume = false) => new()
     { RunId = "pareto-guards", MaxEvaluationAttempts = budget, MaxProposals = 100, ProposalBatchSize = 1, Resume = resume };
     private static EvolutionEngine<double> Engine(EvolutionParetoDefinition definition, int budget, IEvolutionCheckpointStore store, bool resume = false) =>
@@ -79,9 +100,10 @@ public sealed class ParetoIntegrationGuardTests
     }
     private sealed class Codec : IEvolutionGenomeCodec<double>
     {
+        public int Reads { get; private set; }
         public string Id => "pareto-guard-codec";
         public string VersionHash => "v1";
         public string Serialize(double genome) => genome.ToString("R", CultureInfo.InvariantCulture);
-        public double Deserialize(string payload) => double.Parse(payload, CultureInfo.InvariantCulture);
+        public double Deserialize(string payload) { Reads++; return double.Parse(payload, CultureInfo.InvariantCulture); }
     }
 }
