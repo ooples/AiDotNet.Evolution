@@ -181,7 +181,8 @@ public sealed class EvolutionPolicyOptimizer
             task.Id, task.VersionHash, replicate.ToString(CultureInfo.InvariantCulture) }).Substring(0, 16), NumberStyles.HexNumber, CultureInfo.InvariantCulture);
         var maximum = _options.TrialBudget.ReservedResources;
         var stage = phase == "holdout" ? EvolutionResourceStage.Confirmation : EvolutionResourceStage.Evaluation;
-        using var reservation = _ledger.TryReserve("inner/" + sequence.ToString(CultureInfo.InvariantCulture), stage, maximum, maximum);
+        // Disposed once, in the finally below, because the record it feeds is written there too.
+        var reservation = _ledger.TryReserve("inner/" + sequence.ToString(CultureInfo.InvariantCulture), stage, maximum, maximum);
         if (reservation is null)
         {
             _records.Add(new EvolutionPolicyTrialRecord(sequence, phase, task, policy, replicate, seed, TimeSpan.Zero,
@@ -207,7 +208,7 @@ public sealed class EvolutionPolicyOptimizer
             observation = await work.ConfigureAwait(false) ?? throw new InvalidOperationException("Policy trial returned no receipt.");
             var amounts = observation.ActualResources.Amounts;
             if (!amounts.ContainsKey("cost_units") || new[] { PolicyResources.Evaluations, PolicyResources.Proposals, PolicyResources.Restarts }
-                .Any(key => !amounts.ContainsKey(key) || decimal.Truncate(amounts[key]) != amounts[key]))
+                .Any(key => !amounts.TryGetValue(key, out decimal amount) || decimal.Truncate(amount) != amount))
                 throw new InvalidDataException("Policy receipt must explicitly report integral engine counters and cost_units.");
             if (amounts.Keys.Any(key => !maximum.Amounts.ContainsKey(key)))
                 throw new InvalidDataException("Policy receipt introduced undeclared resources.");
