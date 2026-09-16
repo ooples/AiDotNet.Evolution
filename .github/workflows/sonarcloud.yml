@@ -94,6 +94,13 @@ jobs:
           --collect:"XPlat Code Coverage" --results-directory coverage
           --
           DataCollectionRunSettings.DataCollectors.DataCollector.Configuration.Format=opencover
+      - name: Test compiler-guided integration with OpenCover
+        run: >
+          dotnet test tests/AiDotNet.Evolution.CSharp.Tests/AiDotNet.Evolution.CSharp.Tests.csproj
+          --configuration Release --framework net10.0 --no-build
+          --collect:"XPlat Code Coverage" --results-directory coverage
+          --
+          DataCollectionRunSettings.DataCollectors.DataCollector.Configuration.Format=opencover
       - name: End analysis
         if: steps.sonar_guard.outputs.enabled == 'true'
         env:

@@ -1,0 +1,17 @@
+<Project Sdk="Microsoft.NET.Sdk">
+  <PropertyGroup>
+    <TargetFrameworks>net10.0;net8.0</TargetFrameworks>
+    <ImplicitUsings>enable</ImplicitUsings>
+    <Nullable>enable</Nullable>
+    <TreatWarningsAsErrors>true</TreatWarningsAsErrors>
+    <Version>0.1.0-preview.1</Version>
+    <Description>Compiler-neutral bounded program improvement and artifact-bound promotion.</Description>
+    <RepositoryUrl>https://github.com/ooples/AiDotNet.Evolution</RepositoryUrl>
+    <PackageLicenseExpression>Apache-2.0</PackageLicenseExpression>
+    <PackageReadmeFile>README.md</PackageReadmeFile>
+  </PropertyGroup>
+  <ItemGroup>
+    <None Include="../../docs/COMPILER_GUIDED_PROGRAMS.md" Pack="true" PackagePath="README.md" />
+    <ProjectReference Include="../AiDotNet.Evolution/AiDotNet.Evolution.csproj" />
+  </ItemGroup>
+</Project>

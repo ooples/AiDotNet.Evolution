@@ -54,6 +54,11 @@ jobs:
           dotnet test tests/AiDotNet.Evolution.Tests/AiDotNet.Evolution.Tests.csproj
           --configuration Release --framework net8.0 --no-restore --verbosity normal
           --blame-hang --blame-hang-timeout 120s --blame-crash
+      - name: Verify compiler-guided program improvement
+        run: |
+          dotnet test tests/AiDotNet.Evolution.CSharp.Tests -c Release -f net10.0 --no-restore
+          dotnet test tests/AiDotNet.Evolution.CSharp.Tests -c Release -f net8.0 --no-restore
+          dotnet run --project examples/CompilerGuidedSearch -c Release -f net10.0 -- TestResults/compiler-guided
       - name: Verify numeric quality harness contracts
         shell: pwsh
         env:
@@ -114,6 +119,7 @@ jobs:
         with:
           name: coverage-and-diagnostics
           path: |
+            TestResults/compiler-guided/**
             TestResults/quality/**/*.json
             TestResults/experiment-reports/**
             TestResults/ablations/**
