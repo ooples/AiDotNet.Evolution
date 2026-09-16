@@ -18,7 +18,7 @@ internal static class ParetoCampaign
         Sample[] Samples, Elite[] Elites);
 
     internal static EvolutionParetoDefinition Definition(int dimensions) => new(Enumerable.Range(0, dimensions)
-        .Select(i => new EvolutionObjectiveDefinition("loss-" + i, EvolutionOptimizationDirection.Minimize, 0, 2)), 64, 1);
+        .Select(i => new EvolutionObjectiveDefinition("loss-" + i, EvolutionOptimizationDirection.Minimize, 0, 2)), 64, constraintCount: 1);
 
     internal static async Task<int> RunAsync(string[] args)
     {
@@ -101,15 +101,15 @@ internal static class ParetoCampaign
                     EnableEvaluationCache = false
                 },
                 selection: pareto ? new ParetoEvolutionSelectionPolicy<Genome>() : new UniformEvolutionSelectionPolicy<Genome>(),
-                migration: pareto ? new ParetoMigrationPolicy<Genome>() : new RingMigrationPolicy<Genome>(), observer: observer);
+                migration: pareto ? new ParetoEvolutionMigrationPolicy<Genome>() : new RingMigrationPolicy<Genome>(), observer: observer);
             var result = await engine.RunAsync(seeds); watch.Stop();
             var entries = result.Islands.SelectMany(island => island.Entries).ToArray();
             bool passed = entries.Length > 0 && result.Counters.EvaluationAttempts == budget && observer.Samples.Sum(sample => sample.Attempts) == budget &&
-                entries.All(entry => definition.IsFeasible(entry.Evaluation));
+                entries.All(entry => definition.Accepts(entry.Evaluation));
             return new(dimensions, method, seed, budget, passed ? "completed" : "failed", passed ? null : "Budget or feasibility contract failed.",
                 initialHash, result.StateHash, false, result.Counters.EvaluationAttempts, result.Counters.Proposals,
                 observer.Samples.Sum(sample => sample.Cost), watch.Elapsed.TotalMilliseconds,
-                EvolutionParetoQuery.Hypervolume(definition, entries.Select(entry => entry.Evaluation)), entries.Length,
+                new EvolutionParetoFront<Genome>(definition, entries).Hypervolume(), entries.Length,
                 observer.Samples.Count(sample => sample.Status == "Completed"),
                 entries.Length == 0 ? Array.Empty<double>() : Enumerable.Range(0, dimensions).Select(i => entries.Min(entry => entry.Evaluation.Objectives[i])).ToArray(),
                 entries.Length == 0 ? Array.Empty<double>() : Enumerable.Range(0, dimensions).Select(i => entries.Max(entry => entry.Evaluation.Objectives[i])).ToArray(), observer.Samples.ToArray(),

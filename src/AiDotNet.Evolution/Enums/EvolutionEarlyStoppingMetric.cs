@@ -26,6 +26,6 @@ public enum EvolutionEarlyStoppingMetric
     Coverage = 1,
     /// <summary>The sum of every elite's quality across every island, negated under minimization.</summary>
     QdScore = 2,
-    /// <summary>The mean retained-front normalized hypervolume across islands, with fixed objective bounds.</summary>
+    /// <summary>Exact normalized hypervolume of the retained feasible island-front union; two or three objectives only.</summary>
     ParetoHypervolume = 3
 }

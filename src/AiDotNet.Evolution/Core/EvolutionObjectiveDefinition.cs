@@ -1,47 +1,54 @@
 namespace AiDotNet.Evolution;
 
-/// <summary>Immutable objective axis with a fixed admissible range and optional normalized tolerance bins.</summary>
-/// <remarks>Values outside the declared range are rejected, not clipped. Tolerance is a bin width in
-/// normalized loss space, anchored at the ideal bound. Zero uses exact comparison. Quantization is transitive,
-/// unlike pairwise approximate equality. Hypervolume always uses unquantized normalized values.</remarks>
+/// <summary>One position in an evaluation's objective vector, with fixed units and comparison precision.</summary>
 public sealed class EvolutionObjectiveDefinition
 {
-    /// <summary>Defines an axis. Bounds must be finite with a finite positive span; tolerance is zero or in [1e-12, 1].</summary>
-    public EvolutionObjectiveDefinition(string name, EvolutionOptimizationDirection direction, double minimum, double maximum, double tolerance = 0)
+    /// <summary>Defines a finite closed reporting interval and an optional normalized epsilon-box width.</summary>
+    /// <remarks>
+    /// Values outside the interval are rejected, never silently clipped. Resolution zero means exact dominance;
+    /// otherwise comparisons use floor(normalized loss / resolution). This transitive box order deliberately
+    /// avoids pairwise epsilon comparisons, which can cycle. Bounds and resolution must be fixed before a run.
+    /// </remarks>
+    public EvolutionObjectiveDefinition(string name, EvolutionOptimizationDirection direction,
+        double minimum, double maximum, double resolution = 0)
     {
         Guard.NotNullOrWhiteSpace(name);
+        if (name.Trim().Length > 128) throw new ArgumentException("Objective names are limited to 128 characters.", nameof(name));
         if (!Enum.IsDefined(typeof(EvolutionOptimizationDirection), direction)) throw new ArgumentOutOfRangeException(nameof(direction));
         if (!EvolutionDescriptorDefinition.IsFinite(minimum) || !EvolutionDescriptorDefinition.IsFinite(maximum) ||
-            !EvolutionDescriptorDefinition.IsFinite(maximum - minimum) || maximum <= minimum)
-            throw new ArgumentOutOfRangeException(nameof(maximum));
-        if (!EvolutionDescriptorDefinition.IsFinite(tolerance) || tolerance < 0 || tolerance > 1 || (tolerance > 0 && tolerance < 1e-12))
-            throw new ArgumentOutOfRangeException(nameof(tolerance));
-        Name = name.Trim(); Direction = direction; Minimum = minimum; Maximum = maximum; Tolerance = tolerance;
+            maximum <= minimum || !EvolutionDescriptorDefinition.IsFinite(maximum - minimum))
+            throw new ArgumentOutOfRangeException(nameof(maximum), "Objective bounds need a positive finite width.");
+        if (!EvolutionDescriptorDefinition.IsFinite(resolution) || resolution < 0 || resolution > 1 ||
+            (resolution > 0 && resolution < 1e-12)) throw new ArgumentOutOfRangeException(nameof(resolution));
+        Name = name.Trim(); Direction = direction; Minimum = minimum; Maximum = maximum; Resolution = resolution;
     }
 
-    /// <summary>Gets the unique ordinal axis name.</summary>
+    /// <summary>Gets the unique case-sensitive objective name.</summary>
     public string Name { get; }
-    /// <summary>Gets the direction of improvement.</summary>
+    /// <summary>Gets whether this objective is minimized or maximized, independently of scalar quality.</summary>
     public EvolutionOptimizationDirection Direction { get; }
-    /// <summary>Gets the lower admissible bound.</summary>
+    /// <summary>Gets the inclusive lower bound in the objective's original units.</summary>
     public double Minimum { get; }
-    /// <summary>Gets the upper admissible bound.</summary>
+    /// <summary>Gets the inclusive upper bound in the objective's original units.</summary>
     public double Maximum { get; }
-    /// <summary>Gets the normalized comparison bin width; zero means exact comparison.</summary>
-    public double Tolerance { get; }
-    /// <summary>Converts a valid raw value to normalized loss in [0, 1]; smaller is better.</summary>
+    /// <summary>Gets the normalized epsilon-box width, or zero for exact comparisons.</summary>
+    public double Resolution { get; }
+
+    /// <summary>Converts a valid value to loss: zero is ideal and one is worst.</summary>
     public double Normalize(double value)
     {
         if (!EvolutionDescriptorDefinition.IsFinite(value) || value < Minimum || value > Maximum)
-            throw new ArgumentOutOfRangeException(nameof(value), "Objective value is outside its declared domain.");
+            throw new ArgumentOutOfRangeException(nameof(value), "Objective value is outside the fixed reporting interval.");
         return Direction == EvolutionOptimizationDirection.Minimize
             ? (value - Minimum) / (Maximum - Minimum) : (Maximum - value) / (Maximum - Minimum);
     }
-    internal double ComparisonValue(double value)
+
+    internal double CompareValue(double value)
     {
         double loss = Normalize(value);
-        return Tolerance == 0 ? (Direction == EvolutionOptimizationDirection.Minimize ? value : -value) : Math.Floor(loss / Tolerance);
+        return Resolution == 0 ? loss : Math.Floor(loss / Resolution);
     }
-    internal string Canonical => EvolutionHash.Combine(new[] { Name, Direction.ToString(), EvolutionHash.EncodeDouble(Minimum),
-        EvolutionHash.EncodeDouble(Maximum), EvolutionHash.EncodeDouble(Tolerance) });
+
+    internal string Canonical => EvolutionHash.Combine(new[] { Name, Direction.ToString(),
+        EvolutionHash.EncodeDouble(Minimum), EvolutionHash.EncodeDouble(Maximum), EvolutionHash.EncodeDouble(Resolution) });
 }

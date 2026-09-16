@@ -1,53 +1,165 @@
+using System.Globalization;
+
 namespace AiDotNet.Evolution;
 
-/// <summary>Fixed two- or three-objective feasible-front contract, including constraint shape and capacity.</summary>
-/// <remarks>Hard constraints require exactly ConstraintCount reported violations, all zero. Infeasible exploration
-/// is deliberately not retained in this deployable archive. Best remains a scalar-quality representative only.
-/// Capacity pruning uses normalized crowding with stable identity ties; discarded points are not remembered.</remarks>
+/// <summary>Immutable bounded-front semantics, including objective order, capacity and representative policy.</summary>
 public sealed class EvolutionParetoDefinition
 {
-    /// <summary>Creates a front contract. Capacity is 2..1024, constraint count 0..64.</summary>
-    public EvolutionParetoDefinition(IEnumerable<EvolutionObjectiveDefinition> objectives, int capacity = 64, int constraintCount = 0)
+    /// <summary>Creates a two-to-eight-objective front with capacity between two and 256.</summary>
+    public EvolutionParetoDefinition(IEnumerable<EvolutionObjectiveDefinition> objectives, int capacity = 64,
+        EvolutionParetoRepresentative representative = EvolutionParetoRepresentative.ClosestToIdeal, int infeasibleCapacity = 0,
+        int? constraintCount = null)
     {
         Guard.NotNull(objectives);
-        var axes = EvolutionCollection.ToBoundedArray(objectives, 3, nameof(objectives));
-        if (axes.Length < 2 || axes.Any(axis => axis is null) || axes.Select(axis => axis.Name).Distinct(StringComparer.Ordinal).Count() != axes.Length)
-            throw new ArgumentException("Two or three uniquely named objectives are required.", nameof(objectives));
-        if (capacity < 2 || capacity > 1024) throw new ArgumentOutOfRangeException(nameof(capacity));
+        var copy = EvolutionCollection.CopyBounded(objectives.Take(9).ToArray(), 8, nameof(objectives));
+        if (copy.Length < 2 || copy.Any(axis => axis is null) ||
+            copy.Select(axis => axis.Name).Distinct(StringComparer.Ordinal).Count() != copy.Length)
+            throw new ArgumentException("Provide two to eight uniquely named objective definitions.", nameof(objectives));
+        if (capacity < 2 || capacity > 256) throw new ArgumentOutOfRangeException(nameof(capacity));
+        if (infeasibleCapacity < 0 || infeasibleCapacity > 256) throw new ArgumentOutOfRangeException(nameof(infeasibleCapacity));
         if (constraintCount < 0 || constraintCount > 64) throw new ArgumentOutOfRangeException(nameof(constraintCount));
-        Objectives = Array.AsReadOnly(axes); Capacity = capacity; ConstraintCount = constraintCount;
-        DefinitionHash = EvolutionHash.Combine(new[] { "pareto-crowding-v1", capacity.ToString(System.Globalization.CultureInfo.InvariantCulture),
-            constraintCount.ToString(System.Globalization.CultureInfo.InvariantCulture), "scalar-quality-representative", "unit-reference" }.Concat(axes.Select(axis => axis.Canonical)));
+        if (!Enum.IsDefined(typeof(EvolutionParetoRepresentative), representative)) throw new ArgumentOutOfRangeException(nameof(representative));
+        Objectives = Array.AsReadOnly(copy); Capacity = capacity; Representative = representative; InfeasibleCapacity = infeasibleCapacity;
+        DefinitionHash = EvolutionHash.Combine(new[] { "pareto-epsilon-box-crowding-v1",
+            capacity.ToString(CultureInfo.InvariantCulture), representative.ToString() }.Concat(copy.Select(axis => axis.Canonical)));
+        if (infeasibleCapacity > 0) DefinitionHash = EvolutionHash.Combine(new[] { DefinitionHash, "infeasible-max-violation-v1",
+            infeasibleCapacity.ToString(CultureInfo.InvariantCulture) });
+        ConstraintCount = constraintCount;
+        if (constraintCount.HasValue) DefinitionHash = EvolutionHash.Combine(new[] { DefinitionHash, "constraint-count-v1",
+            constraintCount.Value.ToString(CultureInfo.InvariantCulture) });
     }
-    /// <summary>Gets the ordered axes matching evaluation objective vectors.</summary>
+
+    /// <summary>Gets definitions in exactly the order of EvolutionEvaluation.Objectives.</summary>
     public IReadOnlyList<EvolutionObjectiveDefinition> Objectives { get; }
-    /// <summary>Gets the retained-front capacity.</summary>
+    /// <summary>Gets the maximum number of retained feasible front members per island.</summary>
     public int Capacity { get; }
-    /// <summary>Gets the exact number of hard constraint violations required.</summary>
-    public int ConstraintCount { get; }
-    /// <summary>Gets the stable contract hash.</summary>
+    /// <summary>Gets the separate infeasible exploration capacity; zero disables it without changing feasible-only semantics.</summary>
+    public int InfeasibleCapacity { get; }
+    /// <summary>Gets the required violation-vector length, or null for legacy task-defined shape.</summary>
+    /// <remarks>Declare this for constrained tasks so an omitted violation cannot masquerade as feasibility.
+    /// Both feasible and exploration entries must report the exact shape. Zero explicitly means unconstrained.</remarks>
+    public int? ConstraintCount { get; }
+    /// <summary>Gets the explicit policy for Best; the complete answer is the front, not Best.</summary>
+    public EvolutionParetoRepresentative Representative { get; }
+    /// <summary>Gets the versioned identity of every admission, retention and reporting choice.</summary>
     public string DefinitionHash { get; }
-    /// <summary>Checks completion, objective domains and complete zero-valued hard constraints.</summary>
-    public bool IsFeasible(EvolutionEvaluation evaluation)
+
+    /// <summary>Reports whether a completed feasible evaluation has the exact objective shape and valid bounds.</summary>
+    public bool Accepts(EvolutionEvaluation evaluation)
     {
         Guard.NotNull(evaluation);
-        return evaluation.Status == EvolutionEvaluationStatus.Completed && evaluation.Quality.HasValue &&
-            evaluation.Objectives.Count == Objectives.Count && evaluation.ConstraintViolations.Count == ConstraintCount &&
-            evaluation.ConstraintViolations.All(value => value == 0) &&
-            Objectives.Select((axis, i) => evaluation.Objectives[i] >= axis.Minimum && evaluation.Objectives[i] <= axis.Maximum).All(valid => valid);
+        return HasValidObjectives(evaluation) && !evaluation.ConstraintViolations.Any(value => value > 0);
     }
-    /// <summary>Compares feasible vectors: -1 dominates, 1 is dominated, 0 is equivalent or incomparable.</summary>
-    public int Compare(EvolutionEvaluation left, EvolutionEvaluation right)
+
+    internal bool HasValidObjectives(EvolutionEvaluation evaluation) => DescribeObjectiveProblem(evaluation, out _) is null;
+
+    /// <summary>Names the first reason an evaluation cannot enter the front, or null when the vector is admissible.</summary>
+    /// <remarks>
+    /// Feasibility is deliberately not a problem: a positive constraint violation is a reported outcome, while an
+    /// unusable objective vector is a contract mistake the engine must surface instead of dropping silently.
+    /// </remarks>
+    internal string? DescribeObjectiveProblem(EvolutionEvaluation evaluation, out int index)
     {
-        if (!IsFeasible(left) || !IsFeasible(right)) throw new ArgumentException("Dominance requires feasible objective vectors.");
-        bool less = false, greater = false;
+        index = -1;
+        if (evaluation.Status != EvolutionEvaluationStatus.Completed) return "not_completed";
+        if (!evaluation.Quality.HasValue) return "missing_quality";
+        if (ConstraintCount.HasValue && evaluation.ConstraintViolations.Count != ConstraintCount.Value) return "constraint_count";
+        if (evaluation.Objectives.Count != Objectives.Count) return "objective_count";
         for (int i = 0; i < Objectives.Count; i++)
         {
-            int comparison = Objectives[i].ComparisonValue(left.Objectives[i]).CompareTo(Objectives[i].ComparisonValue(right.Objectives[i]));
-            less |= comparison < 0; greater |= comparison > 0;
+            if (!EvolutionDescriptorDefinition.IsFinite(evaluation.Objectives[i])) { index = i; return "not_finite"; }
+            if (evaluation.Objectives[i] < Objectives[i].Minimum || evaluation.Objectives[i] > Objectives[i].Maximum)
+            { index = i; return "out_of_bounds"; }
         }
-        return less == greater ? 0 : less ? -1 : 1;
+        return null;
     }
-    internal bool Equivalent(EvolutionEvaluation left, EvolutionEvaluation right) =>
-        Objectives.Select((axis, i) => axis.ComparisonValue(left.Objectives[i]) == axis.ComparisonValue(right.Objectives[i])).All(equal => equal);
+
+    /// <summary>Tests strict Pareto dominance under the fixed exact or epsilon-box objective order.</summary>
+    public bool Dominates(IReadOnlyList<double> left, IReadOnlyList<double> right)
+    {
+        Validate(left); Validate(right);
+        bool better = false;
+        for (int i = 0; i < Objectives.Count; i++)
+        {
+            double a = Objectives[i].CompareValue(left[i]), b = Objectives[i].CompareValue(right[i]);
+            if (a > b) return false;
+            if (a < b) better = true;
+        }
+        return better;
+    }
+
+    internal void Validate(IReadOnlyList<double> values)
+    {
+        Guard.NotNull(values);
+        if (values.Count != Objectives.Count) throw new ArgumentException("Objective vector has the wrong dimension.", nameof(values));
+        for (int i = 0; i < values.Count; i++) Objectives[i].Normalize(values[i]);
+    }
+
+    /// <summary>Computes the comparison coordinates of one validated objective vector, exact or epsilon-box.</summary>
+    internal double[] CompareVector(IReadOnlyList<double> values)
+    {
+        var vector = new double[Objectives.Count];
+        for (int i = 0; i < Objectives.Count; i++) vector[i] = Objectives[i].CompareValue(values[i]);
+        return vector;
+    }
+
+    /// <summary>Computes the normalized losses of one validated objective vector; zero is ideal and one is worst.</summary>
+    internal double[] NormalizedVector(IReadOnlyList<double> values)
+    {
+        var vector = new double[Objectives.Count];
+        for (int i = 0; i < Objectives.Count; i++) vector[i] = Objectives[i].Normalize(values[i]);
+        return vector;
+    }
+
+    /// <summary>Tests strict dominance between two comparison vectors produced by <see cref="CompareVector"/>.</summary>
+    internal static bool DominatesCompared(double[] left, double[] right)
+    {
+        bool better = false;
+        for (int i = 0; i < left.Length; i++)
+        {
+            if (left[i] > right[i]) return false;
+            if (left[i] < right[i]) better = true;
+        }
+        return better;
+    }
+
+    /// <summary>Tests whether two comparison vectors occupy the same exact point or epsilon box.</summary>
+    internal static bool SameCompared(double[] left, double[] right)
+    {
+        for (int i = 0; i < left.Length; i++) if (left[i] != right[i]) return false;
+        return true;
+    }
+
+    internal int CompareRepresentative<T>(EvolutionArchiveEntry<T> a, EvolutionArchiveEntry<T> b)
+    {
+        int comparison = 0;
+        if (Representative == EvolutionParetoRepresentative.ScalarQuality)
+            comparison = a.Evaluation.Direction == EvolutionOptimizationDirection.Maximize
+                ? Nullable.Compare(b.Evaluation.Quality, a.Evaluation.Quality) : Nullable.Compare(a.Evaluation.Quality, b.Evaluation.Quality);
+        else if (Representative == EvolutionParetoRepresentative.ClosestToIdeal)
+            comparison = IdealDistance(a.Evaluation).CompareTo(IdealDistance(b.Evaluation));
+        return comparison != 0 ? comparison : CompareObjectiveTie(a, b);
+    }
+
+    internal int CompareObjectiveTie<T>(EvolutionArchiveEntry<T> a, EvolutionArchiveEntry<T> b)
+    {
+        for (int i = 0; i < Objectives.Count; i++)
+        {
+            int comparison = Objectives[i].Normalize(a.Evaluation.Objectives[i]).CompareTo(Objectives[i].Normalize(b.Evaluation.Objectives[i]));
+            if (comparison != 0) return comparison;
+        }
+        int identity = StringComparer.Ordinal.Compare(a.Evaluation.GenomeId, b.Evaluation.GenomeId);
+        return identity != 0 ? identity : a.Evaluation.EvaluationId.CompareTo(b.Evaluation.EvaluationId);
+    }
+
+    private double IdealDistance(EvolutionEvaluation evaluation)
+    {
+        double sum = 0;
+        for (int i = 0; i < Objectives.Count; i++)
+        {
+            double value = Objectives[i].Normalize(evaluation.Objectives[i]);
+            sum += value * value;
+        }
+        return sum;
+    }
 }
