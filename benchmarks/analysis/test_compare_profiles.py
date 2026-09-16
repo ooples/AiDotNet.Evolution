@@ -1,10 +1,29 @@
 import copy
 import unittest
+import gzip
+import hashlib
+import json
+from pathlib import Path
 
 from compare_profiles import compare
 
 
 class ProfileComparisonTests(unittest.TestCase):
+    def test_committed_campaign_hashes_and_comparison_recompute(self):
+        directory = Path(__file__).resolve().parents[1] / "evidence/performance/us10-integration"
+        saved = json.loads((directory / "comparison.json").read_text())
+        reports = []
+        for name in ("before", "after"):
+            content = gzip.decompress((directory / (name + "-report.json.gz")).read_bytes())
+            digest = hashlib.sha256(content).hexdigest()
+            self.assertEqual(saved[name + "RawSha256"], digest)
+            summary = json.loads((directory / (name + "-summary.json")).read_text())
+            self.assertEqual(summary["raw"]["sha256"], digest)
+            self.assertEqual(summary["raw"]["bytes"], len(content))
+            reports.append(json.loads(content))
+        result = compare(*reports)
+        self.assertEqual({key: value for key, value in saved.items() if key not in ("beforeRawSha256", "afterRawSha256")}, result)
+
     def report(self):
         case = dict(id="engine", kind="engine")
         measurement = dict(case=case, environment={"runtime": "fixed"}, operations=100, iterations=1,
@@ -38,6 +57,14 @@ class ProfileComparisonTests(unittest.TestCase):
                 elif corruption == "environment": row["environment"] = {"runtime": "changed"}
                 else: row["managedAllocatedBytes"] = -1
                 with self.assertRaises(ValueError): compare(before, after)
+
+    def test_zero_allocation_baseline_has_no_percentage_and_failed_attempt_is_not_hidden(self):
+        before, after = self.report(), self.report()
+        for attempt in before["attempts"]:
+            attempt["measurement"]["managedAllocatedBytes"] = 0
+        self.assertIsNone(compare(before, after)["rows"][0]["allocationReductionPercent"])
+        after["attempts"].append(dict(caseId="engine", repetition=0, status="failed", measurement=None))
+        with self.assertRaises(ValueError): compare(before, after)
 
 
 if __name__ == "__main__":

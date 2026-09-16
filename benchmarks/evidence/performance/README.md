@@ -1,5 +1,10 @@
 # US-10 engine profiling evidence
 
+Historical campaign from PR #53. The current integration's before/after evidence lives in
+[us10-integration](us10-integration/README.md). Its corrected renderer also regenerates the historical
+table's per-iteration extrema and allocation medians from individual attempts; raw historical measurements
+and source identity are unchanged. Earlier ratio-of-summary-values columns are superseded.
+
 Source: `b6303d6208bf8f7a06d0cb9cee483e685ee5e2f2`, verified against the commit SourceLink compiled into the measured
 assembly (`0.1.0-preview.1+b6303d6208bf8f7a06d0cb9cee483e685ee5e2f2`), tracked working tree clean.
 Recorded September 12, 2026, 00:20:54–00:24:49 UTC.

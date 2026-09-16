@@ -17,6 +17,11 @@ def compare(before, after):
     for report in (before, after):
         require(report["status"] == "passed" and not report["smoke"], "A full passing campaign is required.")
         require(report["workingTreeStatus"] == "clean", "Dirty source provenance.")
+        planned = {case["id"] for case in report["cases"]}
+        require(len(planned) == len(report["cases"]), "Duplicate cases.")
+        for attempt in report["attempts"]:
+            require(attempt["status"] in ("passed", "contended") and attempt["caseId"] in planned
+                    and 0 <= attempt["repetition"] < report["repetitions"], "Unplanned or failed attempt.")
     require(before["cases"] == after["cases"] and before["repetitions"] == after["repetitions"], "Unpaired campaign plans.")
     require(before["affinityHex"] == after["affinityHex"] and before["pinnedTopology"] == after["pinnedTopology"], "Changed CPU controls.")
     environments = [attempt["measurement"]["environment"] for report in (before, after) for attempt in report["attempts"] if attempt["status"] == "passed"]
@@ -47,7 +52,8 @@ def compare(before, after):
         left, right = metrics
         rows.append(dict(caseId=case["id"], before=left, after=right,
                          elapsedReductionPercent=100 * (1 - right["medianMillisecondsPerOperation"] / left["medianMillisecondsPerOperation"]),
-                         allocationReductionPercent=100 * (1 - right["medianAllocatedBytesPerOperation"] / left["medianAllocatedBytesPerOperation"])))
+                         allocationReductionPercent=100 * (1 - right["medianAllocatedBytesPerOperation"] / left["medianAllocatedBytesPerOperation"])
+                         if left["medianAllocatedBytesPerOperation"] > 0 else None))
     return dict(beforeRevision=before["sourceRevision"], afterRevision=after["sourceRevision"], rows=rows,
                 interpretation="Sequential before/after campaigns on one host, three fresh-process repetitions per case. Descriptive medians only; not randomized cross-revision timing, statistical superiority, optimizer-quality improvement or competitor evidence. All regressions retained.")
 

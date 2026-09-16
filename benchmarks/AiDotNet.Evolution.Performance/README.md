@@ -1,5 +1,15 @@
 # Engine performance suite
 
+Current integration adds strict throughput/iteration/delay validation, bounded justified contention retries,
+and source-revision checks for both the core and profiler assemblies. Tables normalize each attempt before
+aggregating; extrema are not divided by median iteration counts. Linux per-thread `schedstat` is no longer
+mislabeled as process-wide CPU; the optional fine-resolution process field is unavailable instead.
+
+For the current before/after study, complete compressed reports are committed alongside their summaries rather
+than requiring a release publication. Use `eng/Export-ProfileComparison.ps1` to preserve both reports and compare
+matched plans/runtime controls, exact search state and quality. Sequential campaign timings are descriptive,
+not randomized cross-revision inference. See [US-10 delivery](../../docs/evolution-stories/US-10.md).
+
 BenchmarkDotNet 0.15.8 is confined to this executable; the core package has no benchmark dependency.
 These measure orchestration and data-structure cost, not the quality or runtime speed of evolved algorithms.
 
