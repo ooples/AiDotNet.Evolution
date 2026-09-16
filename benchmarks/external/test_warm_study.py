@@ -12,6 +12,7 @@ from warm_evaluator import WarmEvaluator
 from warm_study_design import call_cap, choose_profiles, digest, grid, power_requirement
 from warm_study_report import interval, summarize
 from warm_budget import requirements, validate_accounting
+from warm_confirmation import policy as noise_policy, validate_report
 
 
 def fixture(phase="selection", count=4):
@@ -30,8 +31,9 @@ def fixture(phase="selection", count=4):
 
 
 def budget_plan(plan):
-    limits = requirements(plan["grid"], plan["iterations"], plan["samples"])
-    return dict(plan, schema="warm-head-to-head-v3", resource_limits=limits, call_limit=limits["model_calls"],
+    noise = noise_policy(sum(len(row["tracks"]) for row in plan["grid"]),pairs=3)
+    limits = requirements(plan["grid"], plan["iterations"], plan["samples"],noise["pairs"])
+    return dict(plan, schema="warm-head-to-head-v4", noise_policy=noise, resource_limits=limits, call_limit=limits["model_calls"],
                 container_limit=limits["search_containers"] + limits["confirmation_containers"], cumulative_containers_before=0)
 
 
@@ -227,10 +229,19 @@ class WarmDesignTests(unittest.TestCase):
         self.assertEqual(6,len(report["rows"][0]["pairs"]))
         self.assertTrue(all(p["selected"]["status"] == "valid" and all(a["status"] == "valid" for a in p["audits"])
                             for p in report["rows"][0]["pairs"]))
-        self.assertEqual(72,report["evaluator_attempts"])
+        self.assertEqual(96,report["evaluator_attempts"])
         accounting = validate_accounting(report)
-        self.assertEqual(dict(model_calls=6,search_containers=12,confirmation_containers=60), accounting["spent"])
-        self.assertEqual(72,report["cumulative_container_attempts"])
+        self.assertEqual(dict(model_calls=6,search_containers=12,confirmation_containers=84), accounting["spent"])
+        self.assertEqual(96,report["cumulative_container_attempts"])
+        validate_report(report)
+        for change in (lambda r:r["rows"][0]["pairs"][0]["noise_confirmation"].update(confirmed="forged"),
+                       lambda r:r["rows"][0]["pairs"][0].update(speedup=1e9),
+                       lambda r:r["rows"][0]["pairs"][0]["noise_confirmation"]["orders"].pop(),
+                       lambda r:r["rows"][0]["pairs"][0]["selected"].update(duration_seconds=.0000001)):
+            damaged = copy.deepcopy(report)
+            change(damaged)
+            with self.assertRaises(ValueError):
+                validate_report(damaged)
         # Recompute the digest to test semantic validation, not just hash mismatch.
         for change in (lambda r:r["accounting"]["rows"].pop(),
                        lambda r:r["rows"][0]["pairs"][0]["original_audits"].pop(),

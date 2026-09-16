@@ -17,11 +17,11 @@ SCHEMA = "warm-budget-v1"
 RESOURCES = {"model_calls", "search_containers", "confirmation_containers"}
 
 
-def requirements(grid, iterations, samples):
+def requirements(grid, iterations, samples, confirmation_pairs=None):
     tracks = sum(len(row["tracks"]) for row in grid)
     return dict(model_calls=call_cap(grid, iterations),
                 search_containers=tracks * (iterations + 1) * samples,
-                confirmation_containers=tracks * (2 * samples + 8))
+                confirmation_containers=tracks * (2 * (samples if confirmation_pairs is None else confirmation_pairs) + 8))
 
 
 def integer(value):
@@ -133,7 +133,7 @@ def validate_accounting(report):
             or accounting["closed"] or any(accounting["pending"].values())):
         raise ValueError("Unreconciled campaign accounting")
     validate_limits(accounting["limits"])
-    if (accounting["limits"] != requirements(plan["grid"],plan["iterations"],plan["samples"])
+    if (accounting["limits"] != requirements(plan["grid"],plan["iterations"],plan["samples"],plan.get("noise_policy",{}).get("pairs"))
             or report["cumulative_model_calls"] != plan["cumulative_calls_before"] + report["model_calls"]
             or report["cumulative_container_attempts"] != plan["cumulative_containers_before"] + report["evaluator_attempts"]
             or report["cumulative_model_calls"] > plan["call_limit"]

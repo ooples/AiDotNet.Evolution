@@ -21,9 +21,12 @@ def interval(logs, alpha):
 def summarize(report):
     plan = report["plan"]
     accounting = None
-    if plan.get("schema") == "warm-head-to-head-v3":
+    if plan.get("schema") in ("warm-head-to-head-v3", "warm-head-to-head-v4"):
         from warm_budget import validate_accounting
         accounting = validate_accounting(report)
+    if plan.get("schema") == "warm-head-to-head-v4":
+        from warm_confirmation import validate_report
+        validate_report(report)
     if report["plan_sha256"] != digest(plan) or report["status"] != "completed" or report["unknown_work"]:
         raise ValueError("Incomplete/unreconciled study cannot produce a comparative summary")
     if len(report["rows"]) != len(plan["grid"]):

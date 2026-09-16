@@ -35,6 +35,10 @@ cost through cache copies, migration, checkpoints and traces; fresh replication 
 [Persistent evaluation reuse](docs/PERSISTENT_EVALUATION_REUSE.md) adds exact-key storage, explicit freshness and
 force-fresh policies, metered store calls and a runnable cold/warm/force-fresh engine example.
 
+[Noise-aware confirmation](docs/evolution-stories/US-06.md) adds finite incumbent challenges,
+audits of screen-rejected candidates, charged warmups and independent paired timing confirmation
+for the Evolution-owned program benchmark. Correctness alone does not establish a performance win.
+
 ## Integration boundaries
 
 The engine intentionally knows nothing about models, prompts, compilers, or hardware. Integrations keep those domain

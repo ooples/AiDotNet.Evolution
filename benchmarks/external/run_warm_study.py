@@ -7,7 +7,6 @@ import argparse
 import hashlib
 import json
 from pathlib import Path
-import random
 import subprocess
 import time
 
@@ -21,6 +20,7 @@ from warm_panel import DEFINITIONS, prepare_task, description
 from warm_sandbox import WarmDockerSandbox
 from warm_study_design import call_cap, choose_profiles, digest, grid, power_requirement
 from warm_budget import CampaignBudget, requirements, integer, validate_limits, validate_accounting
+from warm_confirmation import policy as noise_policy, confirm, validate_report, manifest as noise_manifest
 
 ROOT = Path(__file__).resolve().parents[2]
 OE_REVISION = "411fb59c886c18704caaffb611e17cf9e7d824d2"
@@ -58,9 +58,10 @@ def verify(plan):
 
 def predecessor(path, phase):
     value = json.loads(Path(path).read_bytes())
-    if value["plan"].get("schema") != "warm-head-to-head-v3":
+    if value["plan"].get("schema") != "warm-head-to-head-v4":
         raise ValueError("New budget protocol requires a new development registration")
     validate_accounting(value)
+    validate_report(value)
     expected = "development" if phase == "selection" else "selection"
     if value["phase"] != expected or value["status"] != "completed" or value["unknown_work"]:
         raise ValueError("Predecessor must be complete, reconciled and from the preceding partition")
@@ -100,7 +101,8 @@ def prepare(output, upstream, openevolve, dll, codex, image, *, phase="developme
     planned_calls = call_cap(schedule)
     if consumed + planned_calls > call_limit:
         raise ValueError(f"Do not open {phase} data: {planned_calls} more calls required; {call_limit-consumed} available")
-    limits = requirements(schedule, 4, 3)
+    noise = noise_policy(sum(len(row["tracks"]) for row in schedule))
+    limits = requirements(schedule, 4, 3, noise["pairs"])
     containers_before = prior["cumulative_container_attempts"] if prior else 0
     if not integer(container_limit):
         raise ValueError("Declare an explicit cumulative container-attempt limit")
@@ -110,7 +112,7 @@ def prepare(output, upstream, openevolve, dll, codex, image, *, phase="developme
         raise ValueError("Insufficient container budget including reserved final audits")
     root = Path(output).resolve()
     root.mkdir(parents=True, exist_ok=False)
-    plan = dict(schema="warm-head-to-head-v3", phase=phase, profiles=profiles, grid=schedule,
+    plan = dict(schema="warm-head-to-head-v4", phase=phase, profiles=profiles, grid=schedule, noise_policy=noise,
                 resource_limits=limits, container_limit=container_limit, cumulative_containers_before=containers_before,
                 accounting_policy="warm-budget-v1", setup_allocation="shared-unallocated",
                 correctness_contract="strict-upstream-v1", final_audit_policy="both-executables-v1",
@@ -149,10 +151,12 @@ def execute(plan_path, registered_sha256):
     plan = json.loads(plan_path.read_bytes())
     if digest(plan) != registered_sha256:
         raise ValueError("Registration hash mismatch")
-    if plan.get("schema") != "warm-head-to-head-v3" or plan.get("correctness_contract") != "strict-upstream-v1" or plan.get("final_audit_policy") != "both-executables-v1":
+    if plan.get("schema") != "warm-head-to-head-v4" or plan.get("correctness_contract") != "strict-upstream-v1" or plan.get("final_audit_policy") != "both-executables-v1":
         raise ValueError("Require a new registration for strengthened correctness and fallback audits")
+    if plan["noise_policy"] != noise_policy(sum(len(row["tracks"]) for row in plan["grid"]),plan["noise_policy"]["pairs"]):
+        raise ValueError("Confirmation policy differs from registered challenge family")
     validate_limits(plan["resource_limits"])
-    if (plan["resource_limits"] != requirements(plan["grid"], plan["iterations"], plan["samples"])
+    if (plan["resource_limits"] != requirements(plan["grid"], plan["iterations"], plan["samples"],plan["noise_policy"]["pairs"])
             or not all(integer(plan[k]) for k in ("call_limit", "cumulative_calls_before", "container_limit", "cumulative_containers_before"))
             or plan["resource_limits"]["model_calls"] + plan["cumulative_calls_before"] > plan["call_limit"]
             or sum(plan["resource_limits"][k] for k in ("search_containers", "confirmation_containers")) + plan["cumulative_containers_before"] > plan["container_limit"]):
@@ -205,14 +209,13 @@ def execute(plan_path, registered_sha256):
             fresh = budget.run("diagnostic-setup", lambda: prepare_task(plan["upstream"], row["task"], partition=plan["phase"],
                                  seeds=plan["diagnostic_instance_seeds"], scale=task["metadata"]["scale"],contract=plan["correctness_contract"]), owner=owner)
             confirmation = WarmEvaluator(sandbox, fresh["metadata"]["class"], fresh["cases"], fresh["validate"],
-                                         identity=digest(fresh["metadata"]), samples=plan["samples"], phase="confirmation", budget=budget, stage="diagnostic")
+                                         identity=digest(fresh["metadata"]), samples=1, phase="confirmation", budget=budget, stage="diagnostic")
             audits = [budget.run("audit-setup", lambda: prepare_task(plan["upstream"], row["task"], partition=plan["phase"], seeds=plan["audit_instance_seeds"][i:i+2],
                                    scale=task["metadata"]["scale"],contract=plan["correctness_contract"]), owner=owner) for i in range(0,8,2)]
             for track_index, track in enumerate(result["runs"]):
-                order = ["original", "selected"]
-                random.Random(row["seed"]*31+track_index).shuffle(order)
                 track_owner = f"{owner}/{track['mode']}/{track['method']}"
-                values = {role:confirmation(task["initial"] if role == "original" else track["selected_code"], owner=track_owner) for role in order}
+                values, noise = confirm(task["initial"],track["selected_code"],confirmation,plan["noise_policy"],
+                                        seed=row["seed"]*31+track_index,owner=track_owner)
                 if values["original"]["status"] != "valid":
                     raise RuntimeError("Original failed fresh validation; retain the failed planned grid")
                 audit_rows, original_audits, audit_bindings = [], [], []
@@ -223,11 +226,11 @@ def execute(plan_path, registered_sha256):
                     audit_rows.append(check(track["selected_code"]))
                     audit_bindings.append(dict(input_sha256=check.manifest["input_sha256"],evaluator_sha256=digest(check.manifest)))
                 # Persist even when the baseline audit fails and promotion aborts.
-                (cell / f"acceptance-{track_index}.json").write_bytes(encode(dict(diagnostics=values,original_audits=original_audits,selected_audits=audit_rows)))
-                expected = dict(diagnostic=dict(input_sha256=confirmation.manifest["input_sha256"],evaluator_sha256=digest(confirmation.manifest)),audits=audit_bindings)
-                decision = promote(task["initial"],track["selected_code"],values,audit_rows,original_audits,expected=expected,search_failed=bool(track.get("fallback")))
+                (cell / f"acceptance-{track_index}.json").write_bytes(encode(dict(diagnostics=values,original_audits=original_audits,selected_audits=audit_rows,noise_confirmation=noise)))
+                expected = dict(diagnostic=dict(input_sha256=confirmation.manifest["input_sha256"],evaluator_sha256=digest(noise_manifest(confirmation.manifest,plan["noise_policy"]))),audits=audit_bindings)
+                decision = promote(task["initial"],track["selected_code"],values,audit_rows,original_audits,expected=expected,search_failed=bool(track.get("fallback")),performance_confirmed=noise["confirmed"])
                 fallback, deployed = decision["fallback"],decision["deployed"]
-                row["pairs"].append(dict(mode=track["mode"], method=track["method"], order=order, **values, audits=audit_rows,original_audits=original_audits,
+                row["pairs"].append(dict(mode=track["mode"], method=track["method"], order=noise["orders"], noise_confirmation=noise, **values, audits=audit_rows,original_audits=original_audits,
                                          deployed_hash=decision["deployed_hash"],
                                          fallback=fallback, deployed_seconds=deployed["duration_seconds"],
                                          deployed=deployed, speedup=1.0 if fallback else values["original"]["duration_seconds"]/deployed["duration_seconds"],
@@ -263,6 +266,7 @@ def execute(plan_path, registered_sha256):
         if report["status"] == "completed":
             try:
                 validate_accounting(report)
+                validate_report(report)
             except Exception as error:
                 report.update(status="failed", error="Accounting: " + str(error)[:500])
         save()

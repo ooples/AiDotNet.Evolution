@@ -174,6 +174,15 @@ def receipt(code,inputs,status="valid"):
 
 
 class PromotionTests(unittest.TestCase):
+    def test_correct_but_unconfirmed_candidate_falls_back_to_audited_original(self):
+        result = promote("original","selected",self.diagnostics,self.selected,self.original,
+                         expected=self.expected,performance_confirmed=False)
+        self.assertTrue(result["fallback"])
+        self.assertEqual(candidate_hash("original"),result["deployed_hash"])
+        with self.assertRaises(ValueError):
+            promote("original","selected",self.diagnostics,self.selected,self.original,
+                    expected=self.expected,performance_confirmed="true")
+
     def setUp(self):
         self.diagnostics = {role:receipt(code,"diagnostic") for role,code in (("original","original"),("selected","selected"))}
         self.original = [receipt("original","audit-1"),receipt("original","audit-2")]
