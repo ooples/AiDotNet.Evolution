@@ -15,12 +15,14 @@
     <Project Path="examples/TypedParameterSearch/TypedParameterSearch.csproj" />
   </Folder>
   <Folder Name="/src/">
+    <Project Path="src/AiDotNet.Evolution.Deployment/AiDotNet.Evolution.Deployment.csproj" />
     <Project Path="src/AiDotNet.Evolution.Surrogates/AiDotNet.Evolution.Surrogates.csproj" />
     <Project Path="src/AiDotNet.Evolution.Programs/AiDotNet.Evolution.Programs.csproj" />
     <Project Path="src/AiDotNet.Evolution.CSharp/AiDotNet.Evolution.CSharp.csproj" />
     <Project Path="src/AiDotNet.Evolution/AiDotNet.Evolution.csproj" />
   </Folder>
   <Folder Name="/tests/">
+    <Project Path="tests/AiDotNet.Evolution.Deployment.Tests/AiDotNet.Evolution.Deployment.Tests.csproj" />
     <Project Path="tests/AiDotNet.Evolution.Performance.Tests/AiDotNet.Evolution.Performance.Tests.csproj" />
     <Project Path="tests/AiDotNet.Evolution.CSharp.Tests/AiDotNet.Evolution.CSharp.Tests.csproj" />
     <Project Path="tests/AiDotNet.Evolution.Tests/AiDotNet.Evolution.Tests.csproj" />

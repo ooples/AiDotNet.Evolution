@@ -21,6 +21,11 @@ jobs:
             8.0.x
       - name: Compiler and program contracts
         run: dotnet test tests/AiDotNet.Evolution.CSharp.Tests -c Release
+      - name: Standalone deployment and model search contracts
+        run: dotnet test tests/AiDotNet.Evolution.Deployment.Tests -c Release
+      - name: Pack optional deployment package
+        shell: pwsh
+        run: ./eng/Test-DeploymentPackage.ps1
       - name: Fresh consumer study and adversarial verification
         shell: pwsh
         run: |
