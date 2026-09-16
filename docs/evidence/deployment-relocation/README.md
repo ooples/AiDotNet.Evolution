@@ -20,3 +20,13 @@ No packages were published and no provider/model API calls were made.
 Original PR2202 docs/evidence are retained separately in
 `docs/migration/aidotnet-pr-2202-original.zip`; all four contained files match their
 original Git blobs at `d4535f7376888a7c2d35d7e6229494c4c60c0ac6`.
+
+## Clean-checkout packaging correction
+
+Hosted consumer run35162459264 failed with NU5026: the net471 core DLL was missing.
+Core sets `GeneratePackageOnBuild=true`, which causes Pack to skip its normal build;
+earlier local outputs masked that assumption. `Test-DeploymentPackage.ps1` now
+sets `GeneratePackageOnBuild=false` explicitly for each pack invocation.
+A fresh detached worktree reproduced the original failure and passed with this
+single script change, building all target frameworks and running the package-only
+consumer. Before/after logs are retained in `clean-package-verification.zip`.
