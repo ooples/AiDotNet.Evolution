@@ -51,7 +51,7 @@ internal static class NumericObjectiveService
                 // JSON null is the sole terminal request; no success is inferred from a disconnected controller.
                 if (line == "null")
                 {
-                    Write(new { Kind = "summary", EvaluatorCalls = calls, BestLoss = best, Samples = samples, Resources = ledger.Snapshot() });
+                    Write(new { Kind = "summary", EvaluatorCalls = calls, BestLoss = best, Samples = Published(samples), Resources = ledger.Snapshot() });
                     return 0;
                 }
                 double[] units = JsonSerializer.Deserialize<double[]>(line) ?? throw new InvalidDataException("Missing coordinates.");
@@ -78,7 +78,7 @@ internal static class NumericObjectiveService
         }
         catch (Exception exception) when (exception is not OutOfMemoryException)
         {
-            Write(new { Kind = "error", Error = exception.GetType().Name, EvaluatorCalls = calls, BestLoss = best, Samples = samples, Resources = ledger.Snapshot() });
+            Write(new { Kind = "error", Error = exception.GetType().Name, EvaluatorCalls = calls, BestLoss = best, Samples = Published(samples), Resources = ledger.Snapshot() });
             return 1;
         }
     }
@@ -95,6 +95,24 @@ internal static class NumericObjectiveService
         }
         throw new InvalidDataException("Request exceeds 4096 characters.");
     }
+
+    /// <summary>
+    /// The published sample shape of numeric-objective-service-v1: evaluation identity, status, best
+    /// loss so far, attempts, cost and diagnostics. The in-process record carries more than that --
+    /// quality, constraint violations, descriptors and the genome id, which the archive pilot reads --
+    /// and serializing those extra members over the wire silently breaks every external controller
+    /// that compares the summary against the evidence it recorded itself.
+    /// </summary>
+    private static object[] Published(List<SampleRecord> samples)
+        => samples.Select(sample => (object)new
+        {
+            sample.EvaluationId,
+            sample.Status,
+            sample.BestLoss,
+            sample.Attempts,
+            sample.CostUnits,
+            sample.DiagnosticCodes
+        }).ToArray();
 
     private static void Write(object value) { Console.WriteLine(JsonSerializer.Serialize(value, Json)); Console.Out.Flush(); }
 }
