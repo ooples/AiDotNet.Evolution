@@ -40,7 +40,11 @@ AiDotNet PR2202 is also closed as relocated to non-draft
 The [deployment migration map](DEPLOYMENT_MIGRATION.md) accounts for lifecycle,
 program/model retuners, local MAP-Elites orchestration and original evidence.
 492 scoped tests and package-only consumption passed; hosted PR89 checks were pending
-at publication. PR88's hosted checks are now all green.
+at publication. PR88 and PR89 hosted checks are now all green, including PR89's
+clean-package fix at `a6b931a`.
+The next [program foundation increment](PROGRAM_FOUNDATION_MIGRATION.md) moves the
+actual task/edit/descriptor/language APIs and tests into Programs without an AiDotNet
+dependency. It is only part of PR2148/2168 and does not authorize their closure.
 The remaining three code-bearing PRs below stay open until their unique implementation
 is accounted for. PR81/88/89 do not prove those complete ports are done.
 
