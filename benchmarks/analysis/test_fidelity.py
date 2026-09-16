@@ -89,7 +89,12 @@ class FidelityAnalysisTests(unittest.TestCase):
             self.assertEqual(packed, (output / "raw.json.gz").read_bytes())
 
     def test_committed_pilots_preserve_hash_chain_and_analysis(self):
-        root = Path(__file__).resolve().parents[1] / "evidence/fidelity/ac36140"
+        for revision in ("ac36140", "85960cd"):
+            with self.subTest(revision=revision):
+                self.assert_pilot_evidence(revision)
+
+    def assert_pilot_evidence(self, revision):
+        root = Path(__file__).resolve().parents[1] / "evidence/fidelity" / revision
         for name in ("trained", "curves"):
             with self.subTest(fixture=name):
                 packed = (root / name / "raw.json.gz").read_bytes(); raw = gzip.decompress(packed)
@@ -125,8 +130,15 @@ class FidelityAnalysisTests(unittest.TestCase):
         self.assertEqual(0, result["Runs"][0]["PenalizedQuality"])
 
     def test_committed_separate_process_recovery_has_no_duplicate_training(self):
-        path = Path(__file__).resolve().parents[1] / "evidence/fidelity/ac36140/recovery.zip"
-        self.assertEqual("d72bfdf4e2ef5312f4609493dec508417b3640102e44e3054e0ac56da6814512", hashlib.sha256(path.read_bytes()).hexdigest())
+        for revision, digest in (
+                ("ac36140", "d72bfdf4e2ef5312f4609493dec508417b3640102e44e3054e0ac56da6814512"),
+                ("85960cd", "e81a4a1bb8b9b99431e36c45a23876c5c162034e993034d03d06b44513cf630e")):
+            with self.subTest(revision=revision):
+                self.assert_recovery_evidence(revision, digest)
+
+    def assert_recovery_evidence(self, revision, digest):
+        path = Path(__file__).resolve().parents[1] / "evidence/fidelity" / revision / "recovery.zip"
+        self.assertEqual(digest, hashlib.sha256(path.read_bytes()).hexdigest())
         with zipfile.ZipFile(path) as archive:
             baseline, start, resume = [json.loads(archive.read(name + ".json")) for name in ("baseline", "start", "resume")]
         self.assertEqual(3, len({row["ProcessId"] for row in (baseline, start, resume)}))

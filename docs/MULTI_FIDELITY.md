@@ -1,5 +1,8 @@
 # Resource-aware multi-fidelity promotion
 
+Current-stack verification: [US-15 acceptance](evolution-stories/US-15.md) and
+[32-seed cost/quality and process-recovery evidence](../benchmarks/evidence/fidelity/85960cd/README.md).
+
 `EvolutionFidelityScheduler<TGenome>` evaluates a bounded candidate cohort at increasing resource levels, promotes
 selected candidates, resumes compatible per-replicate evaluator state, and independently confirms final survivors.
 It is **one synchronous successive-halving-style bracket**, not the complete multi-bracket Hyperband algorithm or
