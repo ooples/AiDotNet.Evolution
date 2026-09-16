@@ -63,6 +63,15 @@ class IslandRawEvidenceTests(unittest.TestCase):
         result = analyze(load_verified(self.path))
         self.assertEqual(json.loads((self.path.parent / "analysis.json").read_text()), result)
 
+    def test_current_raw_chain_analysis_and_timing_corruption(self):
+        path = self.path.parent.parent / "cfebe58/summary.json"
+        summary = load_verified(path)
+        self.assertEqual(json.loads((path.parent / "analysis.json").read_text()), analyze(summary))
+        raw = json.loads(gzip.decompress((path.parent / "raw.json.gz").read_bytes()))
+        raw["Runs"][0]["Measurements"][0]["ElapsedMilliseconds"] = -1
+        with self.assertRaisesRegex(ValueError, "Invalid measurement timing"):
+            verify_raw(summary, raw)
+
     def test_summary_cannot_lie_with_unchanged_raw_hashes(self):
         report = copy.deepcopy(self.summary)
         report["Runs"][0]["FinalQuality"] = 0.75

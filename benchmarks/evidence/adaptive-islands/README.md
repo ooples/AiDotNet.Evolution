@@ -1,5 +1,8 @@
 # Fixed adaptive-island development pilot
 
+Historical v1 evidence. See [current-stack v2 verification](cfebe58/README.md) for current results and commands.
+The reproduction commands below require the historical runtime/exporter, not the v2-only exporter.
+
 Production revision: `a6199ee53d34f176e45f2acd3776557b469a0cd4`. Embedded example assembly: `1.0.0+a6199ee53d34f176e45f2acd3776557b469a0cd4`.
 
 The restart mechanism escapes the deliberately separated local basin; this experiment does **not** establish that adaptive allocation is better than uniform allocation. Both restart policies reach quality >= 0.95 in all 30 separated-basin runs, while neither non-restart policy escapes its initial quality 0.5. The adaptive-versus-uniform intervals include zero on both fixtures. On the easy quadratic, adaptive allocation has a worse observed tail, and its restart ablation has a tiny negative quality effect. Keep the feature opt-in; do not promote a universal default from these authored examples.

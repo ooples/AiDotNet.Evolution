@@ -1,5 +1,9 @@
 # PR #58 state-validation review proof
 
+Historical proof for PR #58 only. Current-stack US-16 delivery is described in
+[US-16](../docs/evolution-stories/US-16.md); its v2 strict-field checkpoint contract
+intentionally supersedes the missing-scalar compatibility described below.
+
 This bounded follow-up addresses CodeQL review comments **3990510444**
 (`PRRT_kwDOUOzYOs6hhcGQ`) and **3990510459** (`PRRT_kwDOUOzYOs6hhcGa`).
 The PR branch is `feat/evolution-us-16`, targeting
