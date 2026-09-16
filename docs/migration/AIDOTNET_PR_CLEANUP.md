@@ -35,15 +35,21 @@ Their complete disposition is in [the consumer migration map](PROGRAM_CONSUMER_M
 Fresh validation: 3,733 core/program/compiler test executions, 18 consumer-study
 runs, six corruption controls, output refusal checks, and byte-verified original
 evidence. Hosted checks were pending at publication; closure is relocation, not merge.
-The remaining four code-bearing PRs below stay open until their unique implementation
-is accounted for. PR81/88 do not prove those complete ports are done.
+AiDotNet PR2202 is also closed as relocated to non-draft
+[Evolution PR89](https://github.com/ooples/AiDotNet.Evolution/pull/89), dependent on PR88.
+The [deployment migration map](DEPLOYMENT_MIGRATION.md) accounts for lifecycle,
+program/model retuners, local MAP-Elites orchestration and original evidence.
+492 scoped tests and package-only consumption passed; hosted PR89 checks were pending
+at publication. PR88's hosted checks are now all green.
+The remaining three code-bearing PRs below stay open until their unique implementation
+is accounted for. PR81/88/89 do not prove those complete ports are done.
 
 | AiDotNet PR | Files | Work requiring preservation/port review |
 |---|---:|---|
 | 2148 | 208 | Foundation: public builder integration, C# compiler/proposal adapter, program evaluator, worker, output and correctness/cache contracts; includes inherited embedded-engine removal |
 | 2168 | 59 | US-24 CLI, preflight, run control, inspection/evidence bundles, telemetry and raw-sample correctness hardening |
 | 2182 (closed) | 8 | Fully relocated and tested in Evolution PR81; original raw-evidence files preserved |
-| 2202 | 18 | US-25 deployment registry, validated selection/rollback/retuning and model/program adapters |
+| 2202 (closed) | 18 | Relocated to Evolution PR89: deployment lifecycle, model/program adapters and local MAP-Elites orchestration, original evidence preserved |
 | 2203 | 3 | US-02 C# program comparison host, not just the newer generic/Python comparison |
 | 2210 (closed) | 11 | Relocated to Evolution PR88; standalone noise session, fresh model/sorting benchmark, verifiers, and original evidence |
 | 2212 (closed) | 17 | Relocated to Evolution PR88; portfolio, standalone compiler-arm factory/provider contract, integration tests, usage aggregation and benchmark verification |

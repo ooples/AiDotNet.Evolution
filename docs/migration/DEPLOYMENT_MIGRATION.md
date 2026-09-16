@@ -1,6 +1,8 @@
 # AiDotNet PR2202: standalone deployment migration
 
 Source: `d4535f7376888a7c2d35d7e6229494c4c60c0ac6`.
+Replacement: non-draft [Evolution PR89](https://github.com/ooples/AiDotNet.Evolution/pull/89),
+based on PR88. AiDotNet PR2202 is closed as relocated; source branch retained.
 Destination: optional `AiDotNet.Evolution.Deployment` project, net8.0/net10.0.
 All deployment orchestration, MAP-Elites search, and its parameter sampler live
 in AiDotNet.Evolution. AiDotNet 0.231.0 is pinned and assembly-aliased solely for
@@ -50,6 +52,11 @@ Moving across assemblies exposed internal-only sampler/model-key dependencies an
 the published base class's required copy factory. The sampler is now local, the
 documented model key is explicit, and a new search copy snapshots its options.
 No production access to AiDotNet internals was added.
+
+Final local validation: zero-warning Release solution build, 492 scoped passing
+test executions, full solution formatting, and package-only consumer success.
+Raw receipts: [deployment-relocation evidence](../evidence/deployment-relocation/README.md).
+Hosted checks were pending at publication, not claimed green.
 
 This migration does not complete #2148, #2168, #2203 or the separate clean-breaking
 AiDotNet removal. Keep their source PRs open until their own ports are verified.
