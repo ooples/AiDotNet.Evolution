@@ -55,8 +55,9 @@ another metering owner and double-charge it. Scheduler bookkeeping overhead is n
 Continuation tokens are independently owned opaque byte sequences of at most 4096 bytes. They can reference a larger
 consumer-owned checkpoint with a content hash, but the consumer must validate that external state, its environment
 and storage access. Token properties expose metadata/hash, not payload; explicit copy methods return detached bytes.
-The core does not execute, deserialize or fetch arbitrary external state. Tokens move between levels within the current
-run only: durable process restart, worker leases and evaluator checkpoint storage are separate work.
+The core does not execute, deserialize or fetch arbitrary external model state. Tokens can move between levels or
+through an explicit coordinated settled-batch checkpoint (below). Worker leases and recovery of unjournaled in-flight
+work remain separate work.
 
 Search batches that reuse training state or were selected on early scores need not satisfy IID assumptions. Their
 replication intervals are **exploratory**, not selection-corrected confidence. Final confirmation uses fixed fresh
@@ -78,6 +79,81 @@ and charges 92 incremental/full-restart steps plus 0.08 setup units under a 100-
 step costs, not trained-model performance or a real-workload speedup. The smoke requires correct allocation, identities,
 accounting and exact replay; it does not require the exploratory policy to win each seed.
 
-Full Hyperband bracket allocation, asynchronous promotions, persisted scheduler/worker state, representative learning
-workloads and statistically confirmed release gains remain separate extensions. The generic callback contract supports
-real evaluators, but this example is not an AiDotNet AutoML integration or a code-execution sandbox.
+Full Hyperband bracket allocation, asynchronous promotions, durable worker leases, representative external workloads
+and statistically confirmed release gains remain separate extensions. The generic callback contract supports real
+evaluators, but these examples are not AiDotNet AutoML integration or a code-execution sandbox.
+
+## Coordinated settled-batch checkpoint and resume
+
+[Pinned 256-run evidence and complete replay](../benchmarks/evidence/fidelity/ac36140/README.md) include actual regression training, misleading-curve controls, retained unfavorable outcomes, and separate-process recovery. The fixtures do not establish representative superiority or deployment readiness.
+
+`RunCheckpointedAsync` uses the same promotion algorithm and semantic identity as `RunAsync`. After each fully
+settled batch, its asynchronous sink receives an `EvolutionFidelityCheckpoint`; return `false` to pause before
+further dispatch. A paused report never exposes `BestConfirmed`, even when the last confirmation batch just finished.
+The immutable checkpoint exposes only run/version/count/checksum metadata through ordinary property serialization.
+Call `ToJson()` explicitly to persist its sensitive ledger/evidence/model-token payload in a trusted store.
+
+To resume, parse the saved checkpoint, restore `checkpoint.GetResourceState()` into a compatible fresh ledger,
+and re-supply the exact run ID, ordered immutable canonical cohort, seed and plan/callback versions. Pass the
+checkpoint to `RunCheckpointedAsync`. Current caps and the complete ledger state must match exactly. The scheduler
+does not roll back spending, create free measurements or dispatch already settled sample identities.
+
+Restoration validates every stored sample against its settled ledger receipt (including tombstones when diagnostic
+receipt retention is zero), rebuilds statistics from accepted measurements, checks batch chronology against the
+original deterministic promotions, and validates token source/replicate/version/hash and active membership.
+The recorded batch prefix is replayed only as control-flow evidence: no evaluator callback or resource reservation
+runs for that prefix. Actual evaluation starts only after that prefix has been validated. Original failures, sample
+identities, promotion evidence and charges remain in the final report. Search tokens are cleared before confirmation.
+
+Bounds: at most 576 settled batches, 64 initial candidates, 16 replicas, 4,096 bytes per current token and 16 Mi
+UTF-16 characters per checkpoint envelope. Large provenance/token combinations can reach the envelope bound before
+the population bound. Oversized capture fails after retaining already consumed work; it does not silently truncate.
+Checksums detect corruption, not hostile forgery. Store permissions/authentication and atomic durable persistence are
+the application's responsibility. There is no automatic model deserialization or arbitrary file access in the core.
+
+Serialize the run and its ledger. Other in-flight reservations prevent capture; a sink that mutates the ledger is
+rejected. Sink failures propagate before the next batch and measurement charges remain. A coordinated pause or
+cancellation at a saved boundary can resume. **An old checkpoint is not permission to redispatch work after arbitrary
+process death**: if anything was dispatched after capture, first reconcile its independently durable receipts/leases.
+US-21 owns that distributed/in-flight protocol. Checkpoint I/O, startup and rehydration CPU are not automatically
+metered; include them through an appropriate external accounting protocol before a whole-cost economic claim.
+
+```csharp
+EvolutionFidelityCheckpoint? saved = null;
+var paused = await scheduler.RunCheckpointedAsync(runId, cohort, seed, async (checkpoint, token) =>
+{
+    await trustedStore.WriteAtomicallyAsync(checkpoint.ToJson(), token);
+    saved = checkpoint;
+    return false; // no next batch is dispatched
+});
+// In a new process: recreate compatible components and supply the same owned cohort.
+var checkpoint = EvolutionFidelityCheckpoint.Parse(await trustedStore.ReadAsync());
+freshLedger.RestoreState(checkpoint.GetResourceState());
+var resumed = await recreatedScheduler.RunCheckpointedAsync(runId, cohort, seed,
+    (next, token) => PersistNextBoundaryAsync(next, token), checkpoint);
+```
+
+The store methods in this sketch are application-owned, not APIs supplied by this package. The executable
+`eng/Test-FidelityRecovery.ps1` uses three separate processes for baseline, saved pause and resume, and verifies
+actual trained weights, data identities, every measurement, full report and ledger against uninterrupted execution.
+
+## Actual incremental model-training workload
+
+`examples/MultiFidelitySearch --regression` trains a four-feature linear model by full-batch gradient descent;
+it does not manufacture scores from an epoch-count formula. Eight learning-rate/warmup configurations run at
+4, 16 and 64 epochs on 128 training rows, with error measured on 64 held-out rows. A token contains owned weights,
+completed epochs, genome/data/replicate identity and a weight hash. The training/data stream is fixed across
+fidelities of each replicate. Confirmation starts new weights and separate training/held-out data at full fidelity.
+
+The fixed-cohort comparison includes full-cohort retention, greedy halving, exploratory halving and restart-only
+halving. Each has a 2,100-unit cap but stops after its finite bracket: **equal caps do not mean equal spent budgets**.
+Actual epochs cost one declared unit each; 0.25 per measurement covers fixed data generation/scoring/token work;
+initial cohort setup costs 0.08. Row visits are independently counted. These are synthetic prices, not measured CPU
+time. The restart-only control isolates the saved repeated training without changing the selected trained result.
+The authored synthetic dataset is not representative AutoML validation or a competitive-superiority benchmark.
+
+```powershell
+powershell -ExecutionPolicy Bypass -File eng/Test-RegressionFidelity.ps1
+powershell -ExecutionPolicy Bypass -File eng/Test-FidelityRecovery.ps1
+dotnet run --project examples/MultiFidelitySearch -c Release -- --regression 32 TestResults/regression-new.json
+```

@@ -4,7 +4,7 @@ on:
   push:
     branches: [main]
   pull_request:
-    branches: [main, feat/competitive-evolution-platform, 'feat/evolution-us-*', feat/evolution-us02-efficacy, feat/evolution-us03-correctness, feat/evolution-us05-campaign-budget, feat/evolution-us06-noise-integration, feat/evolution-us07-ablation-integration, feat/evolution-us08-portfolio-integration, chore/evolution-pr-consolidation, feat/evolution-program-consolidation, feat/evolution-us13-integration]
+    branches: [main, feat/competitive-evolution-platform, 'feat/evolution-us-*', feat/evolution-us02-efficacy, feat/evolution-us03-correctness, feat/evolution-us05-campaign-budget, feat/evolution-us06-noise-integration, feat/evolution-us07-ablation-integration, feat/evolution-us08-portfolio-integration, chore/evolution-pr-consolidation, feat/evolution-program-consolidation, feat/evolution-us13-integration, feat/evolution-us14-integration]
 
 concurrency:
   group: ${{ github.workflow }}-${{ github.ref }}
@@ -91,6 +91,12 @@ jobs:
       - name: Verify multi-fidelity promotion and independent confirmation
         shell: pwsh
         run: ./eng/Test-MultiFidelity.ps1
+      - name: Verify incremental training and fidelity accounting
+        shell: pwsh
+        run: ./eng/Test-RegressionFidelity.ps1
+      - name: Verify separate-process settled fidelity recovery
+        shell: pwsh
+        run: ./eng/Test-FidelityRecovery.ps1
       - name: Verify gain and all-stage operator credit
         shell: pwsh
         run: ./eng/Test-OperatorCredit.ps1
