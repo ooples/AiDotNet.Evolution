@@ -57,7 +57,9 @@ unconditional real/logarithmic parameters. It does not model cross-coordinate co
 
 The bounded-domain variant clips proposals and learns from their evaluated coordinates. Variances and step size have
 finite safety bounds. Only fresh, completed, feasible measurements with the configured direction train it. Full learning
-populations require enough valid parents; failed, cached or infeasible outcomes never become successful parents.
+populations require enough valid parents; failed, cached, producer-declared reused or infeasible outcomes never
+become successful parents. Measurement-origin-aware CMA versions reject older learned checkpoints; see
+[measurement origin](MEASUREMENT_ORIGIN.md#learning-from-measurements).
 
 Proposal generation can span evaluation batches. Each population retains its sampling distribution. A stale population's
 results can still enter the archive, but cannot overwrite a newer distribution; `StalePopulations` exposes this tradeoff.

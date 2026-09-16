@@ -10,6 +10,7 @@ internal static class Program
     private static async Task<int> Main(string[] args)
     {
         if (args.Length > 0 && args[0] == "--ablation") return await AblationCampaign.RunAsync(args.Skip(1).ToArray());
+        if (args.Length > 0 && args[0] == "--portfolio-study") return await PortfolioCampaign.RunAsync(args.Skip(1).ToArray());
         if (args.Length > 0 && args[0] == "--archive-partition") return await ArchivePartitionPilot.RunAsync(args.Skip(1).ToArray());
         if (args.Length > 0 && args[0] == "--numeric-service") return NumericObjectiveService.Run(args.Skip(1).ToArray());
         if (args.Length > 0 && args[0] == "--suite-numeric-service") return NumericObjectiveService.Run(args.Skip(1).ToArray(), suite: true);
