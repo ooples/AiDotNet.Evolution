@@ -18,7 +18,10 @@ def policy(enabled=False):
 
 
 def validate_policy(value):
-    if value != policy(value.get("enabled")):
+    if not isinstance(value, dict):
+        raise ValueError("Unknown frozen screening policy")
+    expected = policy(value.get("enabled"))
+    if value != expected or any(type(value[k]) is not type(v) for k,v in expected.items()):
         raise ValueError("Unknown frozen screening policy")
 
 
@@ -115,29 +118,45 @@ class ScreenedEvaluator:
         self.manifest = dict(identity=digest([screen.manifest,full.manifest,frozen]),
                              screen=screen.manifest,baseline=self.baseline.manifest,
                              full=full.manifest,auditor=auditor.manifest,policy=self.policy)
-        self.states, self.frozen = {},False
+        self.states, self.frozen, self.stopped = {},False,False
 
     def __call__(self, code, *, owner):
-        if self.frozen:
+        if self.frozen or self.stopped:
             raise ValueError("Search already frozen for rejection audit")
         if owner not in self.states and len(self.states) >= self.tracks:
             raise ValueError("Undeclared screen owner")
         state = self.states.setdefault(owner,dict(baseline=None,rejected={},events=[]))
         if len(state["events"]) >= 65 or (state["baseline"] is None and code != self.initial):
             raise ValueError("Require bounded evaluations starting with original")
-        screen = (self.baseline if state["baseline"] is None else self.screen)(code,owner=owner)
+        try:
+            screen = (self.baseline if state["baseline"] is None else self.screen)(code,owner=owner)
+        except BaseException:
+            self.stopped = True
+            self.frozen = state["baseline"] is None
+            raise
         if screen["unknown_work"] is not False or screen["candidate_hash"] != candidate_hash(code):
+            self.stopped = True
+            self.frozen = state["baseline"] is None
             raise ValueError("Unreconciled screen")
         if state["baseline"] is None:
             if screen["status"] != "valid":
+                self.frozen = True
                 raise ValueError("Original failed cheap correctness; no screening baseline")
             state["baseline"] = copy.deepcopy(screen)
         decision = "baseline" if code == self.initial else reason(screen,state["baseline"],self.policy)
-        full = self.full(code,owner=owner) if decision in ("baseline","advance") else None
+        try:
+            full = self.full(code,owner=owner) if decision in ("baseline","advance") else None
+        except BaseException:
+            self.stopped = True
+            self.frozen = decision == "baseline"
+            raise
         if full is None:
             state["rejected"][candidate_hash(code)] = code
         result = combined(screen,full,decision)
         state["events"].append(copy.deepcopy(result))
+        if decision == "baseline" and full["status"] != "valid":
+            self.frozen = True
+            raise ValueError("Original failed full evaluation; no valid screening baseline")
         return result
 
     def finish(self):
@@ -199,7 +218,8 @@ def validate_screening(report):
                 raise ValueError("Missing screen baseline")
             initial = results[0]["request"]["code"]
             baseline = results[0]["result"]["screening"]["screen"]
-            if baseline["status"] != "valid":
+            full_baseline = results[0]["result"]["screening"]["full"]
+            if baseline["status"] != "valid" or full_baseline is None or full_baseline["status"] != "valid":
                 raise ValueError("Invalid screening baseline")
             rejected = []
             for event in results:
@@ -220,6 +240,7 @@ def validate_screening(report):
                             raise ValueError("Screen/full receipt ownership differs")
                         if part["status"] == "valid" and (len(part["samples"]) != binding["samples"]
                                 or len(part["sample_ids"]) != binding["samples"]
+                                or any(type(v) not in (int,float) or not math.isfinite(v) or v <= 0 for v in part["samples"])
                                 or part["duration_seconds"] != statistics.median(part["samples"])
                                 or part["quality"] != 1/part["duration_seconds"]):
                             raise ValueError("Screen/full measurements differ from reported fitness")

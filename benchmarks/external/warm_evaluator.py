@@ -33,9 +33,12 @@ class WarmEvaluator:
             validate = lambda: self.validate(row["output"])
             valid = row["status"] == "completed" and row["resource_status"] == "measured" and (
                 self.budget.run("validation", validate, owner=owner) if self.budget else validate())
+            elapsed = row["elapsed_seconds"]
+            valid = valid and type(elapsed) in (int, float) and math.isfinite(elapsed) and elapsed > 0
             if not valid:
                 break
-        times = [r["elapsed_seconds"] for r in rows if r["elapsed_seconds"] is not None]
+        times = [r["elapsed_seconds"] for r in rows if type(r["elapsed_seconds"]) in (int, float)
+                 and math.isfinite(r["elapsed_seconds"]) and r["elapsed_seconds"] > 0]
         duration = statistics.median(times) if len(times) == len(rows) else None
         valid = valid and duration is not None and math.isfinite(duration) and duration > 0
         return dict(candidate_hash=candidate_hash(code), status="valid" if valid else "invalid",

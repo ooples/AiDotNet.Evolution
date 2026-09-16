@@ -6,7 +6,7 @@ from pathlib import Path
 
 from warm_budget import CampaignBudget, requirements
 from warm_evaluator import WarmEvaluator
-from warm_screening import ScreenedEvaluator, policy, selected_rejects, selected_population, audit_summary, validate_registration
+from warm_screening import ScreenedEvaluator, policy, selected_rejects, selected_population, audit_summary, validate_registration, validate_policy
 from warm_study_design import digest
 
 
@@ -26,6 +26,57 @@ class Sandbox:
 
 
 class ScreeningTests(unittest.TestCase):
+    def test_frozen_policy_rejects_equal_but_wrong_types(self):
+        for key,value in (("scale_divisor",True),("baseline_samples",3.0),("audit_pairs",3.0),("slow_ratio",4)):
+            with self.subTest(key=key), self.assertRaises(ValueError):
+                validate_policy(dict(policy(True),**{key:value}))
+        with self.assertRaises(ValueError):
+            validate_policy(None)
+
+    def test_invalid_individual_timing_cannot_hide_in_a_valid_median(self):
+        for elapsed in (0,-1,float("nan"),float("inf"),None,True,"0.1"):
+            with self.subTest(elapsed=elapsed), tempfile.TemporaryDirectory() as root:
+                pipeline = self.setup_pipeline(root)
+                run = self.sandbox.run
+                def bad_timing(*args,**kwargs):
+                    row = run(*args,**kwargs)
+                    if len(self.sandbox.calls) == 2:
+                        row["elapsed_seconds"] = elapsed
+                    return row
+                self.sandbox.run = bad_timing
+                result = pipeline.full("good",owner="track")
+                self.assertEqual("invalid",result["status"])
+                self.assertIsNone(result["duration_seconds"])
+                self.assertEqual(2,len(result["sample_ids"]))
+                self.assertEqual(2,self.budget.snapshot()["spent"]["search_containers"])
+
+    def test_invalid_full_baseline_stops_search_and_cannot_be_retried(self):
+        with tempfile.TemporaryDirectory() as root:
+            pipeline = self.setup_pipeline(root)
+            pipeline.full.validate = lambda output: False
+            with self.assertRaisesRegex(ValueError,"Original failed full evaluation"):
+                pipeline("original",owner="track")
+            self.assertEqual("invalid",pipeline.states["track"]["events"][0]["status"])
+            spent = self.budget.snapshot()["spent"]
+            self.assertEqual(4,spent["search_containers"])
+            for code in ("original","good"):
+                with self.assertRaises(ValueError):
+                    pipeline(code,owner="track")
+            with self.assertRaises(ValueError):
+                pipeline.finish()
+            self.assertEqual(spent,self.budget.snapshot()["spent"])
+
+    def test_failed_cheap_baseline_cannot_be_retried_until_lucky(self):
+        with tempfile.TemporaryDirectory() as root:
+            pipeline = self.setup_pipeline(root)
+            pipeline.baseline.validate = lambda output: False
+            with self.assertRaises(ValueError):
+                pipeline("original",owner="track")
+            pipeline.baseline.validate = lambda output: True
+            with self.assertRaises(ValueError):
+                pipeline("original",owner="track")
+            self.assertEqual(1,self.budget.snapshot()["spent"]["search_containers"])
+
     def test_retention_metric_excludes_candidates_failing_after_the_cheap_pass(self):
         from run_screening_pilot import retained_fraction
         before = [dict(candidate_hash="original",duration_seconds=10),dict(candidate_hash="improved",duration_seconds=1)]
@@ -140,6 +191,8 @@ class ScreeningTests(unittest.TestCase):
             pipeline("slow",owner="track")
             with self.assertRaises(ValueError):
                 pipeline("good",owner="track")
+            with self.assertRaises(ValueError):
+                pipeline("original",owner="track")
             self.assertEqual(1,pipeline.finish()["track"]["summary"]["audited"])
             self.assertEqual(6,self.budget.snapshot()["spent"]["confirmation_containers"])
 

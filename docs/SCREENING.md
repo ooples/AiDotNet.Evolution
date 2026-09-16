@@ -26,6 +26,9 @@ or exposed inside the isolated candidate filesystem.
 - **Given** unknown work, interrupted execution or insufficient capacity, **when**
   dispatch/reconciliation fails, **then** keep charges/evidence and fail closed.
   Search cannot spend the reserved rejection-audit/final-confirmation capacity.
+- **Given** a baseline failing cheap or full evaluation, **when** initialization
+  fails, **then** stop the screening instance permanently; retrying cannot select
+  a lucky baseline. Each timing must be finite and positive before aggregation.
 - **Given** missing audits, altered populations, forged cheap/full receipts or
   changed classifications, **when** v5 reporting runs, **then** reject the report.
 
