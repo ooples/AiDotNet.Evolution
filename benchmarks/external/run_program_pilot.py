@@ -19,10 +19,14 @@ from program_tasks import TASKS, description, initial_program
 from run_program_comparison import run_campaign
 
 
-def run(output, image, upstream, openevolve, dll, *, codex=None, model="gpt-6-astra", tasks=None, samples=3):
+def run(output, image, upstream, openevolve, dll, *, codex=None, model="gpt-6-astra", tasks=None, samples=3,
+        seed=37, search_instance_seed=9137, diagnostic_instance_seed=491837):
     task_ids = list(TASKS) if tasks is None else tasks
     if not task_ids or len(set(task_ids)) != len(task_ids) or any(t not in TASKS for t in task_ids) or not 1 <= samples <= 9:
         raise ValueError("Invalid development pilot panel")
+    if (any(type(s) is not int or not 0 <= s < 2**32 for s in (seed, search_instance_seed, diagnostic_instance_seed)) or
+            search_instance_seed == diagnostic_instance_seed):
+        raise ValueError("Require bounded search seeds and distinct diagnostic instances")
     root = Path(output).resolve()
     root.mkdir(parents=True, exist_ok=False)
     source_revision = subprocess.check_output(["git", "rev-parse", "HEAD"], cwd=Path(__file__).parent, text=True).strip()
@@ -34,7 +38,8 @@ def run(output, image, upstream, openevolve, dll, *, codex=None, model="gpt-6-as
     plan = {"schema": "evolution-program-pilot-v1", "evidence_class": "development-only",
             "source_revision": source_revision, "artifacts_sha256": artifacts,
             "image": image, "tasks": {t: s[1] for t, s in sources.items()},
-            "task_order": task_ids, "search_seeds": [37], "iterations_per_track": 2, "samples_per_evaluation": samples,
+            "task_order": task_ids, "search_seeds": [seed], "iterations_per_track": 2, "samples_per_evaluation": samples,
+            "search_instance_seed": search_instance_seed, "diagnostic_instance_seed": diagnostic_instance_seed,
             "model_calls_maximum": len(task_ids) * 11, "model_tokens_per_track": 100000,
             "model": model if codex else "scripted-no-provider", "resolved_model": "unreported" if codex else "not-applicable",
             "primary_endpoint": "fresh-process batch runtime including imports and serialization",
@@ -50,7 +55,7 @@ def run(output, image, upstream, openevolve, dll, *, codex=None, model="gpt-6-as
     started = time.monotonic()
     for task_id in task_ids:
         source, provenance = sources[task_id]
-        evaluator = IsolatedProgramEvaluator(sandbox, task_id, 9137, samples=samples)
+        evaluator = IsolatedProgramEvaluator(sandbox, task_id, search_instance_seed, samples=samples)
         if transport:
             generate = transport.generate_metered
         else:
@@ -60,16 +65,16 @@ def run(output, image, upstream, openevolve, dll, *, codex=None, model="gpt-6-as
                 return {"text": "```python\n" + source + "\n# scripted-" + nonce + "\n```",
                         "cost_units": 0, "cost_metric": "reported_input_plus_output_tokens"}
         result = run_campaign(root / task_id, dll, openevolve, source, description(task_id), plan["model"], generate,
-                              evaluator, iterations=2, seed=37, evidence_class="development-experiment",
+                              evaluator, iterations=2, seed=seed, evidence_class="development-experiment",
                               evaluator_manifest=evaluator.manifest)
         # Selection is frozen before fresh-instance diagnostic inputs are generated or scored.
         selections = [{"mode": row["mode"], "method": row["method"], "hash": row["selected_hash"]} for row in result["runs"]]
         (root / task_id / "selections.json").write_bytes(encode(selections))
-        fresh = IsolatedProgramEvaluator(sandbox, task_id, 491837, samples=samples, phase="confirmation")
+        fresh = IsolatedProgramEvaluator(sandbox, task_id, diagnostic_instance_seed, samples=samples, phase="confirmation")
         pairs = []
         for index, row in enumerate(result["runs"]):
             order = ["original", "selected"]
-            random.Random(371 + index).shuffle(order)
+            random.Random(seed * 10 + 1 + index).shuffle(order)
             receipts = {}
             for role in order:
                 receipts[role] = fresh(source if role == "original" else row["selected_code"])

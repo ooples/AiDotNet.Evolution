@@ -13,6 +13,7 @@ internal static class Program
         if (args.Length > 0 && args[0] == "--numeric-service") return NumericObjectiveService.Run(args.Skip(1).ToArray());
         if (args.Length > 0 && args[0] == "--suite-numeric-service") return NumericObjectiveService.Run(args.Skip(1).ToArray(), suite: true);
         if (args.Length > 0 && args[0] == "--suite") return await RepresentativeSuite.RunAsync(args.Skip(1).ToArray());
+        if (args.Length > 0 && args[0] == "--analysis-campaign") return await FixedAnalysisCampaign.RunAsync(args.Skip(1).ToArray());
         int methodCount = Enum.GetValues<QualityMethod>().Length;
         int taskCount = Enum.GetValues<QualityTask>().Length;
         if (args.Length != 4 || !int.TryParse(args[0], out int seeds) || seeds is < 1 or > 1000 ||

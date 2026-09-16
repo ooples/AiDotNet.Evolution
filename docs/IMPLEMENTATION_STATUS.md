@@ -5,6 +5,28 @@ Implementation is continuing across the core and companion PRs. **The roadmap is
 
 Track the full plan through the [26 user-story issues and PR delivery index](USER_STORY_DELIVERY.md).
 
+## September 15: US-04 acceptance complete locally
+
+[PR #47](https://github.com/ooples/AiDotNet.Evolution/pull/47) now includes the
+[completed 72-cell real-program study](evidence/us04/PROGRAM_STUDY.md), independent
+cost accounting under trace loss, paired conditional intervals, fixed prospective
+planning, four-axis progress/AUC and reproducible offline scorecards. All 85
+analysis tests passed, alongside the final build, 654/608/608 .NET tests and 37
+external Python tests. All feature work is in AiDotNet.Evolution. CI, dependencies,
+independent review and user merging remain gates; no competitive win is claimed.
+
+## September 14: US-04 reporting implementation
+
+[PR #47](https://github.com/ooples/AiDotNet.Evolution/pull/47) now implements fixed-sample
+planning and one-use artifact-pinned execution, failure-aware scorecards, declared
+target censoring and offline HTML/SVG reports. Final verification: 654/608/608 .NET
+tests, 36 Python tests, 1,320 actual fixed numeric runs, repeated-use refusal,
+90.68%/76.20% coverage and clean build/format. [Raw evidence](evidence/us04/README.md).
+Base is US-02 #46, preserving US-01 #45 and foundation #15 transitively. No companion
+change is needed. Review readiness is not representative competitive confirmation,
+US-03 isolation approval, merge readiness, or completion of the entire roadmap.
+The following initial-delivery sections are historical, not a current count of drafts.
+
 ## Dependent story delivery
 
 The user chose to retain #15, AiDotNet #2148 and Tensors #1024 as shared foundations.
