@@ -6,7 +6,7 @@ from package-removal/integration PR2092. Unrelated AiDotNet PRs are excluded.
 Source branch tips and all 329 changed-file records are pinned in
 [aidotnet-pr-inventory.json](aidotnet-pr-inventory.json).
 
-## Documentation-only PRs: safe to close after publishing this relocation
+## Documentation-only PRs: closed after publishing Evolution PR80
 
 | AiDotNet PR | Story | Destination |
 |---|---|---|
@@ -22,13 +22,20 @@ not current direction. Current checklists preserve the Given/When/Then criteria.
 Closing these PRs means **relocated**, not **story completed**. Keep their branches and
 issues; do not delete source history.
 
-## Code-bearing PRs: do not close until their unique implementation is accounted for
+## Code-bearing PRs: disposition
+
+AiDotNet PR2182 is now closed as relocated to non-draft
+[Evolution PR81](https://github.com/ooples/AiDotNet.Evolution/pull/81), dependent on
+PR80. Its complete eight-file change is accounted for in the
+[runtime migration contract](PROGRAM_RUNTIME_MIGRATION.md). Source history remains.
+The other six code-bearing PRs below remain open until their unique implementation
+is accounted for; PR81 is not evidence that those complete ports are done.
 
 | AiDotNet PR | Files | Work requiring preservation/port review |
 |---|---:|---|
 | 2148 | 208 | Foundation: public builder integration, C# compiler/proposal adapter, program evaluator, worker, output and correctness/cache contracts; includes inherited embedded-engine removal |
 | 2168 | 59 | US-24 CLI, preflight, run control, inspection/evidence bundles, telemetry and raw-sample correctness hardening |
-| 2182 | 8 | US-23 raw sample evidence store and tests; overlaps 2168 but must be checked at exact source tips |
+| 2182 (closed) | 8 | Fully relocated and tested in Evolution PR81; original raw-evidence files preserved |
 | 2202 | 18 | US-25 deployment registry, validated selection/rollback/retuning and model/program adapters |
 | 2203 | 3 | US-02 C# program comparison host, not just the newer generic/Python comparison |
 | 2210 | 11 | US-06 typed C# program noise session and benchmark/verification scripts |
