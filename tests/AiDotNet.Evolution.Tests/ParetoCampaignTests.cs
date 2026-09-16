@@ -29,6 +29,7 @@ public sealed class ParetoCampaignTests
         var a = await ParetoCampaign.RunCase(2, "scalar-single", 1, 16, 1);
         var b = await ParetoCampaign.RunCase(2, "scalar-map64", 1, 16, 1);
         var c = await ParetoCampaign.RunCase(2, "pareto64", 1, 16, 1);
+        Assert.Equal("completed", a.Status); Assert.Equal("completed", b.Status); Assert.Equal("completed", c.Status);
         Assert.Equal(a.InitialHash, b.InitialHash); Assert.Equal(a.InitialHash, c.InitialHash);
         Assert.Equal(a.Samples.Take(8).Select(s => s.GenomeId), c.Samples.Take(8).Select(s => s.GenomeId));
         Assert.Equal(a.Calls, b.Calls); Assert.Equal(a.Calls, c.Calls);

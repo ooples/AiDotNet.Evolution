@@ -8,9 +8,9 @@ namespace AiDotNet.Evolution.Quality;
 /// <summary>Fixed-budget authored development fixtures; no model calls or competitor-superiority claims.</summary>
 internal static class ParetoCampaign
 {
-    internal sealed record Genome(double X, double Y);
+    internal readonly record struct Genome(double X, double Y);
     internal sealed record Sample(long Id, string GenomeId, string Status, double? Quality, double[] Objectives,
-        double[] Violations, int Attempts, double Cost, string? Insertion);
+        double[] Violations, int Attempts, double Cost, string? Insertion, string[] Diagnostics);
     internal sealed record Elite(string GenomeId, double Quality, double[] Objectives);
     internal sealed record Row(int Dimensions, string Method, ulong Seed, int Budget, string Status, string? Error,
         string InitialHash, string? StateHash, bool ReplayMatched, long Calls, long Proposals, double Cost, double Milliseconds,
@@ -104,15 +104,15 @@ internal static class ParetoCampaign
                 migration: pareto ? new ParetoMigrationPolicy<Genome>() : new RingMigrationPolicy<Genome>(), observer: observer);
             var result = await engine.RunAsync(seeds); watch.Stop();
             var entries = result.Islands.SelectMany(island => island.Entries).ToArray();
-            bool passed = result.Counters.EvaluationAttempts == budget && observer.Samples.Sum(sample => sample.Attempts) == budget &&
+            bool passed = entries.Length > 0 && result.Counters.EvaluationAttempts == budget && observer.Samples.Sum(sample => sample.Attempts) == budget &&
                 entries.All(entry => definition.IsFeasible(entry.Evaluation));
             return new(dimensions, method, seed, budget, passed ? "completed" : "failed", passed ? null : "Budget or feasibility contract failed.",
                 initialHash, result.StateHash, false, result.Counters.EvaluationAttempts, result.Counters.Proposals,
                 observer.Samples.Sum(sample => sample.Cost), watch.Elapsed.TotalMilliseconds,
                 EvolutionParetoQuery.Hypervolume(definition, entries.Select(entry => entry.Evaluation)), entries.Length,
                 observer.Samples.Count(sample => sample.Status == "Completed"),
-                Enumerable.Range(0, dimensions).Select(i => entries.Min(entry => entry.Evaluation.Objectives[i])).ToArray(),
-                Enumerable.Range(0, dimensions).Select(i => entries.Max(entry => entry.Evaluation.Objectives[i])).ToArray(), observer.Samples.ToArray(),
+                entries.Length == 0 ? Array.Empty<double>() : Enumerable.Range(0, dimensions).Select(i => entries.Min(entry => entry.Evaluation.Objectives[i])).ToArray(),
+                entries.Length == 0 ? Array.Empty<double>() : Enumerable.Range(0, dimensions).Select(i => entries.Max(entry => entry.Evaluation.Objectives[i])).ToArray(), observer.Samples.ToArray(),
                 entries.Select(entry => new Elite(entry.Evaluation.GenomeId, entry.Evaluation.Quality!.Value, entry.Evaluation.Objectives.ToArray())).ToArray());
         }
         catch (Exception exception) when (exception is not OutOfMemoryException)
@@ -160,7 +160,7 @@ internal static class ParetoCampaign
         {
             if (evolutionEvent.Kind == EvolutionEventKind.Evaluated && evolutionEvent.Evaluation is EvolutionEvaluation e)
                 Samples.Add(new(e.EvaluationId, e.GenomeId, e.Status.ToString(), e.Quality, e.Objectives.ToArray(), e.ConstraintViolations.ToArray(),
-                    e.Cost.AttemptCount, e.Cost.CostUnits, evolutionEvent.InsertionResult?.ToString()));
+                    e.Cost.AttemptCount, e.Cost.CostUnits, evolutionEvent.InsertionResult?.ToString(), e.Diagnostics.Select(d => d.Code + ": " + d.Message).ToArray()));
             return default;
         }
     }
