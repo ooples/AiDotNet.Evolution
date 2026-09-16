@@ -4,7 +4,7 @@ on:
   push:
     branches: [main]
   pull_request:
-    branches: [main, feat/competitive-evolution-platform, 'feat/evolution-us-*', feat/evolution-us02-efficacy, feat/evolution-us03-correctness, feat/evolution-us05-campaign-budget, feat/evolution-us06-noise-integration, feat/evolution-us07-ablation-integration, feat/evolution-us08-portfolio-integration, chore/evolution-pr-consolidation, feat/evolution-program-consolidation]
+    branches: [main, feat/competitive-evolution-platform, 'feat/evolution-us-*', feat/evolution-us02-efficacy, feat/evolution-us03-correctness, feat/evolution-us05-campaign-budget, feat/evolution-us06-noise-integration, feat/evolution-us07-ablation-integration, feat/evolution-us08-portfolio-integration, chore/evolution-pr-consolidation, feat/evolution-program-consolidation, feat/evolution-us13-integration]
 
 concurrency:
   group: ${{ github.workflow }}-${{ github.ref }}
@@ -80,6 +80,14 @@ jobs:
       - name: Verify surrogate backend and measured-only selection
         shell: pwsh
         run: ./eng/Test-SurrogateSearch.ps1
+      - name: Verify standalone surrogate package consumption
+        shell: pwsh
+        run: |
+          dotnet pack src/AiDotNet.Evolution/AiDotNet.Evolution.csproj -c Release --no-build -o TestResults/surrogate-packages
+          if ($LASTEXITCODE -ne 0) { throw 'Core package failed.' }
+          dotnet pack src/AiDotNet.Evolution.Surrogates/AiDotNet.Evolution.Surrogates.csproj -c Release -o TestResults/surrogate-packages
+          if ($LASTEXITCODE -ne 0) { throw 'Surrogate package failed.' }
+          ./eng/Test-SurrogatePackage.ps1 -CorePackagePath TestResults/surrogate-packages/AiDotNet.Evolution.0.1.0-preview.1.nupkg -AdapterPackagePath TestResults/surrogate-packages/AiDotNet.Evolution.Surrogates.0.1.0-preview.1.nupkg -CoreVersion 0.1.0-preview.1 -AdapterVersion 0.1.0-preview.1
       - name: Verify multi-fidelity promotion and independent confirmation
         shell: pwsh
         run: ./eng/Test-MultiFidelity.ps1

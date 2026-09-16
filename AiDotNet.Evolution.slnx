@@ -14,6 +14,7 @@
     <Project Path="examples/TypedParameterSearch/TypedParameterSearch.csproj" />
   </Folder>
   <Folder Name="/src/">
+    <Project Path="src/AiDotNet.Evolution.Surrogates/AiDotNet.Evolution.Surrogates.csproj" />
     <Project Path="src/AiDotNet.Evolution.Programs/AiDotNet.Evolution.Programs.csproj" />
     <Project Path="src/AiDotNet.Evolution.CSharp/AiDotNet.Evolution.CSharp.csproj" />
     <Project Path="src/AiDotNet.Evolution/AiDotNet.Evolution.csproj" />
