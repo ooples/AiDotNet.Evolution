@@ -494,6 +494,13 @@ public sealed partial class EvolutionEngine<TGenome>
     private void RecordCompletedEvaluation(int island, EvolutionCandidate<TGenome> candidate, EvolutionEvaluation evaluation)
     {
         IEvolutionArchive<TGenome> archive = _islands[island];
+        if (archive.GetParetoDefinition() is EvolutionParetoDefinition definition)
+        {
+            if (!definition.IsFeasible(evaluation))
+                RetainFailure(new EvolutionDiagnostic("pareto_not_feasible",
+                    "Completed candidate has missing/out-of-domain objectives or missing/nonzero hard constraints; excluded from the deployable front."));
+            return;
+        }
         EvolutionCellKey? cell = TryCreateCellKey(archive, evaluation.Descriptors);
         if (cell is null)
         {

@@ -169,10 +169,11 @@ public sealed class EvolutionRunResult<TGenome>
     /// </remarks>
     public IReadOnlyDictionary<string, IReadOnlyList<EvolutionArtifact>> PendingArtifacts { get; }
 
-    /// <summary>Gets the globally best elite using deterministic quality and identity tie-breaking.</summary>
+    /// <summary>Gets the scalar-quality representative using deterministic quality and identity tie-breaking.</summary>
     /// <remarks>
     /// Returns <c>null</c> when every island is empty. The comparison direction is read from the first island; the
     /// engine requires every island to share one archive definition, so all islands agree on it.
+    /// For Pareto runs use ParetoFront() for the tradeoffs; this representative does not replace that front.
     /// </remarks>
     public EvolutionArchiveEntry<TGenome>? Best => Islands.Select(archive => archive.Best)
         .OfType<EvolutionArchiveEntry<TGenome>>()

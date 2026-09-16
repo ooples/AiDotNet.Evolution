@@ -47,7 +47,8 @@ public interface IEvolutionArchiveView<TGenome>
     /// <summary>Gets elites in stable cell-key order.</summary>
     IReadOnlyList<EvolutionArchiveEntry<TGenome>> Entries { get; }
 
-    /// <summary>Gets the globally best elite with deterministic tie-breaking.</summary>
+    /// <summary>Gets the scalar-quality representative with deterministic tie-breaking.</summary>
+    /// <remarks>For a Pareto archive this does not replace its full feasible nondominated Entries front.</remarks>
     EvolutionArchiveEntry<TGenome>? Best { get; }
 
     /// <summary>Returns the elite in a specific cell, or <c>null</c>.</summary>

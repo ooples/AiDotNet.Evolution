@@ -189,6 +189,7 @@ public sealed partial class EvolutionEngine<TGenome>
                     throw new ArgumentException("The archive factory must return independent instances.", nameof(archiveFactory));
         }
         ValidateCompatibleArchives(_islands);
+        ValidateParetoPolicies();
         if (_options.Cascade.Enabled) _options.Cascade.ValidateAgainstStages(_cascadeStageCount, _islands[0].Direction);
         _islandGenerations = new long[_islands.Length];
         _globalElites = new EvolutionGlobalEliteIndex<TGenome>(

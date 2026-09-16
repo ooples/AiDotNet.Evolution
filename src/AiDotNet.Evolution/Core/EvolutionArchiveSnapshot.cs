@@ -27,7 +27,7 @@ namespace AiDotNet.Evolution;
 /// in a snapshot and store it; the stored copy stays exactly as it was even after the search moves on. This is also
 /// the type behind each island in <see cref="EvolutionRunResult{TGenome}.Islands"/> once a run finishes.</para>
 /// </remarks>
-public sealed class EvolutionArchiveSnapshot<TGenome> : IEvolutionArchiveView<TGenome>, IEvolutionArchiveCellCount
+public sealed class EvolutionArchiveSnapshot<TGenome> : IEvolutionArchiveView<TGenome>, IEvolutionArchiveCellCount, IEvolutionObjectiveArchiveView
 {
     private readonly ReadOnlyCollection<EvolutionDescriptorDefinition> _descriptors;
     private readonly ReadOnlyCollection<EvolutionArchiveEntry<TGenome>> _entries;
@@ -72,6 +72,13 @@ public sealed class EvolutionArchiveSnapshot<TGenome> : IEvolutionArchiveView<TG
         Direction = source.Direction;
         Version = source.Version;
         TotalCells = EvolutionArchiveGeometry.CellCount(source);
+        ParetoDefinition = source.GetParetoDefinition();
+        if (ParetoDefinition is not null)
+        {
+            var validated = new ParetoArchive<TGenome>(ParetoDefinition, Direction);
+            if (validated.DefinitionHash != DefinitionHash) throw new ArgumentException("Pareto definition hash mismatch.", nameof(source));
+            validated.Restore(_entries, _descriptors, Version);
+        }
         EvolutionArchiveEntry<TGenome>? best = null;
         foreach (EvolutionArchiveEntry<TGenome> entry in entries)
             if (EvolutionEntryOrdering.Compare(Direction, entry, best) < 0) best = entry;
@@ -95,6 +102,9 @@ public sealed class EvolutionArchiveSnapshot<TGenome> : IEvolutionArchiveView<TG
 
     /// <inheritdoc/>
     public long TotalCells { get; }
+
+    /// <inheritdoc/>
+    public EvolutionParetoDefinition? ParetoDefinition { get; }
 
     /// <inheritdoc/>
     public IReadOnlyList<EvolutionArchiveEntry<TGenome>> Entries => _entries;

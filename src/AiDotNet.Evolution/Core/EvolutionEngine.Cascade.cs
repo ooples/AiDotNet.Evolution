@@ -287,7 +287,8 @@ public sealed partial class EvolutionEngine<TGenome>
         if (_options.EarlyStopping.PatienceEvaluations <= 0) return;
         double? metric = CurrentEarlyStoppingMetric();
         if (metric.HasValue &&
-            (!_earlyStoppingBest.HasValue || metric.Value - _earlyStoppingBest.Value >= _options.EarlyStopping.MinimumImprovement))
+            (!_earlyStoppingBest.HasValue || (metric.Value - _earlyStoppingBest.Value >= _options.EarlyStopping.MinimumImprovement &&
+                (_options.EarlyStopping.Metric != EvolutionEarlyStoppingMetric.ParetoHypervolume || metric.Value > _earlyStoppingBest.Value))))
         {
             _earlyStoppingBest = metric;
             _evaluationsSinceImprovement = 0;
@@ -324,6 +325,8 @@ public sealed partial class EvolutionEngine<TGenome>
 
         switch (_options.EarlyStopping.Metric)
         {
+            case EvolutionEarlyStoppingMetric.ParetoHypervolume:
+                return _islands.Average(archive => archive.Hypervolume());
             case EvolutionEarlyStoppingMetric.Coverage:
                 {
                     long occupied = 0;

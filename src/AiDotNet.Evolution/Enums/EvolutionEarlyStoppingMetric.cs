@@ -25,5 +25,7 @@ public enum EvolutionEarlyStoppingMetric
     /// <summary>The fraction of grid cells occupied across every island.</summary>
     Coverage = 1,
     /// <summary>The sum of every elite's quality across every island, negated under minimization.</summary>
-    QdScore = 2
+    QdScore = 2,
+    /// <summary>The mean retained-front normalized hypervolume across islands, with fixed objective bounds.</summary>
+    ParetoHypervolume = 3
 }
