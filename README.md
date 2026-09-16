@@ -14,6 +14,8 @@ against both a strong static strategy and a uniform mixture before default promo
 
 ## Core contracts
 
+Optional [Pareto search](docs/PARETO_SEARCH.md) retains feasible objective tradeoffs with separate non-deployable exploration, explicit representatives, front-aware policies and validated checkpoints. [US-09 evidence](benchmarks/evidence/pareto/us09-current-stack/README.md) includes equal-budget scalar comparisons and losing cases.
+
 - `IEvolutionTask<TGenome>` owns canonical identity, validation, and evaluation.
 - `IVariationOperator<TGenome>` proposes immutable typed genomes; stateful operators can additionally implement
   `ICheckpointableVariationOperator<TGenome>`.

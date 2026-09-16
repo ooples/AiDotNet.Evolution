@@ -51,15 +51,16 @@ State-hash comparisons must use matching component identities, including the gen
 
 ## Matched-budget campaign
 
+The current-stack [US-09 campaign](../benchmarks/evidence/pareto/us09-current-stack/README.md) runs two authored two-/three-objective fixtures, 24 paired seeds, three methods, 128 charged calls each, and complete four-worker replays. It compares Pareto64 with both scalar-single and a capacity-matched scalar-map64 baseline. All methods share initial genomes, mutation, scalarization, constraints and budgets. The optional exploration pool is disabled for this comparison; its safety and behavior are tested separately.
+
 ```powershell
-dotnet run --project examples/ParetoSearch -c Release -- <new-report.json> <40-character-source-commit>
+dotnet benchmarks/AiDotNet.Evolution.Quality/bin/Release/net10.0/AiDotNet.Evolution.Quality.dll --pareto-study <compiled-source-revision> <new-report.json>
+python benchmarks/analysis/pareto_study.py <new-report.json> <new-summary.json>
 ```
 
-The executable runs 180 experiments: two authored bounded quadratic tasks, 30 paired seeds, and three methods. Each receives 256 successful evaluation attempts, the same initial genomes, mutation code, worker count and scalar weights. Comparators are a scalar 32-bin MAP-Elites archive and a scalar single-best archive, both wrapped in a feasible-only admission guard; their capacity difference is reported explicitly. One task has a disconnected feasible region. This campaign leaves the optional exploration pool disabled, so it isolates feasible-front search. Exploration correctness is separately regression-tested; no measured quality improvement is claimed for enabling it.
+The harness verifies both compiled revisions and refuses overwrite. Reports retain every terminal evaluation, raw objective vectors, feasibility, cost, state hashes, primary/replay outcomes and observational timing. Independent Python analysis checks budgets, membership, pairing and exact dominated volume. Three-dimensional losses and a worsened marginal objective are retained; this is not an OpenEvolve or representative latency/memory result.
 
-Reports retain every final front's objective vectors and genome, counters, state hashes, declared bounds/reference point, source revision and runtime. Paired bootstrap intervals (2000 resamples) summarize hypervolume, each objective's minimum and best scalar quality. These are descriptive, not multiplicity-adjusted claims. Wall-clock measurements are observational. Results do not establish OpenEvolve superiority, representative algorithm-optimization performance, or safe consumer deployment.
-
-The example refuses to overwrite a prior report. CI runs it and uploads the raw JSON as evidence; failure to consume a declared budget, evaluator failure, an empty front or an infeasible retained member fails the campaign.
+The [historical PR52 campaign](https://github.com/ooples/AiDotNet.Evolution/blob/2de0419e8aab7dc656d59af9358134b8483a7544/benchmarks/evidence/pareto/README.md) remains separate historical evidence, including its inconclusive disconnected-task comparison. It is not relabeled as a current-stack run.
 
 ## Regression evidence
 
