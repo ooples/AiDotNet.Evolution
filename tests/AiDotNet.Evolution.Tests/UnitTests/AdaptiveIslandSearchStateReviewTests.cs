@@ -158,7 +158,7 @@ public sealed partial class AdaptiveIslandSearchTests
     }
 
     [Fact]
-    public void MissingScalarCountersRetainTheirExistingZeroDefaultForEmptyState()
+    public void MissingScalarCountersAreRejectedEvenForEmptyState()
     {
         var target = CreateRestorePolicy();
         string before = target.Policy.CaptureState();
@@ -166,11 +166,11 @@ public sealed partial class AdaptiveIslandSearchTests
         Assert.True(json.Remove("Epoch"));
         Assert.True(json.Remove("LastGeneration"));
 
-        target.Policy.RestoreState(json.ToJsonString());
+        Assert.Throws<InvalidDataException>(() => target.Policy.RestoreState(json.ToJsonString()));
 
         Assert.Equal(before, target.Policy.CaptureState());
-        Assert.Equal(1, target.First.Restores);
-        Assert.Equal(1, target.Second.Restores);
+        Assert.Equal(0, target.First.Restores);
+        Assert.Equal(0, target.Second.Restores);
     }
 
     [Theory]
