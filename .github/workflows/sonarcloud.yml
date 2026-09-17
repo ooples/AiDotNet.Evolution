@@ -4,7 +4,7 @@ on:
   push:
     branches: [main]
   pull_request:
-    branches: [main, feat/competitive-evolution-platform, 'feat/evolution-us-*', feat/evolution-us02-efficacy, feat/evolution-us03-correctness, feat/evolution-us05-campaign-budget, feat/evolution-us06-noise-integration, feat/evolution-us07-ablation-integration, feat/evolution-us08-portfolio-integration, chore/evolution-pr-consolidation, feat/evolution-program-consolidation, feat/evolution-us13-integration, feat/evolution-us14-integration, feat/evolution-us15-integration, feat/evolution-us16-integration, feat/evolution-us10-integration, feat/evolution-us09-integration, fix/evolution-remaining-pr-relocation, fix/evolution-deployment-relocation, fix/evolution-program-foundation-relocation, fix/evolution-model-runtime-relocation]
+    branches: [main, feat/competitive-evolution-platform, 'feat/evolution-us-*', feat/evolution-us02-efficacy, feat/evolution-us03-correctness, feat/evolution-us05-campaign-budget, feat/evolution-us06-noise-integration, feat/evolution-us07-ablation-integration, feat/evolution-us08-portfolio-integration, chore/evolution-pr-consolidation, feat/evolution-program-consolidation, feat/evolution-us13-integration, feat/evolution-us14-integration, feat/evolution-us15-integration, feat/evolution-us16-integration, feat/evolution-us10-integration, feat/evolution-us09-integration, fix/evolution-remaining-pr-relocation, fix/evolution-deployment-relocation, fix/evolution-program-foundation-relocation, fix/evolution-model-runtime-relocation, fix/evolution-execution-runtime-relocation]
 
 concurrency:
   group: sonar-${{ github.ref }}

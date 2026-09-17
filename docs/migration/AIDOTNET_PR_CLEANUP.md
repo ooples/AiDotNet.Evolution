@@ -53,6 +53,9 @@ runner, execution contracts and input/output fitness evaluators without an AiDot
 PR2148 and PR2168 still
 require their remaining implementations to be ported. Partial foundation ports do not
 justify closing those two PRs.
+The [script/metric scoring increment](SCRIPT_METRICS_MIGRATION.md) additionally ports
+script evaluation and typed scalarization, with bounded evidence and retained numeric
+metrics. LLM/novelty, artifact/output, facade and CLI integration remain outstanding.
 
 | AiDotNet PR | Files | Work requiring preservation/port review |
 |---|---:|---|

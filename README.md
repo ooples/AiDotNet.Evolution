@@ -66,6 +66,8 @@ objects in their owning repository and implement the typed contracts above:
   see the [standalone comparison host](benchmarks/ProgramEvolutionComparison/README.md).
 - Standalone process execution and input/output fitness are available in `AiDotNet.Evolution.Programs`;
   see [execution runtime usage and boundaries](docs/migration/EXECUTION_RUNTIME_MIGRATION.md).
+- Script evaluators retain numeric metrics and support explicit scoring policies;
+  see [standalone script evaluation](docs/migration/SCRIPT_METRICS_MIGRATION.md).
   Other old consumer integrations are still being ported; the [PR audit](docs/migration/AIDOTNET_PR_CLEANUP.md)
   records what remains. Old AiModelBuilder evolution APIs will be removed in a separate breaking-removal PR,
   without obsolete forwarding APIs.

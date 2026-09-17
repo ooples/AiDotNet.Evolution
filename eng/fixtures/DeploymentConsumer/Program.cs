@@ -45,7 +45,13 @@ var executionFitness = new SandboxedProgramFitnessEvaluator(processRunner,
 var executionResult = await executionFitness.EvaluateAsync(new ProgramGenome("package-execution-proof", ProgramLanguage.Python), new(0, 1, 1, 1));
 if (executionResult.Quality != 1 || executionResult.CostUnits != 1)
     throw new InvalidOperationException("Packaged process evaluator failed.");
-Console.WriteLine("PASS: packaged deployment, model/program runtime and real child process; 2 search evaluations plus 1 execution; no project references.");
+var scriptFitness = new ScriptProgramFitnessEvaluator(processRunner,
+    "{\"metrics\":{\"speed\":4,\"accuracy\":2}}", new ScriptProgramEvaluationOptions { RequireEntryPoint = false },
+    metricAggregator: new AiDotNet.Evolution.Programs.Metrics.ProgramMetricAggregator());
+var scriptResult = await scriptFitness.EvaluateAsync(new ProgramGenome("candidate", ProgramLanguage.Python), new(0, 1, 1, 1));
+if (scriptResult.Quality != 3 || scriptResult.Metrics["speed"] != 4 || scriptResult.CostUnits != 1)
+    throw new InvalidOperationException("Packaged script metrics evaluation failed.");
+Console.WriteLine("PASS: packaged deployment/program runtime and script metrics; 2 search evaluations plus 2 child-process evaluations; no project references.");
 
 sealed class FixtureEdit : IVariationOperator<ProgramGenome>
 {
