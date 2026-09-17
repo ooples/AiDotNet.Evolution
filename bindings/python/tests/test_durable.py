@@ -9,6 +9,7 @@ from pathlib import Path
 
 sys.path.insert(0, str(Path(__file__).resolve().parents[1]))
 from aidotnet_evolution import DurableWorkClient, DurableWorkError, parse_evaluation_payload
+from aidotnet_evolution.durable import _lease, _normalize_timestamp, _parse_timestamp
 
 ROOT = Path(__file__).resolve().parents[3]
 DLL = os.environ.get("AIDOTNET_DURABLE_HOST_DLL")
@@ -89,6 +90,42 @@ class DurableTests(unittest.TestCase):
                 self.assertEqual("stale", client.commit(receipt(lease)))
                 self.assertEqual("duplicate-stale", client.commit(receipt(lease)))
                 self.assertIsNone(client.result(JOB["evaluationId"], 1))
+
+    def test_dotnet_tick_precision_timestamps_are_accepted_on_every_supported_python(self):
+        # The host writes .NET round-trip timestamps, which carry 100-nanosecond ticks and therefore
+        # SEVEN fractional-second digits. datetime.fromisoformat accepts only three or six before
+        # Python 3.11, so on 3.10 -- which this binding supports and CI pins -- every real lease was
+        # rejected as an invalid claim response and three live-host tests failed.
+        lease = {"identity": {"runId": "run", "evaluationId": "9223372036854775807", "attempt": 1,
+                              "leaseId": "01a2d4c85b4d45cabe5d4f40a80feea4"},
+                 "workerId": "one", "canonicalGenomeId": "integer:7", "payload": "7",
+                 "deliveryNumber": 1, "expiresAt": "2026-09-17T23:05:49.7461110+00:00"}
+        self.assertTrue(_lease(lease))
+
+        for stamp in ["2026-09-17T23:05:49.7461110+00:00", "2026-09-17T23:05:49.7461110Z",
+                      "2026-09-17T23:05:49.746111+00:00", "2026-09-17T23:05:49.746+00:00",
+                      "2026-09-17T23:05:49.74+00:00", "2026-09-17T23:05:49Z"]:
+            with self.subTest(stamp=stamp):
+                parsed = _parse_timestamp(stamp)
+                self.assertIsNotNone(parsed.utcoffset())
+                self.assertEqual(49, parsed.second)
+
+        # Asserted on the NORMALISED TEXT, not only on the parsed result: Python 3.11+ parses seven
+        # digits natively, so a result-only assertion would pass on a modern interpreter even with the
+        # normalisation removed, and the breakage would reappear only on the 3.10 job.
+        for stamp, expected in [("2026-09-17T23:05:49.7461110+00:00", ".746111"),
+                                ("2026-09-17T23:05:49.74+00:00", ".740000"),
+                                ("2026-09-17T23:05:49.746111+00:00", ".746111")]:
+            with self.subTest(stamp=stamp):
+                normalized = _normalize_timestamp(stamp)
+                self.assertIn(expected, normalized)
+                self.assertRegex(normalized, r"\.[0-9]{6}[+-]")
+        self.assertNotIn(".", _normalize_timestamp("2026-09-17T23:05:49Z"))
+
+        # Truncation must not round or shift the instant.
+        self.assertEqual(746111, _parse_timestamp("2026-09-17T23:05:49.7461119+00:00").microsecond)
+        # A malformed stamp must still be refused rather than normalised into something parseable.
+        self.assertFalse(_lease(dict(lease, expiresAt="not-a-timestamp")))
 
     def test_envelope_preserves_all_bits_and_rejects_numeric_seed(self):
         payload = {"schema": 1, "genomePayload": "7", "canonicalGenomeId": "integer:7", "evaluationId": JOB["evaluationId"],

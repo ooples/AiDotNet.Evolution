@@ -50,6 +50,22 @@ def _identity(value: Any) -> bool:
         and isinstance(value.get("leaseId"), str) and bool(re.fullmatch(r"[0-9a-f]{32}", value["leaseId"]))
 
 
+# .NET round-trip timestamps carry 100-nanosecond ticks, so they have SEVEN fractional-second
+# digits. datetime.fromisoformat accepts only three or six before Python 3.11, and this binding
+# supports 3.10, so the host's own expiry stamps are unparseable there and every claim is refused
+# as an invalid response. Normalise the fraction to exactly six digits before parsing.
+_FRACTIONAL_SECONDS = re.compile(r"(?<=:[0-9][0-9])\.([0-9]+)")
+
+
+def _normalize_timestamp(text: str) -> str:
+    """Rewrites the fractional second to exactly six digits, which every supported Python parses."""
+    return _FRACTIONAL_SECONDS.sub(lambda match: "." + (match.group(1) + "000000")[:6], text.replace("Z", "+00:00"))
+
+
+def _parse_timestamp(text: str) -> datetime:
+    return datetime.fromisoformat(_normalize_timestamp(text))
+
+
 def _lease(value: Any) -> bool:
     if not isinstance(value, dict) or not _identity(value.get("identity")) or not isinstance(value.get("workerId"), str) \
             or not value["workerId"] or not isinstance(value.get("canonicalGenomeId"), str) \
@@ -57,7 +73,7 @@ def _lease(value: Any) -> bool:
             or not isinstance(value.get("expiresAt"), str):
         return False
     try:
-        return datetime.fromisoformat(value["expiresAt"].replace("Z", "+00:00")).utcoffset() is not None
+        return _parse_timestamp(value["expiresAt"]).utcoffset() is not None
     except ValueError:
         return False
 
