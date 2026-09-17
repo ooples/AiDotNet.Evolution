@@ -1,0 +1,724 @@
+// Migrated from ooples/AiDotNet 9cd7d5d6c366a483874024650d02901f69a1829c:tests/AiDotNet.Tests/UnitTests/Evolution/Programs/LlmProgramVariationOperatorTests.cs
+// Original license retained in Legacy/AIDOTNET-LICENSE.txt.
+using AiDotNet.Evolution;
+using AiDotNet.Evolution.Programs;
+using AiDotNet.Evolution.Prompts;
+using Xunit;
+
+namespace AiDotNet.Evolution.CSharp.Tests.ModelRuntime;
+
+public sealed class LlmProgramVariationOperatorTests
+{
+    private const string ParentSource = "def solve(x):\n    return x\n";
+
+    private static EvolutionArchiveEntry<ProgramGenome> Entry(
+        ProgramGenome genome,
+        double quality,
+        long evaluationId = 0,
+        IReadOnlyList<EvolutionDiagnostic>? diagnostics = null)
+    {
+        var lineage = new EvolutionLineage(null, null, "seed", null, 0, 0, 0UL);
+        var candidate = new EvolutionCandidate<ProgramGenome>(
+            evaluationId, new EvolutionCanonicalGenome<ProgramGenome>(genome, genome.Id), lineage);
+        var evaluation = new EvolutionEvaluation(
+            evaluationId,
+            genome.Id,
+            EvolutionEvaluationStatus.Completed,
+            quality,
+            EvolutionOptimizationDirection.Maximize,
+            new Dictionary<string, double>(StringComparer.Ordinal) { ["x"] = quality },
+            Array.Empty<double>(),
+            Array.Empty<double>(),
+            new EvolutionEvaluationCost(TimeSpan.Zero, 1, 1),
+            lineage,
+            EvolutionCacheStatus.Miss,
+            diagnostics ?? Array.Empty<EvolutionDiagnostic>(),
+            "task-v1",
+            "evaluator-v1",
+            "config-v1");
+
+        return new EvolutionArchiveEntry<ProgramGenome>(new EvolutionCellKey(new[] { 1, 2 }), candidate, evaluation);
+    }
+
+    private static EvolutionVariationContext<ProgramGenome> Context(
+        ProgramGenome? parent = null,
+        IReadOnlyList<EvolutionArchiveEntry<ProgramGenome>>? inspirations = null,
+        IReadOnlyList<EvolutionDiagnostic>? diagnostics = null) =>
+        new(Entry(parent ?? new ProgramGenome(ParentSource, ProgramLanguage.Python), 0.5, 0, diagnostics),
+            inspirations ?? Array.Empty<EvolutionArchiveEntry<ProgramGenome>>(),
+            new StableRandom(1234UL, 7UL),
+            0,
+            0);
+
+    private static string DiffResponse(string search, string replace) =>
+        "<<<<<<< SEARCH\n" + search + "\n=======\n" + replace + "\n>>>>>>> REPLACE\n";
+
+    [Fact]
+    public async Task AMeaningfulMultilineWhitespaceEditIsNotDiscardedAsUnchanged()
+    {
+        var parent = new ProgramGenome("text = '''value\nend'''", ProgramLanguage.Python);
+        const string changed = "text = '''value \nend'''";
+        var client = new FakeChatClient("```python\n" + changed + "\n```");
+        var variation = new LlmProgramVariationOperator(client,
+            new ProgramProposalOptions { Language = ProgramLanguage.Python },
+            new LlmProgramVariationOptions { Mode = ProgramEvolutionMode.FullRewrite, MaxProposalRetries = 0 });
+        ProgramGenome child = await variation.ProposeAsync(Context(parent));
+        Assert.Equal(changed, child.Source); Assert.NotEqual(parent.Id, child.Id);
+        Assert.Equal(parent.NormalizedSource, child.NormalizedSource); Assert.Equal(1, client.Calls);
+    }
+
+    [Fact]
+    public async Task SourceLimitCountsInteriorTrailingWhitespaceInRewrites()
+    {
+        string changed = "text = '''value" + new string(' ', 150) + "\nend'''";
+        var client = new FakeChatClient("```python\n" + changed + "\n```", "```python\nprint(3)\n```");
+        var variation = new LlmProgramVariationOperator(client,
+            new ProgramProposalOptions { Language = ProgramLanguage.Python, MaxProgramChars = 100 },
+            new LlmProgramVariationOptions { Mode = ProgramEvolutionMode.FullRewrite });
+        ProgramGenome child = await variation.ProposeAsync(Context());
+        Assert.Equal("print(3)", child.Source); Assert.Equal(2, client.Calls);
+        Assert.Contains("above the limit", client.Conversations[1][3].Text, StringComparison.Ordinal);
+    }
+
+    [Fact]
+    public async Task MalformedUnicodeIsRecordedAndRetriedWithoutLosingUsage()
+    {
+        string invalid = "print('" + (char)0xD800 + "')";
+        var client = new FakeChatClient("```python\n" + invalid + "\n```", "```python\nprint(3)\n```");
+        var variation = new LlmProgramVariationOperator(client,
+            new ProgramProposalOptions { Language = ProgramLanguage.Python },
+            new LlmProgramVariationOptions { Mode = ProgramEvolutionMode.FullRewrite, MaxProposalRetries = 1 });
+
+        ProgramGenome child = await variation.ProposeAsync(Context());
+
+        Assert.Equal("print(3)", child.Source);
+        Assert.Equal(2, variation.GetUsage().ChatCalls);
+        Assert.Equal(1, variation.GetUsage().Retries);
+        Assert.Equal(0, variation.GetUsage().ProviderErrors);
+        Assert.Equal(ProgramProposalOutcome.ParseFailed, variation.GetRecentAttempts()[0].Outcome);
+        Assert.Contains("malformed Unicode", client.Conversations[1][3].Text, StringComparison.Ordinal);
+    }
+
+    [Fact]
+    public async Task MalformedUnicodeAtRetryLimitPreservesTheParent()
+    {
+        var parent = new ProgramGenome(ParentSource, ProgramLanguage.Python);
+        string invalid = "    return '" + (char)0xDC00 + "'";
+        var client = new FakeChatClient(DiffResponse("    return x", invalid));
+        var variation = new LlmProgramVariationOperator(client, null,
+            new LlmProgramVariationOptions { MaxProposalRetries = 0 });
+
+        EvolutionVariationContext<ProgramGenome> context = Context(parent);
+        ProgramGenome child = await variation.ProposeAsync(context);
+        Assert.Same(context.Parent.Candidate.CanonicalGenome.Genome, child);
+        Assert.NotSame(parent, child);
+        Assert.Equal(parent.Source, child.Source);
+        Assert.Equal(parent.Id, child.Id);
+        Assert.Equal(1, variation.GetUsage().ChatCalls);
+        Assert.Equal(1, variation.GetUsage().AbandonedProposals);
+        Assert.Equal(new[] { ProgramProposalOutcome.ParseFailed, ProgramProposalOutcome.Exhausted },
+            variation.GetRecentAttempts().Select(attempt => attempt.Outcome));
+    }
+
+    [Fact]
+    public async Task AppliedEditsBecomeTheChildProgram()
+    {
+        var client = new FakeChatClient(DiffResponse("    return x", "    return x * 2"));
+        var operatorUnderTest = new LlmProgramVariationOperator(client);
+
+        ProgramGenome child = await operatorUnderTest.ProposeAsync(Context());
+
+        Assert.Equal("def solve(x):\n    return x * 2\n", child.Source);
+        Assert.Equal(ProgramLanguage.Python, child.Language);
+        Assert.Equal(1, client.Calls);
+    }
+
+    [Fact]
+    public async Task UnusableEditsAreRetriedWithFeedback()
+    {
+        var client = new FakeChatClient(
+            DiffResponse("    return y", "    return 0"),
+            DiffResponse("    return x", "    return x + 1"));
+
+        var operatorUnderTest = new LlmProgramVariationOperator(client);
+        ProgramGenome child = await operatorUnderTest.ProposeAsync(Context());
+
+        Assert.Equal("def solve(x):\n    return x + 1\n", child.Source);
+        Assert.Equal(2, client.Calls);
+
+        IReadOnlyList<ProgramChatMessage> retry = client.Conversations[1];
+        Assert.Equal(4, retry.Count);
+        Assert.Contains("could not be applied", retry[3].Text, StringComparison.Ordinal);
+        Assert.Contains("return y", retry[3].Text, StringComparison.Ordinal);
+    }
+
+    [Fact]
+    public async Task ExhaustedRetriesReturnTheParentSoNoEvaluationIsSpent()
+    {
+        var client = new FakeChatClient(
+            DiffResponse("nope", "x"), DiffResponse("nope", "x"), DiffResponse("nope", "x"), DiffResponse("nope", "x"));
+
+        var operatorUnderTest = new LlmProgramVariationOperator(client);
+        var parent = new ProgramGenome(ParentSource, ProgramLanguage.Python);
+        EvolutionVariationContext<ProgramGenome> context = Context(parent);
+
+        ProgramGenome child = await operatorUnderTest.ProposeAsync(context);
+
+        Assert.Equal(parent.Id, child.Id);
+        Assert.Equal(parent, child);
+        Assert.NotSame(parent, child);
+        Assert.Same(context.Parent.Candidate.CanonicalGenome.Genome, child);
+        Assert.Equal(3, client.Calls);
+    }
+
+    [Fact]
+    public async Task RetryCountIsConfigurable()
+    {
+        var client = new FakeChatClient(DiffResponse("nope", "x"), DiffResponse("nope", "x"));
+        var operatorUnderTest = new LlmProgramVariationOperator(
+            client, null, new LlmProgramVariationOptions { MaxProposalRetries = 0 });
+
+        await operatorUnderTest.ProposeAsync(Context());
+        Assert.Equal(1, client.Calls);
+    }
+
+    [Fact]
+    public async Task IdenticalProposalsAreRejectedRatherThanReturnedAsChildren()
+    {
+        var client = new FakeChatClient(
+            DiffResponse("    return x", "    return x"),
+            DiffResponse("    return x", "    return x - 1"));
+
+        var operatorUnderTest = new LlmProgramVariationOperator(client);
+        ProgramGenome child = await operatorUnderTest.ProposeAsync(Context());
+
+        Assert.Equal("def solve(x):\n    return x - 1\n", child.Source);
+        Assert.Contains("identical", client.Conversations[1][3].Text, StringComparison.Ordinal);
+    }
+
+    [Fact]
+    public async Task FullRewriteModeReadsAFencedBlock()
+    {
+        var client = new FakeChatClient("Here it is:\n```python\ndef solve(x):\n    return x * 7\n```\n");
+        var operatorUnderTest = new LlmProgramVariationOperator(
+            client,
+            new ProgramProposalOptions { Language = ProgramLanguage.Python },
+            new LlmProgramVariationOptions { Mode = ProgramEvolutionMode.FullRewrite });
+
+        ProgramGenome child = await operatorUnderTest.ProposeAsync(Context());
+        Assert.Equal("def solve(x):\n    return x * 7", child.Source);
+    }
+
+    [Fact]
+    public async Task FullRewriteModeRefusesUnfencedProse()
+    {
+        var client = new FakeChatClient("I would change the return value.", "```python\nprint(2)\n```");
+        var operatorUnderTest = new LlmProgramVariationOperator(
+            client,
+            new ProgramProposalOptions { Language = ProgramLanguage.Python },
+            new LlmProgramVariationOptions { Mode = ProgramEvolutionMode.FullRewrite });
+
+        ProgramGenome child = await operatorUnderTest.ProposeAsync(Context());
+
+        Assert.Equal("print(2)", child.Source);
+        Assert.Contains("fenced code block", client.Conversations[1][3].Text, StringComparison.Ordinal);
+    }
+
+    [Fact]
+    public async Task OversizedProposalsAreRefused()
+    {
+        string huge = new string('x', 400);
+        var client = new FakeChatClient(
+            "```python\n" + huge + "\n```",
+            "```python\nprint(3)\n```");
+
+        var operatorUnderTest = new LlmProgramVariationOperator(
+            client,
+            new ProgramProposalOptions { Language = ProgramLanguage.Python, MaxProgramChars = 100 },
+            new LlmProgramVariationOptions { Mode = ProgramEvolutionMode.FullRewrite });
+
+        ProgramGenome child = await operatorUnderTest.ProposeAsync(Context());
+
+        Assert.Equal(2, client.Calls);
+        Assert.Contains("above the limit", client.Conversations[1][3].Text, StringComparison.Ordinal);
+        Assert.Equal("print(3)", child.Source);
+    }
+
+    [Fact]
+    public async Task ProviderExceptionsAreRetriedAndNeverLeakTheirMessage()
+    {
+        var client = new FakeChatClient(DiffResponse("    return x", "    return 9"))
+        {
+            ThrowOnFirstCall = new InvalidOperationException("api key sk-secret-value rejected")
+        };
+
+        var operatorUnderTest = new LlmProgramVariationOperator(client);
+        ProgramGenome child = await operatorUnderTest.ProposeAsync(Context());
+
+        Assert.Equal("def solve(x):\n    return 9\n", child.Source);
+        string feedback = client.Conversations[1][3].Text;
+        Assert.Contains("InvalidOperationException", feedback, StringComparison.Ordinal);
+        Assert.DoesNotContain("sk-secret-value", feedback, StringComparison.Ordinal);
+    }
+
+    [Fact]
+    public async Task PromptQuotesTheParentAndBoundsItsLength()
+    {
+        var client = new FakeChatClient(DiffResponse("    return x", "    return 4"));
+        var operatorUnderTest = new LlmProgramVariationOperator(
+            client, null, new LlmProgramVariationOptions { MaxPromptProgramChars = 300 });
+
+        await operatorUnderTest.ProposeAsync(Context(new ProgramGenome(new string('q', 5000), ProgramLanguage.Python)));
+
+        string user = client.Conversations[0][1].Text;
+        Assert.Contains("# Current Program", user, StringComparison.Ordinal);
+        Assert.Contains(new string('q', 100), user, StringComparison.Ordinal);
+        Assert.DoesNotContain(new string('q', 400), user, StringComparison.Ordinal);
+        Assert.Contains("...", user, StringComparison.Ordinal);
+    }
+
+    [Fact]
+    public async Task PromptIsRenderedThroughTheTemplateBuilder()
+    {
+        var client = new FakeChatClient(DiffResponse("    return x", "    return 4"));
+        var operatorUnderTest = new LlmProgramVariationOperator(client);
+
+        await operatorUnderTest.ProposeAsync(Context());
+
+        string user = client.Conversations[0][1].Text;
+        Assert.Contains("# Current Program Information", user, StringComparison.Ordinal);
+        Assert.Contains("# Program Evolution History", user, StringComparison.Ordinal);
+        Assert.Contains("- Fitness: 0.5", user, StringComparison.Ordinal);
+        Assert.Equal(ProgramPromptTemplateKey.DiffUser, ProgramPromptTemplateKey.DiffUser);
+    }
+
+    [Fact]
+    public async Task AnExplicitPromptBuilderOwnsTheModeAndTheParserFollowsIt()
+    {
+        // The builder asks for a full rewrite even though the variation options still say Diff, so an answer that
+        // is only a fenced block must be accepted: the parser has to follow the builder, not the options.
+        var builder = new ProgramPromptBuilder(
+            new ProgramEvolutionPromptOptions { EvolutionMode = ProgramPromptEvolutionMode.FullRewrite },
+            new ProgramProposalOptions { Language = ProgramLanguage.Python });
+        var client = new FakeChatClient("```python\ndef solve(x):\n    return x + 9\n```");
+        var operatorUnderTest = new LlmProgramVariationOperator(
+            client,
+            new ProgramProposalOptions { Language = ProgramLanguage.Python },
+            new LlmProgramVariationOptions { Mode = ProgramEvolutionMode.Diff },
+            promptBuilder: builder);
+
+        ProgramGenome child = await operatorUnderTest.ProposeAsync(Context());
+
+        // The fenced-code extractor drops the block's trailing blank line, so the child keeps only the code.
+        Assert.Equal("def solve(x):\n    return x + 9", child.Source);
+        Assert.Same(builder, operatorUnderTest.PromptBuilder);
+    }
+
+    [Fact]
+    public async Task ParentDiagnosticsAreSplitIntoArtifactsAndDiagnostics()
+    {
+        var client = new FakeChatClient(DiffResponse("    return x", "    return 4"));
+        var operatorUnderTest = new LlmProgramVariationOperator(client);
+
+        await operatorUnderTest.ProposeAsync(Context(diagnostics: new[]
+        {
+            new EvolutionDiagnostic("program_script_artifact_stdout", "captured stdout line", isRedacted: true),
+            new EvolutionDiagnostic("program_sandbox_timeout", "the candidate ran out of time")
+        }));
+
+        string user = client.Conversations[0][1].Text;
+        Assert.Contains("captured stdout line", user, StringComparison.Ordinal);
+        Assert.Contains("the candidate ran out of time", user, StringComparison.Ordinal);
+        Assert.Contains("Evaluation Diagnostics", user, StringComparison.Ordinal);
+    }
+
+    [Fact]
+    public async Task FeatureDimensionNamesLabelTheArchiveCell()
+    {
+        var client = new FakeChatClient(DiffResponse("    return x", "    return 4"));
+        var named = new LlmProgramVariationOperator(client, null, new LlmProgramVariationOptions
+        {
+            FeatureDimensions = new List<string> { "length", "complexity" },
+            FeatureBinCounts = new List<int> { 10, 10 }
+        });
+
+        await named.ProposeAsync(Context());
+
+        string user = client.Conversations[0][1].Text;
+        Assert.Contains("length", user, StringComparison.Ordinal);
+        Assert.Contains("complexity", user, StringComparison.Ordinal);
+    }
+
+    [Fact]
+    public async Task MismatchedFeatureNamesKeepTheNamesAndDropTheIndices()
+    {
+        // The cell has two bins but only one name is configured, so the indices must not be attached to it.
+        var client = new FakeChatClient(DiffResponse("    return x", "    return 4"));
+        var mismatched = new LlmProgramVariationOperator(client, null, new LlmProgramVariationOptions
+        {
+            FeatureDimensions = new List<string> { "length" }
+        });
+
+        ProgramGenome child = await mismatched.ProposeAsync(Context());
+
+        Assert.NotEqual(ParentSource, child.Source);
+        Assert.Contains("length", client.Conversations[0][1].Text, StringComparison.Ordinal);
+    }
+
+    [Fact]
+    public async Task UsageTotalsSeparateProposalsFromRequests()
+    {
+        var client = new FakeChatClient("no edits here", DiffResponse("    return x", "    return 4"));
+        var operatorUnderTest = new LlmProgramVariationOperator(client);
+
+        await operatorUnderTest.ProposeAsync(Context());
+        ProgramEvolutionLlmUsage usage = operatorUnderTest.GetUsage();
+
+        Assert.Equal(1, usage.Proposals);
+        Assert.Equal(2, usage.ChatCalls);
+        Assert.Equal(1, usage.Retries);
+        Assert.Equal(0, usage.AbandonedProposals);
+        Assert.Equal(0, usage.ProviderErrors);
+        Assert.Equal(2.0, usage.CallsPerProposal);
+    }
+
+    [Fact]
+    public async Task AbandonedProposalsAreCountedAndRecorded()
+    {
+        var client = new FakeChatClient("prose", "more prose", "still prose");
+        var operatorUnderTest = new LlmProgramVariationOperator(client);
+
+        ProgramGenome child = await operatorUnderTest.ProposeAsync(Context());
+
+        Assert.Equal(ParentSource, child.Source);
+        Assert.Equal(1, operatorUnderTest.GetUsage().AbandonedProposals);
+
+        IReadOnlyList<ProgramProposalAttempt> attempts = operatorUnderTest.GetRecentAttempts();
+        Assert.Equal(4, attempts.Count);
+        Assert.All(attempts.Take(3), attempt => Assert.Equal(ProgramProposalOutcome.ParseFailed, attempt.Outcome));
+        Assert.Equal(ProgramProposalOutcome.Exhausted, attempts[3].Outcome);
+        Assert.Equal(new[] { 1, 2, 3, 3 }, attempts.Select(attempt => attempt.AttemptNumber));
+    }
+
+    [Fact]
+    public async Task RecordedAttemptsAreBoundedAndNeverEchoProviderMessages()
+    {
+        var client = new FakeChatClient("prose", "more prose", DiffResponse("    return x", "    return 4"))
+        {
+            ThrowOnFirstCall = new InvalidOperationException("key=sk-secret-value endpoint=https://internal")
+        };
+        var operatorUnderTest = new LlmProgramVariationOperator(
+            client, null, new LlmProgramVariationOptions { MaxProposalRetries = 3, MaxRecordedAttempts = 2 });
+
+        await operatorUnderTest.ProposeAsync(Context());
+
+        IReadOnlyList<ProgramProposalAttempt> attempts = operatorUnderTest.GetRecentAttempts();
+        Assert.Equal(2, attempts.Count);
+        Assert.All(attempts, attempt => Assert.DoesNotContain("sk-secret-value", attempt.Detail, StringComparison.Ordinal));
+        Assert.Equal(1, operatorUnderTest.GetUsage().ProviderErrors);
+    }
+
+    [Fact]
+    public async Task AttemptRecordingCanBeTurnedOffWithoutLosingTheCounters()
+    {
+        var client = new FakeChatClient(DiffResponse("    return x", "    return 4"));
+        var operatorUnderTest = new LlmProgramVariationOperator(
+            client, null, new LlmProgramVariationOptions { MaxRecordedAttempts = 0 });
+
+        await operatorUnderTest.ProposeAsync(Context());
+
+        Assert.Empty(operatorUnderTest.GetRecentAttempts());
+        Assert.Equal(1, operatorUnderTest.GetUsage().ChatCalls);
+    }
+
+    [Fact]
+    public async Task ProviderReportedTokensAccumulate()
+    {
+        var client = new FakeChatClient(DiffResponse("    return x", "    return 4")) { Usage = new ProgramChatUsage(11, 7) };
+        var operatorUnderTest = new LlmProgramVariationOperator(client);
+
+        await operatorUnderTest.ProposeAsync(Context());
+        ProgramEvolutionLlmUsage usage = operatorUnderTest.GetUsage();
+
+        Assert.Equal(11, usage.InputTokens);
+        Assert.Equal(7, usage.OutputTokens);
+        Assert.Equal(18, usage.TotalTokens);
+        Assert.Equal(11, operatorUnderTest.GetRecentAttempts()[0].InputTokens);
+    }
+
+    [Fact]
+    public async Task TaskDescriptionReachesThePrompt()
+    {
+        var client = new FakeChatClient(DiffResponse("    return x", "    return 4"));
+        var operatorUnderTest = new LlmProgramVariationOperator(
+            client,
+            new ProgramProposalOptions
+            {
+                Language = ProgramLanguage.Python,
+                TaskDescription = "Return the smallest prime above the input."
+            });
+
+        await operatorUnderTest.ProposeAsync(Context());
+
+        Assert.Contains("smallest prime above the input", client.Conversations[0][1].Text, StringComparison.Ordinal);
+    }
+
+    [Fact]
+    public async Task InspirationsAreQuotedAndCapped()
+    {
+        var client = new FakeChatClient(DiffResponse("    return x", "    return 4"));
+        var operatorUnderTest = new LlmProgramVariationOperator(
+            client, null, new LlmProgramVariationOptions { MaxInspirations = 2 });
+
+        var inspirations = new[]
+        {
+            Entry(new ProgramGenome("alpha_program = 1", ProgramLanguage.Python), 0.9, 1),
+            Entry(new ProgramGenome("beta_program = 2", ProgramLanguage.Python), 0.8, 2),
+            Entry(new ProgramGenome("gamma_program = 3", ProgramLanguage.Python), 0.7, 3)
+        };
+
+        await operatorUnderTest.ProposeAsync(Context(inspirations: inspirations));
+
+        string user = client.Conversations[0][1].Text;
+        Assert.Contains("alpha_program", user, StringComparison.Ordinal);
+        Assert.Contains("beta_program", user, StringComparison.Ordinal);
+        Assert.DoesNotContain("gamma_program", user, StringComparison.Ordinal);
+    }
+
+    [Fact]
+    public async Task SeedIsDerivedDeterministicallyFromTheProposalStream()
+    {
+        var first = new FakeChatClient(DiffResponse("    return x", "    return 4"));
+        var second = new FakeChatClient(DiffResponse("    return x", "    return 4"));
+
+        await new LlmProgramVariationOperator(first).ProposeAsync(Context());
+        await new LlmProgramVariationOperator(second).ProposeAsync(Context());
+
+        Assert.NotNull(first.LastOptions);
+        Assert.NotNull(first.LastOptions?.Seed);
+        Assert.Equal(first.LastOptions?.Seed, second.LastOptions?.Seed);
+        Assert.True(first.LastOptions?.Seed >= 0);
+    }
+
+    [Fact]
+    public async Task ExplicitSeedOverridesTheStream()
+    {
+        var client = new FakeChatClient(DiffResponse("    return x", "    return 4"));
+        var operatorUnderTest = new LlmProgramVariationOperator(
+            client, null, new LlmProgramVariationOptions { Seed = 4242, Temperature = 0.3, MaxOutputTokens = 500 });
+
+        await operatorUnderTest.ProposeAsync(Context());
+
+        Assert.Equal(4242, client.LastOptions?.Seed);
+        Assert.Equal(0.3, client.LastOptions?.Temperature);
+        Assert.Equal(500, client.LastOptions?.MaxOutputTokens);
+    }
+
+    [Fact]
+    public async Task RequestedFormatAndEvolveBlockRulesReachTheModel()
+    {
+        var diffClient = new FakeChatClient(DiffResponse("    return x", "    return 4"));
+        await new LlmProgramVariationOperator(diffClient).ProposeAsync(Context());
+        Assert.Contains("<<<<<<< SEARCH", diffClient.Conversations[0][1].Text, StringComparison.Ordinal);
+
+        var enforcedClient = new FakeChatClient(DiffResponse("    return x", "    return 4"));
+        var enforced = new LlmProgramVariationOperator(
+            enforcedClient,
+            new ProgramProposalOptions { Language = ProgramLanguage.Python, EnforceEvolveBlocks = true });
+        await enforced.ProposeAsync(Context());
+        Assert.Contains("EVOLVE-BLOCK-START", enforcedClient.Conversations[0][1].Text, StringComparison.Ordinal);
+
+        var customClient = new FakeChatClient(DiffResponse("    return x", "    return 4"));
+        var custom = new LlmProgramVariationOperator(
+            customClient, null, new LlmProgramVariationOptions { SystemMessage = "Be terse." });
+        await custom.ProposeAsync(Context());
+        Assert.Equal("Be terse.", customClient.Conversations[0][0].Text);
+    }
+
+    [Fact]
+    public async Task FullRewriteModeAsksForAFencedBlockRatherThanEditBlocks()
+    {
+        var client = new FakeChatClient("```python\ndef solve(x):\n    return x - 1\n```");
+        var operatorUnderTest = new LlmProgramVariationOperator(
+            client,
+            new ProgramProposalOptions { Language = ProgramLanguage.Python },
+            new LlmProgramVariationOptions { Mode = ProgramEvolutionMode.FullRewrite });
+
+        await operatorUnderTest.ProposeAsync(Context());
+
+        string user = client.Conversations[0][1].Text;
+        Assert.Contains("Return the complete new program inside a single fenced block", user, StringComparison.Ordinal);
+        Assert.DoesNotContain("<<<<<<< SEARCH", user, StringComparison.Ordinal);
+    }
+
+    [Fact]
+    public async Task CancellationPropagates()
+    {
+        using var source = new CancellationTokenSource();
+        source.Cancel();
+        var client = new FakeChatClient(DiffResponse("    return x", "    return 4"));
+        var operatorUnderTest = new LlmProgramVariationOperator(client);
+
+        await Assert.ThrowsAnyAsync<OperationCanceledException>(
+            async () => await operatorUnderTest.ProposeAsync(Context(), source.Token));
+        Assert.Equal(0, client.Calls);
+    }
+
+    [Fact]
+    public void VersionHashTracksBehaviourChanges()
+    {
+        var client = new FakeChatClient("ignored");
+        string baseline = new LlmProgramVariationOperator(client).VersionHash;
+
+        Assert.Equal(baseline, new LlmProgramVariationOperator(client).VersionHash);
+        Assert.NotEqual(baseline, new LlmProgramVariationOperator(
+            client, null, new LlmProgramVariationOptions { Mode = ProgramEvolutionMode.FullRewrite }).VersionHash);
+        Assert.NotEqual(baseline, new LlmProgramVariationOperator(
+            client, null, new LlmProgramVariationOptions { MaxProposalRetries = 5 }).VersionHash);
+        Assert.NotEqual(baseline, new LlmProgramVariationOperator(
+            client, new ProgramProposalOptions { Language = ProgramLanguage.CSharp }).VersionHash);
+        Assert.Equal("llm-program-variation", new LlmProgramVariationOperator(client).Id);
+    }
+
+    [Fact]
+    public void OptionsAreValidatedAndCopied()
+    {
+        var client = new FakeChatClient("ignored");
+#pragma warning disable CS8600, CS8625
+        Assert.Throws<ArgumentNullException>(() => new LlmProgramVariationOperator(null));
+#pragma warning restore CS8600, CS8625
+        Assert.Throws<ArgumentOutOfRangeException>(() => new LlmProgramVariationOperator(
+            client, null, new LlmProgramVariationOptions { MaxProposalRetries = -1 }));
+        Assert.Throws<ArgumentOutOfRangeException>(() => new LlmProgramVariationOperator(
+            client, null, new LlmProgramVariationOptions { Temperature = 5 }));
+        Assert.Throws<ArgumentException>(() => new LlmProgramVariationOperator(client, id: " "));
+
+        var options = new LlmProgramVariationOptions { MaxInspirations = 1 };
+        var operatorUnderTest = new LlmProgramVariationOperator(client, null, options);
+        options.MaxInspirations = 9;
+        Assert.Equal(1, operatorUnderTest.GetVariationOptions().MaxInspirations);
+        Assert.Equal(100_000, operatorUnderTest.GetProgramOptions().MaxProgramChars);
+    }
+
+    [Theory]
+    [InlineData("samples")]
+    [InlineData("temperature")]
+    [InlineData("tokens")]
+    [InlineData("metrics")]
+    [InlineData("history")]
+    [InlineData("recording")]
+    [InlineData("top")]
+    [InlineData("neighbors")]
+    [InlineData("bins")]
+    public void All_prompt_sampling_and_learning_options_invalidate_compatibility(string setting)
+    {
+        var client = new FakeChatClient("ignored");
+        var baselineOptions = new LlmProgramVariationOptions { FeatureDimensions = new List<string> { "x" }, FeatureBinCounts = new List<int> { 4 } };
+        var changed = baselineOptions.Clone();
+        switch (setting)
+        {
+            case "samples": changed.SamplesPerAttempt = 2; break;
+            case "temperature": changed.Temperature = 0.2; break;
+            case "tokens": changed.MaxOutputTokens = 512; break;
+            case "metrics": changed.IncludeParentMetrics = false; break;
+            case "history": changed.MaxPreviousAttempts = 0; break;
+            case "recording": changed.MaxRecordedAttempts = 0; break;
+            case "top": changed.MaxTopPrograms = 0; break;
+            case "neighbors": changed.MaxEmptyNeighborCells = 0; break;
+            case "bins": changed.FeatureBinCounts[0] = 8; break;
+        }
+        Assert.NotEqual(new LlmProgramVariationOperator(client, null, baselineOptions).VersionHash,
+            new LlmProgramVariationOperator(client, null, changed).VersionHash);
+    }
+
+    [Fact]
+    public async Task Full_rewrite_cannot_change_protected_text_outside_evolve_blocks()
+    {
+        const string original = "protected_value = 1\n# EVOLVE-BLOCK-START\nvalue = 2\n# EVOLVE-BLOCK-END\n# protected footer";
+        string bad = original.Replace("protected_value = 1", "protected_value = 9").Replace("value = 2", "value = 3");
+        string good = original.Replace("value = 2", "value = 4");
+        var client = new FakeChatClient("```python\n" + bad + "\n```", "```python\n" + good + "\n```");
+        var variation = new LlmProgramVariationOperator(client,
+            new ProgramProposalOptions { Language = ProgramLanguage.Python, EnforceEvolveBlocks = true },
+            new LlmProgramVariationOptions { Mode = ProgramEvolutionMode.FullRewrite, MaxProposalRetries = 1 });
+        var child = await variation.ProposeAsync(Context(new ProgramGenome(original, ProgramLanguage.Python)));
+        Assert.Equal(good, child.Source); Assert.Equal(2, client.Calls);
+        Assert.Equal(ProgramProposalOutcome.ParseFailed, variation.GetRecentAttempts()[0].Outcome);
+        Assert.Contains("protected", client.Conversations[1][3].Text, StringComparison.OrdinalIgnoreCase);
+    }
+
+    [Theory]
+    [InlineData("carriage-returns")]
+    [InlineData("require-block")]
+    [InlineData("block-count")]
+    [InlineData("failure-excerpt")]
+    public void Diff_parser_settings_invalidate_compatibility(string setting)
+    {
+        var options = new ProgramProposalOptions();
+        var changed = options.Clone();
+        switch (setting)
+        {
+            case "carriage-returns": changed.Diff.AllowCarriageReturns = false; break;
+            case "require-block": changed.Diff.RejectWhenNoBlockApplied = false; break;
+            case "block-count": changed.Diff.MaxBlocks = 2; break;
+            case "failure-excerpt": changed.Diff.MaxFailureExcerptLength = 100; break;
+        }
+        var client = new FakeChatClient("ignored");
+        Assert.NotEqual(new LlmProgramVariationOperator(client, options).VersionHash,
+            new LlmProgramVariationOperator(client, changed).VersionHash);
+    }
+
+    [Fact]
+    public void Feature_names_with_delimiters_cannot_collide()
+    {
+        var first = new LlmProgramVariationOptions { FeatureDimensions = new List<string> { "a,b", "c" } };
+        var second = new LlmProgramVariationOptions { FeatureDimensions = new List<string> { "a", "b,c" } };
+        var client = new FakeChatClient("ignored");
+        Assert.NotEqual(new LlmProgramVariationOperator(client, null, first).VersionHash,
+            new LlmProgramVariationOperator(client, null, second).VersionHash);
+        Assert.Equal(new LlmProgramVariationOperator(client, null, first).VersionHash,
+            new LlmProgramVariationOperator(client, null, first.Clone()).VersionHash);
+    }
+
+    [Fact]
+    public async Task Full_rewrite_preserves_mixed_protected_newlines_and_source_eof_newline()
+    {
+        const string source = "header\r\n# EVOLVE-BLOCK-START\nold\r# EVOLVE-BLOCK-END\r\n";
+        string changed = source.Replace("old", "new");
+        var client = new FakeChatClient("```python\n" + changed + "\n```");
+        var variation = new LlmProgramVariationOperator(client,
+            new ProgramProposalOptions { Language = ProgramLanguage.Python, EnforceEvolveBlocks = true },
+            new LlmProgramVariationOptions { Mode = ProgramEvolutionMode.FullRewrite, MaxProposalRetries = 0 });
+        Assert.Equal(changed, (await variation.ProposeAsync(Context(new ProgramGenome(source, ProgramLanguage.Python)))).Source);
+        Assert.Equal(1, client.Calls);
+    }
+
+    [Theory]
+    [InlineData("\n")]
+    [InlineData("\r\n")]
+    public async Task Protected_boundary_allows_valid_diffs_with_the_original_newline_convention(string newline)
+    {
+        string source = string.Join(newline, "header", "# EVOLVE-BLOCK-START", "old", "# EVOLVE-BLOCK-END", "tail");
+        var client = new FakeChatClient(DiffResponse("old", "new"));
+        var variation = new LlmProgramVariationOperator(client,
+            new ProgramProposalOptions { Language = ProgramLanguage.Python, EnforceEvolveBlocks = true },
+            new LlmProgramVariationOptions { Mode = ProgramEvolutionMode.Diff, MaxProposalRetries = 0 });
+        Assert.Equal(source.Replace("old", "new"), (await variation.ProposeAsync(Context(new ProgramGenome(source, ProgramLanguage.Python)))).Source);
+        Assert.Equal(1, client.Calls);
+    }
+
+    [Theory]
+    [InlineData(false)]
+    [InlineData(true)]
+    public void Description_parser_options_remain_fingerprinted_with_an_explicit_prompt_builder(bool initialDescription)
+    {
+        var first = new ProgramProposalOptions();
+        var changed = first.Clone();
+        if (initialDescription) changed.Prompt.InitialChangesDescription = "different starting hypothesis";
+        else changed.Prompt.ProgramsAsChangesDescription = true;
+        var builder = new ProgramPromptBuilder();
+        var client = new FakeChatClient("ignored");
+        Assert.NotEqual(new LlmProgramVariationOperator(client, first, promptBuilder: builder).VersionHash,
+            new LlmProgramVariationOperator(client, changed, promptBuilder: builder).VersionHash);
+    }
+}

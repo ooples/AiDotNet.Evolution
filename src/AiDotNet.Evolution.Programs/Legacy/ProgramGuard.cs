@@ -4,6 +4,11 @@ namespace AiDotNet.Evolution.Programs;
 
 internal static class ProgramGuard
 {
+    internal static void Positive(int value)
+    {
+        if (value <= 0) throw new ArgumentOutOfRangeException(nameof(value));
+    }
+
     internal static void NonNegative(int value)
     {
         if (value < 0) throw new ArgumentOutOfRangeException(nameof(value));

@@ -31,6 +31,10 @@ if (evaluations != 2 || result.Best?.Evaluation.Quality != 2)
     throw new InvalidOperationException("Packaged task/edit/descriptor engine integration failed.");
 if (typeof(ProgramEvolutionTask).Assembly.GetReferencedAssemblies().Any(reference => reference.Name == "AiDotNet"))
     throw new InvalidOperationException("Program foundation must not depend on AiDotNet.");
+var modelRuntime = new LlmProgramVariationOperator(new FixtureChat(),
+    new ProgramProposalOptions { Language = ProgramLanguage.Python });
+if (modelRuntime.PromptBuilder.Build(new AiDotNet.Evolution.Prompts.ProgramPromptContext(new ProgramGenome("x = 1", ProgramLanguage.Python))).Messages.Count == 0)
+    throw new InvalidOperationException("Packaged model runtime produced no prompt.");
 Console.WriteLine("PASS: packaged deployment, MAP-Elites and program foundation; 2 evaluations, fixture quality 1 -> 2; no project references.");
 
 sealed class FixtureEdit : IVariationOperator<ProgramGenome>
@@ -45,4 +49,12 @@ sealed class FixtureEdit : IVariationOperator<ProgramGenome>
         if (!edit.IsSuccess) throw new InvalidOperationException("Package edit failed.");
         return new(new ProgramGenome(edit.ModifiedSource, ProgramLanguage.Python));
     }
+}
+
+sealed class FixtureChat : IProgramChatClient
+{
+    public string ModelId => "package-fixture";
+    public Task<ProgramChatResponse> GetResponseAsync(IReadOnlyList<ProgramChatMessage> messages,
+        ProgramChatOptions? options = null, CancellationToken cancellationToken = default) =>
+        Task.FromResult(new ProgramChatResponse(ProgramChatMessage.Assistant("fixture")));
 }

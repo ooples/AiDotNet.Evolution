@@ -45,8 +45,11 @@ clean-package fix at `a6b931a`.
 The next [program foundation increment](PROGRAM_FOUNDATION_MIGRATION.md) moves the
 actual task/edit/descriptor/language APIs and tests into Programs without an AiDotNet
 dependency. It is only part of PR2148/2168 and does not authorize their closure.
-The remaining three code-bearing PRs below stay open until their unique implementation
-is accounted for. PR81/88/89 do not prove those complete ports are done.
+PR2203's complete host contribution is now accounted for by the
+[standalone model runtime and comparison host](MODEL_RUNTIME_MIGRATION.md); its source
+PR is to be closed as relocated after replacement publication. PR2148 and PR2168 still
+require their remaining implementations to be ported. Partial foundation ports do not
+justify closing those two PRs.
 
 | AiDotNet PR | Files | Work requiring preservation/port review |
 |---|---:|---|
@@ -54,7 +57,7 @@ is accounted for. PR81/88/89 do not prove those complete ports are done.
 | 2168 | 59 | US-24 CLI, preflight, run control, inspection/evidence bundles, telemetry and raw-sample correctness hardening |
 | 2182 (closed) | 8 | Fully relocated and tested in Evolution PR81; original raw-evidence files preserved |
 | 2202 (closed) | 18 | Relocated to Evolution PR89: deployment lifecycle, model/program adapters and local MAP-Elites orchestration, original evidence preserved |
-| 2203 | 3 | US-02 C# program comparison host, not just the newer generic/Python comparison |
+| 2203 | 3 | Complete replacement in benchmarks/ProgramEvolutionComparison, backed by standalone prompts/variation/provenance; close source PR after publication |
 | 2210 (closed) | 11 | Relocated to Evolution PR88; standalone noise session, fresh model/sorting benchmark, verifiers, and original evidence |
 | 2212 (closed) | 17 | Relocated to Evolution PR88; portfolio, standalone compiler-arm factory/provider contract, integration tests, usage aggregation and benchmark verification |
 

@@ -62,6 +62,8 @@ objects in their owning repository and implement the typed contracts above:
 - Optional `AiDotNet.Evolution.Programs` and `AiDotNet.Evolution.CSharp` projects target .NET 8 and .NET 10.
   They provide standalone program contracts, metered portfolios, correctness-gated fitness reuse and compiler-guided
   improvement without an AiDotNet dependency. See the [migration contract](docs/migration/PROGRAM_RUNTIME_MIGRATION.md).
+  Programs also provides caller-owned model-driven variation, bounded prompts and proposal provenance;
+  see the [standalone comparison host](benchmarks/ProgramEvolutionComparison/README.md).
   Other old consumer integrations are still being ported; the [PR audit](docs/migration/AIDOTNET_PR_CLEANUP.md)
   records what remains. Old AiModelBuilder evolution APIs will be removed in a separate breaking-removal PR,
   without obsolete forwarding APIs.
