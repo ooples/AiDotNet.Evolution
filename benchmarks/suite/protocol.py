@@ -67,6 +67,17 @@ def catalog(path=CATALOG):
     for task in tasks:
         if task["partition"] not in PARTITIONS or not re.fullmatch("[a-z0-9_-]+", task["id"]):
             raise ValueError("Invalid task or partition")
+        if not re.fullmatch("[a-z0-9-]+", str(task.get("family", ""))):
+            raise ValueError("Invalid task family")
+    for task in value["algotune"]:
+        # The pinned blob, class and scale are load-bearing: the blob is the only check that the
+        # upstream source is unmodified, and the scale is passed straight to generate_problem.
+        if not re.fullmatch("[0-9a-f]{40}", str(task.get("blob", ""))):
+            raise ValueError("Pin an exact upstream Git blob for every application task")
+        if not re.fullmatch("[A-Za-z_][A-Za-z0-9_]*", str(task.get("class", ""))):
+            raise ValueError("Name an exact upstream solver class")
+        if type(task.get("scale")) is not int or not 1 <= task["scale"] <= 1024:
+            raise ValueError("Bound the application task scale to 1..1024")
         previous = families.setdefault(task["family"].casefold(), task["partition"])
         if previous != task["partition"]:
             raise ValueError("Semantic family leaked across partitions")

@@ -75,7 +75,7 @@ internal static class RepresentativeSuite
                 DependencyManifestHash = Digest(File.ReadAllBytes(dependencies)),
                 DependencyManifest = dependencyDocument.RootElement
             },
-            Semantics = "Same eight initial genomes and information per task/search seed; two fixed feasible anchors; descriptors are coordinates, not fitness. Cache reuse disabled. No model calls. Work units are task-defined, not FLOPs, price or CPU time. No timing-speedup claim.",
+            Semantics = "Same eight initial genomes and information per task/search seed; two fixed anchors at opposite box corners, exactly one of which is feasible for each constrained family (the other is recorded with its constraint violation); descriptors are coordinates, not fitness. Cache reuse disabled. No model calls. Work units are task-defined, not FLOPs, price or CPU time. No timing-speedup claim.",
             Runs = runs
         }, Json);
         return complete ? 0 : 1;
@@ -97,8 +97,9 @@ internal static class RepresentativeSuite
             _ => ["inventory-risk", "robust-design", "spin-glass"]
         };
         if (request.Instances.Any(value => value is null || value.SearchSeeds is null || value.SearchSeeds.Length is < 1 or > 16 ||
-            value.SearchSeeds.Distinct().Count() != value.SearchSeeds.Length || new SuiteNumericTask(value.Id, value.Seed).Partition != request.Partition) ||
+            value.SearchSeeds.Distinct().Count() != value.SearchSeeds.Length) ||
             !request.Instances.Select(value => value.Id).Distinct().OrderBy(value => value, StringComparer.Ordinal).SequenceEqual(required) ||
+            request.Instances.Any(value => new SuiteNumericTask(value.Id, value.Seed).Partition != request.Partition) ||
             request.Instances.Select(value => (value.Id, value.Seed)).Distinct().Count() != request.Instances.Length ||
             request.Instances.GroupBy(value => value.Id).Select(group => group.Count()).Distinct().Count() != 1 ||
             (long)request.Instances.Sum(value => value.SearchSeeds.Length) * request.Budget * Enum.GetValues<QualityMethod>().Length > 2_000_000)

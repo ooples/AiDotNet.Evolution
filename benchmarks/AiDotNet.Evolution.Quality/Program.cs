@@ -81,13 +81,15 @@ internal static class QualityExperiment
     {
         string taskId = suiteTask?.Id ?? taskKind.ToString();
         decimal evaluationWork = suiteTask?.WorkUnits ?? 1;
-        var ledger = new EvolutionResourceLedger($"{taskKind}-{method}-{seed}", new EvolutionResources(
+        var ledger = new EvolutionResourceLedger($"{taskId}-{method}-{seed}", new EvolutionResources(
             new Dictionary<string, decimal> { ["cost_units"] = budget * evaluationWork, ["proposal_calls"] = budget * 4 }),
             retainedReceiptLimit: 64, maximumOperations: Math.Min(1_000_000, budget * 5));
         NumericGenome[] seeds = InitialUnits(seed).Select(values => new NumericGenome(ToCoordinates(values))).ToArray();
         if (suiteTask is not null)
         {
-            // Shared feasible anchors for the two constrained families; identical for every method.
+            // Two shared anchors at opposite corners of the box, identical for every method. Exactly one is
+            // feasible for each constrained family -- the low corner for knapsack, the high corner for
+            // robust-design -- so every constrained family starts from one feasible and one recorded-infeasible point.
             seeds[0] = new NumericGenome(Enumerable.Repeat(-5d, Dimensions));
             seeds[1] = new NumericGenome(Enumerable.Repeat(5d, Dimensions));
         }

@@ -59,13 +59,32 @@ public sealed class SuiteNumericTaskTests
     }
 
     [Fact]
-    public void SharedAnchorsAreFeasibleAndConstraintViolationIsExplicit()
+    public void EachConstrainedFamilyStartsFromExactlyOneFeasibleSharedAnchor()
     {
+        // The two shared anchors are the opposite corners of the box. Neither corner is feasible for
+        // both constrained families, so the published semantics must not claim two feasible anchors:
+        // the low corner is feasible only for knapsack and the high corner only for robust-design.
         var knapsack = new SuiteNumericTask("knapsack", 42);
         var design = new SuiteNumericTask("robust-design", 42);
-        Assert.Equal(0, knapsack.Evaluate(Enumerable.Repeat(-5d, 8).ToArray(), 0).Violation);
-        Assert.Equal(0, design.Evaluate(Enumerable.Repeat(5d, 8).ToArray(), 0).Violation);
-        Assert.True(knapsack.Evaluate(Enumerable.Repeat(5d, 8).ToArray(), 0).Violation > 0);
+        double[] low = Enumerable.Repeat(-5d, 8).ToArray(), high = Enumerable.Repeat(5d, 8).ToArray();
+        Assert.Equal(0, knapsack.Evaluate(low, 0).Violation);
+        Assert.True(knapsack.Evaluate(high, 0).Violation > 0);
+        Assert.Equal(0, design.Evaluate(high, 0).Violation);
+        Assert.True(design.Evaluate(low, 0).Violation > 0);
+    }
+
+    [Fact]
+    public async Task UnregisteredSuiteObjectivesAreRejectedAsAnInvalidContractNotAnArgumentFault()
+    {
+        string directory = Directory.CreateTempSubdirectory("us01-contract-tests-").FullName;
+        try
+        {
+            string request = Path.Combine(directory, "request.json"), output = Path.Combine(directory, "output.json");
+            File.WriteAllText(request, Request("development", crossFamily: true));
+            await Assert.ThrowsAsync<InvalidDataException>(() => RepresentativeSuite.RunAsync([request, output]));
+            Assert.False(File.Exists(output));
+        }
+        finally { Directory.Delete(directory, recursive: true); }
     }
 
     [Fact]
