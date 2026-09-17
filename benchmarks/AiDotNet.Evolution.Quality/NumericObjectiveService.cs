@@ -65,7 +65,7 @@ internal static class NumericObjectiveService
                 // JSON null is the sole terminal request; no success is inferred from a disconnected controller.
                 if (line == "null")
                 {
-                    Write(new { Kind = "summary", EvaluatorCalls = calls, BestLoss = best, Samples = samples, Resources = ledger.Snapshot() });
+                    Write(new { Kind = "summary", EvaluatorCalls = calls, BestLoss = best, Samples = Published(samples, suite), Resources = ledger.Snapshot() });
                     return 0;
                 }
                 double[] units = JsonSerializer.Deserialize<double[]>(line) ?? throw new InvalidDataException("Missing coordinates.");
@@ -94,7 +94,7 @@ internal static class NumericObjectiveService
         }
         catch (Exception exception) when (exception is not OutOfMemoryException)
         {
-            Write(new { Kind = "error", Error = exception.GetType().Name, EvaluatorCalls = calls, BestLoss = best, Samples = samples, Resources = ledger.Snapshot() });
+            Write(new { Kind = "error", Error = exception.GetType().Name, EvaluatorCalls = calls, BestLoss = best, Samples = Published(samples, suite), Resources = ledger.Snapshot() });
             return 1;
         }
     }
@@ -112,4 +112,24 @@ internal static class NumericObjectiveService
         throw new InvalidDataException("Request exceeds 4096 characters.");
     }
 
+    /// <summary>
+    /// The published sample shape. <c>numeric-objective-service-v1</c> is frozen at evaluation identity,
+    /// status, best loss so far, attempts, cost and diagnostics: the in-process record carries more than
+    /// that -- quality, constraint violations, descriptors and the genome id, which the archive pilot
+    /// reads -- and adding those members to the established protocol silently breaks every external
+    /// controller that compares the summary against the evidence it recorded itself.
+    /// <para><c>suite-numeric-objective-service-v1</c> is a new protocol with no deployed controllers, and
+    /// US-02 requires the external service to be provably measurement-identical to the in-process engine,
+    /// so it publishes the full record. The frozen protocol is never widened; the new one is never narrowed.</para>
+    /// </summary>
+    private static object[] Published(List<SampleRecord> samples, bool suite)
+        => samples.Select(sample => suite ? (object)sample : new
+        {
+            sample.EvaluationId,
+            sample.Status,
+            sample.BestLoss,
+            sample.Attempts,
+            sample.CostUnits,
+            sample.DiagnosticCodes
+        }).ToArray();
 }

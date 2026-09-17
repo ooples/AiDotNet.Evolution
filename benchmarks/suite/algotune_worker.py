@@ -104,10 +104,19 @@ def finite_solution(value):
     return not isinstance(value, float) or math.isfinite(value)
 
 
+def dependency_version(name):
+    # Reporting an absent package must not discard an already-completed measurement; record the
+    # absence instead, so the manifest still says exactly which environment produced the result.
+    try:
+        return importlib.metadata.version(name)
+    except importlib.metadata.PackageNotFoundError:
+        return "not-installed"
+
+
 def environment():
     return {"python": platform.python_version(), "platform": platform.platform(), "machine": platform.machine(),
             "cpu": platform.processor() or "unavailable", "logical_processors": os.cpu_count(),
-            "dependencies": {name: importlib.metadata.version(name) for name in
+            "dependencies": {name: dependency_version(name) for name in
                              ("numpy", "scipy", "networkx", "cryptography", "cffi", "pycparser")},
             "thread_limits": {name: os.environ.get(name) for name in
                               ("OMP_NUM_THREADS", "OPENBLAS_NUM_THREADS", "MKL_NUM_THREADS")}}
