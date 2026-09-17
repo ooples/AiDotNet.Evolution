@@ -172,7 +172,15 @@ class DurableWorkClient:
         except subprocess.TimeoutExpired:
             pass
         for stream in (self._process.stdin, self._process.stdout, self._process.stderr):
-            stream.close()
+            try:
+                stream.close()
+            except OSError:
+                # Closing stdin flushes whatever is still buffered, and the host this method has just
+                # killed is not there to read it, so close() raises BrokenPipeError on POSIX. Letting
+                # that escape replaces the DurableWorkError explaining what actually went wrong with an
+                # unrelated pipe error, and abandons the remaining streams unclosed -- and it happens
+                # precisely in the host-died path this client exists to report accurately.
+                pass
 
     def _fatal(self, message: str) -> None:
         self._failed = self._failed or DurableWorkError(message)

@@ -91,6 +91,49 @@ class DurableTests(unittest.TestCase):
                 self.assertEqual("duplicate-stale", client.commit(receipt(lease)))
                 self.assertIsNone(client.result(JOB["evaluationId"], 1))
 
+    def test_a_dead_host_still_reports_the_durable_error_and_closes_every_stream(self):
+        # _terminate kills the host and then closes its pipes. Closing stdin flushes what is still
+        # buffered, and on POSIX that raises BrokenPipeError once the reader is gone. Unguarded, that
+        # escaped _fatal BEFORE it could raise, so the caller saw an unrelated pipe error instead of
+        # the DurableWorkError saying what to reconcile, and stdout/stderr were left open.
+        class DeadStream:
+            def __init__(self, fails):
+                self.fails, self.closed = fails, False
+
+            def close(self):
+                self.closed = True
+                if self.fails:
+                    raise BrokenPipeError(32, "Broken pipe")
+
+        class DeadProcess:
+            def __init__(self):
+                self.stdin, self.stdout, self.stderr = DeadStream(True), DeadStream(False), DeadStream(False)
+                self.killed = False
+
+            def poll(self):
+                return None
+
+            def kill(self):
+                self.killed = True
+
+            def wait(self, timeout=None):
+                return 0
+
+        client = DurableWorkClient.__new__(DurableWorkClient)
+        process = DeadProcess()
+        client._process = process
+        client._failed = None
+
+        with self.assertRaises(DurableWorkError) as caught:
+            client._fatal("Durable pipe failed; reconcile unacknowledged work.")
+
+        self.assertIn("reconcile", str(caught.exception))
+        self.assertTrue(process.killed)
+        # Every stream is closed even though the first one raised.
+        self.assertTrue(process.stdin.closed)
+        self.assertTrue(process.stdout.closed)
+        self.assertTrue(process.stderr.closed)
+
     def test_dotnet_tick_precision_timestamps_are_accepted_on_every_supported_python(self):
         # The host writes .NET round-trip timestamps, which carry 100-nanosecond ticks and therefore
         # SEVEN fractional-second digits. datetime.fromisoformat accepts only three or six before
