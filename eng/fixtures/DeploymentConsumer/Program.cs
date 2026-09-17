@@ -35,7 +35,17 @@ var modelRuntime = new LlmProgramVariationOperator(new FixtureChat(),
     new ProgramProposalOptions { Language = ProgramLanguage.Python });
 if (modelRuntime.PromptBuilder.Build(new AiDotNet.Evolution.Prompts.ProgramPromptContext(new ProgramGenome("x = 1", ProgramLanguage.Python))).Messages.Count == 0)
     throw new InvalidOperationException("Packaged model runtime produced no prompt.");
-Console.WriteLine("PASS: packaged deployment, MAP-Elites and program foundation; 2 evaluations, fixture quality 1 -> 2; no project references.");
+var processOptions = new ProgramSandboxOptions { RuntimeVersion = "package-fixture-shell-v1" };
+processOptions.SetInterpreter(ProgramLanguage.Python, new ProgramInterpreterSpecification(
+    OperatingSystem.IsWindows() ? Path.Combine(Environment.GetFolderPath(Environment.SpecialFolder.System), "cmd.exe") : "/bin/cat",
+    OperatingSystem.IsWindows() ? "/c type {source}" : "{source}"));
+using var processRunner = new ProcessProgramExecutionEngine(processOptions);
+var executionFitness = new SandboxedProgramFitnessEvaluator(processRunner,
+    new[] { new ProgramInputOutputExample { ExpectedOutput = "package-execution-proof" } });
+var executionResult = await executionFitness.EvaluateAsync(new ProgramGenome("package-execution-proof", ProgramLanguage.Python), new(0, 1, 1, 1));
+if (executionResult.Quality != 1 || executionResult.CostUnits != 1)
+    throw new InvalidOperationException("Packaged process evaluator failed.");
+Console.WriteLine("PASS: packaged deployment, model/program runtime and real child process; 2 search evaluations plus 1 execution; no project references.");
 
 sealed class FixtureEdit : IVariationOperator<ProgramGenome>
 {
