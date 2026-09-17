@@ -23,7 +23,11 @@ public sealed class PipelineCleanupLifecycleReviewTests
         try
         {
             await CompleteWithinGuard(variation.CallbackRegistered.Task);
-            Assert.Equal(2, variation.Active);
+            // Both proposals must be concurrently in flight, but WHICH starts first is not ordered.
+            // Generation 1 increments Active and then blocks on the very gate generation 2 sets, so on a
+            // two-core runner generation 2 can register its callback before generation 1 has begun and a
+            // single sample reads 1. Wait for the concurrency the pipeline is required to reach instead.
+            await ReachesWithinGuard(() => variation.Active == 2, "both proposals must be concurrently in flight");
             variation.ReleaseFailure.TrySetResult(true);
             await CompleteWithinGuard(variation.CallbackInvoked.Task);
             Assert.False(variation.SiblingExited.Task.IsCompleted);
@@ -157,6 +161,14 @@ public sealed class PipelineCleanupLifecycleReviewTests
             BindingFlags.NonPublic | BindingFlags.Instance)
             ?? throw new InvalidOperationException("Missing actual transaction counter: " + fieldName);
         return Assert.IsType<long>(field.GetValue(engine));
+    }
+
+    private static async Task ReachesWithinGuard(Func<bool> condition, string because)
+    {
+        // Same budget as CompleteWithinGuard. A timeout can only fail this test; it never passes one.
+        for (int attempt = 0; attempt < 1500 && !condition(); attempt++)
+            await Task.Delay(10).ConfigureAwait(false);
+        Assert.True(condition(), because);
     }
 
     private static async Task CompleteWithinGuard(Task task)
