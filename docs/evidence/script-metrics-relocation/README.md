@@ -5,16 +5,16 @@ Final local verification on Windows, Release configuration:
 | Check | Result |
 |---|---:|
 | Solution build | 0 warnings, 0 errors |
-| Programs/compiler, net8.0 | 715 passed, 0 skipped |
-| Programs/compiler, net10.0 | 715 passed, 0 skipped |
+| Programs/compiler, net8.0 | 716 passed, 0 skipped |
+| Programs/compiler, net10.0 | 716 passed, 0 skipped |
 | Deployment, both frameworks | 82 passed, 0 skipped |
 | Workflow contracts, net10.0 | 4 passed |
-| Total test executions | 1,516 passed |
+| Total test executions | 1,518 passed |
 | Fresh package-only consumer | Passed |
 | Formatting verification | Exit 0 |
 | Original source archive | 13 Git blobs byte-verified |
 
-Programs/compiler coverage increased from 630 to 715 test cases per framework;
+Programs/compiler coverage increased from 630 to 716 test cases per framework;
 these are additional behavior checks, **not a measured algorithmic speedup**.
 
 The package consumer performs two authored search-fixture evaluations and two real

@@ -167,4 +167,20 @@ public sealed class ScriptEvidenceAdversarialTests
         Assert.False(result.Diagnostics[0].IsRedacted);
         Assert.NotEqual(privateEvaluator.VersionHash, optedIn.VersionHash);
     }
+
+    [Fact]
+    public async Task ExplicitAndDerivedScoresShareOneRegisteredDirection()
+    {
+        var aggregate = new ProgramMetricAggregator(new()
+        {
+            Strategy = ProgramMetricAggregationStrategy.Tchebycheff,
+            Weights = new Dictionary<string, double> { ["speed"] = 1 },
+            ReferencePoint = new Dictionary<string, double> { ["speed"] = 10 }
+        });
+        var explicitScore = await Evaluator("{\"quality\":2}", aggregator: aggregate).EvaluateAsync(Candidate, Context);
+        var derivedScore = await Evaluator("{\"speed\":8}", aggregator: aggregate).EvaluateAsync(Candidate, Context);
+        Assert.Equal(EvolutionOptimizationDirection.Minimize, explicitScore.Direction);
+        Assert.Equal(explicitScore.Direction, derivedScore.Direction);
+        Assert.Throws<ArgumentException>(() => Evaluator("{}", new() { Direction = EvolutionOptimizationDirection.Maximize }, aggregate));
+    }
 }

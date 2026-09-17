@@ -53,6 +53,12 @@ public sealed class ScriptProgramFitnessEvaluator : IProgramFitnessEvaluator
         ProgramGuard.NotNullOrWhiteSpace(id);
 
         ScriptProgramEvaluationOptions resolved = (options ?? new ScriptProgramEvaluationOptions()).Clone();
+        if (metricAggregator is not null)
+        {
+            if (options is not null && resolved.Direction != metricAggregator.PreferredDirection)
+                throw new ArgumentException("Script direction must match the configured metric aggregation direction.", nameof(options));
+            resolved.Direction = metricAggregator.PreferredDirection;
+        }
         resolved.Validate();
 
         string script = string.IsNullOrWhiteSpace(evaluatorScript)
@@ -304,7 +310,6 @@ public sealed class ScriptProgramFitnessEvaluator : IProgramFitnessEvaluator
 
         var metricIssues = new List<EvolutionDiagnostic>();
         ValidateCollections(payload);
-        bool aggregated = false;
         if (!TryReadFinite(payload[QualityProperty], out double quality))
         {
             if (payload.Property(QualityProperty) is not null)
@@ -321,7 +326,6 @@ public sealed class ScriptProgramFitnessEvaluator : IProgramFitnessEvaluator
                         : $"The '{QualityProperty}' property is missing and no finite metric could be combined " +
                           "in its place.");
             }
-            aggregated = true;
         }
 
         var descriptors = new Dictionary<string, double>(StringComparer.Ordinal);
@@ -394,7 +398,7 @@ public sealed class ScriptProgramFitnessEvaluator : IProgramFitnessEvaluator
         return new EvolutionTaskResult(
             EvolutionEvaluationStatus.Completed,
             quality,
-            aggregated ? _metricAggregator!.PreferredDirection : _options.Direction,
+            _options.Direction,
             descriptors,
             objectives,
             costUnits: 1,

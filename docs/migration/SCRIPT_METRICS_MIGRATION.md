@@ -30,8 +30,11 @@ Policies include combined-score-or-mean, mean, weighted mean and Tchebycheff dis
 The legacy `UpstreamFitnessScore` helper is retained as a compatibility API, **not a
 claim of parity with any current competitor version**. Script scoring refuses a
 fallback with no contributing measurements or a boolean used as the selected score.
-Tchebycheff-derived scores use minimization; explicit quality retains the caller's
-configured direction.
+An aggregator fixes the direction for both explicit and derived scores; Tchebycheff
+uses minimization. Conflicting explicitly supplied script options are rejected before
+execution. Without an aggregator, script options fix the direction. A single evaluator
+never mixes maximization and minimization between candidate responses. The evaluator
+author must also keep explicit and derived scores on the same measurement scale.
 
 Adversarial corrections:
 
