@@ -181,7 +181,13 @@ public sealed class EvolutionPolicyOptimizer
             task.Id, task.VersionHash, replicate.ToString(CultureInfo.InvariantCulture) }).Substring(0, 16), NumberStyles.HexNumber, CultureInfo.InvariantCulture);
         var maximum = _options.TrialBudget.ReservedResources;
         var stage = phase == "holdout" ? EvolutionResourceStage.Confirmation : EvolutionResourceStage.Evaluation;
-        // Disposed once, in the finally below, because the record it feeds is written there too.
+        // Deliberately disposed inside the finally below rather than with a using statement, and CodeQL's
+        // "missed using opportunity" here is a false positive. Dispose() is not a passive release: it calls
+        // ledger.Abandon, which charges an unsettled reservation's maximum as unknown consumption. A using
+        // declaration would run that after the finally block, so the trial record would be appended while its
+        // ledger operation was still pending and the ledger would settle afterwards -- breaking the
+        // Admitted == Settled boundary that coordinated checkpoints rely on. TryReserve may also return null,
+        // and that path records a rejection and throws before any using scope would begin.
         var reservation = _ledger.TryReserve("inner/" + sequence.ToString(CultureInfo.InvariantCulture), stage, maximum, maximum);
         if (reservation is null)
         {
