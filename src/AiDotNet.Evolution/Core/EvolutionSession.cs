@@ -39,6 +39,13 @@ namespace AiDotNet.Evolution;
 /// scoring, score them however you like and whenever you like, then call <see cref="Tell"/> with the scores. The
 /// contest advances only when you say so, which means it can be driven from another language, another process, or
 /// a person clicking a button.</para>
+/// <para>
+/// <b>Determinism is preserved but not free.</b> The engine's own ordering is unchanged, and results are applied
+/// through the same code path as a direct evaluation. What the caller controls is when a result arrives: telling
+/// two outstanding candidates in a different order across two runs produces the same archive content, because
+/// placement is keyed on canonical identity rather than arrival, but observer event ORDER will differ. Reproduce a
+/// run by replaying the same asks and tells, not by assuming any interleaving is equivalent.
+/// </para>
 /// </remarks>
 public sealed class EvolutionSession<TGenome> : IDisposable
 {
