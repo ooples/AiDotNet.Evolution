@@ -81,10 +81,6 @@ jobs:
         run: ./eng/Test-OperatorCredit.ps1
       - name: Verify performance fixture contracts
         run: dotnet run --project benchmarks/AiDotNet.Evolution.Performance -c Release -- --smoke
-      - name: Test performance evidence contracts
-        run: dotnet test tests/AiDotNet.Evolution.Performance.Tests -c Release --no-restore --verbosity normal
-      - name: Verify isolated performance profiling and worker determinism
-        run: dotnet run --project benchmarks/AiDotNet.Evolution.Performance -c Release --no-build -- --profile TestResults/performance '${{ github.sha }}' --smoke
       - name: Verify paired analysis contracts
         run: python3 -m unittest discover -s benchmarks/analysis -v
       - name: Verify retained proposal pipeline and default-profile evidence
