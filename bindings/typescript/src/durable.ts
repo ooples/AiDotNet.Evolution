@@ -170,6 +170,7 @@ export class DurableWorkClient {
   readonly #pending = new Map<number, { accept: (value: ObjectValue) => void; reject: (error: Error) => void; timer: NodeJS.Timeout }>();
   #nextId = 1;
   #buffer = '';
+  #scanned = 0;
   #stderr = '';
   #fatal: Error | undefined;
   #closing: Promise<void> | undefined;
@@ -183,11 +184,22 @@ export class DurableWorkClient {
       if (this.#fatal) return;
       this.#buffer += chunk;
       for (;;) {
-        const index = this.#buffer.indexOf('\n');
-        const frame = index < 0 ? this.#buffer : this.#buffer.slice(0, index);
+        // Scan only what is new and measure the frame in code units, not bytes. Re-measuring
+        // the whole buffer on every chunk was quadratic: against a 16 MiB frame it cost seconds
+        // of pure scanning, so on a loaded runner the request timeout won the race and the
+        // caller was told the claim timed out rather than that the response was oversized.
+        // A UTF-8 byte length is never smaller than the UTF-16 code-unit count of the same
+        // text, so this rejects an over-long frame without measuring its bytes; the exact byte
+        // check still runs once the frame is complete.
+        const index = this.#buffer.indexOf('\n', this.#scanned);
+        if ((index < 0 ? this.#buffer.length : index) > MAX_FRAME_BYTES) {
+          this.#fail('Oversized durable response; reconcile the original store.'); return;
+        }
+        if (index < 0) { this.#scanned = this.#buffer.length; return; }
+        const frame = this.#buffer.slice(0, index);
         if (Buffer.byteLength(frame, 'utf8') > MAX_FRAME_BYTES) { this.#fail('Oversized durable response; reconcile the original store.'); return; }
-        if (index < 0) return;
         this.#buffer = this.#buffer.slice(index + 1);
+        this.#scanned = 0;
         try {
           const response: unknown = JSON.parse(frame);
           if (!record(response) || !integer(response.id, Number.MAX_SAFE_INTEGER) || response.protocol !== 1 || typeof response.ok !== 'boolean') {
