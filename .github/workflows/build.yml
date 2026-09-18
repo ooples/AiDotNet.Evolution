@@ -123,7 +123,11 @@ jobs:
   representative-suite:
     name: Representative numeric and AlgoTune suite contracts
     runs-on: ubuntu-latest
-    timeout-minutes: 15
+    # Five campaigns run sequentially -- three contract-smoke, then registered selection and final --
+    # and run_suite.py bounds each at a 300 s deadline, so the declared child timeouts alone permit
+    # 25 minutes before checkout, the AlgoTune checkout, pip install, the dotnet build and the
+    # repeat-refusal step. At 15 minutes this job could cancel a run that respected every one of them.
+    timeout-minutes: 35
     steps:
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
         with:

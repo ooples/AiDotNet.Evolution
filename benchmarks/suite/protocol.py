@@ -69,6 +69,11 @@ def catalog(path=CATALOG):
             raise ValueError("Invalid task or partition")
         if not re.fullmatch("[a-z0-9-]+", str(task.get("family", ""))):
             raise ValueError("Invalid task family")
+        # Both panels, not just algotune: a numeric family that spans partitions leaks
+        # development signal into selection or final just as an application family would.
+        previous = families.setdefault(task["family"].casefold(), task["partition"])
+        if previous != task["partition"]:
+            raise ValueError("Semantic family leaked across partitions")
     for task in value["algotune"]:
         # The pinned blob, class and scale are load-bearing: the blob is the only check that the
         # upstream source is unmodified, and the scale is passed straight to generate_problem.
@@ -78,9 +83,6 @@ def catalog(path=CATALOG):
             raise ValueError("Name an exact upstream solver class")
         if type(task.get("scale")) is not int or not 1 <= task["scale"] <= 1024:
             raise ValueError("Bound the application task scale to 1..1024")
-        previous = families.setdefault(task["family"].casefold(), task["partition"])
-        if previous != task["partition"]:
-            raise ValueError("Semantic family leaked across partitions")
     for partition in PARTITIONS:
         for panel in (value["numeric"], value["algotune"]):
             if len({task["family"] for task in panel if task["partition"] == partition}) < 2:

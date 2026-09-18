@@ -87,6 +87,37 @@ public sealed class SuiteNumericTaskTests
         finally { Directory.Delete(directory, recursive: true); }
     }
 
+    [Theory]
+    [InlineData("knapsack")]
+    [InlineData("robust-design")]
+    public async Task AnInfeasibleEvaluationCannotImproveTheReportedBestFeasibleLoss(string id)
+    {
+        // Removing the ConstraintViolations gate in Progress.OnEventAsync is not detectable from the
+        // final loss alone, because an infeasible candidate usually is not the best one anyway. Assert
+        // it on the TRACE: the running best may only change on a sample whose violations are all <= 0,
+        // so any sample carrying a positive violation must leave the preceding value untouched.
+        var task = new SuiteNumericTask(id, 42);
+        RunRecord record = await QualityExperiment.RunAsync(QualityTask.Sphere, QualityMethod.RandomSearch, 72, 64, task);
+
+        Assert.Equal("completed", record.Status);
+        Assert.Contains(record.Samples, sample => sample.ConstraintViolations.Any(value => value > 0));
+
+        double? previous = null;
+        bool everFeasible = false;
+        foreach (SampleRecord sample in record.Samples)
+        {
+            bool infeasible = sample.ConstraintViolations.Any(value => value > 0);
+            if (infeasible)
+                Assert.Equal(previous, sample.BestLoss);
+            else if (sample.Quality.HasValue)
+                everFeasible = true;
+            previous = sample.BestLoss;
+        }
+
+        Assert.True(everFeasible, "the fixture must reach at least one feasible sample for this to mean anything");
+        Assert.NotNull(record.FinalLoss);
+    }
+
     [Fact]
     public void MalformedOrUnregisteredObjectivesAreRejected()
     {
