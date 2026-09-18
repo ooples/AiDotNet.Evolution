@@ -116,6 +116,15 @@ public sealed class HostWorkIdentityTests
         string Hash(params ParameterDefinition[] definitions) =>
             new ParameterGenomeCodec(new ParameterSpace(definitions)).VersionHash;
 
+        // The absolute value, computed independently of this code: SHA-256 over
+        // "x120.50" + "y-1111".
+        // The assertions below pin relationships between hashes, which a change to the encoding or
+        // to how the bytes are fed to the hash would satisfy just as well; this pins the contract
+        // itself, so persisted genomes cannot start being rejected without a deliberate edit here.
+        Assert.Equal(
+            "ordered-normalized-parameters-v2-canonical:67ed39341acb1c303b857ec430443b728451354903499402c72a61ff1e6ce4b6",
+            Hash(new ParameterDefinition("x", 1, 2, .5, false), new ParameterDefinition("y", -1, 1, 1, true)));
+
         // Field separators are load-bearing, not decoration. These two spaces are genuinely different
         // -- one runs to 2 in steps of 11, the other to 21 in steps of 1 -- but their field values
         // concatenate to the same characters ("x" "1" "2" "11" "0" against "x" "1" "21" "1" "0").

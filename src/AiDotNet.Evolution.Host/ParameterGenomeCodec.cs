@@ -20,17 +20,39 @@ internal sealed class ParameterGenomeCodec : IEvolutionGenomeCodec<ParameterGeno
         // so the same logical space could hash differently across runtimes and reject its own genomes.
         // Fixed field order, explicit separators that cannot occur in a parameter name, and round-trip
         // invariant number formatting remove all three degrees of freedom.
-        var canonical = new StringBuilder();
+        // STREAMED INTO THE HASH, NOT MATERIALIZED. Parameter count is bounded (Protocol.MaxDimensions)
+        // and the frame is bounded, but the names are only bounded in aggregate by the frame, so a
+        // near-limit space built the whole canonical text three times over -- a StringBuilder in UTF-16,
+        // its ToString, and the UTF-8 byte array -- before a single byte was hashed. Feeding the same
+        // bytes to an incremental hash keeps the encoding identical and the working set constant.
+        using var hash = IncrementalHash.CreateHash(HashAlgorithmName.SHA256);
         foreach (ParameterDefinition definition in space.Parameters)
         {
-            canonical.Append(definition.Name).Append('\u001f')
-                .Append(definition.Minimum.ToString("R", CultureInfo.InvariantCulture)).Append('\u001f')
-                .Append(definition.Maximum.ToString("R", CultureInfo.InvariantCulture)).Append('\u001f')
-                .Append(definition.Step.ToString("R", CultureInfo.InvariantCulture)).Append('\u001f')
-                .Append(definition.Integral ? '1' : '0').Append('\u001e');
+            Field(hash, definition.Name);
+            Field(hash, definition.Minimum.ToString("R", CultureInfo.InvariantCulture));
+            Field(hash, definition.Maximum.ToString("R", CultureInfo.InvariantCulture));
+            Field(hash, definition.Step.ToString("R", CultureInfo.InvariantCulture));
+            // The integral flag takes the record separator directly, not Field: the previous encoding
+            // put no unit separator between it and the end of the record, and adding one here would
+            // have changed every hash while every relational test still passed.
+            hash.AppendData(definition.Integral ? IntegralTrue : IntegralFalse);
+            hash.AppendData(RecordSeparator);
         }
-        byte[] schema = Encoding.UTF8.GetBytes(canonical.ToString());
-        VersionHash = "ordered-normalized-parameters-v2-canonical:" + Convert.ToHexString(SHA256.HashData(schema)).ToLowerInvariant();
+        VersionHash = "ordered-normalized-parameters-v2-canonical:" + Convert.ToHexString(hash.GetHashAndReset()).ToLowerInvariant();
+    }
+
+    // 0x1f between fields and 0x1e between parameters, the same unit and record separators the
+    // previous StringBuilder appended. Both are single UTF-8 bytes and neither can appear in a
+    // parameter name, so the encoding stays unambiguous without any escaping.
+    private static readonly byte[] UnitSeparator = { 0x1f };
+    private static readonly byte[] RecordSeparator = { 0x1e };
+    private static readonly byte[] IntegralTrue = { (byte)'1' };
+    private static readonly byte[] IntegralFalse = { (byte)'0' };
+
+    private static void Field(IncrementalHash hash, string value)
+    {
+        hash.AppendData(Encoding.UTF8.GetBytes(value));
+        hash.AppendData(UnitSeparator);
     }
 
     public string Id => "host-parameter-vector";
