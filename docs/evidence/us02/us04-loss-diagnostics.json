@@ -1,0 +1,314 @@
+{
+  "schema": "program-loss-diagnostics-v1",
+  "claim": "none",
+  "purpose": "retrospective-development",
+  "source_study_sha256": "9b38df2d6c98fd443673f5f178680e852ba75064fd8ee04274c15883faaa33bf",
+  "pairs": [
+    {
+      "block": "confirmation-1009",
+      "task": "sha256_hashing",
+      "mode": "controlled",
+      "identical_source": false,
+      "identical_ast": true,
+      "methods": {
+        "aidotnet": {
+          "model_calls": 2,
+          "evaluated_sources": 3,
+          "unique_evaluated_sources": 3,
+          "repeated_evaluations": 0,
+          "later_original_parent_prompts": 1,
+          "selected_hash": "432f629f09d0376ab0cbac7010f71a9f07ab60d0db3590b52c93f523b1cce72b"
+        },
+        "openevolve": {
+          "model_calls": 2,
+          "evaluated_sources": 3,
+          "unique_evaluated_sources": 2,
+          "repeated_evaluations": 1,
+          "later_original_parent_prompts": 1,
+          "selected_hash": "10eb1f1e2b7c087ae462ad5d0f076bbdadc668ade4355a158b4a9e3352b2fbbc"
+        }
+      }
+    },
+    {
+      "block": "confirmation-1009",
+      "task": "sha256_hashing",
+      "mode": "native-bounded",
+      "identical_source": false,
+      "identical_ast": false,
+      "methods": {
+        "aidotnet": {
+          "model_calls": 2,
+          "evaluated_sources": 2,
+          "unique_evaluated_sources": 2,
+          "repeated_evaluations": 0,
+          "later_original_parent_prompts": null,
+          "selected_hash": "e7ddc19d2f35ba07491d1e92926f75885254cdec88e9639a02a8714d0ad8a0ba"
+        },
+        "openevolve": {
+          "model_calls": 2,
+          "evaluated_sources": 3,
+          "unique_evaluated_sources": 2,
+          "repeated_evaluations": 1,
+          "later_original_parent_prompts": null,
+          "selected_hash": "10eb1f1e2b7c087ae462ad5d0f076bbdadc668ade4355a158b4a9e3352b2fbbc"
+        }
+      }
+    },
+    {
+      "block": "confirmation-1009",
+      "task": "count_connected_components",
+      "mode": "controlled",
+      "identical_source": false,
+      "identical_ast": false,
+      "methods": {
+        "aidotnet": {
+          "model_calls": 2,
+          "evaluated_sources": 3,
+          "unique_evaluated_sources": 3,
+          "repeated_evaluations": 0,
+          "later_original_parent_prompts": 1,
+          "selected_hash": "ee5d74345087ebdb5d390c825886d05496c177a54409455fbd2db5c9ef384372"
+        },
+        "openevolve": {
+          "model_calls": 2,
+          "evaluated_sources": 3,
+          "unique_evaluated_sources": 3,
+          "repeated_evaluations": 0,
+          "later_original_parent_prompts": 1,
+          "selected_hash": "2c40a302644f2caf668d41a22bf1a18f56bd7a4a4e76343c05674a7cac13bbc0"
+        }
+      }
+    },
+    {
+      "block": "confirmation-1009",
+      "task": "count_connected_components",
+      "mode": "native-bounded",
+      "identical_source": false,
+      "identical_ast": false,
+      "methods": {
+        "aidotnet": {
+          "model_calls": 2,
+          "evaluated_sources": 3,
+          "unique_evaluated_sources": 3,
+          "repeated_evaluations": 0,
+          "later_original_parent_prompts": null,
+          "selected_hash": "ceb842e1259f5c91df754e7d7cfb6a64682e142b03e5ab9ccba0118052219939"
+        },
+        "openevolve": {
+          "model_calls": 2,
+          "evaluated_sources": 3,
+          "unique_evaluated_sources": 3,
+          "repeated_evaluations": 0,
+          "later_original_parent_prompts": null,
+          "selected_hash": "7fe48b1763883a906cc71e6acedc1f955397c6c9ca6f115924c45a90f860ccaa"
+        }
+      }
+    },
+    {
+      "block": "confirmation-1009",
+      "task": "base64_encoding",
+      "mode": "controlled",
+      "identical_source": false,
+      "identical_ast": true,
+      "methods": {
+        "aidotnet": {
+          "model_calls": 2,
+          "evaluated_sources": 3,
+          "unique_evaluated_sources": 3,
+          "repeated_evaluations": 0,
+          "later_original_parent_prompts": 1,
+          "selected_hash": "8a15a727a326ffd51a12d4bc1209d91b4ff5283c939d779064f65049018a0fa1"
+        },
+        "openevolve": {
+          "model_calls": 2,
+          "evaluated_sources": 3,
+          "unique_evaluated_sources": 3,
+          "repeated_evaluations": 0,
+          "later_original_parent_prompts": 1,
+          "selected_hash": "402a33f4fa2a8a0a477c905a16d5d82f3a670740d5f410054349e07ef5ed9466"
+        }
+      }
+    },
+    {
+      "block": "confirmation-1009",
+      "task": "base64_encoding",
+      "mode": "native-bounded",
+      "identical_source": false,
+      "identical_ast": true,
+      "methods": {
+        "aidotnet": {
+          "model_calls": 2,
+          "evaluated_sources": 2,
+          "unique_evaluated_sources": 2,
+          "repeated_evaluations": 0,
+          "later_original_parent_prompts": null,
+          "selected_hash": "8a15a727a326ffd51a12d4bc1209d91b4ff5283c939d779064f65049018a0fa1"
+        },
+        "openevolve": {
+          "model_calls": 2,
+          "evaluated_sources": 3,
+          "unique_evaluated_sources": 2,
+          "repeated_evaluations": 1,
+          "later_original_parent_prompts": null,
+          "selected_hash": "402a33f4fa2a8a0a477c905a16d5d82f3a670740d5f410054349e07ef5ed9466"
+        }
+      }
+    },
+    {
+      "block": "confirmation-1013",
+      "task": "base64_encoding",
+      "mode": "controlled",
+      "identical_source": false,
+      "identical_ast": true,
+      "methods": {
+        "aidotnet": {
+          "model_calls": 2,
+          "evaluated_sources": 2,
+          "unique_evaluated_sources": 2,
+          "repeated_evaluations": 0,
+          "later_original_parent_prompts": 0,
+          "selected_hash": "8a15a727a326ffd51a12d4bc1209d91b4ff5283c939d779064f65049018a0fa1"
+        },
+        "openevolve": {
+          "model_calls": 2,
+          "evaluated_sources": 3,
+          "unique_evaluated_sources": 2,
+          "repeated_evaluations": 1,
+          "later_original_parent_prompts": 1,
+          "selected_hash": "402a33f4fa2a8a0a477c905a16d5d82f3a670740d5f410054349e07ef5ed9466"
+        }
+      }
+    },
+    {
+      "block": "confirmation-1013",
+      "task": "base64_encoding",
+      "mode": "native-bounded",
+      "identical_source": false,
+      "identical_ast": true,
+      "methods": {
+        "aidotnet": {
+          "model_calls": 2,
+          "evaluated_sources": 2,
+          "unique_evaluated_sources": 2,
+          "repeated_evaluations": 0,
+          "later_original_parent_prompts": null,
+          "selected_hash": "8a15a727a326ffd51a12d4bc1209d91b4ff5283c939d779064f65049018a0fa1"
+        },
+        "openevolve": {
+          "model_calls": 2,
+          "evaluated_sources": 3,
+          "unique_evaluated_sources": 2,
+          "repeated_evaluations": 1,
+          "later_original_parent_prompts": null,
+          "selected_hash": "402a33f4fa2a8a0a477c905a16d5d82f3a670740d5f410054349e07ef5ed9466"
+        }
+      }
+    },
+    {
+      "block": "confirmation-1013",
+      "task": "count_connected_components",
+      "mode": "controlled",
+      "identical_source": false,
+      "identical_ast": false,
+      "methods": {
+        "aidotnet": {
+          "model_calls": 2,
+          "evaluated_sources": 3,
+          "unique_evaluated_sources": 3,
+          "repeated_evaluations": 0,
+          "later_original_parent_prompts": 0,
+          "selected_hash": "f1063d50200ce21866182daad2c3c401b0c875532051faeaf5f4a5bc097d2a6f"
+        },
+        "openevolve": {
+          "model_calls": 2,
+          "evaluated_sources": 3,
+          "unique_evaluated_sources": 3,
+          "repeated_evaluations": 0,
+          "later_original_parent_prompts": 1,
+          "selected_hash": "a1cefe14c24e193032b18479961229e6cfe241bf20a5447fe0b7315a2791c8e4"
+        }
+      }
+    },
+    {
+      "block": "confirmation-1013",
+      "task": "count_connected_components",
+      "mode": "native-bounded",
+      "identical_source": false,
+      "identical_ast": false,
+      "methods": {
+        "aidotnet": {
+          "model_calls": 2,
+          "evaluated_sources": 3,
+          "unique_evaluated_sources": 3,
+          "repeated_evaluations": 0,
+          "later_original_parent_prompts": null,
+          "selected_hash": "83cd9b5c3fcfd0c3e51fcca361a517e4f312e4fe7d8d6c9b1d572e4b7bcb61d1"
+        },
+        "openevolve": {
+          "model_calls": 2,
+          "evaluated_sources": 3,
+          "unique_evaluated_sources": 3,
+          "repeated_evaluations": 0,
+          "later_original_parent_prompts": null,
+          "selected_hash": "9a4e57241dc9236e5d5ef47a55c58611e58d7a2ddae39c7a522022dd6401e664"
+        }
+      }
+    },
+    {
+      "block": "confirmation-1013",
+      "task": "sha256_hashing",
+      "mode": "controlled",
+      "identical_source": false,
+      "identical_ast": false,
+      "methods": {
+        "aidotnet": {
+          "model_calls": 2,
+          "evaluated_sources": 3,
+          "unique_evaluated_sources": 3,
+          "repeated_evaluations": 0,
+          "later_original_parent_prompts": 0,
+          "selected_hash": "b2500be1a6d30bb6b0cc914640c6f16875fd9e516485ad5bd2c55cffbe37601f"
+        },
+        "openevolve": {
+          "model_calls": 2,
+          "evaluated_sources": 3,
+          "unique_evaluated_sources": 3,
+          "repeated_evaluations": 0,
+          "later_original_parent_prompts": 1,
+          "selected_hash": "10eb1f1e2b7c087ae462ad5d0f076bbdadc668ade4355a158b4a9e3352b2fbbc"
+        }
+      }
+    },
+    {
+      "block": "confirmation-1013",
+      "task": "sha256_hashing",
+      "mode": "native-bounded",
+      "identical_source": false,
+      "identical_ast": true,
+      "methods": {
+        "aidotnet": {
+          "model_calls": 2,
+          "evaluated_sources": 3,
+          "unique_evaluated_sources": 3,
+          "repeated_evaluations": 0,
+          "later_original_parent_prompts": null,
+          "selected_hash": "432f629f09d0376ab0cbac7010f71a9f07ab60d0db3590b52c93f523b1cce72b"
+        },
+        "openevolve": {
+          "model_calls": 2,
+          "evaluated_sources": 3,
+          "unique_evaluated_sources": 2,
+          "repeated_evaluations": 1,
+          "later_original_parent_prompts": null,
+          "selected_hash": "10eb1f1e2b7c087ae462ad5d0f076bbdadc668ade4355a158b4a9e3352b2fbbc"
+        }
+      }
+    }
+  ],
+  "limitations": [
+    "All original outcomes, losses and confidence intervals remain unchanged.",
+    "AST equality is a structural diagnostic, not proof of behavioral or performance equivalence.",
+    "Two model calls cannot establish population-search effectiveness; duplicate evaluations may amplify timing selection noise.",
+    "These inspected tasks/results are development evidence for future changes, not fresh confirmation."
+  ]
+}

@@ -6,7 +6,7 @@ namespace MultiFidelitySearch;
 /// <summary>An authored, actually trained regression workload; not an AiDotNet AutoML or real-world dataset benchmark.</summary>
 internal sealed class IncrementalRegressionTask
 {
-    internal const string StateVersion = "regression-gd-state-v1";
+    internal const string StateVersion = "regression-gd-state-v2-strict-fields";
     internal const int Dimensions = 4;
     private const int TrainingRows = 128, ValidationRows = 64;
     private static readonly double[] Truth = { 0.2, -0.4, 0.6, 0.8 };
@@ -134,6 +134,14 @@ internal sealed class IncrementalRegressionTask
     private static double[] DecodeState(byte[] payload, string genome, string data, int replicate, int epochs, out int completed)
     {
         if (payload.Length > 4096) throw new InvalidOperationException("Training state exceeds its token bound.");
+        using var document = JsonDocument.Parse(payload);
+        string[] required = { "Version", "Genome", "Data", "Replicate", "Epochs", "Weights", "WeightsHash" };
+        if (document.RootElement.ValueKind != JsonValueKind.Object)
+            throw new InvalidOperationException("Training state must be an object.");
+        string[] names = document.RootElement.EnumerateObject().Select(property => property.Name).ToArray();
+        if (names.Length != required.Length || names.Distinct(StringComparer.Ordinal).Count() != required.Length ||
+            names.Any(name => !required.Contains(name, StringComparer.Ordinal)))
+            throw new InvalidOperationException("Training state fields are missing, duplicated or unknown.");
         var state = JsonSerializer.Deserialize<TrainingState>(payload) ?? throw new InvalidOperationException("Missing training state.");
         if (state.Version != StateVersion || state.Genome != genome || state.Data != data || state.Replicate != replicate || state.Epochs != epochs ||
             state.Epochs is < 1 or > 64 || state.Weights is null || state.Weights.Length != Dimensions + 1 ||
@@ -168,7 +176,20 @@ internal sealed class IncrementalRegressionTask
             catch (InvalidOperationException) { rejected = true; }
             if (!rejected) throw new InvalidOperationException("Training state corruption was accepted.");
         }
-        Console.WriteLine("Real regression training verified: gradient descent learns, split-token continuation is exact, five provenance/weight corruptions rejected.");
+        string canonical = System.Text.Encoding.UTF8.GetString(EncodeState("genome", "data", 0, 16, split));
+        foreach (string malformed in new[]
+        {
+            canonical.Replace("\"Replicate\":0,", ""),
+            canonical.Replace("\"Epochs\":16", "\"Epochs\":16,\"Epochs\":16"),
+            canonical.Replace("\"Replicate\":0", "\"Other\":0")
+        })
+        {
+            bool rejected = false;
+            try { DecodeState(System.Text.Encoding.UTF8.GetBytes(malformed), "genome", "data", 0, 16, out _); }
+            catch (InvalidOperationException) { rejected = true; }
+            if (!rejected) throw new InvalidOperationException("Ambiguous or incomplete training state was accepted.");
+        }
+        Console.WriteLine("Real regression training verified: exact continuation, five provenance/weight corruptions and three ambiguous/incomplete token cases rejected.");
     }
     private sealed class TrainingState
     {

@@ -89,7 +89,12 @@ class FidelityAnalysisTests(unittest.TestCase):
             self.assertEqual(packed, (output / "raw.json.gz").read_bytes())
 
     def test_committed_pilots_preserve_hash_chain_and_analysis(self):
-        root = Path(__file__).resolve().parents[1] / "evidence/fidelity/ac36140"
+        for revision in ("ac36140", "85960cd"):
+            with self.subTest(revision=revision):
+                self.assert_pilot_evidence(revision)
+
+    def assert_pilot_evidence(self, revision):
+        root = Path(__file__).resolve().parents[1] / "evidence/fidelity" / revision
         for name in ("trained", "curves"):
             with self.subTest(fixture=name):
                 packed = (root / name / "raw.json.gz").read_bytes(); raw = gzip.decompress(packed)
@@ -105,6 +110,8 @@ class FidelityAnalysisTests(unittest.TestCase):
         path = Path(__file__).resolve().parents[1] / "evidence/fidelity/ac36140/trained/raw.json.gz"
         original = json.loads(gzip.decompress(path.read_bytes()))
         for change in (lambda row: row["Measurements"][0].update(MeanSquaredError=100),
+                       lambda row: row["Measurements"][0].update(MeanSquaredError=-1),
+                       lambda row: row["Measurements"][0].update(MeanSquaredError=-2, Quality=-1),
                        lambda row: row["Measurements"][-1].update(DataIdentity=row["Measurements"][0]["DataIdentity"]),
                        lambda row: row["Measurements"][-1].update(ResumedFrom="search-token"),
                        lambda row: row["Measurements"][0].update(ActualEpochs=-1)):
@@ -112,9 +119,26 @@ class FidelityAnalysisTests(unittest.TestCase):
             self.assertEqual(1, result["FailedOrInvalidRuns"])
             self.assertEqual(0, result["Runs"][0]["PenalizedQuality"])
 
+    def test_balanced_negative_receipts_cannot_fabricate_cheap_work(self):
+        report = campaign()
+        receipts = report["Runs"][0]["Report"]["Resources"]["Receipts"]
+        original = receipts[1]["Charged"]["Amounts"]["cost_units"]
+        receipts[1]["Charged"]["Amounts"]["cost_units"] = -1
+        receipts[2]["Charged"]["Amounts"]["cost_units"] += original + 1
+        result = analyze(report)
+        self.assertEqual(1, result["FailedOrInvalidRuns"])
+        self.assertEqual(0, result["Runs"][0]["PenalizedQuality"])
+
     def test_committed_separate_process_recovery_has_no_duplicate_training(self):
-        path = Path(__file__).resolve().parents[1] / "evidence/fidelity/ac36140/recovery.zip"
-        self.assertEqual("d72bfdf4e2ef5312f4609493dec508417b3640102e44e3054e0ac56da6814512", hashlib.sha256(path.read_bytes()).hexdigest())
+        for revision, digest in (
+                ("ac36140", "d72bfdf4e2ef5312f4609493dec508417b3640102e44e3054e0ac56da6814512"),
+                ("85960cd", "e81a4a1bb8b9b99431e36c45a23876c5c162034e993034d03d06b44513cf630e")):
+            with self.subTest(revision=revision):
+                self.assert_recovery_evidence(revision, digest)
+
+    def assert_recovery_evidence(self, revision, digest):
+        path = Path(__file__).resolve().parents[1] / "evidence/fidelity" / revision / "recovery.zip"
+        self.assertEqual(digest, hashlib.sha256(path.read_bytes()).hexdigest())
         with zipfile.ZipFile(path) as archive:
             baseline, start, resume = [json.loads(archive.read(name + ".json")) for name in ("baseline", "start", "resume")]
         self.assertEqual(3, len({row["ProcessId"] for row in (baseline, start, resume)}))

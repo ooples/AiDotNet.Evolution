@@ -25,23 +25,67 @@ public static class EvolutionSearchPresets
     /// <summary>Creates a fresh preset using the exact supplied schema; unsupported CMA domains fail before search.</summary>
     /// <param name="space">Validated mixed or continuous search space.</param>
     /// <param name="preset">Explicit operator choice; the default does not enable learning.</param>
-    /// <param name="direction">Required scalar direction for CMA learning; other presets are direction-independent.</param>
-    /// <returns>A newly owned operator whose version includes its domain and behavioral settings.</returns>
+    /// <param name="direction">Scalar direction for CMA learning. Only <see cref="EvolutionSearchPreset.DiagonalCma"/>
+    /// uses one, so supplying a direction for any other preset is rejected instead of silently ignored.</param>
+    /// <returns>A newly owned operator whose version includes its domain and behavioral settings. The concrete type is
+    /// <see cref="SearchSpaceMutation"/>, <see cref="AdaptiveVariationPortfolio{TGenome}"/> for both mixed presets, or
+    /// <see cref="DiagonalCmaEmitter"/>; the typed factory methods return those types without a cast.</returns>
     public static IVariationOperator<EvolutionSearchGenome> Create(EvolutionSearchSpace space,
         EvolutionSearchPreset preset = EvolutionSearchPreset.Mutation,
-        EvolutionOptimizationDirection direction = EvolutionOptimizationDirection.Maximize)
+        EvolutionOptimizationDirection? direction = null)
     {
         Guard.NotNull(space);
         if (!Enum.IsDefined(typeof(EvolutionSearchPreset), preset)) throw new ArgumentOutOfRangeException(nameof(preset));
-        if (!Enum.IsDefined(typeof(EvolutionOptimizationDirection), direction)) throw new ArgumentOutOfRangeException(nameof(direction));
+        if (direction.HasValue && !Enum.IsDefined(typeof(EvolutionOptimizationDirection), direction.Value))
+            throw new ArgumentOutOfRangeException(nameof(direction));
+        if (direction.HasValue && preset != EvolutionSearchPreset.DiagonalCma)
+            throw new ArgumentException("Only the DiagonalCma preset uses a scalar direction.", nameof(direction));
         return preset switch
         {
-            EvolutionSearchPreset.Mutation => new SearchSpaceMutation(space),
-            EvolutionSearchPreset.DiagonalCma => new DiagonalCmaEmitter(space, direction: direction),
-            _ => new AdaptiveVariationPortfolio<EvolutionSearchGenome>(new IVariationOperator<EvolutionSearchGenome>[]
-            {
-                new SearchSpaceMutation(space), new SearchSpaceCrossover(space), new SearchSpaceRestart(space)
-            }, explorationProbability: preset == EvolutionSearchPreset.UniformMixed ? 1 : 0.1)
+            EvolutionSearchPreset.Mutation => CreateMutation(space),
+            EvolutionSearchPreset.UniformMixed => CreateUniformMixed(space),
+            EvolutionSearchPreset.DiagonalCma => CreateDiagonalCma(space, direction ?? EvolutionOptimizationDirection.Maximize),
+            _ => CreateAdaptiveMixed(space)
         };
+    }
+
+    /// <summary>Creates the conservative default: normalized Gaussian mutation with probability 0.2 and scale 0.1.</summary>
+    /// <param name="space">Validated mixed or continuous search space.</param>
+    /// <returns>A newly owned mutation operator.</returns>
+    public static SearchSpaceMutation CreateMutation(EvolutionSearchSpace space)
+    {
+        Guard.NotNull(space);
+        return new SearchSpaceMutation(space);
+    }
+
+    /// <summary>Creates the mutation/crossover/restart catalog with uniform allocation after one trial each.</summary>
+    /// <param name="space">Validated mixed or continuous search space.</param>
+    /// <returns>A newly owned portfolio; its statistics are readable without a cast.</returns>
+    public static AdaptiveVariationPortfolio<EvolutionSearchGenome> CreateUniformMixed(EvolutionSearchSpace space) => CreateMixed(space, 1);
+
+    /// <summary>Creates the same catalog with archive-success credit and 0.1 exploration.</summary>
+    /// <param name="space">Validated mixed or continuous search space.</param>
+    /// <returns>A newly owned portfolio; its statistics are readable without a cast.</returns>
+    public static AdaptiveVariationPortfolio<EvolutionSearchGenome> CreateAdaptiveMixed(EvolutionSearchSpace space) => CreateMixed(space, 0.1);
+
+    /// <summary>Creates the opt-in diagonal CMA emitter for supported unconditional, nonconstant continuous domains.</summary>
+    /// <param name="space">Validated continuous search space; unsupported domains fail before search.</param>
+    /// <param name="direction">Scalar direction the emitter learns from; mismatching evaluations cannot train it.</param>
+    /// <returns>A newly owned emitter.</returns>
+    public static DiagonalCmaEmitter CreateDiagonalCma(EvolutionSearchSpace space,
+        EvolutionOptimizationDirection direction = EvolutionOptimizationDirection.Maximize)
+    {
+        Guard.NotNull(space);
+        if (!Enum.IsDefined(typeof(EvolutionOptimizationDirection), direction)) throw new ArgumentOutOfRangeException(nameof(direction));
+        return new DiagonalCmaEmitter(space, direction: direction);
+    }
+
+    private static AdaptiveVariationPortfolio<EvolutionSearchGenome> CreateMixed(EvolutionSearchSpace space, double explorationProbability)
+    {
+        Guard.NotNull(space);
+        return new AdaptiveVariationPortfolio<EvolutionSearchGenome>(new IVariationOperator<EvolutionSearchGenome>[]
+        {
+            new SearchSpaceMutation(space), new SearchSpaceCrossover(space), new SearchSpaceRestart(space)
+        }, explorationProbability: explorationProbability);
     }
 }

@@ -43,7 +43,7 @@ def analyze(campaign):
         expected_confirmed = 8 if trained and row["Method"] == "FullCohort" else 2
         initial_ids = report.get("InitialCandidateIds")
         completed = (row.get("Status") == "completed" and report.get("IsComplete") is True and report.get("StopReason") == "Completed"
-                     and finite(quality) and quality <= 1 and finite(spent) and spent <= campaign["CostCap"]
+                     and finite(quality) and 0 <= quality <= 1 and finite(spent) and 0 <= spent <= campaign["CostCap"]
                      and resources.get("Unknown") == 0 and resources.get("MaximumViolated") is False and resources.get("DroppedReceipts") == 0
                      and resources.get("Reserved") == {"cost_units": 0} and integer(resources.get("Admitted"), 1, 4096)
                      and resources.get("Settled") == resources["Admitted"] and structural and integer(row.get("EvaluatorCalls"), 1, 1024)
@@ -54,7 +54,9 @@ def analyze(campaign):
             try:
                 completed = (len({sample["Context"]["SampleIdentity"] for sample in samples}) == len(samples)
                              and all(isinstance(sample["Context"]["SampleIdentity"], str) and sample["Status"] == "Completed" and sample["UnknownCost"] is False
-                                     and finite(sample["Quality"]) and sample["Quality"] <= 1 and finite(sample["ChargedCostUnits"]) for sample in samples)
+                                     and finite(sample["Quality"]) and 0 <= sample["Quality"] <= 1
+                                     and finite(sample["ChargedCostUnits"]) and sample["ChargedCostUnits"] >= 0 for sample in samples)
+                             and all(finite(receipt["Charged"]["Amounts"]["cost_units"]) and receipt["Charged"]["Amounts"]["cost_units"] >= 0 for receipt in receipts)
                              and all(batch["Candidate"]["Id"] in initial_ids and len(batch["Measurements"]["Samples"]) == 2
                                      and abs(statistics.fmean(sample["Quality"] for sample in batch["Measurements"]["Samples"]) - batch["Measurements"]["MeanQuality"]) < 1e-12 for batch in batches)
                              and abs(sum(sample["ChargedCostUnits"] for sample in samples) - report["ChargedCostUnits"]) < 1e-8
@@ -71,7 +73,7 @@ def analyze(campaign):
                                  and sum(value["ActualEpochs"] for value in observations) == row["ExecutedEpochs"]
                                  and row["TrainingRowVisits"] == row["ExecutedEpochs"] * 128 and row["ValidationRowVisits"] == row["EvaluatorCalls"] * 64
                                  and abs(report["ChargedCostUnits"] - row["ExecutedEpochs"] - 0.25 * row["EvaluatorCalls"]) < 1e-8
-                                 and all(integer(value["ActualEpochs"], 1, 64) and finite(value["MeanSquaredError"])
+                                 and all(integer(value["ActualEpochs"], 1, 64) and finite(value["MeanSquaredError"]) and value["MeanSquaredError"] >= 0
                                          and abs(value["Quality"] - 1 / (1 + value["MeanSquaredError"])) < 1e-12
                                          and value["Quality"] == by_sample[value["SampleIdentity"]]["Quality"]
                                          and by_sample[value["SampleIdentity"]]["ChargedCostUnits"] == value["ActualEpochs"] + 0.25
