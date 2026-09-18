@@ -276,15 +276,22 @@ public sealed class EvolutionResourceLedger
                 Operation operation = pair.Value;
                 StageTotals totals = StageFor(operation.Stage);
                 totals.Admitted++;
+                // REPLAY BOTH SIDES OF THE RESERVATION, not just the outstanding remainder. The live
+                // path adds the maximum on admission and subtracts it on settlement, and a decimal
+                // keeps the scale of that arithmetic: 0.08 - 0.08 is 0.00, not 0. Reconstructing a
+                // fully settled stage from a bare 0m produced a numerically equal but textually
+                // different total, so a resumed run's report stopped matching an uninterrupted one
+                // byte for byte and the separate-process recovery check failed on the difference.
+                foreach (string key in Limits.Amounts.Keys) totals.Reserved[key] += operation.Maximum[key];
                 if (operation.Receipt is { } receipt)
                 {
                     totals.Settled++;
                     if (receipt.Outcome == EvolutionResourceOutcome.Unknown) totals.Unknown++;
-                    foreach (string key in Limits.Amounts.Keys) totals.Spent[key] += receipt.Charged[key];
-                }
-                else
-                {
-                    foreach (string key in Limits.Amounts.Keys) totals.Reserved[key] += operation.Maximum[key];
+                    foreach (string key in Limits.Amounts.Keys)
+                    {
+                        totals.Reserved[key] -= operation.Maximum[key];
+                        totals.Spent[key] += receipt.Charged[key];
+                    }
                 }
             }
             foreach (string key in Limits.Amounts.Keys) { _spent[key] = restored._spent[key]; _reserved[key] = restored._reserved[key]; }
