@@ -11,6 +11,7 @@ import json
 import os
 from pathlib import Path
 import platform
+import random
 import subprocess
 import sys
 import time
@@ -38,12 +39,20 @@ def run_child(command, environment, directory, timeout):
 
 
 def run_campaign(output, aidotnet_dll, upstream, initial, task, model, generate, evaluate, *,
-                 iterations=2, seed=37, model_tokens=100000, evidence_class, evaluator_manifest):
+                 iterations=2, seed=37, model_tokens=100000, evolution_profile="uniform", openevolve_profile="default",
+                 tracks=None, evidence_class, evaluator_manifest, accounting=None, accounting_owner="shared"):
     if (type(iterations) is not int or not 1 <= iterations <= 64 or type(seed) is not int or not 0 <= seed < 2**32
+            or evolution_profile not in ("uniform", "best")
+            or openevolve_profile not in ("default", "best")
             or evidence_class not in ("contract-only", "development-experiment")):
         raise ValueError("Invalid bounded program campaign")
     if not isinstance(evaluator_manifest, dict) or not evaluator_manifest.get("identity"):
         raise ValueError("Declare the evaluator identity and isolation contract")
+    allowed = [("controlled", "aidotnet"), ("controlled", "openevolve"), ("controlled", "one-shot"),
+               ("controlled", "single-parent"), ("native-bounded", "aidotnet"), ("native-bounded", "openevolve")]
+    schedule = allowed if tracks is None else [tuple(t) for t in tracks]
+    if not schedule or len(schedule) != len(set(schedule)) or any(t not in allowed for t in schedule):
+        raise ValueError("Invalid declared controller panel")
     initial_hash = candidate_hash(initial)
     dll = Path(aidotnet_dll).resolve(strict=True)
     root = Path(output)
@@ -53,6 +62,7 @@ def run_campaign(output, aidotnet_dll, upstream, initial, task, model, generate,
     description.write_text(task, encoding="utf-8", newline="")
     report = dict(schema="aidotnet-program-comparison-v1", evidence_class=evidence_class, status="running",
                   requested_model=model, initial_program_hash=initial_hash, seed=seed, iterations=iterations,
+                  evolution_profile=evolution_profile, openevolve_profile=openevolve_profile,
                   language="python", evaluator=evaluator_manifest, tuning={"trials": 0, "work": 0},
                   hardware={"os": platform.platform(), "machine": platform.machine(), "processors": os.cpu_count()},
                   consumer_binary_sha256=hashlib.sha256(dll.read_bytes()).hexdigest(), runs=[],
@@ -62,19 +72,32 @@ def run_campaign(output, aidotnet_dll, upstream, initial, task, model, generate,
                                "No registered holdout or competitive superiority claim follows from this controller"])
     schedule = [("controlled", "aidotnet"), ("controlled", "openevolve"), ("controlled", "one-shot"),
                 ("controlled", "single-parent"), ("native-bounded", "aidotnet"), ("native-bounded", "openevolve")]
+    if evidence_class == "development-experiment":
+        random.Random(seed).shuffle(schedule)
+    report["schedule"] = schedule
     for index, (mode, method) in enumerate(schedule):
+        track_started = time.monotonic()
         directory = root / f"{index}-{mode}-{method}"
         directory.mkdir()
         row = dict(mode=mode, method=method, status="failed", model_call_cap=iterations, evaluation_cap=iterations + 1,
                    model_token_cap=model_tokens)
-        with ProgramBroker(generate, evaluate, model_calls=iterations, evaluations=iterations + 1,
+        owner = f"{accounting_owner}/{mode}/{method}"
+        if accounting is not None:
+            from warm_budget import model_observations
+            metered_generate = lambda system, messages: accounting.run("model", lambda: generate(system, messages),
+                resource="model_calls", owner=owner, measure=model_observations)
+            metered_evaluate = lambda code: evaluate(code, owner=owner)
+        else:
+            metered_generate, metered_evaluate = generate, evaluate
+        with ProgramBroker(metered_generate, metered_evaluate, model_calls=iterations, evaluations=iterations + 1,
                            seconds=300, initial=initial, model_tokens=model_tokens) as broker:
             try:
                 if method in ("one-shot", "single-parent"):
-                    row["control"] = run_control(method, task, initial,
+                    control = lambda: run_control(method, task, initial,
                         lambda system, messages: request(broker.endpoint, broker.capability, "model", {"system": system, "messages": messages}),
                         lambda code: request(broker.endpoint, broker.capability, "evaluate", {"code": code}),
                         model_calls=iterations, evaluations=iterations + 1, seconds=300)
+                    row["control"] = accounting.run("controller", control, owner=owner) if accounting else control()
                     if row["control"]["status"] not in ("completed", "evaluation-cap"):
                         raise ValueError("Population ablation did not complete")
                 else:
@@ -85,13 +108,15 @@ def run_campaign(output, aidotnet_dll, upstream, initial, task, model, generate,
                         environment.pop(name, None)
                     if method == "aidotnet":
                         command = ["dotnet", str(dll), str(source.resolve()), str((directory / "adapter-result.json").resolve()),
-                                   model, str(iterations), str(seed), str(description.resolve()), mode]
+                                   model, str(iterations), str(seed), str(description.resolve()), mode, evolution_profile]
                     else:
-                        command = [sys.executable, str(Path(__file__).with_name("openevolve_adapter.py")),
+                        command = [sys.executable, "-X", "utf8", str(Path(__file__).with_name("openevolve_adapter.py")),
                                    "--upstream", str(Path(upstream).resolve()), "--initial", str(source.resolve()),
                                    "--output", str((directory / "upstream").resolve()), "--model", model,
-                                   "--iterations", str(iterations), "--seed", str(seed), "--task", str(description.resolve()), "--mode", mode]
-                    row["exit_code"] = run_child(command, environment, directory, 315)
+                                   "--iterations", str(iterations), "--seed", str(seed), "--task", str(description.resolve()), "--mode", mode,
+                                   "--selection-profile", openevolve_profile]
+                    child = lambda: run_child(command, environment, directory, 315)
+                    row["exit_code"] = accounting.run("controller", child, owner=owner) if accounting else child()
                     if row["exit_code"]:
                         raise ValueError("Optimizer exited unsuccessfully")
                 if broker.closed or any(receipt["status"] != "completed" for receipt in broker.rows):
@@ -105,6 +130,19 @@ def run_campaign(output, aidotnet_dll, upstream, initial, task, model, generate,
                     expected_system, expected_messages = controlled_prompt(task, initial, None)
                     if models[0]["request"] != {"system": expected_system, "messages": expected_messages}:
                         raise ValueError("Controlled first prompts differ despite identical initial information")
+                if method in ("one-shot", "single-parent"):
+                    selected = row["control"]["best"]["code"]
+                elif method == "aidotnet":
+                    selected = json.loads((directory / "adapter-result.json").read_text())["best"]
+                else:
+                    selected = json.loads((directory / "upstream/adapter-result.json").read_text())["best"]["code"]
+                if not isinstance(selected, str) or not any(
+                        receipt["operation"] == "evaluate" and receipt["status"] == "completed" and
+                        receipt["result"]["status"] == "valid" and receipt["request"]["code"] == selected
+                        for receipt in broker.rows):
+                    raise ValueError("The selected program has no matching valid search receipt")
+                row["selected_code"] = selected
+                row["selected_hash"] = candidate_hash(selected)
                 row["status"] = "completed"
             except Exception as error:
                 if isinstance(error, MemoryError):
@@ -114,6 +152,12 @@ def run_campaign(output, aidotnet_dll, upstream, initial, task, model, generate,
         # must not be retained beside a stale, pre-shutdown token count.
         row["receipts"] = broker.rows
         row["actual_model_tokens"] = broker.model_tokens
+        row["search_wall_seconds"] = time.monotonic() - track_started
+        row["independent_counters"] = {"attempted": dict(broker.attempted), "unknown": dict(broker.unknown_attempts),
+                                       "model_tokens": broker.model_tokens, "evaluation_seconds": broker.evaluation_seconds}
+        if row["status"] != "completed":
+            row["selected_code"], row["selected_hash"] = initial, initial_hash
+            row["fallback"] = "original-after-failed-search"
         report["runs"].append(row)
         (directory / "receipts.json").write_text(json.dumps(row, indent=2, allow_nan=False), encoding="utf-8")
     report["status"] = "completed" if all(row["status"] == "completed" for row in report["runs"]) else "failed"

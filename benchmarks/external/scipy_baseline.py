@@ -130,10 +130,11 @@ def run_one(dll, task, seed, budget, expected_hash, optimizer=None, source_revis
             if len(losses) < 8:
                 require(response.get("GenomeHash") == manifest["InitialGenomeHashes"][len(losses)], "Initialization round-trip changed.")
             losses.append(loss)
+            # numeric-objective-service-v1 is frozen at these six members. Widening this expectation to
+            # match a leaked in-process record is what let the wire-shape guard be dropped; the suite
+            # protocol carries quality, violations, descriptors and genome id instead (suite_baseline.py).
             samples.append(dict(EvaluationId=len(losses) - 1, Status="Completed", BestLoss=min(losses), Attempts=1,
-                                CostUnits=1, DiagnosticCodes=[], Quality=-loss, ConstraintViolations=[],
-                                Descriptors={"coordinate-0": -5 + 10 * float(units[0]),
-                                             "coordinate-1": -5 + 10 * float(units[1])}, GenomeId=response["GenomeHash"]))
+                                CostUnits=1, DiagnosticCodes=[]))
             return loss
 
         result = optimizer(objective, [(0, 1)] * 8, init=initial, maxiter=budget // 8 - 1,

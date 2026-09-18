@@ -49,11 +49,25 @@ class ProtocolTests(unittest.TestCase):
         self.assertTrue({"deceptive", "multimodal", "constrained", "noisy", "expensive"} <= features)
 
     def test_rejects_relabeling_one_family_as_an_independent_partition(self):
+        # Reuse the family UNCHANGED rather than uppercased. An uppercased name now fails the
+        # family-syntax check first, so the assertion passed without ever reaching the
+        # cross-partition leak check -- and therefore could not notice when that check stopped
+        # covering the numeric panel.
         value = catalog()
-        value["numeric"][3]["family"] = value["numeric"][0]["family"].upper()
+        self.assertNotEqual(value["numeric"][0]["partition"], value["numeric"][3]["partition"])
+        value["numeric"][3]["family"] = value["numeric"][0]["family"]
         path = self.root / "invalid-catalog.json"
         write_new(path, value)
-        with self.assertRaises(ValueError):
+        with self.assertRaisesRegex(ValueError, "leaked across partitions"):
+            catalog(path)
+
+    def test_rejects_an_application_family_that_spans_partitions(self):
+        value = catalog()
+        self.assertNotEqual(value["algotune"][0]["partition"], value["algotune"][-1]["partition"])
+        value["algotune"][-1]["family"] = value["algotune"][0]["family"]
+        path = self.root / "invalid-algotune-catalog.json"
+        write_new(path, value)
+        with self.assertRaisesRegex(ValueError, "leaked across partitions"):
             catalog(path)
 
     def test_private_final_root_is_not_in_public_plan(self):

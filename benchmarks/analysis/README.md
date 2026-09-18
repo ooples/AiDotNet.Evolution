@@ -135,3 +135,12 @@ A seed count of 30 is not a power guarantee; task-population uncertainty also ca
 repetitions or seeds to the same handful of tasks. The new fixed-development runner
 does not supply representative sealed task custody, program correctness/isolation,
 sequential testing, or held-out promotion gates. Those dependencies remain separate.
+# Real program pilot reports
+
+`program_report.py --pilot <directory> --audit <directory> --output <new-directory>`
+reads the US-02 pilot and post-selection audit directly and emits JSON/Markdown/offline
+HTML. It preserves scheduled failures, validates timing/identity bindings, and reports
+actual known costs with unknown counts. This single-search-seed schema cannot supply
+paired-search variance, confidence intervals or a powered sample-size estimate; those
+remain explicitly null. It is not silently converted into a numeric-v3/v4 campaign.
+See [scope and adversarial acceptance](../../docs/evidence/us04/PROGRAM_REPORTING.md).

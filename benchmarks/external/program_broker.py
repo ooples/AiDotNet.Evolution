@@ -61,6 +61,10 @@ class ProgramBroker:
         self.closed = False
         self.model_tokens = 0
         self.model_token_cap = model_tokens
+        self.attempted = {"model": 0, "evaluate": 0}
+        self.unknown_attempts = {"model": 0, "evaluate": 0}
+        self.evaluation_seconds = 0.0
+        self.has_valid_evaluation = False
         self.capability = secrets.token_hex(32)
         broker = self
 
@@ -110,21 +114,23 @@ class ProgramBroker:
 
     def dispatch(self, operation, payload):
         if (operation not in self.limits or self.closed or time.monotonic() - self.started >= self.seconds
-                or sum(row["operation"] == operation for row in self.rows) >= self.limits[operation]):
+                or self.attempted[operation] >= self.limits[operation]):
             raise ValueError("Independent broker admission closed")
         if not isinstance(payload, dict):
             raise ValueError("Expected object payload")
         if operation == "evaluate":
             identity = candidate_hash(payload["code"])
-            if not any(row["operation"] == "evaluate" for row in self.rows) and identity != self.initial_hash:
+            if self.attempted["evaluate"] == 0 and identity != self.initial_hash:
                 raise ValueError("Optimizer changed the initial program")
-        elif (not any(row["operation"] == "evaluate" and row["status"] == "completed"
-                      and row["result"]["status"] == "valid" for row in self.rows)
-              or sum(row["operation"] == "evaluate" for row in self.rows) >= self.limits["evaluate"]
+        elif (not self.has_valid_evaluation
+              or self.attempted["evaluate"] >= self.limits["evaluate"]
               or self.model_tokens >= self.model_token_cap):
             raise ValueError("A valid shared start and remaining evaluation capacity are required")
-        row = {"operation": operation, "request": payload, "status": "dispatched", "result": None}
+        self.attempted[operation] += 1
+        row = {"operation": operation, "request": payload, "status": "dispatched", "result": None,
+               "sequence": sum(self.attempted.values()), "started_elapsed_seconds": time.monotonic() - self.started}
         self.rows.append(row)
+        known_work = False
         try:
             if operation == "model":
                 measured = self.generate(payload["system"], payload["messages"])
@@ -134,6 +140,7 @@ class ProgramBroker:
                         or measured.get("cost_metric") != "reported_input_plus_output_tokens"):
                     raise ValueError("Missing bounded model response or independently reported token cost")
                 self.model_tokens += measured["cost_units"]
+                known_work = True
                 row["model_usage"] = {"cost_units": measured["cost_units"], "cost_metric": measured["cost_metric"]}
                 result = measured["text"]
                 if self.model_tokens > self.model_token_cap:
@@ -141,6 +148,10 @@ class ProgramBroker:
                     raise ValueError("Actual token cost exceeded the declared cap; result is not admissible")
             else:
                 result = self.evaluate(payload["code"])
+                if (isinstance(result, dict) and result.get("unknown_work") is False and
+                        type(result.get("work_units")) in (int, float) and math.isfinite(result["work_units"]) and result["work_units"] >= 0):
+                    self.evaluation_seconds += result["work_units"]
+                    known_work = True
                 if (result.get("candidate_hash") != identity or result.get("unknown_work") is not False
                         or result.get("status") not in ("valid", "invalid")
                         or type(result.get("work_units")) not in (int, float)
@@ -149,6 +160,8 @@ class ProgramBroker:
                 if result["status"] == "valid" and (type(result.get("quality")) not in (int, float)
                         or not math.isfinite(result["quality"]) or result["quality"] <= -1e299):
                     raise ValueError("Valid score must be finite")
+                if result["status"] == "valid":
+                    self.has_valid_evaluation = True
             row.update(status="completed", result=result)
             return result
         except Exception:
@@ -156,3 +169,8 @@ class ProgramBroker:
             if row["status"] == "dispatched":
                 row["status"] = "unknown"
             raise
+        finally:
+            if not known_work:
+                self.unknown_attempts[operation] += 1
+            row.update(finished_elapsed_seconds=time.monotonic() - self.started,
+                       model_tokens_after=self.model_tokens, evaluation_seconds_after=self.evaluation_seconds)
