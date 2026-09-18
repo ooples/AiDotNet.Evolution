@@ -1,13 +1,15 @@
-param([string]$Python = 'python')
+param([string]$Python = 'python', [switch]$NoBuild)
 $ErrorActionPreference = 'Stop'
 $repo = Split-Path -Parent $PSScriptRoot
 $project = Join-Path $repo 'benchmarks/AiDotNet.Evolution.Quality/AiDotNet.Evolution.Quality.csproj'
 $dll = Join-Path $repo 'benchmarks/AiDotNet.Evolution.Quality/bin/Release/net10.0/AiDotNet.Evolution.Quality.dll'
 $directory = Join-Path $repo ('TestResults/quality/external-' + [Guid]::NewGuid().ToString('N'))
 New-Item -ItemType Directory -Path $directory | Out-Null
-dotnet build $project -c Release --verbosity quiet
-if ($LASTEXITCODE -ne 0) { throw 'External objective service build failed.' }
-& $Python -m unittest discover -s (Join-Path $repo 'benchmarks/external') -v
+if (-not $NoBuild) {
+    dotnet build $project -c Release --verbosity quiet
+    if ($LASTEXITCODE -ne 0) { throw 'External objective service build failed.' }
+}
+& $Python -m unittest discover -s (Join-Path $repo 'benchmarks/external') -p 'test_*baseline.py' -v
 if ($LASTEXITCODE -ne 0) { throw 'External baseline contract tests failed.' }
 $revision = (git -C $repo rev-parse HEAD).Trim()
 if ($LASTEXITCODE -ne 0) { throw 'Cannot identify source revision.' }

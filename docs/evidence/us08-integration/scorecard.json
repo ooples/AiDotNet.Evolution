@@ -1,0 +1,1272 @@
+{
+  "PlanHash": "00c4b75694d9d1632e25a448bc9120de2472ca9c47cd3b2799591e9af829e26e",
+  "Summary": [
+    {
+      "Partition": "development",
+      "Family": "numeric",
+      "Method": "mutation",
+      "Quality": 0.6346443753737268,
+      "Cost": 64,
+      "Diversity": 0.27783203125,
+      "CpuSeconds": 0.0107421875,
+      "WallSeconds": 0.0066660750000000005,
+      "ProposalCalls": 28,
+      "ObjectiveCalls": 36,
+      "Failures": 0
+    },
+    {
+      "Partition": "development",
+      "Family": "numeric",
+      "Method": "crossover",
+      "Quality": 0.6473785333251408,
+      "Cost": 64,
+      "Diversity": 0.33984375,
+      "CpuSeconds": 0.00927734375,
+      "WallSeconds": 0.00675421875,
+      "ProposalCalls": 28,
+      "ObjectiveCalls": 36,
+      "Failures": 0
+    },
+    {
+      "Partition": "development",
+      "Family": "numeric",
+      "Method": "restart",
+      "Quality": 0.6468207839692481,
+      "Cost": 64,
+      "Diversity": 0.431640625,
+      "CpuSeconds": 0.0087890625,
+      "WallSeconds": 0.006903765625,
+      "ProposalCalls": 28,
+      "ObjectiveCalls": 36,
+      "Failures": 0
+    },
+    {
+      "Partition": "development",
+      "Family": "numeric",
+      "Method": "refinement",
+      "Quality": 0.5786444084990731,
+      "Cost": 64,
+      "Diversity": 0.14404296875,
+      "CpuSeconds": 0.0048828125,
+      "WallSeconds": 0.00493185,
+      "ProposalCalls": 14,
+      "ObjectiveCalls": 50,
+      "Failures": 0
+    },
+    {
+      "Partition": "development",
+      "Family": "numeric",
+      "Method": "adaptive-parent",
+      "Quality": 0.6464139956551707,
+      "Cost": 63.875,
+      "Diversity": 0.3408203125,
+      "CpuSeconds": 0.01318359375,
+      "WallSeconds": 0.011008559375,
+      "ProposalCalls": 25.375,
+      "ObjectiveCalls": 38.5,
+      "Failures": 0
+    },
+    {
+      "Partition": "development",
+      "Family": "numeric",
+      "Method": "adaptive-archive",
+      "Quality": 0.6362763991727047,
+      "Cost": 63.875,
+      "Diversity": 0.35205078125,
+      "CpuSeconds": 0.00927734375,
+      "WallSeconds": 0.00767699375,
+      "ProposalCalls": 25.875,
+      "ObjectiveCalls": 38,
+      "Failures": 0
+    },
+    {
+      "Partition": "development",
+      "Family": "numeric",
+      "Method": "uniform-portfolio",
+      "Quality": 0.6189858061700808,
+      "Cost": 63.6875,
+      "Diversity": 0.29248046875,
+      "CpuSeconds": 0.0068359375,
+      "WallSeconds": 0.0066020968749999995,
+      "ProposalCalls": 22.5625,
+      "ObjectiveCalls": 41.125,
+      "Failures": 0
+    },
+    {
+      "Partition": "development",
+      "Family": "program",
+      "Method": "mutation",
+      "Quality": 0.8376290357025642,
+      "Cost": 64,
+      "Diversity": 0.27294921875,
+      "CpuSeconds": 0.01171875,
+      "WallSeconds": 0.01041755,
+      "ProposalCalls": 28,
+      "ObjectiveCalls": 36,
+      "Failures": 0
+    },
+    {
+      "Partition": "development",
+      "Family": "program",
+      "Method": "crossover",
+      "Quality": 0.9019544764256068,
+      "Cost": 64,
+      "Diversity": 0.3408203125,
+      "CpuSeconds": 0.0166015625,
+      "WallSeconds": 0.010256984375,
+      "ProposalCalls": 28,
+      "ObjectiveCalls": 36,
+      "Failures": 0
+    },
+    {
+      "Partition": "development",
+      "Family": "program",
+      "Method": "restart",
+      "Quality": 0.8793654930173351,
+      "Cost": 64,
+      "Diversity": 0.431640625,
+      "CpuSeconds": 0.01611328125,
+      "WallSeconds": 0.010563275,
+      "ProposalCalls": 28,
+      "ObjectiveCalls": 36,
+      "Failures": 0
+    },
+    {
+      "Partition": "development",
+      "Family": "program",
+      "Method": "refinement",
+      "Quality": 0.7691982586804683,
+      "Cost": 64,
+      "Diversity": 0.14892578125,
+      "CpuSeconds": 0.0146484375,
+      "WallSeconds": 0.010831525,
+      "ProposalCalls": 14,
+      "ObjectiveCalls": 50,
+      "Failures": 0
+    },
+    {
+      "Partition": "development",
+      "Family": "program",
+      "Method": "adaptive-parent",
+      "Quality": 0.8552446443572944,
+      "Cost": 63.8125,
+      "Diversity": 0.3466796875,
+      "CpuSeconds": 0.015625,
+      "WallSeconds": 0.011485800000000001,
+      "ProposalCalls": 25.4375,
+      "ObjectiveCalls": 38.375,
+      "Failures": 0
+    },
+    {
+      "Partition": "development",
+      "Family": "program",
+      "Method": "adaptive-archive",
+      "Quality": 0.8914359744027673,
+      "Cost": 63.9375,
+      "Diversity": 0.34912109375,
+      "CpuSeconds": 0.0146484375,
+      "WallSeconds": 0.010387846875,
+      "ProposalCalls": 26.125,
+      "ObjectiveCalls": 37.8125,
+      "Failures": 0
+    },
+    {
+      "Partition": "development",
+      "Family": "program",
+      "Method": "uniform-portfolio",
+      "Quality": 0.8498324632739038,
+      "Cost": 63.6875,
+      "Diversity": 0.29638671875,
+      "CpuSeconds": 0.01806640625,
+      "WallSeconds": 0.010551121875,
+      "ProposalCalls": 22.5625,
+      "ObjectiveCalls": 41.125,
+      "Failures": 0
+    },
+    {
+      "Partition": "development",
+      "Family": "kernel",
+      "Method": "mutation",
+      "Quality": 0.9355917915914848,
+      "Cost": 64,
+      "Diversity": 0.28662109375,
+      "CpuSeconds": 0.0185546875,
+      "WallSeconds": 0.016725275,
+      "ProposalCalls": 36.96875,
+      "ObjectiveCalls": 27.03125,
+      "Failures": 0
+    },
+    {
+      "Partition": "development",
+      "Family": "kernel",
+      "Method": "crossover",
+      "Quality": 0.9364760870757567,
+      "Cost": 64,
+      "Diversity": 0.3466796875,
+      "CpuSeconds": 0.021484375,
+      "WallSeconds": 0.0199747625,
+      "ProposalCalls": 30.0625,
+      "ObjectiveCalls": 33.9375,
+      "Failures": 0
+    },
+    {
+      "Partition": "development",
+      "Family": "kernel",
+      "Method": "restart",
+      "Quality": 0.9321223060915155,
+      "Cost": 64,
+      "Diversity": 0.42626953125,
+      "CpuSeconds": 0.02490234375,
+      "WallSeconds": 0.02029631875,
+      "ProposalCalls": 28.5625,
+      "ObjectiveCalls": 35.4375,
+      "Failures": 0
+    },
+    {
+      "Partition": "development",
+      "Family": "kernel",
+      "Method": "refinement",
+      "Quality": 0.9285517513945416,
+      "Cost": 62.0625,
+      "Diversity": 0.1171875,
+      "CpuSeconds": 0.02392578125,
+      "WallSeconds": 0.022315709375,
+      "ProposalCalls": 18.03125,
+      "ObjectiveCalls": 44.03125,
+      "Failures": 0
+    },
+    {
+      "Partition": "development",
+      "Family": "kernel",
+      "Method": "adaptive-parent",
+      "Quality": 0.9312543530821046,
+      "Cost": 63.96875,
+      "Diversity": 0.3515625,
+      "CpuSeconds": 0.02392578125,
+      "WallSeconds": 0.0201231875,
+      "ProposalCalls": 28.96875,
+      "ObjectiveCalls": 35,
+      "Failures": 0
+    },
+    {
+      "Partition": "development",
+      "Family": "kernel",
+      "Method": "adaptive-archive",
+      "Quality": 0.9332484082077896,
+      "Cost": 64,
+      "Diversity": 0.36328125,
+      "CpuSeconds": 0.02294921875,
+      "WallSeconds": 0.02048740625,
+      "ProposalCalls": 28.53125,
+      "ObjectiveCalls": 35.46875,
+      "Failures": 0
+    },
+    {
+      "Partition": "development",
+      "Family": "kernel",
+      "Method": "uniform-portfolio",
+      "Quality": 0.9334721289707703,
+      "Cost": 63.71875,
+      "Diversity": 0.2919921875,
+      "CpuSeconds": 0.025390625,
+      "WallSeconds": 0.02042396875,
+      "ProposalCalls": 26.71875,
+      "ObjectiveCalls": 37,
+      "Failures": 0
+    },
+    {
+      "Partition": "confirmation",
+      "Family": "numeric",
+      "Method": "mutation",
+      "Quality": 0.5291125070135193,
+      "Cost": 64,
+      "Diversity": 0.27020263671875,
+      "CpuSeconds": 0.004119873046875,
+      "WallSeconds": 0.0034507458984375,
+      "ProposalCalls": 28,
+      "ObjectiveCalls": 36,
+      "Failures": 0
+    },
+    {
+      "Partition": "confirmation",
+      "Family": "numeric",
+      "Method": "crossover",
+      "Quality": 0.5511569567178043,
+      "Cost": 64,
+      "Diversity": 0.352752685546875,
+      "CpuSeconds": 0.003509521484375,
+      "WallSeconds": 0.0032716400390625,
+      "ProposalCalls": 28,
+      "ObjectiveCalls": 36,
+      "Failures": 0
+    },
+    {
+      "Partition": "confirmation",
+      "Family": "numeric",
+      "Method": "restart",
+      "Quality": 0.5679112025599576,
+      "Cost": 64,
+      "Diversity": 0.429229736328125,
+      "CpuSeconds": 0.0040283203125,
+      "WallSeconds": 0.003541997265625,
+      "ProposalCalls": 28,
+      "ObjectiveCalls": 36,
+      "Failures": 0
+    },
+    {
+      "Partition": "confirmation",
+      "Family": "numeric",
+      "Method": "refinement",
+      "Quality": 0.49311000688600476,
+      "Cost": 64,
+      "Diversity": 0.14569091796875,
+      "CpuSeconds": 0.0023193359375,
+      "WallSeconds": 0.0023551228515625,
+      "ProposalCalls": 14,
+      "ObjectiveCalls": 50,
+      "Failures": 0
+    },
+    {
+      "Partition": "confirmation",
+      "Family": "numeric",
+      "Method": "adaptive-parent",
+      "Quality": 0.5414206892613298,
+      "Cost": 63.8515625,
+      "Diversity": 0.329132080078125,
+      "CpuSeconds": 0.003662109375,
+      "WallSeconds": 0.0034982814453125,
+      "ProposalCalls": 24.841796875,
+      "ObjectiveCalls": 39.009765625,
+      "Failures": 0
+    },
+    {
+      "Partition": "confirmation",
+      "Family": "numeric",
+      "Method": "adaptive-archive",
+      "Quality": 0.5507546939463301,
+      "Cost": 63.90625,
+      "Diversity": 0.3515625,
+      "CpuSeconds": 0.00433349609375,
+      "WallSeconds": 0.003454883984375,
+      "ProposalCalls": 25.890625,
+      "ObjectiveCalls": 38.015625,
+      "Failures": 0
+    },
+    {
+      "Partition": "confirmation",
+      "Family": "numeric",
+      "Method": "uniform-portfolio",
+      "Quality": 0.5334593922862045,
+      "Cost": 63.640625,
+      "Diversity": 0.2899169921875,
+      "CpuSeconds": 0.004974365234375,
+      "WallSeconds": 0.0036290201171875,
+      "ProposalCalls": 22.36328125,
+      "ObjectiveCalls": 41.27734375,
+      "Failures": 0
+    },
+    {
+      "Partition": "confirmation",
+      "Family": "program",
+      "Method": "mutation",
+      "Quality": 0.8133951078442847,
+      "Cost": 64,
+      "Diversity": 0.270843505859375,
+      "CpuSeconds": 0.0072021484375,
+      "WallSeconds": 0.0067438005859375,
+      "ProposalCalls": 28.001953125,
+      "ObjectiveCalls": 35.998046875,
+      "Failures": 0
+    },
+    {
+      "Partition": "confirmation",
+      "Family": "program",
+      "Method": "crossover",
+      "Quality": 0.8676161157635227,
+      "Cost": 64,
+      "Diversity": 0.35272216796875,
+      "CpuSeconds": 0.007232666015625,
+      "WallSeconds": 0.006924925,
+      "ProposalCalls": 28.001953125,
+      "ObjectiveCalls": 35.998046875,
+      "Failures": 0
+    },
+    {
+      "Partition": "confirmation",
+      "Family": "program",
+      "Method": "restart",
+      "Quality": 0.8898605405522705,
+      "Cost": 64,
+      "Diversity": 0.429229736328125,
+      "CpuSeconds": 0.006866455078125,
+      "WallSeconds": 0.0069088841796875,
+      "ProposalCalls": 28,
+      "ObjectiveCalls": 36,
+      "Failures": 0
+    },
+    {
+      "Partition": "confirmation",
+      "Family": "program",
+      "Method": "refinement",
+      "Quality": 0.7462554493126156,
+      "Cost": 64,
+      "Diversity": 0.147216796875,
+      "CpuSeconds": 0.007171630859375,
+      "WallSeconds": 0.007292332421875,
+      "ProposalCalls": 14,
+      "ObjectiveCalls": 50,
+      "Failures": 0
+    },
+    {
+      "Partition": "confirmation",
+      "Family": "program",
+      "Method": "adaptive-parent",
+      "Quality": 0.856696570696917,
+      "Cost": 63.83984375,
+      "Diversity": 0.33270263671875,
+      "CpuSeconds": 0.007110595703125,
+      "WallSeconds": 0.00694285546875,
+      "ProposalCalls": 24.8984375,
+      "ObjectiveCalls": 38.94140625,
+      "Failures": 0
+    },
+    {
+      "Partition": "confirmation",
+      "Family": "program",
+      "Method": "adaptive-archive",
+      "Quality": 0.8701161318772122,
+      "Cost": 63.9140625,
+      "Diversity": 0.353668212890625,
+      "CpuSeconds": 0.006622314453125,
+      "WallSeconds": 0.006928710546875,
+      "ProposalCalls": 25.916015625,
+      "ObjectiveCalls": 37.998046875,
+      "Failures": 0
+    },
+    {
+      "Partition": "confirmation",
+      "Family": "program",
+      "Method": "uniform-portfolio",
+      "Quality": 0.8441138372626743,
+      "Cost": 63.640625,
+      "Diversity": 0.290130615234375,
+      "CpuSeconds": 0.007110595703125,
+      "WallSeconds": 0.0071864134765625,
+      "ProposalCalls": 22.36328125,
+      "ObjectiveCalls": 41.27734375,
+      "Failures": 0
+    },
+    {
+      "Partition": "confirmation",
+      "Family": "kernel",
+      "Method": "mutation",
+      "Quality": 0.9338948645623089,
+      "Cost": 64,
+      "Diversity": 0.289276123046875,
+      "CpuSeconds": 0.015533447265625,
+      "WallSeconds": 0.0154537759765625,
+      "ProposalCalls": 37.078125,
+      "ObjectiveCalls": 26.921875,
+      "Failures": 0
+    },
+    {
+      "Partition": "confirmation",
+      "Family": "kernel",
+      "Method": "crossover",
+      "Quality": 0.9338825298239505,
+      "Cost": 64,
+      "Diversity": 0.351959228515625,
+      "CpuSeconds": 0.0189208984375,
+      "WallSeconds": 0.018541790234375,
+      "ProposalCalls": 30.033203125,
+      "ObjectiveCalls": 33.966796875,
+      "Failures": 0
+    },
+    {
+      "Partition": "confirmation",
+      "Family": "kernel",
+      "Method": "restart",
+      "Quality": 0.9333233469578862,
+      "Cost": 64,
+      "Diversity": 0.421112060546875,
+      "CpuSeconds": 0.0196533203125,
+      "WallSeconds": 0.0193968384765625,
+      "ProposalCalls": 28.57421875,
+      "ObjectiveCalls": 35.42578125,
+      "Failures": 0
+    },
+    {
+      "Partition": "confirmation",
+      "Family": "kernel",
+      "Method": "refinement",
+      "Quality": 0.92946675866296,
+      "Cost": 62.078125,
+      "Diversity": 0.11737060546875,
+      "CpuSeconds": 0.021331787109375,
+      "WallSeconds": 0.02188719296875,
+      "ProposalCalls": 18.0390625,
+      "ObjectiveCalls": 44.0390625,
+      "Failures": 0
+    },
+    {
+      "Partition": "confirmation",
+      "Family": "kernel",
+      "Method": "adaptive-parent",
+      "Quality": 0.9336500476505708,
+      "Cost": 63.92578125,
+      "Diversity": 0.3447265625,
+      "CpuSeconds": 0.01861572265625,
+      "WallSeconds": 0.0185890234375,
+      "ProposalCalls": 29.779296875,
+      "ObjectiveCalls": 34.146484375,
+      "Failures": 0
+    },
+    {
+      "Partition": "confirmation",
+      "Family": "kernel",
+      "Method": "adaptive-archive",
+      "Quality": 0.93426199854859,
+      "Cost": 63.931640625,
+      "Diversity": 0.3651123046875,
+      "CpuSeconds": 0.019195556640625,
+      "WallSeconds": 0.019153653515625,
+      "ProposalCalls": 28.447265625,
+      "ObjectiveCalls": 35.484375,
+      "Failures": 0
+    },
+    {
+      "Partition": "confirmation",
+      "Family": "kernel",
+      "Method": "uniform-portfolio",
+      "Quality": 0.9341972848370946,
+      "Cost": 63.685546875,
+      "Diversity": 0.29522705078125,
+      "CpuSeconds": 0.019805908203125,
+      "WallSeconds": 0.019729721875,
+      "ProposalCalls": 26.49609375,
+      "ObjectiveCalls": 37.189453125,
+      "Failures": 0
+    }
+  ],
+  "Decisions": [
+    {
+      "Family": "numeric",
+      "Adaptive": "adaptive-parent",
+      "Comparator": "crossover",
+      "Control": "best-static",
+      "MeanGain": -0.0097362674564745,
+      "LowerGain": -0.15605354529578044,
+      "PromotionEligible": false
+    },
+    {
+      "Family": "numeric",
+      "Adaptive": "adaptive-parent",
+      "Comparator": "uniform-portfolio",
+      "Control": "uniform-portfolio",
+      "MeanGain": 0.007961296975125248,
+      "LowerGain": -0.13835598086418072,
+      "PromotionEligible": false
+    },
+    {
+      "Family": "numeric",
+      "Adaptive": "adaptive-archive",
+      "Comparator": "crossover",
+      "Control": "best-static",
+      "MeanGain": -0.00040226277147410033,
+      "LowerGain": -0.14671954061078005,
+      "PromotionEligible": false
+    },
+    {
+      "Family": "numeric",
+      "Adaptive": "adaptive-archive",
+      "Comparator": "uniform-portfolio",
+      "Control": "uniform-portfolio",
+      "MeanGain": 0.017295301660125648,
+      "LowerGain": -0.12902197617918032,
+      "PromotionEligible": false
+    },
+    {
+      "Family": "program",
+      "Adaptive": "adaptive-parent",
+      "Comparator": "crossover",
+      "Control": "best-static",
+      "MeanGain": -0.010919545066605788,
+      "LowerGain": -0.15723682290591173,
+      "PromotionEligible": false
+    },
+    {
+      "Family": "program",
+      "Adaptive": "adaptive-parent",
+      "Comparator": "uniform-portfolio",
+      "Control": "uniform-portfolio",
+      "MeanGain": 0.012582733434242599,
+      "LowerGain": -0.13373454440506335,
+      "PromotionEligible": false
+    },
+    {
+      "Family": "program",
+      "Adaptive": "adaptive-archive",
+      "Comparator": "crossover",
+      "Control": "best-static",
+      "MeanGain": 0.002500016113689498,
+      "LowerGain": -0.14381726172561646,
+      "PromotionEligible": false
+    },
+    {
+      "Family": "program",
+      "Adaptive": "adaptive-archive",
+      "Comparator": "uniform-portfolio",
+      "Control": "uniform-portfolio",
+      "MeanGain": 0.026002294614537885,
+      "LowerGain": -0.12031498322476807,
+      "PromotionEligible": false
+    },
+    {
+      "Family": "kernel",
+      "Adaptive": "adaptive-parent",
+      "Comparator": "crossover",
+      "Control": "best-static",
+      "MeanGain": -0.0002324821733796637,
+      "LowerGain": -0.1465497600126856,
+      "PromotionEligible": false
+    },
+    {
+      "Family": "kernel",
+      "Adaptive": "adaptive-parent",
+      "Comparator": "uniform-portfolio",
+      "Control": "uniform-portfolio",
+      "MeanGain": -0.0005472371865238067,
+      "LowerGain": -0.14686451502582976,
+      "PromotionEligible": false
+    },
+    {
+      "Family": "kernel",
+      "Adaptive": "adaptive-archive",
+      "Comparator": "crossover",
+      "Control": "best-static",
+      "MeanGain": 0.0003794687246394888,
+      "LowerGain": -0.14593780911466647,
+      "PromotionEligible": false
+    },
+    {
+      "Family": "kernel",
+      "Adaptive": "adaptive-archive",
+      "Comparator": "uniform-portfolio",
+      "Control": "uniform-portfolio",
+      "MeanGain": 6.471371149534581e-05,
+      "LowerGain": -0.1462525641278106,
+      "PromotionEligible": false
+    }
+  ],
+  "Promotions": [
+    {
+      "Family": "numeric",
+      "Adaptive": "adaptive-parent",
+      "Eligible": false
+    },
+    {
+      "Family": "numeric",
+      "Adaptive": "adaptive-archive",
+      "Eligible": false
+    },
+    {
+      "Family": "program",
+      "Adaptive": "adaptive-parent",
+      "Eligible": false
+    },
+    {
+      "Family": "program",
+      "Adaptive": "adaptive-archive",
+      "Eligible": false
+    },
+    {
+      "Family": "kernel",
+      "Adaptive": "adaptive-parent",
+      "Eligible": false
+    },
+    {
+      "Family": "kernel",
+      "Adaptive": "adaptive-archive",
+      "Eligible": false
+    }
+  ],
+  "BeforeAfter": [
+    {
+      "Family": "numeric",
+      "Adaptive": "adaptive-parent",
+      "Control": "best-static",
+      "Comparator": "crossover",
+      "Metrics": {
+        "Quality": {
+          "Before": 0.5511569567178043,
+          "After": 0.5414206892613298,
+          "Delta": -0.00973626745647449
+        },
+        "Diversity": {
+          "Before": 0.352752685546875,
+          "After": 0.329132080078125,
+          "Delta": -0.02362060546875
+        },
+        "Cost": {
+          "Before": 64,
+          "After": 63.8515625,
+          "Delta": -0.1484375
+        },
+        "CpuSeconds": {
+          "Before": 0.003509521484375,
+          "After": 0.003662109375,
+          "Delta": 0.000152587890625
+        },
+        "WallSeconds": {
+          "Before": 0.0032716400390625,
+          "After": 0.0034982814453125,
+          "Delta": 0.0002266414062500003
+        },
+        "ProposalCalls": {
+          "Before": 28,
+          "After": 24.841796875,
+          "Delta": -3.158203125
+        },
+        "ObjectiveCalls": {
+          "Before": 36,
+          "After": 39.009765625,
+          "Delta": 3.009765625
+        },
+        "Failures": {
+          "Before": 0,
+          "After": 0,
+          "Delta": 0
+        }
+      }
+    },
+    {
+      "Family": "numeric",
+      "Adaptive": "adaptive-parent",
+      "Control": "uniform-portfolio",
+      "Comparator": "uniform-portfolio",
+      "Metrics": {
+        "Quality": {
+          "Before": 0.5334593922862045,
+          "After": 0.5414206892613298,
+          "Delta": 0.007961296975125265
+        },
+        "Diversity": {
+          "Before": 0.2899169921875,
+          "After": 0.329132080078125,
+          "Delta": 0.039215087890625
+        },
+        "Cost": {
+          "Before": 63.640625,
+          "After": 63.8515625,
+          "Delta": 0.2109375
+        },
+        "CpuSeconds": {
+          "Before": 0.004974365234375,
+          "After": 0.003662109375,
+          "Delta": -0.001312255859375
+        },
+        "WallSeconds": {
+          "Before": 0.0036290201171875,
+          "After": 0.0034982814453125,
+          "Delta": -0.00013073867187499968
+        },
+        "ProposalCalls": {
+          "Before": 22.36328125,
+          "After": 24.841796875,
+          "Delta": 2.478515625
+        },
+        "ObjectiveCalls": {
+          "Before": 41.27734375,
+          "After": 39.009765625,
+          "Delta": -2.267578125
+        },
+        "Failures": {
+          "Before": 0,
+          "After": 0,
+          "Delta": 0
+        }
+      }
+    },
+    {
+      "Family": "numeric",
+      "Adaptive": "adaptive-archive",
+      "Control": "best-static",
+      "Comparator": "crossover",
+      "Metrics": {
+        "Quality": {
+          "Before": 0.5511569567178043,
+          "After": 0.5507546939463301,
+          "Delta": -0.0004022627714741489
+        },
+        "Diversity": {
+          "Before": 0.352752685546875,
+          "After": 0.3515625,
+          "Delta": -0.001190185546875
+        },
+        "Cost": {
+          "Before": 64,
+          "After": 63.90625,
+          "Delta": -0.09375
+        },
+        "CpuSeconds": {
+          "Before": 0.003509521484375,
+          "After": 0.00433349609375,
+          "Delta": 0.000823974609375
+        },
+        "WallSeconds": {
+          "Before": 0.0032716400390625,
+          "After": 0.003454883984375,
+          "Delta": 0.0001832439453125002
+        },
+        "ProposalCalls": {
+          "Before": 28,
+          "After": 25.890625,
+          "Delta": -2.109375
+        },
+        "ObjectiveCalls": {
+          "Before": 36,
+          "After": 38.015625,
+          "Delta": 2.015625
+        },
+        "Failures": {
+          "Before": 0,
+          "After": 0,
+          "Delta": 0
+        }
+      }
+    },
+    {
+      "Family": "numeric",
+      "Adaptive": "adaptive-archive",
+      "Control": "uniform-portfolio",
+      "Comparator": "uniform-portfolio",
+      "Metrics": {
+        "Quality": {
+          "Before": 0.5334593922862045,
+          "After": 0.5507546939463301,
+          "Delta": 0.017295301660125606
+        },
+        "Diversity": {
+          "Before": 0.2899169921875,
+          "After": 0.3515625,
+          "Delta": 0.0616455078125
+        },
+        "Cost": {
+          "Before": 63.640625,
+          "After": 63.90625,
+          "Delta": 0.265625
+        },
+        "CpuSeconds": {
+          "Before": 0.004974365234375,
+          "After": 0.00433349609375,
+          "Delta": -0.000640869140625
+        },
+        "WallSeconds": {
+          "Before": 0.0036290201171875,
+          "After": 0.003454883984375,
+          "Delta": -0.0001741361328124998
+        },
+        "ProposalCalls": {
+          "Before": 22.36328125,
+          "After": 25.890625,
+          "Delta": 3.52734375
+        },
+        "ObjectiveCalls": {
+          "Before": 41.27734375,
+          "After": 38.015625,
+          "Delta": -3.26171875
+        },
+        "Failures": {
+          "Before": 0,
+          "After": 0,
+          "Delta": 0
+        }
+      }
+    },
+    {
+      "Family": "program",
+      "Adaptive": "adaptive-parent",
+      "Control": "best-static",
+      "Comparator": "crossover",
+      "Metrics": {
+        "Quality": {
+          "Before": 0.8676161157635227,
+          "After": 0.856696570696917,
+          "Delta": -0.010919545066605751
+        },
+        "Diversity": {
+          "Before": 0.35272216796875,
+          "After": 0.33270263671875,
+          "Delta": -0.02001953125
+        },
+        "Cost": {
+          "Before": 64,
+          "After": 63.83984375,
+          "Delta": -0.16015625
+        },
+        "CpuSeconds": {
+          "Before": 0.007232666015625,
+          "After": 0.007110595703125,
+          "Delta": -0.0001220703125
+        },
+        "WallSeconds": {
+          "Before": 0.006924925,
+          "After": 0.00694285546875,
+          "Delta": 1.7930468749999956e-05
+        },
+        "ProposalCalls": {
+          "Before": 28.001953125,
+          "After": 24.8984375,
+          "Delta": -3.103515625
+        },
+        "ObjectiveCalls": {
+          "Before": 35.998046875,
+          "After": 38.94140625,
+          "Delta": 2.943359375
+        },
+        "Failures": {
+          "Before": 0,
+          "After": 0,
+          "Delta": 0
+        }
+      }
+    },
+    {
+      "Family": "program",
+      "Adaptive": "adaptive-parent",
+      "Control": "uniform-portfolio",
+      "Comparator": "uniform-portfolio",
+      "Metrics": {
+        "Quality": {
+          "Before": 0.8441138372626743,
+          "After": 0.856696570696917,
+          "Delta": 0.012582733434242654
+        },
+        "Diversity": {
+          "Before": 0.290130615234375,
+          "After": 0.33270263671875,
+          "Delta": 0.042572021484375
+        },
+        "Cost": {
+          "Before": 63.640625,
+          "After": 63.83984375,
+          "Delta": 0.19921875
+        },
+        "CpuSeconds": {
+          "Before": 0.007110595703125,
+          "After": 0.007110595703125,
+          "Delta": 0.0
+        },
+        "WallSeconds": {
+          "Before": 0.0071864134765625,
+          "After": 0.00694285546875,
+          "Delta": -0.00024355800781250027
+        },
+        "ProposalCalls": {
+          "Before": 22.36328125,
+          "After": 24.8984375,
+          "Delta": 2.53515625
+        },
+        "ObjectiveCalls": {
+          "Before": 41.27734375,
+          "After": 38.94140625,
+          "Delta": -2.3359375
+        },
+        "Failures": {
+          "Before": 0,
+          "After": 0,
+          "Delta": 0
+        }
+      }
+    },
+    {
+      "Family": "program",
+      "Adaptive": "adaptive-archive",
+      "Control": "best-static",
+      "Comparator": "crossover",
+      "Metrics": {
+        "Quality": {
+          "Before": 0.8676161157635227,
+          "After": 0.8701161318772122,
+          "Delta": 0.0025000161136894405
+        },
+        "Diversity": {
+          "Before": 0.35272216796875,
+          "After": 0.353668212890625,
+          "Delta": 0.000946044921875
+        },
+        "Cost": {
+          "Before": 64,
+          "After": 63.9140625,
+          "Delta": -0.0859375
+        },
+        "CpuSeconds": {
+          "Before": 0.007232666015625,
+          "After": 0.006622314453125,
+          "Delta": -0.0006103515625
+        },
+        "WallSeconds": {
+          "Before": 0.006924925,
+          "After": 0.006928710546875,
+          "Delta": 3.785546875000219e-06
+        },
+        "ProposalCalls": {
+          "Before": 28.001953125,
+          "After": 25.916015625,
+          "Delta": -2.0859375
+        },
+        "ObjectiveCalls": {
+          "Before": 35.998046875,
+          "After": 37.998046875,
+          "Delta": 2.0
+        },
+        "Failures": {
+          "Before": 0,
+          "After": 0,
+          "Delta": 0
+        }
+      }
+    },
+    {
+      "Family": "program",
+      "Adaptive": "adaptive-archive",
+      "Control": "uniform-portfolio",
+      "Comparator": "uniform-portfolio",
+      "Metrics": {
+        "Quality": {
+          "Before": 0.8441138372626743,
+          "After": 0.8701161318772122,
+          "Delta": 0.026002294614537846
+        },
+        "Diversity": {
+          "Before": 0.290130615234375,
+          "After": 0.353668212890625,
+          "Delta": 0.06353759765625
+        },
+        "Cost": {
+          "Before": 63.640625,
+          "After": 63.9140625,
+          "Delta": 0.2734375
+        },
+        "CpuSeconds": {
+          "Before": 0.007110595703125,
+          "After": 0.006622314453125,
+          "Delta": -0.00048828125
+        },
+        "WallSeconds": {
+          "Before": 0.0071864134765625,
+          "After": 0.006928710546875,
+          "Delta": -0.0002577029296875
+        },
+        "ProposalCalls": {
+          "Before": 22.36328125,
+          "After": 25.916015625,
+          "Delta": 3.552734375
+        },
+        "ObjectiveCalls": {
+          "Before": 41.27734375,
+          "After": 37.998046875,
+          "Delta": -3.279296875
+        },
+        "Failures": {
+          "Before": 0,
+          "After": 0,
+          "Delta": 0
+        }
+      }
+    },
+    {
+      "Family": "kernel",
+      "Adaptive": "adaptive-parent",
+      "Control": "best-static",
+      "Comparator": "crossover",
+      "Metrics": {
+        "Quality": {
+          "Before": 0.9338825298239505,
+          "After": 0.9336500476505708,
+          "Delta": -0.0002324821733796778
+        },
+        "Diversity": {
+          "Before": 0.351959228515625,
+          "After": 0.3447265625,
+          "Delta": -0.007232666015625
+        },
+        "Cost": {
+          "Before": 64,
+          "After": 63.92578125,
+          "Delta": -0.07421875
+        },
+        "CpuSeconds": {
+          "Before": 0.0189208984375,
+          "After": 0.01861572265625,
+          "Delta": -0.00030517578125
+        },
+        "WallSeconds": {
+          "Before": 0.018541790234375,
+          "After": 0.0185890234375,
+          "Delta": 4.723320312500015e-05
+        },
+        "ProposalCalls": {
+          "Before": 30.033203125,
+          "After": 29.779296875,
+          "Delta": -0.25390625
+        },
+        "ObjectiveCalls": {
+          "Before": 33.966796875,
+          "After": 34.146484375,
+          "Delta": 0.1796875
+        },
+        "Failures": {
+          "Before": 0,
+          "After": 0,
+          "Delta": 0
+        }
+      }
+    },
+    {
+      "Family": "kernel",
+      "Adaptive": "adaptive-parent",
+      "Control": "uniform-portfolio",
+      "Comparator": "uniform-portfolio",
+      "Metrics": {
+        "Quality": {
+          "Before": 0.9341972848370946,
+          "After": 0.9336500476505708,
+          "Delta": -0.0005472371865238301
+        },
+        "Diversity": {
+          "Before": 0.29522705078125,
+          "After": 0.3447265625,
+          "Delta": 0.04949951171875
+        },
+        "Cost": {
+          "Before": 63.685546875,
+          "After": 63.92578125,
+          "Delta": 0.240234375
+        },
+        "CpuSeconds": {
+          "Before": 0.019805908203125,
+          "After": 0.01861572265625,
+          "Delta": -0.001190185546875
+        },
+        "WallSeconds": {
+          "Before": 0.019729721875,
+          "After": 0.0185890234375,
+          "Delta": -0.0011406984375000005
+        },
+        "ProposalCalls": {
+          "Before": 26.49609375,
+          "After": 29.779296875,
+          "Delta": 3.283203125
+        },
+        "ObjectiveCalls": {
+          "Before": 37.189453125,
+          "After": 34.146484375,
+          "Delta": -3.04296875
+        },
+        "Failures": {
+          "Before": 0,
+          "After": 0,
+          "Delta": 0
+        }
+      }
+    },
+    {
+      "Family": "kernel",
+      "Adaptive": "adaptive-archive",
+      "Control": "best-static",
+      "Comparator": "crossover",
+      "Metrics": {
+        "Quality": {
+          "Before": 0.9338825298239505,
+          "After": 0.93426199854859,
+          "Delta": 0.0003794687246395645
+        },
+        "Diversity": {
+          "Before": 0.351959228515625,
+          "After": 0.3651123046875,
+          "Delta": 0.013153076171875
+        },
+        "Cost": {
+          "Before": 64,
+          "After": 63.931640625,
+          "Delta": -0.068359375
+        },
+        "CpuSeconds": {
+          "Before": 0.0189208984375,
+          "After": 0.019195556640625,
+          "Delta": 0.000274658203125
+        },
+        "WallSeconds": {
+          "Before": 0.018541790234375,
+          "After": 0.019153653515625,
+          "Delta": 0.0006118632812499997
+        },
+        "ProposalCalls": {
+          "Before": 30.033203125,
+          "After": 28.447265625,
+          "Delta": -1.5859375
+        },
+        "ObjectiveCalls": {
+          "Before": 33.966796875,
+          "After": 35.484375,
+          "Delta": 1.517578125
+        },
+        "Failures": {
+          "Before": 0,
+          "After": 0,
+          "Delta": 0
+        }
+      }
+    },
+    {
+      "Family": "kernel",
+      "Adaptive": "adaptive-archive",
+      "Control": "uniform-portfolio",
+      "Comparator": "uniform-portfolio",
+      "Metrics": {
+        "Quality": {
+          "Before": 0.9341972848370946,
+          "After": 0.93426199854859,
+          "Delta": 6.471371149541216e-05
+        },
+        "Diversity": {
+          "Before": 0.29522705078125,
+          "After": 0.3651123046875,
+          "Delta": 0.06988525390625
+        },
+        "Cost": {
+          "Before": 63.685546875,
+          "After": 63.931640625,
+          "Delta": 0.24609375
+        },
+        "CpuSeconds": {
+          "Before": 0.019805908203125,
+          "After": 0.019195556640625,
+          "Delta": -0.0006103515625
+        },
+        "WallSeconds": {
+          "Before": 0.019729721875,
+          "After": 0.019153653515625,
+          "Delta": -0.000576068359375001
+        },
+        "ProposalCalls": {
+          "Before": 26.49609375,
+          "After": 28.447265625,
+          "Delta": 1.951171875
+        },
+        "ObjectiveCalls": {
+          "Before": 37.189453125,
+          "After": 35.484375,
+          "Delta": -1.705078125
+        },
+        "Failures": {
+          "Before": 0,
+          "After": 0,
+          "Delta": 0
+        }
+      }
+    }
+  ],
+  "Scope": "Local numeric, expression and CPU kernels; service-operation budgets, not equal CPU time or API money. No model-quality or production speedup claim. Optional portfolio remains opt-in."
+}
