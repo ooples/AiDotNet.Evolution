@@ -1,0 +1,14 @@
+<Project Sdk="Microsoft.NET.Sdk">
+  <PropertyGroup>
+    <OutputType>Exe</OutputType>
+    <TargetFramework>net10.0</TargetFramework>
+    <ImplicitUsings>enable</ImplicitUsings>
+    <Nullable>enable</Nullable>
+    <IsPackable>false</IsPackable>
+  </PropertyGroup>
+  <ItemGroup>
+    <ProjectReference Include="../../src/AiDotNet.Evolution.Programs/AiDotNet.Evolution.Programs.csproj" />
+    <!-- Model primitives only. All Evolution types resolve to the projects in this repository. -->
+    <PackageReference Include="AiDotNet" Version="0.231.0" Aliases="AiDotNetConsumer" />
+  </ItemGroup>
+</Project>

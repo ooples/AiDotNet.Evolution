@@ -8,6 +8,12 @@ and readiness updates supersede those initial labels. The historical table below
 not an authoritative live draft count.
 Creating a PR or inheriting a foundation does not complete a story.
 
+## September 16: local tracking requested
+
+The user requested keeping all work tracked locally after US-09 publication encountered GitHub authorization errors. Retain implementation, tests, evidence, review notes and intended PR descriptions locally; do not retry publication unless requested. US-09 is committed on `feat/evolution-us09-integration`, with 3,838 passing tests; no new PR or hosted-CI result is claimed.
+
+Recommended next: US-11, starting with reproducible CPU-only program-optimization workloads, independent correctness, original-implementation fallback, and measured runtime/allocation/cost regressions. All implementation belongs in AiDotNet.Evolution. This recommendation does not authorize starting the next story or expensive competitor campaigns; full US-11 comparative acceptance still requires its declared OpenEvolve comparison.
+
 ## September 15: US-04 reporting acceptance complete locally
 
 [PR #47](https://github.com/ooples/AiDotNet.Evolution/pull/47) is non-draft and
@@ -51,7 +57,7 @@ Retargeting after squash/rebase merging needs special care to avoid reintroducin
 | US-06: Handle noisy measurements and expensive evaluation | [#24](https://github.com/ooples/AiDotNet.Evolution/issues/24) | Partial | [AiDotNet.Evolution#49](https://github.com/ooples/AiDotNet.Evolution/pull/49) |
 | US-07: Identify which existing features improve search | [#25](https://github.com/ooples/AiDotNet.Evolution/issues/25) | Local v2 implementation/study verified; CI/review/merge pending; baseline presets retained | [AiDotNet.Evolution#78](https://github.com/ooples/AiDotNet.Evolution/pull/78), historical pilot #50 |
 | US-08: Adapt proposal strategies using measured outcomes | [#26](https://github.com/ooples/AiDotNet.Evolution/issues/26) | Implemented and locally verified; hosted CI/review pending; no default promotion | Non-draft [#79](https://github.com/ooples/AiDotNet.Evolution/pull/79) on #78; historical #51 merged. [Evidence](evidence/us08-integration/README.md). |
-| US-09: Preserve useful tradeoffs between objectives | [#27](https://github.com/ooples/AiDotNet.Evolution/issues/27) | Not implemented | [AiDotNet.Evolution#52](https://github.com/ooples/AiDotNet.Evolution/pull/52) |
+| US-09: Preserve useful tradeoffs between objectives | [#27](https://github.com/ooples/AiDotNet.Evolution/issues/27) | [Current-stack functionality and 288-run evidence locally verified](evolution-stories/US-09.md); 3,838 tests passed | Local integration on #86 incorporating historical [#52](https://github.com/ooples/AiDotNet.Evolution/pull/52); push/PR creation blocked by GitHub 403, no new PR yet |
 | US-10: Measure engine overhead and scaling | [#28](https://github.com/ooples/AiDotNet.Evolution/issues/28) | [Current-stack profiling and snapshot optimization locally verified](evolution-stories/US-10.md); CI/review/stack merges pending | Non-draft [#86](https://github.com/ooples/AiDotNet.Evolution/pull/86) on #85, incorporating historical #53 |
 | US-11: Demonstrate value in consumer workloads | [#29](https://github.com/ooples/AiDotNet.Evolution/issues/29) | Partial, companion | [AiDotNet#2164](https://github.com/ooples/AiDotNet/pull/2164) |
 | US-12: Gate releases on demonstrated improvement | [#30](https://github.com/ooples/AiDotNet.Evolution/issues/30) | Partial | [AiDotNet.Evolution#54](https://github.com/ooples/AiDotNet.Evolution/pull/54) |

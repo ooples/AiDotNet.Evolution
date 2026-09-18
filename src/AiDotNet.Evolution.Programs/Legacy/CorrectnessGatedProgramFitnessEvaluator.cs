@@ -69,7 +69,7 @@ internal sealed class CorrectnessGatedProgramFitnessEvaluator : IProgramFitnessE
         return Copy(fitness, status, validation.CostUnits + fitness.CostUnits);
     }
 
-    private static EvolutionTaskResult Copy(EvolutionTaskResult result, EvolutionEvaluationStatus status, double cost)
+    internal static EvolutionTaskResult Copy(EvolutionTaskResult result, EvolutionEvaluationStatus status, double cost)
     {
         var copy = new EvolutionTaskResult(status, status == EvolutionEvaluationStatus.Completed ? result.Quality : null, result.Direction,
             result.Descriptors, result.Objectives, result.ConstraintViolations, cost, result.Diagnostics, result.Metrics, result.Artifacts);
