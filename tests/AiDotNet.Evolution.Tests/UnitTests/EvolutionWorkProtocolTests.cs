@@ -114,6 +114,36 @@ public sealed class EvolutionWorkProtocolTests
         Assert.False(JsonNode.Parse(endpoint.ProcessJson("{}"))!["ok"]!.GetValue<bool>());
     }
 
+    [Fact]
+    public void EveryWireOperationIsRecognizedAndAnythingElseIsRefusedBeforeItReachesAHandler()
+    {
+        // Dispatch maps the wire string to a closed enum once, so this pins the vocabulary from the
+        // outside: a member added to the enum without a wire name, or a case label quietly renamed,
+        // shows up here as an operation that stopped being reachable.
+        using var fixture = new Fixture();
+        using var endpoint = fixture.Open();
+
+        foreach (string op in new[] { "", "OPEN", "Status", "stat us", "enqueue ", "unknown" })
+        {
+            var request = new JsonObject { ["id"] = 1, ["protocol"] = 1, ["op"] = op };
+            var parsed = JsonNode.Parse(endpoint.ProcessJson(request.ToJsonString()))!.AsObject();
+            Assert.False(parsed["ok"]!.GetValue<bool>());
+            Assert.Contains("Unknown durable worker operation", parsed["error"]!.GetValue<string>());
+        }
+
+        // Close really closes, so it goes last; the rest fail on their missing arguments, and what
+        // matters is that none is refused as unknown or falls through to the unreachable default.
+        foreach (string op in new[] { "open", "enqueue", "claim", "heartbeat", "cancel",
+                                      "commit", "result", "delivery", "unsettled", "status", "close" })
+        {
+            var request = new JsonObject { ["id"] = 1, ["protocol"] = 1, ["op"] = op };
+            string error = JsonNode.Parse(endpoint.ProcessJson(request.ToJsonString()))!["error"]?.GetValue<string>() ?? "";
+            Assert.DoesNotContain("Unknown durable worker operation", error);
+            Assert.DoesNotContain("Unhandled durable worker operation", error);
+        }
+        Assert.True(endpoint.IsClosed);
+    }
+
     [Theory]
     [InlineData("01")]
     [InlineData("1.0")]

@@ -51,7 +51,9 @@ public sealed partial class EvolutionWorkProtocol : IDisposable
                 if (id == 0) throw new ArgumentException("id must be a positive JavaScript-safe integer.");
                 if (Integer(request, "protocol") != Version) throw new ArgumentException("Unsupported durable worker protocol version.");
                 string op = Text(request, "op");
-                return Reply(id, writer => Dispatch(request, op, writer));
+                Operation operation = ParseOperation(op)
+                    ?? throw new ArgumentException("Unknown durable worker operation: " + op);
+                return Reply(id, writer => Dispatch(request, operation, writer));
             }
             catch (Exception ex) when (ex is ArgumentException or JsonException or IOException or InvalidOperationException or OverflowException)
             {
@@ -95,9 +97,48 @@ public sealed partial class EvolutionWorkProtocol : IDisposable
         return Utf8.GetString(stream.ToArray());
     }
 
-    private void Dispatch(JsonElement request, string op, Utf8JsonWriter writer)
+    /// <summary>The closed set of wire operations.</summary>
+    /// <remarks>AN ENUM INSIDE, A STRING ON THE WIRE, matching the host's Protocol.Op. The wire
+    /// vocabulary is defined in exactly one place, an unknown operation is refused before any
+    /// handler runs rather than falling out of a dispatch default, and a mistyped case label is a
+    /// compile error instead of an operation that silently stops being reachable.</remarks>
+    private enum Operation
     {
-        if (op == "open")
+        Open,
+        Close,
+        Enqueue,
+        Claim,
+        Heartbeat,
+        Cancel,
+        Commit,
+        Result,
+        Delivery,
+        Unsettled,
+        Status,
+    }
+
+    /// <summary>Maps a wire operation to the enum, or null when it names nothing.</summary>
+    /// <remarks>The caller quotes the rejected name, which is caller-controlled and can approach a
+    /// full frame; <see cref="BoundedError"/> is what keeps that reportable.</remarks>
+    private static Operation? ParseOperation(string op) => op switch
+    {
+        "open" => Operation.Open,
+        "close" => Operation.Close,
+        "enqueue" => Operation.Enqueue,
+        "claim" => Operation.Claim,
+        "heartbeat" => Operation.Heartbeat,
+        "cancel" => Operation.Cancel,
+        "commit" => Operation.Commit,
+        "result" => Operation.Result,
+        "delivery" => Operation.Delivery,
+        "unsettled" => Operation.Unsettled,
+        "status" => Operation.Status,
+        _ => null,
+    };
+
+    private void Dispatch(JsonElement request, Operation operation, Utf8JsonWriter writer)
+    {
+        if (operation == Operation.Open)
         {
             Shape(request, "id", "protocol", "op", "config");
             if (_coordinator is not null) throw new InvalidOperationException("A coordinator is already open.");
@@ -111,36 +152,38 @@ public sealed partial class EvolutionWorkProtocol : IDisposable
                 Amounts(config, "limits"), options, _utcNow);
             WriteStatus(writer); return;
         }
-        if (op == "close") { Shape(request, "id", "protocol", "op"); Dispose(); writer.WriteBoolean("closed", true); return; }
+        if (operation == Operation.Close) { Shape(request, "id", "protocol", "op"); Dispose(); writer.WriteBoolean("closed", true); return; }
         DurableEvolutionWorkCoordinator coordinator = _coordinator ?? throw new InvalidOperationException("No coordinator is open.");
-        switch (op)
+        switch (operation)
         {
-            case "enqueue":
+            case Operation.Enqueue:
                 Shape(request, "id", "protocol", "op", "job"); Enqueue(coordinator, Required(request, "job"), writer); break;
-            case "claim":
+            case Operation.Claim:
                 Shape(request, "id", "protocol", "op", "worker");
                 EvolutionWorkLease? lease = coordinator.Claim(Worker(request));
                 writer.WriteBoolean("available", lease is not null); WriteLease(writer, lease); break;
-            case "heartbeat":
+            case Operation.Heartbeat:
                 Shape(request, "id", "protocol", "op", "identity", "workerId");
                 writer.WriteString("status", Heartbeat(coordinator.Heartbeat(Ticket(request), Text(request, "workerId")))); break;
-            case "cancel":
+            case Operation.Cancel:
                 Shape(request, "id", "protocol", "op", "evaluationId", "attempt");
                 writer.WriteBoolean("canceled", coordinator.Cancel(EvaluationId(request), Integer(request, "attempt"))); break;
-            case "commit":
+            case Operation.Commit:
                 Shape(request, "id", "protocol", "op", "identity", "workerId", "payload", "provenance", "actual", "outcome");
                 writer.WriteString("disposition", Disposition(coordinator.Commit(Ticket(request), Text(request, "workerId"), Text(request, "payload"),
                     Text(request, "provenance"), Amounts(request, "actual"), Outcome(request)))); break;
-            case "result":
+            case Operation.Result:
                 Shape(request, "id", "protocol", "op", "evaluationId", "attempt");
                 WriteResult(writer, coordinator.GetResult(EvaluationId(request), Integer(request, "attempt"))); break;
-            case "delivery":
+            case Operation.Delivery:
                 Shape(request, "id", "protocol", "op", "identity", "workerId");
                 WriteResult(writer, coordinator.GetDeliveryResult(Ticket(request), Text(request, "workerId"))); break;
-            case "unsettled":
+            case Operation.Unsettled:
                 Shape(request, "id", "protocol", "op", "workerId", "afterLeaseId"); Unsettled(coordinator, request, writer); break;
-            case "status": Shape(request, "id", "protocol", "op"); WriteStatus(writer); break;
-            default: throw new ArgumentException("Unknown durable worker operation: " + op);
+            case Operation.Status: Shape(request, "id", "protocol", "op"); WriteStatus(writer); break;
+            // ParseOperation already refused anything outside the enum, and Open/Close returned
+            // above, so reaching here means a new member was added without a handler.
+            default: throw new InvalidOperationException("Unhandled durable worker operation.");
         }
     }
 
