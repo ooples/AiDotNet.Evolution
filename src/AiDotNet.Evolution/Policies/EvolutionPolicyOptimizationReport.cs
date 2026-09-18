@@ -6,7 +6,7 @@ namespace AiDotNet.Evolution;
 /// <summary>One auditable policy/task/seed execution, including failed, denied and abandoned work.</summary>
 public sealed class EvolutionPolicyTrialRecord
 {
-    internal EvolutionPolicyTrialRecord(int sequence, string phase, EvolutionPolicyTrial task, EvolutionSearchPolicy policy,
+    internal EvolutionPolicyTrialRecord(int sequence, EvolutionPolicyTrialPhase phase, EvolutionPolicyTrial task, EvolutionSearchPolicy policy,
         int replicate, ulong seed, TimeSpan elapsed, EvolutionResourceOutcome outcome,
         EvolutionResources charged, EvolutionPolicyObservation? observation, string? failureCode)
     {
@@ -17,7 +17,7 @@ public sealed class EvolutionPolicyTrialRecord
     /// <summary>Gets the zero-based deterministic dispatch order.</summary>
     public int Sequence { get; }
     /// <summary>Gets development or holdout; only development observations influence candidate selection.</summary>
-    public string Phase { get; }
+    public EvolutionPolicyTrialPhase Phase { get; }
     /// <summary>Gets the task identity.</summary>
     public string TaskId { get; }
     /// <summary>Gets the predeclared independent task family.</summary>
@@ -95,7 +95,7 @@ public sealed class EvolutionPolicyBaselineComparison
 /// <summary>A detached campaign result; a suggested policy is never automatically activated in production.</summary>
 public sealed class EvolutionPolicyOptimizationReport
 {
-    internal EvolutionPolicyOptimizationReport(string planHash, string outcome, EvolutionPolicyOptimizationOptions options,
+    internal EvolutionPolicyOptimizationReport(string planHash, EvolutionPolicyCampaignOutcome outcome, EvolutionPolicyOptimizationOptions options,
         EvolutionPolicySpace space, EvolutionPolicyTrial[] developmentTasks, EvolutionPolicyTrial[] heldOutTasks,
         EvolutionSearchPolicy stablePreset, EvolutionSearchPolicy? champion, EvolutionPolicyBaseline[] baselines,
         EvolutionPolicyTrialRecord[] trials, EvolutionPolicyBaselineComparison[] comparisons,
@@ -107,7 +107,7 @@ public sealed class EvolutionPolicyOptimizationReport
         Baselines = Array.AsReadOnly(baselines); Trials = Array.AsReadOnly(trials); Comparisons = Array.AsReadOnly(comparisons);
         Resources = resources; Elapsed = elapsed; InnerElapsed = innerElapsed; OuterElapsed = elapsed > innerElapsed ? elapsed - innerElapsed : TimeSpan.Zero;
         FailureCode = failureCode;
-        GeneralizationPassed = outcome == "GeneralizationPassed" && comparisons.Length == baselines.Length && comparisons.All(value => value.Passed);
+        GeneralizationPassed = outcome == EvolutionPolicyCampaignOutcome.GeneralizationPassed && comparisons.Length == baselines.Length && comparisons.All(value => value.Passed);
         SuggestedPolicy = GeneralizationPassed ? champion! : stablePreset;
         var prior = new SortedDictionary<string, decimal>(StringComparer.Ordinal);
         foreach (var baseline in baselines)
@@ -118,7 +118,7 @@ public sealed class EvolutionPolicyOptimizationReport
     /// <summary>Gets the immutable plan identity, excluding measured outcomes and wall-clock timing.</summary>
     public string PlanHash { get; }
     /// <summary>Gets the terminal disposition, including inconclusive, denied and abandoned campaigns.</summary>
-    public string Outcome { get; }
+    public EvolutionPolicyCampaignOutcome Outcome { get; }
     /// <summary>Gets the exact predeclared limits and thresholds.</summary>
     public EvolutionPolicyOptimizationOptions Options { get; }
     /// <summary>Gets the complete finite catalogue needed to reproduce proposal sampling.</summary>

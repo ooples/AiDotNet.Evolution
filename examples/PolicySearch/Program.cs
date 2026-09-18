@@ -54,7 +54,9 @@ var options = new EvolutionPolicyOptimizationOptions(new EvolutionPolicyTrialBud
     seed: 426, minimumMeanGain: 0.005, maximumWithinTaskRange: 0.4);
 var report = await new EvolutionPolicyOptimizer(new EvolutionPolicySpace(policies), options, development, holdout, baselines, baselineA).RunAsync();
 if (report.Trials.Count == 0 || report.Trials.Any(value => value.Observation?.EvidenceJson is null) ||
-    report.Outcome is not ("NoDevelopmentImprovement" or "GeneralizationRejected" or "GeneralizationPassed"))
+    report.Outcome is not (EvolutionPolicyCampaignOutcome.NoDevelopmentImprovement
+        or EvolutionPolicyCampaignOutcome.GeneralizationRejected
+        or EvolutionPolicyCampaignOutcome.GeneralizationPassed))
     throw new InvalidOperationException("The CPU protocol did not complete: " + report.Outcome + "/" + report.FailureCode);
 Directory.CreateDirectory(Path.GetDirectoryName(destination)!);
 using (var output = new FileStream(destination, FileMode.CreateNew, FileAccess.Write))

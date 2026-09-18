@@ -24,7 +24,7 @@ public sealed class EvolutionPolicyOptimizer
     private readonly string _planHash;
     private int _started, _proposals, _inlineEvidenceBytes;
     private Task? _abandonedWork;
-    private string _outcome = "Failed";
+    private EvolutionPolicyCampaignOutcome _outcome = EvolutionPolicyCampaignOutcome.Failed;
     private string? _failureCode;
     private TimeSpan _innerElapsed;
 
@@ -115,7 +115,7 @@ public sealed class EvolutionPolicyOptimizer
             }
             if (scores[champion.Id] <= strongestBaseline || scores[champion.Id] - strongestBaseline < _options.MinimumMeanGain)
             {
-                _outcome = "NoDevelopmentImprovement";
+                _outcome = EvolutionPolicyCampaignOutcome.NoDevelopmentImprovement;
             }
             else
             {
@@ -132,18 +132,23 @@ public sealed class EvolutionPolicyOptimizer
                         for (int index = 0; index < policies.Length; index++)
                         {
                             var policy = policies[(index + offset) % policies.Length];
-                            panel[policy.Id].Add(await RunOne(task, policy, "holdout", replicate, deadline.Token).ConfigureAwait(false));
+                            panel[policy.Id].Add(await RunOne(task, policy, EvolutionPolicyTrialPhase.Holdout, replicate, deadline.Token).ConfigureAwait(false));
                         }
                     }
                 comparisons = _baselines.Select(baseline => Compare(panel[champion.Id], panel[baseline.Policy.Id], baseline)).ToArray();
-                _outcome = comparisons.All(value => value.Passed) ? "GeneralizationPassed" : "GeneralizationRejected";
+                _outcome = comparisons.All(value => value.Passed)
+                    ? EvolutionPolicyCampaignOutcome.GeneralizationPassed
+                    : EvolutionPolicyCampaignOutcome.GeneralizationRejected;
             }
         }
         catch (Exception error) when (EvolutionExceptionPolicy.IsRecoverable(error))
         {
             _failureCode = error.GetType().Name;
-            _outcome = error is PolicyTrialStopped stopped ? stopped.Outcome : error is EvolutionResourceBudgetException ? "BudgetDenied" :
-                error is OperationCanceledException ? cancellationToken.IsCancellationRequested ? "Canceled" : "TimedOut" : "Failed";
+            _outcome = error is PolicyTrialStopped stopped ? stopped.Outcome
+                : error is EvolutionResourceBudgetException ? EvolutionPolicyCampaignOutcome.BudgetDenied
+                : error is OperationCanceledException
+                    ? cancellationToken.IsCancellationRequested ? EvolutionPolicyCampaignOutcome.Canceled : EvolutionPolicyCampaignOutcome.TimedOut
+                : EvolutionPolicyCampaignOutcome.Failed;
         }
         finally
         {
@@ -159,7 +164,7 @@ public sealed class EvolutionPolicyOptimizer
         var records = new List<EvolutionPolicyTrialRecord>();
         foreach (var task in _development)
             for (int replicate = 0; replicate < _options.Replicates; replicate++)
-                records.Add(await RunOne(task, policy, "development", replicate, token).ConfigureAwait(false));
+                records.Add(await RunOne(task, policy, EvolutionPolicyTrialPhase.Development, replicate, token).ConfigureAwait(false));
         return records.GroupBy(value => value.Family, StringComparer.OrdinalIgnoreCase).Average(group => group.Average(Utility));
     }
 
@@ -172,15 +177,17 @@ public sealed class EvolutionPolicyOptimizer
     }
 
     private async Task<EvolutionPolicyTrialRecord> RunOne(EvolutionPolicyTrial task, EvolutionSearchPolicy policy,
-        string phase, int replicate, CancellationToken token)
+        EvolutionPolicyTrialPhase phase, int replicate, CancellationToken token)
     {
         token.ThrowIfCancellationRequested();
-        if (_records.Count >= _options.MaximumInnerTrials) throw new PolicyTrialStopped("TrialLimit");
+        if (_records.Count >= _options.MaximumInnerTrials) throw new PolicyTrialStopped(EvolutionPolicyCampaignOutcome.TrialLimit);
         int sequence = _records.Count;
-        ulong seed = ulong.Parse(EvolutionHash.Combine(new[] { _options.Seed.ToString(CultureInfo.InvariantCulture), phase,
+        // EvolutionPolicyWire.Token, never phase.ToString(): the seed is derived from the wire token
+        // "development"/"holdout", and a capitalized member name here would reseed every campaign.
+        ulong seed = ulong.Parse(EvolutionHash.Combine(new[] { _options.Seed.ToString(CultureInfo.InvariantCulture), EvolutionPolicyWire.Token(phase),
             task.Id, task.VersionHash, replicate.ToString(CultureInfo.InvariantCulture) }).Substring(0, 16), NumberStyles.HexNumber, CultureInfo.InvariantCulture);
         var maximum = _options.TrialBudget.ReservedResources;
-        var stage = phase == "holdout" ? EvolutionResourceStage.Confirmation : EvolutionResourceStage.Evaluation;
+        var stage = phase == EvolutionPolicyTrialPhase.Holdout ? EvolutionResourceStage.Confirmation : EvolutionResourceStage.Evaluation;
         // Deliberately disposed inside the finally below rather than with a using statement, and CodeQL's
         // "missed using opportunity" here is a false positive. Dispose() is not a passive release: it calls
         // ledger.Abandon, which charges an unsettled reservation's maximum as unknown consumption. A using
@@ -214,7 +221,7 @@ public sealed class EvolutionPolicyOptimizer
                 // cancellation ("Canceled") from the campaign deadline ("TimedOut") -- classification it
                 // already implements and that a PolicyTrialStopped would discard as "CanceledOrTimedOut".
                 token.ThrowIfCancellationRequested();
-                throw new PolicyTrialStopped("InnerTimedOut");
+                throw new PolicyTrialStopped(EvolutionPolicyCampaignOutcome.InnerTimedOut);
             }
             observation = await work.ConfigureAwait(false) ?? throw new InvalidOperationException("Policy trial returned no receipt.");
             var amounts = observation.ActualResources.Amounts;
@@ -232,11 +239,11 @@ public sealed class EvolutionPolicyOptimizer
             charged = outcome == EvolutionResourceOutcome.Unknown ? maximum : observation.ActualResources;
             _inlineEvidenceBytes += observation.EvidenceJson is null ? 0 : System.Text.Encoding.UTF8.GetByteCount(observation.EvidenceJson);
             if (_inlineEvidenceBytes > _options.MaximumInlineEvidenceBytes)
-                throw new PolicyTrialStopped("EvidenceLimit");
+                throw new PolicyTrialStopped(EvolutionPolicyCampaignOutcome.EvidenceLimit);
             timeout.Token.ThrowIfCancellationRequested(); // Late quality cannot qualify; its known cost still belongs in the ledger.
             // An over-budget receipt is already Rejected above, so the outcome alone decides here.
             if (outcome != EvolutionResourceOutcome.Completed)
-                throw new PolicyTrialStopped("InvalidOrOverBudgetTrial");
+                throw new PolicyTrialStopped(EvolutionPolicyCampaignOutcome.InvalidOrOverBudgetTrial);
         }
         catch (Exception error) { failure = error.GetType().Name; throw; }
         finally
@@ -277,6 +284,6 @@ public sealed class EvolutionPolicyOptimizer
             throw new ArgumentException("Declare two to sixty-four unique tasks spanning at least two semantic families.", nameof(tasks));
         return copy.OrderBy(value => value.Id, StringComparer.Ordinal).ToArray();
     }
-    private sealed class PolicyTrialStopped(string outcome) : InvalidOperationException("The policy campaign stopped without adopting a candidate.")
-    { internal string Outcome { get; } = outcome; }
+    private sealed class PolicyTrialStopped(EvolutionPolicyCampaignOutcome outcome) : InvalidOperationException("The policy campaign stopped without adopting a candidate.")
+    { internal EvolutionPolicyCampaignOutcome Outcome { get; } = outcome; }
 }

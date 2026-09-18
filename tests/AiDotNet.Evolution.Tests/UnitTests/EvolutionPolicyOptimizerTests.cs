@@ -1,3 +1,4 @@
+using System.Globalization;
 using Xunit;
 
 namespace AiDotNet.Evolution.Tests;
@@ -101,7 +102,7 @@ public sealed class EvolutionPolicyOptimizerTests
     public async Task ReplicatesDoNotMasqueradeAsIndependentFamilies()
     {
         var report = await Campaign(heldOutFamilies: 2, replicates: 32).RunAsync();
-        Assert.Equal("GeneralizationRejected", report.Outcome);
+        Assert.Equal(EvolutionPolicyCampaignOutcome.GeneralizationRejected, report.Outcome);
         Assert.False(report.GeneralizationPassed);
         Assert.Equal(Stable.Id, report.SuggestedPolicy.Id);
         Assert.All(report.Comparisons, comparison => Assert.False(comparison.Passed));
@@ -118,7 +119,7 @@ public sealed class EvolutionPolicyOptimizerTests
             return Task.FromResult(Receipt(policy.Id == Candidate.Id ? heldout ? 0.1 : 0.9 : 0.6));
         }).RunAsync();
         Assert.Equal(Candidate.Id, report.DevelopmentChampion!.Id);
-        Assert.Equal("GeneralizationRejected", report.Outcome);
+        Assert.Equal(EvolutionPolicyCampaignOutcome.GeneralizationRejected, report.Outcome);
         Assert.Equal(Stable.Id, report.SuggestedPolicy.Id);
     }
 
@@ -130,9 +131,38 @@ public sealed class EvolutionPolicyOptimizerTests
             Assert.False(heldout);
             return Task.FromResult(Receipt());
         }).RunAsync();
-        Assert.Equal("NoDevelopmentImprovement", report.Outcome);
+        Assert.Equal(EvolutionPolicyCampaignOutcome.NoDevelopmentImprovement, report.Outcome);
         Assert.Equal(12, report.Trials.Count);
         Assert.Empty(report.Comparisons);
+    }
+
+    [Fact]
+    public async Task ClosedCampaignTypesKeepTheirExactWireTokensInReportsAndInSeedDerivation()
+    {
+        // Outcome and Phase are enums, but their serialized tokens and -- for the phase -- the seed
+        // derivation are the retained contract. Default enum serialization would have written numbers,
+        // a reflection-based string converter would have written "Development", and either would have
+        // rewritten retained reports; using the member name in the seed would reseed every campaign.
+        var report = await Campaign().RunAsync();
+        string json = report.ToJson();
+        Assert.Contains("\"Outcome\":\"GeneralizationPassed\"", json);
+        Assert.Contains("\"Phase\":\"development\"", json);
+        Assert.Contains("\"Phase\":\"holdout\"", json);
+        Assert.DoesNotContain("\"Phase\":\"Development\"", json);
+        Assert.DoesNotContain("\"Phase\":0", json);
+
+        // Recomputed from literal tokens rather than from the production mapping, so renaming an enum
+        // member or changing its token fails here instead of silently reseeding.
+        foreach (var trial in report.Trials)
+        {
+            string phase = trial.Phase == EvolutionPolicyTrialPhase.Holdout ? "holdout" : "development";
+            ulong expected = ulong.Parse(EvolutionHash.Combine(new[]
+            {
+                report.Options.Seed.ToString(CultureInfo.InvariantCulture), phase,
+                trial.TaskId, trial.TaskVersionHash, trial.Replicate.ToString(CultureInfo.InvariantCulture),
+            }).Substring(0, 16), NumberStyles.HexNumber, CultureInfo.InvariantCulture);
+            Assert.Equal(expected, trial.Seed);
+        }
     }
 
     [Fact]
@@ -186,7 +216,7 @@ public sealed class EvolutionPolicyOptimizerTests
         int calls = 0;
         var report = await Campaign((_, _, _, _, _) => { calls++; return Task.FromResult(Receipt()); }, cap: 9).RunAsync();
         Assert.Equal(0, calls);
-        Assert.Equal("BudgetDenied", report.Outcome);
+        Assert.Equal(EvolutionPolicyCampaignOutcome.BudgetDenied, report.Outcome);
         Assert.Equal(0m, report.Resources.Spent["cost_units"]);
         Assert.Single(report.Trials);
     }
@@ -205,7 +235,7 @@ public sealed class EvolutionPolicyOptimizerTests
             Assert.Same(entered.Task, await Task.WhenAny(entered.Task, Task.Delay(TimeSpan.FromSeconds(5))));
             Assert.Same(running, await Task.WhenAny(running, Task.Delay(TimeSpan.FromSeconds(5))));
             var report = await running;
-            Assert.Equal("InnerTimedOut", report.Outcome);
+            Assert.Equal(EvolutionPolicyCampaignOutcome.InnerTimedOut, report.Outcome);
             Assert.True(campaign.HasOutstandingWork);
             Assert.Equal(1, calls);
             Assert.Equal(10m, report.Resources.Spent["cost_units"]);
@@ -253,7 +283,7 @@ public sealed class EvolutionPolicyOptimizerTests
         string evidence = "{\"raw\":\"" + new string('x', 70000) + "\"}";
         var report = await Campaign((_, _, _, _, _) => Task.FromResult(new EvolutionPolicyObservation(0.5, Charges(),
             EvolutionHash.Compute(evidence), evidenceJson: evidence)), evidenceLimit: 128 * 1024).RunAsync();
-        Assert.Equal("EvidenceLimit", report.Outcome);
+        Assert.Equal(EvolutionPolicyCampaignOutcome.EvidenceLimit, report.Outcome);
         Assert.Equal(2, report.Trials.Count);
         Assert.Equal(2m, report.Resources.Spent["cost_units"]);
         Assert.False(report.GeneralizationPassed);
@@ -265,7 +295,7 @@ public sealed class EvolutionPolicyOptimizerTests
     {
         var report = await Campaign((heldout, _, policy, _, _) => Task.FromResult(Receipt(
             policy.Id == Candidate.Id ? 0.8 : heldout && policy.Id == Manual.Id ? 0.9 : 0.5))).RunAsync();
-        Assert.Equal("GeneralizationRejected", report.Outcome);
+        Assert.Equal(EvolutionPolicyCampaignOutcome.GeneralizationRejected, report.Outcome);
         Assert.Single(report.Comparisons, value => value.Passed);
         Assert.Equal(Stable.Id, report.SuggestedPolicy.Id);
     }
@@ -281,7 +311,7 @@ public sealed class EvolutionPolicyOptimizerTests
             calls[key] = ordinal + 1;
             return Task.FromResult(Receipt(policy.Id == Candidate.Id ? heldout ? ordinal == 0 ? 0.1 : 1 : 0.9 : 0.05));
         }).RunAsync();
-        Assert.Equal("GeneralizationRejected", report.Outcome);
+        Assert.Equal(EvolutionPolicyCampaignOutcome.GeneralizationRejected, report.Outcome);
         Assert.All(report.Comparisons, value => Assert.False(value.Passed));
     }
 

@@ -76,7 +76,7 @@ public sealed class EvolutionPolicyEngineTests
     {
         int tasks = 0, sources = 0;
         var report = await Campaign(() => tasks++, () => sources++, restart: interval).RunAsync();
-        Assert.Equal("NoDevelopmentImprovement", report.Outcome);
+        Assert.Equal(EvolutionPolicyCampaignOutcome.NoDevelopmentImprovement, report.Outcome);
         Assert.Equal(12, report.Trials.Count);
         Assert.All(report.Trials, trial =>
         {
@@ -110,7 +110,7 @@ public sealed class EvolutionPolicyEngineTests
             if (context != EvolutionPolicyContext.FeedbackAndInspirations) Assert.Empty(value.ParentArtifacts);
             else Assert.All(value.ParentArtifacts, artifact => Assert.True(artifact.SizeBytes <= 4096));
         }).RunAsync();
-        Assert.Equal("NoDevelopmentImprovement", report.Outcome);
+        Assert.Equal(EvolutionPolicyCampaignOutcome.NoDevelopmentImprovement, report.Outcome);
         Assert.True(calls > 0);
     }
 
@@ -120,7 +120,7 @@ public sealed class EvolutionPolicyEngineTests
     public async Task FixedNormalizationWorksForEitherDirection(EvolutionOptimizationDirection direction)
     {
         var report = await Campaign(() => { }, () => { }, direction: direction).RunAsync();
-        Assert.Equal("NoDevelopmentImprovement", report.Outcome);
+        Assert.Equal(EvolutionPolicyCampaignOutcome.NoDevelopmentImprovement, report.Outcome);
         Assert.All(report.Trials, trial => Assert.Equal(0.5, trial.Observation!.Utility));
     }
 
@@ -131,7 +131,7 @@ public sealed class EvolutionPolicyEngineTests
     {
         int tasks = 0, sources = 0;
         var report = await Campaign(() => tasks++, () => sources++, excessSeeds: excessSeeds, changedOperator: changedOperator).RunAsync();
-        Assert.Equal("Failed", report.Outcome);
+        Assert.Equal(EvolutionPolicyCampaignOutcome.Failed, report.Outcome);
         Assert.Single(report.Trials);
         Assert.Equal(1, tasks);
         Assert.Equal(1, sources);
