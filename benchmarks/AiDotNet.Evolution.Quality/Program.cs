@@ -11,7 +11,9 @@ internal static class Program
     {
         if (args.Length > 0 && args[0] == "--archive-partition") return await ArchivePartitionPilot.RunAsync(args.Skip(1).ToArray());
         if (args.Length > 0 && args[0] == "--numeric-service") return NumericObjectiveService.Run(args.Skip(1).ToArray());
+        if (args.Length > 0 && args[0] == "--suite-numeric-service") return NumericObjectiveService.Run(args.Skip(1).ToArray(), suite: true);
         if (args.Length > 0 && args[0] == "--suite") return await RepresentativeSuite.RunAsync(args.Skip(1).ToArray());
+        if (args.Length > 0 && args[0] == "--analysis-campaign") return await FixedAnalysisCampaign.RunAsync(args.Skip(1).ToArray());
         int methodCount = Enum.GetValues<QualityMethod>().Length;
         int taskCount = Enum.GetValues<QualityTask>().Length;
         if (args.Length != 4 || !int.TryParse(args[0], out int seeds) || seeds is < 1 or > 1000 ||
@@ -84,15 +86,8 @@ internal static class QualityExperiment
         var ledger = new EvolutionResourceLedger($"{taskId}-{method}-{seed}", new EvolutionResources(
             new Dictionary<string, decimal> { ["cost_units"] = budget * evaluationWork, ["proposal_calls"] = budget * 4 }),
             retainedReceiptLimit: 64, maximumOperations: Math.Min(1_000_000, budget * 5));
-        NumericGenome[] seeds = InitialUnits(seed).Select(values => new NumericGenome(ToCoordinates(values))).ToArray();
-        if (suiteTask is not null)
-        {
-            // Two shared anchors at opposite corners of the box, identical for every method. Exactly one is
-            // feasible for each constrained family -- the low corner for knapsack, the high corner for
-            // robust-design -- so every constrained family starts from one feasible and one recorded-infeasible point.
-            seeds[0] = new NumericGenome(Enumerable.Repeat(-5d, Dimensions));
-            seeds[1] = new NumericGenome(Enumerable.Repeat(5d, Dimensions));
-        }
+        NumericGenome[] seeds = SharedInitialUnits(seed, suiteTask is not null)
+            .Select(values => new NumericGenome(ToCoordinates(values))).ToArray();
         string initialHash = EvolutionHash.Combine(seeds.Select(genome => genome.Identity));
         var task = new NumericTask(taskKind, suiteTask);
         var observer = new Progress();
@@ -160,6 +155,21 @@ internal static class QualityExperiment
 
     private static NumericGenome RandomGenome(StableRandom random) =>
         new(Enumerable.Range(0, Dimensions).Select(_ => -5 + 10 * random.NextDouble()));
+
+    internal static double[][] SharedInitialUnits(ulong seed, bool suite)
+    {
+        double[][] units = InitialUnits(seed);
+        if (suite)
+        {
+            // Two shared anchors at opposite corners of the box, identical for every method. Exactly one is
+            // feasible for each constrained family -- the low corner for knapsack, the high corner for
+            // robust-design -- so every constrained family starts from one feasible and one recorded-infeasible
+            // point. Do not describe these as two feasible anchors; the recorded violations disprove it.
+            units[0] = new double[Dimensions];
+            units[1] = Enumerable.Repeat(1d, Dimensions).ToArray();
+        }
+        return units;
+    }
 
     internal static double[][] InitialUnits(ulong seed)
     {
