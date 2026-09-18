@@ -14,6 +14,7 @@ import time
 from codex_transport import CodexTransport
 from docker_sandbox import encode
 from program_controls import candidate_hash
+from program_promotion import promote
 from run_program_comparison import run_campaign
 from warm_evaluator import WarmEvaluator
 from warm_panel import DEFINITIONS, prepare_task, description
@@ -97,7 +98,8 @@ def prepare(output, upstream, openevolve, dll, codex, image, *, phase="developme
         raise ValueError(f"Do not open {phase} data: {planned_calls} more calls required; {call_limit-consumed} available")
     root = Path(output).resolve()
     root.mkdir(parents=True, exist_ok=False)
-    plan = dict(schema="warm-head-to-head-v1", phase=phase, profiles=profiles, grid=schedule,
+    plan = dict(schema="warm-head-to-head-v2", phase=phase, profiles=profiles, grid=schedule,
+                correctness_contract="strict-upstream-v1", final_audit_policy="both-executables-v1",
                 image=image, upstream=str(Path(upstream).resolve()), openevolve=str(Path(openevolve).resolve()),
                 dll=str(Path(dll).resolve()), codex=str(Path(codex).resolve()), model="gpt-6-astra",
                 resolved_model="unreported; model alias may change across time blocks", iterations=4, samples=3,
@@ -116,7 +118,7 @@ def prepare(output, upstream, openevolve, dll, codex, image, *, phase="developme
                 primary_gate="Each final task x four contrasts: Bonferroni 95% upper paired-log normalized-latency-ratio CI < 1",
                 practical_target="20% lower warm latency; separately report whether upper CI < 0.8",
                 resources="Kernel cgroup CPU/peak through response, including startup/probe overhead; NOT total host cost",
-                correctness="Pinned trusted upstream host validator plus eight fresh instances; NOT exhaustive or independent proof",
+                correctness="Task-specific schema/host checks plus pinned upstream compatibility; both executables audited on eight fresh instances; NOT exhaustive proof",
                 failure_policy="Failed search/invalid selection deploy original; retain failures; unknown work stops all dispatch",
                 tuning="Two native profiles per method, equal task/seed/call caps; choose by mean log fresh-instance speedup",
                 cost_policy="Equal declared caps, report actual calls/tokens/work/wall; NOT equal realized costs",
@@ -133,6 +135,8 @@ def execute(plan_path, registered_sha256):
     plan = json.loads(plan_path.read_bytes())
     if digest(plan) != registered_sha256:
         raise ValueError("Registration hash mismatch")
+    if plan.get("schema") != "warm-head-to-head-v2" or plan.get("correctness_contract") != "strict-upstream-v1" or plan.get("final_audit_policy") != "both-executables-v1":
+        raise ValueError("Require a new registration for strengthened correctness and fallback audits")
     verify(plan)
     root = plan_path.parent
     # Exclusive marker forbids resumes/retries/optional sample extensions.
@@ -154,7 +158,7 @@ def execute(plan_path, registered_sha256):
             row["status"] = "running"
             save()
             task = prepare_task(plan["upstream"], row["task"], partition=plan["phase"],
-                                seeds=plan["search_instance_seeds"], scale=DEFINITIONS[row["task"]]["scale"]*plan["scale_multiplier"])
+                                seeds=plan["search_instance_seeds"], scale=DEFINITIONS[row["task"]]["scale"]*plan["scale_multiplier"],contract=plan["correctness_contract"])
             row["task_metadata"] = task["metadata"]
             cell = root / f"cell-{index:04d}"
             cap = call_cap([row], plan["iterations"])
@@ -176,26 +180,31 @@ def execute(plan_path, registered_sha256):
             if transport.failed or any(any(r["independent_counters"]["unknown"].values()) for r in result["runs"]):
                 raise RuntimeError("Unknown/failed provider work; stop the study without retries")
             fresh = prepare_task(plan["upstream"], row["task"], partition=plan["phase"],
-                                 seeds=plan["diagnostic_instance_seeds"], scale=task["metadata"]["scale"])
+                                 seeds=plan["diagnostic_instance_seeds"], scale=task["metadata"]["scale"],contract=plan["correctness_contract"])
             confirmation = WarmEvaluator(sandbox, fresh["metadata"]["class"], fresh["cases"], fresh["validate"],
                                          identity=digest(fresh["metadata"]), samples=plan["samples"], phase="confirmation")
             audits = [prepare_task(plan["upstream"], row["task"], partition=plan["phase"], seeds=plan["audit_instance_seeds"][i:i+2],
-                                   scale=task["metadata"]["scale"]) for i in range(0,8,2)]
+                                   scale=task["metadata"]["scale"],contract=plan["correctness_contract"]) for i in range(0,8,2)]
             for track_index, track in enumerate(result["runs"]):
                 order = ["original", "selected"]
                 random.Random(row["seed"]*31+track_index).shuffle(order)
                 values = {role:confirmation(task["initial"] if role == "original" else track["selected_code"]) for role in order}
                 if values["original"]["status"] != "valid":
                     raise RuntimeError("Original failed fresh validation; retain the failed planned grid")
-                audit_rows = []
+                audit_rows, original_audits, audit_bindings = [], [], []
                 for audit in audits:
                     check = WarmEvaluator(sandbox, audit["metadata"]["class"], audit["cases"], audit["validate"],
                                           identity=digest(audit["metadata"]), samples=1, phase="confirmation")
+                    original_audits.append(check(task["initial"]))
                     audit_rows.append(check(track["selected_code"]))
-                fallback = bool(track.get("fallback") or track["selected_hash"] == candidate_hash(task["initial"]) or
-                                values["selected"]["status"] != "valid" or any(a["status"] != "valid" for a in audit_rows))
-                deployed = values["original"] if fallback else values["selected"]
-                row["pairs"].append(dict(mode=track["mode"], method=track["method"], order=order, **values, audits=audit_rows,
+                    audit_bindings.append(dict(input_sha256=check.manifest["input_sha256"],evaluator_sha256=digest(check.manifest)))
+                # Persist even when the baseline audit fails and promotion aborts.
+                (cell / f"acceptance-{track_index}.json").write_bytes(encode(dict(diagnostics=values,original_audits=original_audits,selected_audits=audit_rows)))
+                expected = dict(diagnostic=dict(input_sha256=confirmation.manifest["input_sha256"],evaluator_sha256=digest(confirmation.manifest)),audits=audit_bindings)
+                decision = promote(task["initial"],track["selected_code"],values,audit_rows,original_audits,expected=expected,search_failed=bool(track.get("fallback")))
+                fallback, deployed = decision["fallback"],decision["deployed"]
+                row["pairs"].append(dict(mode=track["mode"], method=track["method"], order=order, **values, audits=audit_rows,original_audits=original_audits,
+                                         deployed_hash=decision["deployed_hash"],
                                          fallback=fallback, deployed_seconds=deployed["duration_seconds"],
                                          deployed=deployed, speedup=1.0 if fallback else values["original"]["duration_seconds"]/deployed["duration_seconds"],
                                          model_tokens=track["actual_model_tokens"], model_calls=track["independent_counters"]["attempted"]["model"],

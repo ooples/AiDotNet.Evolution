@@ -15,7 +15,7 @@ from warm_study_report import interval, summarize
 
 def fixture(phase="selection", count=4):
     cells = grid(phase, list(range(count)), dict(aidotnet="uniform",openevolve="default"))
-    plan = dict(phase=phase, grid=cells)
+    plan = dict(phase=phase, grid=cells,schema="warm-head-to-head-v2",correctness_contract="strict-upstream-v1",final_audit_policy="both-executables-v1")
     rows = []
     for cell in cells:
         pairs = []
@@ -95,13 +95,14 @@ class WarmDesignTests(unittest.TestCase):
     def test_bad_hash_and_one_use_marker_prevent_model_dispatch(self):
         with tempfile.TemporaryDirectory() as folder:
             path = Path(folder)/"plan.json"
-            path.write_bytes(encode({"phase":"development"}))
+            plan = dict(phase="development",schema="warm-head-to-head-v2",correctness_contract="strict-upstream-v1",final_audit_policy="both-executables-v1")
+            path.write_bytes(encode(plan))
             with self.assertRaises(ValueError):
                 execute(path,"wrong")
             (path.parent/"execution-started.json").write_text("{}")
             with patch("run_warm_study.verify"), patch("run_warm_study.CodexTransport") as provider:
                 with self.assertRaises(FileExistsError):
-                    execute(path,digest({"phase":"development"}))
+                    execute(path,digest(plan))
                 provider.assert_not_called()
 
     def test_runtime_mutation_and_wrong_predecessor_refused(self):
@@ -167,8 +168,10 @@ class WarmDesignTests(unittest.TestCase):
                     search_instance_seeds=[1,2],diagnostic_instance_seeds=[3,4],audit_instance_seeds=list(range(5,13)),
                     scale_multiplier=1,iterations=1,samples=1)
         initial = "class Solver:\n def solve(self,p): return p['x']+1\n"
-        task = dict(metadata={"id":"fixture","class":"Solver","scale":1},cases=[{"x":1},{"x":2}],
-                    validate=lambda x:x==[2,3],initial=initial)
+        def task(*args,**kwargs):
+            seeds = kwargs["seeds"]
+            return dict(metadata={"id":"fixture","class":"Solver","scale":1,"seeds":seeds},cases=[{"x":s} for s in seeds],
+                        validate=lambda x:x==[s+1 for s in seeds],initial=initial)
         transport = SimpleNamespace(calls=0,failed=False)
         def generate(system,messages):
             transport.calls += 1
@@ -181,7 +184,7 @@ class WarmDesignTests(unittest.TestCase):
         root = Path(tempfile.mkdtemp(prefix="warm-controller-proof-",dir=parent))
         path = root/"plan.json"
         path.write_bytes(encode(plan))
-        with patch("run_warm_study.verify"), patch("run_warm_study.prepare_task",return_value=task), \
+        with patch("run_warm_study.verify"), patch("run_warm_study.prepare_task",side_effect=task), \
              patch("run_warm_study.CodexTransport",return_value=transport):
             report = execute(path,digest(plan))
         self.assertEqual("completed",report["status"],report.get("error"))
@@ -190,7 +193,7 @@ class WarmDesignTests(unittest.TestCase):
         self.assertEqual(6,len(report["rows"][0]["pairs"]))
         self.assertTrue(all(p["selected"]["status"] == "valid" and all(a["status"] == "valid" for a in p["audits"])
                             for p in report["rows"][0]["pairs"]))
-        self.assertEqual(48,report["evaluator_attempts"])
+        self.assertEqual(72,report["evaluator_attempts"])
 
 
 if __name__ == "__main__":

@@ -7,6 +7,7 @@ import sys
 
 from docker_sandbox import encode, MAX_REQUEST
 from program_tasks import SUITE
+from program_correctness import CONTRACTS, RTOL, ATOL, validator
 
 sys.path.insert(0, str(Path(__file__).with_name("sandbox")))
 from wire_codec import decode, encode as wire
@@ -17,7 +18,9 @@ CATALOG = json.loads((SUITE / "catalog-v1.json").read_bytes())
 DEFINITIONS = {t["id"]: t for t in CATALOG["algotune"]}
 
 
-def prepare_task(upstream, task_id, *, partition, seeds, scale=None):
+def prepare_task(upstream, task_id, *, partition, seeds, scale=None, contract="strict-upstream-v1"):
+    if contract not in CONTRACTS:
+        raise ValueError("Unknown correctness contract")
     definition = DEFINITIONS[task_id]
     if definition["partition"] != partition or not seeds or len(set(seeds)) != len(seeds):
         raise ValueError("Task partition/instance schedule mismatch")
@@ -32,16 +35,17 @@ def prepare_task(upstream, task_id, *, partition, seeds, scale=None):
     if len(encode({"class": definition["class"], "problems": wires})) > MAX_REQUEST:
         raise ValueError("Panel batch exceeds isolated request bound")
     hashes = [fingerprint(p) for p in cases]
+    checks = [validator(task_id,p,reference,contract=contract) for p in cases]
     references = [reference.solve(copy.deepcopy(p)) for p in cases]
-    if not all(finite_solution(v) and reference.is_solution(copy.deepcopy(p), copy.deepcopy(v)) for p, v in zip(cases, references)):
-        raise ValueError("Pinned original failed its own validator")
+    if not all(finite_solution(v) and check(v) for check,v in zip(checks,references)):
+        raise ValueError("Pinned original failed the declared correctness contract")
     def validate(outputs):
         if not isinstance(outputs, list) or len(outputs) != len(cases):
             return False
         try:
-            for problem, output in zip(cases, outputs):
+            for check, output in zip(checks, outputs):
                 value = decode(output)
-                if not finite_solution(value) or not reference.is_solution(copy.deepcopy(problem), value):
+                if not finite_solution(value) or not check(value):
                     return False
         except (ValueError, TypeError, KeyError, IndexError, OverflowError, RecursionError, AttributeError):
             return False
@@ -52,7 +56,8 @@ def prepare_task(upstream, task_id, *, partition, seeds, scale=None):
     return dict(initial=normalized_source(upstream, definition).decode(), cases=wires, validate=validate,
                 metadata={**definition, "scale": scale, "instance_seeds": seeds, "source_sha256": source_hash,
                           "input_sha256": hashlib.sha256(encode(wires)).hexdigest(),
-                          "validator": "pinned upstream host validator, not independent mathematical proof"})
+                          "correctness_contract": contract, "rtol":RTOL, "atol":ATOL,
+                          "validator": "versioned task-specific host checks; strict profile also requires pinned upstream acceptance; not an exhaustive proof"})
 
 
 def description(task):
