@@ -42,6 +42,14 @@ public sealed class EvolutionSearchGenome : IImmutableEvolutionGenome<EvolutionS
     public double Number(string name) => Values[name].Number;
     /// <summary>Gets an active categorical parameter without coercion.</summary>
     public string Category(string name) => Values[name].Category;
+    /// <summary>Reads an exact declared enum name without accepting numeric strings or undeclared flag combinations.</summary>
+    public TEnum Enum<TEnum>(string name) where TEnum : struct, System.Enum
+    {
+        string value = Category(name);
+        if (!System.Enum.GetNames(typeof(TEnum)).Contains(value, StringComparer.Ordinal))
+            throw new ArgumentException("The categorical value is not a declared member of the requested enum.", nameof(name));
+        return (TEnum)System.Enum.Parse(typeof(TEnum), value, ignoreCase: false);
+    }
     /// <inheritdoc/>
     public EvolutionSearchGenome CreateOwnedSnapshot() => new(SchemaHash, Values);
 }

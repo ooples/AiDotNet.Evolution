@@ -4,7 +4,7 @@ on:
   push:
     branches: [main]
   pull_request:
-    branches: [main, feat/competitive-evolution-platform, 'feat/evolution-us-*', feat/evolution-us02-efficacy, feat/evolution-us03-correctness, feat/evolution-us05-campaign-budget, feat/evolution-us06-noise-integration, feat/evolution-us07-ablation-integration]
+    branches: [main, feat/competitive-evolution-platform, 'feat/evolution-us-*', feat/evolution-us02-efficacy, feat/evolution-us05-campaign-budget, feat/evolution-us07-ablation-integration, feat/evolution-us08-portfolio-integration, feat/evolution-program-consolidation, feat/evolution-us14-integration, feat/evolution-us15-integration, feat/evolution-us10-integration, feat/evolution-us09-integration]
 
 concurrency:
   group: ${{ github.workflow }}-${{ github.ref }}
@@ -54,6 +54,11 @@ jobs:
           dotnet test tests/AiDotNet.Evolution.Tests/AiDotNet.Evolution.Tests.csproj
           --configuration Release --framework net8.0 --no-restore --verbosity normal
           --blame-hang --blame-hang-timeout 120s --blame-crash
+      - name: Verify standalone program and compiler contracts
+        shell: pwsh
+        run: |
+          dotnet test tests/AiDotNet.Evolution.CSharp.Tests/AiDotNet.Evolution.CSharp.Tests.csproj -c Release --no-restore
+          if ($LASTEXITCODE -ne 0) { throw 'Standalone program migration tests failed.' }
       - name: Verify numeric quality harness contracts
         shell: pwsh
         env:
@@ -75,14 +80,37 @@ jobs:
       - name: Verify surrogate backend and measured-only selection
         shell: pwsh
         run: ./eng/Test-SurrogateSearch.ps1
+      - name: Verify standalone surrogate package consumption
+        shell: pwsh
+        run: |
+          dotnet pack src/AiDotNet.Evolution/AiDotNet.Evolution.csproj -c Release --no-build -o TestResults/surrogate-packages
+          if ($LASTEXITCODE -ne 0) { throw 'Core package failed.' }
+          dotnet pack src/AiDotNet.Evolution.Surrogates/AiDotNet.Evolution.Surrogates.csproj -c Release -o TestResults/surrogate-packages
+          if ($LASTEXITCODE -ne 0) { throw 'Surrogate package failed.' }
+          ./eng/Test-SurrogatePackage.ps1 -CorePackagePath TestResults/surrogate-packages/AiDotNet.Evolution.0.1.0-preview.1.nupkg -AdapterPackagePath TestResults/surrogate-packages/AiDotNet.Evolution.Surrogates.0.1.0-preview.1.nupkg -CoreVersion 0.1.0-preview.1 -AdapterVersion 0.1.0-preview.1
       - name: Verify multi-fidelity promotion and independent confirmation
         shell: pwsh
         run: ./eng/Test-MultiFidelity.ps1
+      - name: Verify incremental training and fidelity accounting
+        shell: pwsh
+        run: ./eng/Test-RegressionFidelity.ps1
+      - name: Verify separate-process settled fidelity recovery
+        shell: pwsh
+        run: ./eng/Test-FidelityRecovery.ps1
       - name: Verify gain and all-stage operator credit
         shell: pwsh
         run: ./eng/Test-OperatorCredit.ps1
+      - name: Verify adaptive island replay and evaluation accounting
+        run: dotnet run --project examples/AdaptiveIslandSearch -c Release -- 1 64 "${{ github.workspace }}/TestResults/adaptive-islands-smoke.json"
       - name: Verify performance fixture contracts
         run: dotnet run --project benchmarks/AiDotNet.Evolution.Performance -c Release -- --smoke
+      - name: Test performance evidence contracts
+        run: dotnet test tests/AiDotNet.Evolution.Performance.Tests -c Release --no-restore --verbosity normal
+      - name: Verify published performance tables regenerate from committed evidence
+        shell: pwsh
+        run: ./eng/Test-EvidenceTables.ps1
+      - name: Verify isolated performance profiling and worker determinism
+        run: dotnet run --project benchmarks/AiDotNet.Evolution.Performance -c Release --no-build -- --profile TestResults/performance '${{ github.sha }}' --smoke
       - name: Verify paired analysis contracts
         run: python3 -m unittest discover -s benchmarks/analysis -v
       - name: Verify frozen feature-ablation campaign
@@ -115,6 +143,7 @@ jobs:
           name: coverage-and-diagnostics
           path: |
             TestResults/quality/**/*.json
+            TestResults/performance/**
             TestResults/ablations/**
             TestResults/ablation-*
             TestResults/portfolio-*
