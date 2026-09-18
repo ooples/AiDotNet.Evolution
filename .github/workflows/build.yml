@@ -4,7 +4,7 @@ on:
   push:
     branches: [main]
   pull_request:
-    branches: [main, feat/competitive-evolution-platform, 'feat/evolution-us-*', feat/evolution-us02-efficacy, feat/evolution-us03-correctness, feat/evolution-us05-campaign-budget, feat/evolution-us06-noise-integration, feat/evolution-us07-ablation-integration, feat/evolution-us08-portfolio-integration, chore/evolution-pr-consolidation, feat/evolution-program-consolidation, feat/evolution-us13-integration, feat/evolution-us14-integration]
+    branches: [main, feat/competitive-evolution-platform, 'feat/evolution-us-*', feat/evolution-us02-efficacy, feat/evolution-us03-correctness, feat/evolution-us05-campaign-budget, feat/evolution-us06-noise-integration, feat/evolution-us07-ablation-integration, feat/evolution-us08-portfolio-integration, chore/evolution-pr-consolidation, feat/evolution-program-consolidation, feat/evolution-us13-integration, feat/evolution-us14-integration, feat/evolution-us15-integration]
 
 concurrency:
   group: ${{ github.workflow }}-${{ github.ref }}
@@ -100,6 +100,8 @@ jobs:
       - name: Verify gain and all-stage operator credit
         shell: pwsh
         run: ./eng/Test-OperatorCredit.ps1
+      - name: Verify adaptive island replay and evaluation accounting
+        run: dotnet run --project examples/AdaptiveIslandSearch -c Release -- 1 64 "${{ github.workspace }}/TestResults/adaptive-islands-smoke.json"
       - name: Verify performance fixture contracts
         run: dotnet run --project benchmarks/AiDotNet.Evolution.Performance -c Release -- --smoke
       - name: Verify paired analysis contracts

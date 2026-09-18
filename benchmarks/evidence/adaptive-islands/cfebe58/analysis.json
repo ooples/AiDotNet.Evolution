@@ -1,0 +1,186 @@
+{
+  "SourceRevision": "cfebe5891ac2911b1e5e71cfc2b70d2439d6f87d",
+  "BootstrapSamples": 10000,
+  "BootstrapSeed": 42,
+  "Summaries": [
+    {
+      "Task": "ShiftedQuadratic1",
+      "Method": "Uniform",
+      "Mean": 0.9999993342440535,
+      "Median": 0.9999998859640191,
+      "Worst": 0.9999917421561529,
+      "Best": 0.9999999999395798,
+      "Reached095": 30,
+      "MedianElapsedMilliseconds": 32.18955,
+      "MeanElapsedMilliseconds": 38.12098,
+      "EvaluatorCallsPerRun": 128,
+      "SuccessRate095": 1.0
+    },
+    {
+      "Task": "ShiftedQuadratic1",
+      "Method": "Adaptive",
+      "Mean": 0.9999713395544331,
+      "Median": 0.9999999230826928,
+      "Worst": 0.999147593916195,
+      "Best": 0.9999999999998935,
+      "Reached095": 30,
+      "MedianElapsedMilliseconds": 32.23205,
+      "MeanElapsedMilliseconds": 39.381843333333336,
+      "EvaluatorCallsPerRun": 128,
+      "SuccessRate095": 1.0
+    },
+    {
+      "Task": "ShiftedQuadratic1",
+      "Method": "UniformRestart",
+      "Mean": 0.9999992762094808,
+      "Median": 0.9999999079143127,
+      "Worst": 0.9999917421561529,
+      "Best": 0.9999999999395798,
+      "Reached095": 30,
+      "MedianElapsedMilliseconds": 30.3898,
+      "MeanElapsedMilliseconds": 37.64391,
+      "EvaluatorCallsPerRun": 128,
+      "SuccessRate095": 1.0
+    },
+    {
+      "Task": "ShiftedQuadratic1",
+      "Method": "AdaptiveRestart",
+      "Mean": 0.9999712829935192,
+      "Median": 0.999999839914088,
+      "Worst": 0.999147593916195,
+      "Best": 0.9999999999998935,
+      "Reached095": 30,
+      "MedianElapsedMilliseconds": 31.9333,
+      "MeanElapsedMilliseconds": 38.94612666666667,
+      "EvaluatorCallsPerRun": 128,
+      "SuccessRate095": 1.0
+    },
+    {
+      "Task": "SeparatedBasins1",
+      "Method": "Uniform",
+      "Mean": 0.5,
+      "Median": 0.5,
+      "Worst": 0.5,
+      "Best": 0.5,
+      "Reached095": 0,
+      "MedianElapsedMilliseconds": 29.921,
+      "MeanElapsedMilliseconds": 31.023500000000002,
+      "EvaluatorCallsPerRun": 128,
+      "SuccessRate095": 0.0
+    },
+    {
+      "Task": "SeparatedBasins1",
+      "Method": "Adaptive",
+      "Mean": 0.5,
+      "Median": 0.5,
+      "Worst": 0.5,
+      "Best": 0.5,
+      "Reached095": 0,
+      "MedianElapsedMilliseconds": 29.05675,
+      "MeanElapsedMilliseconds": 30.071323333333336,
+      "EvaluatorCallsPerRun": 128,
+      "SuccessRate095": 0.0
+    },
+    {
+      "Task": "SeparatedBasins1",
+      "Method": "UniformRestart",
+      "Mean": 0.9998282533350592,
+      "Median": 0.9999924816494306,
+      "Worst": 0.9951341886688406,
+      "Best": 0.9999997500634825,
+      "Reached095": 30,
+      "MedianElapsedMilliseconds": 29.225099999999998,
+      "MeanElapsedMilliseconds": 29.678766666666668,
+      "EvaluatorCallsPerRun": 128,
+      "SuccessRate095": 1.0
+    },
+    {
+      "Task": "SeparatedBasins1",
+      "Method": "AdaptiveRestart",
+      "Mean": 0.9999780272478425,
+      "Median": 0.9999931987851692,
+      "Worst": 0.9997698693313567,
+      "Best": 0.9999999971064957,
+      "Reached095": 30,
+      "MedianElapsedMilliseconds": 29.1899,
+      "MeanElapsedMilliseconds": 30.234730000000003,
+      "EvaluatorCallsPerRun": 128,
+      "SuccessRate095": 1.0
+    }
+  ],
+  "Contrasts": [
+    {
+      "Task": "ShiftedQuadratic1",
+      "Contrast": "Adaptive - Uniform",
+      "MeanDifference": -2.7994689620384574e-05,
+      "PairedPercentile95": [
+        -8.515806180169745e-05,
+        8.933292047656284e-07
+      ]
+    },
+    {
+      "Task": "ShiftedQuadratic1",
+      "Contrast": "AdaptiveRestart - UniformRestart",
+      "MeanDifference": -2.7993215961537774e-05,
+      "PairedPercentile95": [
+        -8.518576911220747e-05,
+        9.157205991953501e-07
+      ]
+    },
+    {
+      "Task": "ShiftedQuadratic1",
+      "Contrast": "UniformRestart - Uniform",
+      "MeanDifference": -5.803457273634294e-08,
+      "PairedPercentile95": [
+        -2.141522594882132e-07,
+        7.834337441309235e-08
+      ]
+    },
+    {
+      "Task": "ShiftedQuadratic1",
+      "Contrast": "AdaptiveRestart - Adaptive",
+      "MeanDifference": -5.6560913889539914e-08,
+      "PairedPercentile95": [
+        -1.2418019013314222e-07,
+        -1.3654292474463148e-08
+      ]
+    },
+    {
+      "Task": "SeparatedBasins1",
+      "Contrast": "Adaptive - Uniform",
+      "MeanDifference": 0.0,
+      "PairedPercentile95": [
+        0.0,
+        0.0
+      ]
+    },
+    {
+      "Task": "SeparatedBasins1",
+      "Contrast": "AdaptiveRestart - UniformRestart",
+      "MeanDifference": 0.00014977391278316507,
+      "PairedPercentile95": [
+        -2.5666369518727582e-05,
+        0.0004804735027078577
+      ]
+    },
+    {
+      "Task": "SeparatedBasins1",
+      "Contrast": "UniformRestart - Uniform",
+      "MeanDifference": 0.4998282533350593,
+      "PairedPercentile95": [
+        0.4995027663501734,
+        0.4999930308779714
+      ]
+    },
+    {
+      "Task": "SeparatedBasins1",
+      "Contrast": "AdaptiveRestart - Adaptive",
+      "MeanDifference": 0.49997802724784246,
+      "PairedPercentile95": [
+        0.4999596267005676,
+        0.4999910209395777
+      ]
+    }
+  ],
+  "Interpretation": "Retrospective diagnostic, absolute quality differences, 30 paired seeds in the recorded campaign. Unadjusted intervals for authored tasks, not a preregistered gate, held-out generalization or competitor claim. No task-family resampling or best-method selection."
+}
