@@ -229,7 +229,8 @@ jobs:
           for result in \
             "modern:$MODERN_RESULT" \
             "legacy:$LEGACY_RESULT" \
-            "package:$PACKAGE_RESULT" \n            "noisy-reuse:$REUSE_RESULT"; do
+            "package:$PACKAGE_RESULT" \
+            "noisy-reuse:$REUSE_RESULT"; do
             job="${result%%:*}"
             conclusion="${result#*:}"
             if [ "$conclusion" != success ]; then
