@@ -110,6 +110,35 @@ public sealed class HostWorkIdentityTests
         Assert.Equal(codec.VersionHash, new ParameterGenomeCodec(other).VersionHash);
     }
 
+    [Fact]
+    public void ParameterCodecSchemaHashSeparatesAdjacentFieldsAndTracksEveryDeclaredAttribute()
+    {
+        string Hash(params ParameterDefinition[] definitions) =>
+            new ParameterGenomeCodec(new ParameterSpace(definitions)).VersionHash;
+
+        // Field separators are load-bearing, not decoration. These two spaces are genuinely different
+        // -- one runs to 2 in steps of 11, the other to 21 in steps of 1 -- but their field values
+        // concatenate to the same characters ("x" "1" "2" "11" "0" against "x" "1" "21" "1" "0").
+        // Drop the separator and the hash declares them compatible, letting a genome built for one
+        // space deserialize against the other.
+        Assert.NotEqual(
+            Hash(new ParameterDefinition("x", 1, 2, 11, false)),
+            Hash(new ParameterDefinition("x", 1, 21, 1, false)));
+
+        // Every declared attribute is part of the compatibility contract, and order is significant.
+        var baseline = Hash(new ParameterDefinition("x", -1, 1, .5, false), new ParameterDefinition("y", 0, 2, .5, false));
+        Assert.NotEqual(baseline, Hash(new ParameterDefinition("y", 0, 2, .5, false), new ParameterDefinition("x", -1, 1, .5, false)));
+        Assert.NotEqual(baseline, Hash(new ParameterDefinition("x", -1, 1, .5, true), new ParameterDefinition("y", 0, 2, .5, false)));
+        Assert.NotEqual(baseline, Hash(new ParameterDefinition("x", -1, 1, .25, false), new ParameterDefinition("y", 0, 2, .5, false)));
+        Assert.NotEqual(baseline, Hash(new ParameterDefinition("x", -1, 1.5, .5, false), new ParameterDefinition("y", 0, 2, .5, false)));
+
+        // Round-trip formatting, not the shortest representation: bounds that print the same under a
+        // lossy format are distinct doubles and must stay distinguishable.
+        Assert.NotEqual(
+            Hash(new ParameterDefinition("x", 0, 0.1 + 0.2, 1, false)),
+            Hash(new ParameterDefinition("x", 0, 0.3, 1, false)));
+    }
+
     private static RunConfig Config() => new()
     {
         Parameters = new() { new ParameterConfig { Name = "x", Min = -1, Max = 1, Step = .5 } },

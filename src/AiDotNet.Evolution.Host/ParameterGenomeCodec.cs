@@ -1,3 +1,5 @@
+using System.Globalization;
+using System.Text;
 using System.Security.Cryptography;
 using System.Text.Json;
 
@@ -11,16 +13,24 @@ internal sealed class ParameterGenomeCodec : IEvolutionGenomeCodec<ParameterGeno
     internal ParameterGenomeCodec(ParameterSpace space)
     {
         _space = space;
-        var definitions = space.Parameters.Select(p => new ParameterConfig
+        // CANONICAL ENCODING, NOT SERIALIZER OUTPUT. This hash decides whether a persisted genome is
+        // compatible with a space, so it must depend only on the declared parameters. Hashing
+        // System.Text.Json's bytes made it depend on that serializer's incidental choices as well --
+        // number formatting and property order are implementation details, not part of the contract --
+        // so the same logical space could hash differently across runtimes and reject its own genomes.
+        // Fixed field order, explicit separators that cannot occur in a parameter name, and round-trip
+        // invariant number formatting remove all three degrees of freedom.
+        var canonical = new StringBuilder();
+        foreach (ParameterDefinition definition in space.Parameters)
         {
-            Name = p.Name,
-            Min = p.Minimum,
-            Max = p.Maximum,
-            Step = p.Step,
-            Integral = p.Integral,
-        }).ToList();
-        byte[] schema = JsonSerializer.SerializeToUtf8Bytes(definitions, HostJsonContext.Default.ParameterDefinitions);
-        VersionHash = "ordered-normalized-parameters-v1:" + Convert.ToHexString(SHA256.HashData(schema)).ToLowerInvariant();
+            canonical.Append(definition.Name).Append('\u001f')
+                .Append(definition.Minimum.ToString("R", CultureInfo.InvariantCulture)).Append('\u001f')
+                .Append(definition.Maximum.ToString("R", CultureInfo.InvariantCulture)).Append('\u001f')
+                .Append(definition.Step.ToString("R", CultureInfo.InvariantCulture)).Append('\u001f')
+                .Append(definition.Integral ? '1' : '0').Append('\u001e');
+        }
+        byte[] schema = Encoding.UTF8.GetBytes(canonical.ToString());
+        VersionHash = "ordered-normalized-parameters-v2-canonical:" + Convert.ToHexString(SHA256.HashData(schema)).ToLowerInvariant();
     }
 
     public string Id => "host-parameter-vector";
