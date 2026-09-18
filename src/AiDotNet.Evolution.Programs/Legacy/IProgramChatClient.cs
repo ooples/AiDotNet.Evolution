@@ -38,12 +38,24 @@ public sealed class ProgramChatMessage
 /// <summary>Sampling settings; null means the caller's provider default.</summary>
 public sealed class ProgramChatOptions
 {
+    /// <summary>Requested format; an adapter must honor or explicitly reject unsupported formats.</summary>
+    public ProgramChatResponseFormat ResponseFormat { get; set; }
     /// <summary>Sampling temperature.</summary>
     public double? Temperature { get; set; }
     /// <summary>Maximum generated tokens.</summary>
     public int? MaxOutputTokens { get; set; }
     /// <summary>Proposal-local sampling seed.</summary>
     public int? Seed { get; set; }
+}
+
+/// <summary>Provider response-format request, not a guarantee that returned text is valid.</summary>
+public enum ProgramChatResponseFormat { Text, Json }
+
+/// <summary>Exposes a wrapped client so judging can discover an explicitly configured panel.</summary>
+public interface IProgramChatClientDecorator : IProgramChatClient
+{
+    /// <summary>Wrapped client.</summary>
+    IProgramChatClient Inner { get; }
 }
 
 /// <summary>Immutable provider-reported token usage; not a monetary charge or budget admission.</summary>
