@@ -55,7 +55,8 @@ files match their original Git blob IDs. No model calls were made.
 PR88 subsequently ports and verifies the PR2210 model benchmark and PR2212
 compiler-arm/provider adapter; those two source PRs are closed as relocated.
 See [the complete consumer mapping](PROGRAM_CONSUMER_MIGRATION.md).
-The complete PR2148 foundation, PR2168 CLI, PR2202 deployment lifecycle and PR2203
+PR89 subsequently relocates PR2202 deployment/model retuning and MAP-Elites search;
+that source PR is closed too. The complete PR2148 foundation, PR2168 CLI and PR2203
 comparison host remain open. The AiDotNet breaking-removal PR follows the verified
 ports; do not delete still-needed implementations first.
 

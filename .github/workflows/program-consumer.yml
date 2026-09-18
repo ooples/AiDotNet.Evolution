@@ -21,6 +21,18 @@ jobs:
             8.0.x
       - name: Compiler and program contracts
         run: dotnet test tests/AiDotNet.Evolution.CSharp.Tests -c Release
+      - name: Standalone deployment and model search contracts
+        run: dotnet test tests/AiDotNet.Evolution.Deployment.Tests -c Release
+      - name: Standalone model-driven comparison host contracts
+        shell: pwsh
+        run: |
+          dotnet build benchmarks/ProgramEvolutionComparison -c Release
+          if ($LASTEXITCODE -ne 0) { throw 'Program comparison host build failed.' }
+          python benchmarks/ProgramEvolutionComparison/test_host.py
+          if ($LASTEXITCODE -ne 0) { throw 'Program comparison host verification failed.' }
+      - name: Pack optional deployment package
+        shell: pwsh
+        run: ./eng/Test-DeploymentPackage.ps1
       - name: Fresh consumer study and adversarial verification
         shell: pwsh
         run: |
