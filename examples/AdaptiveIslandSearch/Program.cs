@@ -1,4 +1,5 @@
 using System.Globalization;
+using System.Diagnostics;
 using System.Text.Json;
 using AiDotNet.Evolution;
 
@@ -10,9 +11,13 @@ if (args.Length != 0 && (args.Length is < 2 or > 3 || !int.TryParse(args[0], out
 }
 using var output = args.Length == 3 ? new FileStream(args[2], FileMode.CreateNew, FileAccess.Write, FileShare.Read) : null;
 var runs = new List<object>(); bool valid = true;
+string[] methods = { "Uniform", "Adaptive", "UniformRestart", "AdaptiveRestart" };
+// Unreported timing warmup is separately accounted, never used for quality selection.
 foreach (string taskName in new[] { "ShiftedQuadratic1", "SeparatedBasins1" })
-    foreach (string method in new[] { "Uniform", "Adaptive", "UniformRestart", "AdaptiveRestart" })
-        for (ulong seed = 0; seed < (ulong)seeds; seed++)
+    foreach (string method in methods) valid &= (await Run(taskName, method, 999, 32, false)).Valid;
+foreach (string taskName in new[] { "ShiftedQuadratic1", "SeparatedBasins1" })
+    for (ulong seed = 0; seed < (ulong)seeds; seed++)
+        foreach (string method in methods.Skip((int)(seed % 4)).Concat(methods.Take((int)(seed % 4))))
         {
             var first = await Run(taskName, method, seed, budget, false);
             var replay = await Run(taskName, method, seed, budget, false);
@@ -32,6 +37,7 @@ foreach (string taskName in new[] { "ShiftedQuadratic1", "SeparatedBasins1" })
                 EvaluatorCalls = first.Measurements.Count,
                 Proposals = first.Result.Counters.Proposals,
                 FinalQuality = first.Result.Best!.Evaluation.Quality,
+                first.ElapsedMilliseconds,
                 first.Result.StateHash,
                 ReplayStateHash = replay.Result.StateHash,
                 ResumeStateHash = resumed?.Result.StateHash,
@@ -42,13 +48,18 @@ foreach (string taskName in new[] { "ShiftedQuadratic1", "SeparatedBasins1" })
                 Measurements = first.Measurements.Select(measurement =>
                 {
                     best = Math.Max(best, measurement.Quality);
-                    return new { measurement.EvaluationId, measurement.Generation, measurement.Island, measurement.X, measurement.Quality, BestQuality = best };
+                    return new { measurement.EvaluationId, measurement.Generation, measurement.Island, measurement.X, measurement.Quality, measurement.ElapsedMilliseconds, BestQuality = best };
                 }).ToArray()
             });
         }
 string json = JsonSerializer.Serialize(new
 {
-    Protocol = "fixed-adaptive-islands-pilot-v1",
+    Protocol = "fixed-adaptive-islands-pilot-v2",
+    WarmupEvaluatorCalls = 256,
+    Runtime = System.Runtime.InteropServices.RuntimeInformation.FrameworkDescription,
+    OperatingSystem = System.Runtime.InteropServices.RuntimeInformation.OSDescription,
+    ProcessorCount = Environment.ProcessorCount,
+    TimingProtocol = "Whole in-process run including setup and checkpoint capture; excludes process startup. Eight 32-call warmups. Method order rotates by seed. Single host, no timing superiority gate; replay timing is not compared.",
     Seeds = seeds,
     EvaluatorCallCap = budget,
     AssemblyVersion = typeof(Genome).Assembly.GetCustomAttributes(typeof(System.Reflection.AssemblyInformationalVersionAttribute), false)
@@ -64,6 +75,7 @@ return valid ? 0 : 1;
 
 static async Task<RunData> Run(string taskName, string method, ulong seed, int budget, bool split)
 {
+    var clock = Stopwatch.StartNew();
     var measurements = new List<Measurement>();
     var store = new InMemoryEvolutionCheckpointStore();
     EvolutionResourceLedger Ledger() => new("island-example", EvolutionResources.Of("cost_units", budget), retainedReceiptLimit: 4096);
@@ -75,7 +87,7 @@ static async Task<RunData> Run(string taskName, string method, ulong seed, int b
             enableRestarts: method.EndsWith("Restart", StringComparison.Ordinal)));
     async Task<EvolutionRunResult<Genome>> Engine(AdaptiveIslandSearch<Genome> policy, EvolutionResourceLedger ledger, int cap, bool resume)
     {
-        var task = new ResourceMeteredEvolutionTask<Genome>(new Objective(taskName, measurements), ledger, new[] { 1m });
+        var task = new ResourceMeteredEvolutionTask<Genome>(new Objective(taskName, measurements, clock), ledger, new[] { 1m });
         var options = new EvolutionEngineOptions
         {
             RunId = "island-example",
@@ -106,7 +118,7 @@ static async Task<RunData> Run(string taskName, string method, ulong seed, int b
         resources.Unknown == 0 && !resources.MaximumViolated &&
         policy.Statistics.Sum(stat => stat.Proposals) == result.Counters.Proposals - 2 &&
         policy.Statistics.All(stat => stat.Proposals == stat.Outcomes) && result.Best!.Evaluation.Quality >= 0.5;
-    return new RunData(result, policy, ledger, measurements, valid);
+    return new RunData(result, policy, ledger, measurements, valid, clock.Elapsed.TotalMilliseconds);
 }
 
 internal sealed record Genome(double X) : IImmutableEvolutionGenome<Genome>
@@ -136,7 +148,7 @@ internal sealed class Restart : IVariationOperator<Genome>
     public string VersionHash => "v1";
     public ValueTask<Genome> ProposeAsync(EvolutionVariationContext<Genome> context, CancellationToken cancellationToken = default) => new(new Genome(context.Random.NextDouble()));
 }
-internal sealed class Objective(string task, List<Measurement> measurements) : IEvolutionTask<Genome>
+internal sealed class Objective(string task, List<Measurement> measurements, Stopwatch clock) : IEvolutionTask<Genome>
 {
     public string Id => task;
     public string VersionHash => "island-fixture-v1-" + task;
@@ -148,10 +160,10 @@ internal sealed class Objective(string task, List<Measurement> measurements) : I
         double x = candidate.CanonicalGenome.Genome.X;
         double quality = task == "ShiftedQuadratic1" ? 1 - (x - 0.8) * (x - 0.8) :
             Math.Max(0.5 - 10 * (x - 0.2) * (x - 0.2), 1 - 60 * (x - 0.8) * (x - 0.8));
-        measurements.Add(new Measurement(candidate.EvaluationId, candidate.Lineage.Generation, candidate.Lineage.Island, x, quality));
+        measurements.Add(new Measurement(candidate.EvaluationId, candidate.Lineage.Generation, candidate.Lineage.Island, x, quality, clock.Elapsed.TotalMilliseconds));
         return new(EvolutionTaskResult.Completed(quality, new Dictionary<string, double> { ["all"] = 0.5 }, costUnits: 1));
     }
 }
-internal sealed record Measurement(long EvaluationId, long Generation, int Island, double X, double Quality);
+internal sealed record Measurement(long EvaluationId, long Generation, int Island, double X, double Quality, double ElapsedMilliseconds);
 internal sealed record RunData(EvolutionRunResult<Genome> Result, AdaptiveIslandSearch<Genome> Policy,
-    EvolutionResourceLedger Ledger, List<Measurement> Measurements, bool Valid);
+    EvolutionResourceLedger Ledger, List<Measurement> Measurements, bool Valid, double ElapsedMilliseconds);

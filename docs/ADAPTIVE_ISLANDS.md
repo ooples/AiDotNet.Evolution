@@ -50,6 +50,16 @@ The policy fingerprints ordered membership, child identities/versions and every 
 
 Restore validates the policy graph and child-state presence before invoking any child. Invalid counters, non-finite rewards, attribution, incompatible membership and oversized payloads fail closed. If a child itself rejects state after another child has restored, discard the wrapper instance before retrying. Child-defined restore cannot be made transactional by this wrapper. Policy state is bounded to 16 Mi UTF-16 characters, pending attribution to 65,536 entries, and the recent reward window to 4,096 outcomes per island.
 
+The current `adaptive-islands-v2-strict-state` identity intentionally rejects older policy checkpoints.
+Every policy, island, reward, attribution and decision field must occur exactly once: missing default-valued fields,
+duplicates and unknown fields fail before child restoration. Checksums are not authentication; checkpoint storage is trusted.
+
+The v2 example records whole-run elapsed milliseconds and quality-versus-time measurements after eight separately
+accounted warmups (256 calls), rotating method order by seed. Timing includes in-process setup and checkpoint capture,
+not process startup, and never influences selection or deterministic replay. Single-host timing is descriptive, not a
+speedup claim. The analyzer reconciles summary fields, objectives, running bests, measurement identities, receipts and
+timing against raw artifacts, in addition to checking their hashes. Failed campaigns remain retained and fail validation.
+
 Engine and resource-ledger snapshots must describe the same quiescent boundary. The resource ledger intentionally lives outside engine rollback because canceled/dispatched work can still cost resources. The example saves both together in process; it is not a durable distributed transaction protocol. Continuous-dispatch replay comparisons must also hold checkpoint scheduling fixed: checkpoint drains can change the context available to later proposals.
 
 ## Validation

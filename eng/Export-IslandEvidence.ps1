@@ -7,7 +7,7 @@ $ErrorActionPreference = 'Stop'
 if ($Revision -notmatch '^[0-9a-f]{40}$') { throw 'Supply the full production revision.' }
 $source = (Resolve-Path -LiteralPath $InputFile).Path
 $report = Get-Content -LiteralPath $source -Raw | ConvertFrom-Json
-if ($report.Protocol -ne 'fixed-adaptive-islands-pilot-v1' -or $report.AssemblyVersion -notlike "*$Revision*") {
+if ($report.Protocol -ne 'fixed-adaptive-islands-pilot-v2' -or $report.AssemblyVersion -notlike "*$Revision*") {
     throw 'The artifact protocol or embedded source revision does not match.'
 }
 $directory = [IO.Path]::GetFullPath($OutputDirectory)
@@ -28,6 +28,7 @@ $runs = @($report.Runs | ForEach-Object {
         Task = $_.Task; Method = $_.Method; Seed = $_.Seed; Status = $_.Status
         InitialPopulationHash = $_.InitialPopulationHash; EvaluatorCalls = $_.EvaluatorCalls; Proposals = $_.Proposals
         FinalQuality = $_.FinalQuality; StateHash = $_.StateHash; ReplayStateHash = $_.ReplayStateHash; ResumeStateHash = $_.ResumeStateHash
+        ElapsedMilliseconds = $_.ElapsedMilliseconds
         Statistics = $_.Statistics; Spent = $_.Resources.Spent; Unknown = $_.Resources.Unknown; MaximumViolated = $_.Resources.MaximumViolated
     }
 })
@@ -36,6 +37,8 @@ $resumes = @($report.Runs | Where-Object { $null -ne $_.ResumeStateHash }).Count
 $summary = [ordered]@{
     Protocol = $report.Protocol; SourceRevision = $Revision; AssemblyVersion = $report.AssemblyVersion; AssemblySha256 = $report.AssemblySha256
     Seeds = $report.Seeds; EvaluatorCallCap = $report.EvaluatorCallCap; AllValid = $report.AllValid
+    WarmupEvaluatorCalls = $report.WarmupEvaluatorCalls; Runtime = $report.Runtime
+    OperatingSystem = $report.OperatingSystem; ProcessorCount = $report.ProcessorCount; TimingProtocol = $report.TimingProtocol
     RawFile = 'raw.json.gz'; RawSha256 = (Get-FileHash -LiteralPath $source -Algorithm SHA256).Hash.ToLowerInvariant()
     GzipSha256 = (Get-FileHash -LiteralPath $rawTarget -Algorithm SHA256).Hash.ToLowerInvariant()
     RawBytes = (Get-Item -LiteralPath $source).Length; GzipBytes = (Get-Item -LiteralPath $rawTarget).Length

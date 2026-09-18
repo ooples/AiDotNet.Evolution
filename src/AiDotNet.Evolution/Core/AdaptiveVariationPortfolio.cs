@@ -28,6 +28,7 @@ public sealed class AdaptiveVariationPortfolio<TGenome> : IOutcomeAwareVariation
     private ArmState[] _arms;
     private SortedDictionary<long, int> _pending = new();
     private SortedDictionary<long, ParentCredit>? _credit;
+    private bool _notifying;
 
     /// <summary>Creates the archive-success/evaluator-cost portfolio with measurement-origin-aware learning.</summary>
     public AdaptiveVariationPortfolio(IEnumerable<IVariationOperator<TGenome>> operators, double explorationProbability = 0.1)
@@ -61,7 +62,7 @@ public sealed class AdaptiveVariationPortfolio<TGenome> : IOutcomeAwareVariation
             throw new ArgumentException("Every operator must supply checkpointed proposal costs using the policy's declared units.", nameof(operators));
         if (rewardPolicy is not null) _credit = new();
         _arms = _operators.Select(_ => new ArmState()).ToArray();
-        VersionHash = EvolutionHash.Combine(new[] { "adaptive-variation-v2-measurement-origin", EvolutionHash.EncodeDouble(explorationProbability) }
+        VersionHash = EvolutionHash.Combine(new[] { "adaptive-variation-v3-valid-measurement", EvolutionHash.EncodeDouble(explorationProbability) }
             .Concat(_operators.SelectMany(op => new[] { op.Id, op.VersionHash })));
         if (rewardPolicy is not null) VersionHash = EvolutionHash.Combine(new[] { "adaptive-variation-credit-v3-measurement-origin", VersionHash, rewardPolicy.VersionHash });
     }
@@ -77,6 +78,28 @@ public sealed class AdaptiveVariationPortfolio<TGenome> : IOutcomeAwareVariation
     /// when a full audit trace is needed; learned totals and pending attribution remain in CaptureState.</remarks>
     public EvolutionOperatorCredit? LastCredit { get; private set; }
 
+    /// <summary>Raised once after each successfully committed portfolio outcome, with detached child attribution.</summary>
+    /// <remarks>Notifications do not supply learning input and are not replayed after restore. Each registered
+    /// handler is invoked once; handler exceptions are counted and isolated, not retried. This is an in-process
+    /// notification contract, not transactional exactly-once delivery to an external store. Handlers must not
+    /// reenter the portfolio. Persist receipts using their evaluation/generation identity when durable audit is needed.</remarks>
+    public event Action<EvolutionOperatorCredit>? CreditCommitted;
+
+    /// <summary>Gets failed notification-handler invocations; diagnostic only, reset by restore.</summary>
+    public long CreditNotificationFailures { get; private set; }
+
+    /// <summary>Returns the selected child's pending proposal receipt before its terminal outcome consumes it.</summary>
+    /// <remarks>Requires an explicit proposal-inclusive policy. Never charges resources again or invents a zero
+    /// receipt for an unknown generation. Allows consumer adapters to expose the common cost-provider contract.</remarks>
+    public EvolutionProposalCost GetProposalCost(long generation)
+    {
+        if (_rewardPolicy?.CostBasis != EvolutionOperatorCostBasis.ProposalAndEvaluation)
+            throw new InvalidOperationException("The portfolio does not have proposal-inclusive cost semantics.");
+        if (!_pending.TryGetValue(generation, out int index))
+            throw new InvalidOperationException("Unknown or consumed portfolio proposal identity.");
+        return ((IEvolutionProposalCostProvider)_operators[index]).GetProposalCost(generation);
+    }
+
     /// <summary>Returns detached per-operator statistics, in constructor order.</summary>
     public IReadOnlyList<EvolutionOperatorStatistics> Statistics => Array.AsReadOnly(_arms
         .Select((arm, index) => new EvolutionOperatorStatistics(_operators[index].Id,
@@ -87,6 +110,7 @@ public sealed class AdaptiveVariationPortfolio<TGenome> : IOutcomeAwareVariation
         CancellationToken cancellationToken = default)
     {
         Guard.NotNull(context);
+        RejectNotificationReentry();
         cancellationToken.ThrowIfCancellationRequested();
         if (context.Generation <= 0 || _pending.ContainsKey(context.Generation))
             throw new ArgumentException("A proposal requires a unique positive generation.", nameof(context));
@@ -115,12 +139,15 @@ public sealed class AdaptiveVariationPortfolio<TGenome> : IOutcomeAwareVariation
     public void Observe(EvolutionEvaluation evaluation, EvolutionArchiveInsertionResult? insertionResult)
     {
         Guard.NotNull(evaluation);
+        RejectNotificationReentry();
         if (!_pending.TryGetValue(evaluation.Lineage.Generation, out int index))
             throw new InvalidOperationException("The portfolio received an unknown or repeated outcome.");
         bool improved = insertionResult is EvolutionArchiveInsertionResult.Inserted or
             EvolutionArchiveInsertionResult.Replaced or EvolutionArchiveInsertionResult.InsertedWithEviction;
         double reward = evaluation.Status == EvolutionEvaluationStatus.Completed &&
-            !evaluation.IsMeasurementReuse && improved
+            !evaluation.IsMeasurementReuse && improved && evaluation.Cost.AttemptCount > 0 && evaluation.Quality.HasValue &&
+            evaluation.ConstraintViolations.All(value => value <= 0) &&
+            !evaluation.Diagnostics.Any(diagnostic => diagnostic.Code is "resource_cost_unknown" or "resource_cost_unrepresentable" or "resource_maximum_exceeded")
             ? 1 / Math.Max(1, evaluation.Cost.CostUnits) : 0;
         ParentCredit? baseline = null;
         EvolutionProposalCost? cost = null;
@@ -138,12 +165,30 @@ public sealed class AdaptiveVariationPortfolio<TGenome> : IOutcomeAwareVariation
         _arms[index].Outcomes = checked(_arms[index].Outcomes + 1);
         _arms[index].RewardSum += reward;
         LastCredit = new(evaluation.Lineage.Generation, _operators[index].Id, _operators[index].VersionHash,
-            _rewardPolicy?.VersionHash ?? "archive-success-evaluator-cost-v2-measurement-origin", baseline?.Quality, evaluation, insertionResult, cost, reward);
+            _rewardPolicy?.VersionHash ?? "archive-success-evaluator-cost-v3-valid-measurement", baseline?.Quality, evaluation, insertionResult, cost, reward);
+        if (CreditCommitted is { } notification)
+        {
+            EvolutionOperatorCredit committed = LastCredit;
+            _notifying = true;
+            try
+            {
+                foreach (Action<EvolutionOperatorCredit> handler in notification.GetInvocationList())
+                {
+                    try { handler(committed); }
+                    catch (Exception exception) when (exception is not OutOfMemoryException)
+                    {
+                        if (CreditNotificationFailures < long.MaxValue) CreditNotificationFailures++;
+                    }
+                }
+            }
+            finally { _notifying = false; }
+        }
     }
 
     /// <inheritdoc/>
     public string CaptureState()
     {
+        RejectNotificationReentry();
         string state = JsonSerializer.Serialize(new PortfolioState
         {
             VersionHash = VersionHash,
@@ -163,6 +208,7 @@ public sealed class AdaptiveVariationPortfolio<TGenome> : IOutcomeAwareVariation
     public void RestoreState(string state)
     {
         Guard.NotNull(state);
+        RejectNotificationReentry();
         if (state.Length > MaximumStateCharacters)
             throw new InvalidDataException("The portfolio state exceeds its safety limit.");
         PortfolioState? restored;
@@ -203,9 +249,15 @@ public sealed class AdaptiveVariationPortfolio<TGenome> : IOutcomeAwareVariation
         _pending = restored.Pending;
         _credit = restored.Credit;
         LastCredit = null;
+        CreditNotificationFailures = 0;
     }
 
     private static double MeanReward(ArmState arm) => arm.Outcomes == 0 ? 0 : arm.RewardSum / arm.Outcomes;
+
+    private void RejectNotificationReentry()
+    {
+        if (_notifying) throw new InvalidOperationException("Credit notification handlers cannot reenter portfolio mutation or checkpoint operations.");
+    }
 
     private sealed class ArmState
     {

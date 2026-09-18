@@ -1,0 +1,30 @@
+{
+  "schema": "aidotnet-benchmark-suite-v1",
+  "upstream": "https://github.com/oripress/AlgoTune",
+  "upstream_revision": "dff9914c10800c7a031c9e8c3d4d1c8cd1b38906",
+  "partitions": ["development", "selection", "final"],
+  "numeric": [
+    {"id":"block-trap","family":"deceptive-binary-blocks","partition":"development","features":["deceptive"],"work_units":1},
+    {"id":"rastrigin","family":"periodic-separable-landscapes","partition":"development","features":["multimodal"],"work_units":1},
+    {"id":"knapsack","family":"capacity-selection","partition":"development","features":["constrained"],"work_units":1},
+    {"id":"stochastic-regression","family":"noisy-linear-prediction","partition":"selection","features":["noisy"],"work_units":16},
+    {"id":"diffusion-control","family":"time-stepped-diffusion","partition":"selection","features":["expensive"],"work_units":256},
+    {"id":"coupled-absolute","family":"nonsmooth-coupled-losses","partition":"selection","features":["nonsmooth"],"work_units":1},
+    {"id":"spin-glass","family":"signed-interaction-graphs","partition":"final","features":["multimodal","deceptive"],"work_units":1},
+    {"id":"inventory-risk","family":"stochastic-inventory-control","partition":"final","features":["noisy","expensive"],"work_units":128},
+    {"id":"robust-design","family":"nonlinear-robust-constraints","partition":"final","features":["constrained"],"work_units":16}
+  ],
+  "algotune": [
+    {"id":"base64_encoding","family":"binary-encoding","partition":"development","class":"Base64Encoding","scale":1,"blob":"ccdf9b8bd6310fff74abc0a8a4b77cfa94c7ef7e"},
+    {"id":"sha256_hashing","family":"cryptographic-digests","partition":"development","class":"Sha256Hashing","scale":1,"blob":"a6e83eca96888e977f07ae554fab13323abd9ea6"},
+    {"id":"count_connected_components","family":"graph-algorithms","partition":"development","class":"CountConnectedComponents","scale":16,"blob":"6d5c47fa8d78a4561db18d8d679d4682600792c7"},
+    {"id":"minimum_spanning_tree","family":"graph-algorithms","partition":"development","class":"MinimumSpanningTree","scale":16,"blob":"9b9e536b1219f6cfb35f30d08b6d4d4eb7cb0c0f"},
+    {"id":"shortest_path_dijkstra","family":"graph-algorithms","partition":"development","class":"ShortestPathDijkstra","scale":16,"blob":"37af56d5bf1a1f003afe76ef1894f5488a55e3b0"},
+    {"id":"convolve_1d","family":"discrete-signal-processing","partition":"selection","class":"Convolve1D","scale":1,"blob":"4de6dd3d12c3891f4a50fe2d25992b6add2eacf8"},
+    {"id":"correlate_1d","family":"discrete-signal-processing","partition":"selection","class":"Correlate1D","scale":1,"blob":"9d9b34ecdfee1766aaae3d3e5c187f93462c3669"},
+    {"id":"stable_matching","family":"preference-matching","partition":"selection","class":"StableMatchingTask","scale":16,"blob":"11a39d944a14c5e9e9e5c31a0b07a05511d454a5"},
+    {"id":"matrix_multiplication","family":"dense-linear-algebra","partition":"final","class":"MatrixMultiplication","scale":16,"blob":"f5a0e85511d97374ab5c3ac00a94561b5d24b148"},
+    {"id":"outer_product","family":"dense-linear-algebra","partition":"final","class":"VectorOuterProduct","scale":16,"blob":"6747654312f4647cee4e7d21473eab53de9d9e50"},
+    {"id":"unit_simplex_projection","family":"convex-projection","partition":"final","class":"unit_simplex_projection","scale":32,"blob":"2578e2e4b02c404b5cc7febe58c8044bcbacf4d0"}
+  ]
+}

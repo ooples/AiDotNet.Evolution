@@ -44,7 +44,7 @@ public sealed partial class AdaptiveIslandSearch<TGenome> : IOutcomeAwareVariati
         _epochLength = _members.Length * _options.ProposalsPerIslandPerEpoch;
         _identities = _members.Select(Identity).ToArray();
         _islands = _members.Select(_ => new IslandState()).ToArray();
-        VersionHash = EvolutionHash.Combine(new[] { "adaptive-islands-v1", _options.VersionHash }.Concat(_identities));
+        VersionHash = EvolutionHash.Combine(new[] { "adaptive-islands-v2-strict-state", _options.VersionHash }.Concat(_identities));
     }
 
     /// <inheritdoc/>

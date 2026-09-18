@@ -106,6 +106,37 @@ public sealed class EvolutionResourceLedgerTests
     }
 
     [Fact]
+    public void ARestoredLedgerReportsStageTotalsIdenticallyToOneThatNeverStopped()
+    {
+        // Not just numerically equal -- identical as serialized text. A decimal keeps the scale of
+        // the arithmetic that produced it, so a stage whose reservations were added and then
+        // subtracted holds 0.00 while one rebuilt from a bare zero holds 0. Both are zero; only one
+        // matches the uninterrupted run, and the separate-process recovery check compares reports
+        // as text, which is what caught this.
+        var live = Ledger(100, retained: 8);
+        var identical = Ledger(100, retained: 8);
+        foreach (EvolutionResourceLedger ledger in new[] { live, identical })
+        {
+            using var setup = Assert.IsType<EvolutionResourceReservation>(
+                ledger.TryReserve("s", EvolutionResourceStage.Setup, Cost(0.08m), Cost(0.08m)));
+            setup.Complete(Cost(0.08m));
+            using var evaluation = Assert.IsType<EvolutionResourceReservation>(
+                ledger.TryReserve("e", EvolutionResourceStage.Evaluation, Cost(1.5m), Cost(2.50m)));
+            evaluation.Complete(Cost(1.25m));
+            ledger.TryReserve("p", EvolutionResourceStage.Proposal, Cost(1m), Cost(3.000m));
+        }
+
+        var restored = Ledger(100, retained: 8);
+        restored.RestoreState(identical.CaptureState());
+
+        string Stages(EvolutionResourceLedger ledger) => string.Join("|", ledger.Snapshot().Stages
+            .Select(stage => $"{stage.Stage}:spent={stage.Spent["cost_units"]}:reserved={stage.Reserved["cost_units"]}"
+                             + $":admitted={stage.Admitted}:settled={stage.Settled}:unknown={stage.Unknown}"));
+        Assert.Equal(Stages(live), Stages(restored));
+        Assert.Contains("Setup:spent=0.08:reserved=0.00", Stages(restored));
+    }
+
+    [Fact]
     public void RestorePreservesPendingAndSettledOperationsAndAllowsBudgetChanges()
     {
         var ledger = Ledger(10, retained: 1);

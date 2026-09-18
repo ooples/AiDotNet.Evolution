@@ -1,0 +1,82 @@
+{
+  "schema": "engine-profile-evidence-v1",
+  "sourceRevision": "0bed72d64516f244ed59bbcea2c6816caf7bc9b7",
+  "status": "failed",
+  "reason": "the deterministic comparison grouped checkpoint-on and checkpoint-off runs into one fixed-semantics group; continuous checkpoint drains change proposal context and lineage",
+  "attempts": 132,
+  "passedAttempts": 132,
+  "divergences": [
+    {
+      "determinismKey": "engine|256|8|1|256|False|Continuous|8|4711",
+      "groups": [
+        {
+          "stateHash": "603c6ed5029ffdf902eeb142dde1d9281175715692c4d919069010bbff9f6200",
+          "attempts": [
+            "engine-w1-Continuous-cheap-cp0-r0",
+            "engine-w1-Continuous-cheap-cp0-r1",
+            "engine-w1-Continuous-cheap-cp0-r2",
+            "engine-w2-Continuous-cheap-cp0-r0",
+            "engine-w2-Continuous-cheap-cp0-r1",
+            "engine-w2-Continuous-cheap-cp0-r2",
+            "engine-w4-Continuous-cheap-cp0-r0",
+            "engine-w4-Continuous-cheap-cp0-r1",
+            "engine-w4-Continuous-cheap-cp0-r2"
+          ]
+        },
+        {
+          "stateHash": "b0f7a1616b61fc70b2c6723ba85b4e97f987d99eda223215a888c05ebaa65f2f",
+          "attempts": [
+            "engine-w1-Continuous-cheap-cp1-r0",
+            "engine-w1-Continuous-cheap-cp1-r1",
+            "engine-w1-Continuous-cheap-cp1-r2",
+            "engine-w2-Continuous-cheap-cp1-r0",
+            "engine-w2-Continuous-cheap-cp1-r1",
+            "engine-w2-Continuous-cheap-cp1-r2",
+            "engine-w4-Continuous-cheap-cp1-r0",
+            "engine-w4-Continuous-cheap-cp1-r1",
+            "engine-w4-Continuous-cheap-cp1-r2"
+          ]
+        }
+      ]
+    },
+    {
+      "determinismKey": "engine|256|8|1|256|True|Continuous|8|4711",
+      "groups": [
+        {
+          "stateHash": "140ba5093008e65ff24f605d916407b7020edc9a7027fbf9a053b9f3e2586c91",
+          "attempts": [
+            "engine-w1-Continuous-mixed-cp1-r0",
+            "engine-w1-Continuous-mixed-cp1-r1",
+            "engine-w1-Continuous-mixed-cp1-r2",
+            "engine-w2-Continuous-mixed-cp1-r0",
+            "engine-w2-Continuous-mixed-cp1-r1",
+            "engine-w2-Continuous-mixed-cp1-r2",
+            "engine-w4-Continuous-mixed-cp1-r0",
+            "engine-w4-Continuous-mixed-cp1-r1",
+            "engine-w4-Continuous-mixed-cp1-r2"
+          ]
+        },
+        {
+          "stateHash": "f4ed27cf06df40e3d303589804eadfa9cdf520bb9426daa7317c386854d663ed",
+          "attempts": [
+            "engine-w1-Continuous-mixed-cp0-r0",
+            "engine-w1-Continuous-mixed-cp0-r1",
+            "engine-w1-Continuous-mixed-cp0-r2",
+            "engine-w2-Continuous-mixed-cp0-r0",
+            "engine-w2-Continuous-mixed-cp0-r1",
+            "engine-w2-Continuous-mixed-cp0-r2",
+            "engine-w4-Continuous-mixed-cp0-r0",
+            "engine-w4-Continuous-mixed-cp0-r1",
+            "engine-w4-Continuous-mixed-cp0-r2"
+          ]
+        }
+      ]
+    }
+  ],
+  "raw": {
+    "fileName": "0bed72d-failed-report.json",
+    "bytes": 4404769,
+    "sha256": "a0753a2056794e40061df92beec21aa1ad543326f5a830aac9c66d7792f21bd0",
+    "downloadUrl": "https://github.com/ooples/AiDotNet.Evolution/releases/download/evidence-us-10-b6303d6/0bed72d-failed-report.json"
+  }
+}

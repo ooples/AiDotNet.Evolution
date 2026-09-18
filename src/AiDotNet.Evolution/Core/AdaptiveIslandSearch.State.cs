@@ -31,7 +31,12 @@ public sealed partial class AdaptiveIslandSearch<TGenome>
         EnsureIdentities();
         if (state.Length > MaximumStateCharacters) throw new InvalidDataException("The island state exceeds its safety limit.");
         PolicyState? deserialized;
-        try { deserialized = JsonSerializer.Deserialize<PolicyState>(state, EvolutionJson.Compact); }
+        try
+        {
+            using JsonDocument document = JsonDocument.Parse(state);
+            ValidateFields(document.RootElement);
+            deserialized = JsonSerializer.Deserialize<PolicyState>(state, EvolutionJson.Compact);
+        }
         catch (JsonException exception) { throw new InvalidDataException("The island state is invalid.", exception); }
         ValidatedPolicyState restored = Validate(deserialized);
         IVariationOperator<TGenome>[] children = _members.SelectMany(member => new[] { member.Variation, member.Restart }).ToArray();
@@ -43,6 +48,45 @@ public sealed partial class AdaptiveIslandSearch<TGenome>
                 child.RestoreState(childState);
         _islands = restored.Islands; _pending = restored.Pending; _decisions = restored.Decisions;
         _epoch = restored.Epoch; _lastGeneration = restored.LastGeneration;
+    }
+
+    private static void ValidateFields(JsonElement root)
+    {
+        if (root.ValueKind == JsonValueKind.Null) return;
+        RequireFields(root, "VersionHash", "Islands", "Pending", "Decisions", "Children", "Epoch", "LastGeneration");
+        foreach (JsonElement island in RequireArray(root.GetProperty("Islands")))
+        {
+            if (island.ValueKind == JsonValueKind.Null) continue;
+            RequireFields(island, "Proposals", "Outcomes", "Fresh", "RestartProposals", "RestartOutcomes", "Phases",
+                "Remaining", "Stagnation", "EpochProposals", "Recent");
+            foreach (JsonElement reward in RequireArray(island.GetProperty("Recent")))
+                if (reward.ValueKind != JsonValueKind.Null) RequireFields(reward, "Gain", "Diversity");
+        }
+        JsonElement pending = root.GetProperty("Pending");
+        if (pending.ValueKind != JsonValueKind.Object) throw new InvalidDataException("The island state is incompatible or incomplete.");
+        var generations = new HashSet<string>(StringComparer.Ordinal);
+        foreach (JsonProperty item in pending.EnumerateObject())
+        {
+            if (!generations.Add(item.Name)) throw new InvalidDataException("Duplicate pending attribution.");
+            if (item.Value.ValueKind != JsonValueKind.Null) RequireFields(item.Value, "Island", "Restart", "ParentQuality");
+        }
+        foreach (JsonElement decision in RequireArray(root.GetProperty("Decisions")))
+            if (decision.ValueKind != JsonValueKind.Null) RequireFields(decision, "Generation", "Island", "Restart");
+    }
+
+    private static JsonElement.ArrayEnumerator RequireArray(JsonElement value)
+    {
+        if (value.ValueKind != JsonValueKind.Array) throw new InvalidDataException("The island state is incompatible or incomplete.");
+        return value.EnumerateArray();
+    }
+
+    private static void RequireFields(JsonElement value, params string[] fields)
+    {
+        if (value.ValueKind != JsonValueKind.Object) throw new InvalidDataException("Invalid island state object.");
+        var remaining = new HashSet<string>(fields, StringComparer.Ordinal);
+        foreach (JsonProperty property in value.EnumerateObject())
+            if (!remaining.Remove(property.Name)) throw new InvalidDataException("Unknown or duplicate island state field.");
+        if (remaining.Count != 0) throw new InvalidDataException("The island state is incompatible or incomplete.");
     }
 
     private ValidatedPolicyState Validate(PolicyState? state)
