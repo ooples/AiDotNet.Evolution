@@ -105,13 +105,70 @@ internal static class EvolutionEngineDocuments
         /// <summary>The descriptor ranges in force at checkpoint time, which a Grow axis widens during a run.</summary>
         public List<DescriptorDocument>? Descriptors { get; set; }
 
+        [JsonIgnore(Condition = JsonIgnoreCondition.WhenWritingNull)]
+        public ParetoDocument? Pareto { get; set; }
+
+        [JsonIgnore(Condition = JsonIgnoreCondition.WhenWritingNull)]
+        public List<ArchiveEntryDocument>? InfeasibleEntries { get; set; }
+
         public static ArchiveDocument From<TGenome>(IEvolutionArchive<TGenome> archive, Func<TGenome, string> serializeGenome) => new()
         {
             Version = archive.Version,
+            Pareto = (archive as IEvolutionParetoArchiveView<TGenome>)?.ParetoDefinition is { } definition ? ParetoDocument.From(definition) : null,
+            InfeasibleEntries = (archive as IEvolutionParetoArchiveView<TGenome>)?.InfeasibleEntries?
+                .OrderBy(entry => entry.Cell.StableKey, StringComparer.Ordinal).Select(entry => ArchiveEntryDocument.From(entry, serializeGenome)).ToList(),
             Descriptors = archive.Descriptors.Select(DescriptorDocument.From).ToList(),
             Entries = archive.Entries.OrderBy(item => item.Cell.StableKey, StringComparer.Ordinal)
                 .Select(entry => ArchiveEntryDocument.From(entry, serializeGenome)).ToList()
         };
+    }
+
+    internal sealed class ParetoDocument
+    {
+        public int Capacity { get; set; }
+        [JsonIgnore(Condition = JsonIgnoreCondition.WhenWritingNull)]
+        public int? ConstraintCount { get; set; }
+        [JsonIgnore(Condition = JsonIgnoreCondition.WhenWritingDefault)]
+        public int InfeasibleCapacity { get; set; }
+        public EvolutionParetoRepresentative Representative { get; set; }
+        public List<ObjectiveDocument>? Objectives { get; set; }
+
+        public static ParetoDocument From(EvolutionParetoDefinition definition) => new()
+        {
+            Capacity = definition.Capacity,
+            InfeasibleCapacity = definition.InfeasibleCapacity,
+            ConstraintCount = definition.ConstraintCount,
+            Representative = definition.Representative,
+            Objectives = definition.Objectives.Select(axis => new ObjectiveDocument
+            {
+                Name = axis.Name,
+                Direction = axis.Direction,
+                Minimum = axis.Minimum,
+                Maximum = axis.Maximum,
+                Resolution = axis.Resolution
+            }).ToList()
+        };
+
+        public EvolutionParetoDefinition ToDefinition()
+        {
+            if (Objectives is null || Objectives.Count > 8 || Objectives.Any(axis => axis is null))
+                throw new InvalidDataException("Checkpoint objective definitions are missing or exceed the bound.");
+            try
+            {
+                return new EvolutionParetoDefinition(Objectives.Select(axis => new EvolutionObjectiveDefinition(
+                    axis.Name, axis.Direction, axis.Minimum, axis.Maximum, axis.Resolution)), Capacity, Representative, InfeasibleCapacity, ConstraintCount);
+            }
+            catch (ArgumentException exception) { throw new InvalidDataException("Invalid checkpoint objective definition.", exception); }
+        }
+    }
+
+    internal sealed class ObjectiveDocument
+    {
+        public string Name { get; set; } = string.Empty;
+        public EvolutionOptimizationDirection Direction { get; set; }
+        public double Minimum { get; set; }
+        public double Maximum { get; set; }
+        public double Resolution { get; set; }
     }
 
     internal sealed class DescriptorDocument

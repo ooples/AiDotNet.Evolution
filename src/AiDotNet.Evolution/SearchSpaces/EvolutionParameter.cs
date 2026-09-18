@@ -63,12 +63,25 @@ public sealed class EvolutionParameterCondition
 /// <summary>An immutable parameter domain with optional activation conditions.</summary>
 public sealed class EvolutionParameter
 {
+    // Logarithmic coordinates use the ratio maximum/minimum, whose rounding is IEEE-deterministic, rather than a
+    // difference of two logarithms that cancels catastrophically and depends on the runtime's Math.Log rounding.
+    private readonly double _logSpan;
+    private readonly bool _logRatioIsFinite;
+    private readonly bool _logSpanIsLinear;
+
     private EvolutionParameter(string name, EvolutionParameterKind kind, double minimum, double maximum,
         string[] categories, EvolutionParameterCondition[] conditions)
     {
         ValidateName(name);
         Name = name; Kind = kind; Minimum = minimum == 0 ? 0 : minimum; Maximum = maximum == 0 ? 0 : maximum;
         Categories = Array.AsReadOnly(categories); Conditions = Array.AsReadOnly(conditions);
+        if (kind != EvolutionParameterKind.Logarithmic || Maximum <= Minimum) return;
+        double ratio = Maximum / Minimum;
+        _logRatioIsFinite = EvolutionDescriptorDefinition.IsFinite(ratio);
+        // Below one part in 1e9 the logarithmic and linear maps differ by under 1.3e-10 of the normalized span,
+        // while the linear map avoids cancellation and keeps representable narrow-domain points distinct.
+        _logSpanIsLinear = _logRatioIsFinite && ratio - 1 < 1e-9;
+        _logSpan = _logRatioIsFinite ? Math.Log(ratio) : Math.Log(Maximum) - Math.Log(Minimum);
     }
     /// <summary>Gets the unique parameter name.</summary>
     public string Name { get; }
@@ -89,6 +102,10 @@ public sealed class EvolutionParameter
     public static EvolutionParameter Integer(string name, int minimum, int maximum) => Numeric(name, EvolutionParameterKind.Integer, minimum, maximum);
     /// <summary>Defines a strictly positive interval sampled and mutated in log space.</summary>
     public static EvolutionParameter Logarithmic(string name, double minimum, double maximum) => Numeric(name, EvolutionParameterKind.Logarithmic, minimum, maximum);
+    /// <summary>Defines a categorical domain containing the declared names of an enum, in ordinal order.</summary>
+    /// <remarks>Aliases remain distinct named choices. Flags combinations must be explicitly declared enum members.</remarks>
+    public static EvolutionParameter Enum<TEnum>(string name) where TEnum : struct, System.Enum =>
+        Categorical(name, System.Enum.GetNames(typeof(TEnum)).OrderBy(value => value, StringComparer.Ordinal));
     /// <summary>Defines between one and 256 distinct categorical choices.</summary>
     public static EvolutionParameter Categorical(string name, IEnumerable<string> choices)
     {
@@ -139,9 +156,11 @@ public sealed class EvolutionParameter
     {
         if (!Contains(value) || Kind == EvolutionParameterKind.Categorical) throw new ArgumentException("A valid numeric value is required.", nameof(value));
         if (Maximum == Minimum) return 0;
-        return Kind == EvolutionParameterKind.Logarithmic
-            ? (Math.Log(value.Number) - Math.Log(Minimum)) / (Math.Log(Maximum) - Math.Log(Minimum))
-            : (value.Number - Minimum) / (Maximum - Minimum);
+        if (Kind != EvolutionParameterKind.Logarithmic || _logSpanIsLinear) return (value.Number - Minimum) / (Maximum - Minimum);
+        double coordinate = _logRatioIsFinite
+            ? Math.Log(value.Number / Minimum) / _logSpan
+            : (Math.Log(value.Number) - Math.Log(Minimum)) / _logSpan;
+        return Math.Max(0, Math.Min(1, coordinate));
     }
 
     /// <summary>Decodes a normalized numeric coordinate, clipping finite out-of-range values and rounding integers.</summary>
@@ -150,9 +169,13 @@ public sealed class EvolutionParameter
         if (!EvolutionDescriptorDefinition.IsFinite(coordinate) || Kind == EvolutionParameterKind.Categorical)
             throw new ArgumentOutOfRangeException(nameof(coordinate));
         double t = Math.Max(0, Math.Min(1, coordinate));
-        double value = Kind == EvolutionParameterKind.Logarithmic
-            ? Math.Exp(Math.Log(Minimum) + t * (Math.Log(Maximum) - Math.Log(Minimum)))
-            : Minimum + t * (Maximum - Minimum);
+        // Both endpoints are pinned exactly: a parent sitting on a bound and mutating outward keeps its identity.
+        double value = t <= 0 ? Minimum
+            : t >= 1 ? Maximum
+            : Kind != EvolutionParameterKind.Logarithmic || Maximum <= Minimum ? Minimum + t * (Maximum - Minimum)
+            : _logSpanIsLinear ? Minimum + t * (Maximum - Minimum)
+            : _logRatioIsFinite ? Minimum * Math.Exp(t * _logSpan)
+            : Math.Exp(Math.Log(Minimum) + t * _logSpan);
         value = Math.Max(Minimum, Math.Min(Maximum, value));
         return EvolutionParameterValue.Numeric(Kind == EvolutionParameterKind.Integer ? Math.Round(value, MidpointRounding.AwayFromZero) : value);
     }
@@ -162,7 +185,9 @@ public sealed class EvolutionParameter
     internal string DefinitionHash => EvolutionHash.Combine(new[] { Name, Kind.ToString(),
         EvolutionParameterValue.Numeric(Minimum).Canonical, EvolutionParameterValue.Numeric(Maximum).Canonical,
         EvolutionHash.Combine(Categories) }.Concat(Conditions.OrderBy(condition => condition.Parameter, StringComparer.Ordinal)
-        .Select(condition => EvolutionHash.Combine(new[] { condition.Parameter }.Concat(condition.AnyOf.Select(value => value.Canonical))))));
+        .Select(condition => EvolutionHash.Combine(new[] { condition.Parameter }.Concat(condition.AnyOf.Select(value => value.Canonical)))))
+        .Concat(Kind == EvolutionParameterKind.Logarithmic ? new[] { "log-domain-v3-ratio-pinned" }
+            : Kind == EvolutionParameterKind.Real ? new[] { "real-domain-v2-pinned" } : Array.Empty<string>()));
 
     internal static void ValidateName(string name)
     {
@@ -171,9 +196,16 @@ public sealed class EvolutionParameter
     }
     private static EvolutionParameter Numeric(string name, EvolutionParameterKind kind, double minimum, double maximum)
     {
-        if (!EvolutionDescriptorDefinition.IsFinite(minimum) || !EvolutionDescriptorDefinition.IsFinite(maximum) ||
-            maximum < minimum || !EvolutionDescriptorDefinition.IsFinite(maximum - minimum) ||
-            (kind == EvolutionParameterKind.Logarithmic && minimum <= 0)) throw new ArgumentOutOfRangeException(nameof(minimum));
+        if (!EvolutionDescriptorDefinition.IsFinite(minimum))
+            throw new ArgumentOutOfRangeException(nameof(minimum), minimum, "The minimum must be a finite number.");
+        if (!EvolutionDescriptorDefinition.IsFinite(maximum))
+            throw new ArgumentOutOfRangeException(nameof(maximum), maximum, "The maximum must be a finite number.");
+        if (kind == EvolutionParameterKind.Logarithmic && minimum <= 0)
+            throw new ArgumentOutOfRangeException(nameof(minimum), minimum, "A logarithmic minimum must be greater than zero.");
+        if (maximum < minimum)
+            throw new ArgumentOutOfRangeException(nameof(maximum), maximum, "The maximum must be greater than or equal to the minimum.");
+        if (!EvolutionDescriptorDefinition.IsFinite(maximum - minimum))
+            throw new ArgumentOutOfRangeException(nameof(maximum), maximum, "The interval width maximum - minimum must be finite.");
         return new(name, kind, minimum, maximum, Array.Empty<string>(), Array.Empty<EvolutionParameterCondition>());
     }
 }

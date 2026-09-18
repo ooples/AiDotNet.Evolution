@@ -22,7 +22,8 @@ public interface IOutcomeAwareVariationOperator<TGenome> : ICheckpointableVariat
     /// <param name="evaluation">The immutable outcome, including proposal lineage and evaluation costs.</param>
     /// <param name="insertionResult">
     /// The archive decision, or <see langword="null"/> when the evaluation did not complete.
-    /// A completed cached result is identifiable through <see cref="EvolutionEvaluation.CacheStatus"/>.
+    /// Declared measurement reuse is identifiable through <see cref="EvolutionEvaluation.IsMeasurementReuse"/>;
+    /// engine-only CacheStatus does not identify producer-side persistent reuse.
     /// </param>
     void Observe(EvolutionEvaluation evaluation, EvolutionArchiveInsertionResult? insertionResult);
 }

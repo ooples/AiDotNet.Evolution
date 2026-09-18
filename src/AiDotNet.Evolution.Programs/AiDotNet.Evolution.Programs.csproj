@@ -1,0 +1,23 @@
+<Project Sdk="Microsoft.NET.Sdk">
+  <PropertyGroup>
+    <TargetFrameworks>net10.0;net8.0</TargetFrameworks>
+    <ImplicitUsings>enable</ImplicitUsings>
+    <Nullable>enable</Nullable>
+    <TreatWarningsAsErrors>true</TreatWarningsAsErrors>
+    <Version>0.1.0-preview.1</Version>
+    <Description>Compiler-neutral bounded program improvement and artifact-bound promotion.</Description>
+    <RepositoryUrl>https://github.com/ooples/AiDotNet.Evolution</RepositoryUrl>
+    <PackageLicenseFile>AIDOTNET-LICENSE.txt</PackageLicenseFile>
+    <PackageReadmeFile>README.md</PackageReadmeFile>
+  </PropertyGroup>
+  <ItemGroup>
+    <None Include="Legacy/AIDOTNET-LICENSE.txt" Pack="true" PackagePath="AIDOTNET-LICENSE.txt" />
+    <None Include="../../LICENSE" Pack="true" PackagePath="APACHE-LICENSE.txt" />
+    <InternalsVisibleTo Include="AiDotNet.Evolution.CSharp.Tests" />
+    <InternalsVisibleTo Include="AiDotNet.Evolution.CSharp" />
+    <InternalsVisibleTo Include="AiDotNet.Evolution.Deployment" />
+    <None Include="../../docs/COMPILER_GUIDED_PROGRAMS.md" Pack="true" PackagePath="README.md" />
+    <ProjectReference Include="../AiDotNet.Evolution/AiDotNet.Evolution.csproj" />
+    <PackageReference Include="Newtonsoft.Json" Version="13.0.4" />
+  </ItemGroup>
+</Project>
