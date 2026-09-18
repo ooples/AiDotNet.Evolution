@@ -1,4 +1,5 @@
 extern alias AiDotNetConsumer;
+using AiDotNet.Evolution;
 using AiDotNet.Evolution.AutoML;
 using AiDotNet.Evolution.Deployment;
 using AiDotNet.Evolution.Programs;
@@ -13,4 +14,35 @@ if (search.GetType().Assembly.GetName().Name != "AiDotNet.Evolution.Deployment")
     throw new InvalidOperationException("Wrong AutoML owner.");
 if (typeof(AiDotNetConsumer::AiDotNet.Regression.MultipleRegression<double>).Assembly == search.GetType().Assembly)
     throw new InvalidOperationException("Consumer primitives must remain separate.");
-Console.WriteLine("PASS: packaged deployment and MAP-Elites consumer, without project references.");
+var taskOptions = new ProgramTaskOptions { Language = ProgramLanguage.Python, EnforceEvolveBlocks = true };
+int evaluations = 0;
+var fitness = new DelegateProgramFitnessEvaluator(genome =>
+{
+    evaluations++;
+    return genome.Source.Contains("value = 2", StringComparison.Ordinal) ? 2 : 1;
+});
+var task = new ProgramEvolutionTask(fitness, new ProgramDescriptorSet(new ProgramLengthDescriptor()), taskOptions);
+var engine = new EvolutionEngine<ProgramGenome>(task, new FixtureEdit(),
+    _ => new MapElitesArchive<ProgramGenome>(new[] { new EvolutionDescriptorDefinition("length", 0, 1000, 1) }),
+    new EvolutionEngineOptions { MaxProposals = 2, MaxEvaluationAttempts = 2, MaxGenerations = 1, ProposalBatchSize = 1, MaxDegreeOfParallelism = 1 });
+const string seed = "# EVOLVE-BLOCK-START\nvalue = 1\n# EVOLVE-BLOCK-END\n";
+var result = await engine.RunAsync(new[] { new ProgramGenome(seed, ProgramLanguage.Python) });
+if (evaluations != 2 || result.Best?.Evaluation.Quality != 2)
+    throw new InvalidOperationException("Packaged task/edit/descriptor engine integration failed.");
+if (typeof(ProgramEvolutionTask).Assembly.GetReferencedAssemblies().Any(reference => reference.Name == "AiDotNet"))
+    throw new InvalidOperationException("Program foundation must not depend on AiDotNet.");
+Console.WriteLine("PASS: packaged deployment, MAP-Elites and program foundation; 2 evaluations, fixture quality 1 -> 2; no project references.");
+
+sealed class FixtureEdit : IVariationOperator<ProgramGenome>
+{
+    public string Id => "package-fixture-edit";
+    public string VersionHash => "v1";
+    public ValueTask<ProgramGenome> ProposeAsync(EvolutionVariationContext<ProgramGenome> context, CancellationToken cancellationToken = default)
+    {
+        cancellationToken.ThrowIfCancellationRequested();
+        var edit = ProgramDiff.Apply(context.Parent.Candidate.CanonicalGenome.Genome.Source, new[] { new ProgramDiffBlock("value = 1", "value = 2") },
+            new ProgramTaskOptions { Language = ProgramLanguage.Python, EnforceEvolveBlocks = true });
+        if (!edit.IsSuccess) throw new InvalidOperationException("Package edit failed.");
+        return new(new ProgramGenome(edit.ModifiedSource, ProgramLanguage.Python));
+    }
+}
