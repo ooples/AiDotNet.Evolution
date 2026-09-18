@@ -153,18 +153,9 @@ public static class ProfileHost
         return QueryProcessCycleTime(GetCurrentProcess(), out ulong cycles) ? cycles : null;
     }
 
-    /// <summary>Nanosecond-resolution CPU time for this process from /proc (Linux); null elsewhere.</summary>
-    public static double? ProcessFineCpuMilliseconds()
-    {
-        if (!OperatingSystem.IsLinux()) return null;
-        try
-        {
-            string[] fields = File.ReadAllText("/proc/self/schedstat").Split(' ', StringSplitOptions.RemoveEmptyEntries);
-            return fields.Length > 0 && double.TryParse(fields[0], NumberStyles.Integer, CultureInfo.InvariantCulture, out double nanoseconds)
-                ? nanoseconds / 1_000_000d : null;
-        }
-        catch (IOException) { return null; }
-    }
+    /// <summary>Unavailable until a true process-wide high-resolution counter is provided.</summary>
+    /// <remarks>/proc/self/schedstat measures one task, not aggregate worker-thread CPU; do not label it process CPU.</remarks>
+    public static double? ProcessFineCpuMilliseconds() => null;
 
     /// <summary>Busy and total time accumulated by the given logical CPUs, for measuring load this profile does not own.</summary>
     public static ProfileCpuLoadSample? SampleCpuLoad(ulong mask, ushort group)

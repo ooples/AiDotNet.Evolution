@@ -172,9 +172,12 @@ public static class ProfileEvidence
         builder.Append("| --- | ---: | ---: | ---: | ---: | ---: | ---: | ---: |\n");
         foreach (var item in summary.Summaries)
         {
-            double minimumPerIteration = item.MinimumElapsedMilliseconds / Math.Max(1, item.MedianIterations);
-            double maximumPerIteration = item.MaximumElapsedMilliseconds / Math.Max(1, item.MedianIterations);
-            double kibPerOperation = item.MedianAllocatedBytes / Math.Max(1, item.MedianIterations * item.OperationsPerIteration) / 1024d;
+            var attempts = summary.Attempts.Where(attempt => attempt.CaseId == item.CaseId && attempt.Status == "passed").ToArray();
+            if (attempts.Length == 0 || attempts.Any(attempt => attempt.Operations <= 0 || attempt.Iterations <= 0))
+                throw new InvalidDataException("Published metrics require nonempty, positive-work attempts.");
+            double minimumPerIteration = attempts.Min(attempt => attempt.MillisecondsPerIteration);
+            double maximumPerIteration = attempts.Max(attempt => attempt.MillisecondsPerIteration);
+            double kibPerOperation = ProfileCampaign.Median(attempts.Select(attempt => attempt.ManagedAllocatedBytes / (double)attempt.Operations)) / 1024d;
             builder.Append(CultureInfo.InvariantCulture,
                 $"| {item.CaseId} | {Format(item.MedianOperationsPerSecond, 2)} | {Format(item.MedianIterations, 0)} | {Format(item.MedianMillisecondsPerIteration, 3)} | {Format(minimumPerIteration, 3)}-{Format(maximumPerIteration, 3)} | {Format(kibPerOperation, 3)} | {Format(item.MaximumLifetimePeakWorkingSetBytes / 1048576d, 2)} | {item.MaximumForeignCpuFraction * 100:F2}% |\n");
         }

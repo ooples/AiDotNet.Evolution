@@ -41,6 +41,7 @@ public static class ProfileRevision
         string informational = typeof(EvolutionSearchSpace).Assembly
             .GetCustomAttribute<AssemblyInformationalVersionAttribute>()?.InformationalVersion ?? string.Empty;
         EnsureMatches(supplied, informational);
+        EnsureMatches(supplied, typeof(ProfileRunner).Assembly.GetCustomAttribute<AssemblyInformationalVersionAttribute>()?.InformationalVersion);
         return new ProfileRevisionInfo(supplied, RevisionFrom(informational)!, informational, WorkingTree());
     }
 

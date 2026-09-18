@@ -1,0 +1,1 @@
+{"schema":"aidotnet-suite-configuration-v1","numeric_methods":["RandomSearch","HillClimb","FixedMapElites"],"program_solver":"upstream-reference"}

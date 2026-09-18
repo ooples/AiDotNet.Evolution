@@ -5,6 +5,28 @@ Implementation is continuing across the core and companion PRs. **The roadmap is
 
 Track the full plan through the [26 user-story issues and PR delivery index](USER_STORY_DELIVERY.md).
 
+## September 15: US-04 acceptance complete locally
+
+[PR #47](https://github.com/ooples/AiDotNet.Evolution/pull/47) now includes the
+[completed 72-cell real-program study](evidence/us04/PROGRAM_STUDY.md), independent
+cost accounting under trace loss, paired conditional intervals, fixed prospective
+planning, four-axis progress/AUC and reproducible offline scorecards. All 85
+analysis tests passed, alongside the final build, 654/608/608 .NET tests and 37
+external Python tests. All feature work is in AiDotNet.Evolution. CI, dependencies,
+independent review and user merging remain gates; no competitive win is claimed.
+
+## September 14: US-04 reporting implementation
+
+[PR #47](https://github.com/ooples/AiDotNet.Evolution/pull/47) now implements fixed-sample
+planning and one-use artifact-pinned execution, failure-aware scorecards, declared
+target censoring and offline HTML/SVG reports. Final verification: 654/608/608 .NET
+tests, 36 Python tests, 1,320 actual fixed numeric runs, repeated-use refusal,
+90.68%/76.20% coverage and clean build/format. [Raw evidence](evidence/us04/README.md).
+Base is US-02 #46, preserving US-01 #45 and foundation #15 transitively. No companion
+change is needed. Review readiness is not representative competitive confirmation,
+US-03 isolation approval, merge readiness, or completion of the entire roadmap.
+The following initial-delivery sections are historical, not a current count of drafts.
+
 ## Dependent story delivery
 
 The user chose to retain #15, AiDotNet #2148 and Tensors #1024 as shared foundations.
@@ -123,16 +145,16 @@ Durable evaluation identities and leases must be developed against its eventual 
 
 | Story | State | Work still required |
 | --- | --- | --- |
-| US-01 representative suites | Partial | Authored C# end-to-end pilot now runs; representative program/kernel/AutoML tasks, AlgoTune subset and sealed task partitions remain. |
-| US-02 fair baselines | Partial | Matched-population SciPy differential evolution now uses the shared C# evaluator and independent counters; native-default/tuned controls, OpenEvolve and consistent model access remain. |
+| US-01 representative suites | Implemented and locally verified; review/merge gates remain | [Nine numeric families and an 11-task pinned AlgoTune reference subset](../benchmarks/suite/README.md), independent generated instances, disjoint partitions, frozen-method final execution, one-use final receipts and reproducible source/runtime/resource manifests. 631 net10 tests, 608 each net8/net471, 17 Python protocol tests and all starting implementations verified. Contract evidence is not competitive superiority or a full AlgoTuner reproduction. |
+| US-02 fair baselines | Implemented adapters; empirical acceptance incomplete | Pinned SciPy/CMA-ME/OpenEvolve and controls; Evolution-owned program host, independently checked real Python candidates in resource-bounded Linux containers, daemon timing and a bounded development pilot. Registered holdouts, exact provider snapshot and equally budgeted native tuning remain. See [execution protocol](../benchmarks/external/PROGRAM_EXECUTION.md). |
 | US-03 correctness gates | Partial, companion | Real C# worker/facade checks and fail-closed truncated-output/owned-case contracts exist; trusted OS isolation, reference integrations and held-out validation remain. |
 | US-04 statistical evidence | Partial | Paired task/run analysis, failure-inclusive effects/intervals and trace checks implemented; prospective sample-size/power design and representative confirmation remain. |
 | US-05 resource ledger | Partial | Generic ledger and adapters plus bounded C# consumer model/compiler/setup/audit/evaluation integration implemented; other consumer stages, coordinated persistence and deterministic concurrent admission remain. |
 | US-06 noisy evaluation | Partial | Fresh bounded replicate runner, per-sample costs, finite-look uncertainty and separate confirmation identities implemented; archive resampling policy, cascade-rejection audit and representative noisy comparisons remain. |
-| US-07 ablations | Partial | Same-operator uniform/adaptive allocation is available; representative island, migration, novelty and dispatch ablations remain. |
-| US-08 adaptive operators | Partial | Parent-improvement/archive-success policies, proposal-plus-evaluator credit and typed attribution implemented; full consumer-stage integration and representative held-out comparisons before default promotion remain. |
-| US-09 Pareto pipeline | Not implemented | Feasibility, objective definitions, archive/snapshot/selection/stopping/migration semantics together. |
-| US-10 engine performance | Partial | 47 cases × three isolated repetitions on one host measure throughput, allocation, peak memory, checkpoint cost, utilization and quality-over-time, with measured delays, measured pinned-CPU contention and worker-determinism groups; frequency/power are recorded not pinned, islands and archive capacity are one-factor contrasts at one worker, and representative workloads plus release thresholds remain with US-01/US-04/US-12. |
+| US-07 ablations | Local-workload implementation verified; hosted gates pending | [Current v2 study](evolution-stories/US-07.md): 19 configurations, 7,968 runs, 509,952 calls, raw-bound before/after metrics and independent preset gate. All nominees inconclusive; baseline retained. No unrestricted-program or competitive claim. |
+| US-08 adaptive operators | Implemented; locally verified, hosted CI/review pending | Current Evolution-only shared-ledger factory, engine-delivered typed credit, reuse guards and coordinated replay. 2,347 tests pass; 11,424 registered local runs have zero failures. No adaptive policy passes both held-out controls; defaults unchanged. [Evidence](evidence/us08-integration/README.md). |
+| US-09 Pareto pipeline | Implemented | Feasible fronts, separate infeasible exploration, metadata/checkpoints/query/selection/migration/stopping and retained 180-run comparison; review and dependencies remain. |
+| US-10 engine performance | Local acceptance verified | 44 cases × three isolated repetitions, peak memory/allocation/checkpoint scaling, quality-over-time/utilization and eight deterministic worker groups; current-head CI/review and representative release thresholds remain separate. |
 | US-11 application examples | Partial, companion | Executable authored-C# facade/worker/timing/confirmation example exists; representative program, AutoML, kernel and external-session examples remain. |
 | US-12 quality release gates | Partial | Representative measured quality thresholds, confidence and release artifacts. |
 | US-13 typed search spaces | Implemented | Mixed/conditional domains, owned canonical genomes, operators/refinement, checkpointed diagonal CMA and pinned simpler-baseline comparison; no universal-quality claim. |
@@ -142,7 +164,7 @@ Durable evaluation identities and leases must be developed against its eventual 
 | US-17 compiler-guided edits | Partial, companion | Exact identity/boundaries plus bounded C# syntax edits, real emit, compiler repair, reference/assembly fingerprints, attempt evidence and a real console worker/facade integration implemented; correctness-driven repair, OS isolation, public-API/target validation, multi-file evolution and representative performance confirmation remain. |
 | US-18 reusable experience | Not implemented | Provenance-backed retrieval, lessons and calibrated semantic novelty. |
 | US-19 model/prompt routing | Not implemented | Consumer routing policy, end-to-end costs, replay and fixed-routing comparisons. |
-| US-20 proposal concurrency | Not implemented | Immutable proposal contexts, bounded scheduling and deterministic policy. |
+| US-20 proposal concurrency | Implemented; local acceptance verified, review/CI/dependencies pending | Opt-in bounded feedback-wave pipeline, immutable semantic snapshots, explicit concurrency capability, rate limits/cancellation, deterministic resource phases/retries and bounded queue/utilization/commit/abort diagnostics. 691 tests per TFM; 576 authored live cases with exact offline response replay; 132 matched default-profile pairs plus retained hardware-mismatch campaign. [Contract](PROPOSAL_PIPELINE.md), [raw evidence and limitations](../benchmarks/evidence/pipeline/9c3441d/README.md). Pipeline remains off by default; representative model/competitor validation is not established. |
 | US-21 durable external work | Pending API integration | Run/evaluation/attempt identity, leases, heartbeats, stale results and pending-work persistence. |
 | US-22 centroid archive | Partial | Fixed-K routing, immutable geometry, transactional offline projection and engine/checkpoint coverage implemented; matched common-reference runner available; controlled memory/latency and representative quality confirmation remain. |
 | US-23 warm starts | Partial | Bounded [seed repertoires](WARM_START_REPERTOIRES.md), twelve-facet revalidation, [sample provenance](MEASUREMENT_ORIGIN.md), [persistent evaluation storage](PERSISTENT_EVALUATION_REUSE.md), age/uncertainty/force-fresh decisions and store accounting implemented. Real-engine deterministic cold/warm/force-fresh example and AiDotNet fitness-facade integration pass; production raw-evidence providers, other consumer integrations and representative fair warm/cold/freshness campaigns remain. |

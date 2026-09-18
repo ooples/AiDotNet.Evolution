@@ -184,6 +184,16 @@ public static class ProfileCampaign
         if (repetitions < 1 || cases.Count == 0 || cases.Select(item => item.Id).Distinct(StringComparer.Ordinal).Count() != cases.Count ||
             attempts.Count(item => item.Status == "passed") != cases.Count * repetitions)
             throw new InvalidDataException("Campaign evidence does not cover the entire declared plan.");
+        var planned = new HashSet<string>(cases.Select(item => item.Id), StringComparer.Ordinal);
+        if (attempts.Any(item => !planned.Contains(item.CaseId) || item.Repetition < 0 || item.Repetition >= repetitions))
+            throw new InvalidDataException("Campaign contains an unplanned attempt.");
+        foreach (var group in attempts.GroupBy(item => (item.CaseId, item.Repetition)))
+        {
+            var retries = group.Where(item => item.Status == "contended").ToArray();
+            if (retries.Length > ProfileProtocol.MaximumContentionRetries || retries.Any(item => item.Contention is not { } load ||
+                !double.IsFinite(load.ForeignBusyFraction) || load.ForeignBusyFraction <= maximumForeignFraction))
+                throw new InvalidDataException("Contention retries exceed the protocol or lack measured justification.");
+        }
         foreach (var scenario in cases)
             for (int repetition = 0; repetition < repetitions; repetition++)
             {

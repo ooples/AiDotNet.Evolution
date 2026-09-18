@@ -1,5 +1,7 @@
 # Numeric quality development harness
 
+For the versioned nine-family suite, separate development/selection/final instances and pinned 11-task AlgoTune application subset, see [the representative suite](../suite/README.md). The legacy command below remains a development-only regression harness.
+
 This is a small, reproducible starting point for roadmap US-01/02/04/07/12, not evidence of superiority over OpenEvolve.
 It exercises four explicitly defined eight-dimensional objectives on [-5, 5] with random search, best-parent hill climbing,
 fixed MAP-Elites, adaptive MAP-Elites, the same portfolio with uniform allocation and diagonal CMA. Descriptors are two coordinates,

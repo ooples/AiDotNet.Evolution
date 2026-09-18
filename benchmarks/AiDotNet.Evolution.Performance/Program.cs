@@ -29,7 +29,7 @@ if (args.Length > 0 && args[0] == "--profile")
 if (args.Length > 0 && args[0] == "--evidence")
 {
     // Compacts one raw report into the committed summary; the raw report itself is published as a release asset.
-    if (args.Length is < 3 or > 5) throw new ArgumentException("Usage: --evidence <report.json> <new-summary.json> [<raw-download-url>]");
+    if (args.Length is < 3 or > 4) throw new ArgumentException("Usage: --evidence <report.json> <new-summary.json> [<raw-download-url>]");
     var raw = ProfileEvidence.Describe(args[1], args.Length >= 4 ? args[3] : null);
     var report = JsonSerializer.Deserialize<ProfileReport>(await File.ReadAllTextAsync(args[1]), ProfileCampaign.JsonOptions)
         ?? throw new InvalidDataException("The raw report cannot be null.");

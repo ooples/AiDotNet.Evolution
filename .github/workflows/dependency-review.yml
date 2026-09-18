@@ -2,7 +2,7 @@ name: Dependency Review
 
 on:
   pull_request:
-    branches: [main, feat/competitive-evolution-platform]
+    branches: [main, feat/competitive-evolution-platform, 'feat/evolution-us-*', feat/evolution-us02-efficacy, feat/evolution-us05-campaign-budget, feat/evolution-us07-ablation-integration, feat/evolution-us08-portfolio-integration]
 
 permissions:
   contents: read

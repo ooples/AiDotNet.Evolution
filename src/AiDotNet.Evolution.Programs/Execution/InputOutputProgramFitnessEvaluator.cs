@@ -1,0 +1,222 @@
+// Migrated from ooples/AiDotNet 9cd7d5d6c366a483874024650d02901f69a1829c:src/Evolution/Programs/InputOutputProgramFitnessEvaluator.cs
+// Original license retained in ../Legacy/AIDOTNET-LICENSE.txt.
+using System.Collections.ObjectModel;
+using System.Globalization;
+
+namespace AiDotNet.Evolution.Programs;
+
+/// <summary>Scores a candidate program by running it on input/output examples through a caller-supplied engine.</summary>
+/// <remarks>
+/// <para>
+/// Quality is the fraction of <see cref="ProgramInputOutputExample"/> cases whose captured output matches the
+/// expected output, so it is always between zero and one and always comparable between candidates. Execution goes
+/// through the <see cref="IProgramExecutionEngine"/> the caller supplies, which is the whole point: generated
+/// program text is untrusted, the core library never runs it in the AiDotNet process, and the sandbox, container,
+/// or remote runner that does run it stays entirely under the caller's control. A candidate that crashes, times
+/// out, or prints the wrong answer simply scores lower; it never stops the run.
+/// </para>
+/// <para>
+/// Raw failure text from the engine is withheld; bounded diagnostics describe the failure without exporting
+/// candidate-controlled payloads. This keeps a program's standard error from bloating or leaking into a checkpoint.
+/// At most eight example-level diagnostics are retained. <see cref="VersionHash"/> incorporates a hash of the
+/// examples and the comparison mode, so changing the test set correctly invalidates older checkpoints.
+/// </para>
+/// <para>Cost units count calls dispatched to the runner, including the current call when it cancels. They do
+/// not measure runtime, tokens or money. Cancellation before dispatch is free; fatal process failures propagate
+/// so an enclosing resource ledger can retain its conservative unknown-consumption charge.</para>
+/// <para><b>For Beginners:</b> This evaluator checks a generated program the way a teacher marks homework: it runs
+/// the program on each example input and compares what it printed with the expected answer, then reports the
+/// fraction it got right. You supply the "runner" that actually executes the code, because running code a language
+/// model wrote is a security decision only you can make — a container or an isolated process is the usual choice.
+/// Pick a <see cref="ProgramOutputComparison"/> that matches how precise the expected output has to be.</para>
+/// </remarks>
+public sealed class InputOutputProgramFitnessEvaluator : IProgramFitnessEvaluator
+{
+    private const int MaxRetainedExampleDiagnostics = 8;
+    private const int MaxErrorMessageLength = 200;
+
+    private readonly IProgramExecutionEngine _engine;
+    private readonly string _engineId;
+    private readonly string _engineVersion;
+    private readonly ReadOnlyCollection<ProgramInputOutputExample> _examples;
+    private readonly ProgramOutputComparison _comparison;
+
+    /// <summary>Initializes an input/output evaluator.</summary>
+    /// <param name="engine">The sandbox or runner that executes candidate programs.</param>
+    /// <param name="examples">The input/output cases the candidate must satisfy; at least one is required.</param>
+    /// <param name="comparison">How captured output is compared with expected output.</param>
+    /// <param name="id">A stable evaluator identifier.</param>
+    /// <exception cref="ArgumentNullException"><paramref name="engine"/> or <paramref name="examples"/> is <c>null</c>, or an example is <c>null</c>.</exception>
+    /// <exception cref="ArgumentException"><paramref name="examples"/> is empty, or <paramref name="id"/> is empty or white space.</exception>
+    /// <exception cref="ArgumentOutOfRangeException"><paramref name="comparison"/> is not a defined value.</exception>
+    public InputOutputProgramFitnessEvaluator(
+        IProgramExecutionEngine engine,
+        IEnumerable<ProgramInputOutputExample> examples,
+        ProgramOutputComparison comparison = ProgramOutputComparison.TrimmedOrdinal,
+        string id = "program-io-evaluator")
+    {
+        ProgramGuard.NotNull(engine);
+        ProgramGuard.NotNull(examples);
+        ProgramGuard.NotNullOrWhiteSpace(id);
+        if (!Enum.IsDefined(typeof(ProgramOutputComparison), comparison))
+            throw new ArgumentOutOfRangeException(nameof(comparison));
+
+        var copy = new List<ProgramInputOutputExample>();
+        foreach (ProgramInputOutputExample example in examples)
+        {
+            if (example is null) throw new ArgumentNullException(nameof(examples), "Examples cannot be null.");
+            copy.Add(new ProgramInputOutputExample { Input = example.Input, ExpectedOutput = example.ExpectedOutput });
+        }
+
+        if (copy.Count == 0) throw new ArgumentException("At least one example is required.", nameof(examples));
+
+        _engine = engine;
+        VersionPinnedProgramFitnessEvaluator.ValidateIdentity(engine.Id, nameof(engine.Id));
+        VersionPinnedProgramFitnessEvaluator.ValidateIdentity(engine.VersionHash, nameof(engine.VersionHash));
+        _engineId = engine.Id;
+        _engineVersion = engine.VersionHash;
+        _examples = new ReadOnlyCollection<ProgramInputOutputExample>(copy);
+        _comparison = comparison;
+        Id = id.Trim();
+        VersionHash = EvolutionHash.Combine(new[] { BuildVersionHash(copy, comparison), _engineId, _engineVersion });
+    }
+
+    /// <inheritdoc/>
+    public string Id { get; }
+
+    /// <inheritdoc/>
+    public string VersionHash { get; }
+
+    /// <summary>Gets an independently owned copy of the input/output cases this evaluator scores against.</summary>
+    public IReadOnlyList<ProgramInputOutputExample> Examples => _examples
+        .Select(example => new ProgramInputOutputExample { Input = example.Input, ExpectedOutput = example.ExpectedOutput })
+        .ToList().AsReadOnly();
+
+    /// <summary>Gets how captured output is compared with expected output.</summary>
+    public ProgramOutputComparison Comparison => _comparison;
+
+    /// <inheritdoc/>
+    public ValueTask<EvolutionTaskResult> EvaluateAsync(
+        ProgramGenome candidate,
+        EvolutionEvaluationContext context,
+        CancellationToken cancellationToken = default)
+    {
+        ProgramGuard.NotNull(candidate);
+        ProgramGuard.NotNull(context);
+        ValidateEngineIdentity();
+
+        int passed = 0;
+        var diagnostics = new List<EvolutionDiagnostic>();
+
+        for (int index = 0; index < _examples.Count; index++)
+        {
+            ValidateEngineIdentity();
+            if (cancellationToken.IsCancellationRequested)
+            {
+                return new ValueTask<EvolutionTaskResult>(new EvolutionTaskResult(
+                    EvolutionEvaluationStatus.Canceled,
+                    costUnits: index,
+                    diagnostics: new[] { new EvolutionDiagnostic("program_io_canceled", "Evaluation was canceled.") }));
+            }
+
+            ProgramInputOutputExample example = _examples[index];
+            bool executed;
+            string output;
+            string? errorMessage;
+            try
+            {
+                executed = _engine.TryExecute(
+                    candidate.Language, candidate.Source, example.Input, out output, out errorMessage, cancellationToken);
+            }
+            catch (OperationCanceledException)
+            {
+                return new ValueTask<EvolutionTaskResult>(new EvolutionTaskResult(
+                    EvolutionEvaluationStatus.Canceled,
+                    costUnits: index + 1,
+                    diagnostics: new[] { new EvolutionDiagnostic("program_io_canceled", "Execution was canceled.") }));
+            }
+#pragma warning disable CA1031
+            catch (Exception exception) when (exception is not OutOfMemoryException and not StackOverflowException and not AccessViolationException)
+#pragma warning restore CA1031
+            {
+                AddDiagnostic(diagnostics, index, "engine_threw", exception.GetType().Name);
+                ValidateEngineIdentity();
+                continue;
+            }
+
+            ValidateEngineIdentity();
+            if (!executed)
+            {
+                AddDiagnostic(diagnostics, index, "execution_failed", "The engine reported a failure; its untrusted message was withheld.");
+                continue;
+            }
+
+            if (Matches(output, example.ExpectedOutput)) passed++;
+            else AddDiagnostic(diagnostics, index, "output_mismatch", "The captured output did not match the expected output.");
+        }
+
+        double quality = (double)passed / _examples.Count;
+        var descriptors = new Dictionary<string, double>(StringComparer.Ordinal)
+        {
+            ["passRate"] = quality
+        };
+
+        return new ValueTask<EvolutionTaskResult>(new EvolutionTaskResult(
+            EvolutionEvaluationStatus.Completed,
+            quality,
+            EvolutionOptimizationDirection.Maximize,
+            descriptors,
+            costUnits: _examples.Count,
+            diagnostics: diagnostics));
+    }
+
+    private void ValidateEngineIdentity()
+    {
+        if (_engine.Id != _engineId || _engine.VersionHash != _engineVersion)
+            throw new InvalidOperationException("Program execution identity changed during evaluation.");
+    }
+
+    private bool Matches(string? actual, string? expected)
+    {
+        string left = ProgramText.Normalize(actual ?? string.Empty);
+        string right = ProgramText.Normalize(expected ?? string.Empty);
+        switch (_comparison)
+        {
+            case ProgramOutputComparison.Ordinal:
+                return string.Equals(left, right, StringComparison.Ordinal);
+            case ProgramOutputComparison.TrimmedOrdinal:
+                return string.Equals(left.Trim(), right.Trim(), StringComparison.Ordinal);
+            case ProgramOutputComparison.TrimmedOrdinalIgnoreCase:
+                return string.Equals(left.Trim(), right.Trim(), StringComparison.OrdinalIgnoreCase);
+            default:
+                return string.Equals(
+                    ProgramText.CollapseWhitespace(left), ProgramText.CollapseWhitespace(right), StringComparison.Ordinal);
+        }
+    }
+
+    private static void AddDiagnostic(List<EvolutionDiagnostic> diagnostics, int exampleIndex, string code, string detail)
+    {
+        if (diagnostics.Count >= MaxRetainedExampleDiagnostics) return;
+        string message = string.Concat(
+            "Example ", (exampleIndex + 1).ToString(CultureInfo.InvariantCulture), ": ",
+            ProgramText.Bound(ProgramText.Sanitize(detail), MaxErrorMessageLength));
+        diagnostics.Add(new EvolutionDiagnostic("program_io_" + code, message, isRedacted: true));
+    }
+
+    private static string BuildVersionHash(List<ProgramInputOutputExample> examples, ProgramOutputComparison comparison)
+    {
+        var components = new List<string>
+        {
+            "program-io-evaluator-v3-owned-cases-private-receipts",
+            ((int)comparison).ToString(CultureInfo.InvariantCulture)
+        };
+
+        foreach (ProgramInputOutputExample example in examples)
+        {
+            components.Add(example.Input ?? string.Empty);
+            components.Add(example.ExpectedOutput ?? string.Empty);
+        }
+
+        return "program-io-" + EvolutionHash.Combine(components);
+    }
+}

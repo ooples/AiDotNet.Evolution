@@ -4,7 +4,7 @@ on:
   push:
     branches: [main]
   pull_request:
-    branches: [main, feat/competitive-evolution-platform]
+    branches: [main, feat/competitive-evolution-platform, 'feat/evolution-us-*', feat/evolution-us02-efficacy, feat/evolution-us05-campaign-budget, feat/evolution-us07-ablation-integration, feat/evolution-us08-portfolio-integration]
 
 concurrency:
   group: ${{ github.workflow }}-${{ github.ref }}
@@ -54,6 +54,11 @@ jobs:
           dotnet test tests/AiDotNet.Evolution.Tests/AiDotNet.Evolution.Tests.csproj
           --configuration Release --framework net8.0 --no-restore --verbosity normal
           --blame-hang --blame-hang-timeout 120s --blame-crash
+      - name: Verify standalone program and compiler contracts
+        shell: pwsh
+        run: |
+          dotnet test tests/AiDotNet.Evolution.CSharp.Tests/AiDotNet.Evolution.CSharp.Tests.csproj -c Release --no-restore
+          if ($LASTEXITCODE -ne 0) { throw 'Standalone program migration tests failed.' }
       - name: Verify numeric quality harness contracts
         shell: pwsh
         env:
@@ -65,17 +70,54 @@ jobs:
       - name: Verify replication accounting and confirmation
         shell: pwsh
         run: ./eng/Test-Replication.ps1
+      - name: Verify incumbent challenges and screen-rejection audits
+        shell: pwsh
+        run: |
+          dotnet run --project examples/ReplicatedEvaluation -c Release --no-build -- --noise-policies > TestResults/noise-policies.json
+          if ($LASTEXITCODE -ne 0) { throw 'Noise policy contract failed.' }
       - name: Verify persistent evaluation reuse and force-fresh accounting
         run: dotnet run --project examples/PersistentEvaluation -c Release -- "${{ github.workspace }}/TestResults/persistent-evaluation"
       - name: Verify surrogate backend and measured-only selection
         shell: pwsh
         run: ./eng/Test-SurrogateSearch.ps1
+      - name: Verify standalone surrogate package consumption
+        shell: pwsh
+        run: |
+          dotnet pack src/AiDotNet.Evolution/AiDotNet.Evolution.csproj -c Release --no-build -o TestResults/surrogate-packages
+          if ($LASTEXITCODE -ne 0) { throw 'Core package failed.' }
+          dotnet pack src/AiDotNet.Evolution.Surrogates/AiDotNet.Evolution.Surrogates.csproj -c Release -o TestResults/surrogate-packages
+          if ($LASTEXITCODE -ne 0) { throw 'Surrogate package failed.' }
+          # READ THE VERSIONS, DO NOT HARDCODE THEM. These were literals, and release-please
+          # bumps only the core project, so the core packed as 0.1.0-preview.2 while this line
+          # still asked for preview.1 and the step failed on a package that had just been built
+          # correctly. The two projects version independently, so each is read from its own file.
+          $coreVersion = ([xml](Get-Content src/AiDotNet.Evolution/AiDotNet.Evolution.csproj)).Project.PropertyGroup.Version | Where-Object { $_ } | Select-Object -First 1
+          $adapterVersion = ([xml](Get-Content src/AiDotNet.Evolution.Surrogates/AiDotNet.Evolution.Surrogates.csproj)).Project.PropertyGroup.Version | Where-Object { $_ } | Select-Object -First 1
+          if (-not $coreVersion -or -not $adapterVersion) { throw 'Could not read a package version from its project file.' }
+          ./eng/Test-SurrogatePackage.ps1 -CorePackagePath "TestResults/surrogate-packages/AiDotNet.Evolution.$coreVersion.nupkg" -AdapterPackagePath "TestResults/surrogate-packages/AiDotNet.Evolution.Surrogates.$adapterVersion.nupkg" -CoreVersion $coreVersion -AdapterVersion $adapterVersion
+      # US-09 ships a Pareto implementation and retained campaign evidence, and until now nothing
+      # re-ran either. This reproduces the recorded 180 matched-budget runs against the commit's own
+      # build, so the evidence stays a checked claim rather than a file nobody reads.
+      - name: Verify matched-budget Pareto campaign against retained evidence
+        shell: pwsh
+        run: ./eng/Test-ParetoCampaign.ps1 -SourceRevision '${{ github.sha }}'
       - name: Verify multi-fidelity promotion and independent confirmation
         shell: pwsh
         run: ./eng/Test-MultiFidelity.ps1
+      - name: Verify incremental training and fidelity accounting
+        shell: pwsh
+        run: ./eng/Test-RegressionFidelity.ps1
+      - name: Verify separate-process settled fidelity recovery
+        shell: pwsh
+        run: ./eng/Test-FidelityRecovery.ps1
+      - name: Verify concurrent proposal pipeline and recorded-response replay
+        shell: pwsh
+        run: ./eng/Test-ProposalPipeline.ps1
       - name: Verify gain and all-stage operator credit
         shell: pwsh
         run: ./eng/Test-OperatorCredit.ps1
+      - name: Verify adaptive island replay and evaluation accounting
+        run: dotnet run --project examples/AdaptiveIslandSearch -c Release -- 1 64 "${{ github.workspace }}/TestResults/adaptive-islands-smoke.json"
       - name: Verify performance fixture contracts
         run: dotnet run --project benchmarks/AiDotNet.Evolution.Performance -c Release -- --smoke
       - name: Test performance evidence contracts
@@ -87,6 +129,24 @@ jobs:
         run: dotnet run --project benchmarks/AiDotNet.Evolution.Performance -c Release --no-build -- --profile TestResults/performance '${{ github.sha }}' --smoke
       - name: Verify paired analysis contracts
         run: python3 -m unittest discover -s benchmarks/analysis -v
+      - name: Verify frozen feature-ablation campaign
+        run: |
+          python3 benchmarks/analysis/ablation.py register benchmarks/AiDotNet.Evolution.Quality/bin/Release/net10.0/AiDotNet.Evolution.Quality.dll TestResults/ablation-plan.json --seeds 2 --budget 16
+          python3 benchmarks/analysis/ablation.py execute TestResults/ablation-plan.json TestResults/ablations development
+          python3 benchmarks/analysis/ablation.py execute TestResults/ablation-plan.json TestResults/ablations confirmation
+          python3 benchmarks/analysis/ablation.py report TestResults/ablation-plan.json TestResults/ablations TestResults/ablation-report.json
+      - name: Verify registered portfolio comparison
+        run: |
+          python3 benchmarks/analysis/portfolio_study.py register benchmarks/AiDotNet.Evolution.Quality/bin/Release/net10.0/AiDotNet.Evolution.Quality.dll TestResults/portfolio-plan.json --count 2 --budget 32
+          python3 benchmarks/analysis/portfolio_study.py execute TestResults/portfolio-plan.json TestResults/portfolio-study development
+          python3 benchmarks/analysis/portfolio_study.py execute TestResults/portfolio-plan.json TestResults/portfolio-study confirmation
+          python3 benchmarks/analysis/portfolio_study.py report TestResults/portfolio-plan.json TestResults/portfolio-study TestResults/portfolio-report.json
+      - name: Verify fixed-sample reporting with actual numeric search
+        run: python3 benchmarks/analysis/verify_reports.py --evaluator benchmarks/AiDotNet.Evolution.Quality/bin/Release/net10.0/AiDotNet.Evolution.Quality.dll --source-revision '${{ github.sha }}' --output TestResults/experiment-reports
+      - name: Verify retained proposal pipeline and default-profile evidence
+        run: |
+          python3 benchmarks/analysis/analyze_pipeline.py --verify-evidence benchmarks/evidence/pipeline/9c3441d/pilot
+          python3 benchmarks/analysis/compare_pipeline_defaults.py --archive benchmarks/evidence/pipeline/9c3441d/default-profiles.zip --verify-comparison benchmarks/evidence/pipeline/9c3441d/default-comparison.json
       - name: Verify archive partition accounting and replay
         shell: pwsh
         run: ./eng/Test-ArchivePartition.ps1 -SourceRevision '${{ github.sha }}'
@@ -104,6 +164,12 @@ jobs:
           path: |
             TestResults/quality/**/*.json
             TestResults/performance/**
+            TestResults/ablations/**
+            TestResults/ablation-*
+            TestResults/portfolio-*
+            TestResults/portfolio-study/**
+            TestResults/noise-policies.json
+            TestResults/experiment-reports/**
             TestResults/persistent-evaluation/**/*.json
             TestResults/persistent-evaluation/*.jsonl
             coverage/**/coverage.cobertura.xml
@@ -122,6 +188,43 @@ jobs:
         env:
           CODECOV_TOKEN: ${{ secrets.CODECOV_TOKEN }}
 
+  representative-suite:
+    name: Representative numeric and AlgoTune suite contracts
+    runs-on: ubuntu-latest
+    # Five campaigns run sequentially -- three contract-smoke, then registered selection and final --
+    # and run_suite.py bounds each at a 300 s deadline, so the declared child timeouts alone permit
+    # 25 minutes before checkout, the AlgoTune checkout, pip install, the dotnet build and the
+    # repeat-refusal step. At 15 minutes this job could cancel a run that respected every one of them.
+    timeout-minutes: 35
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          persist-credentials: false
+      - uses: actions/setup-dotnet@a98b56852c35b8e3190ac28c8c2271da59106c68 # v6.0.0
+        with:
+          dotnet-version: '10.0.x'
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          repository: oripress/AlgoTune
+          ref: dff9914c10800c7a031c9e8c3d4d1c8cd1b38906
+          path: .local/algotune-upstream
+          sparse-checkout: AlgoTuneTasks
+          persist-credentials: false
+      - name: Install isolated reference dependencies
+        run: |
+          python3 -m venv .local/suite-env
+          .local/suite-env/bin/python -m pip install -r benchmarks/suite/requirements.txt
+      - name: Verify all partition contracts and starting implementations
+        shell: pwsh
+        run: ./eng/Test-RepresentativeSuite.ps1 -Python .local/suite-env/bin/python -Upstream .local/algotune-upstream -SourceRevision '${{ github.sha }}'
+      - name: Retain failed and successful suite evidence
+        if: always()
+        uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a # v7.0.1
+        with:
+          name: representative-suite-evidence
+          path: TestResults/representative-suite/**
+          if-no-files-found: warn
+
   external-baseline:
     name: External numeric baseline contracts
     runs-on: ubuntu-latest
@@ -138,6 +241,68 @@ jobs:
       - name: Verify shared evaluator and matched baseline
         shell: pwsh
         run: ./eng/Test-ExternalBaseline.ps1 -Python .local/external-env/bin/python
+
+  program-comparison:
+    name: Shared program comparison contract
+    runs-on: ubuntu-latest
+    timeout-minutes: 30
+    env:
+      DOTNET_PROCESSOR_COUNT: '2'
+      EVOLUTION_OPENEVOLVE_CHECKOUT: ${{ github.workspace }}/.local/openevolve-upstream
+      EVOLUTION_PROFILE_UPSTREAM: ${{ github.workspace }}/.local/openevolve-upstream
+      EVOLUTION_CORRECTNESS_UPSTREAM: ${{ github.workspace }}/.local/correctness-algotune
+      EVOLUTION_PROFILE_DLL: ${{ github.workspace }}/benchmarks/EvolutionComparison/bin/Release/net10.0/EvolutionComparison.dll
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1
+        with:
+          persist-credentials: false
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1
+        with:
+          repository: algorithmicsuperintelligence/openevolve
+          ref: 411fb59c886c18704caaffb611e17cf9e7d824d2
+          path: .local/openevolve-upstream
+          persist-credentials: false
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1
+        with:
+          repository: oripress/AlgoTune
+          ref: dff9914c10800c7a031c9e8c3d4d1c8cd1b38906
+          path: .local/correctness-algotune
+          persist-credentials: false
+      - uses: actions/setup-dotnet@a98b56852c35b8e3190ac28c8c2271da59106c68
+        with:
+          dotnet-version: '10.0.x'
+      - name: Install isolated pinned program dependencies
+        run: |
+          python3 -m venv .local/program-env
+          .local/program-env/bin/python -m pip install -r benchmarks/external/requirements-program.txt
+          .local/program-env/bin/python -m pip install --no-deps -e .local/openevolve-upstream
+      - name: Evolution-owned program host and contract gates
+        run: |
+          dotnet build benchmarks/EvolutionComparison/EvolutionComparison.csproj -c Release
+          [ -f "$EVOLUTION_PROFILE_DLL" ] || { echo "::error::EVOLUTION_PROFILE_DLL missing: $EVOLUTION_PROFILE_DLL"; exit 1; }
+          [ -d "$EVOLUTION_PROFILE_UPSTREAM" ] || { echo "::error::EVOLUTION_PROFILE_UPSTREAM missing: $EVOLUTION_PROFILE_UPSTREAM"; exit 1; }
+          .local/program-env/bin/python eng/run_required_tests.py benchmarks/external 'test_program*.py'
+          .local/program-env/bin/python -m unittest discover -s benchmarks/external -p test_codex_transport.py -v
+          .local/program-env/bin/python -m unittest discover -s benchmarks/external -p test_openevolve_adapter.py -v
+          .local/program-env/bin/python benchmarks/external/run_program_comparison.py --aidotnet benchmarks/EvolutionComparison/bin/Release/net10.0/EvolutionComparison.dll --upstream .local/openevolve-upstream --output TestResults/program-comparison
+      - name: Validate actual container isolation and independent oracles
+        run: |
+          docker build --tag evolution-program-sandbox:ci --file benchmarks/external/sandbox/Dockerfile .
+          # "export VAR=$(cmd)" returns the status of export, not of cmd, so a failed inspect would
+          # leave the id empty, silently skip every isolation gate below and still report success.
+          image_id="$(docker image inspect evolution-program-sandbox:ci --format '{{.Id}}')"
+          [ -n "$image_id" ] || { echo "::error::sandbox image id is empty; isolation gates would silently skip"; exit 1; }
+          export EVOLUTION_SANDBOX_IMAGE="$image_id"
+          export EVOLUTION_SANDBOX_EVIDENCE="$PWD/TestResults/program-isolation"
+          .local/program-env/bin/python eng/run_required_tests.py benchmarks/external test_docker_sandbox.py 'test_warm*.py'
+      - uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02
+        if: always()
+        with:
+          name: program-comparison-contract
+          path: |
+            TestResults/program-comparison
+            TestResults/program-isolation
+          if-no-files-found: warn
 
   legacy:
     name: Build and test net471
@@ -189,7 +354,7 @@ jobs:
 
   ci-gate:
     name: CI Gate
-    needs: [modern, legacy, package]
+    needs: [modern, legacy, package, representative-suite, external-baseline, program-comparison]
     if: "${{ always() && !startsWith(github.head_ref, 'release-please--') && !(github.event_name == 'push' && startsWith(github.event.head_commit.message, 'chore(main): release')) }}"
     runs-on: ubuntu-latest
     timeout-minutes: 5
@@ -199,6 +364,9 @@ jobs:
           MODERN_RESULT: ${{ needs.modern.result }}
           LEGACY_RESULT: ${{ needs.legacy.result }}
           PACKAGE_RESULT: ${{ needs.package.result }}
+          SUITE_RESULT: ${{ needs.representative-suite.result }}
+          EXTERNAL_RESULT: ${{ needs.external-baseline.result }}
+          PROGRAM_RESULT: ${{ needs.program-comparison.result }}
         shell: bash
         run: |
           set -euo pipefail
@@ -206,7 +374,10 @@ jobs:
           for result in \
             "modern:$MODERN_RESULT" \
             "legacy:$LEGACY_RESULT" \
-            "package:$PACKAGE_RESULT"; do
+            "package:$PACKAGE_RESULT" \
+            "representative-suite:$SUITE_RESULT" \
+            "external-baseline:$EXTERNAL_RESULT" \
+            "program-comparison:$PROGRAM_RESULT"; do
             job="${result%%:*}"
             conclusion="${result#*:}"
             if [ "$conclusion" != success ]; then

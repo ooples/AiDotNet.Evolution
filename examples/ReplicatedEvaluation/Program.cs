@@ -1,6 +1,8 @@
 using System.Text.Json;
 using AiDotNet.Evolution;
 
+if (args.Length == 1 && args[0] == "--noise-policies") return await NoisePolicyExample.RunAsync();
+
 int samples = 32;
 if (args.Length > 1 || (args.Length == 1 && !int.TryParse(args[0], out samples)) || samples is < 2 or > 256)
 {

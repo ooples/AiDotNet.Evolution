@@ -4,7 +4,7 @@ using Xunit;
 
 namespace AiDotNet.Evolution.Performance.Tests;
 
-public sealed class ProfileTests
+public sealed partial class ProfileTests
 {
     private static ProfileCase Case(int workers = 1) => new("engine-w" + workers, "engine", 32, 2, 1, workers, 8,
         false, false, EvolutionDispatchMode.Batch, 8, 42);

@@ -183,7 +183,8 @@ public static class ProfileValidation
     public static void Validate(ProfileMeasurement measurement)
     {
         measurement.Case.Validate();
-        if (measurement.Iterations <= 0 || measurement.OperationsPerIteration <= 0 ||
+        if (measurement.Iterations <= 0 || measurement.Iterations > ProfileProtocol.MaximumIterations || measurement.OperationsPerIteration <= 0 ||
+            measurement.OperationsPerIteration > long.MaxValue / measurement.Iterations ||
             measurement.Operations != measurement.Iterations * measurement.OperationsPerIteration ||
             !double.IsFinite(measurement.ElapsedMilliseconds) || measurement.ElapsedMilliseconds <= 0 ||
             !double.IsFinite(measurement.MillisecondsPerIteration) || measurement.MillisecondsPerIteration <= 0 ||
@@ -200,6 +201,9 @@ public static class ProfileValidation
             throw new InvalidDataException("The measured phase is below the declared minimum measured time: single-shot sub-millisecond timing is not reported.");
         if (Math.Abs(measurement.MillisecondsPerIteration * measurement.Iterations - measurement.ElapsedMilliseconds) > 1e-6 * measurement.ElapsedMilliseconds + 1e-6)
             throw new InvalidDataException("Per-iteration time disagrees with the measured elapsed time.");
+        double expectedThroughput = measurement.Operations * 1000d / measurement.ElapsedMilliseconds;
+        if (Math.Abs(measurement.OperationsPerSecond - expectedThroughput) > 1e-6 * expectedThroughput + 1e-6)
+            throw new InvalidDataException("Throughput disagrees with measured work and elapsed time.");
         ValidateProcessorTime(measurement);
         if (measurement.EvaluatorSlotUtilization is { } utilization && (!double.IsFinite(utilization) || utilization < 0 || utilization > 1.001))
             throw new InvalidDataException("Evaluator slot utilization is outside its physical bound.");
@@ -248,7 +252,9 @@ public static class ProfileValidation
         foreach (var bucket in measurement.DelayBuckets)
         {
             if (bucket.Count <= 0 || !double.IsFinite(bucket.MeanMilliseconds) || bucket.MeanMilliseconds < 0 ||
-                bucket.MinimumMilliseconds < 0 || bucket.MaximumMilliseconds < bucket.MinimumMilliseconds)
+                !double.IsFinite(bucket.MinimumMilliseconds) || !double.IsFinite(bucket.MaximumMilliseconds) ||
+                bucket.MinimumMilliseconds < 0 || bucket.MaximumMilliseconds < bucket.MinimumMilliseconds ||
+                bucket.MeanMilliseconds < bucket.MinimumMilliseconds || bucket.MeanMilliseconds > bucket.MaximumMilliseconds)
                 throw new InvalidDataException("A declared delay bucket recorded no or impossible observations.");
             if (bucket.RequestedMilliseconds == 0) continue;
             if (bucket.MeanMilliseconds < bucket.RequestedMilliseconds - 0.25 ||
