@@ -5,8 +5,10 @@ using System.Text.Json;
 using AiDotNet.Evolution;
 
 // The host evolves strings; only the separately isolated broker evaluator executes candidate code.
-if (args.Length != 7 || !int.TryParse(args[3], out int iterations) || iterations is < 1 or > 64 ||
+if (args.Length is not (7 or 8) || !int.TryParse(args[3], out int iterations) || iterations is < 1 or > 64 ||
     !uint.TryParse(args[4], out uint seed) || args[6] is not ("controlled" or "native-bounded")) return 64;
+string profile = args.Length == 8 ? args[7] : "uniform";
+if (profile is not ("uniform" or "best")) return 64;
 string Read(string path, int bound)
 {
     using var file = File.OpenRead(path);
@@ -24,6 +26,13 @@ var engine = new EvolutionEngine<string>(evaluator, variation,
     new EvolutionEngineOptions
     {
         RunId = "us02-evolution-owned",
+        SelectionPolicy = profile == "uniform" ? EvolutionSelectionPolicyKind.Uniform : EvolutionSelectionPolicyKind.Ratio,
+        Selection = profile == "uniform" ? new EvolutionSelectionOptions() : new EvolutionSelectionOptions
+        {
+            ExplorationRatio = 0,
+            ExploitationRatio = 0,
+            EliteRatio = 1
+        },
         Seed = seed,
         MaxEvaluationAttempts = iterations + 1,
         MaxProposals = iterations + 1, // The unchanged initial seed also consumes one proposal.
@@ -43,6 +52,7 @@ try
     {
         schema = "evolution-owned-program-run-v1",
         mode,
+        selection_profile = profile,
         requested_model = args[2],
         seed,
         iterations,

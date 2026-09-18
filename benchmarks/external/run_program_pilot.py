@@ -20,8 +20,10 @@ from run_program_comparison import run_campaign
 
 
 def run(output, image, upstream, openevolve, dll, *, codex=None, model="gpt-6-astra", tasks=None, samples=3,
-        seed=37, search_instance_seed=9137, diagnostic_instance_seed=491837):
+        seed=37, search_instance_seed=9137, diagnostic_instance_seed=491837, iterations=2, evolution_profile="uniform"):
     task_ids = list(TASKS) if tasks is None else tasks
+    if type(iterations) is not int or not 1 <= iterations <= 8 or evolution_profile not in ("uniform", "best"):
+        raise ValueError("Invalid bounded development search configuration")
     if not task_ids or len(set(task_ids)) != len(task_ids) or any(t not in TASKS for t in task_ids) or not 1 <= samples <= 9:
         raise ValueError("Invalid development pilot panel")
     if (any(type(s) is not int or not 0 <= s < 2**32 for s in (seed, search_instance_seed, diagnostic_instance_seed)) or
@@ -38,9 +40,10 @@ def run(output, image, upstream, openevolve, dll, *, codex=None, model="gpt-6-as
     plan = {"schema": "evolution-program-pilot-v1", "evidence_class": "development-only",
             "source_revision": source_revision, "artifacts_sha256": artifacts,
             "image": image, "tasks": {t: s[1] for t, s in sources.items()},
-            "task_order": task_ids, "search_seeds": [seed], "iterations_per_track": 2, "samples_per_evaluation": samples,
+            "task_order": task_ids, "search_seeds": [seed], "iterations_per_track": iterations, "samples_per_evaluation": samples,
+            "evolution_profile": evolution_profile,
             "search_instance_seed": search_instance_seed, "diagnostic_instance_seed": diagnostic_instance_seed,
-            "model_calls_maximum": len(task_ids) * 11, "model_tokens_per_track": 100000,
+            "model_calls_maximum": len(task_ids) * (5 * iterations + 1), "model_tokens_per_track": 100000,
             "model": model if codex else "scripted-no-provider", "resolved_model": "unreported" if codex else "not-applicable",
             "primary_endpoint": "fresh-process batch runtime including imports and serialization",
             "budget_semantics": "equal declared per-track caps; actual tokens/evaluation seconds reported separately, NOT equal reconciled cost",
@@ -65,7 +68,7 @@ def run(output, image, upstream, openevolve, dll, *, codex=None, model="gpt-6-as
                 return {"text": "```python\n" + source + "\n# scripted-" + nonce + "\n```",
                         "cost_units": 0, "cost_metric": "reported_input_plus_output_tokens"}
         result = run_campaign(root / task_id, dll, openevolve, source, description(task_id), plan["model"], generate,
-                              evaluator, iterations=2, seed=seed, evidence_class="development-experiment",
+                              evaluator, iterations=iterations, seed=seed, evolution_profile=evolution_profile, evidence_class="development-experiment",
                               evaluator_manifest=evaluator.manifest)
         # Selection is frozen before fresh-instance diagnostic inputs are generated or scored.
         selections = [{"mode": row["mode"], "method": row["method"], "hash": row["selected_hash"]} for row in result["runs"]]
@@ -89,8 +92,7 @@ def run(output, image, upstream, openevolve, dll, *, codex=None, model="gpt-6-as
                           "original": original, "selected": selected, "speedup": ratio,
                           "fallback": fallback, "deployed_hash": candidate_hash(source) if fallback else row["selected_hash"],
                           "model_tokens": row["actual_model_tokens"],
-                          "search_evaluation_seconds": sum(r["result"]["work_units"] for r in row["receipts"]
-                              if r["operation"] == "evaluate" and r["status"] == "completed"),
+                          "search_evaluation_seconds": row["independent_counters"]["evaluation_seconds"],
                           "search_evaluator_setup_seconds": evaluator.oracle_setup_seconds,
                           "diagnostic_oracle_setup_seconds": fresh.oracle_setup_seconds})
             (root / task_id / "diagnostic-pairs.json").write_bytes(encode(pairs))
@@ -117,10 +119,13 @@ def main():
     parser.add_argument("--model", default="gpt-6-astra")
     parser.add_argument("--task", action="append", choices=list(TASKS))
     parser.add_argument("--samples", type=int, default=3)
+    parser.add_argument("--iterations", type=int, default=2)
+    parser.add_argument("--evolution-profile", choices=("uniform", "best"), default="uniform")
     args = parser.parse_args()
     try:
         result = run(args.output, args.image, args.upstream, args.openevolve, args.dll,
-                     codex=args.codex, model=args.model, tasks=args.task, samples=args.samples)
+                     codex=args.codex, model=args.model, tasks=args.task, samples=args.samples,
+                     iterations=args.iterations, evolution_profile=args.evolution_profile)
     except Exception as error:
         if args.output.is_dir():
             failure = args.output / "failure.json"

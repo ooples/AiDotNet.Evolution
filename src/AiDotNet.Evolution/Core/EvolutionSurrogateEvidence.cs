@@ -11,7 +11,7 @@ public sealed class EvolutionSurrogateObservation<TGenome>
         Guard.NotNull(candidate); Guard.NotNull(evaluation);
         if (candidate.EvaluationId != evaluation.EvaluationId || candidate.CanonicalGenome.Id != evaluation.GenomeId ||
             evaluation.Status != EvolutionEvaluationStatus.Completed || !evaluation.Quality.HasValue ||
-            evaluation.CacheStatus == EvolutionCacheStatus.Hit || evaluation.Cost.AttemptCount == 0 ||
+            evaluation.IsMeasurementReuse || evaluation.Cost.AttemptCount == 0 ||
             evaluation.ConstraintViolations.Any(value => value > 0))
             throw new ArgumentException("Surrogate observations require matching fresh feasible measured outcomes.", nameof(evaluation));
         Candidate = candidate.CanonicalGenome; Evaluation = evaluation;
@@ -75,11 +75,12 @@ public sealed class EvolutionSurrogateSelection<TGenome>
 {
     internal EvolutionSurrogateSelection(EvolutionCanonicalGenome<TGenome> candidate, EvolutionSurrogateSelectionReason reason,
         string operationIdentity, string trainingIdentity, string? modelVersionHash, double explorationProbability,
-        int poolSize, IEnumerable<EvolutionSurrogatePrediction> predictions)
+        int poolSize, IEnumerable<EvolutionSurrogatePrediction> predictions, EvolutionSurrogateValidationReport? validationReport = null)
     {
         Candidate = candidate; Reason = reason; OperationIdentity = operationIdentity; TrainingIdentity = trainingIdentity;
         ModelVersionHash = modelVersionHash; ExplorationProbability = explorationProbability; PoolSize = poolSize;
         Predictions = Array.AsReadOnly(predictions.ToArray());
+        ValidationReport = validationReport;
     }
     /// <summary>Gets the selected candidate, which still requires true evaluation.</summary>
     public EvolutionCanonicalGenome<TGenome> Candidate { get; }
@@ -97,4 +98,6 @@ public sealed class EvolutionSurrogateSelection<TGenome>
     public int PoolSize { get; }
     /// <summary>Gets all returned well-formed predictions, including those rejected for unfamiliarity.</summary>
     public IReadOnlyList<EvolutionSurrogatePrediction> Predictions { get; }
+    /// <summary>Gets optional detached backend reliability evidence, including for unreliable-model fallback.</summary>
+    public EvolutionSurrogateValidationReport? ValidationReport { get; }
 }

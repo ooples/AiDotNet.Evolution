@@ -8,6 +8,12 @@ and readiness updates supersede those initial labels. The historical table below
 not an authoritative live draft count.
 Creating a PR or inheriting a foundation does not complete a story.
 
+## September 16: local tracking requested
+
+The user requested keeping all work tracked locally after US-09 publication encountered GitHub authorization errors. Retain implementation, tests, evidence, review notes and intended PR descriptions locally; do not retry publication unless requested. US-09 is committed on `feat/evolution-us09-integration`, with 3,838 passing tests; no new PR or hosted-CI result is claimed.
+
+Recommended next: US-11, starting with reproducible CPU-only program-optimization workloads, independent correctness, original-implementation fallback, and measured runtime/allocation/cost regressions. All implementation belongs in AiDotNet.Evolution. This recommendation does not authorize starting the next story or expensive competitor campaigns; full US-11 comparative acceptance still requires its declared OpenEvolve comparison.
+
 ## September 15: US-04 reporting acceptance complete locally
 
 [PR #47](https://github.com/ooples/AiDotNet.Evolution/pull/47) is non-draft and
@@ -49,16 +55,16 @@ Retargeting after squash/rebase merging needs special care to avoid reintroducin
 | US-04: Turn traces into trustworthy experiment reports | [#22](https://github.com/ooples/AiDotNet.Evolution/issues/22) | Implemented and verified; CI/review/merge pending | [AiDotNet.Evolution#47](https://github.com/ooples/AiDotNet.Evolution/pull/47) |
 | US-05: Account for and enforce the real search budget | [#23](https://github.com/ooples/AiDotNet.Evolution/issues/23) | Partial | [AiDotNet.Evolution#48](https://github.com/ooples/AiDotNet.Evolution/pull/48) |
 | US-06: Handle noisy measurements and expensive evaluation | [#24](https://github.com/ooples/AiDotNet.Evolution/issues/24) | Partial | [AiDotNet.Evolution#49](https://github.com/ooples/AiDotNet.Evolution/pull/49) |
-| US-07: Identify which existing features improve search | [#25](https://github.com/ooples/AiDotNet.Evolution/issues/25) | Partial | [AiDotNet.Evolution#50](https://github.com/ooples/AiDotNet.Evolution/pull/50) |
-| US-08: Adapt proposal strategies using measured outcomes | [#26](https://github.com/ooples/AiDotNet.Evolution/issues/26) | Partial story; completed fix ready for review | [AiDotNet.Evolution#51](https://github.com/ooples/AiDotNet.Evolution/pull/51) |
-| US-09: Preserve useful tradeoffs between objectives | [#27](https://github.com/ooples/AiDotNet.Evolution/issues/27) | Not implemented | [AiDotNet.Evolution#52](https://github.com/ooples/AiDotNet.Evolution/pull/52) |
-| US-10: Measure engine overhead and scaling | [#28](https://github.com/ooples/AiDotNet.Evolution/issues/28) | Partial | [AiDotNet.Evolution#53](https://github.com/ooples/AiDotNet.Evolution/pull/53) |
+| US-07: Identify which existing features improve search | [#25](https://github.com/ooples/AiDotNet.Evolution/issues/25) | Local v2 implementation/study verified; CI/review/merge pending; baseline presets retained | [AiDotNet.Evolution#78](https://github.com/ooples/AiDotNet.Evolution/pull/78), historical pilot #50 |
+| US-08: Adapt proposal strategies using measured outcomes | [#26](https://github.com/ooples/AiDotNet.Evolution/issues/26) | Implemented and locally verified; hosted CI/review pending; no default promotion | Non-draft [#79](https://github.com/ooples/AiDotNet.Evolution/pull/79) on #78; historical #51 merged. [Evidence](evidence/us08-integration/README.md). |
+| US-09: Preserve useful tradeoffs between objectives | [#27](https://github.com/ooples/AiDotNet.Evolution/issues/27) | [Current-stack functionality and 288-run evidence locally verified](evolution-stories/US-09.md); 3,838 tests passed | Local integration on #86 incorporating historical [#52](https://github.com/ooples/AiDotNet.Evolution/pull/52); push/PR creation blocked by GitHub 403, no new PR yet |
+| US-10: Measure engine overhead and scaling | [#28](https://github.com/ooples/AiDotNet.Evolution/issues/28) | [Current-stack profiling and snapshot optimization locally verified](evolution-stories/US-10.md); CI/review/stack merges pending | Non-draft [#86](https://github.com/ooples/AiDotNet.Evolution/pull/86) on #85, incorporating historical #53 |
 | US-11: Demonstrate value in consumer workloads | [#29](https://github.com/ooples/AiDotNet.Evolution/issues/29) | Partial, companion | [AiDotNet#2164](https://github.com/ooples/AiDotNet/pull/2164) |
 | US-12: Gate releases on demonstrated improvement | [#30](https://github.com/ooples/AiDotNet.Evolution/issues/30) | Partial | [AiDotNet.Evolution#54](https://github.com/ooples/AiDotNet.Evolution/pull/54) |
-| US-13: Supply typed search spaces and useful operators | [#31](https://github.com/ooples/AiDotNet.Evolution/issues/31) | Partial; reused-learning regression open | [AiDotNet.Evolution#55](https://github.com/ooples/AiDotNet.Evolution/pull/55) |
-| US-14: Rank proposals using a surrogate model | [#32](https://github.com/ooples/AiDotNet.Evolution/issues/32) | Partial | [AiDotNet.Evolution#56](https://github.com/ooples/AiDotNet.Evolution/pull/56) |
-| US-15: Allocate evaluation resources dynamically | [#33](https://github.com/ooples/AiDotNet.Evolution/issues/33) | Partial | [AiDotNet.Evolution#57](https://github.com/ooples/AiDotNet.Evolution/pull/57) |
-| US-16: Adapt islands and restart stalled searches | [#34](https://github.com/ooples/AiDotNet.Evolution/issues/34) | Not implemented | [AiDotNet.Evolution#58](https://github.com/ooples/AiDotNet.Evolution/pull/58) |
+| US-13: Supply typed search spaces and useful operators | [#31](https://github.com/ooples/AiDotNet.Evolution/issues/31) | [Integrated; functional acceptance locally verified](evolution-stories/US-13.md); CI/review pending | [AiDotNet.Evolution#82](https://github.com/ooples/AiDotNet.Evolution/pull/82), incorporating #55 |
+| US-14: Rank proposals using a surrogate model | [#32](https://github.com/ooples/AiDotNet.Evolution/issues/32) | [Functional acceptance integrated and locally verified](evolution-stories/US-14.md); default off, CI/review pending | [AiDotNet.Evolution#83](https://github.com/ooples/AiDotNet.Evolution/pull/83), incorporating #56 |
+| US-15: Allocate evaluation resources dynamically | [#33](https://github.com/ooples/AiDotNet.Evolution/issues/33) | Functional acceptance locally verified; CI/review/stack merges pending | [US-15 delivery and evidence](evolution-stories/US-15.md); original [#57](https://github.com/ooples/AiDotNet.Evolution/pull/57) |
+| US-16: Adapt islands and restart stalled searches | [#34](https://github.com/ooples/AiDotNet.Evolution/issues/34) | [Integrated; functional acceptance locally verified](evolution-stories/US-16.md); opt-in, CI/review/stack merges pending | Non-draft [#85](https://github.com/ooples/AiDotNet.Evolution/pull/85) on #84, incorporating #58 |
 | US-17: Build a compiler-guided program improvement loop | [#35](https://github.com/ooples/AiDotNet.Evolution/issues/35) | Partial, companion | [AiDotNet#2165](https://github.com/ooples/AiDotNet/pull/2165) |
 | US-18: Reuse experience and detect meaningful novelty | [#36](https://github.com/ooples/AiDotNet.Evolution/issues/36) | Not implemented | [AiDotNet#2166](https://github.com/ooples/AiDotNet/pull/2166) |
 | US-19: Route models and prompts by measured return | [#37](https://github.com/ooples/AiDotNet.Evolution/issues/37) | Not implemented | [AiDotNet#2167](https://github.com/ooples/AiDotNet/pull/2167) |

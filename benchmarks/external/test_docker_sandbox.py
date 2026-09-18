@@ -118,9 +118,25 @@ class Solver:
         self.assertFalse(receipt["unknown_work"])
 
     def test_memory_limit_is_enforced(self):
-        result = self.run_source("x = bytearray(1024 * 1024 * 1024)\nclass Solver: pass")
-        self.assertEqual("candidate-failed", result["status"])
-        self.assertTrue(result["state"]["OOMKilled"])
+        # Docker's container-level OOMKilled flag is not the kernel counter.
+        # Keep a small fixture parent alive so it can read cgroup-v2 evidence
+        # after its allocation child is killed; exit 137 alone is not proof.
+        result = self.run_source('''import subprocess
+class Solver:
+ def solve(self, problem):
+  def events():
+   return dict(line.split() for line in open('/sys/fs/cgroup/memory.events'))
+  before = int(events()['oom_kill'])
+  maximum = int(open('/sys/fs/cgroup/memory.max').read())
+  child = subprocess.run(['python', '-c', 'x = [bytearray(8*1024*1024) for _ in range(128)]'],
+                         capture_output=True, timeout=3)
+  return {'maximum':maximum, 'exit':child.returncode, 'oom_kills':int(events()['oom_kill'])-before}
+''')
+        self.assertEqual("completed", result["status"])
+        self.assertEqual(self.sandbox.memory_mib * 1024 * 1024,result["output"][0]["maximum"])
+        self.assertEqual(-9,result["output"][0]["exit"])
+        self.assertGreaterEqual(result["output"][0]["oom_kills"],1)
+        self.assertFalse(result["unknown_work"])
 
     def test_pid_limit_is_enforced(self):
         result = self.run_source('''import subprocess

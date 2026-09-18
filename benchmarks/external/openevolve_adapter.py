@@ -39,13 +39,14 @@ def evaluate(program_path):
     return {"combined_score": result["quality"] if result["status"] == "valid" else -1e300}
 
 
-async def run(upstream, initial, output, model, iterations, seed, task, mode):
+async def run(upstream, initial, output, model, iterations, seed, task, mode, selection_profile="default"):
     upstream = Path(upstream).resolve(strict=True)
     actual = subprocess.check_output(["git", "rev-parse", "HEAD"], cwd=upstream, text=True).strip()
     changes = subprocess.check_output(["git", "status", "--porcelain", "--untracked-files=no"], cwd=upstream, text=True)
     if actual != REVISION or changes.strip():
         raise ValueError("OpenEvolve checkout is not the exact clean pinned source")
-    if not 1 <= iterations <= 64 or not 0 <= seed < 2**32 or mode not in ("controlled", "native-bounded"):
+    if (not 1 <= iterations <= 64 or not 0 <= seed < 2**32 or mode not in ("controlled", "native-bounded") or
+            selection_profile not in ("default", "best")):
         raise ValueError("Invalid bounded OpenEvolve run")
     import openevolve
     from openevolve import Config, OpenEvolve
@@ -55,6 +56,10 @@ async def run(upstream, initial, output, model, iterations, seed, task, mode):
     destination = Path(output)
     destination.mkdir(parents=True, exist_ok=False)
     config = Config()
+    if selection_profile == "best":
+        config.database.exploration_ratio = 0.0
+        config.database.exploitation_ratio = 0.0
+        config.database.elite_selection_ratio = 1.0
     config.random_seed = seed
     config.max_iterations = iterations
     config.language = "python"
@@ -87,7 +92,7 @@ async def run(upstream, initial, output, model, iterations, seed, task, mode):
     engine = OpenEvolve(str(initial), str(Path(__file__).resolve()), config, str(destination))
     best = await engine.run(iterations=iterations)
     result = dict(schema="openevolve-broker-run-v1", revision=actual, mode=mode,
-                  model=model, iterations=iterations, seed=seed,
+                  model=model, iterations=iterations, seed=seed, selection_profile=selection_profile,
                   best=None if best is None else {"code": best.code, "metrics": best.metrics},
                   overrides={"diff_based_evolution": False, "parallel_evaluations": 1, "evaluator_retries": 0,
                              "llm_retries": 0, "cascade_evaluation": False, "llm_feedback": False},
@@ -107,8 +112,9 @@ def main():
     parser.add_argument("--seed", type=int, required=True)
     parser.add_argument("--task", type=Path, required=True)
     parser.add_argument("--mode", choices=("controlled", "native-bounded"), required=True)
+    parser.add_argument("--selection-profile", choices=("default", "best"), default="default")
     args = parser.parse_args()
-    asyncio.run(run(args.upstream, args.initial, args.output, args.model, args.iterations, args.seed, args.task, args.mode))
+    asyncio.run(run(args.upstream, args.initial, args.output, args.model, args.iterations, args.seed, args.task, args.mode, args.selection_profile))
 
 
 if __name__ == "__main__":
