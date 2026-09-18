@@ -45,7 +45,7 @@ def _amounts(value: Any) -> bool:
 
 
 def _identity(value: Any) -> bool:
-    return isinstance(value, dict) and isinstance(value.get("runId"), str) and 0 < len(value["runId"]) <= 256 \
+    return isinstance(value, dict) and isinstance(value.get("runId"), str) and 0 < len(value["runId"]) <= 1024 \
         and _unsigned(value.get("evaluationId")) and _integer(value.get("attempt")) \
         and isinstance(value.get("leaseId"), str) and bool(re.fullmatch(r"[0-9a-f]{32}", value["leaseId"]))
 
@@ -298,9 +298,14 @@ class DurableWorkClient:
 
     def delivery(self, identity: Mapping[str, Any], worker_id: str) -> dict[str, Any] | None:
         _require(_identity(identity), "The original complete durable identity is required.")
-        reply = self._call("delivery", identity=dict(identity), workerId=worker_id)
+        # Compare against the NORMALIZED identity. Mapping[str, Any] is a typing annotation, not an
+        # enforced base class, so a caller may pass any object satisfying the protocol; one that does
+        # not inherit collections.abc.Mapping compares by object identity, and the receipt check would
+        # fail for a correct receipt -- killing the host and demanding reconciliation for nothing.
+        normalized = dict(identity)
+        reply = self._call("delivery", identity=normalized, workerId=worker_id)
         value = reply.get("result")
-        return self._checked(value, "result" in reply and _result(value) and (value is None or value["identity"] == identity), "Invalid delivery receipt.")
+        return self._checked(value, "result" in reply and _result(value) and (value is None or value["identity"] == normalized), "Invalid delivery receipt.")
 
     def unsettled(self, worker_id: str, after_lease_id: str | None = None) -> dict[str, Any]:
         """One keyset page for reconciliation only; new concurrent claims require restarting a scan."""

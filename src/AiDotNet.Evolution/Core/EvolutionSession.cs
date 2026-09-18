@@ -114,6 +114,14 @@ public sealed class EvolutionSession<TGenome> : IDisposable
         Func<TGenome, string> canonicalIdentity)
         : this(engineFactory, initialGenomes, canonicalIdentity, new EvolutionExternalTaskIdentity("ask-tell", "1", "external"), true) { }
 
+    // RETRIES AND THE LEGACY OVERLOAD. Tell takes a bare evaluation id, which cannot distinguish a
+    // retry from another session's result, so it settles only the first attempt. That does NOT mean a
+    // session built here cannot retry: TellAttempt is available on every session and settles retries
+    // by their full work identity, which is what EvolutionSessionAttemptTests exercises. A caller that
+    // uses Tell exclusively and configures MaxRetries above zero will see Tell return false for the
+    // replacement attempt and, if it ignores that, wait for a completion nobody supplies. Use
+    // TellAttempt for the ask/tell loop, or leave MaxRetries at zero.
+
     /// <summary>Creates a fingerprinted session requiring fenced <see cref="TellAttempt"/> results.</summary>
     /// <remarks>Inject the matching genome codec through the engine factory for checkpoints. This local queue is not a durable coordinator.</remarks>
     public EvolutionSession(Func<IEvolutionTask<TGenome>, EvolutionEngine<TGenome>> engineFactory,

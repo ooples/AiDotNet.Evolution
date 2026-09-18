@@ -84,6 +84,36 @@ public sealed class EvolutionWorkProtocolTests
         Assert.False(JsonNode.Parse(endpoint.ProcessJson("{}"))!["ok"]!.GetValue<bool>());
     }
 
+    [Fact]
+    public void AnOversizedOperationReturnsABoundedProtocolErrorInsteadOfKillingTheEndpoint()
+    {
+        // The unknown-operation message concatenates the caller-supplied op, so a near-frame-sized op
+        // produced an error reply larger than MaximumFrameBytes. Reply threw from inside the catch
+        // block, that exception escaped ProcessJson, and the server terminated instead of answering
+        // with the bounded protocol error the caller was owed.
+        using var fixture = new Fixture();
+        using var endpoint = fixture.Open();
+
+        var request = new JsonObject
+        {
+            ["id"] = 1,
+            ["protocol"] = 1,
+            ["op"] = new string('o', 4 * 1024 * 1024)
+        };
+
+        string response = endpoint.ProcessJson(request.ToJsonString());
+        var parsed = JsonNode.Parse(response)!.AsObject();
+
+        Assert.False(parsed["ok"]!.GetValue<bool>());
+        Assert.Equal(1, parsed["id"]!.GetValue<long>());
+        Assert.Contains("Unknown durable worker operation", parsed["error"]!.GetValue<string>());
+        Assert.True(response.Length < 8 * 1024, "the error reply must stay small rather than echoing the request");
+        Assert.False(endpoint.IsClosed);
+
+        // The endpoint is still usable afterwards.
+        Assert.False(JsonNode.Parse(endpoint.ProcessJson("{}"))!["ok"]!.GetValue<bool>());
+    }
+
     [Theory]
     [InlineData("01")]
     [InlineData("1.0")]

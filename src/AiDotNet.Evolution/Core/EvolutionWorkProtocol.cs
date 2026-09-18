@@ -57,11 +57,30 @@ public sealed partial class EvolutionWorkProtocol : IDisposable
             {
                 return Reply(id, writer =>
                 {
-                    writer.WriteString("error", ex.GetType().Name + ": " + ex.Message);
+                    writer.WriteString("error", BoundedError(ex));
                     writer.WriteString("recovery", "reconcile-original-store; never assume an unacknowledged mutation failed");
                 }, ok: false);
             }
         }
+    }
+
+    /// <summary>Bounds error text so a protocol error can always be reported.</summary>
+    /// <remarks>An exception message can embed caller-controlled text -- the unknown-operation message
+    /// concatenates the requested op -- so a near-frame-sized op produced a reply larger than
+    /// MaximumFrameBytes. Reply then threw from inside the catch block, that exception escaped
+    /// ProcessJson, and the server terminated instead of returning the bounded protocol error the
+    /// caller was owed.</remarks>
+    private const int MaximumErrorTextBytes = 1024;
+
+    private static string BoundedError(Exception error)
+    {
+        string text = error.GetType().Name + ": " + error.Message;
+        // Four bytes is the UTF-8 maximum for one char, so this bound holds without counting bytes.
+        const int maximumCharacters = MaximumErrorTextBytes / 4;
+        if (text.Length <= maximumCharacters) return text;
+        int cut = maximumCharacters;
+        if (char.IsHighSurrogate(text[cut - 1])) cut--;
+        return text.Substring(0, cut) + "... (truncated)";
     }
 
     private static string Reply(long id, Action<Utf8JsonWriter> body, bool ok = true)

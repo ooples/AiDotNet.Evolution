@@ -105,7 +105,7 @@ function amounts(value: unknown): value is ResourceAmounts {
     typeof amount === 'string' && /^(0|[1-9][0-9]{0,28})(\.[0-9]{0,27}[1-9])?$/.test(amount));
 }
 function identity(value: unknown): value is DurableWorkIdentity {
-  return record(value) && typeof value.runId === 'string' && value.runId.length > 0 && value.runId.length <= 256 &&
+  return record(value) && typeof value.runId === 'string' && value.runId.length > 0 && value.runId.length <= 1024 &&
     unsigned(value.evaluationId) && integer(value.attempt) && typeof value.leaseId === 'string' && /^[0-9a-f]{32}$/.test(value.leaseId);
 }
 function lease(value: unknown): value is DurableLease {

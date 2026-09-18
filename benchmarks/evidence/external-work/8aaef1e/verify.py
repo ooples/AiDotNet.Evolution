@@ -84,6 +84,11 @@ def verify(archive):
 
 
 if __name__ == "__main__":
+    # Every check in verify() is an assert, and python -O removes assert statements outright, so an
+    # optimized invocation would skip the evidence checks and still print the success line. The README
+    # documents running this file directly, and nothing else prevents -O, so refuse it explicitly.
+    if not __debug__:
+        raise SystemExit("Run this verifier without -O: its checks are assertions and -O removes them.")
     with zipfile.ZipFile(Path(__file__).with_name("verification.zip")) as archive:
         verify(archive)
     print("Verified source/binary identities, six schema-2 journals, receipts/liabilities, session fences and checkpoint hashes.")
