@@ -1,7 +1,7 @@
 namespace AiDotNet.Evolution.Programs;
 
 /// <summary>Compiler-neutral program bounds and edit rules, independent of model-builder configuration.</summary>
-public sealed class ProgramTaskOptions
+public class ProgramTaskOptions
 {
     /// <summary>Required candidate language; Generic allows any explicitly identified language.</summary>
     public ProgramLanguage Language { get; set; } = ProgramLanguage.Generic;
@@ -31,7 +31,7 @@ public sealed class ProgramTaskOptions
     }
 
     /// <summary>Copies mutable settings; the caller-owned live resource ledger remains shared.</summary>
-    public ProgramTaskOptions Clone() => new()
+    public virtual ProgramTaskOptions Clone() => new()
     {
         Language = Language,
         EvolveBlockStartMarker = EvolveBlockStartMarker,
@@ -43,7 +43,7 @@ public sealed class ProgramTaskOptions
     };
 
     /// <summary>Rejects invalid bounds, languages, and marker settings.</summary>
-    public void Validate()
+    public virtual void Validate()
     {
         if (!Enum.IsDefined(Language)) throw new ArgumentOutOfRangeException(nameof(Language));
         if (MaxProgramChars <= 0 || MaxProgramChars > ProgramGenome.MaxSourceLength)

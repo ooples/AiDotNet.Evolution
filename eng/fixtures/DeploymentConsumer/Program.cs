@@ -31,7 +31,39 @@ if (evaluations != 2 || result.Best?.Evaluation.Quality != 2)
     throw new InvalidOperationException("Packaged task/edit/descriptor engine integration failed.");
 if (typeof(ProgramEvolutionTask).Assembly.GetReferencedAssemblies().Any(reference => reference.Name == "AiDotNet"))
     throw new InvalidOperationException("Program foundation must not depend on AiDotNet.");
-Console.WriteLine("PASS: packaged deployment, MAP-Elites and program foundation; 2 evaluations, fixture quality 1 -> 2; no project references.");
+var modelRuntime = new LlmProgramVariationOperator(new FixtureChat(),
+    new ProgramProposalOptions { Language = ProgramLanguage.Python });
+if (modelRuntime.PromptBuilder.Build(new AiDotNet.Evolution.Prompts.ProgramPromptContext(new ProgramGenome("x = 1", ProgramLanguage.Python))).Messages.Count == 0)
+    throw new InvalidOperationException("Packaged model runtime produced no prompt.");
+var processOptions = new ProgramSandboxOptions { RuntimeVersion = "package-fixture-shell-v1" };
+processOptions.SetInterpreter(ProgramLanguage.Python, new ProgramInterpreterSpecification(
+    OperatingSystem.IsWindows() ? Path.Combine(Environment.GetFolderPath(Environment.SpecialFolder.System), "cmd.exe") : "/bin/cat",
+    OperatingSystem.IsWindows() ? "/c type {source}" : "{source}"));
+using var processRunner = new ProcessProgramExecutionEngine(processOptions);
+var executionFitness = new SandboxedProgramFitnessEvaluator(processRunner,
+    new[] { new ProgramInputOutputExample { ExpectedOutput = "package-execution-proof" } });
+var executionResult = await executionFitness.EvaluateAsync(new ProgramGenome("package-execution-proof", ProgramLanguage.Python), new(0, 1, 1, 1));
+if (executionResult.Quality != 1 || executionResult.CostUnits != 1)
+    throw new InvalidOperationException("Packaged process evaluator failed.");
+var scriptFitness = new ScriptProgramFitnessEvaluator(processRunner,
+    "{\"metrics\":{\"speed\":4,\"accuracy\":2}}", new ScriptProgramEvaluationOptions { RequireEntryPoint = false },
+    metricAggregator: new AiDotNet.Evolution.Programs.Metrics.ProgramMetricAggregator());
+var scriptResult = await scriptFitness.EvaluateAsync(new ProgramGenome("candidate", ProgramLanguage.Python), new(0, 1, 1, 1));
+if (scriptResult.Quality != 3 || scriptResult.Metrics["speed"] != 4 || scriptResult.CostUnits != 1)
+    throw new InvalidOperationException("Packaged script metrics evaluation failed.");
+var judge = new LlmJudgeProgramFitnessEvaluator(new FixtureJudge(), new DelegateProgramFitnessEvaluator(_ => .5),
+    options: new LlmFeedbackOptions { Criteria = new[] { "score" } });
+var judged = await judge.EvaluateAsync(new ProgramGenome("candidate", ProgramLanguage.Python), new(0, 1, 1, 1));
+if (Math.Abs(judged.Quality!.Value - .65) > 1e-10 || judged.CostUnits != 1 || judged.Descriptors["llm_average"] != 1)
+    throw new InvalidOperationException("Packaged judge evaluation failed.");
+var novelty = new AiDotNet.Evolution.Programs.Novelty.NoveltyGatingProgramFitnessEvaluator(new DelegateProgramFitnessEvaluator(_ => 1));
+var original = new ProgramGenome("x=1", ProgramLanguage.Python);
+var novel = await novelty.EvaluateAsync(original, new(0, 1, 1, 1));
+var duplicate = await novelty.EvaluateAsync(new ProgramGenome("x = 1", ProgramLanguage.Python), new(1, 1, 1, 1));
+if (novel.Status != EvolutionEvaluationStatus.Completed || duplicate.Status != EvolutionEvaluationStatus.Rejected
+    || novelty.AcceptedCount != 1 || novelty.RejectedCount != 1 || duplicate.CostUnits != 0)
+    throw new InvalidOperationException("Packaged pre-evaluation novelty gate failed.");
+Console.WriteLine("PASS: packaged deployment/program runtime, script metrics, judge and novelty; no project references or live model calls.");
 
 sealed class FixtureEdit : IVariationOperator<ProgramGenome>
 {
@@ -45,4 +77,20 @@ sealed class FixtureEdit : IVariationOperator<ProgramGenome>
         if (!edit.IsSuccess) throw new InvalidOperationException("Package edit failed.");
         return new(new ProgramGenome(edit.ModifiedSource, ProgramLanguage.Python));
     }
+}
+
+sealed class FixtureChat : IProgramChatClient
+{
+    public string ModelId => "package-fixture";
+    public Task<ProgramChatResponse> GetResponseAsync(IReadOnlyList<ProgramChatMessage> messages,
+        ProgramChatOptions? options = null, CancellationToken cancellationToken = default) =>
+        Task.FromResult(new ProgramChatResponse(ProgramChatMessage.Assistant("fixture")));
+}
+
+sealed class FixtureJudge : IProgramChatClient
+{
+    public string ModelId => "package-judge-fixture";
+    public Task<ProgramChatResponse> GetResponseAsync(IReadOnlyList<ProgramChatMessage> messages,
+        ProgramChatOptions? options = null, CancellationToken cancellationToken = default) =>
+        Task.FromResult(new ProgramChatResponse(ProgramChatMessage.Assistant("{\"score\":1}")));
 }

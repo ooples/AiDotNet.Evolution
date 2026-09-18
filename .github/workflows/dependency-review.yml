@@ -2,7 +2,7 @@ name: Dependency Review
 
 on:
   pull_request:
-    branches: [main, feat/competitive-evolution-platform, 'feat/evolution-us-*', feat/evolution-us02-efficacy, feat/evolution-us05-campaign-budget, feat/evolution-us07-ablation-integration, feat/evolution-us08-portfolio-integration, feat/evolution-program-consolidation, feat/evolution-us14-integration, feat/evolution-us15-integration, feat/evolution-us10-integration, feat/evolution-us09-integration, fix/evolution-deployment-relocation]
+    branches: [main, feat/competitive-evolution-platform, 'feat/evolution-us-*', feat/evolution-us02-efficacy, feat/evolution-us05-campaign-budget, feat/evolution-us07-ablation-integration, feat/evolution-us08-portfolio-integration, feat/evolution-program-consolidation, feat/evolution-us14-integration, feat/evolution-us15-integration, feat/evolution-us10-integration, feat/evolution-us09-integration, fix/evolution-deployment-relocation, fix/evolution-model-runtime-relocation, fix/evolution-script-metrics-relocation, fix/evolution-judge-relocation]
 
 permissions:
   contents: read
