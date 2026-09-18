@@ -112,6 +112,9 @@ public sealed class EvolutionEngineOptions
     /// </remarks>
     public int MaxDegreeOfParallelism { get; set; } = 1;
 
+    /// <summary>Gets or sets bounded proposal/evaluation pipeline settings; used only with Pipeline dispatch.</summary>
+    public EvolutionPipelineOptions Pipeline { get; set; } = new();
+
     /// <summary>Gets or sets deterministic or opportunistic commit behavior.</summary>
     public EvolutionExecutionMode ExecutionMode { get; set; } = EvolutionExecutionMode.Deterministic;
 
@@ -565,6 +568,10 @@ public sealed class EvolutionEngineOptions
         Guard.NotNull(Cascade);
         Guard.NotNull(Artifacts);
         Guard.NotNull(EarlyStopping);
+        Guard.NotNull(Pipeline);
+        EvolutionPipelineOptions pipeline = Pipeline.SnapshotAndValidate();
+        if (Dispatch == EvolutionDispatchMode.Pipeline && (MaxInFlight != 0 || MaxInFlightPerIsland != 0))
+            throw new ArgumentException("Pipeline uses its own WaveSize and bounded queues; continuous-window/island quotas are not supported.", nameof(Pipeline));
         EvolutionSelectionOptions selection = Selection.SnapshotAndValidate();
         EvolutionCascadeOptions cascade = Cascade.SnapshotAndValidate();
         EvolutionArtifactOptions artifacts = Artifacts.SnapshotAndValidate();
@@ -575,6 +582,7 @@ public sealed class EvolutionEngineOptions
         snapshot.Artifacts = artifacts;
         snapshot.EarlyStopping = earlyStopping;
         snapshot.Selection = selection;
+        snapshot.Pipeline = pipeline;
         snapshot.RunId = RunId.Trim();
         snapshot.OutputDirectory = outputDirectory;
         snapshot.QualityDescriptorName = QualityDescriptorName?.Trim();
@@ -594,17 +602,30 @@ public sealed class EvolutionEngineOptions
         return EvolutionHash.Compute(snapshot.ToSemanticCanonicalString());
     }
 
-    /// <summary>Copies every option without validating any of them.</summary>
+    /// <summary>Copies every option, validating the nested subsystems as it goes.</summary>
     /// <returns>An independent instance carrying the same values, with each nested subsystem deep-copied.</returns>
+    /// <exception cref="ArgumentOutOfRangeException">A nested subsystem holds an invalid value.</exception>
     /// <remarks>
-    /// This is the single place that enumerates the options, so a new one cannot be forgotten by a second
+    /// <para>This is the single place that enumerates the options, so a new one cannot be forgotten by a second
     /// hand-maintained copy elsewhere. <see cref="SnapshotAndValidate"/> builds on it and then substitutes the
     /// validated nested subsystems. Before this existed a separate copy in
     /// AiDotNet's program-evolution adapter once silently dropped 19 of the 41 options, so that domain adapter
     /// discarded its cascade, early stopping, target quality, migration topology, selection policy and output
-    /// directory without any error.
+    /// directory without any error.</para>
+    /// <para><b>Public because the adapter that needed it now lives in another assembly.</b> While this
+    /// engine was carried inside AiDotNet, its program-evolution adapter reached this method as an
+    /// internal. Now that the engine ships as its own package that adapter cannot, and the alternatives
+    /// are for it to hand-maintain a second copy - the exact defect described above, which dropped 19 of
+    /// 41 options last time - or to lose the options silently. Any consumer composing engine options
+    /// from its own configuration needs this, so it belongs in the contract.</para>
+    /// <para><b>The scalar options are copied as-is; the nested subsystems are validated.</b> Cascade,
+    /// Artifacts, EarlyStopping and Selection are copied through their own
+    /// <c>SnapshotAndValidate</c>, so copying an options object holding an invalid nested value throws
+    /// rather than propagating it. That is deliberate - <see cref="SnapshotAndValidate"/> builds on this
+    /// method and must not be able to hand the engine a subsystem it would reject - but it does mean Copy
+    /// is not a pure clone, and a caller copying user-supplied configuration should expect to handle it.</para>
     /// </remarks>
-    internal EvolutionEngineOptions Copy()
+    public EvolutionEngineOptions Copy()
     {
         return new EvolutionEngineOptions
         {
@@ -612,6 +633,7 @@ public sealed class EvolutionEngineOptions
             Artifacts = Artifacts.SnapshotAndValidate(),
             EarlyStopping = EarlyStopping.SnapshotAndValidate(),
             Selection = Selection.SnapshotAndValidate(),
+            Pipeline = Pipeline.SnapshotAndValidate(),
             QualityDescriptorName = QualityDescriptorName,
             OutputDirectory = OutputDirectory,
             RunId = RunId,
@@ -707,7 +729,9 @@ public sealed class EvolutionEngineOptions
         Field("retry-base-delay", RetryBaseDelay.Ticks.ToString(CultureInfo.InvariantCulture)),
         Field("retry-backoff-multiplier", EvolutionHash.EncodeDouble(RetryBackoffMultiplier)),
         Field("target-quality", EvolutionHash.EncodeNullableDouble(TargetQuality))
-    };
+    }.Concat(Dispatch == EvolutionDispatchMode.Pipeline
+        ? new[] { Field("pipeline", Pipeline.ToCanonicalString()) }
+        : Array.Empty<KeyValuePair<string, string>>()).ToArray();
 
     /// <summary>Lists every option that only bounds or locates a run, as ordered name/value pairs.</summary>
     /// <remarks>
@@ -726,7 +750,9 @@ public sealed class EvolutionEngineOptions
         Field("resume", Resume ? "resume" : "fresh"),
         Field("max-degree-of-parallelism", MaxDegreeOfParallelism.ToString(CultureInfo.InvariantCulture)),
         Field("output-directory", OutputDirectory ?? "none")
-    };
+    }.Concat(Dispatch == EvolutionDispatchMode.Pipeline
+        ? new[] { Field("pipeline-schedule-records", Pipeline.MaximumScheduleRecords.ToString(CultureInfo.InvariantCulture)) }
+        : Array.Empty<KeyValuePair<string, string>>()).ToArray();
 
     /// <summary>Encodes the semantic options into the string the configuration hash is computed from.</summary>
     internal string ToSemanticCanonicalString() => Encode(SemanticFields());

@@ -5,8 +5,9 @@ namespace AiDotNet.Evolution;
 /// <para>
 /// <see cref="AiDotNet.Evolution.MapElitesArchive{TGenome}.TryAdd"/> returns one of these values for every completed
 /// evaluation the engine offers it. The archive changes state, and increments its version, only for
-/// <see cref="Inserted"/>, <see cref="Replaced"/>, and <see cref="InsertedWithEviction"/>; the other two values leave
-/// it untouched. <see cref="Rejected"/> signals a contract failure such as an evaluation that did not complete, a
+/// <see cref="Inserted"/>, <see cref="Replaced"/>, and <see cref="InsertedWithEviction"/>. Pareto archives additionally
+/// increment the version for <see cref="RetainedForExploration"/>, which changes only the separate infeasible pool.
+/// <see cref="Rejected"/> and <see cref="NotImproved"/> leave it untouched. <see cref="Rejected"/> signals a contract failure such as an evaluation that did not complete, a
 /// mismatched optimization direction, or a descriptor that is missing or outside its allowed range, whereas
 /// <see cref="NotImproved"/> is the normal outcome of a valid candidate that lost to the incumbent in its cell.
 /// </para>
@@ -35,5 +36,7 @@ public enum EvolutionArchiveInsertionResult
     /// <summary>The candidate or one of its descriptors was invalid for this archive.</summary>
     Rejected = 3,
     /// <summary>The candidate was inserted and a deterministic capacity eviction occurred.</summary>
-    InsertedWithEviction = 4
+    InsertedWithEviction = 4,
+    /// <summary>An infeasible candidate entered the separate exploration pool; no deployable elite was added.</summary>
+    RetainedForExploration = 5
 }

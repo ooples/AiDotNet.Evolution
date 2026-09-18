@@ -10,7 +10,7 @@
   </PropertyGroup>
 
   <ItemGroup>
-    <PackageReference Include="Microsoft.NET.Test.Sdk" Version="18.9.0" />
+    <PackageReference Include="Microsoft.NET.Test.Sdk" Version="18.10.0" />
     <PackageReference Include="xunit" Version="2.9.3" />
     <PackageReference Include="YamlDotNet" Version="18.1.0" />
     <PackageReference Include="xunit.runner.visualstudio" Version="2.8.2">
@@ -25,5 +25,15 @@
 
   <ItemGroup>
     <ProjectReference Include="..\..\src\AiDotNet.Evolution\AiDotNet.Evolution.csproj" />
+    <ProjectReference Include="..\..\src\AiDotNet.Evolution.Surrogates\AiDotNet.Evolution.Surrogates.csproj" />
+    <ProjectReference Include="..\..\benchmarks\AiDotNet.Evolution.Quality\AiDotNet.Evolution.Quality.csproj" Condition="'$(TargetFramework)' == 'net10.0'" />
+  </ItemGroup>
+
+  <!--
+    The host is net8.0 only, so it is referenced only from the TFMs that can load it.
+    net471 runs the same suite minus the host tests rather than losing the whole target.
+  -->
+  <ItemGroup Condition="'$(TargetFramework)' != 'net471'">
+    <ProjectReference Include="..\..\src\AiDotNet.Evolution.Host\AiDotNet.Evolution.Host.csproj" />
   </ItemGroup>
 </Project>
