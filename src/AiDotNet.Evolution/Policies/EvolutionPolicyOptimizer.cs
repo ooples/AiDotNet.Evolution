@@ -209,7 +209,12 @@ public sealed class EvolutionPolicyOptimizer
             if (await Task.WhenAny(work, Task.Delay(System.Threading.Timeout.Infinite, timeout.Token)).ConfigureAwait(false) != work)
             {
                 _abandonedWork = work;
-                throw new PolicyTrialStopped(token.IsCancellationRequested ? "CanceledOrTimedOut" : "InnerTimedOut");
+                // Only the per-trial deadline is this trial's own stop reason. When the campaign token
+                // fired instead, propagate the cancellation so the outer handler can distinguish caller
+                // cancellation ("Canceled") from the campaign deadline ("TimedOut") -- classification it
+                // already implements and that a PolicyTrialStopped would discard as "CanceledOrTimedOut".
+                token.ThrowIfCancellationRequested();
+                throw new PolicyTrialStopped("InnerTimedOut");
             }
             observation = await work.ConfigureAwait(false) ?? throw new InvalidOperationException("Policy trial returned no receipt.");
             var amounts = observation.ActualResources.Amounts;

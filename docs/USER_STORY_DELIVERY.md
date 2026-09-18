@@ -1,9 +1,9 @@
 # User-story delivery index
 
 The [research roadmap](COMPETITIVE_ANALYSIS_AND_ROADMAP.md) has **26 open issues and 26 separate dependent PRs**:
-US-08 / #51 is ready for review of its completed learning-correctness slice; the other 25 remain tracking drafts.
+US-08 / #51 is ready for review of its completed learning-correctness slice and US-26 / #63 adds an implemented bounded offline policy optimizer; the other 24 remain tracking drafts.
 Each issue includes the original Given/When/Then criteria, dependency checklist, partial evidence and remaining work.
-All initial story PR commits were **tracking-only checklists**. US-08 / #51 now adds a tested partial implementation slice; the other 25 story PRs remain tracking-only.
+All initial story PR commits were **tracking-only checklists**. US-08 / #51 now adds a tested partial implementation slice and US-26 / #63 an implemented offline optimizer with held-out validation; the other 24 story PRs remain tracking-only.
 Creating a PR or inheriting a foundation does not complete a story.
 
 ## Agreed delivery structure

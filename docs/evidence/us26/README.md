@@ -37,7 +37,7 @@ dotnet test tests/AiDotNet.Evolution.Tests/AiDotNet.Evolution.Tests.csproj -c Re
 dotnet run --project examples/PolicySearch -c Release --no-build --no-restore -- .local/us26-committed/cpu-report.json
 ```
 
-Tests used `DOTNET_PROCESSOR_COUNT=2`. Restore was performed by the initial format command. Fresh machines need `dotnet restore AiDotNet.Evolution.slnx` first. The example refuses to overwrite an existing report; choose a new output path for a new run.
+Tests used `DOTNET_PROCESSOR_COUNT=2`. Every command above passes `--no-restore`, so none of them restores; the restore was a separate `dotnet restore AiDotNet.Evolution.slnx` run before this sequence, which fresh machines also need. The example refuses to overwrite an existing report; choose a new output path for a new run.
 
 ## Failed gates retained, not reclassified as passes
 
