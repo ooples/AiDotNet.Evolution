@@ -39,8 +39,19 @@ public static class EvolutionResourceWork
         EvolutionResourceResult<T> result = await work(cancellationToken).ConfigureAwait(false)
             ?? throw new InvalidOperationException("The resource-metered operation returned no receipt.");
         reservation.Complete(result.Actual, result.Outcome);
+        if (result.Actual.Amounts.Any(pair => pair.Value > maximum[pair.Key]))
+            throw new EvolutionResourceLimitExceededException(operationId);
         return result.Value;
     }
+}
+
+/// <summary>Actual consumption exceeded a producer's reserved maximum; its result must not be used as admissible work.</summary>
+public sealed class EvolutionResourceLimitExceededException : InvalidOperationException
+{
+    /// <summary>Creates an overrun failure after the full actual receipt has been retained.</summary>
+    public EvolutionResourceLimitExceededException(string operationId) : base("The producer exceeded its reserved resource maximum.") => OperationId = operationId;
+    /// <summary>Gets the offending operation identity.</summary>
+    public string OperationId { get; }
 }
 
 /// <summary>Indicates that a resource reservation was denied before any work was dispatched.</summary>

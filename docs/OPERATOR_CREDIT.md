@@ -1,8 +1,10 @@
 # Measured gain and proposal-cost credit
 
 US-08 now has opt-in reward policies and a proposal-resource adapter, not only an archive-success counter.
-The original `AdaptiveVariationPortfolio(operators, explorationProbability)` constructor, binary signature,
-version formula and checkpoint representation remain available unchanged. New behavior requires an explicit policy.
+The original `AdaptiveVariationPortfolio(operators, explorationProbability)` binary signature remains available.
+All reward modes now reject declared measurement reuse, including producer-side reuse on an engine cache miss.
+Learning version hashes changed: older portfolio checkpoints are rejected, not silently resumed with possibly
+inflated credit. Parent-relative and proposal-inclusive policies still require explicit opt-in.
 
 ```csharp
 var policy = new EvolutionOperatorRewardPolicy(
@@ -27,11 +29,13 @@ The backend, genome and shared ledger are application-supplied. No model call or
   credit uses the parent score captured **at proposal time**, not a newer parent or a mutable live archive at commit time.
 - Given maximize or minimize objectives, when parent credit is computed, then the direction-aware improvement is divided
   by a predeclared positive quality scale and clipped to `[0,1]`. No improvement, direction mismatch, failed/infeasible work,
-  cache hits, missing evaluation attempts or no archive change earn zero. Archive-success mode remains a separate option.
+  engine cache hits, producer-declared reuse, missing evaluation attempts or no archive change earn zero.
+  Archive-success mode remains a separate option.
 - Given proposal-inclusive credit, when an outcome commits, then the selected child's complete proposal receipt is read
   before feedback consumes its attribution, and added to terminal evaluator-attempt charges without charging the ledger again.
 - Given a selected operator/configuration, when feedback commits, then `LastCredit` identifies the child, its version, policy,
-  generation, archive outcome, included charges and applied reward. It is a detached diagnostic record, not a learning callback.
+  generation, archive outcome, included charges, original measurement provenance and applied reward.
+  It is a detached diagnostic record, not a learning callback; acquisition cost is not charged again.
 - Given an exception or cancellation without a proposal receipt, when admitted work ends, then the maximum is charged as
   unknown. A pre-dispatch denial costs zero and does not send feedback to an undispatched backend. Known failures and maximum
   overruns keep their actual charges. A missing explicit `cost_units` field is not interpreted as free work.

@@ -1,0 +1,596 @@
+{
+  "SchemaVersion": 1,
+  "Purpose": "retrospective-surrogate-development",
+  "SourceRevision": "c770896d361c71604d39e2ac9745b587ebca0f57",
+  "FullTraceSha256": "f548d050d9bffb368c925ad5de53331c01d2ae0f8c74c67ed06d370e529d9ad7",
+  "ScheduledRuns": 240,
+  "FailedOrInvalidRuns": [],
+  "Interpretation": "Negative paired loss difference favors ValidatedPool. Equal total caps only within each tariff. 10000 paired seed bootstrap draws, seed 42, unadjusted 95% percentile intervals; no task resampling. Failed/incomplete/invalid runs retain worst-support loss 8; none are dropped. Two authored deterministic fixtures, synthetic work tariffs, no matched tuning or competitor superiority claim.",
+  "Summaries": [
+    {
+      "Task": "ShiftedQuadratic4",
+      "EvaluationUnitCost": 0.1,
+      "Method": "Ordinary",
+      "Runs": 10,
+      "MeanPenalizedLoss": 0.003157409741857772,
+      "MedianPenalizedLoss": 0.0023536260345478222,
+      "WorstPenalizedLoss": 0.007724332968687596,
+      "ReportedEvaluatorCallRows": 10,
+      "MeanReportedEvaluatorCalls": 58.0,
+      "ReportedSpentCostRows": 10,
+      "MeanReportedSpentCostUnits": 6.38
+    },
+    {
+      "Task": "ShiftedQuadratic4",
+      "EvaluationUnitCost": 0.1,
+      "Method": "UniformPool",
+      "Runs": 10,
+      "MeanPenalizedLoss": 0.00911712470653538,
+      "MedianPenalizedLoss": 0.005824242715230455,
+      "WorstPenalizedLoss": 0.040140579583119125,
+      "ReportedEvaluatorCallRows": 10,
+      "MeanReportedEvaluatorCalls": 46.0,
+      "ReportedSpentCostRows": 10,
+      "MeanReportedSpentCostUnits": 6.2
+    },
+    {
+      "Task": "ShiftedQuadratic4",
+      "EvaluationUnitCost": 0.1,
+      "Method": "SurrogatePool",
+      "Runs": 10,
+      "MeanPenalizedLoss": 0.004649764907484382,
+      "MedianPenalizedLoss": 0.0035476671502326176,
+      "WorstPenalizedLoss": 0.010068349318859016,
+      "ReportedEvaluatorCallRows": 10,
+      "MeanReportedEvaluatorCalls": 40.3,
+      "ReportedSpentCostRows": 10,
+      "MeanReportedSpentCostUnits": 6.1755176
+    },
+    {
+      "Task": "ShiftedQuadratic4",
+      "EvaluationUnitCost": 0.1,
+      "Method": "ValidatedPool",
+      "Runs": 10,
+      "MeanPenalizedLoss": 0.012067549499177255,
+      "MedianPenalizedLoss": 0.003567447643121677,
+      "WorstPenalizedLoss": 0.05780533887874782,
+      "ReportedEvaluatorCallRows": 10,
+      "MeanReportedEvaluatorCalls": 41.1,
+      "ReportedSpentCostRows": 10,
+      "MeanReportedSpentCostUnits": 6.148932
+    },
+    {
+      "Task": "ShiftedQuadratic4",
+      "EvaluationUnitCost": 1,
+      "Method": "Ordinary",
+      "Runs": 10,
+      "MeanPenalizedLoss": 0.003157409741857772,
+      "MedianPenalizedLoss": 0.0023536260345478222,
+      "WorstPenalizedLoss": 0.007724332968687596,
+      "ReportedEvaluatorCallRows": 10,
+      "MeanReportedEvaluatorCalls": 63.0,
+      "ReportedSpentCostRows": 10,
+      "MeanReportedSpentCostUnits": 63.64
+    },
+    {
+      "Task": "ShiftedQuadratic4",
+      "EvaluationUnitCost": 1,
+      "Method": "UniformPool",
+      "Runs": 10,
+      "MeanPenalizedLoss": 0.0029373518446797085,
+      "MedianPenalizedLoss": 0.0025578218137857337,
+      "WorstPenalizedLoss": 0.004839243608184332,
+      "ReportedEvaluatorCallRows": 10,
+      "MeanReportedEvaluatorCalls": 61.0,
+      "ReportedSpentCostRows": 10,
+      "MeanReportedSpentCostUnits": 63.239999999999995
+    },
+    {
+      "Task": "ShiftedQuadratic4",
+      "EvaluationUnitCost": 1,
+      "Method": "SurrogatePool",
+      "Runs": 10,
+      "MeanPenalizedLoss": 0.0030277477944358837,
+      "MedianPenalizedLoss": 0.002804842608488352,
+      "WorstPenalizedLoss": 0.005276577158833417,
+      "ReportedEvaluatorCallRows": 10,
+      "MeanReportedEvaluatorCalls": 60.0,
+      "ReportedSpentCostRows": 10,
+      "MeanReportedSpentCostUnits": 63.5243952
+    },
+    {
+      "Task": "ShiftedQuadratic4",
+      "EvaluationUnitCost": 1,
+      "Method": "ValidatedPool",
+      "Runs": 10,
+      "MeanPenalizedLoss": 0.0025596204765799078,
+      "MedianPenalizedLoss": 0.001385631787830716,
+      "WorstPenalizedLoss": 0.009408285591950135,
+      "ReportedEvaluatorCallRows": 10,
+      "MeanReportedEvaluatorCalls": 60.0,
+      "ReportedSpentCostRows": 10,
+      "MeanReportedSpentCostUnits": 63.2546648
+    },
+    {
+      "Task": "ShiftedQuadratic4",
+      "EvaluationUnitCost": 10,
+      "Method": "Ordinary",
+      "Runs": 10,
+      "MeanPenalizedLoss": 0.003157409741857772,
+      "MedianPenalizedLoss": 0.0023536260345478222,
+      "WorstPenalizedLoss": 0.007724332968687596,
+      "ReportedEvaluatorCallRows": 10,
+      "MeanReportedEvaluatorCalls": 63.0,
+      "ReportedSpentCostRows": 10,
+      "MeanReportedSpentCostUnits": 630.64
+    },
+    {
+      "Task": "ShiftedQuadratic4",
+      "EvaluationUnitCost": 10,
+      "Method": "UniformPool",
+      "Runs": 10,
+      "MeanPenalizedLoss": 0.002588516561975962,
+      "MedianPenalizedLoss": 0.0023728357003615355,
+      "WorstPenalizedLoss": 0.004839243608184332,
+      "ReportedEvaluatorCallRows": 10,
+      "MeanReportedEvaluatorCalls": 63.0,
+      "ReportedSpentCostRows": 10,
+      "MeanReportedSpentCostUnits": 632.32
+    },
+    {
+      "Task": "ShiftedQuadratic4",
+      "EvaluationUnitCost": 10,
+      "Method": "SurrogatePool",
+      "Runs": 10,
+      "MeanPenalizedLoss": 0.0026890437572401043,
+      "MedianPenalizedLoss": 0.002804842608488352,
+      "WorstPenalizedLoss": 0.005276577158833417,
+      "ReportedEvaluatorCallRows": 10,
+      "MeanReportedEvaluatorCalls": 63.0,
+      "ReportedSpentCostRows": 10,
+      "MeanReportedSpentCostUnits": 633.7265136
+    },
+    {
+      "Task": "ShiftedQuadratic4",
+      "EvaluationUnitCost": 10,
+      "Method": "ValidatedPool",
+      "Runs": 10,
+      "MeanPenalizedLoss": 0.002316555324662474,
+      "MedianPenalizedLoss": 0.001385631787830716,
+      "WorstPenalizedLoss": 0.009408285591950135,
+      "ReportedEvaluatorCallRows": 10,
+      "MeanReportedEvaluatorCalls": 63.0,
+      "ReportedSpentCostRows": 10,
+      "MeanReportedSpentCostUnits": 633.4397984
+    },
+    {
+      "Task": "RippledQuadratic4",
+      "EvaluationUnitCost": 0.1,
+      "Method": "Ordinary",
+      "Runs": 10,
+      "MeanPenalizedLoss": 0.2723156651920346,
+      "MedianPenalizedLoss": 0.26367508626752134,
+      "WorstPenalizedLoss": 0.5115837412037137,
+      "ReportedEvaluatorCallRows": 10,
+      "MeanReportedEvaluatorCalls": 58.0,
+      "ReportedSpentCostRows": 10,
+      "MeanReportedSpentCostUnits": 6.38
+    },
+    {
+      "Task": "RippledQuadratic4",
+      "EvaluationUnitCost": 0.1,
+      "Method": "UniformPool",
+      "Runs": 10,
+      "MeanPenalizedLoss": 0.2379507618634741,
+      "MedianPenalizedLoss": 0.22243085095098036,
+      "WorstPenalizedLoss": 0.38900815032354985,
+      "ReportedEvaluatorCallRows": 10,
+      "MeanReportedEvaluatorCalls": 46.0,
+      "ReportedSpentCostRows": 10,
+      "MeanReportedSpentCostUnits": 6.2
+    },
+    {
+      "Task": "RippledQuadratic4",
+      "EvaluationUnitCost": 0.1,
+      "Method": "SurrogatePool",
+      "Runs": 10,
+      "MeanPenalizedLoss": 0.2983131269658095,
+      "MedianPenalizedLoss": 0.30441413923968624,
+      "WorstPenalizedLoss": 0.49194123677860424,
+      "ReportedEvaluatorCallRows": 10,
+      "MeanReportedEvaluatorCalls": 40.3,
+      "ReportedSpentCostRows": 10,
+      "MeanReportedSpentCostUnits": 6.1755176
+    },
+    {
+      "Task": "RippledQuadratic4",
+      "EvaluationUnitCost": 0.1,
+      "Method": "ValidatedPool",
+      "Runs": 10,
+      "MeanPenalizedLoss": 0.2571817195283467,
+      "MedianPenalizedLoss": 0.23611429844275597,
+      "WorstPenalizedLoss": 0.4684837872035476,
+      "ReportedEvaluatorCallRows": 10,
+      "MeanReportedEvaluatorCalls": 41.0,
+      "ReportedSpentCostRows": 10,
+      "MeanReportedSpentCostUnits": 6.138944
+    },
+    {
+      "Task": "RippledQuadratic4",
+      "EvaluationUnitCost": 1,
+      "Method": "Ordinary",
+      "Runs": 10,
+      "MeanPenalizedLoss": 0.2627463219303171,
+      "MedianPenalizedLoss": 0.2605247980019171,
+      "WorstPenalizedLoss": 0.4587913882659304,
+      "ReportedEvaluatorCallRows": 10,
+      "MeanReportedEvaluatorCalls": 63.0,
+      "ReportedSpentCostRows": 10,
+      "MeanReportedSpentCostUnits": 63.64
+    },
+    {
+      "Task": "RippledQuadratic4",
+      "EvaluationUnitCost": 1,
+      "Method": "UniformPool",
+      "Runs": 10,
+      "MeanPenalizedLoss": 0.2006987299865902,
+      "MedianPenalizedLoss": 0.18558634030120685,
+      "WorstPenalizedLoss": 0.3803220661496922,
+      "ReportedEvaluatorCallRows": 10,
+      "MeanReportedEvaluatorCalls": 61.0,
+      "ReportedSpentCostRows": 10,
+      "MeanReportedSpentCostUnits": 63.239999999999995
+    },
+    {
+      "Task": "RippledQuadratic4",
+      "EvaluationUnitCost": 1,
+      "Method": "SurrogatePool",
+      "Runs": 10,
+      "MeanPenalizedLoss": 0.2705679255896686,
+      "MedianPenalizedLoss": 0.2334614821689116,
+      "WorstPenalizedLoss": 0.49194123677860424,
+      "ReportedEvaluatorCallRows": 10,
+      "MeanReportedEvaluatorCalls": 60.0,
+      "ReportedSpentCostRows": 10,
+      "MeanReportedSpentCostUnits": 63.5243952
+    },
+    {
+      "Task": "RippledQuadratic4",
+      "EvaluationUnitCost": 1,
+      "Method": "ValidatedPool",
+      "Runs": 10,
+      "MeanPenalizedLoss": 0.24686359061452623,
+      "MedianPenalizedLoss": 0.21797003144831212,
+      "WorstPenalizedLoss": 0.4684837872035476,
+      "ReportedEvaluatorCallRows": 10,
+      "MeanReportedEvaluatorCalls": 60.0,
+      "ReportedSpentCostRows": 10,
+      "MeanReportedSpentCostUnits": 63.262028799999996
+    },
+    {
+      "Task": "RippledQuadratic4",
+      "EvaluationUnitCost": 10,
+      "Method": "Ordinary",
+      "Runs": 10,
+      "MeanPenalizedLoss": 0.2627463219303171,
+      "MedianPenalizedLoss": 0.2605247980019171,
+      "WorstPenalizedLoss": 0.4587913882659304,
+      "ReportedEvaluatorCallRows": 10,
+      "MeanReportedEvaluatorCalls": 63.0,
+      "ReportedSpentCostRows": 10,
+      "MeanReportedSpentCostUnits": 630.64
+    },
+    {
+      "Task": "RippledQuadratic4",
+      "EvaluationUnitCost": 10,
+      "Method": "UniformPool",
+      "Runs": 10,
+      "MeanPenalizedLoss": 0.2006987299865902,
+      "MedianPenalizedLoss": 0.18558634030120685,
+      "WorstPenalizedLoss": 0.3803220661496922,
+      "ReportedEvaluatorCallRows": 10,
+      "MeanReportedEvaluatorCalls": 63.0,
+      "ReportedSpentCostRows": 10,
+      "MeanReportedSpentCostUnits": 632.32
+    },
+    {
+      "Task": "RippledQuadratic4",
+      "EvaluationUnitCost": 10,
+      "Method": "SurrogatePool",
+      "Runs": 10,
+      "MeanPenalizedLoss": 0.2705679255896686,
+      "MedianPenalizedLoss": 0.2334614821689116,
+      "WorstPenalizedLoss": 0.49194123677860424,
+      "ReportedEvaluatorCallRows": 10,
+      "MeanReportedEvaluatorCalls": 63.0,
+      "ReportedSpentCostRows": 10,
+      "MeanReportedSpentCostUnits": 633.7265136
+    },
+    {
+      "Task": "RippledQuadratic4",
+      "EvaluationUnitCost": 10,
+      "Method": "ValidatedPool",
+      "Runs": 10,
+      "MeanPenalizedLoss": 0.24686359061452623,
+      "MedianPenalizedLoss": 0.21797003144831212,
+      "WorstPenalizedLoss": 0.4684837872035476,
+      "ReportedEvaluatorCallRows": 10,
+      "MeanReportedEvaluatorCalls": 63.0,
+      "ReportedSpentCostRows": 10,
+      "MeanReportedSpentCostUnits": 633.4482968
+    }
+  ],
+  "Comparisons": [
+    {
+      "Task": "ShiftedQuadratic4",
+      "EvaluationUnitCost": 0.1,
+      "Primary": "ValidatedPool",
+      "Comparator": "Ordinary",
+      "PairedSeeds": 10,
+      "MeanPairedLossDifference": 0.008910139757319482,
+      "PairedPercentile95Interval": [
+        -0.00048368498514315527,
+        0.02126561557766043
+      ],
+      "PrimaryWins": 3,
+      "Ties": 0,
+      "PrimaryLosses": 7
+    },
+    {
+      "Task": "ShiftedQuadratic4",
+      "EvaluationUnitCost": 0.1,
+      "Primary": "ValidatedPool",
+      "Comparator": "UniformPool",
+      "PairedSeeds": 10,
+      "MeanPairedLossDifference": 0.0029504247926418767,
+      "PairedPercentile95Interval": [
+        -0.003137661711832665,
+        0.013943009302296944
+      ],
+      "PrimaryWins": 8,
+      "Ties": 1,
+      "PrimaryLosses": 1
+    },
+    {
+      "Task": "ShiftedQuadratic4",
+      "EvaluationUnitCost": 0.1,
+      "Primary": "ValidatedPool",
+      "Comparator": "SurrogatePool",
+      "PairedSeeds": 10,
+      "MeanPairedLossDifference": 0.007417784591692874,
+      "PairedPercentile95Interval": [
+        -0.001966136478563421,
+        0.01981604548159836
+      ],
+      "PrimaryWins": 6,
+      "Ties": 0,
+      "PrimaryLosses": 4
+    },
+    {
+      "Task": "ShiftedQuadratic4",
+      "EvaluationUnitCost": 1,
+      "Primary": "ValidatedPool",
+      "Comparator": "Ordinary",
+      "PairedSeeds": 10,
+      "MeanPairedLossDifference": -0.0005977892652778644,
+      "PairedPercentile95Interval": [
+        -0.0026149207351011112,
+        0.0016313054932796975
+      ],
+      "PrimaryWins": 7,
+      "Ties": 0,
+      "PrimaryLosses": 3
+    },
+    {
+      "Task": "ShiftedQuadratic4",
+      "EvaluationUnitCost": 1,
+      "Primary": "ValidatedPool",
+      "Comparator": "UniformPool",
+      "PairedSeeds": 10,
+      "MeanPairedLossDifference": -0.00037773136809980044,
+      "PairedPercentile95Interval": [
+        -0.0019186679138334854,
+        0.0016782957009292068
+      ],
+      "PrimaryWins": 7,
+      "Ties": 1,
+      "PrimaryLosses": 2
+    },
+    {
+      "Task": "ShiftedQuadratic4",
+      "EvaluationUnitCost": 1,
+      "Primary": "ValidatedPool",
+      "Comparator": "SurrogatePool",
+      "PairedSeeds": 10,
+      "MeanPairedLossDifference": -0.0004681273178559762,
+      "PairedPercentile95Interval": [
+        -0.0019637389237708936,
+        0.001399694843434955
+      ],
+      "PrimaryWins": 8,
+      "Ties": 0,
+      "PrimaryLosses": 2
+    },
+    {
+      "Task": "ShiftedQuadratic4",
+      "EvaluationUnitCost": 10,
+      "Primary": "ValidatedPool",
+      "Comparator": "Ordinary",
+      "PairedSeeds": 10,
+      "MeanPairedLossDifference": -0.0008408544171952983,
+      "PairedPercentile95Interval": [
+        -0.0028631226172762393,
+        0.001441331527747631
+      ],
+      "PrimaryWins": 7,
+      "Ties": 0,
+      "PrimaryLosses": 3
+    },
+    {
+      "Task": "ShiftedQuadratic4",
+      "EvaluationUnitCost": 10,
+      "Primary": "ValidatedPool",
+      "Comparator": "UniformPool",
+      "PairedSeeds": 10,
+      "MeanPairedLossDifference": -0.0002719612373134887,
+      "PairedPercentile95Interval": [
+        -0.0016715180093018682,
+        0.0016549831172975895
+      ],
+      "PrimaryWins": 6,
+      "Ties": 1,
+      "PrimaryLosses": 3
+    },
+    {
+      "Task": "ShiftedQuadratic4",
+      "EvaluationUnitCost": 10,
+      "Primary": "ValidatedPool",
+      "Comparator": "SurrogatePool",
+      "PairedSeeds": 10,
+      "MeanPairedLossDifference": -0.00037248843257763054,
+      "PairedPercentile95Interval": [
+        -0.0019595849327808555,
+        0.0014929077744985848
+      ],
+      "PrimaryWins": 7,
+      "Ties": 0,
+      "PrimaryLosses": 3
+    },
+    {
+      "Task": "RippledQuadratic4",
+      "EvaluationUnitCost": 0.1,
+      "Primary": "ValidatedPool",
+      "Comparator": "Ordinary",
+      "PairedSeeds": 10,
+      "MeanPairedLossDifference": -0.015133945663687897,
+      "PairedPercentile95Interval": [
+        -0.10219119006620465,
+        0.06309796375569045
+      ],
+      "PrimaryWins": 5,
+      "Ties": 0,
+      "PrimaryLosses": 5
+    },
+    {
+      "Task": "RippledQuadratic4",
+      "EvaluationUnitCost": 0.1,
+      "Primary": "ValidatedPool",
+      "Comparator": "UniformPool",
+      "PairedSeeds": 10,
+      "MeanPairedLossDifference": 0.01923095766487259,
+      "PairedPercentile95Interval": [
+        -0.07331280608839758,
+        0.11777136688620224
+      ],
+      "PrimaryWins": 4,
+      "Ties": 1,
+      "PrimaryLosses": 5
+    },
+    {
+      "Task": "RippledQuadratic4",
+      "EvaluationUnitCost": 0.1,
+      "Primary": "ValidatedPool",
+      "Comparator": "SurrogatePool",
+      "PairedSeeds": 10,
+      "MeanPairedLossDifference": -0.04113140743746282,
+      "PairedPercentile95Interval": [
+        -0.13386448500927584,
+        0.06426405900669892
+      ],
+      "PrimaryWins": 6,
+      "Ties": 0,
+      "PrimaryLosses": 4
+    },
+    {
+      "Task": "RippledQuadratic4",
+      "EvaluationUnitCost": 1,
+      "Primary": "ValidatedPool",
+      "Comparator": "Ordinary",
+      "PairedSeeds": 10,
+      "MeanPairedLossDifference": -0.015882731315790835,
+      "PairedPercentile95Interval": [
+        -0.09812840859839346,
+        0.05896772719636694
+      ],
+      "PrimaryWins": 5,
+      "Ties": 0,
+      "PrimaryLosses": 5
+    },
+    {
+      "Task": "RippledQuadratic4",
+      "EvaluationUnitCost": 1,
+      "Primary": "ValidatedPool",
+      "Comparator": "UniformPool",
+      "PairedSeeds": 10,
+      "MeanPairedLossDifference": 0.04616486062793605,
+      "PairedPercentile95Interval": [
+        -0.024841972529200042,
+        0.13231946554858093
+      ],
+      "PrimaryWins": 6,
+      "Ties": 0,
+      "PrimaryLosses": 4
+    },
+    {
+      "Task": "RippledQuadratic4",
+      "EvaluationUnitCost": 1,
+      "Primary": "ValidatedPool",
+      "Comparator": "SurrogatePool",
+      "PairedSeeds": 10,
+      "MeanPairedLossDifference": -0.02370433497514233,
+      "PairedPercentile95Interval": [
+        -0.11547550582834705,
+        0.07359999682394697
+      ],
+      "PrimaryWins": 6,
+      "Ties": 0,
+      "PrimaryLosses": 4
+    },
+    {
+      "Task": "RippledQuadratic4",
+      "EvaluationUnitCost": 10,
+      "Primary": "ValidatedPool",
+      "Comparator": "Ordinary",
+      "PairedSeeds": 10,
+      "MeanPairedLossDifference": -0.015882731315790835,
+      "PairedPercentile95Interval": [
+        -0.09812840859839346,
+        0.05896772719636694
+      ],
+      "PrimaryWins": 5,
+      "Ties": 0,
+      "PrimaryLosses": 5
+    },
+    {
+      "Task": "RippledQuadratic4",
+      "EvaluationUnitCost": 10,
+      "Primary": "ValidatedPool",
+      "Comparator": "UniformPool",
+      "PairedSeeds": 10,
+      "MeanPairedLossDifference": 0.04616486062793605,
+      "PairedPercentile95Interval": [
+        -0.024841972529200042,
+        0.13231946554858093
+      ],
+      "PrimaryWins": 6,
+      "Ties": 0,
+      "PrimaryLosses": 4
+    },
+    {
+      "Task": "RippledQuadratic4",
+      "EvaluationUnitCost": 10,
+      "Primary": "ValidatedPool",
+      "Comparator": "SurrogatePool",
+      "PairedSeeds": 10,
+      "MeanPairedLossDifference": -0.02370433497514233,
+      "PairedPercentile95Interval": [
+        -0.11547550582834705,
+        0.07359999682394697
+      ],
+      "PrimaryWins": 6,
+      "Ties": 0,
+      "PrimaryLosses": 4
+    }
+  ],
+  "InputSummarySha256": "e7d6d7480bf2478e053dfc9052f5b7062f6f5d38ed30b4e0fc6a5b49e98ca6f7"
+}
