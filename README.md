@@ -70,6 +70,8 @@ objects in their owning repository and implement the typed contracts above:
   see [standalone script evaluation](docs/migration/SCRIPT_METRICS_MIGRATION.md).
   [Standalone model judging](docs/migration/JUDGE_RUNTIME_MIGRATION.md) supports bounded
   feedback, weighted panels, and direction-aware scoring through caller-owned providers.
+  [Standalone novelty screening](docs/migration/NOVELTY_MIGRATION.md) adds cheap structural
+  checks, optional embedding/model decisions, and a cost-aware pre-evaluation gate.
   Other old consumer integrations are still being ported; the [PR audit](docs/migration/AIDOTNET_PR_CLEANUP.md)
   records what remains. Old AiModelBuilder evolution APIs will be removed in a separate breaking-removal PR,
   without obsolete forwarding APIs.

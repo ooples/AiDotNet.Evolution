@@ -56,7 +56,14 @@ var judge = new LlmJudgeProgramFitnessEvaluator(new FixtureJudge(), new Delegate
 var judged = await judge.EvaluateAsync(new ProgramGenome("candidate", ProgramLanguage.Python), new(0, 1, 1, 1));
 if (Math.Abs(judged.Quality!.Value - .65) > 1e-10 || judged.CostUnits != 1 || judged.Descriptors["llm_average"] != 1)
     throw new InvalidOperationException("Packaged judge evaluation failed.");
-Console.WriteLine("PASS: packaged deployment/program runtime, script metrics and judge; no project references or live model calls.");
+var novelty = new AiDotNet.Evolution.Programs.Novelty.NoveltyGatingProgramFitnessEvaluator(new DelegateProgramFitnessEvaluator(_ => 1));
+var original = new ProgramGenome("x=1", ProgramLanguage.Python);
+var novel = await novelty.EvaluateAsync(original, new(0, 1, 1, 1));
+var duplicate = await novelty.EvaluateAsync(new ProgramGenome("x = 1", ProgramLanguage.Python), new(1, 1, 1, 1));
+if (novel.Status != EvolutionEvaluationStatus.Completed || duplicate.Status != EvolutionEvaluationStatus.Rejected
+    || novelty.AcceptedCount != 1 || novelty.RejectedCount != 1 || duplicate.CostUnits != 0)
+    throw new InvalidOperationException("Packaged pre-evaluation novelty gate failed.");
+Console.WriteLine("PASS: packaged deployment/program runtime, script metrics, judge and novelty; no project references or live model calls.");
 
 sealed class FixtureEdit : IVariationOperator<ProgramGenome>
 {
