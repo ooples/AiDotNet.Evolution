@@ -74,6 +74,9 @@ public sealed record ProfileMeasurement(ProfileCase Case, ProfileEnvironment Env
 public static class ProfileValidation
 {
     /// <summary>Rejects missing work, nonsensical metrics and worker-dependent search state rather than dropping a case.</summary>
+    /// <summary>The number of restorations a checkpoint-restore case performs, per ProfileRunner.</summary>
+    public const int CheckpointRestorations = 2;
+
     public static void Validate(ProfileMeasurement measurement)
     {
         measurement.Case.Validate();
@@ -93,6 +96,15 @@ public static class ProfileValidation
             if (measurement.EvaluationCalls != measurement.Case.Budget || measurement.Operations != measurement.Case.Budget ||
                 measurement.EvaluatorSlotUtilization is null || measurement.PeakConcurrentEvaluations == 0)
                 throw new InvalidDataException("The declared evaluation budget was not measured in full.");
+        // A report whose CPU cannot be named is not comparable with any other report, which is the
+        // whole purpose of retaining the environment block.
+        if (string.IsNullOrWhiteSpace(measurement.Environment.Cpu) || measurement.Environment.Cpu == "not-reported")
+            throw new InvalidDataException("Profiling requires a concrete CPU identity for its environment to be comparable.");
+        // Restoration is only evidenced by the restored state hash and the two declared restorations;
+        // without both, a measurement can claim semantic restoration it never demonstrated.
+        if (measurement.Case.Kind == "checkpoint-restore" &&
+            (string.IsNullOrEmpty(measurement.StateHash) || measurement.Operations != CheckpointRestorations))
+            throw new InvalidDataException("Checkpoint-restore profiling omitted its restored state hash or its two declared restorations.");
         if (measurement.Case.Kind == "engine")
         {
             if (string.IsNullOrEmpty(measurement.StateHash) || measurement.BestQuality is not { } best || !double.IsFinite(best) ||

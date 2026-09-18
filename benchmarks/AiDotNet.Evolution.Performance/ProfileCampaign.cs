@@ -34,6 +34,18 @@ public static class ProfileCampaign
     {
         if (sourceRevision.Length != 40 || sourceRevision.Any(c => !char.IsAsciiHexDigit(c)))
             throw new ArgumentException("Supply the exact 40-character Git revision of the built source.", nameof(sourceRevision));
+        // A well-formed SHA is not evidence. Without comparing it against the commit actually compiled
+        // into the measured assembly, a caller can label measurements from a different or dirty build
+        // with any revision, and the report then attributes results to source that was never measured.
+        string informational = typeof(ProfileCampaign).Assembly
+            .GetCustomAttribute<AssemblyInformationalVersionAttribute>()?.InformationalVersion ?? string.Empty;
+        int plus = informational.IndexOf('+');
+        string built = plus >= 0 ? informational[(plus + 1)..] : string.Empty;
+        if (built.Length == 0)
+            throw new InvalidDataException("The measured assembly carries no source revision; build with SourceLink before profiling.");
+        if (!built.StartsWith(sourceRevision, StringComparison.OrdinalIgnoreCase) &&
+            !sourceRevision.StartsWith(built, StringComparison.OrdinalIgnoreCase))
+            throw new InvalidDataException("The supplied revision is not the commit compiled into the measured assembly: built " + built + ".");
         string root = Path.GetFullPath(outputDirectory);
         if (Directory.Exists(root) && Directory.EnumerateFileSystemEntries(root).Any())
             throw new IOException("Choose a new or empty output directory; previous evidence is never overwritten.");

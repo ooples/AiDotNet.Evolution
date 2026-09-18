@@ -62,7 +62,7 @@ public static class ProfileRunner
         long allocated = GC.GetTotalAllocatedBytes(precise: true) - allocatedBefore;
         process.Refresh();
         var environment = new ProfileEnvironment(RuntimeInformation.FrameworkDescription, RuntimeInformation.OSDescription,
-            RuntimeInformation.ProcessArchitecture.ToString(), Environment.GetEnvironmentVariable("PROCESSOR_IDENTIFIER") ?? "not-reported",
+            RuntimeInformation.ProcessArchitecture.ToString(), CpuIdentity(),
             Environment.ProcessorCount, CurrentAffinity().ToString("X", CultureInfo.InvariantCulture), GCSettings.IsServerGC,
             Environment.GetEnvironmentVariable("DOTNET_TieredCompilation"), Environment.GetEnvironmentVariable("DOTNET_Thread_UseAllCpuGroups"),
             Environment.GetEnvironmentVariable("DOTNET_Thread_AssignCpuGroups"), CurrentProcessorGroup());
@@ -94,6 +94,31 @@ public static class ProfileRunner
             if ((available & (1UL << bit)) != 0) { selected |= 1UL << bit; count++; }
         return selected;
     }
+
+    /// <summary>Reads a concrete processor identity per platform.</summary>
+    /// <remarks>PROCESSOR_IDENTIFIER exists only on Windows, so reading it alone recorded
+    /// "not-reported" on every Linux run -- including the ubuntu profiling job -- and the reports
+    /// carried no CPU identity at all while still being accepted. ProfileValidation now rejects an
+    /// unreported identity, so a platform without a probe fails loudly instead of publishing
+    /// measurements nobody can compare.</remarks>
+    private static string CpuIdentity()
+    {
+        if (RuntimeInformation.IsOSPlatform(OSPlatform.Windows))
+            return Nonempty(Environment.GetEnvironmentVariable("PROCESSOR_IDENTIFIER"));
+        if (File.Exists("/proc/cpuinfo"))
+        {
+            string? model = File.ReadLines("/proc/cpuinfo").Take(256)
+                .FirstOrDefault(line => line.StartsWith("model name", StringComparison.Ordinal)
+                    || line.StartsWith("Model name", StringComparison.Ordinal)
+                    || line.StartsWith("cpu model", StringComparison.Ordinal));
+            if (model is not null && model.IndexOf(':') >= 0)
+                return Nonempty(model[(model.IndexOf(':') + 1)..]);
+        }
+        return "not-reported";
+    }
+
+    private static string Nonempty(string? value) =>
+        string.IsNullOrWhiteSpace(value) ? "not-reported" : value.Trim();
 
     private static string CurrentProcessorGroup()
     {

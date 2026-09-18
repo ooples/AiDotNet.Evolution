@@ -74,6 +74,14 @@ public sealed class ProfileTests
     public static IEnumerable<object[]> CorruptMeasurements()
     {
         var value = Valid();
+        // An unnamed CPU makes the report incomparable with every other report, and a
+        // checkpoint-restore case that omits its restored hash or its two declared restorations
+        // claims a semantic restoration it never demonstrated. Both used to pass validation.
+        yield return new object[] { value with { Environment = value.Environment with { Cpu = "not-reported" } } };
+        yield return new object[] { value with { Environment = value.Environment with { Cpu = "   " } } };
+        var restore = Valid(Case() with { Id = "checkpoint-restore-case", Kind = "checkpoint-restore", Checkpoint = true });
+        yield return new object[] { restore with { Operations = ProfileValidation.CheckpointRestorations, StateHash = null } };
+        yield return new object[] { restore with { Operations = ProfileValidation.CheckpointRestorations + 1 } };
         yield return new object[] { value with { Operations = 0 } };
         yield return new object[] { value with { Operations = 7 } };
         yield return new object[] { value with { ElapsedMilliseconds = double.NaN } };

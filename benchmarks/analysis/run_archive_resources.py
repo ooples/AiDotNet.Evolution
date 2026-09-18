@@ -177,7 +177,12 @@ def run(configuration, worker, output):
                                     record["ExitCode"] = process.wait(timeout=configuration["WorkerTimeoutSeconds"])
                                 except subprocess.TimeoutExpired:
                                     process.kill()  # Only the exact child this runner started.
-                                    process.wait()
+                                    # Keep the termination code separate from ExitCode. Leaving ExitCode unset made the
+                                    # exit/report check below compare None against 0 or 1, so a report the worker had
+                                    # already committed was rejected as a mismatch and its known physical calls were
+                                    # reclassified as unknown -- the opposite of what the accounting needs.
+                                    record["TimedOut"] = True
+                                    record["TerminationCode"] = process.wait()
                                     record["Failure"] = "worker-timeout; physical calls unknown unless a valid report was committed"
                             except OSError as error:
                                 record["Failure"] = type(error).__name__
@@ -186,7 +191,11 @@ def run(configuration, worker, output):
                             try:
                                 report, report_hash = load_json(report_path, 16 * 1024 * 1024)
                                 row = validate_case(report, spec, configuration)
-                                require(record.get("ExitCode") == (0 if row["Status"] == "completed" else 1), "Worker exit/report mismatch.")
+                                # A timed-out worker has no meaningful exit code, but a report it committed before
+                                # termination is still real measured work and is retained for physical accounting.
+                                # record["Failure"] is already set, so the case itself stays failed.
+                                if not record.get("TimedOut"):
+                                    require(record.get("ExitCode") == (0 if row["Status"] == "completed" else 1), "Worker exit/report mismatch.")
                                 require(report["Measurement"]["ProcessId"] == record["OwnedProcessId"], "Worker PID mismatch.")
                                 record["Report"] = report
                                 record["ReportSha256"] = report_hash
