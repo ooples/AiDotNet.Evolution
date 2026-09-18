@@ -41,6 +41,7 @@ public sealed class EvolutionEngineOptionsCopyTests
         nameof(EvolutionEngineOptions.Cascade),
         nameof(EvolutionEngineOptions.Artifacts),
         nameof(EvolutionEngineOptions.EarlyStopping),
+        nameof(EvolutionEngineOptions.Pipeline),
     };
 
     [Fact]
@@ -99,13 +100,26 @@ public sealed class EvolutionEngineOptionsCopyTests
         // Changing a scalar afterwards only proves a value was assigned. A nested subsystem copied by
         // REFERENCE would still pass that, and a later edit through the original would then reach into the
         // options a run is already using - a shared-state defect that surfaces only under concurrency.
+        //
+        // Driven from NestedSubsystems by reflection rather than a written-out list of assertions. A hand
+        // written list here would be the same defect this file exists to prevent, one level down: the guard
+        // above forces a new subsystem to be REGISTERED, but nothing would force its independence to be
+        // ASSERTED, so registering it and forgetting the assertion would pass in silence.
         EvolutionEngineOptions options = new();
         EvolutionEngineOptions copy = options.Copy();
 
-        Assert.NotSame(options.Selection, copy.Selection);
-        Assert.NotSame(options.Cascade, copy.Cascade);
-        Assert.NotSame(options.Artifacts, copy.Artifacts);
-        Assert.NotSame(options.EarlyStopping, copy.EarlyStopping);
+        Assert.NotEmpty(NestedSubsystems);
+        foreach (string name in NestedSubsystems.OrderBy(value => value, StringComparer.Ordinal))
+        {
+            PropertyInfo property = typeof(EvolutionEngineOptions).GetProperty(name, BindingFlags.Public | BindingFlags.Instance)
+                ?? throw new InvalidOperationException(name + " is registered as a nested subsystem but is not a public property.");
+            object? original = property.GetValue(options);
+            object? copied = property.GetValue(copy);
+            Assert.NotNull(original);
+            Assert.NotNull(copied);
+            Assert.False(ReferenceEquals(original, copied),
+                name + " was copied by reference, so a later edit through the original would reach into the options a run is already using.");
+        }
     }
 
     [Fact]

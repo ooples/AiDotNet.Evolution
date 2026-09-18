@@ -48,7 +48,7 @@ jobs:
           --blame-hang --blame-hang-timeout 120s --blame-crash
           --collect:"XPlat Code Coverage" --results-directory ./coverage
           --
-          DataCollectionRunSettings.DataCollectors.DataCollector.Configuration.Format=cobertura DataCollectionRunSettings.DataCollectors.DataCollector.Configuration.ExcludeByAttribute=GeneratedCodeAttribute
+          DataCollectionRunSettings.DataCollectors.DataCollector.Configuration.Format=cobertura
       - name: Test net8.0
         run: >
           dotnet test tests/AiDotNet.Evolution.Tests/AiDotNet.Evolution.Tests.csproj
@@ -73,6 +73,9 @@ jobs:
       - name: Verify multi-fidelity promotion and independent confirmation
         shell: pwsh
         run: ./eng/Test-MultiFidelity.ps1
+      - name: Verify concurrent proposal pipeline and recorded-response replay
+        shell: pwsh
+        run: ./eng/Test-ProposalPipeline.ps1
       - name: Verify gain and all-stage operator credit
         shell: pwsh
         run: ./eng/Test-OperatorCredit.ps1
@@ -80,15 +83,13 @@ jobs:
         run: dotnet run --project benchmarks/AiDotNet.Evolution.Performance -c Release -- --smoke
       - name: Verify paired analysis contracts
         run: python3 -m unittest discover -s benchmarks/analysis -v
+      - name: Verify retained proposal pipeline and default-profile evidence
+        run: |
+          python3 benchmarks/analysis/analyze_pipeline.py --verify-evidence benchmarks/evidence/pipeline/9c3441d/pilot
+          python3 benchmarks/analysis/compare_pipeline_defaults.py --archive benchmarks/evidence/pipeline/9c3441d/default-profiles.zip --verify-comparison benchmarks/evidence/pipeline/9c3441d/default-comparison.json
       - name: Verify archive partition accounting and replay
         shell: pwsh
         run: ./eng/Test-ArchivePartition.ps1 -SourceRevision '${{ github.sha }}'
-      # GENERATED CODE IS EXCLUDED FROM THE RATCHET, and that is a like-for-like
-      # correction rather than a relaxation. The baseline was recorded on a solution
-      # with one project and no source generators. AiDotNet.Evolution.Host uses
-      # System.Text.Json source generation because NativeAOT trims the reflection
-      # path. Only GeneratedCodeAttribute is excluded: CompilerGeneratedAttribute
-      # also marks user-written closures and must remain in the measured surface.
       - name: Enforce coverage ratchet
         shell: pwsh
         run: |
@@ -97,11 +98,12 @@ jobs:
           ./eng/Test-Coverage.ps1 -CoverageFile $report.FullName -BaselineFile coverage-baseline.json
       - name: Upload coverage and crash diagnostics
         if: always()
-        uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a # v7.0.1
+        uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02 # v4
         with:
           name: coverage-and-diagnostics
           path: |
             TestResults/quality/**/*.json
+            TestResults/performance/**
             TestResults/persistent-evaluation/**/*.json
             TestResults/persistent-evaluation/*.jsonl
             coverage/**/coverage.cobertura.xml
@@ -110,7 +112,7 @@ jobs:
           if-no-files-found: warn
       - name: Upload coverage to Codecov
         if: always()
-        uses: codecov/codecov-action@fb8b3582c8e4def4969c97caa2f19720cb33a72f # v7.0.0
+        uses: codecov/codecov-action@b9fd7d16f6d7d1b5d2bec1a2887e65ceed900238 # v4
         with:
           files: ./coverage/**/coverage.cobertura.xml
           disable_search: true
@@ -177,7 +179,7 @@ jobs:
           $version = [string] $project.Project.PropertyGroup.Version
           if ([string]::IsNullOrWhiteSpace($version)) { throw 'The package project has no Version.' }
           ./eng/Test-Package.ps1 -PackagePath "artifacts/AiDotNet.Evolution.$version.nupkg" -ExpectedVersion $version
-      - uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a # v7.0.1
+      - uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02 # v4
         with:
           name: packages
           path: |
