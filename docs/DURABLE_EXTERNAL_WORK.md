@@ -25,9 +25,15 @@ coordinator.Enqueue(evaluationId, attempt, canonicalGenomeId, codec.Serialize(ge
 var worker = new EvolutionWorkerProfile(workerIncarnationId, compatibilityHash,
     new[] { "cuda" }, EvolutionResources.Of("gpu_slots", 1));
 EvolutionWorkLease? lease = coordinator.Claim(worker);
-// After executing under the declared maximum, return the original complete identity:
-coordinator.Commit(lease!.Identity, worker.WorkerId, serializedResult, responseProvenance,
-    EvolutionResources.Of("evaluation_calls", 1));
+if (lease is not null)
+{
+    // A null claim means nothing is claimable right now, never that the search finished, so the
+    // check belongs here rather than in a null-forgiving operator: this sample is what a caller
+    // copies, and the paragraph below asks for exactly this before any physical work starts.
+    // After executing under the declared maximum, return the original complete identity:
+    coordinator.Commit(lease.Identity, worker.WorkerId, serializedResult, responseProvenance,
+        EvolutionResources.Of("evaluation_calls", 1));
+}
 ```
 
 The example's caller supplies domain variables, canonicalization, codec, evaluation and
@@ -150,7 +156,7 @@ durable storage provider; this library does not claim those from an in-process A
 Latest verified runtime: **8aaef1e**, including US-20 cleanup fix **96d245e**.
 **1,000 net10.0 / 1,000 net8.0 / 800 net471 tests pass**, zero skips;
 coverage is **92.96% line / 79.64% branch**, passing the unchanged ratchet. All 139 native
-TypeScript tests, six Python tests on each managed/native host, and six exported C ABI
+TypeScript tests, eight Python tests on each managed/native host, and six exported C ABI
 tests pass. Strict .NET 10 native delivery, live-engine and shared-library builds emit
 zero warnings. All three packaged DLLs match their explicit builds. The
 [current evidence archive](../benchmarks/evidence/external-work/8aaef1e/README.md) retains

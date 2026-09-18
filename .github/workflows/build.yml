@@ -95,6 +95,11 @@ jobs:
         run: |
           python3 benchmarks/analysis/analyze_pipeline.py --verify-evidence benchmarks/evidence/pipeline/9c3441d/pilot
           python3 benchmarks/analysis/compare_pipeline_defaults.py --archive benchmarks/evidence/pipeline/9c3441d/default-profiles.zip --verify-comparison benchmarks/evidence/pipeline/9c3441d/default-comparison.json
+      # The external-work evidence is a shipped claim about a real crash-recovery run. Nothing
+      # re-checked it after it was committed, so a later change to the archive -- or a verifier
+      # that stopped verifying -- would have gone unnoticed. It is stdlib-only and offline.
+      - name: Verify retained external-work recovery evidence
+        run: python3 benchmarks/evidence/external-work/8aaef1e/verify.py
       - name: Verify archive partition accounting and replay
         shell: pwsh
         run: ./eng/Test-ArchivePartition.ps1 -SourceRevision '${{ github.sha }}'

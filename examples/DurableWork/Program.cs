@@ -159,15 +159,28 @@ internal static class Program
         start.ArgumentList.Add(mode); start.ArgumentList.Add(directory);
         using var process = Process.Start(start) ?? throw new InvalidOperationException("Child process did not start.");
         Task<string> errors = process.StandardError.ReadToEndAsync();
-        string? line;
-        try { line = await process.StandardOutput.ReadLineAsync().WaitAsync(TimeSpan.FromSeconds(30)); }
+        var markerTimeout = TimeSpan.FromSeconds(30);
+        string? line = null;
+        TimeoutException? timedOut = null;
+        // A child that hangs before printing its marker used to surface as a bare TimeoutException
+        // with the reason discarded: the finally killed the child and the exception left before
+        // anything read its stderr. The child's own diagnostics are the only explanation of why it
+        // never printed, so hold the timeout and report it with them attached.
+        try { line = await process.StandardOutput.ReadLineAsync().WaitAsync(markerTimeout); }
+        catch (TimeoutException error) { timedOut = error; }
         finally
         {
             // Only the exact child started above, never an unrelated dotnet/worker process.
             if (!process.HasExited) process.Kill(entireProcessTree: true);
             await process.WaitForExitAsync().WaitAsync(TimeSpan.FromSeconds(10));
         }
-        string stderr = await errors;
+        // The child has exited, so its stderr pipe is closed and this completes; the bound only
+        // guards against a surviving pipe holder, and losing stderr must not lose the diagnosis.
+        string stderr;
+        try { stderr = await errors.WaitAsync(TimeSpan.FromSeconds(10)); }
+        catch (TimeoutException) { stderr = "(child stderr unavailable: the pipe did not close)"; }
+        if (timedOut is not null)
+            throw new TimeoutException($"Child printed no marker within {markerTimeout.TotalSeconds:0}s: " + stderr, timedOut);
         if (line is null) throw new InvalidOperationException("Child produced no marker: " + stderr);
         ProcessMarker marker = JsonSerializer.Deserialize(line, EvidenceJson.Default.ProcessMarker) ?? throw new InvalidDataException("Missing process marker.");
         Require(marker.ProcessId == process.Id && process.ExitCode != 0, "observed abrupt child termination");

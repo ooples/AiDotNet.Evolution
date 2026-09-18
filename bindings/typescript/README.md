@@ -227,8 +227,10 @@ try {
   if (lease !== null) {
     // Toy evaluator. Production workers durably record execution IDs and receipts;
     // do not repeat a physical operation just because its reply was lost.
+    // BigInt, not Number: payloads are strings on the wire precisely because a double
+    // silently rounds past 2^53, and squaring reaches that from a nine-digit input.
     await work.commit({ identity: lease.identity, workerId: lease.workerId,
-      payload: String(Number(lease.payload) ** 2), provenance: 'integer-square-v1',
+      payload: (BigInt(lease.payload) ** 2n).toString(), provenance: 'integer-square-v1',
       actual: { evaluation_calls: '1' }, outcome: 'completed' });
   }
 } finally { await work.close(); }

@@ -6,8 +6,10 @@ The package does not depend on AiDotNet or AiDotNet.Tensors. Domain integrations
 
 [External sessions](docs/EXTERNAL_WORK_IDENTITY.md) support canonicalization/version fingerprints and fenced work tickets,
 including strict native-host/TypeScript mode. The optional [durable delivery coordinator](docs/DURABLE_EXTERNAL_WORK.md)
-persists work, leases and resource receipts together. Durable engine/binding integration remains in progress;
-delivery recovery is not exact partial-batch search continuation.
+persists work, leases and resource receipts together. The engine bridge and the TypeScript, Python and C ABI
+bindings ship with it. What remains is exact partial-batch search continuation: delivery recovery restores work,
+leases and accounting, not a mid-batch search state, so resuming across a crash mid-batch is a labeled fork rather
+than a resumption until proposal, operator and external-response provenance are persisted too.
 
 The initial package version is `0.1.0-preview.1` and targets .NET 10, .NET 8, and .NET Framework 4.7.1.
 

@@ -88,6 +88,17 @@ submitting it; after a lost acknowledgement inspect `delivery`, then resend only
 same receipt if needed. Expiry or cancellation retains the original reservation until an
 actual receipt arrives. A resumed worker normally uses a new incarnation ID.
 
+**Receipt ordering.** The endpoint serializes every command, so operations take effect in the
+order their frames reach it -- not the order a client issued them. TypeScript allows 32
+outstanding requests and correlates replies by `id`, so two concurrently issued commits have no
+defined relative order; a worker that needs one to precede another must await the first reply.
+Within a single lease, the first receipt wins: it settles the reservation, a byte-identical
+resend returns `duplicate` or `duplicate-stale` and charges nothing further, and a *conflicting*
+receipt for an already-committed lease is refused outright rather than replacing the delivery.
+Across leases of one work item, only the newest lease can be accepted; an earlier lease's
+receipt still settles its own reservation and returns `stale`, so a late receipt never revives
+superseded work or rewrites an accepted result.
+
 An accepted delivery result still requires the caller's pinned decoder and independent
 evaluation validation before archive admission. `status.searchState` is `not-owned` and
 `supportsExactSearchContinuation` is false. None of these responses claim a finished search,
