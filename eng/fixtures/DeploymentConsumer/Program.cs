@@ -51,7 +51,19 @@ var scriptFitness = new ScriptProgramFitnessEvaluator(processRunner,
 var scriptResult = await scriptFitness.EvaluateAsync(new ProgramGenome("candidate", ProgramLanguage.Python), new(0, 1, 1, 1));
 if (scriptResult.Quality != 3 || scriptResult.Metrics["speed"] != 4 || scriptResult.CostUnits != 1)
     throw new InvalidOperationException("Packaged script metrics evaluation failed.");
-Console.WriteLine("PASS: packaged deployment/program runtime and script metrics; 2 search evaluations plus 2 child-process evaluations; no project references.");
+var judge = new LlmJudgeProgramFitnessEvaluator(new FixtureJudge(), new DelegateProgramFitnessEvaluator(_ => .5),
+    options: new LlmFeedbackOptions { Criteria = new[] { "score" } });
+var judged = await judge.EvaluateAsync(new ProgramGenome("candidate", ProgramLanguage.Python), new(0, 1, 1, 1));
+if (Math.Abs(judged.Quality!.Value - .65) > 1e-10 || judged.CostUnits != 1 || judged.Descriptors["llm_average"] != 1)
+    throw new InvalidOperationException("Packaged judge evaluation failed.");
+var novelty = new AiDotNet.Evolution.Programs.Novelty.NoveltyGatingProgramFitnessEvaluator(new DelegateProgramFitnessEvaluator(_ => 1));
+var original = new ProgramGenome("x=1", ProgramLanguage.Python);
+var novel = await novelty.EvaluateAsync(original, new(0, 1, 1, 1));
+var duplicate = await novelty.EvaluateAsync(new ProgramGenome("x = 1", ProgramLanguage.Python), new(1, 1, 1, 1));
+if (novel.Status != EvolutionEvaluationStatus.Completed || duplicate.Status != EvolutionEvaluationStatus.Rejected
+    || novelty.AcceptedCount != 1 || novelty.RejectedCount != 1 || duplicate.CostUnits != 0)
+    throw new InvalidOperationException("Packaged pre-evaluation novelty gate failed.");
+Console.WriteLine("PASS: packaged deployment/program runtime, script metrics, judge and novelty; no project references or live model calls.");
 
 sealed class FixtureEdit : IVariationOperator<ProgramGenome>
 {
@@ -73,4 +85,12 @@ sealed class FixtureChat : IProgramChatClient
     public Task<ProgramChatResponse> GetResponseAsync(IReadOnlyList<ProgramChatMessage> messages,
         ProgramChatOptions? options = null, CancellationToken cancellationToken = default) =>
         Task.FromResult(new ProgramChatResponse(ProgramChatMessage.Assistant("fixture")));
+}
+
+sealed class FixtureJudge : IProgramChatClient
+{
+    public string ModelId => "package-judge-fixture";
+    public Task<ProgramChatResponse> GetResponseAsync(IReadOnlyList<ProgramChatMessage> messages,
+        ProgramChatOptions? options = null, CancellationToken cancellationToken = default) =>
+        Task.FromResult(new ProgramChatResponse(ProgramChatMessage.Assistant("{\"score\":1}")));
 }
