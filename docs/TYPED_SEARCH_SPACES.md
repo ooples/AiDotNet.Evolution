@@ -70,7 +70,10 @@ mutation pushes it outward. Intervals narrower than one part in 1e9 interpolate 
 logarithmic map by under 1.3e-10 of the normalized span and keeps every representable value distinct; when the ratio
 overflows to infinity the difference-of-logarithms form is used instead. Logarithmic domain fingerprints include
 `log-domain-v3-ratio-pinned`; genomes and checkpoints from either earlier logarithmic schema are rejected, not
-silently reinterpreted. Non-logarithmic schemas retain their prior fingerprints. Domain identity does not depend on
+silently reinterpreted. Real domains also pin both endpoints: for example, the old decoding
+of 1 in [-1e100, 1] returned 0 through cancellation. Real fingerprints now include
+`real-domain-v2-pinned`, rejecting older real-domain genomes/checkpoints.
+Integer and categorical schemas retain their prior fingerprints. Domain identity does not depend on
 how a particular runtime rounds `Math.Log`.
 
 Known limitation: there is no integer logarithmic kind. `Integer` is always sampled and mutated in linear
@@ -78,6 +81,12 @@ coordinates, so a wide integer range is not log-uniform. Declare a `Logarithmic`
 evaluator when a log-scaled integer is needed.
 
 ## Optional diagonal CMA-style learning
+
+Use `EvolutionParameter.Enum<MyEnum>("choice")` for declared enum names and
+`genome.Enum<MyEnum>("choice")` to read them without accepting numeric strings,
+case-insensitive conversions or undeclared flags combinations. Names are sorted
+ordinally; aliases remain separate named choices. This is a categorical schema,
+not an assembly-qualified type binding; callers own the meaning of their enum.
 
 `DiagonalCmaEmitter` implements positive-weight ranked recombination, diagonal covariance adaptation and cumulative
 step-size control, based on [Hansen's CMA tutorial](https://arxiv.org/abs/1604.00772). It supports one to 32 nonconstant,

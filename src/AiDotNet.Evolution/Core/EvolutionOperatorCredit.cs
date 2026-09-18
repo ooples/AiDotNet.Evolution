@@ -13,7 +13,14 @@ public sealed class EvolutionOperatorCredit
         ParentQuality = parentQuality; Quality = evaluation.Quality; Direction = evaluation.Direction; Status = evaluation.Status;
         CacheStatus = evaluation.CacheStatus; Insertion = insertion; EvaluationCostUnits = evaluation.Cost.CostUnits;
         ProposalCost = proposalCost; Reward = reward; MeasurementOrigin = evaluation.MeasurementOrigin;
+        EvaluationId = evaluation.EvaluationId; GenomeId = evaluation.GenomeId; EvaluationAttempts = evaluation.Cost.AttemptCount;
     }
+    /// <summary>Gets the terminal evaluation identity within the run, including rejected or failed proposals.</summary>
+    public long EvaluationId { get; }
+    /// <summary>Gets the terminal canonical genome identity.</summary>
+    public string GenomeId { get; }
+    /// <summary>Gets actual evaluator attempts, including retries; zero does not mean proposal work was free.</summary>
+    public int EvaluationAttempts { get; }
     /// <summary>Gets the proposal generation, independent of worker completion order.</summary>
     public long Generation { get; }
     /// <summary>Gets the selected child operator, not only the containing portfolio.</summary>

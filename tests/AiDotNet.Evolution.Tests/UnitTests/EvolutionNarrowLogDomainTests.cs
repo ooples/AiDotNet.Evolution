@@ -14,7 +14,7 @@ public sealed class EvolutionNarrowLogDomainTests
     [InlineData("log")]
     [InlineData("narrow-log")]
     [InlineData("fixed-log")]
-    public void OnlyLogarithmicSchemasInvalidateOldCodecIdentity(string kind)
+    public void ChangedNumericMappingsInvalidateOldCodecIdentity(string kind)
     {
         var parameter = kind switch
         {
@@ -34,7 +34,7 @@ public sealed class EvolutionNarrowLogDomainTests
         var space = new EvolutionSearchSpaceBuilder().Add(parameter).Build();
         var genome = space.Sample(StableRandom.CreateStream(12, 0));
         string legacyPayload = space.Serialize(genome).Replace(space.VersionHash, legacySchema);
-        if (parameter.Kind == EvolutionParameterKind.Logarithmic)
+        if (parameter.Kind is EvolutionParameterKind.Logarithmic or EvolutionParameterKind.Real)
         {
             Assert.NotEqual(legacySchema, space.VersionHash);
             Assert.Throws<ArgumentException>(() => space.Deserialize(legacyPayload));

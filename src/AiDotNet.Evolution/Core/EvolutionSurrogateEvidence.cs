@@ -75,11 +75,12 @@ public sealed class EvolutionSurrogateSelection<TGenome>
 {
     internal EvolutionSurrogateSelection(EvolutionCanonicalGenome<TGenome> candidate, EvolutionSurrogateSelectionReason reason,
         string operationIdentity, string trainingIdentity, string? modelVersionHash, double explorationProbability,
-        int poolSize, IEnumerable<EvolutionSurrogatePrediction> predictions)
+        int poolSize, IEnumerable<EvolutionSurrogatePrediction> predictions, EvolutionSurrogateValidationReport? validationReport = null)
     {
         Candidate = candidate; Reason = reason; OperationIdentity = operationIdentity; TrainingIdentity = trainingIdentity;
         ModelVersionHash = modelVersionHash; ExplorationProbability = explorationProbability; PoolSize = poolSize;
         Predictions = Array.AsReadOnly(predictions.ToArray());
+        ValidationReport = validationReport;
     }
     /// <summary>Gets the selected candidate, which still requires true evaluation.</summary>
     public EvolutionCanonicalGenome<TGenome> Candidate { get; }
@@ -97,4 +98,6 @@ public sealed class EvolutionSurrogateSelection<TGenome>
     public int PoolSize { get; }
     /// <summary>Gets all returned well-formed predictions, including those rejected for unfamiliarity.</summary>
     public IReadOnlyList<EvolutionSurrogatePrediction> Predictions { get; }
+    /// <summary>Gets optional detached backend reliability evidence, including for unreliable-model fallback.</summary>
+    public EvolutionSurrogateValidationReport? ValidationReport { get; }
 }

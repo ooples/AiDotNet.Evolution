@@ -79,7 +79,7 @@ public sealed class EvolutionParameter
         double ratio = Maximum / Minimum;
         _logRatioIsFinite = EvolutionDescriptorDefinition.IsFinite(ratio);
         // Below one part in 1e9 the logarithmic and linear maps differ by under 1.3e-10 of the normalized span,
-        // which is far below double resolution, while the linear map keeps every representable point distinct.
+        // while the linear map avoids cancellation and keeps representable narrow-domain points distinct.
         _logSpanIsLinear = _logRatioIsFinite && ratio - 1 < 1e-9;
         _logSpan = _logRatioIsFinite ? Math.Log(ratio) : Math.Log(Maximum) - Math.Log(Minimum);
     }
@@ -102,6 +102,10 @@ public sealed class EvolutionParameter
     public static EvolutionParameter Integer(string name, int minimum, int maximum) => Numeric(name, EvolutionParameterKind.Integer, minimum, maximum);
     /// <summary>Defines a strictly positive interval sampled and mutated in log space.</summary>
     public static EvolutionParameter Logarithmic(string name, double minimum, double maximum) => Numeric(name, EvolutionParameterKind.Logarithmic, minimum, maximum);
+    /// <summary>Defines a categorical domain containing the declared names of an enum, in ordinal order.</summary>
+    /// <remarks>Aliases remain distinct named choices. Flags combinations must be explicitly declared enum members.</remarks>
+    public static EvolutionParameter Enum<TEnum>(string name) where TEnum : struct, System.Enum =>
+        Categorical(name, System.Enum.GetNames(typeof(TEnum)).OrderBy(value => value, StringComparer.Ordinal));
     /// <summary>Defines between one and 256 distinct categorical choices.</summary>
     public static EvolutionParameter Categorical(string name, IEnumerable<string> choices)
     {
@@ -166,9 +170,9 @@ public sealed class EvolutionParameter
             throw new ArgumentOutOfRangeException(nameof(coordinate));
         double t = Math.Max(0, Math.Min(1, coordinate));
         // Both endpoints are pinned exactly: a parent sitting on a bound and mutating outward keeps its identity.
-        double value = Kind != EvolutionParameterKind.Logarithmic || Maximum <= Minimum ? Minimum + t * (Maximum - Minimum)
-            : t <= 0 ? Minimum
+        double value = t <= 0 ? Minimum
             : t >= 1 ? Maximum
+            : Kind != EvolutionParameterKind.Logarithmic || Maximum <= Minimum ? Minimum + t * (Maximum - Minimum)
             : _logSpanIsLinear ? Minimum + t * (Maximum - Minimum)
             : _logRatioIsFinite ? Minimum * Math.Exp(t * _logSpan)
             : Math.Exp(Math.Log(Minimum) + t * _logSpan);
@@ -182,7 +186,8 @@ public sealed class EvolutionParameter
         EvolutionParameterValue.Numeric(Minimum).Canonical, EvolutionParameterValue.Numeric(Maximum).Canonical,
         EvolutionHash.Combine(Categories) }.Concat(Conditions.OrderBy(condition => condition.Parameter, StringComparer.Ordinal)
         .Select(condition => EvolutionHash.Combine(new[] { condition.Parameter }.Concat(condition.AnyOf.Select(value => value.Canonical)))))
-        .Concat(Kind == EvolutionParameterKind.Logarithmic ? new[] { "log-domain-v3-ratio-pinned" } : Array.Empty<string>()));
+        .Concat(Kind == EvolutionParameterKind.Logarithmic ? new[] { "log-domain-v3-ratio-pinned" }
+            : Kind == EvolutionParameterKind.Real ? new[] { "real-domain-v2-pinned" } : Array.Empty<string>()));
 
     internal static void ValidateName(string name)
     {
