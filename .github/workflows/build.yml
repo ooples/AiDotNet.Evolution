@@ -210,17 +210,22 @@ jobs:
       - name: Evolution-owned program host and contract gates
         run: |
           dotnet build benchmarks/EvolutionComparison/EvolutionComparison.csproj -c Release
-          .local/program-env/bin/python -m unittest discover -s benchmarks/external -p 'test_program*.py' -v
+          [ -f "$EVOLUTION_PROFILE_DLL" ] || { echo "::error::EVOLUTION_PROFILE_DLL missing: $EVOLUTION_PROFILE_DLL"; exit 1; }
+          [ -d "$EVOLUTION_PROFILE_UPSTREAM" ] || { echo "::error::EVOLUTION_PROFILE_UPSTREAM missing: $EVOLUTION_PROFILE_UPSTREAM"; exit 1; }
+          .local/program-env/bin/python eng/run_required_tests.py benchmarks/external 'test_program*.py'
           .local/program-env/bin/python -m unittest discover -s benchmarks/external -p test_codex_transport.py -v
           .local/program-env/bin/python -m unittest discover -s benchmarks/external -p test_openevolve_adapter.py -v
           .local/program-env/bin/python benchmarks/external/run_program_comparison.py --aidotnet benchmarks/EvolutionComparison/bin/Release/net10.0/EvolutionComparison.dll --upstream .local/openevolve-upstream --output TestResults/program-comparison
       - name: Validate actual container isolation and independent oracles
         run: |
           docker build --tag evolution-program-sandbox:ci --file benchmarks/external/sandbox/Dockerfile .
-          export EVOLUTION_SANDBOX_IMAGE="$(docker image inspect evolution-program-sandbox:ci --format '{{.Id}}')"
+          # "export VAR=$(cmd)" returns the status of export, not of cmd, so a failed inspect would
+          # leave the id empty, silently skip every isolation gate below and still report success.
+          image_id="$(docker image inspect evolution-program-sandbox:ci --format '{{.Id}}')"
+          [ -n "$image_id" ] || { echo "::error::sandbox image id is empty; isolation gates would silently skip"; exit 1; }
+          export EVOLUTION_SANDBOX_IMAGE="$image_id"
           export EVOLUTION_SANDBOX_EVIDENCE="$PWD/TestResults/program-isolation"
-          .local/program-env/bin/python -m unittest discover -s benchmarks/external -p test_docker_sandbox.py -v
-          .local/program-env/bin/python -m unittest discover -s benchmarks/external -p 'test_warm*.py' -v
+          .local/program-env/bin/python eng/run_required_tests.py benchmarks/external test_docker_sandbox.py 'test_warm*.py'
       - uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02
         if: always()
         with:
