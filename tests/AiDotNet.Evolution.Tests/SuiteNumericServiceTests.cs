@@ -42,6 +42,46 @@ public sealed class SuiteNumericServiceTests
         Assert.Equal(8 * task.WorkUnits, summary.RootElement.GetProperty("Resources").GetProperty("Spent").GetProperty("cost_units").GetInt32());
     }
 
+    [Fact]
+    public void FrozenProtocolPublishesOnlyItsDeclaredSampleMembersWhileTheSuiteProtocolPublishesTheFullRecord()
+    {
+        // numeric-objective-service-v1 is an established protocol: widening its summary samples breaks
+        // controllers that compare it against evidence they recorded themselves. suite-numeric-objective-service-v1
+        // is new and must be provably measurement-identical to the in-process engine, so it carries everything.
+        // Nothing else exercises the non-suite shape, which is how this guard was silently dropped once already.
+        string[] frozen = ["EvaluationId", "Status", "BestLoss", "Attempts", "CostUnits", "DiagnosticCodes"];
+
+        string legacyText = Drive(["Sphere", "0", "8"], suite: false, seed: 0);
+        string[] legacyLines = legacyText.Split(NEWLINE, StringSplitOptions.RemoveEmptyEntries);
+        using var manifest = JsonDocument.Parse(legacyLines[0]);
+        Assert.Equal("numeric-objective-service-v1", manifest.RootElement.GetProperty("Protocol").GetString());
+        using var legacy = JsonDocument.Parse(legacyLines[^1]);
+        foreach (var sample in legacy.RootElement.GetProperty("Samples").EnumerateArray())
+            Assert.Equal(frozen, sample.EnumerateObject().Select(member => member.Name).ToArray());
+
+        string suiteText = Drive(["knapsack", "0", "8", "42"], suite: true, seed: 0);
+        using var suiteSummary = JsonDocument.Parse(suiteText.Split(NEWLINE, StringSplitOptions.RemoveEmptyEntries)[^1]);
+        foreach (var sample in suiteSummary.RootElement.GetProperty("Samples").EnumerateArray())
+        {
+            string[] members = sample.EnumerateObject().Select(member => member.Name).ToArray();
+            Assert.All(frozen, name => Assert.Contains(name, members));
+            Assert.Contains("Quality", members);
+            Assert.Contains("ConstraintViolations", members);
+            Assert.Contains("GenomeId", members);
+        }
+    }
+
+    private const char NEWLINE = '\n';
+
+    private static string Drive(string[] args, bool suite, ulong seed)
+    {
+        var lines = QualityExperiment.SharedInitialUnits(seed, suite).Select(values => JsonSerializer.Serialize(values));
+        using var input = new StringReader(string.Join(NEWLINE, lines) + NEWLINE + "null" + NEWLINE);
+        using var output = new StringWriter();
+        Assert.Equal(0, NumericObjectiveService.Run(args, suite, input, output));
+        return output.ToString();
+    }
+
     [Theory]
     [InlineData("unknown", "0", "8", "1")]
     [InlineData("rastrigin", "-1", "8", "1")]

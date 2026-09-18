@@ -70,6 +70,8 @@ def run_campaign(output, aidotnet_dll, upstream, initial, task, model, generate,
                                "Same provider instance/evaluator callback for every system; caller owns evaluator isolation",
                                "One-shot intentionally consumes one model call; unused allowance is not silently spent",
                                "No registered holdout or competitive superiority claim follows from this controller"])
+    schedule = [("controlled", "aidotnet"), ("controlled", "openevolve"), ("controlled", "one-shot"),
+                ("controlled", "single-parent"), ("native-bounded", "aidotnet"), ("native-bounded", "openevolve")]
     if evidence_class == "development-experiment":
         random.Random(seed).shuffle(schedule)
     report["schedule"] = schedule
