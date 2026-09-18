@@ -1,5 +1,6 @@
 using System.Diagnostics;
 using System.Globalization;
+using System.Text;
 
 namespace AiDotNet.Evolution;
 
@@ -22,6 +23,15 @@ public sealed partial class EvolutionEngine<TGenome>
     /// returns <c>null</c> when no island holds an elite to select from.
     /// </summary>
     private async Task<PreparedProposal?> PrepareVariationAsync(CancellationToken cancellationToken)
+    {
+        VariationRequest? request = CreateVariationRequest();
+        if (request is null) return null;
+        VariationResponse response = await InvokeVariationAsync(request, cancellationToken).ConfigureAwait(false);
+        return new PreparedProposal(await CompleteVariationAsync(request, response, cancellationToken).ConfigureAwait(false));
+    }
+
+    /// <summary>Allocates identity and selects inputs on the single writer, without invoking a proposal backend.</summary>
+    private VariationRequest? CreateVariationRequest(Dictionary<int, PipelineArchiveContext>? snapshots = null)
     {
         long evaluationId = _nextEvaluationId;
         int island = (int)(evaluationId % _islands.Length);
@@ -50,16 +60,36 @@ public sealed partial class EvolutionEngine<TGenome>
             (ulong)evaluationId);
 
         IReadOnlyList<EvolutionArtifact> parentArtifacts = ConsumeArtifacts(selection.Parent.Evaluation.GenomeId);
-        TGenome proposed;
+        IEvolutionArchiveView<TGenome> view = sourceArchive;
+        string? snapshotHash = null;
+        if (snapshots is not null)
+        {
+            if (!snapshots.TryGetValue(sourceIsland, out PipelineArchiveContext? snapshot))
+                snapshots.Add(sourceIsland, snapshot = new PipelineArchiveContext(new EvolutionArchiveSnapshot<TGenome>(sourceArchive)));
+            view = snapshot.Archive;
+            snapshotHash = snapshot.Fingerprint;
+        }
+        var artifactFingerprint = snapshots is null ? null : new StringBuilder();
+        if (artifactFingerprint is not null) AppendArtifacts(artifactFingerprint, parentArtifacts);
+        string? identity = snapshots is null ? null : EvolutionHash.Combine(new[] { "pipeline-proposal-v2-content", _options.RunId, _compatibilityHash,
+            evaluationId.ToString(CultureInfo.InvariantCulture), generation.ToString(CultureInfo.InvariantCulture),
+            island.ToString(CultureInfo.InvariantCulture), view.DefinitionHash, view.Version.ToString(CultureInfo.InvariantCulture),
+            snapshotHash!, FingerprintPipelineEvaluation(selection.Parent.Evaluation), EvolutionHash.Compute(artifactFingerprint!.ToString()) }
+            .Concat(selection.Inspirations.Select(entry => FingerprintPipelineEvaluation(entry.Evaluation))));
+        var context = snapshots is null
+            ? new EvolutionVariationContext<TGenome>(selection.Parent, selection.Inspirations, proposalRandom, generation, island, parentArtifacts, view)
+            : new EvolutionVariationContext<TGenome>(selection.Parent, selection.Inspirations, proposalRandom, generation, island, parentArtifacts, view, identity!, evaluationId);
+        return new VariationRequest(evaluationId, island, lineage, context);
+    }
+
+    /// <summary>Runs only the external proposal call; no engine archive/counter/artifact mutation occurs here.</summary>
+    private async Task<VariationResponse> InvokeVariationAsync(VariationRequest request, CancellationToken cancellationToken)
+    {
         try
         {
-            // The archive the parent came from, handed over read-only so an operator can reason about the frontier
-            // (which cells are still empty, which elites lead) instead of only about its parent. Insertion stays
-            // the engine's alone, so the single-writer guarantee is unaffected.
-            var context = new EvolutionVariationContext<TGenome>(selection.Parent, selection.Inspirations,
-                proposalRandom, generation, island, parentArtifacts, sourceArchive);
-            proposed = await _variation.ProposeAsync(context, cancellationToken).ConfigureAwait(false);
+            TGenome proposed = await _variation.ProposeAsync(request.Context, cancellationToken).ConfigureAwait(false);
             if (proposed is null) throw new InvalidOperationException("The variation operator returned null.");
+            return new VariationResponse(proposed, false);
         }
         catch (OperationCanceledException) when (cancellationToken.IsCancellationRequested)
         {
@@ -67,12 +97,55 @@ public sealed partial class EvolutionEngine<TGenome>
         }
         catch (Exception exception) when (EvolutionExceptionPolicy.IsRecoverable(exception))
         {
-            if (parentArtifacts.Count > 0)
-                QueueArtifactsForDelivery(selection.Parent.Evaluation.GenomeId, parentArtifacts);
-            return new PreparedProposal(CreatePreEvaluationFailure(evaluationId, island, lineage, "variation_failure"));
+            return new VariationResponse(default!, true);
         }
+    }
 
-        return new PreparedProposal(await PrepareGenomeAsync(proposed, evaluationId, island, lineage, cancellationToken).ConfigureAwait(false));
+    /// <summary>Rejoins the single writer for failed-artifact delivery, canonicalization, refinement and deduplication.</summary>
+    private async Task<WorkItem> CompleteVariationAsync(VariationRequest request, VariationResponse response, CancellationToken cancellationToken)
+    {
+        if (response.Failed)
+        {
+            if (request.Context.ParentArtifacts.Count > 0)
+                QueueArtifactsForDelivery(request.Context.Parent.Evaluation.GenomeId, request.Context.ParentArtifacts);
+            return CreatePreEvaluationFailure(request.EvaluationId, request.Island, request.Lineage, "variation_failure");
+        }
+        return await PrepareGenomeAsync(response.Genome, request.EvaluationId, request.Island, request.Lineage, cancellationToken).ConfigureAwait(false);
+    }
+
+    private sealed class VariationRequest(long evaluationId, int island, EvolutionLineage lineage, EvolutionVariationContext<TGenome> context)
+    {
+        public long EvaluationId { get; } = evaluationId;
+        public int Island { get; } = island;
+        public EvolutionLineage Lineage { get; } = lineage;
+        public EvolutionVariationContext<TGenome> Context { get; } = context;
+    }
+
+    private sealed class VariationResponse(TGenome genome, bool failed)
+    {
+        public TGenome Genome { get; } = genome;
+        public bool Failed { get; } = failed;
+    }
+
+    private static string FingerprintPipelineEvaluation(EvolutionEvaluation evaluation)
+    {
+        var builder = new StringBuilder();
+        // Reuse checkpoint/state-hash semantics: include measurements, costs, origins, lineage and artifacts,
+        // but not callback elapsed time. A version counter plus genome ID does not identify observed evidence.
+        AppendEvaluation(builder, evaluation);
+        return EvolutionHash.Compute(builder.ToString());
+    }
+
+    private sealed class PipelineArchiveContext
+    {
+        public PipelineArchiveContext(EvolutionArchiveSnapshot<TGenome> archive)
+        {
+            Archive = archive;
+            Fingerprint = EvolutionHash.Combine(new[] { archive.DefinitionHash, archive.Version.ToString(CultureInfo.InvariantCulture) }
+                .Concat(archive.Entries.SelectMany(entry => new[] { entry.Cell.StableKey, FingerprintPipelineEvaluation(entry.Evaluation) })));
+        }
+        public EvolutionArchiveSnapshot<TGenome> Archive { get; }
+        public string Fingerprint { get; }
     }
 
     /// <summary>
@@ -279,11 +352,19 @@ public sealed partial class EvolutionEngine<TGenome>
     /// <summary>Runs one evaluation attempt inside a parallelism slot and records its timing and result.</summary>
     private async Task EvaluateWithSlotAsync(WorkItem item, SemaphoreSlim semaphore, CancellationToken cancellationToken)
     {
-        await semaphore.WaitAsync(cancellationToken).ConfigureAwait(false);
+        _pipelineStatistics?.Enqueue(1);
+        try { await semaphore.WaitAsync(cancellationToken).ConfigureAwait(false); }
+        catch { _pipelineStatistics?.CancelQueued(1); throw; }
+        _pipelineStatistics?.Claim(1);
+        Stopwatch? pipelineTimer = null;
         try
         {
+            if (_pipelineEvaluationRate is not null) await _pipelineEvaluationRate.WaitAsync(cancellationToken).ConfigureAwait(false);
+            if (_pipelineStatistics is not null) { _pipelineStatistics.Started(1); pipelineTimer = Stopwatch.StartNew(); }
             Stopwatch timer = Stopwatch.StartNew();
-            EvolutionTaskResult result = await EvaluateAttemptAsync(item, cancellationToken).ConfigureAwait(false);
+            EvolutionTaskResult result = _pipelineStatistics is null
+                ? await EvaluateAttemptAsync(item, cancellationToken).ConfigureAwait(false)
+                : await Task.Run(() => EvaluateAttemptAsync(item, cancellationToken), CancellationToken.None).ConfigureAwait(false);
             timer.Stop();
             item.Elapsed += timer.Elapsed;
             AccumulateAttemptMetadata(item, result);
@@ -292,6 +373,7 @@ public sealed partial class EvolutionEngine<TGenome>
         }
         finally
         {
+            _pipelineStatistics?.Released(1, pipelineTimer?.Elapsed.TotalSeconds ?? 0);
             semaphore.Release();
         }
     }
@@ -458,6 +540,8 @@ public sealed partial class EvolutionEngine<TGenome>
             if (evaluation.Lineage.Generation > 0 &&
                 _variation is IOutcomeAwareVariationOperator<TGenome> adaptiveVariation)
                 adaptiveVariation.Observe(evaluation, insertion);
+
+            _pipelineStatistics?.Record(EvolutionPipelineScheduleKind.Commit, evaluation.EvaluationId, evaluation.Lineage.Generation, evaluation.GenomeId);
 
             if (IsFailureLike(evaluation.Status))
             {
