@@ -22,7 +22,7 @@ public sealed class ValidatedNearestNeighborTrainer : IEvolutionSurrogateTrainer
         _space = space ?? throw new ArgumentNullException(nameof(space));
         _options = options ?? throw new ArgumentNullException(nameof(options));
         if (space.FeatureCount > 128) throw new ArgumentException("The numeric backend supports at most 128 features.", nameof(space));
-        VersionHash = EvolutionHash.Combine(new[] { "validated-knn-v1-group-split", space.VersionHash, options.VersionHash });
+        VersionHash = EvolutionHash.Combine(new[] { "validated-knn-v2-pinned-support", space.VersionHash, options.VersionHash });
     }
     /// <inheritdoc/>
     public string VersionHash { get; }
@@ -146,7 +146,7 @@ public sealed class ValidatedNearestNeighborModel : IEvolutionSurrogateModel<Evo
         _space = space; _options = options; _training = training; Validation = diagnostics; VersionHash = identity;
         TrainingGenomeIds = Array.AsReadOnly(training.Select(point => point.Id).ToArray());
         CalibrationGenomeIds = Array.AsReadOnly(calibration); ValidationGenomeIds = Array.AsReadOnly(validation);
-        ValidationReport = new EvolutionSurrogateValidationReport(EvolutionHash.Combine(new[] { "validated-knn-v1-group-split", options.VersionHash }),
+        ValidationReport = new EvolutionSurrogateValidationReport(EvolutionHash.Combine(new[] { "validated-knn-v2-pinned-support", options.VersionHash }),
             diagnostics.Reason, new Dictionary<string, double>
             {
                 ["training_groups"] = diagnostics.TrainingGroups,
@@ -190,7 +190,10 @@ public sealed class ValidatedNearestNeighborModel : IEvolutionSurrogateModel<Evo
         {
             double[] features = _space.EncodeFeatures(candidate.Genome).ToArray(); work += features.Length;
             var estimate = ValidatedNearestNeighborTrainer.Estimate(features, _training, _options.Neighbors, ref work, cancellationToken);
-            double mean = _options.QualityMinimum + estimate.Mean * (_options.QualityMaximum - _options.QualityMinimum);
+            // Finite support does not prevent cancellation: -1e100 + (1 - -1e100) rounds to zero.
+            double mean = estimate.Mean <= 0 ? _options.QualityMinimum : estimate.Mean >= 1 ? _options.QualityMaximum
+                : Math.Max(_options.QualityMinimum, Math.Min(_options.QualityMaximum,
+                    _options.QualityMinimum + estimate.Mean * (_options.QualityMaximum - _options.QualityMinimum)));
             return new EvolutionSurrogatePrediction(candidate.Id, mean, Validation.ResidualRadius, estimate.Distance <= _options.MaximumDistance);
         }).ToArray());
         return new(new EvolutionResourceResult<IReadOnlyList<EvolutionSurrogatePrediction>>(predictions,

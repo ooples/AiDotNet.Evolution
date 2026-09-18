@@ -21,6 +21,22 @@ namespace AiDotNet.Evolution;
 /// </remarks>
 public sealed class EvolutionVariationContext<TGenome>
 {
+    internal EvolutionVariationContext(EvolutionArchiveEntry<TGenome> parent,
+        IReadOnlyList<EvolutionArchiveEntry<TGenome>> inspirations, StableRandom random, long generation, int island,
+        IReadOnlyList<EvolutionArtifact> parentArtifacts, IEvolutionArchiveView<TGenome> archive,
+        string proposalIdentity, long evaluationId)
+        : this(parent, inspirations, random, generation, island, parentArtifacts, archive)
+    {
+        ProposalIdentity = proposalIdentity;
+        EvaluationId = evaluationId;
+    }
+
+    /// <summary>Gets the stable run/configuration/parent/snapshot identity in pipeline mode; null for legacy callers.</summary>
+    public string? ProposalIdentity { get; }
+
+    /// <summary>Gets the allocated evaluation identity in pipeline mode; null for legacy callers.</summary>
+    public long? EvaluationId { get; }
+
     /// <summary>Initializes a variation context.</summary>
     /// <param name="parent">The selected parent elite.</param>
     /// <param name="inspirations">Additional selected elites that variation may draw from; may be empty.</param>

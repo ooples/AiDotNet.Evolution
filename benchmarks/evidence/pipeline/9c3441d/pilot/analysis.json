@@ -1,0 +1,341 @@
+{
+  "Protocol": "authored-proposal-pipeline-v1",
+  "SourceRevision": "9c3441d9723ed333644d991e2df9e658e4e25a74",
+  "AssemblySha256": "841bb2424df588f3a0c62a2ce9517c69036e9ac661588f93a7415a9c0787fdee",
+  "CoreAssemblySha256": "bddbab4a2f441fc23a63f49ae50c5b3a219eab155f6dd2ad72655b2480eefb75",
+  "Scheduled": 576,
+  "Valid": 576,
+  "WarmupsValid": 4,
+  "BootstrapSamples": 10000,
+  "BootstrapSeed": 20,
+  "NominalFamilyConfidence": 0.95,
+  "AdjustedEndpoints": 18,
+  "SeedClusters": 8,
+  "TimingRepetitionsPerSeed": 3,
+  "ConfirmatoryEligible": false,
+  "Interpretation": "Two fixed authored tasks, artificial delays and declared work tariffs on a shared host. Pair methods first; average tasks/timing repeats within each seed, then resample seed clusters. Failed executions score zero quality and suppress the affected timing comparison. Completed-only latency tails are descriptive, not independent replications. Offline response replay executes no physical backend work; repeated timings are not additional search seeds. Small-seed bootstrap intervals cannot establish representative or competitor superiority.",
+  "PhysicalProposalCalls": 13824,
+  "PhysicalEvaluationCalls": 18432,
+  "FailedRuns": [],
+  "Summaries": [
+    {
+      "Profile": "ZeroLatency",
+      "Method": "Batch",
+      "Scheduled": 48,
+      "Valid": 48,
+      "MeanFailureInclusiveQuality": 0.8464949065454278,
+      "MedianCompletedElapsedSeconds": 0.0019368,
+      "P95CompletedElapsedSeconds": 0.003903485,
+      "MeanCompletedCost": 38.08,
+      "MedianCompletedAllocatedBytes": 1156224.0,
+      "MedianCompletedProcessCpuSeconds": 0.0
+    },
+    {
+      "Profile": "ZeroLatency",
+      "Method": "Continuous",
+      "Scheduled": 48,
+      "Valid": 48,
+      "MeanFailureInclusiveQuality": 0.8467901092563106,
+      "MedianCompletedElapsedSeconds": 0.0025,
+      "P95CompletedElapsedSeconds": 0.0037112449999999997,
+      "MeanCompletedCost": 38.08,
+      "MedianCompletedAllocatedBytes": 1170108.0,
+      "MedianCompletedProcessCpuSeconds": 0.0
+    },
+    {
+      "Profile": "ZeroLatency",
+      "Method": "PipelineSerial",
+      "Scheduled": 48,
+      "Valid": 48,
+      "MeanFailureInclusiveQuality": 0.8464949065454278,
+      "MedianCompletedElapsedSeconds": 0.0038283500000000003,
+      "P95CompletedElapsedSeconds": 0.00644142,
+      "MeanCompletedCost": 38.08,
+      "MedianCompletedAllocatedBytes": 2522060.0,
+      "MedianCompletedProcessCpuSeconds": 0.0
+    },
+    {
+      "Profile": "ZeroLatency",
+      "Method": "PipelineConcurrent",
+      "Scheduled": 48,
+      "Valid": 48,
+      "MeanFailureInclusiveQuality": 0.8464949065454278,
+      "MedianCompletedElapsedSeconds": 0.00353715,
+      "P95CompletedElapsedSeconds": 0.005740169999999999,
+      "MeanCompletedCost": 38.08,
+      "MedianCompletedAllocatedBytes": 2521560.0,
+      "MedianCompletedProcessCpuSeconds": 0.0
+    },
+    {
+      "Profile": "ProposalBound",
+      "Method": "Batch",
+      "Scheduled": 48,
+      "Valid": 48,
+      "MeanFailureInclusiveQuality": 0.8464949065454278,
+      "MedianCompletedElapsedSeconds": 0.4921676,
+      "P95CompletedElapsedSeconds": 0.50955277,
+      "MeanCompletedCost": 38.08,
+      "MedianCompletedAllocatedBytes": 1173052.0,
+      "MedianCompletedProcessCpuSeconds": 0.0
+    },
+    {
+      "Profile": "ProposalBound",
+      "Method": "Continuous",
+      "Scheduled": 48,
+      "Valid": 48,
+      "MeanFailureInclusiveQuality": 0.8467901092563106,
+      "MedianCompletedElapsedSeconds": 0.40032345,
+      "P95CompletedElapsedSeconds": 0.40247457,
+      "MeanCompletedCost": 38.08,
+      "MedianCompletedAllocatedBytes": 1220952.0,
+      "MedianCompletedProcessCpuSeconds": 0.0
+    },
+    {
+      "Profile": "ProposalBound",
+      "Method": "PipelineSerial",
+      "Scheduled": 48,
+      "Valid": 48,
+      "MeanFailureInclusiveQuality": 0.8464949065454278,
+      "MedianCompletedElapsedSeconds": 0.44693055,
+      "P95CompletedElapsedSeconds": 0.45883655,
+      "MeanCompletedCost": 38.08,
+      "MedianCompletedAllocatedBytes": 2508964.0,
+      "MedianCompletedProcessCpuSeconds": 0.0
+    },
+    {
+      "Profile": "ProposalBound",
+      "Method": "PipelineConcurrent",
+      "Scheduled": 48,
+      "Valid": 48,
+      "MeanFailureInclusiveQuality": 0.8464949065454278,
+      "MedianCompletedElapsedSeconds": 0.16652735000000002,
+      "P95CompletedElapsedSeconds": 0.17790069499999997,
+      "MeanCompletedCost": 38.08,
+      "MedianCompletedAllocatedBytes": 2506824.0,
+      "MedianCompletedProcessCpuSeconds": 0.0
+    },
+    {
+      "Profile": "Mixed",
+      "Method": "Batch",
+      "Scheduled": 48,
+      "Valid": 48,
+      "MeanFailureInclusiveQuality": 0.8464949065454278,
+      "MedianCompletedElapsedSeconds": 0.49239245,
+      "P95CompletedElapsedSeconds": 0.51187371,
+      "MeanCompletedCost": 38.08,
+      "MedianCompletedAllocatedBytes": 1171020.0,
+      "MedianCompletedProcessCpuSeconds": 0.0
+    },
+    {
+      "Profile": "Mixed",
+      "Method": "Continuous",
+      "Scheduled": 48,
+      "Valid": 48,
+      "MeanFailureInclusiveQuality": 0.8467901092563106,
+      "MedianCompletedElapsedSeconds": 0.40071345,
+      "P95CompletedElapsedSeconds": 0.402324625,
+      "MeanCompletedCost": 38.08,
+      "MedianCompletedAllocatedBytes": 1216800.0,
+      "MedianCompletedProcessCpuSeconds": 0.0
+    },
+    {
+      "Profile": "Mixed",
+      "Method": "PipelineSerial",
+      "Scheduled": 48,
+      "Valid": 48,
+      "MeanFailureInclusiveQuality": 0.8464949065454278,
+      "MedianCompletedElapsedSeconds": 0.44748805,
+      "P95CompletedElapsedSeconds": 0.456603515,
+      "MeanCompletedCost": 38.08,
+      "MedianCompletedAllocatedBytes": 2502948.0,
+      "MedianCompletedProcessCpuSeconds": 0.0
+    },
+    {
+      "Profile": "Mixed",
+      "Method": "PipelineConcurrent",
+      "Scheduled": 48,
+      "Valid": 48,
+      "MeanFailureInclusiveQuality": 0.8464949065454278,
+      "MedianCompletedElapsedSeconds": 0.16700575,
+      "P95CompletedElapsedSeconds": 0.17673753,
+      "MeanCompletedCost": 38.08,
+      "MedianCompletedAllocatedBytes": 2500752.0,
+      "MedianCompletedProcessCpuSeconds": 0.0
+    }
+  ],
+  "Comparisons": [
+    {
+      "Profile": "ZeroLatency",
+      "Primary": "PipelineConcurrent",
+      "Comparator": "Batch",
+      "SeedClusters": 8,
+      "MeanPairedQualityDifference": 0.0,
+      "QualityInterval": [
+        0.0,
+        0.0
+      ],
+      "MeanPairedCostDifference": 0.0,
+      "GeometricElapsedSpeedRatio": 0.46822837168745457,
+      "SpeedRatioInterval": [
+        0.38200131319925595,
+        0.5728270199000214
+      ],
+      "WorstPairedSeedQualityDifference": 0.0,
+      "TimingEligible": true
+    },
+    {
+      "Profile": "ZeroLatency",
+      "Primary": "PipelineConcurrent",
+      "Comparator": "Continuous",
+      "SeedClusters": 8,
+      "MeanPairedQualityDifference": -0.00029520271088294414,
+      "QualityInterval": [
+        -0.025422562427758942,
+        0.05015016728858491
+      ],
+      "MeanPairedCostDifference": 0.0,
+      "GeometricElapsedSpeedRatio": 0.49689831389081,
+      "SpeedRatioInterval": [
+        0.3966981890194121,
+        0.5948806875338264
+      ],
+      "WorstPairedSeedQualityDifference": -0.03716385531962729,
+      "TimingEligible": true
+    },
+    {
+      "Profile": "ZeroLatency",
+      "Primary": "PipelineConcurrent",
+      "Comparator": "PipelineSerial",
+      "SeedClusters": 8,
+      "MeanPairedQualityDifference": 0.0,
+      "QualityInterval": [
+        0.0,
+        0.0
+      ],
+      "MeanPairedCostDifference": 0.0,
+      "GeometricElapsedSpeedRatio": 1.0158151849981027,
+      "SpeedRatioInterval": [
+        0.868145926277117,
+        1.2197921444242519
+      ],
+      "WorstPairedSeedQualityDifference": 0.0,
+      "TimingEligible": true
+    },
+    {
+      "Profile": "ProposalBound",
+      "Primary": "PipelineConcurrent",
+      "Comparator": "Batch",
+      "SeedClusters": 8,
+      "MeanPairedQualityDifference": 0.0,
+      "QualityInterval": [
+        0.0,
+        0.0
+      ],
+      "MeanPairedCostDifference": 0.0,
+      "GeometricElapsedSpeedRatio": 2.947319627766647,
+      "SpeedRatioInterval": [
+        2.897502267140165,
+        2.9845561221287866
+      ],
+      "WorstPairedSeedQualityDifference": 0.0,
+      "TimingEligible": true
+    },
+    {
+      "Profile": "ProposalBound",
+      "Primary": "PipelineConcurrent",
+      "Comparator": "Continuous",
+      "SeedClusters": 8,
+      "MeanPairedQualityDifference": -0.00029520271088294414,
+      "QualityInterval": [
+        -0.025422562427758942,
+        0.05015016728858491
+      ],
+      "MeanPairedCostDifference": 0.0,
+      "GeometricElapsedSpeedRatio": 2.3833745010624847,
+      "SpeedRatioInterval": [
+        2.341364109033061,
+        2.411494432848623
+      ],
+      "WorstPairedSeedQualityDifference": -0.03716385531962729,
+      "TimingEligible": true
+    },
+    {
+      "Profile": "ProposalBound",
+      "Primary": "PipelineConcurrent",
+      "Comparator": "PipelineSerial",
+      "SeedClusters": 8,
+      "MeanPairedQualityDifference": 0.0,
+      "QualityInterval": [
+        0.0,
+        0.0
+      ],
+      "MeanPairedCostDifference": 0.0,
+      "GeometricElapsedSpeedRatio": 2.6648096827002195,
+      "SpeedRatioInterval": [
+        2.611602296826191,
+        2.6961543279864664
+      ],
+      "WorstPairedSeedQualityDifference": 0.0,
+      "TimingEligible": true
+    },
+    {
+      "Profile": "Mixed",
+      "Primary": "PipelineConcurrent",
+      "Comparator": "Batch",
+      "SeedClusters": 8,
+      "MeanPairedQualityDifference": 0.0,
+      "QualityInterval": [
+        0.0,
+        0.0
+      ],
+      "MeanPairedCostDifference": 0.0,
+      "GeometricElapsedSpeedRatio": 2.9427828289190825,
+      "SpeedRatioInterval": [
+        2.915633043331317,
+        2.9824169052158394
+      ],
+      "WorstPairedSeedQualityDifference": 0.0,
+      "TimingEligible": true
+    },
+    {
+      "Profile": "Mixed",
+      "Primary": "PipelineConcurrent",
+      "Comparator": "Continuous",
+      "SeedClusters": 8,
+      "MeanPairedQualityDifference": -0.00029520271088294414,
+      "QualityInterval": [
+        -0.025422562427758942,
+        0.05015016728858491
+      ],
+      "MeanPairedCostDifference": 0.0,
+      "GeometricElapsedSpeedRatio": 2.3726966983563145,
+      "SpeedRatioInterval": [
+        2.3622845078052204,
+        2.3823391684587234
+      ],
+      "WorstPairedSeedQualityDifference": -0.03716385531962729,
+      "TimingEligible": true
+    },
+    {
+      "Profile": "Mixed",
+      "Primary": "PipelineConcurrent",
+      "Comparator": "PipelineSerial",
+      "SeedClusters": 8,
+      "MeanPairedQualityDifference": 0.0,
+      "QualityInterval": [
+        0.0,
+        0.0
+      ],
+      "MeanPairedCostDifference": 0.0,
+      "GeometricElapsedSpeedRatio": 2.6638058218691145,
+      "SpeedRatioInterval": [
+        2.639777642076248,
+        2.685508360039786
+      ],
+      "WorstPairedSeedQualityDifference": 0.0,
+      "TimingEligible": true
+    }
+  ],
+  "InputSha256": "b46ebbed7f0959393b6dca2f939d57667abd110238c28ab8086f736e75e38921",
+  "CompressedSha256": "195c9bfbd095fe7699fba4311d1d05f0eaa4195e609914bc34946fcddefe6b45"
+}

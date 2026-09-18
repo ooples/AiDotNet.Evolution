@@ -41,6 +41,9 @@ public sealed class EvolutionRunResult<TGenome>
     /// Evaluator artifacts still queued for delivery to a future proposal, keyed by canonical genome identifier, or
     /// <c>null</c> when none are queued.
     /// </param>
+    /// <param name="earlyStopping">
+    /// What the early-stopping criterion did during the run, or <c>null</c> for a result built without one.
+    /// </param>
     /// <exception cref="ArgumentNullException">
     /// <paramref name="islands"/>, <paramref name="counters"/>, or <paramref name="stateHash"/> is <c>null</c>.
     /// </exception>
@@ -53,8 +56,11 @@ public sealed class EvolutionRunResult<TGenome>
         IReadOnlyList<EvolutionEliteRecord<TGenome>>? globalElites = null,
         IReadOnlyList<EvolutionIslandStatus>? islandStatuses = null,
         IReadOnlyList<EvolutionDiagnostic>? retainedFailures = null,
-        IReadOnlyDictionary<string, IReadOnlyList<EvolutionArtifact>>? pendingArtifacts = null)
+        IReadOnlyDictionary<string, IReadOnlyList<EvolutionArtifact>>? pendingArtifacts = null,
+        EvolutionEarlyStoppingReport? earlyStopping = null)
     {
+        EarlyStopping = earlyStopping ?? new EvolutionEarlyStoppingReport(false,
+            EvolutionEarlyStoppingMetric.BestQuality, null, 0, 0, 0, 0);
         if (!Enum.IsDefined(typeof(EvolutionStopReason), stopReason))
             throw new ArgumentOutOfRangeException(nameof(stopReason));
         StopReason = stopReason;
@@ -71,6 +77,20 @@ public sealed class EvolutionRunResult<TGenome>
             islandCopies[index] = new EvolutionArchiveSnapshot<TGenome>(archive);
         }
         Islands = Array.AsReadOnly(islandCopies);
+        var frontDefinitions = islandCopies.Select(archive => (archive as IEvolutionParetoArchiveView<TGenome>)?.ParetoDefinition).ToArray();
+        if (frontDefinitions.Any(definition => definition is not null))
+        {
+            var definition = frontDefinitions.First(item => item is not null)!;
+            if (frontDefinitions.Any(item => item is null || item.DefinitionHash != definition.DefinitionHash))
+                throw new ArgumentException("Pareto results require the same front definition on every island.", nameof(islands));
+            ParetoFront = new EvolutionParetoFront<TGenome>(definition, islandCopies.SelectMany(archive => archive.Entries));
+            if (definition.InfeasibleCapacity > 0)
+            {
+                var exploration = islandCopies.SelectMany((archive, island) =>
+                    ((IEvolutionParetoArchiveView<TGenome>)archive).InfeasibleEntries!.Select(entry => new EvolutionInfeasibleEntry<TGenome>(island, entry)));
+                InfeasibleExploration = Array.AsReadOnly(EvolutionCollection.CopyBounded(exploration.Take(4097).ToArray(), 4096, nameof(islands)));
+            }
+        }
         Counters = counters ?? throw new ArgumentNullException(nameof(counters));
         Guard.NotNullOrWhiteSpace(stateHash);
         StateHash = stateHash.Trim();
@@ -142,6 +162,27 @@ public sealed class EvolutionRunResult<TGenome>
     /// <summary>Gets a deterministic hash that excludes wall-clock timing and observer behavior.</summary>
     public string StateHash { get; }
 
+    /// <summary>Gets what the early-stopping criterion did during this run.</summary>
+    /// <remarks>
+    /// Each committed batch takes one reading, which improved, did not improve, or could not be measured. Only a
+    /// measured non-improvement charges patience, so
+    /// <see cref="EvolutionEarlyStoppingReport.UnmeasurableReadings"/> and
+    /// <see cref="EvolutionEarlyStoppingReport.UnmeasurableReasons"/> are how a caller sees that the criterion was
+    /// skipped and why. A run whose criterion was never measurable at all throws instead of returning a result, so a
+    /// report reached through this property was either disabled or measured at least once. The report covers this
+    /// run's readings only and is deliberately excluded from <see cref="StateHash"/>.
+    /// </remarks>
+    public EvolutionEarlyStoppingReport EarlyStopping { get; }
+
+    /// <summary>Gets the nondominated union of retained island fronts, or null for scalar runs.</summary>
+    /// <remarks>Best is this front's explicit representative; it does not replace this set of deployment choices.</remarks>
+    [System.Text.Json.Serialization.JsonIgnore(Condition = System.Text.Json.Serialization.JsonIgnoreCondition.WhenWritingNull)]
+    public EvolutionParetoFront<TGenome>? ParetoFront { get; }
+
+    /// <summary>Gets separately retained non-deployable exploration candidates, or null when disabled.</summary>
+    [System.Text.Json.Serialization.JsonIgnore(Condition = System.Text.Json.Serialization.JsonIgnoreCondition.WhenWritingNull)]
+    public IReadOnlyList<EvolutionInfeasibleEntry<TGenome>>? InfeasibleExploration { get; }
+
     /// <summary>Gets the cross-island global elites in best-first order; empty when the index is disabled.</summary>
     /// <remarks>
     /// Populated when <c>EvolutionEngineOptions.GlobalEliteCount</c> is positive. Unlike <see cref="Best"/>, which
@@ -174,7 +215,7 @@ public sealed class EvolutionRunResult<TGenome>
     /// Returns <c>null</c> when every island is empty. The comparison direction is read from the first island; the
     /// engine requires every island to share one archive definition, so all islands agree on it.
     /// </remarks>
-    public EvolutionArchiveEntry<TGenome>? Best => Islands.Select(archive => archive.Best)
+    public EvolutionArchiveEntry<TGenome>? Best => ParetoFront is not null ? ParetoFront.Representative : Islands.Select(archive => archive.Best)
         .OfType<EvolutionArchiveEntry<TGenome>>()
         .OrderBy(entry => entry.Evaluation.Quality,
             Islands.Count == 0 || Islands[0].Direction == EvolutionOptimizationDirection.Maximize

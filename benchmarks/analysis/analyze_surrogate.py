@@ -39,10 +39,10 @@ def analyze(report):
         completed = (row.get("Status") == "completed" and resources.get("Unknown") == 0
                      and resources.get("Reserved") == {"cost_units": 0} and resources.get("DroppedReceipts") == 0
                      and integer(resources.get("Admitted"), 1, 4096) and resources.get("Settled") == resources["Admitted"]
-                     and resources.get("MaximumViolated") is False and finite(spent) and spent <= row["CostCap"]
-                     and finite(row.get("FinalLoss")) and row["FinalLoss"] <= 8
+                     and resources.get("MaximumViolated") is False and finite(spent) and 0 <= spent <= row["CostCap"]
+                     and finite(row.get("FinalLoss")) and 0 <= row["FinalLoss"] <= 8
                      and integer(row.get("EvaluatorCalls"), 8, 512) and row.get("MeasurementCount") == row["EvaluatorCalls"]
-                     and isinstance(stages, dict) and all(finite(value) for value in stages.values())
+                     and isinstance(stages, dict) and all(finite(value) and value >= 0 for value in stages.values())
                      and abs(sum(stages.values()) - spent) <= 1e-8
                      and abs(stages.get("Evaluation", -1) - row["EvaluatorCalls"] * row["EvaluationUnitCost"]) <= 1e-8)
         indexed[key] = (row, row["FinalLoss"] if completed else 8.0)

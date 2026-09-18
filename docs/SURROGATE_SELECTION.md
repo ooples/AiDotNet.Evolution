@@ -1,5 +1,11 @@
 # Optional, measured-only surrogate selection
 
+Current-stack delivery and acceptance: [US-14](evolution-stories/US-14.md).
+The [current paired cost study](../benchmarks/evidence/surrogates/7ce6f9a/README.md)
+does not establish an optimization advantage; the backend remains opt-in.
+The numeric backend now uses `validated-knn-v2-pinned-support`: exact quality
+endpoints avoid cancellation when the declared support spans different magnitudes.
+
 `EvolutionSurrogateSelector<TGenome>` generates and charges a bounded proposal pool, optionally fits/scores it,
 and returns a candidate for **true evaluation**. Predictions use a separate type and never authorize archive
 insertion, correctness acceptance or deployment. This opt-in contract has no model-library dependency.

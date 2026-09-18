@@ -57,6 +57,27 @@ public sealed class NumericSurrogateTests
     }
 
     [Theory]
+    [InlineData(-1e100, 1)]
+    [InlineData(-1e300, 1e-100)]
+    [InlineData(-1, 1e-100)]
+    public async Task ConstantQualityAtSupportBoundsRemainsExactDespiteCancellation(double minimum, double maximum)
+    {
+        Assert.NotEqual(maximum, minimum + (maximum - minimum));
+        var space = Space();
+        var trainer = new ValidatedNearestNeighborTrainer(space, new NumericSurrogateOptions(minimum, maximum));
+        foreach (double bound in new[] { minimum, maximum })
+        {
+            var records = Enumerable.Range(0, 32).Select(i => Observation(space, i, i / 31d, quality: bound)).ToArray();
+            var model = Assert.IsType<ValidatedNearestNeighborModel>((await trainer.FitAsync(records)).Value);
+            Assert.True(model.IsReliable);
+            Assert.Equal(0, model.Validation.ResidualRadius);
+            var predictions = await model.PredictAsync(new[] { Genome(space, 0.5) });
+            Assert.Equal(bound, predictions.Value[0].Mean);
+            Assert.InRange(predictions.Value[0].Mean, minimum, maximum);
+        }
+    }
+
+    [Theory]
     [InlineData(2)]
     [InlineData(17)]
     public async Task TooFewDistinctGenomesRemainExplicitlyUnreliable(int distinct)
