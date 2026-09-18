@@ -1,0 +1,47 @@
+# Real program pilot analysis
+
+Claim: none. One independent search run per task/method; confidence intervals and sample-size planning withheld.
+
+| Task | Mode / method | Status | Before ms | Deployed ms | Tokens |
+| --- | --- | --- | ---: | ---: | ---: |
+| count_connected_components | controlled / aidotnet | validated | 379.859 | 227.670 | 39974 |
+| count_connected_components | controlled / openevolve | validated | 390.412 | 215.476 | 40512 |
+| count_connected_components | controlled / one-shot | validated | 394.356 | 211.354 | 10144 |
+| count_connected_components | controlled / single-parent | validated | 433.423 | 223.144 | 39508 |
+| count_connected_components | native-bounded / aidotnet | validated | 429.719 | 265.701 | 41366 |
+| count_connected_components | native-bounded / openevolve | validated | 383.321 | 189.125 | 44027 |
+| sha256_hashing | controlled / aidotnet | validated | 271.481 | 220.745 | 36527 |
+| sha256_hashing | controlled / openevolve | validated | 237.085 | 234.903 | 39473 |
+| sha256_hashing | controlled / one-shot | validated | 236.934 | 214.857 | 9923 |
+| sha256_hashing | controlled / single-parent | validated | 232.780 | 241.157 | 36555 |
+| sha256_hashing | native-bounded / aidotnet | validated | 250.688 | 207.811 | 39928 |
+| sha256_hashing | native-bounded / openevolve | validated | 245.872 | 218.206 | 44404 |
+| base64_encoding | controlled / aidotnet | validated | 313.289 | 224.308 | 36675 |
+| base64_encoding | controlled / openevolve | validated | 319.952 | 227.414 | 39712 |
+| base64_encoding | controlled / one-shot | validated | 309.491 | 226.628 | 9919 |
+| base64_encoding | controlled / single-parent | validated | 303.075 | 203.310 | 36686 |
+| base64_encoding | native-bounded / aidotnet | validated | 313.386 | 221.144 | 39956 |
+| base64_encoding | native-bounded / openevolve | validated | 337.752 | 221.931 | 44902 |
+
+## Descriptive comparisons, not demonstrated superiority
+
+Ratio is comparator runtime / Evolution runtime, geometrically averaged with equal task weights. Above 1 favors Evolution; actual costs differ.
+
+| Mode | Comparator | Runtime ratio | Inference |
+| --- | --- | ---: | --- |
+| controlled | openevolve | 1.006981 | insufficient-independent-search-runs |
+| controlled | one-shot | 0.970087 | insufficient-independent-search-runs |
+| controlled | single-parent | 0.990074 | insufficient-independent-search-runs |
+| native-bounded | openevolve | 0.908585 | insufficient-independent-search-runs |
+
+Known model-token subtotal: 630191; unknown-cost rows: 0.
+Known search-evaluator seconds: 274.726; unknown-work rows: 0.
+Progress curves are unavailable from these summary inputs; no missing trajectory is reconstructed.
+
+- Fresh-process batch latency includes startup/imports/serialization, not kernel latency.
+- Timing repeats and different tasks cannot replace independent paired search runs.
+- Ratios compare selected/deployed runtimes directly, not ratios with different noisy baseline denominators.
+- Known cost subtotals are not complete totals when any cost is unknown; equal caps do not imply equal cost.
+- Independent counters take precedence over retained trace summaries, even when outcomes are missing; legacy summary-only costs do not establish accounting completeness.
+- No numeric-protocol conversion, final registration, power guarantee or exact provider snapshot is invented.
+- Hash consistency is not authentication; source evidence and externally retained hashes require trusted custody.

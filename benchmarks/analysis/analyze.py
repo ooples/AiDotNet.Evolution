@@ -37,10 +37,12 @@ def validate_plan(plan):
     fields = {"SchemaVersion", "Purpose", "SourceRevision", "Protocol", "Tasks", "Methods", "SeedCount",
               "Budget", "PrimaryMethod", "Comparators", "BootstrapSamples", "BootstrapSeed", "ResampleTasks", "ConfidenceLevel"}
     require(isinstance(plan, dict) and set(plan) == fields, "Missing or unknown plan field.")
-    require(integer(plan["SchemaVersion"], 1, 1) and plan["Purpose"] == "retrospective-development", "Only retrospective development analysis is supported.")
+    require(integer(plan["SchemaVersion"], 1, 2) and plan["Purpose"] == "retrospective-development", "Only retrospective development analysis is supported.")
     require(isinstance(plan["SourceRevision"], str) and re.fullmatch(r"[0-9a-f]{40}", plan["SourceRevision"]), "Pin the complete source revision.")
     require(plan["Protocol"] in ("numeric-development-v3-diagonal-cma", "numeric-development-v4-external"), "Unsupported experiment protocol.")
-    require(isinstance(plan["Tasks"], list) and all(isinstance(t, dict) and set(t) == {"Name", "Scale"} for t in plan["Tasks"]), "Invalid tasks.")
+    task_fields = {"Name", "Scale"} if plan["SchemaVersion"] == 1 else {"Name", "Scale", "TargetLoss"}
+    require(isinstance(plan["Tasks"], list) and all(isinstance(t, dict) and set(t) == task_fields for t in plan["Tasks"]), "Invalid tasks.")
+    require(plan["SchemaVersion"] == 1 or all(finite(t["TargetLoss"]) for t in plan["Tasks"]), "Invalid declared target loss.")
     require(names([t["Name"] for t in plan["Tasks"]], 256) and all(finite(t["Scale"]) and 1e-12 <= t["Scale"] <= 1e12 for t in plan["Tasks"]), "Invalid task names or scales.")
     require(names(plan["Methods"], 16) and names(plan["Comparators"], 15), "Invalid methods/comparators.")
     require(plan["PrimaryMethod"] in plan["Methods"] and set(plan["Comparators"]).issubset(plan["Methods"])
@@ -74,7 +76,8 @@ def interval(groups, samples, seed, alpha, resample_tasks):
 
 def trajectory(run, budget):
     samples = run.get("Samples")
-    complete = isinstance(samples, list) and len(samples) == run.get("Proposals")
+    complete = (isinstance(samples, list) and len(samples) == run.get("Proposals")
+                and run.get("DroppedTraceRecords", 0) == 0)
     if not complete:
         return False, []
     points, cost, attempts, previous, previous_id = [], 0, 0, math.inf, -1
@@ -188,7 +191,8 @@ def analyze(campaign, plan):
                                   MedianLossCompletedOnly=statistics.median(completed) if completed else None,
                                   IncompleteTrajectories=sum(not r["TrajectoryComplete"] for r in group),
                                   RecordedEvaluatorCalls=sum(r["EvaluatorCalls"] or 0 for r in group),
-                                  UnknownWorkRuns=sum(r["EvaluatorCalls"] is None for r in group)))
+                                  UnknownWorkRuns=sum(r["EvaluatorCalls"] is None or r["Resources"].get("Unknown", 0) > 0
+                                                      or any(r["Resources"].get("Reserved", {}).values()) for r in group)))
             for at in sorted({8, max(8, plan["Budget"] // 4), max(8, plan["Budget"] // 2), plan["Budget"]}):
                 known = []
                 for row in group:
@@ -205,12 +209,15 @@ def analyze(campaign, plan):
                    for seed in range(plan["SeedCount"])] for task in tasks]
         comparisons.append(dict(Primary=plan["PrimaryMethod"], Comparator=comparator,
                                 MeanPairedUtilityDifference=statistics.fmean(map(statistics.fmean, groups)),
+                                WinTieLoss=dict(Wins=sum(d > 0 for g in groups for d in g),
+                                                Ties=sum(d == 0 for g in groups for d in g),
+                                                Losses=sum(d < 0 for g in groups for d in g)),
                                 Interval=interval(groups, plan["BootstrapSamples"], plan["BootstrapSeed"] + index,
                                                   alpha / len(plan["Comparators"]), plan["ResampleTasks"]),
                                 Tasks=[dict(Task=task, MeanPairedUtilityDifference=statistics.fmean(group),
                                             ExploratoryInterval=interval([group], plan["BootstrapSamples"], plan["BootstrapSeed"] + index,
                                                                          alpha, False)) for task, group in zip(tasks, groups)]))
-    return dict(SchemaVersion=1, Purpose=plan["Purpose"], ConfirmatoryEligible=False, SourceRevision=plan["SourceRevision"],
+    report = dict(SchemaVersion=1, Purpose=plan["Purpose"], ConfirmatoryEligible=False, SourceRevision=plan["SourceRevision"],
                 Endpoint="mean task-balanced paired difference in scale/(scale+final loss); failures have utility 0",
                 ConfidenceLevel=plan["ConfidenceLevel"], ResampleTasks=plan["ResampleTasks"], BootstrapSamples=plan["BootstrapSamples"],
                 IntervalMethod="paired percentile bootstrap; nominal Bonferroni tails across aggregate comparisons",
@@ -222,13 +229,17 @@ def analyze(campaign, plan):
                          "Task resampling does not make a purposively selected suite representative."],
                 Summaries=summaries, Comparisons=comparisons, Progress=progress,
                 Runs=[dict({k: v for k, v in row.items() if k != "Curve"}, TrajectoryPoints=len(row["Curve"])) for row in rows])
+    from presentation import scorecard
+    report["Scorecard"] = scorecard(rows, plan)
+    return report
 
 
 def markdown(report):
     def number(value):
         return "unknown" if value is None else format(value, ".6g")
     lines = ["# Numeric development analysis", "", "Source: `" + report["SourceRevision"] + "`.", "",
-             "Retrospective only. No confirmatory or competitive-win claim.", "",
+             ("Prospectively fixed development schedule. No held-out or competitive-win claim." if "FixedDesign" in report
+              else "Retrospective only. No confirmatory or competitive-win claim."), "",
              "Endpoint: " + report["Endpoint"] + ".", "",
              f"Intervals use {report['BootstrapSamples']} paired bootstrap replicates, with {report['ConfidenceLevel']:.0%} nominal family-wise confidence after adjusting aggregate comparisons.",
              "Tasks are " + ("resampled as clusters." if report["ResampleTasks"] else "fixed; intervals describe seed variability on this suite only."), "",
@@ -248,6 +259,8 @@ def markdown(report):
     if not failed:
         lines.append("None.")
     lines += ["", "## Interpretation limits", ""] + ["- " + caveat for caveat in report["Caveats"]]
+    from presentation import markdown_details
+    lines += markdown_details(report)
     lines += ["", "Task-level exploratory intervals, budget-indexed progress, independent resource counters and every run are in `report.json`.",
               "Full unaggregated trajectories remain in the original input, identified by its SHA-256 in the report.", ""]
     return "\n".join(lines)
@@ -280,6 +293,8 @@ def main():
     args.output_dir.mkdir(parents=False, exist_ok=False)
     (args.output_dir / "report.json").write_text(json.dumps(report, indent=2, allow_nan=False) + "\n", encoding="utf-8")
     (args.output_dir / "report.md").write_text(markdown(report), encoding="utf-8")
+    from presentation import html_report
+    (args.output_dir / "report.html").write_text(html_report(report), encoding="utf-8")
     (args.output_dir / "analysis-plan.json").write_text(json.dumps(plan, indent=2, allow_nan=False) + "\n", encoding="utf-8")
     print(f"Analyzed {len(report['Runs'])} scheduled runs; confirmatory eligible: false.")
 

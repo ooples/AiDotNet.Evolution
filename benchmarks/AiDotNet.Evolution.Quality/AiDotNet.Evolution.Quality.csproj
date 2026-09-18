@@ -8,6 +8,7 @@
     <IsPackable>false</IsPackable>
   </PropertyGroup>
   <ItemGroup>
+    <InternalsVisibleTo Include="AiDotNet.Evolution.Tests" />
     <ProjectReference Include="../../src/AiDotNet.Evolution/AiDotNet.Evolution.csproj" />
   </ItemGroup>
 </Project>

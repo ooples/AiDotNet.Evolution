@@ -2,7 +2,8 @@ using BenchmarkDotNet.Attributes;
 
 namespace AiDotNet.Evolution.Performance;
 
-/// <summary>Whole-run orchestration cost compared with an evaluator-only lower bound.</summary>
+/// <summary>Whole-run orchestration cost. Its lower-bound control lives in <see cref="EvaluatorBaselineBenchmarks"/>,
+/// which declares only the factors an evaluator-only loop actually applies.</summary>
 [MemoryDiagnoser]
 public class EngineBenchmarks
 {
@@ -12,8 +13,8 @@ public class EngineBenchmarks
     private EvolutionSearchTask _task = null!;
     private EvolutionDescriptorDefinition[] _descriptors = null!;
 
-    [Params(1, 4)] public int Workers { get; set; }
-    [Params(EvolutionDispatchMode.Batch, EvolutionDispatchMode.Continuous)] public EvolutionDispatchMode Dispatch { get; set; }
+    [Params(1, 4)] public int Workers { get; set; } = 1;
+    [Params(EvolutionDispatchMode.Batch, EvolutionDispatchMode.Continuous)] public EvolutionDispatchMode Dispatch { get; set; } = EvolutionDispatchMode.Batch;
     [Params(0, 1)] public int EvaluatorDelayMilliseconds { get; set; }
     [Params(false, true)] public bool Checkpoint { get; set; }
     [Params(2, 8)] public int Dimensions { get; set; } = 8;
@@ -29,24 +30,7 @@ public class EngineBenchmarks
         _inputs = Enumerable.Range(0, Budget).Select(i => _space.Sample(StableRandom.CreateStream(42, (ulong)i))).ToArray();
         _descriptors = new[] { new EvolutionDescriptorDefinition("x", -5, 5, ArchiveCells) };
         _task = new EvolutionSearchTask(_space, "overhead", "v1", "delay-" + EvaluatorDelayMilliseconds,
-            (genome, _, token) => Evaluate(genome, token));
-    }
-
-    private async ValueTask<EvolutionTaskResult> Evaluate(EvolutionSearchGenome genome, CancellationToken token)
-    {
-        if (EvaluatorDelayMilliseconds > 0) await Task.Delay(EvaluatorDelayMilliseconds, token).ConfigureAwait(false);
-        double loss = genome.Values.Values.Sum(value => value.Number * value.Number);
-        return EvolutionTaskResult.Completed(-loss, new Dictionary<string, double> { ["x"] = genome.Number("x0") }, costUnits: 1);
-    }
-
-    [Benchmark(Baseline = true, OperationsPerInvoke = Budget)]
-    public async Task EvaluationOnly()
-    {
-        await Parallel.ForEachAsync(_inputs, new ParallelOptions { MaxDegreeOfParallelism = Workers }, async (genome, token) =>
-        {
-            EvolutionTaskResult result = await Evaluate(genome, token);
-            if (result.Status != EvolutionEvaluationStatus.Completed) throw new InvalidOperationException("Evaluator baseline failed.");
-        });
+            (genome, _, token) => EvaluatorBaselineBenchmarks.EvaluateAsync(genome, EvaluatorDelayMilliseconds, token));
     }
 
     [Benchmark(OperationsPerInvoke = Budget)]

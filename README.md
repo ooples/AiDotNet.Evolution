@@ -6,7 +6,15 @@ The package does not depend on AiDotNet or AiDotNet.Tensors. Domain integrations
 
 The initial package version is `0.1.0-preview.1` and targets .NET 10, .NET 8, and .NET Framework 4.7.1.
 
+Optional [cost-aware operator portfolios](docs/OPERATOR_PORTFOLIOS.md) share admission
+budgets across mutation, refinement and consumer-provided model strategies, with
+typed outcome credit and checkpointed learning. The
+[registered local comparison](benchmarks/analysis/PORTFOLIOS.md) requires evidence
+against both a strong static strategy and a uniform mixture before default promotion.
+
 ## Core contracts
+
+Optional [Pareto search](docs/PARETO_SEARCH.md) retains feasible objective tradeoffs with separate non-deployable exploration, explicit representatives, front-aware policies and validated checkpoints. [US-09 evidence](benchmarks/evidence/pareto/us09-current-stack/README.md) includes equal-budget scalar comparisons and losing cases.
 
 - `IEvolutionTask<TGenome>` owns canonical identity, validation, and evaluation.
 - `IVariationOperator<TGenome>` proposes immutable typed genomes; stateful operators can additionally implement
@@ -35,15 +43,38 @@ cost through cache copies, migration, checkpoints and traces; fresh replication 
 [Persistent evaluation reuse](docs/PERSISTENT_EVALUATION_REUSE.md) adds exact-key storage, explicit freshness and
 force-fresh policies, metered store calls and a runnable cold/warm/force-fresh engine example.
 
+[Noise-aware confirmation](docs/evolution-stories/US-06.md) adds finite incumbent challenges,
+audits of screen-rejected candidates, charged warmups and independent paired timing confirmation
+for the Evolution-owned program benchmark. Correctness alone does not establish a performance win.
+[Opt-in cheap screening](docs/SCREENING.md) advances candidates to full evaluation, audits a frozen
+sample of rejects and charges every stage; local screening-on/off controls expose savings and overhead.
+
+[Feature ablations](docs/evolution-stories/US-07.md) compare 19 search configurations with
+paired quality, diversity, success and cost metrics, plus independent confirmation gates for presets.
+
 ## Integration boundaries
 
 The engine intentionally knows nothing about models, prompts, compilers, or hardware. Integrations keep those domain
 objects in their owning repository and implement the typed contracts above:
 
-- AiDotNet uses it for MAP-Elites AutoML and program evolution. Facade builders, model materialization, LLM clients,
-  prompt templates, and sandboxed execution stay in AiDotNet.
-- AiDotNet.Tensors uses it for offline, startup, and background kernel search. Device benchmarks, correctness oracles,
-  launch configurations, hardware fingerprints, and deployment caches stay in AiDotNet.Tensors.
+- Evolution-specific program/compiler, AutoML orchestration, and kernel-search integrations belong in this repository.
+  General model, chat-client, and tensor/device primitives remain in AiDotNet and AiDotNet.Tensors.
+- Optional `AiDotNet.Evolution.Programs` and `AiDotNet.Evolution.CSharp` projects target .NET 8 and .NET 10.
+  They provide standalone program contracts, metered portfolios, correctness-gated fitness reuse and compiler-guided
+  improvement without an AiDotNet dependency. See the [migration contract](docs/migration/PROGRAM_RUNTIME_MIGRATION.md).
+  Programs also provides caller-owned model-driven variation, bounded prompts and proposal provenance;
+  see the [standalone comparison host](benchmarks/ProgramEvolutionComparison/README.md).
+- Standalone process execution and input/output fitness are available in `AiDotNet.Evolution.Programs`;
+  see [execution runtime usage and boundaries](docs/migration/EXECUTION_RUNTIME_MIGRATION.md).
+- Script evaluators retain numeric metrics and support explicit scoring policies;
+  see [standalone script evaluation](docs/migration/SCRIPT_METRICS_MIGRATION.md).
+  [Standalone model judging](docs/migration/JUDGE_RUNTIME_MIGRATION.md) supports bounded
+  feedback, weighted panels, and direction-aware scoring through caller-owned providers.
+  [Standalone novelty screening](docs/migration/NOVELTY_MIGRATION.md) adds cheap structural
+  checks, optional embedding/model decisions, and a cost-aware pre-evaluation gate.
+  Other old consumer integrations are still being ported; the [PR audit](docs/migration/AIDOTNET_PR_CLEANUP.md)
+  records what remains. Old AiModelBuilder evolution APIs will be removed in a separate breaking-removal PR,
+  without obsolete forwarding APIs.
 - Compiler schedule search, fusion-policy search, quantization-policy search, optimizer selection, feature selection,
   architecture search, and prompt/program search can share the engine without sharing domain-specific genomes.
 

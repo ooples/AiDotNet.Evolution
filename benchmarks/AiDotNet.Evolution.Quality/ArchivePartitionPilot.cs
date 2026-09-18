@@ -168,7 +168,8 @@ internal static class ArchivePartitionPilot
             if (evaluation.Status == EvolutionEvaluationStatus.Completed && evaluation.Quality.HasValue)
                 _best = !_best.HasValue ? -evaluation.Quality.Value : Math.Min(_best.Value, -evaluation.Quality.Value);
             Samples.Add(new SampleRecord(evaluation.EvaluationId, evaluation.Status, _best, evaluation.Cost.AttemptCount,
-                evaluation.Cost.CostUnits, evaluation.Diagnostics.Select(d => d.Code).ToArray()));
+                evaluation.Cost.CostUnits, evaluation.Diagnostics.Select(d => d.Code).ToArray(), evaluation.Quality,
+                evaluation.ConstraintViolations, evaluation.Descriptors, evaluation.GenomeId));
             return default;
         }
     }
