@@ -17,11 +17,16 @@ SCHEMA = "warm-budget-v1"
 RESOURCES = {"model_calls", "search_containers", "confirmation_containers"}
 
 
-def requirements(grid, iterations, samples):
+def requirements(grid, iterations, samples, confirmation_pairs=None, screening=None):
     tracks = sum(len(row["tracks"]) for row in grid)
+    screened = bool(screening and screening["enabled"])
+    rejection_audits = (sum(min(iterations*len(row["tracks"]),screening["audit_candidates"]) for row in grid)
+                       * 2 * screening["audit_pairs"] if screened else 0)
     return dict(model_calls=call_cap(grid, iterations),
-                search_containers=tracks * (iterations + 1) * samples,
-                confirmation_containers=tracks * (2 * samples + 8))
+                search_containers=tracks * ((iterations + 1) * (samples + int(screened))
+                                            + (screening["baseline_samples"]-1 if screened else 0)),
+                confirmation_containers=tracks * (2 * (samples if confirmation_pairs is None else confirmation_pairs) + 8)
+                                        + rejection_audits)
 
 
 def integer(value):
@@ -133,7 +138,7 @@ def validate_accounting(report):
             or accounting["closed"] or any(accounting["pending"].values())):
         raise ValueError("Unreconciled campaign accounting")
     validate_limits(accounting["limits"])
-    if (accounting["limits"] != requirements(plan["grid"],plan["iterations"],plan["samples"])
+    if (accounting["limits"] != requirements(plan["grid"],plan["iterations"],plan["samples"],plan.get("noise_policy",{}).get("pairs"),plan.get("screening_policy"))
             or report["cumulative_model_calls"] != plan["cumulative_calls_before"] + report["model_calls"]
             or report["cumulative_container_attempts"] != plan["cumulative_containers_before"] + report["evaluator_attempts"]
             or report["cumulative_model_calls"] > plan["call_limit"]
@@ -150,11 +155,17 @@ def validate_accounting(report):
                        "search-setup": len(plan["grid"]), "transport-setup": len(plan["grid"]),
                        "diagnostic-setup": len(plan["grid"]), "audit-setup": 4 * len(plan["grid"]),
                        "controller": sum(len(cell["tracks"]) for cell in plan["grid"])}
+    screened = plan.get("screening_policy",{}).get("enabled",False)
+    if screened:
+        expected_stages["screen-setup"] = len(plan["grid"])
     if any(sum(r["stage"] == stage for r in rows) != count for stage, count in expected_stages.items()):
         raise ValueError("Missing setup or verification receipts")
     actual = {key: sum(r["resource"] == key for r in rows) for key in RESOURCES}
     allowed = {"model_calls": {"model"}, "search_containers": {"search"},
                "confirmation_containers": {"diagnostic", "audit"}, None: set(expected_stages) | {"validation"}}
+    if screened:
+        allowed["search_containers"].add("screen")
+        allowed["confirmation_containers"].add("rejection-audit")
     if any(r["resource"] not in allowed or r["stage"] not in allowed[r["resource"]] for r in rows):
         raise ValueError("Resource stage differs from registered protocol")
     if actual != accounting["spent"] or any(actual[k] > accounting["limits"][k] for k in RESOURCES):
@@ -163,6 +174,11 @@ def validate_accounting(report):
         raise ValueError("Independent producer counts differ")
     ids, search_ids = [], []
     for index, cell in enumerate(report["rows"]):
+        from warm_screening import audit_receipts
+        for receipt in audit_receipts(cell):
+            if len(receipt["budget_operation_ids"]) != len(receipt["sample_ids"]):
+                raise ValueError("Missing rejection audit charges")
+            ids.extend(receipt["budget_operation_ids"])
         if len(cell["pairs"]) != len(cell["tracks"]):
             raise ValueError("Missing final acceptance work")
         for pair in cell["pairs"]:

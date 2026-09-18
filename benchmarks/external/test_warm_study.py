@@ -12,6 +12,8 @@ from warm_evaluator import WarmEvaluator
 from warm_study_design import call_cap, choose_profiles, digest, grid, power_requirement
 from warm_study_report import interval, summarize
 from warm_budget import requirements, validate_accounting
+from warm_confirmation import policy as noise_policy, validate_report
+from warm_screening import policy as screening_policy, validate_screening
 
 
 def fixture(phase="selection", count=4):
@@ -29,9 +31,12 @@ def fixture(phase="selection", count=4):
     return dict(plan=plan,plan_sha256=digest(plan),phase=phase,status="completed",unknown_work=0,rows=rows)
 
 
-def budget_plan(plan):
-    limits = requirements(plan["grid"], plan["iterations"], plan["samples"])
-    return dict(plan, schema="warm-head-to-head-v3", resource_limits=limits, call_limit=limits["model_calls"],
+def budget_plan(plan, screening=False):
+    noise = noise_policy(sum(len(row["tracks"]) for row in plan["grid"]),pairs=3)
+    screen = screening_policy(screening)
+    limits = requirements(plan["grid"], plan["iterations"], plan["samples"],noise["pairs"],screen)
+    return dict(plan, schema="warm-head-to-head-v5", noise_policy=noise, screening_policy=screen,screening_seed=937,
+                screening_instance_seeds=[14],resource_limits=limits, call_limit=limits["model_calls"],
                 container_limit=limits["search_containers"] + limits["confirmation_containers"], cumulative_containers_before=0)
 
 
@@ -123,7 +128,7 @@ class WarmDesignTests(unittest.TestCase):
                 predecessor(path,"selection")
 
     def test_budget_change_requires_explicit_new_approval_before_next_partition(self):
-        prior = dict(cumulative_model_calls=412,plan={"call_limit":412,"profiles":dict(aidotnet="uniform",openevolve="default")},rows=[])
+        prior = dict(cumulative_model_calls=412,plan={"screening_policy":screening_policy(),"call_limit":412,"profiles":dict(aidotnet="uniform",openevolve="default")},rows=[])
         with patch("run_warm_study.predecessor",return_value=prior), patch("run_warm_study.power_requirement",return_value={"searches_per_task":12}):
             with self.assertRaisesRegex(ValueError,"approval reference"):
                 prepare("unused","unused","unused","unused","unused","unused",phase="final",previous="fixture",call_limit=1168)
@@ -160,7 +165,7 @@ class WarmDesignTests(unittest.TestCase):
 
     def test_changed_container_cap_needs_approval_before_partition(self):
         prior = dict(cumulative_model_calls=0,cumulative_container_attempts=0,rows=[],
-                     plan=dict(call_limit=1000,container_limit=1000,profiles=dict(aidotnet="uniform",openevolve="default")))
+                     plan=dict(screening_policy=screening_policy(),call_limit=1000,container_limit=1000,profiles=dict(aidotnet="uniform",openevolve="default")))
         with patch("run_warm_study.predecessor",return_value=prior), patch("run_warm_study.power_requirement",return_value={"searches_per_task":12}):
             with self.assertRaisesRegex(ValueError,"approval reference"):
                 prepare("unused","unused","unused","unused","unused","unused",phase="final",previous="fixture",
@@ -200,7 +205,7 @@ class WarmDesignTests(unittest.TestCase):
                     codex="fixture-no-provider",model="contract-no-provider",dll=os.environ["EVOLUTION_PROFILE_DLL"],
                     search_instance_seeds=[1,2],diagnostic_instance_seeds=[3,4],audit_instance_seeds=list(range(5,13)),
                     scale_multiplier=1,iterations=1,samples=1)
-        plan = budget_plan(plan)
+        plan = budget_plan(plan,screening=True)
         initial = "class Solver:\n def solve(self,p): return p['x']+1\n"
         def task(*args,**kwargs):
             seeds = kwargs["seeds"]
@@ -209,7 +214,7 @@ class WarmDesignTests(unittest.TestCase):
         transport = SimpleNamespace(calls=0,failed=False)
         def generate(system,messages):
             transport.calls += 1
-            return dict(text="```python\n"+initial+f"# fixture-{transport.calls}\n```",cost_units=0,
+            return dict(text="```python\nclass Solver:\n def solve(self,p): return None\n"+f"# fixture-{transport.calls}\n```",cost_units=0,
                         cost_metric="reported_input_plus_output_tokens")
         transport.generate_metered = generate
         parent = os.environ.get("EVOLUTION_SANDBOX_EVIDENCE")
@@ -227,10 +232,34 @@ class WarmDesignTests(unittest.TestCase):
         self.assertEqual(6,len(report["rows"][0]["pairs"]))
         self.assertTrue(all(p["selected"]["status"] == "valid" and all(a["status"] == "valid" for a in p["audits"])
                             for p in report["rows"][0]["pairs"]))
-        self.assertEqual(72,report["evaluator_attempts"])
+        self.assertEqual(126,report["evaluator_attempts"])
         accounting = validate_accounting(report)
-        self.assertEqual(dict(model_calls=6,search_containers=12,confirmation_containers=60), accounting["spent"])
-        self.assertEqual(72,report["cumulative_container_attempts"])
+        self.assertEqual(dict(model_calls=6,search_containers=30,confirmation_containers=96), accounting["spent"])
+        self.assertEqual(126,report["cumulative_container_attempts"])
+        validate_report(report)
+        validate_screening(report)
+        self.assertTrue(all(p["fallback"] for p in report["rows"][0]["pairs"]))
+        self.assertTrue(all(r["summary"]["rejected"] == 1
+                            for r in report["rows"][0]["screening"].values()))
+        self.assertEqual(2,sum(r["summary"]["audited"] for r in report["rows"][0]["screening"].values()))
+        owner = next(o for o,r in report["rows"][0]["screening"].items() if r["audits"])
+        for change in (lambda r:r["rows"][0]["screening"][owner]["population"].clear(),
+                       lambda r:r["rows"][0]["screening"][owner]["audits"].clear(),
+                       lambda r:r["rows"][0]["screening"][owner]["summary"].update(upper=-1),
+                       lambda r:r["rows"][0]["screening"][owner]["audits"][0].update(classification="useful"),
+                       lambda r:r["rows"][0]["screening_manifest"]["screen"].update(input_sha256="forged")):
+            damaged = copy.deepcopy(report)
+            change(damaged)
+            with self.assertRaises(ValueError):
+                validate_screening(damaged)
+        for change in (lambda r:r["rows"][0]["pairs"][0]["noise_confirmation"].update(confirmed="forged"),
+                       lambda r:r["rows"][0]["pairs"][0].update(speedup=1e9),
+                       lambda r:r["rows"][0]["pairs"][0]["noise_confirmation"]["orders"].pop(),
+                       lambda r:r["rows"][0]["pairs"][0]["selected"].update(duration_seconds=.0000001)):
+            damaged = copy.deepcopy(report)
+            change(damaged)
+            with self.assertRaises(ValueError):
+                validate_report(damaged)
         # Recompute the digest to test semantic validation, not just hash mismatch.
         for change in (lambda r:r["accounting"]["rows"].pop(),
                        lambda r:r["rows"][0]["pairs"][0]["original_audits"].pop(),

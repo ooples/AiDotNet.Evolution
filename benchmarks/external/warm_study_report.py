@@ -21,9 +21,15 @@ def interval(logs, alpha):
 def summarize(report):
     plan = report["plan"]
     accounting = None
-    if plan.get("schema") == "warm-head-to-head-v3":
+    if plan.get("schema") in ("warm-head-to-head-v3", "warm-head-to-head-v4", "warm-head-to-head-v5"):
         from warm_budget import validate_accounting
         accounting = validate_accounting(report)
+    if plan.get("schema") in ("warm-head-to-head-v4", "warm-head-to-head-v5"):
+        from warm_confirmation import validate_report
+        validate_report(report)
+    if plan.get("schema") == "warm-head-to-head-v5":
+        from warm_screening import validate_screening
+        validate_screening(report)
     if report["plan_sha256"] != digest(plan) or report["status"] != "completed" or report["unknown_work"]:
         raise ValueError("Incomplete/unreconciled study cannot produce a comparative summary")
     if len(report["rows"]) != len(plan["grid"]):
@@ -72,6 +78,8 @@ def summarize(report):
                                         latency_superiority=ci["upper"] < 1, practical_twenty_percent=ci["upper"] < .8))
     return dict(schema="warm-study-summary-v1", phase=plan["phase"], plan_sha256=report["plan_sha256"],
                 metrics=summaries, comparisons=comparisons, claim="none", accounting=accounting,
+                screening=[dict(cell=index,owner=owner,**audit["summary"])
+                           for index,cell in enumerate(report["rows"]) for owner,audit in cell.get("screening",{}).items()],
                 all_registered_latency_gates_pass=bool(comparisons) and plan["phase"] == "final" and all(c["latency_superiority"] for c in comparisons),
                 limitations=["Intervals assume approximately normal independent search-level log ratios; only the registered tasks are covered",
                              "Latency significance is NOT superiority on tokens, CPU, memory, search cost or correctness",
