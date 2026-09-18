@@ -3,6 +3,14 @@ using System.Text;
 using System.Text.Json;
 using AiDotNet.Evolution;
 
+// The reuse campaign is a separate mode of this same example so it runs the real engine and the
+// real persistent cache, not a reimplementation of either.
+if (args.Length == 4 && args[0] == "--campaign")
+{
+    await ReuseCampaign.RunAsync(int.Parse(args[1], CultureInfo.InvariantCulture), args[2], args[3]);
+    return;
+}
+
 if (args.Length != 1 || !Path.IsPathFullyQualified(args[0]))
     throw new ArgumentException("Supply one absolute, new output directory.");
 string root = Path.GetFullPath(args[0]);
