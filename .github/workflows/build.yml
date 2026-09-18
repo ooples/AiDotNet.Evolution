@@ -48,7 +48,7 @@ jobs:
           --blame-hang --blame-hang-timeout 120s --blame-crash
           --collect:"XPlat Code Coverage" --results-directory ./coverage
           --
-          DataCollectionRunSettings.DataCollectors.DataCollector.Configuration.Format=cobertura DataCollectionRunSettings.DataCollectors.DataCollector.Configuration.ExcludeByAttribute=GeneratedCodeAttribute
+          DataCollectionRunSettings.DataCollectors.DataCollector.Configuration.Format=cobertura
       - name: Test net8.0
         run: >
           dotnet test tests/AiDotNet.Evolution.Tests/AiDotNet.Evolution.Tests.csproj
