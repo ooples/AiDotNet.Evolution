@@ -154,6 +154,12 @@ public sealed class EvolutionResourceLedger
                     pair.Value.Admitted, pair.Value.Settled, pair.Value.Unknown)).ToArray());
     }
 
+    // Checkpoint validation needs tombstones even when diagnostic receipts were truncated.
+    internal EvolutionResourceReceipt? FindReceipt(string operationId)
+    {
+        lock (_sync) return _operations.TryGetValue(operationId, out var operation) ? operation.Receipt : null;
+    }
+
     internal bool Complete(string operationId, EvolutionResources actual, EvolutionResourceOutcome outcome, bool onlyIfPending = false)
     {
         ValidateAmounts(actual);
