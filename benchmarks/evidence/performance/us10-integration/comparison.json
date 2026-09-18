@@ -1,0 +1,808 @@
+{
+  "beforeRevision": "2a3ccb53d8ae669f2cd01aee9287dfaace57e671",
+  "afterRevision": "f840f8ce841b3ae38df4066a36efb7a699f9bb3f",
+  "rows": [
+    {
+      "caseId": "engine-w1-Batch-cheap-cp0",
+      "before": {
+        "medianMillisecondsPerOperation": 0.14227885044642857,
+        "medianAllocatedBytesPerOperation": 146574.85714285713,
+        "medianOperationsPerSecond": 7028.45150113526,
+        "maximumLifetimePeakBytes": 62894080
+      },
+      "after": {
+        "medianMillisecondsPerOperation": 0.141716015625,
+        "medianAllocatedBytesPerOperation": 146556.13839285713,
+        "medianOperationsPerSecond": 7056.365475629354,
+        "maximumLifetimePeakBytes": 62873600
+      },
+      "elapsedReductionPercent": 0.3955857245560912,
+      "allocationReductionPercent": 0.012770778266391059
+    },
+    {
+      "caseId": "engine-w1-Batch-cheap-cp1",
+      "before": {
+        "medianMillisecondsPerOperation": 0.692941015625,
+        "medianAllocatedBytesPerOperation": 642962.421875,
+        "medianOperationsPerSecond": 1443.1242738576348,
+        "maximumLifetimePeakBytes": 69029888
+      },
+      "after": {
+        "medianMillisecondsPerOperation": 0.692365234375,
+        "medianAllocatedBytesPerOperation": 642953.421875,
+        "medianOperationsPerSecond": 1444.3243975164391,
+        "maximumLifetimePeakBytes": 68653056
+      },
+      "elapsedReductionPercent": 0.08309238983070788,
+      "allocationReductionPercent": 0.0013997707632329437
+    },
+    {
+      "caseId": "engine-w1-Batch-mixed-cp0",
+      "before": {
+        "medianMillisecondsPerOperation": 3.46338515625,
+        "medianAllocatedBytesPerOperation": 147548.40625,
+        "medianOperationsPerSecond": 288.73485185308,
+        "maximumLifetimePeakBytes": 60301312
+      },
+      "after": {
+        "medianMillisecondsPerOperation": 3.459928515625,
+        "medianAllocatedBytesPerOperation": 147519.0,
+        "medianOperationsPerSecond": 289.023312326833,
+        "maximumLifetimePeakBytes": 60317696
+      },
+      "elapsedReductionPercent": 0.099805261876873,
+      "allocationReductionPercent": 0.01992990012388285
+    },
+    {
+      "caseId": "engine-w1-Batch-mixed-cp1",
+      "before": {
+        "medianMillisecondsPerOperation": 4.0072390625,
+        "medianAllocatedBytesPerOperation": 649754.8125,
+        "medianOperationsPerSecond": 249.54837592747188,
+        "maximumLifetimePeakBytes": 68317184
+      },
+      "after": {
+        "medianMillisecondsPerOperation": 4.008593359375,
+        "medianAllocatedBytesPerOperation": 650717.78125,
+        "medianOperationsPerSecond": 249.46406640655488,
+        "maximumLifetimePeakBytes": 71983104
+      },
+      "elapsedReductionPercent": -0.03379625856798629,
+      "allocationReductionPercent": -0.14820494307612453
+    },
+    {
+      "caseId": "engine-w1-Continuous-cheap-cp0",
+      "before": {
+        "medianMillisecondsPerOperation": 0.15232393973214284,
+        "medianAllocatedBytesPerOperation": 148715.69642857142,
+        "medianOperationsPerSecond": 6564.956248889508,
+        "maximumLifetimePeakBytes": 63311872
+      },
+      "after": {
+        "medianMillisecondsPerOperation": 0.150424609375,
+        "medianAllocatedBytesPerOperation": 148711.625,
+        "medianOperationsPerSecond": 6647.848408281765,
+        "maximumLifetimePeakBytes": 63361024
+      },
+      "elapsedReductionPercent": 1.2469020696830535,
+      "allocationReductionPercent": 0.0027377261911154527
+    },
+    {
+      "caseId": "engine-w1-Continuous-cheap-cp1",
+      "before": {
+        "medianMillisecondsPerOperation": 0.3046587890625,
+        "medianAllocatedBytesPerOperation": 279945.15625,
+        "medianOperationsPerSecond": 3282.3605814137613,
+        "maximumLifetimePeakBytes": 68554752
+      },
+      "after": {
+        "medianMillisecondsPerOperation": 0.312010546875,
+        "medianAllocatedBytesPerOperation": 279924.4296875,
+        "medianOperationsPerSecond": 3205.01986235942,
+        "maximumLifetimePeakBytes": 68448256
+      },
+      "elapsedReductionPercent": -2.4131120047850674,
+      "allocationReductionPercent": 0.007403793935079062
+    },
+    {
+      "caseId": "engine-w1-Continuous-mixed-cp0",
+      "before": {
+        "medianMillisecondsPerOperation": 3.3641828125,
+        "medianAllocatedBytesPerOperation": 151771.4375,
+        "medianOperationsPerSecond": 297.24900688642344,
+        "maximumLifetimePeakBytes": 60596224
+      },
+      "after": {
+        "medianMillisecondsPerOperation": 3.3534515625,
+        "medianAllocatedBytesPerOperation": 151731.21875,
+        "medianOperationsPerSecond": 298.20022187960257,
+        "maximumLifetimePeakBytes": 60583936
+      },
+      "elapsedReductionPercent": 0.31898534051499894,
+      "allocationReductionPercent": 0.02649955134015336
+    },
+    {
+      "caseId": "engine-w1-Continuous-mixed-cp1",
+      "before": {
+        "medianMillisecondsPerOperation": 3.51573671875,
+        "medianAllocatedBytesPerOperation": 289052.6875,
+        "medianOperationsPerSecond": 284.43540571932937,
+        "maximumLifetimePeakBytes": 68788224
+      },
+      "after": {
+        "medianMillisecondsPerOperation": 3.475715234375,
+        "medianAllocatedBytesPerOperation": 286520.03125,
+        "medianOperationsPerSecond": 287.71056676621527,
+        "maximumLifetimePeakBytes": 67391488
+      },
+      "elapsedReductionPercent": 1.1383527145692907,
+      "allocationReductionPercent": 0.8761919053252187
+    },
+    {
+      "caseId": "engine-w2-Batch-cheap-cp0",
+      "before": {
+        "medianMillisecondsPerOperation": 0.141646875,
+        "medianAllocatedBytesPerOperation": 146574.85714285713,
+        "medianOperationsPerSecond": 7059.8098263728025,
+        "maximumLifetimePeakBytes": 63008768
+      },
+      "after": {
+        "medianMillisecondsPerOperation": 0.1424291294642857,
+        "medianAllocatedBytesPerOperation": 146556.13839285713,
+        "medianOperationsPerSecond": 7021.035681122738,
+        "maximumLifetimePeakBytes": 62935040
+      },
+      "elapsedReductionPercent": -0.552256775368809,
+      "allocationReductionPercent": 0.012770778266391059
+    },
+    {
+      "caseId": "engine-w2-Batch-cheap-cp1",
+      "before": {
+        "medianMillisecondsPerOperation": 0.6929568359375,
+        "medianAllocatedBytesPerOperation": 642971.375,
+        "medianOperationsPerSecond": 1443.0913271056802,
+        "maximumLifetimePeakBytes": 68911104
+      },
+      "after": {
+        "medianMillisecondsPerOperation": 0.7033939453125,
+        "medianAllocatedBytesPerOperation": 642942.234375,
+        "medianOperationsPerSecond": 1421.678430222662,
+        "maximumLifetimePeakBytes": 68849664
+      },
+      "elapsedReductionPercent": -1.5061702019115941,
+      "allocationReductionPercent": 0.004532180767768956
+    },
+    {
+      "caseId": "engine-w2-Batch-mixed-cp0",
+      "before": {
+        "medianMillisecondsPerOperation": 2.053937109375,
+        "medianAllocatedBytesPerOperation": 147461.34375,
+        "medianOperationsPerSecond": 486.86982451195576,
+        "maximumLifetimePeakBytes": 60055552
+      },
+      "after": {
+        "medianMillisecondsPerOperation": 2.060003515625,
+        "medianAllocatedBytesPerOperation": 147441.96875,
+        "medianOperationsPerSecond": 485.4360647518616,
+        "maximumLifetimePeakBytes": 60108800
+      },
+      "elapsedReductionPercent": -0.2953550146355788,
+      "allocationReductionPercent": 0.013139036650067215
+    },
+    {
+      "caseId": "engine-w2-Batch-mixed-cp1",
+      "before": {
+        "medianMillisecondsPerOperation": 2.60996640625,
+        "medianAllocatedBytesPerOperation": 650702.21875,
+        "medianOperationsPerSecond": 383.1466939977975,
+        "maximumLifetimePeakBytes": 69971968
+      },
+      "after": {
+        "medianMillisecondsPerOperation": 2.601210546875,
+        "medianAllocatedBytesPerOperation": 650720.25,
+        "medianOperationsPerSecond": 384.4363929714816,
+        "maximumLifetimePeakBytes": 70500352
+      },
+      "elapsedReductionPercent": 0.3354778572640882,
+      "allocationReductionPercent": -0.002771044800597977
+    },
+    {
+      "caseId": "engine-w2-Continuous-cheap-cp0",
+      "before": {
+        "medianMillisecondsPerOperation": 0.15221847098214286,
+        "medianAllocatedBytesPerOperation": 148715.69642857142,
+        "medianOperationsPerSecond": 6569.50495920638,
+        "maximumLifetimePeakBytes": 63438848
+      },
+      "after": {
+        "medianMillisecondsPerOperation": 0.14950184151785714,
+        "medianAllocatedBytesPerOperation": 148696.66517857142,
+        "medianOperationsPerSecond": 6688.880818103873,
+        "maximumLifetimePeakBytes": 63242240
+      },
+      "elapsedReductionPercent": 1.7846910737951194,
+      "allocationReductionPercent": 0.01279706880782383
+    },
+    {
+      "caseId": "engine-w2-Continuous-cheap-cp1",
+      "before": {
+        "medianMillisecondsPerOperation": 0.30911845703125,
+        "medianAllocatedBytesPerOperation": 279948.1015625,
+        "medianOperationsPerSecond": 3235.0057955255193,
+        "maximumLifetimePeakBytes": 68558848
+      },
+      "after": {
+        "medianMillisecondsPerOperation": 0.3040234375,
+        "medianAllocatedBytesPerOperation": 279927.6796875,
+        "medianOperationsPerSecond": 3289.2200950790184,
+        "maximumLifetimePeakBytes": 68411392
+      },
+      "elapsedReductionPercent": 1.6482417711909503,
+      "allocationReductionPercent": 0.007294878902919244
+    },
+    {
+      "caseId": "engine-w2-Continuous-mixed-cp0",
+      "before": {
+        "medianMillisecondsPerOperation": 1.708126953125,
+        "medianAllocatedBytesPerOperation": 151712.21875,
+        "medianOperationsPerSecond": 585.4365790379402,
+        "maximumLifetimePeakBytes": 60452864
+      },
+      "after": {
+        "medianMillisecondsPerOperation": 1.70541953125,
+        "medianAllocatedBytesPerOperation": 151696.3125,
+        "medianOperationsPerSecond": 586.365983076928,
+        "maximumLifetimePeakBytes": 60702720
+      },
+      "elapsedReductionPercent": 0.15850238005125084,
+      "allocationReductionPercent": 0.010484488415674065
+    },
+    {
+      "caseId": "engine-w2-Continuous-mixed-cp1",
+      "before": {
+        "medianMillisecondsPerOperation": 1.927851953125,
+        "medianAllocatedBytesPerOperation": 288116.46875,
+        "medianOperationsPerSecond": 518.7120299248212,
+        "maximumLifetimePeakBytes": 68096000
+      },
+      "after": {
+        "medianMillisecondsPerOperation": 1.89491328125,
+        "medianAllocatedBytesPerOperation": 289136.75,
+        "medianOperationsPerSecond": 527.7286353391007,
+        "maximumLifetimePeakBytes": 67821568
+      },
+      "elapsedReductionPercent": 1.7085685351308832,
+      "allocationReductionPercent": -0.3541211144321377
+    },
+    {
+      "caseId": "engine-w4-Batch-cheap-cp0",
+      "before": {
+        "medianMillisecondsPerOperation": 0.14577940848214285,
+        "medianAllocatedBytesPerOperation": 146574.85714285713,
+        "medianOperationsPerSecond": 6859.679363580998,
+        "maximumLifetimePeakBytes": 63090688
+      },
+      "after": {
+        "medianMillisecondsPerOperation": 0.14218599330357143,
+        "medianAllocatedBytesPerOperation": 146556.13839285713,
+        "medianOperationsPerSecond": 7033.041558917618,
+        "maximumLifetimePeakBytes": 62853120
+      },
+      "elapsedReductionPercent": 2.464967594522516,
+      "allocationReductionPercent": 0.012770778266391059
+    },
+    {
+      "caseId": "engine-w4-Batch-cheap-cp1",
+      "before": {
+        "medianMillisecondsPerOperation": 0.7034376953125,
+        "medianAllocatedBytesPerOperation": 642956.390625,
+        "medianOperationsPerSecond": 1421.5900095540844,
+        "maximumLifetimePeakBytes": 69136384
+      },
+      "after": {
+        "medianMillisecondsPerOperation": 0.6910501953125,
+        "medianAllocatedBytesPerOperation": 642944.09375,
+        "medianOperationsPerSecond": 1447.07288527397,
+        "maximumLifetimePeakBytes": 68878336
+      },
+      "elapsedReductionPercent": 1.7609946243351216,
+      "allocationReductionPercent": 0.0019125519520879486
+    },
+    {
+      "caseId": "engine-w4-Batch-mixed-cp0",
+      "before": {
+        "medianMillisecondsPerOperation": 1.339590625,
+        "medianAllocatedBytesPerOperation": 147314.15625,
+        "medianOperationsPerSecond": 746.4967142480562,
+        "maximumLifetimePeakBytes": 60137472
+      },
+      "after": {
+        "medianMillisecondsPerOperation": 1.337453515625,
+        "medianAllocatedBytesPerOperation": 147296.53125,
+        "medianOperationsPerSecond": 747.6895371071599,
+        "maximumLifetimePeakBytes": 60358656
+      },
+      "elapsedReductionPercent": 0.15953451264262286,
+      "allocationReductionPercent": 0.011964226961380664
+    },
+    {
+      "caseId": "engine-w4-Batch-mixed-cp1",
+      "before": {
+        "medianMillisecondsPerOperation": 1.90512578125,
+        "medianAllocatedBytesPerOperation": 650087.375,
+        "medianOperationsPerSecond": 524.8997256988855,
+        "maximumLifetimePeakBytes": 70959104
+      },
+      "after": {
+        "medianMillisecondsPerOperation": 1.913298046875,
+        "medianAllocatedBytesPerOperation": 651597.59375,
+        "medianOperationsPerSecond": 522.6577226863872,
+        "maximumLifetimePeakBytes": 70529024
+      },
+      "elapsedReductionPercent": -0.4289619984900961,
+      "allocationReductionPercent": -0.23231011831295056
+    },
+    {
+      "caseId": "engine-w4-Continuous-cheap-cp0",
+      "before": {
+        "medianMillisecondsPerOperation": 0.1503532924107143,
+        "medianAllocatedBytesPerOperation": 148715.69642857142,
+        "medianOperationsPerSecond": 6651.001677225255,
+        "maximumLifetimePeakBytes": 63471616
+      },
+      "after": {
+        "medianMillisecondsPerOperation": 0.1484732700892857,
+        "medianAllocatedBytesPerOperation": 148696.66517857142,
+        "medianOperationsPerSecond": 6735.21906938967,
+        "maximumLifetimePeakBytes": 63406080
+      },
+      "elapsedReductionPercent": 1.2504031613042477,
+      "allocationReductionPercent": 0.01279706880782383
+    },
+    {
+      "caseId": "engine-w4-Continuous-cheap-cp1",
+      "before": {
+        "medianMillisecondsPerOperation": 0.31868427734375,
+        "medianAllocatedBytesPerOperation": 279950.9296875,
+        "medianOperationsPerSecond": 3137.9019019546618,
+        "maximumLifetimePeakBytes": 68489216
+      },
+      "after": {
+        "medianMillisecondsPerOperation": 0.3051345703125,
+        "medianAllocatedBytesPerOperation": 279924.4375,
+        "medianOperationsPerSecond": 3277.242558835145,
+        "maximumLifetimePeakBytes": 68300800
+      },
+      "elapsedReductionPercent": 4.2517651464287765,
+      "allocationReductionPercent": 0.009463153964006654
+    },
+    {
+      "caseId": "engine-w4-Continuous-mixed-cp0",
+      "before": {
+        "medianMillisecondsPerOperation": 1.030420703125,
+        "medianAllocatedBytesPerOperation": 151319.34375,
+        "medianOperationsPerSecond": 970.4773952689986,
+        "maximumLifetimePeakBytes": 60575744
+      },
+      "after": {
+        "medianMillisecondsPerOperation": 1.03118515625,
+        "medianAllocatedBytesPerOperation": 151254.75,
+        "medianOperationsPerSecond": 969.7579469012067,
+        "maximumLifetimePeakBytes": 60567552
+      },
+      "elapsedReductionPercent": -0.07418844775555211,
+      "allocationReductionPercent": 0.04268704079679608
+    },
+    {
+      "caseId": "engine-w4-Continuous-mixed-cp1",
+      "before": {
+        "medianMillisecondsPerOperation": 1.2417125,
+        "medianAllocatedBytesPerOperation": 288820.6875,
+        "medianOperationsPerSecond": 805.3394002234817,
+        "maximumLifetimePeakBytes": 68485120
+      },
+      "after": {
+        "medianMillisecondsPerOperation": 1.234702734375,
+        "medianAllocatedBytesPerOperation": 288686.46875,
+        "medianOperationsPerSecond": 809.9115456370919,
+        "maximumLifetimePeakBytes": 68558848
+      },
+      "elapsedReductionPercent": 0.5645240444144606,
+      "allocationReductionPercent": 0.046471307565187914
+    },
+    {
+      "caseId": "engine-mutation-w1",
+      "before": {
+        "medianMillisecondsPerOperation": 0.143078125,
+        "medianAllocatedBytesPerOperation": 148550.44642857142,
+        "medianOperationsPerSecond": 6989.188598886098,
+        "maximumLifetimePeakBytes": 60612608
+      },
+      "after": {
+        "medianMillisecondsPerOperation": 0.14259408482142857,
+        "medianAllocatedBytesPerOperation": 148542.44642857142,
+        "medianOperationsPerSecond": 7012.913622976058,
+        "maximumLifetimePeakBytes": 60747776
+      },
+      "elapsedReductionPercent": 0.33830480974742505,
+      "allocationReductionPercent": 0.005385375939515047
+    },
+    {
+      "caseId": "engine-mutation-w2",
+      "before": {
+        "medianMillisecondsPerOperation": 0.142612890625,
+        "medianAllocatedBytesPerOperation": 148550.44642857142,
+        "medianOperationsPerSecond": 7011.988857511456,
+        "maximumLifetimePeakBytes": 60604416
+      },
+      "after": {
+        "medianMillisecondsPerOperation": 0.14158699776785713,
+        "medianAllocatedBytesPerOperation": 148542.44642857142,
+        "medianOperationsPerSecond": 7062.795424475188,
+        "maximumLifetimePeakBytes": 60973056
+      },
+      "elapsedReductionPercent": 0.7193549283286305,
+      "allocationReductionPercent": 0.005385375939515047
+    },
+    {
+      "caseId": "engine-mutation-w4",
+      "before": {
+        "medianMillisecondsPerOperation": 0.14314213169642856,
+        "medianAllocatedBytesPerOperation": 148550.44642857142,
+        "medianOperationsPerSecond": 6986.0633494041385,
+        "maximumLifetimePeakBytes": 60817408
+      },
+      "after": {
+        "medianMillisecondsPerOperation": 0.14149676339285713,
+        "medianAllocatedBytesPerOperation": 148542.44642857142,
+        "medianOperationsPerSecond": 7067.299463405823,
+        "maximumLifetimePeakBytes": 60731392
+      },
+      "elapsedReductionPercent": 1.149464720185156,
+      "allocationReductionPercent": 0.005385375939515047
+    },
+    {
+      "caseId": "evaluation-w1-cheap",
+      "before": {
+        "medianMillisecondsPerOperation": 0.0015676188804173354,
+        "medianAllocatedBytesPerOperation": 1250.7221107544142,
+        "medianOperationsPerSecond": 637910.153093957,
+        "maximumLifetimePeakBytes": 56365056
+      },
+      "after": {
+        "medianMillisecondsPerOperation": 0.001572596492552335,
+        "medianAllocatedBytesPerOperation": 1250.7229267310788,
+        "medianOperationsPerSecond": 635891.0278230325,
+        "maximumLifetimePeakBytes": 56377344
+      },
+      "elapsedReductionPercent": -0.3175269319079854,
+      "allocationReductionPercent": -6.52404445133925e-05
+    },
+    {
+      "caseId": "evaluation-w1-mixed",
+      "before": {
+        "medianMillisecondsPerOperation": 2.87699765625,
+        "medianAllocatedBytesPerOperation": 1626.25,
+        "medianOperationsPerSecond": 347.58457235013606,
+        "maximumLifetimePeakBytes": 51617792
+      },
+      "after": {
+        "medianMillisecondsPerOperation": 2.869368359375,
+        "medianAllocatedBytesPerOperation": 1626.25,
+        "medianOperationsPerSecond": 348.50875689513003,
+        "maximumLifetimePeakBytes": 51453952
+      },
+      "elapsedReductionPercent": 0.2651825891629045,
+      "allocationReductionPercent": 0.0
+    },
+    {
+      "caseId": "evaluation-w2-cheap",
+      "before": {
+        "medianMillisecondsPerOperation": 0.0008872910280426885,
+        "medianAllocatedBytesPerOperation": 1253.8594743415076,
+        "medianOperationsPerSecond": 1127025.9344399557,
+        "maximumLifetimePeakBytes": 56668160
+      },
+      "after": {
+        "medianMillisecondsPerOperation": 0.0008903750284867822,
+        "medianAllocatedBytesPerOperation": 1253.730515041021,
+        "medianOperationsPerSecond": 1123122.2440048982,
+        "maximumLifetimePeakBytes": 56524800
+      },
+      "elapsedReductionPercent": -0.34757484823177975,
+      "allocationReductionPercent": 0.010284988320119481
+    },
+    {
+      "caseId": "evaluation-w2-mixed",
+      "before": {
+        "medianMillisecondsPerOperation": 1.449240625,
+        "medianAllocatedBytesPerOperation": 1627.375,
+        "medianOperationsPerSecond": 690.0165388339151,
+        "maximumLifetimePeakBytes": 51630080
+      },
+      "after": {
+        "medianMillisecondsPerOperation": 1.442044921875,
+        "medianAllocatedBytesPerOperation": 1627.375,
+        "medianOperationsPerSecond": 693.4596730175112,
+        "maximumLifetimePeakBytes": 51507200
+      },
+      "elapsedReductionPercent": 0.4965154164788932,
+      "allocationReductionPercent": 0.0
+    },
+    {
+      "caseId": "evaluation-w4-cheap",
+      "before": {
+        "medianMillisecondsPerOperation": 0.0009146528265449438,
+        "medianAllocatedBytesPerOperation": 1302.0136500929368,
+        "medianOperationsPerSecond": 1093311.0038892583,
+        "maximumLifetimePeakBytes": 56725504
+      },
+      "after": {
+        "medianMillisecondsPerOperation": 0.0008804771959459459,
+        "medianAllocatedBytesPerOperation": 1300.4416103603603,
+        "medianOperationsPerSecond": 1135747.7565624444,
+        "maximumLifetimePeakBytes": 56856576
+      },
+      "elapsedReductionPercent": 3.7364592998738733,
+      "allocationReductionPercent": 0.12073911302422635
+    },
+    {
+      "caseId": "evaluation-w4-mixed",
+      "before": {
+        "medianMillisecondsPerOperation": 0.7316912109375,
+        "medianAllocatedBytesPerOperation": 1606.328125,
+        "medianOperationsPerSecond": 1366.6967500111446,
+        "maximumLifetimePeakBytes": 51740672
+      },
+      "after": {
+        "medianMillisecondsPerOperation": 0.722305859375,
+        "medianAllocatedBytesPerOperation": 1605.125,
+        "medianOperationsPerSecond": 1384.4550573981005,
+        "maximumLifetimePeakBytes": 51585024
+      },
+      "elapsedReductionPercent": 1.282692947818076,
+      "allocationReductionPercent": 0.07489908078400775
+    },
+    {
+      "caseId": "engine-cells-32",
+      "before": {
+        "medianMillisecondsPerOperation": 0.134120556640625,
+        "medianAllocatedBytesPerOperation": 143054.3046875,
+        "medianOperationsPerSecond": 7455.978599011428,
+        "maximumLifetimePeakBytes": 60223488
+      },
+      "after": {
+        "medianMillisecondsPerOperation": 0.13408955078125,
+        "medianAllocatedBytesPerOperation": 143037.03125,
+        "medianOperationsPerSecond": 7457.702663434024,
+        "maximumLifetimePeakBytes": 60407808
+      },
+      "elapsedReductionPercent": 0.02311790239438727,
+      "allocationReductionPercent": 0.01207474150305421
+    },
+    {
+      "caseId": "engine-cells-4096",
+      "before": {
+        "medianMillisecondsPerOperation": 0.14805887276785715,
+        "medianAllocatedBytesPerOperation": 149233.6875,
+        "medianOperationsPerSecond": 6754.070062169858,
+        "maximumLifetimePeakBytes": 64065536
+      },
+      "after": {
+        "medianMillisecondsPerOperation": 0.1473396763392857,
+        "medianAllocatedBytesPerOperation": 149190.94642857142,
+        "medianOperationsPerSecond": 6787.0381206570255,
+        "maximumLifetimePeakBytes": 64299008
+      },
+      "elapsedReductionPercent": 0.4857503067033808,
+      "allocationReductionPercent": 0.028640364079046687
+    },
+    {
+      "caseId": "engine-dimensions-2",
+      "before": {
+        "medianMillisecondsPerOperation": 0.06014124540441176,
+        "medianAllocatedBytesPerOperation": 60862.26102941176,
+        "medianOperationsPerSecond": 16627.523977523808,
+        "maximumLifetimePeakBytes": 60817408
+      },
+      "after": {
+        "medianMillisecondsPerOperation": 0.05983060661764705,
+        "medianAllocatedBytesPerOperation": 60837.88419117647,
+        "medianOperationsPerSecond": 16713.853603233394,
+        "maximumLifetimePeakBytes": 60829696
+      },
+      "elapsedReductionPercent": 0.5165153875279049,
+      "allocationReductionPercent": 0.04005246900622428
+    },
+    {
+      "caseId": "engine-dimensions-32",
+      "before": {
+        "medianMillisecondsPerOperation": 0.495901171875,
+        "medianAllocatedBytesPerOperation": 480756.578125,
+        "medianOperationsPerSecond": 2016.5308265334497,
+        "maximumLifetimePeakBytes": 61521920
+      },
+      "after": {
+        "medianMillisecondsPerOperation": 0.47188437499999997,
+        "medianAllocatedBytesPerOperation": 480724.5416666667,
+        "medianOperationsPerSecond": 2119.1631954332033,
+        "maximumLifetimePeakBytes": 61247488
+      },
+      "elapsedReductionPercent": 4.843061125302972,
+      "allocationReductionPercent": 0.006663758706804135
+    },
+    {
+      "caseId": "engine-islands-2",
+      "before": {
+        "medianMillisecondsPerOperation": 0.14812260044642858,
+        "medianAllocatedBytesPerOperation": 147593.3125,
+        "medianOperationsPerSecond": 6751.164217925471,
+        "maximumLifetimePeakBytes": 63868928
+      },
+      "after": {
+        "medianMillisecondsPerOperation": 0.14585440848214287,
+        "medianAllocatedBytesPerOperation": 147567.25,
+        "medianOperationsPerSecond": 6856.15203823223,
+        "maximumLifetimePeakBytes": 63225856
+      },
+      "elapsedReductionPercent": 1.531293642867182,
+      "allocationReductionPercent": 0.01765832039307691
+    },
+    {
+      "caseId": "engine-islands-4",
+      "before": {
+        "medianMillisecondsPerOperation": 0.15220055803571428,
+        "medianAllocatedBytesPerOperation": 148164.1294642857,
+        "medianOperationsPerSecond": 6570.278144219072,
+        "maximumLifetimePeakBytes": 61730816
+      },
+      "after": {
+        "medianMillisecondsPerOperation": 0.14738666294642858,
+        "medianAllocatedBytesPerOperation": 148131.6294642857,
+        "medianOperationsPerSecond": 6784.874424923207,
+        "maximumLifetimePeakBytes": 61698048
+      },
+      "elapsedReductionPercent": 3.1628629693697397,
+      "allocationReductionPercent": 0.021935133771922022
+    },
+    {
+      "caseId": "archive-cells-100",
+      "before": {
+        "medianMillisecondsPerOperation": 0.011462559567448679,
+        "medianAllocatedBytesPerOperation": 7544.37939882698,
+        "medianOperationsPerSecond": 87240.54990647944,
+        "maximumLifetimePeakBytes": 56410112
+      },
+      "after": {
+        "medianMillisecondsPerOperation": 0.0070199545148247975,
+        "medianAllocatedBytesPerOperation": 4296.218861209964,
+        "medianOperationsPerSecond": 142451.06544325777,
+        "maximumLifetimePeakBytes": 56147968
+      },
+      "elapsedReductionPercent": 38.75753078082115,
+      "allocationReductionPercent": 43.05404548082574
+    },
+    {
+      "caseId": "archive-cells-1000",
+      "before": {
+        "medianMillisecondsPerOperation": 0.12876275614754099,
+        "medianAllocatedBytesPerOperation": 67835.40573770492,
+        "medianOperationsPerSecond": 7766.2208383778625,
+        "maximumLifetimePeakBytes": 58769408
+      },
+      "after": {
+        "medianMillisecondsPerOperation": 0.08175074869791667,
+        "medianAllocatedBytesPerOperation": 39386.03125,
+        "medianOperationsPerSecond": 12232.3038740009,
+        "maximumLifetimePeakBytes": 58617856
+      },
+      "elapsedReductionPercent": 36.51056319092477,
+      "allocationReductionPercent": 41.93882851929626
+    },
+    {
+      "caseId": "archive-cells-10000",
+      "before": {
+        "medianMillisecondsPerOperation": 1.9815890625,
+        "medianAllocatedBytesPerOperation": 643969.4444444445,
+        "medianOperationsPerSecond": 504.64549836502744,
+        "maximumLifetimePeakBytes": 91172864
+      },
+      "after": {
+        "medianMillisecondsPerOperation": 1.2719721153846153,
+        "medianAllocatedBytesPerOperation": 363492.26923076925,
+        "medianOperationsPerSecond": 786.1807565629084,
+        "maximumLifetimePeakBytes": 89739264
+      },
+      "elapsedReductionPercent": 35.81049979253127,
+      "allocationReductionPercent": 43.55442290521163
+    },
+    {
+      "caseId": "archive-dimensions-8",
+      "before": {
+        "medianMillisecondsPerOperation": 0.1314674369747899,
+        "medianAllocatedBytesPerOperation": 67891.49159663866,
+        "medianOperationsPerSecond": 7606.446303442876,
+        "maximumLifetimePeakBytes": 60801024
+      },
+      "after": {
+        "medianMillisecondsPerOperation": 0.08686322916666667,
+        "medianAllocatedBytesPerOperation": 39442.025,
+        "medianOperationsPerSecond": 11512.351193866794,
+        "maximumLifetimePeakBytes": 60563456
+      },
+      "elapsedReductionPercent": 33.9279511600097,
+      "allocationReductionPercent": 41.904318092853934
+    },
+    {
+      "caseId": "archive-dimensions-32",
+      "before": {
+        "medianMillisecondsPerOperation": 0.14903375,
+        "medianAllocatedBytesPerOperation": 68083.47142857143,
+        "medianOperationsPerSecond": 6709.889538443474,
+        "maximumLifetimePeakBytes": 67817472
+      },
+      "after": {
+        "medianMillisecondsPerOperation": 0.09884595125786164,
+        "medianAllocatedBytesPerOperation": 39634.1320754717,
+        "medianOperationsPerSecond": 10116.752252110738,
+        "maximumLifetimePeakBytes": 67772416
+      },
+      "elapsedReductionPercent": 33.67545857373807,
+      "allocationReductionPercent": 41.78597059779311
+    },
+    {
+      "caseId": "checkpoint-evaluations-32",
+      "before": {
+        "medianMillisecondsPerOperation": 5.126766,
+        "medianAllocatedBytesPerOperation": 4084095.52,
+        "medianOperationsPerSecond": 195.0547382111842,
+        "maximumLifetimePeakBytes": 64835584
+      },
+      "after": {
+        "medianMillisecondsPerOperation": 5.108732,
+        "medianAllocatedBytesPerOperation": 4082751.52,
+        "medianOperationsPerSecond": 195.74328815839235,
+        "maximumLifetimePeakBytes": 68833280
+      },
+      "elapsedReductionPercent": 0.35176171489005315,
+      "allocationReductionPercent": 0.03290814314744761
+    },
+    {
+      "caseId": "checkpoint-evaluations-256",
+      "before": {
+        "medianMillisecondsPerOperation": 40.062975,
+        "medianAllocatedBytesPerOperation": 28954627.0,
+        "medianOperationsPerSecond": 24.96070249401099,
+        "maximumLifetimePeakBytes": 74153984
+      },
+      "after": {
+        "medianMillisecondsPerOperation": 39.718375,
+        "medianAllocatedBytesPerOperation": 28948926.0,
+        "medianOperationsPerSecond": 25.17726367204096,
+        "maximumLifetimePeakBytes": 73404416
+      },
+      "elapsedReductionPercent": 0.8601458079436131,
+      "allocationReductionPercent": 0.019689426494773343
+    },
+    {
+      "caseId": "checkpoint-evaluations-2048",
+      "before": {
+        "medianMillisecondsPerOperation": 178.80375,
+        "medianAllocatedBytesPerOperation": 117656552.0,
+        "medianOperationsPerSecond": 5.592723866250008,
+        "maximumLifetimePeakBytes": 120639488
+      },
+      "after": {
+        "medianMillisecondsPerOperation": 173.8158,
+        "medianAllocatedBytesPerOperation": 117632056.0,
+        "medianOperationsPerSecond": 5.753216911235918,
+        "maximumLifetimePeakBytes": 112308224
+      },
+      "elapsedReductionPercent": 2.789622700866179,
+      "allocationReductionPercent": 0.020819919999015557
+    }
+  ],
+  "interpretation": "Sequential before/after campaigns on one host, three fresh-process repetitions per case. Descriptive medians only; not randomized cross-revision timing, statistical superiority, optimizer-quality improvement or competitor evidence. All regressions retained.",
+  "beforeRawSha256": "68455f8c3d2db4edc8b8184de15b65a4b4b02788db46efc83b25a741b04c13cb",
+  "afterRawSha256": "50b91a4f26e4c482e847b7e19995d397b298d228b21fe98adf222bfd872aba77"
+}
