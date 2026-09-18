@@ -95,6 +95,12 @@ jobs:
           $adapterVersion = ([xml](Get-Content src/AiDotNet.Evolution.Surrogates/AiDotNet.Evolution.Surrogates.csproj)).Project.PropertyGroup.Version | Where-Object { $_ } | Select-Object -First 1
           if (-not $coreVersion -or -not $adapterVersion) { throw 'Could not read a package version from its project file.' }
           ./eng/Test-SurrogatePackage.ps1 -CorePackagePath "TestResults/surrogate-packages/AiDotNet.Evolution.$coreVersion.nupkg" -AdapterPackagePath "TestResults/surrogate-packages/AiDotNet.Evolution.Surrogates.$adapterVersion.nupkg" -CoreVersion $coreVersion -AdapterVersion $adapterVersion
+      # US-09 ships a Pareto implementation and retained campaign evidence, and until now nothing
+      # re-ran either. This reproduces the recorded 180 matched-budget runs against the commit's own
+      # build, so the evidence stays a checked claim rather than a file nobody reads.
+      - name: Verify matched-budget Pareto campaign against retained evidence
+        shell: pwsh
+        run: ./eng/Test-ParetoCampaign.ps1 -SourceRevision '${{ github.sha }}'
       - name: Verify multi-fidelity promotion and independent confirmation
         shell: pwsh
         run: ./eng/Test-MultiFidelity.ps1

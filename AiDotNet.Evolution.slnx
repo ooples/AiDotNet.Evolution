@@ -10,6 +10,7 @@
     <Project Path="examples/AdaptiveIslandSearch/AdaptiveIslandSearch.csproj" />
     <Project Path="examples/MultiFidelitySearch/MultiFidelitySearch.csproj" />
     <Project Path="examples/OperatorCreditSearch/OperatorCreditSearch.csproj" />
+    <Project Path="examples/ParetoSearch/ParetoSearch.csproj" />
     <Project Path="examples/PersistentEvaluation/PersistentEvaluation.csproj" />
     <Project Path="examples/ReplicatedEvaluation/ReplicatedEvaluation.csproj" />
     <Project Path="examples/SurrogateSearch/SurrogateSearch.csproj" />
