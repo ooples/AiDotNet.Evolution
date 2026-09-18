@@ -22,7 +22,7 @@ public sealed class StoryPullRequestWorkflowTests
         var root = Assert.IsType<YamlMappingNode>(Assert.Single(yaml.Documents).RootNode);
         var triggers = Assert.IsType<YamlMappingNode>(root.Children[new YamlScalarNode("on")]);
         var pullRequest = Assert.IsType<YamlMappingNode>(triggers.Children[new YamlScalarNode("pull_request")]);
-        Assert.Equal(new[] { "main", "feat/competitive-evolution-platform", "feat/evolution-us-*", "feat/evolution-us02-efficacy", "feat/evolution-us03-correctness", "feat/evolution-us05-campaign-budget", "feat/evolution-us06-noise-integration", "feat/evolution-us07-ablation-integration", "feat/evolution-us08-portfolio-integration", "chore/evolution-pr-consolidation", "feat/evolution-program-consolidation", "feat/evolution-us13-integration", "feat/evolution-us14-integration", "feat/evolution-us15-integration", "feat/evolution-us16-integration" }, Branches(pullRequest));
+        Assert.Equal(new[] { "main", "feat/competitive-evolution-platform", "feat/evolution-us-*", "feat/evolution-us02-efficacy", "feat/evolution-us03-correctness", "feat/evolution-us05-campaign-budget", "feat/evolution-us06-noise-integration", "feat/evolution-us07-ablation-integration", "feat/evolution-us08-portfolio-integration", "chore/evolution-pr-consolidation", "feat/evolution-program-consolidation", "feat/evolution-us13-integration", "feat/evolution-us14-integration", "feat/evolution-us15-integration" }, Branches(pullRequest));
         if (triggers.Children.TryGetValue(new YamlScalarNode("push"), out var push))
             Assert.Equal(new[] { "main" }, Branches(Assert.IsType<YamlMappingNode>(push)));
         Assert.False(triggers.Children.ContainsKey(new YamlScalarNode("pull_request_target")));
