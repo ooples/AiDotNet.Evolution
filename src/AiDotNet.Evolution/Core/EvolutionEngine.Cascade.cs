@@ -301,7 +301,9 @@ public sealed partial class EvolutionEngine<TGenome>
         EvolutionEarlyStoppingOutcome outcome = !reading.IsMeasured
             ? EvolutionEarlyStoppingOutcome.Unmeasurable
             : !_earlyStoppingBest.HasValue ||
-              reading.Value - _earlyStoppingBest.Value >= _options.EarlyStopping.MinimumImprovement
+              (reading.Value - _earlyStoppingBest.Value >= _options.EarlyStopping.MinimumImprovement &&
+               (_options.EarlyStopping.Metric != EvolutionEarlyStoppingMetric.ParetoHypervolume ||
+                _options.EarlyStopping.MetricName is not null || reading.Value > _earlyStoppingBest.Value))
                 ? EvolutionEarlyStoppingOutcome.Improved
                 : EvolutionEarlyStoppingOutcome.NotImproved;
 

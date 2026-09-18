@@ -56,9 +56,9 @@ public sealed class EvolutionArchiveSnapshot<TGenome> : IEvolutionParetoArchiveV
             nameof(source));
         if (descriptors.Any(descriptor => descriptor is null) || unorderedEntries.Any(entry => entry is null))
             throw new ArgumentException("Archive views cannot contain null values.", nameof(source));
-        EvolutionArchiveEntry<TGenome>[] entries = unorderedEntries
-            .OrderBy(entry => entry.Cell.StableKey, StringComparer.Ordinal)
-            .ToArray();
+        // CopyBounded already owns this array. Sort it in place instead of allocating LINQ's key/map/output arrays.
+        EvolutionArchiveEntry<TGenome>[] entries = unorderedEntries;
+        Array.Sort(entries, (left, right) => StringComparer.Ordinal.Compare(left.Cell.StableKey, right.Cell.StableKey));
         if (source.Count != entries.Length || entries.Any(entry =>
                 entry.Evaluation.Status != EvolutionEvaluationStatus.Completed ||
                 entry.Evaluation.Direction != source.Direction))
@@ -94,7 +94,13 @@ public sealed class EvolutionArchiveSnapshot<TGenome> : IEvolutionParetoArchiveV
                     throw new ArgumentException("Pareto snapshot pools repeat identities or exceed the archive version.", nameof(source));
             }
         }
-        else Best = entries.OrderBy(entry => entry, EvolutionEntryOrdering.BestFirst<TGenome>(Direction)).FirstOrDefault();
+        else
+        {
+            EvolutionArchiveEntry<TGenome>? best = null;
+            foreach (EvolutionArchiveEntry<TGenome> entry in entries)
+                if (EvolutionEntryOrdering.Compare(Direction, entry, best) < 0) best = entry;
+            Best = best;
+        }
     }
 
     /// <inheritdoc/>

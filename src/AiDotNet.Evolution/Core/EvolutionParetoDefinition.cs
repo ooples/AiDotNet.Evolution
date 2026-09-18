@@ -7,7 +7,8 @@ public sealed class EvolutionParetoDefinition
 {
     /// <summary>Creates a two-to-eight-objective front with capacity between two and 256.</summary>
     public EvolutionParetoDefinition(IEnumerable<EvolutionObjectiveDefinition> objectives, int capacity = 64,
-        EvolutionParetoRepresentative representative = EvolutionParetoRepresentative.ClosestToIdeal, int infeasibleCapacity = 0)
+        EvolutionParetoRepresentative representative = EvolutionParetoRepresentative.ClosestToIdeal, int infeasibleCapacity = 0,
+        int? constraintCount = null)
     {
         Guard.NotNull(objectives);
         var copy = EvolutionCollection.CopyBounded(objectives.Take(9).ToArray(), 8, nameof(objectives));
@@ -16,12 +17,16 @@ public sealed class EvolutionParetoDefinition
             throw new ArgumentException("Provide two to eight uniquely named objective definitions.", nameof(objectives));
         if (capacity < 2 || capacity > 256) throw new ArgumentOutOfRangeException(nameof(capacity));
         if (infeasibleCapacity < 0 || infeasibleCapacity > 256) throw new ArgumentOutOfRangeException(nameof(infeasibleCapacity));
+        if (constraintCount < 0 || constraintCount > 64) throw new ArgumentOutOfRangeException(nameof(constraintCount));
         if (!Enum.IsDefined(typeof(EvolutionParetoRepresentative), representative)) throw new ArgumentOutOfRangeException(nameof(representative));
         Objectives = Array.AsReadOnly(copy); Capacity = capacity; Representative = representative; InfeasibleCapacity = infeasibleCapacity;
         DefinitionHash = EvolutionHash.Combine(new[] { "pareto-epsilon-box-crowding-v1",
             capacity.ToString(CultureInfo.InvariantCulture), representative.ToString() }.Concat(copy.Select(axis => axis.Canonical)));
         if (infeasibleCapacity > 0) DefinitionHash = EvolutionHash.Combine(new[] { DefinitionHash, "infeasible-max-violation-v1",
             infeasibleCapacity.ToString(CultureInfo.InvariantCulture) });
+        ConstraintCount = constraintCount;
+        if (constraintCount.HasValue) DefinitionHash = EvolutionHash.Combine(new[] { DefinitionHash, "constraint-count-v1",
+            constraintCount.Value.ToString(CultureInfo.InvariantCulture) });
     }
 
     /// <summary>Gets definitions in exactly the order of EvolutionEvaluation.Objectives.</summary>
@@ -30,6 +35,10 @@ public sealed class EvolutionParetoDefinition
     public int Capacity { get; }
     /// <summary>Gets the separate infeasible exploration capacity; zero disables it without changing feasible-only semantics.</summary>
     public int InfeasibleCapacity { get; }
+    /// <summary>Gets the required violation-vector length, or null for legacy task-defined shape.</summary>
+    /// <remarks>Declare this for constrained tasks so an omitted violation cannot masquerade as feasibility.
+    /// Both feasible and exploration entries must report the exact shape. Zero explicitly means unconstrained.</remarks>
+    public int? ConstraintCount { get; }
     /// <summary>Gets the explicit policy for Best; the complete answer is the front, not Best.</summary>
     public EvolutionParetoRepresentative Representative { get; }
     /// <summary>Gets the versioned identity of every admission, retention and reporting choice.</summary>
@@ -54,6 +63,7 @@ public sealed class EvolutionParetoDefinition
         index = -1;
         if (evaluation.Status != EvolutionEvaluationStatus.Completed) return "not_completed";
         if (!evaluation.Quality.HasValue) return "missing_quality";
+        if (ConstraintCount.HasValue && evaluation.ConstraintViolations.Count != ConstraintCount.Value) return "constraint_count";
         if (evaluation.Objectives.Count != Objectives.Count) return "objective_count";
         for (int i = 0; i < Objectives.Count; i++)
         {
