@@ -1,0 +1,2077 @@
+{
+  "sourceRepository": "ooples/AiDotNet",
+  "destinationRepository": "ooples/AiDotNet.Evolution",
+  "auditedAt": "2026-09-16",
+  "pullRequests": [
+    {
+      "sourcePr": 2148,
+      "sourceHead": "8808b25e6429aa4d4a0c35178464fef093df2e56",
+      "sourceBase": "master",
+      "title": "feat(evolution): gate program fitness on correctness and preserve evidence",
+      "files": [
+        {
+          "path": ".github/scripts/check-evolution-cli-coverage.ps1",
+          "previousPath": null,
+          "sha": "9b3fc359709dca17123a82dba6e5b02392f6e2c5",
+          "status": "added"
+        },
+        {
+          "path": ".github/scripts/tests/check-evolution-cli-coverage.tests.ps1",
+          "previousPath": null,
+          "sha": "35194411c7e15b337c83a389d2f3f1b42c599a07",
+          "status": "added"
+        },
+        {
+          "path": ".github/workflows/evolution-csharp.yml",
+          "previousPath": null,
+          "sha": "57fd017e9f10eaac7cbd7bbe5e8d967876462102",
+          "status": "added"
+        },
+        {
+          "path": ".github/workflows/release-please.yml",
+          "previousPath": null,
+          "sha": "40dfb1e645d0d1bd750b036c1a602ca7fcd3fcb7",
+          "status": "modified"
+        },
+        {
+          "path": "AiDotNet.sln",
+          "previousPath": null,
+          "sha": "68e29489b91e82b84ae7f3eb7ac6e7538257008c",
+          "status": "modified"
+        },
+        {
+          "path": "CHANGELOG.md",
+          "previousPath": null,
+          "sha": "a3fe7f3aa8980153ce0faa44bc98960c960b0cf2",
+          "status": "modified"
+        },
+        {
+          "path": "Directory.Packages.props",
+          "previousPath": null,
+          "sha": "052fe3fa03cbaa96a4f5def51b74dd9e57e4ac5f",
+          "status": "modified"
+        },
+        {
+          "path": "docs/benchmarks/authored-runtime-2026-09-11.json",
+          "previousPath": null,
+          "sha": "f86c29a5854197afa25975d8dc76e87ad96fb312",
+          "status": "added"
+        },
+        {
+          "path": "docs/evolution-correctness-gate.md",
+          "previousPath": null,
+          "sha": "ec75f48634e150729ae0de9397ce253ad14a5593",
+          "status": "added"
+        },
+        {
+          "path": "docs/evolution-csharp.md",
+          "previousPath": null,
+          "sha": "223d6b97b50c83a22106e0a7d6ca07bca8c9b904",
+          "status": "added"
+        },
+        {
+          "path": "docs/evolution-package-integration.md",
+          "previousPath": null,
+          "sha": "8dc1a797e42f917d8fd376b376812515d8e19419",
+          "status": "added"
+        },
+        {
+          "path": "docs/evolution-persistent-fitness.md",
+          "previousPath": null,
+          "sha": "966c587a3fc02a255dc7568b6b31999c51fb6bf1",
+          "status": "added"
+        },
+        {
+          "path": "docs/evolution-runtime-benchmark.md",
+          "previousPath": null,
+          "sha": "73a3c5c75290b5294706ad93d6ad6bdda2b19384",
+          "status": "added"
+        },
+        {
+          "path": "docs/evolution-source-identity.md",
+          "previousPath": null,
+          "sha": "6a9945260c9875b4aa3fc5c6a3fc659e7997fc5a",
+          "status": "added"
+        },
+        {
+          "path": "src/AiDotNet.Evolution.CSharp/AiDotNet.Evolution.CSharp.csproj",
+          "previousPath": null,
+          "sha": "c664a8a6d1dbf2c3f2aa297d9bc21da92ef0339c",
+          "status": "added"
+        },
+        {
+          "path": "src/AiDotNet.Evolution.CSharp/CSharpPatchCompiler.cs",
+          "previousPath": null,
+          "sha": "6352ba21e57ad993fca42953d50795ba5d56c6e3",
+          "status": "added"
+        },
+        {
+          "path": "src/AiDotNet.Evolution.CSharp/CSharpProgramEvolutionExtensions.cs",
+          "previousPath": null,
+          "sha": "4068c954392125622ddba7aa4fb6e03a6e0e55d8",
+          "status": "added"
+        },
+        {
+          "path": "src/AiDotNet.Evolution.CSharp/CSharpProgramEvolutionOptions.cs",
+          "previousPath": null,
+          "sha": "a9764a1dd38c86953545b8c5aa5cb958e71efeba",
+          "status": "added"
+        },
+        {
+          "path": "src/AiDotNet.Evolution.CSharp/CSharpProposalSource.cs",
+          "previousPath": null,
+          "sha": "f9724eb31139e3b3f1e2df988eb43aba4015d226",
+          "status": "added"
+        },
+        {
+          "path": "src/AiDotNet.Evolution.CSharp/README.md",
+          "previousPath": null,
+          "sha": "62ae3c4014793ca1829c2b05b9f12d01855b8585",
+          "status": "added"
+        },
+        {
+          "path": "src/AiDotNet.csproj",
+          "previousPath": null,
+          "sha": "500c4584969d4208722a1d2105461bbd67df8c68",
+          "status": "modified"
+        },
+        {
+          "path": "src/AiModelBuilder.Evolution.cs",
+          "previousPath": null,
+          "sha": "ddb7a5ae2bcdd860fe071e360d29ac58f27178d9",
+          "status": "modified"
+        },
+        {
+          "path": "src/AutoML/MapElitesAutoML.cs",
+          "previousPath": null,
+          "sha": "3bfabf0033d5023f4210f8be470f70e53ae711f4",
+          "status": "modified"
+        },
+        {
+          "path": "src/Configuration/EvolutionArtifactOptions.cs",
+          "previousPath": null,
+          "sha": "9658f6e5491c5cfa9c75382a8d1d209df1225109",
+          "status": "removed"
+        },
+        {
+          "path": "src/Configuration/EvolutionCascadeOptions.cs",
+          "previousPath": null,
+          "sha": "7accf7900bbe3ae3998fd293dae542ccfa3d1f21",
+          "status": "removed"
+        },
+        {
+          "path": "src/Configuration/EvolutionCheckpointRetentionOptions.cs",
+          "previousPath": null,
+          "sha": "6398400f21dc1cedf980faf43418ba0df908d99c",
+          "status": "removed"
+        },
+        {
+          "path": "src/Configuration/EvolutionDescriptorCalibrationOptions.cs",
+          "previousPath": null,
+          "sha": "d166b0a707f39b5759ca23451aaf51eddb5be960",
+          "status": "removed"
+        },
+        {
+          "path": "src/Configuration/EvolutionEarlyStoppingOptions.cs",
+          "previousPath": null,
+          "sha": "c5011ff8199e74f4fa9137cc65f6e79ed7a30f78",
+          "status": "removed"
+        },
+        {
+          "path": "src/Configuration/EvolutionEngineOptions.cs",
+          "previousPath": null,
+          "sha": "a4845d5ba5aadc50cee555ed0b33a8728667c727",
+          "status": "removed"
+        },
+        {
+          "path": "src/Configuration/EvolutionSelectionOptions.cs",
+          "previousPath": null,
+          "sha": "8ffb7cfa108d184841ec4bd6e4ef36336d7a21b1",
+          "status": "removed"
+        },
+        {
+          "path": "src/Configuration/EvolutionTraceOptions.cs",
+          "previousPath": null,
+          "sha": "ee86202928cd2aba0b61828ae231cea6e1f455a1",
+          "status": "removed"
+        },
+        {
+          "path": "src/Configuration/ProgramEvolutionOptions.cs",
+          "previousPath": null,
+          "sha": "cd13f14e29f9a717848bfc1ec689fa8e230439a9",
+          "status": "modified"
+        },
+        {
+          "path": "src/Configuration/ProgramEvolutionResourceOptions.cs",
+          "previousPath": null,
+          "sha": "9a215056b13b78b6fddb4af86607e27dfcfabf60",
+          "status": "added"
+        },
+        {
+          "path": "src/Configuration/ProgramSandboxLimitOptions.cs",
+          "previousPath": null,
+          "sha": "470f37c74b4affdc5a93c9df34d17eadeae226d8",
+          "status": "modified"
+        },
+        {
+          "path": "src/Configuration/ProgramSandboxOptions.cs",
+          "previousPath": null,
+          "sha": "55c676aef83de215e851a61e73705ab6c64f0b9e",
+          "status": "modified"
+        },
+        {
+          "path": "src/Configuration/ScriptProgramEvaluationOptions.cs",
+          "previousPath": null,
+          "sha": "69fb977a268d8da5913113b608fc4545f5413e72",
+          "status": "modified"
+        },
+        {
+          "path": "src/Enums/EvolutionArchiveInsertionResult.cs",
+          "previousPath": null,
+          "sha": "333c64ce600f806dd85d57261e2976feebaa4009",
+          "status": "removed"
+        },
+        {
+          "path": "src/Enums/EvolutionCacheStatus.cs",
+          "previousPath": null,
+          "sha": "904dd28c35502a886525d58ded4635dfd1a811e7",
+          "status": "removed"
+        },
+        {
+          "path": "src/Enums/EvolutionCheckpointEntrySource.cs",
+          "previousPath": null,
+          "sha": "e29687f739d9b916437313997d2e1e4ec663fcc8",
+          "status": "removed"
+        },
+        {
+          "path": "src/Enums/EvolutionDispatchMode.cs",
+          "previousPath": null,
+          "sha": "da69eca27ac3901d930119ac57d050171752bd56",
+          "status": "removed"
+        },
+        {
+          "path": "src/Enums/EvolutionEarlyStoppingMetric.cs",
+          "previousPath": null,
+          "sha": "932aafe9c0c634277e74e1fb41937b9c0b2652ca",
+          "status": "removed"
+        },
+        {
+          "path": "src/Enums/EvolutionEvaluationStatus.cs",
+          "previousPath": null,
+          "sha": "27a5dd5c0e176e1a12f6db6418c109f94f58471a",
+          "status": "removed"
+        },
+        {
+          "path": "src/Enums/EvolutionEventKind.cs",
+          "previousPath": null,
+          "sha": "fcccce0bdeeabdfa214381d12dc846f756f08a0e",
+          "status": "removed"
+        },
+        {
+          "path": "src/Enums/EvolutionExecutionMode.cs",
+          "previousPath": null,
+          "sha": "3c0643da33d81eeafb897d4b869a46460e695955",
+          "status": "removed"
+        },
+        {
+          "path": "src/Enums/EvolutionExploitationSource.cs",
+          "previousPath": null,
+          "sha": "8916ea1db2fa74eb51ea1e74921d0872825a73e7",
+          "status": "removed"
+        },
+        {
+          "path": "src/Enums/EvolutionFailurePolicy.cs",
+          "previousPath": null,
+          "sha": "e967e0949ae6cf883e01f93f91c7a276d45db207",
+          "status": "removed"
+        },
+        {
+          "path": "src/Enums/EvolutionIslandAssignmentStrategy.cs",
+          "previousPath": null,
+          "sha": "e8174feabbfa37a2753e462a696bf16fb8c5eb72",
+          "status": "removed"
+        },
+        {
+          "path": "src/Enums/EvolutionMigrationTopology.cs",
+          "previousPath": null,
+          "sha": "05f7a93d35ae340b2aa03976ff461c545ddafb5a",
+          "status": "removed"
+        },
+        {
+          "path": "src/Enums/EvolutionMigrationTrigger.cs",
+          "previousPath": null,
+          "sha": "a9a67e32cefe600552436b4463ccfcb626c8144d",
+          "status": "removed"
+        },
+        {
+          "path": "src/Enums/EvolutionOptimizationDirection.cs",
+          "previousPath": null,
+          "sha": "fba05f051cc0e2e549eab002858c627bf67770b9",
+          "status": "removed"
+        },
+        {
+          "path": "src/Enums/EvolutionOutOfRangePolicy.cs",
+          "previousPath": null,
+          "sha": "77de03fc010398dbd14a277b47a5342ecc4c730e",
+          "status": "removed"
+        },
+        {
+          "path": "src/Enums/EvolutionRetryStatuses.cs",
+          "previousPath": null,
+          "sha": "485f21f9e05a4f9ee780c8306ce32662c8e3bf36",
+          "status": "removed"
+        },
+        {
+          "path": "src/Enums/EvolutionSelectionPolicyKind.cs",
+          "previousPath": null,
+          "sha": "16d52bb45fe65ae31d4dec24a688be5e8f9beac7",
+          "status": "removed"
+        },
+        {
+          "path": "src/Enums/EvolutionStopReason.cs",
+          "previousPath": null,
+          "sha": "b139c58cd576f9faa7b0c411ce831974f6aebfe1",
+          "status": "removed"
+        },
+        {
+          "path": "src/Enums/EvolutionTraceFormat.cs",
+          "previousPath": null,
+          "sha": "c9ba6b3d1f8230ceaed8224e75d18a35dbb1e8e2",
+          "status": "removed"
+        },
+        {
+          "path": "src/Evolution/CuriosityEvolutionSelectionPolicy.cs",
+          "previousPath": null,
+          "sha": "1bd346bf1fb1e08dfc6ea4e2b3f7e3d25499daff",
+          "status": "removed"
+        },
+        {
+          "path": "src/Evolution/DirectoryEvolutionCheckpointStore.cs",
+          "previousPath": null,
+          "sha": "e653127083b645c46ed8b36b61537e95be69c254",
+          "status": "removed"
+        },
+        {
+          "path": "src/Evolution/DoubleEvolutionSelectionPolicy.cs",
+          "previousPath": null,
+          "sha": "8fd2984ee4ea8577a1586a9fb7e92e299b47fc76",
+          "status": "removed"
+        },
+        {
+          "path": "src/Evolution/EvolutionArchiveEntry.cs",
+          "previousPath": null,
+          "sha": "b8a8ccab92faaead3f9dea6bf298bf8ef7cc05d7",
+          "status": "removed"
+        },
+        {
+          "path": "src/Evolution/EvolutionArchiveQuery.cs",
+          "previousPath": null,
+          "sha": "a95b18390eadc56f42a55493bb6c056f3713ab69",
+          "status": "removed"
+        },
+        {
+          "path": "src/Evolution/EvolutionArchiveSnapshot.cs",
+          "previousPath": null,
+          "sha": "c125836d5f45a8d99dbf591485953b9300547c37",
+          "status": "removed"
+        },
+        {
+          "path": "src/Evolution/EvolutionArtifact.cs",
+          "previousPath": null,
+          "sha": "a1437358cb018fde2b58d89a7f713982ba0c1425",
+          "status": "removed"
+        },
+        {
+          "path": "src/Evolution/EvolutionArtifactSanitizer.cs",
+          "previousPath": null,
+          "sha": "f064e96273d0347b9149b148350b0634e79b1a87",
+          "status": "removed"
+        },
+        {
+          "path": "src/Evolution/EvolutionCandidate.cs",
+          "previousPath": null,
+          "sha": "2f3b9b7b4fbd3075cb3b6520e72fc2ab61108464",
+          "status": "removed"
+        },
+        {
+          "path": "src/Evolution/EvolutionCanonicalGenome.cs",
+          "previousPath": null,
+          "sha": "6443fa4d0faf59c67e92f91adc475fecaec4dc1d",
+          "status": "removed"
+        },
+        {
+          "path": "src/Evolution/EvolutionCellKey.cs",
+          "previousPath": null,
+          "sha": "c00104aaaa8a74d67dbcb93811549bd1ff4efa57",
+          "status": "removed"
+        },
+        {
+          "path": "src/Evolution/EvolutionCheckpoint.cs",
+          "previousPath": null,
+          "sha": "41c1ed585d491be136063c6a861e1f16d3dc0fad",
+          "status": "removed"
+        },
+        {
+          "path": "src/Evolution/EvolutionCheckpointContents.cs",
+          "previousPath": null,
+          "sha": "2a36993517ded9d18ce444a7174a60ffcc85b44f",
+          "status": "removed"
+        },
+        {
+          "path": "src/Evolution/EvolutionCheckpointDescriptor.cs",
+          "previousPath": null,
+          "sha": "33b801ff95c8f99ebed725239d91d707ad3c1f25",
+          "status": "removed"
+        },
+        {
+          "path": "src/Evolution/EvolutionCheckpointEntry.cs",
+          "previousPath": null,
+          "sha": "a8ebd9d4ca74e57ad73de2db210e8e44a7af1cfb",
+          "status": "removed"
+        },
+        {
+          "path": "src/Evolution/EvolutionDescriptorCalibration.cs",
+          "previousPath": null,
+          "sha": "cf2ff08367abba532e1a1d06810191231011141a",
+          "status": "removed"
+        },
+        {
+          "path": "src/Evolution/EvolutionDescriptorCalibrator.cs",
+          "previousPath": null,
+          "sha": "b78d37639af5b89d79d4b8127d9782d7333bb7b5",
+          "status": "removed"
+        },
+        {
+          "path": "src/Evolution/EvolutionDescriptorDefinition.cs",
+          "previousPath": null,
+          "sha": "93d54cc39f1afebaab34ea4ef36727112750274e",
+          "status": "removed"
+        },
+        {
+          "path": "src/Evolution/EvolutionDiagnostic.cs",
+          "previousPath": null,
+          "sha": "89357c57c605a2ca8b7ec8267f82a14360d049e8",
+          "status": "removed"
+        },
+        {
+          "path": "src/Evolution/EvolutionEliteRecord.cs",
+          "previousPath": null,
+          "sha": "d1e7be6d1ea51c31925d800cd39eb52f1efdbd5f",
+          "status": "removed"
+        },
+        {
+          "path": "src/Evolution/EvolutionEngine.Cascade.cs",
+          "previousPath": null,
+          "sha": "be168aa05863c87852cb1d3c7c5a5dbaa351a367",
+          "status": "removed"
+        },
+        {
+          "path": "src/Evolution/EvolutionEngine.Continuous.cs",
+          "previousPath": null,
+          "sha": "785aa616804c3df8bafe185ad15cab6eaa6d067f",
+          "status": "removed"
+        },
+        {
+          "path": "src/Evolution/EvolutionEngine.Evaluation.cs",
+          "previousPath": null,
+          "sha": "34463a1ad421327bae330382a72667c7a88aaf51",
+          "status": "removed"
+        },
+        {
+          "path": "src/Evolution/EvolutionEngine.Persistence.cs",
+          "previousPath": null,
+          "sha": "ac5d31d53d725b771636005f1115db4bf27743be",
+          "status": "removed"
+        },
+        {
+          "path": "src/Evolution/EvolutionEngine.cs",
+          "previousPath": null,
+          "sha": "c48a6d9e6ae1f56acc90340fb735bed435e3a6f7",
+          "status": "removed"
+        },
+        {
+          "path": "src/Evolution/EvolutionEntryOrdering.cs",
+          "previousPath": null,
+          "sha": "922a4f71ef90b8c01559967f6317af0596224156",
+          "status": "removed"
+        },
+        {
+          "path": "src/Evolution/EvolutionEvaluation.cs",
+          "previousPath": null,
+          "sha": "81914baa9dd2a1174c49a86cc607a1f2dd1ab989",
+          "status": "removed"
+        },
+        {
+          "path": "src/Evolution/EvolutionEvaluationContext.cs",
+          "previousPath": null,
+          "sha": "cedb8e2cd83aee5bac875a6bd337f198a74c0c60",
+          "status": "removed"
+        },
+        {
+          "path": "src/Evolution/EvolutionEvaluationCost.cs",
+          "previousPath": null,
+          "sha": "80c7fb79add15273f8a6708832a8e19f5dedb888",
+          "status": "removed"
+        },
+        {
+          "path": "src/Evolution/EvolutionEvent.cs",
+          "previousPath": null,
+          "sha": "256c99e8c024d165b2f09b013722f7f6f5019f8b",
+          "status": "removed"
+        },
+        {
+          "path": "src/Evolution/EvolutionGlobalEliteIndex.cs",
+          "previousPath": null,
+          "sha": "6a7f0711b4366b2f6781a0797446ca542304da77",
+          "status": "removed"
+        },
+        {
+          "path": "src/Evolution/EvolutionHash.cs",
+          "previousPath": null,
+          "sha": "c2129f24aa111f793d0e3fe5695c59fa5d6830d0",
+          "status": "removed"
+        },
+        {
+          "path": "src/Evolution/EvolutionIslandHistory.cs",
+          "previousPath": null,
+          "sha": "5e532dec29fc87f73c41111c2901b12b5fbaa1b7",
+          "status": "removed"
+        },
+        {
+          "path": "src/Evolution/EvolutionIslandStatus.cs",
+          "previousPath": null,
+          "sha": "85824fc02f6f15a22fabb49a4d29ecd29729a4de",
+          "status": "removed"
+        },
+        {
+          "path": "src/Evolution/EvolutionLineage.cs",
+          "previousPath": null,
+          "sha": "4bf2dc4ad705e2481648d27a372c695443cfa1f2",
+          "status": "removed"
+        },
+        {
+          "path": "src/Evolution/EvolutionMigration.cs",
+          "previousPath": null,
+          "sha": "6cd1fa2822e45b8d98804b2e9cad9ce6c57f66e4",
+          "status": "removed"
+        },
+        {
+          "path": "src/Evolution/EvolutionOutputLayout.cs",
+          "previousPath": null,
+          "sha": "99f471e66332208130af9d51b2dde6b7fa939995",
+          "status": "removed"
+        },
+        {
+          "path": "src/Evolution/EvolutionRefinementContext.cs",
+          "previousPath": null,
+          "sha": "bad5478b14aab959d50a93062e16b1d8eb6221e1",
+          "status": "removed"
+        },
+        {
+          "path": "src/Evolution/EvolutionRunCounters.cs",
+          "previousPath": null,
+          "sha": "5b8a9cc73233323e9ec5ac8215795783fc3bf337",
+          "status": "removed"
+        },
+        {
+          "path": "src/Evolution/EvolutionRunResult.cs",
+          "previousPath": null,
+          "sha": "0aa872fd1c3f3b1c54dfd6243bc91dc522916870",
+          "status": "removed"
+        },
+        {
+          "path": "src/Evolution/EvolutionSelection.cs",
+          "previousPath": null,
+          "sha": "ab4b967220c3d2c7e438c892b0a61240c345f404",
+          "status": "removed"
+        },
+        {
+          "path": "src/Evolution/EvolutionTaskResult.cs",
+          "previousPath": null,
+          "sha": "aeaa066388fc7a7fd7a46ef645dc40cbf4201eec",
+          "status": "removed"
+        },
+        {
+          "path": "src/Evolution/EvolutionTraceFile.cs",
+          "previousPath": null,
+          "sha": "13edfd5a23ff6b65e89fcc2e12c6480f26cf3bcf",
+          "status": "removed"
+        },
+        {
+          "path": "src/Evolution/EvolutionTraceObserver.cs",
+          "previousPath": null,
+          "sha": "38d25375781f1969d7bdcf96dda41003ca975522",
+          "status": "removed"
+        },
+        {
+          "path": "src/Evolution/EvolutionTraceReadResult.cs",
+          "previousPath": null,
+          "sha": "4921dc4e2d5c3454f4f9f1026c5a7b7deddb5d52",
+          "status": "removed"
+        },
+        {
+          "path": "src/Evolution/EvolutionTraceRecord.cs",
+          "previousPath": null,
+          "sha": "48a3044ca47c01b0ebfbf693efd07a2e21bba576",
+          "status": "removed"
+        },
+        {
+          "path": "src/Evolution/EvolutionTraceSummary.cs",
+          "previousPath": null,
+          "sha": "43d141529764681b327298b5febd8bc62ada7e6a",
+          "status": "removed"
+        },
+        {
+          "path": "src/Evolution/EvolutionVariationContext.cs",
+          "previousPath": null,
+          "sha": "24a0cceaa2723ee26087eb931539c5bed5e1f867",
+          "status": "removed"
+        },
+        {
+          "path": "src/Evolution/InMemoryEvolutionCheckpointStore.cs",
+          "previousPath": null,
+          "sha": "92fab8352d2d4d9c3e89d60aca4117488e1f7c98",
+          "status": "removed"
+        },
+        {
+          "path": "src/Evolution/JsonEvolutionCheckpointStore.cs",
+          "previousPath": null,
+          "sha": "6c0c35d525da46671690771342f040c62569ffbc",
+          "status": "removed"
+        },
+        {
+          "path": "src/Evolution/MapElitesArchive.cs",
+          "previousPath": null,
+          "sha": "ebc1ac47957d9298a1ec6e596fcc4454dec09371",
+          "status": "removed"
+        },
+        {
+          "path": "src/Evolution/Programs/CorrectnessGatedProgramFitnessEvaluator.cs",
+          "previousPath": null,
+          "sha": "a13e3debcc059e6914217423e15d813c5318f050",
+          "status": "added"
+        },
+        {
+          "path": "src/Evolution/Programs/FencedCodeExtractor.cs",
+          "previousPath": null,
+          "sha": "09d7c4e1c7b627c34cc8b402809b487356b59f85",
+          "status": "modified"
+        },
+        {
+          "path": "src/Evolution/Programs/IProgramVariationOperator.cs",
+          "previousPath": null,
+          "sha": "298089b35264689644ed83d15860d92fe9b4bea3",
+          "status": "added"
+        },
+        {
+          "path": "src/Evolution/Programs/InputOutputProgramFitnessEvaluator.cs",
+          "previousPath": null,
+          "sha": "85b3beb7f6e147d264f94685b53cbe41a8a54a54",
+          "status": "modified"
+        },
+        {
+          "path": "src/Evolution/Programs/LlmJudgeProgramFitnessEvaluator.cs",
+          "previousPath": null,
+          "sha": "a1379dca3620c19129b309d002649b349ebfc6d8",
+          "status": "modified"
+        },
+        {
+          "path": "src/Evolution/Programs/LlmProgramVariationOperator.cs",
+          "previousPath": null,
+          "sha": "5c448c44a8f023def6a9f9bbc3dd2be0be708811",
+          "status": "modified"
+        },
+        {
+          "path": "src/Evolution/Programs/Outputs/ProgramRunOutputWriter.cs",
+          "previousPath": null,
+          "sha": "cd1afc530c04786b6cadc74c926ade40fd0c78e8",
+          "status": "modified"
+        },
+        {
+          "path": "src/Evolution/Programs/PersistentProgramFitnessEvaluator.cs",
+          "previousPath": null,
+          "sha": "301663734d18780cb65d055b6819301ae15b388f",
+          "status": "added"
+        },
+        {
+          "path": "src/Evolution/Programs/ProgramEditBoundary.cs",
+          "previousPath": null,
+          "sha": "0bde20a82ce401869b1b4bff01d4a41d64bd3c6c",
+          "status": "added"
+        },
+        {
+          "path": "src/Evolution/Programs/ProgramEvolutionTask.cs",
+          "previousPath": null,
+          "sha": "00a9260b4fd3188e0b427d3e4ceee561a724dbb3",
+          "status": "modified"
+        },
+        {
+          "path": "src/Evolution/Programs/ProgramGenome.cs",
+          "previousPath": null,
+          "sha": "b07fdcc2556a59f28804a383e310165448c9b978",
+          "status": "modified"
+        },
+        {
+          "path": "src/Evolution/Programs/ProgramGenomeCodec.cs",
+          "previousPath": null,
+          "sha": "d6683923a922a612a5445b1cab1cc380ab835c31",
+          "status": "modified"
+        },
+        {
+          "path": "src/Evolution/Programs/ProgramText.cs",
+          "previousPath": null,
+          "sha": "52a8a6ea936aa04ef498c43dd9ddf6de32a40e64",
+          "status": "modified"
+        },
+        {
+          "path": "src/Evolution/Programs/SandboxedProgramFitnessEvaluator.cs",
+          "previousPath": null,
+          "sha": "d5fbf3c9e033d1bdb444c1c8f7a438cba3ac32e3",
+          "status": "modified"
+        },
+        {
+          "path": "src/Evolution/Programs/VersionPinnedProgramFitnessEvaluator.cs",
+          "previousPath": null,
+          "sha": "c202a985471105d866f986b9a3ef7d268c9f3d1c",
+          "status": "added"
+        },
+        {
+          "path": "src/Evolution/RatioEvolutionSelectionPolicy.cs",
+          "previousPath": null,
+          "sha": "af1b4bc8e8d80715319809c67de3e97dfe45c711",
+          "status": "removed"
+        },
+        {
+          "path": "src/Evolution/RingMigrationPolicy.cs",
+          "previousPath": null,
+          "sha": "1009f7617aa6fa908564a532f7605736eb593442",
+          "status": "removed"
+        },
+        {
+          "path": "src/Evolution/StableRandom.cs",
+          "previousPath": null,
+          "sha": "a605648d17c92ea18b79fa35fde192e53a33f5dc",
+          "status": "removed"
+        },
+        {
+          "path": "src/Evolution/StableRandomState.cs",
+          "previousPath": null,
+          "sha": "aa6fc4bfee485cb02af430db3c1f455e03cc52c7",
+          "status": "removed"
+        },
+        {
+          "path": "src/Evolution/TopologyMigrationPolicy.cs",
+          "previousPath": null,
+          "sha": "7aea81c4a36cb7dac705cd2f9704cb276fa7b88f",
+          "status": "removed"
+        },
+        {
+          "path": "src/Evolution/UniformEvolutionSelectionPolicy.cs",
+          "previousPath": null,
+          "sha": "b96c39f176af3410e0dd9bb81fa75e88bd91cb0b",
+          "status": "removed"
+        },
+        {
+          "path": "src/Interfaces/IAiModelBuilder.cs",
+          "previousPath": null,
+          "sha": "7e6ab0f4312a9a30889114d7492b89f070e6a97d",
+          "status": "modified"
+        },
+        {
+          "path": "src/Interfaces/ICandidateRefiner.cs",
+          "previousPath": null,
+          "sha": "7ce3828781c0d032ef83c01a6054ceb74bbeb6fa",
+          "status": "removed"
+        },
+        {
+          "path": "src/Interfaces/ICascadeEvolutionTask.cs",
+          "previousPath": null,
+          "sha": "9d1adbb926a409702bc6bf63bc0714126e7693b3",
+          "status": "removed"
+        },
+        {
+          "path": "src/Interfaces/ICheckpointableEvolutionArchive.cs",
+          "previousPath": null,
+          "sha": "bd907d762ad1991d3d991a1d1c6ea0400d155915",
+          "status": "removed"
+        },
+        {
+          "path": "src/Interfaces/ICheckpointableVariationOperator.cs",
+          "previousPath": null,
+          "sha": "95987ca560abf6a5bd29685809d12fa181f9ff97",
+          "status": "removed"
+        },
+        {
+          "path": "src/Interfaces/IEliteIndexAwareEvolutionSelectionPolicy.cs",
+          "previousPath": null,
+          "sha": "e9bfe86dc33f857e6a8ef19da619643ced15b1f2",
+          "status": "removed"
+        },
+        {
+          "path": "src/Interfaces/IEvolutionArchive.cs",
+          "previousPath": null,
+          "sha": "95e679115db9748b90d61ff73d72c87625a64346",
+          "status": "removed"
+        },
+        {
+          "path": "src/Interfaces/IEvolutionArchiveView.cs",
+          "previousPath": null,
+          "sha": "3540ae24a58327fe2146f0c978006b033dfeae01",
+          "status": "removed"
+        },
+        {
+          "path": "src/Interfaces/IEvolutionCheckpointStore.cs",
+          "previousPath": null,
+          "sha": "e2fc75e5b6b1c83480f88d89bfdeea018776b850",
+          "status": "removed"
+        },
+        {
+          "path": "src/Interfaces/IEvolutionGenomeCodec.cs",
+          "previousPath": null,
+          "sha": "642dfbedcc6e1afd0efb6d1d5160f20947e07ee6",
+          "status": "removed"
+        },
+        {
+          "path": "src/Interfaces/IEvolutionObserver.cs",
+          "previousPath": null,
+          "sha": "409fd3922fb6379bc708d85ea15352eeb9f1557c",
+          "status": "removed"
+        },
+        {
+          "path": "src/Interfaces/IEvolutionTask.cs",
+          "previousPath": null,
+          "sha": "8d0e72bffeb62a3776f52364732b93e7fff6ce1f",
+          "status": "removed"
+        },
+        {
+          "path": "src/Interfaces/IGenomeDistance.cs",
+          "previousPath": null,
+          "sha": "efd80a1ed7b3a2616c3b4490a2a27baf763d7ab9",
+          "status": "removed"
+        },
+        {
+          "path": "src/Interfaces/IGrowableEvolutionArchive.cs",
+          "previousPath": null,
+          "sha": "77b03304b6d1de1191652cb36cf9ea653d2457db",
+          "status": "removed"
+        },
+        {
+          "path": "src/Interfaces/IMigrationPolicy.cs",
+          "previousPath": null,
+          "sha": "e5ab107e75403d27b7c8c82a4edf553ac6143313",
+          "status": "removed"
+        },
+        {
+          "path": "src/Interfaces/IOutcomeAwareEvolutionSelectionPolicy.cs",
+          "previousPath": null,
+          "sha": "c22566a970ca8dcafe1c59e6b342216792fc696c",
+          "status": "removed"
+        },
+        {
+          "path": "src/Interfaces/IProgramMeasurementEvidenceStore.cs",
+          "previousPath": null,
+          "sha": "863f19f3f85d5187be4322f69f5c6a6cfbbeaeda",
+          "status": "added"
+        },
+        {
+          "path": "src/Interfaces/ISelectionPolicy.cs",
+          "previousPath": null,
+          "sha": "563083406d420d9b606a51762ccd79a63e8d5bfb",
+          "status": "removed"
+        },
+        {
+          "path": "src/Interfaces/IVariationOperator.cs",
+          "previousPath": null,
+          "sha": "aa6a6f4cbe137ec76afac592c3c6b1be31a9a6d2",
+          "status": "removed"
+        },
+        {
+          "path": "src/Models/Results/AiModelResult.Evolution.cs",
+          "previousPath": null,
+          "sha": "ad4e11fb92b2ac05d44acf7ba205fb0a0ebe00b8",
+          "status": "modified"
+        },
+        {
+          "path": "src/ProgramSynthesis/Execution/ProcessProgramExecutionEngine.cs",
+          "previousPath": null,
+          "sha": "72036a0a54ecdee809736dba305ca52d376a061e",
+          "status": "modified"
+        },
+        {
+          "path": "tests/AiDotNet.Evolution.CSharp.Tests/AiDotNet.Evolution.CSharp.Tests.csproj",
+          "previousPath": null,
+          "sha": "07598ace0797cbfe1b70ee5d8eacd476b7d2ca8e",
+          "status": "added"
+        },
+        {
+          "path": "tests/AiDotNet.Evolution.CSharp.Tests/CSharpConfigurationTests.cs",
+          "previousPath": null,
+          "sha": "7165e502f1aa8d824aa06b294739909ffdc93c21",
+          "status": "added"
+        },
+        {
+          "path": "tests/AiDotNet.Evolution.CSharp.Tests/CSharpPatchCompilerTests.cs",
+          "previousPath": null,
+          "sha": "15cf85df00a38714739f87c2ab36ff2f2afff0ec",
+          "status": "added"
+        },
+        {
+          "path": "tests/AiDotNet.Evolution.CSharp.Tests/CSharpProposalSourceTests.cs",
+          "previousPath": null,
+          "sha": "cd832013ccac58b834e2aa8dc5d1e23dcd239b2f",
+          "status": "added"
+        },
+        {
+          "path": "tests/AiDotNet.Evolution.CSharp.Tests/CSharpWorkerTests.cs",
+          "previousPath": null,
+          "sha": "0688b692bf04b54c096a8c81c6a170851fcc6d66",
+          "status": "added"
+        },
+        {
+          "path": "tests/AiDotNet.Evolution.CSharp.Tests/CompilerTestSupport.cs",
+          "previousPath": null,
+          "sha": "5dccf9470f51b093d3f84b75bdb0396a86686713",
+          "status": "added"
+        },
+        {
+          "path": "tests/AiDotNet.Evolution.Integration.Tests/AiDotNet.Evolution.Integration.Tests.csproj",
+          "previousPath": null,
+          "sha": "1b7a13609aed78d967aa96a0fe3f1fa5bf8afcae",
+          "status": "added"
+        },
+        {
+          "path": "tests/AiDotNet.Evolve.Cli.Tests/AiDotNet.Evolve.Cli.Tests.csproj",
+          "previousPath": null,
+          "sha": "d78e035f8d8a3a29516db9e587f875805c2d1f24",
+          "status": "added"
+        },
+        {
+          "path": "tests/AiDotNet.Evolve.Cli.Tests/ProgramBenchmarkTests.cs",
+          "previousPath": null,
+          "sha": "5d876d225fb95a860f69d8dda5787bbba06e91ce",
+          "status": "added"
+        },
+        {
+          "path": "tests/AiDotNet.Tests/IntegrationTests/AutoML/MapElitesAutoMLIntegrationTests.cs",
+          "previousPath": null,
+          "sha": "df3cf4c184923434d90be44bbb8fe076cf170142",
+          "status": "modified"
+        },
+        {
+          "path": "tests/AiDotNet.Tests/IntegrationTests/Configuration/EvolutionYamlConfigTests.cs",
+          "previousPath": null,
+          "sha": "d5b59b3b3c359f45aa2808f5de264919e30d287f",
+          "status": "modified"
+        },
+        {
+          "path": "tests/AiDotNet.Tests/IntegrationTests/Evolution/EvolutionFacadeIntegrationTests.cs",
+          "previousPath": null,
+          "sha": "58d1c49f4b26549a2b4f4c969e74538440885e82",
+          "status": "modified"
+        },
+        {
+          "path": "tests/AiDotNet.Tests/UnitTests/Evolution/DirectoryEvolutionCheckpointStoreTests.cs",
+          "previousPath": null,
+          "sha": "69a6b68c254f2b57a280dc2fc9e4d55690e10d93",
+          "status": "removed"
+        },
+        {
+          "path": "tests/AiDotNet.Tests/UnitTests/Evolution/EvolutionAuditRegressionTests.cs",
+          "previousPath": null,
+          "sha": "83b4b104f9bd67ba5aece29b1d8f1cb3e09c6410",
+          "status": "modified"
+        },
+        {
+          "path": "tests/AiDotNet.Tests/UnitTests/Evolution/EvolutionCheckpointReadingTests.cs",
+          "previousPath": null,
+          "sha": "22d57c1778d8d35f9f505ccff66dbe3f3ea27f08",
+          "status": "removed"
+        },
+        {
+          "path": "tests/AiDotNet.Tests/UnitTests/Evolution/EvolutionCheckpointStoreTests.cs",
+          "previousPath": null,
+          "sha": "37c79532f3604e493d99a921b928d0647fd7670f",
+          "status": "removed"
+        },
+        {
+          "path": "tests/AiDotNet.Tests/UnitTests/Evolution/EvolutionContinuousDispatchTests.cs",
+          "previousPath": null,
+          "sha": "f1f63b7ba332330022d4a2f05f5683119725399d",
+          "status": "removed"
+        },
+        {
+          "path": "tests/AiDotNet.Tests/UnitTests/Evolution/EvolutionCoreParityTests.cs",
+          "previousPath": null,
+          "sha": "59f97e1e7ac782fb67bab1f9f86b684e06ade369",
+          "status": "removed"
+        },
+        {
+          "path": "tests/AiDotNet.Tests/UnitTests/Evolution/EvolutionDescriptorCalibrationTests.cs",
+          "previousPath": null,
+          "sha": "04a3d95fee2cd62343d0bb85095037ff31909ebc",
+          "status": "removed"
+        },
+        {
+          "path": "tests/AiDotNet.Tests/UnitTests/Evolution/EvolutionDescriptorGrowthTests.cs",
+          "previousPath": null,
+          "sha": "87ce2ec6ad6805d842804f977e3c219cddbb1d14",
+          "status": "removed"
+        },
+        {
+          "path": "tests/AiDotNet.Tests/UnitTests/Evolution/EvolutionDescriptorTests.cs",
+          "previousPath": null,
+          "sha": "8e850c891f40acb650c19c4a137e0fbda722303c",
+          "status": "removed"
+        },
+        {
+          "path": "tests/AiDotNet.Tests/UnitTests/Evolution/EvolutionEngineReachabilityTests.cs",
+          "previousPath": null,
+          "sha": "598092e472f60aa7883953aded922fb0e151763c",
+          "status": "removed"
+        },
+        {
+          "path": "tests/AiDotNet.Tests/UnitTests/Evolution/EvolutionEngineTests.cs",
+          "previousPath": null,
+          "sha": "409dc92fbf99e8ffba0bf7c880c4445e85a99758",
+          "status": "removed"
+        },
+        {
+          "path": "tests/AiDotNet.Tests/UnitTests/Evolution/EvolutionEvaluationParityTests.cs",
+          "previousPath": null,
+          "sha": "6eec207dea902bc597bfe0df1f5a2c00b62e3a07",
+          "status": "removed"
+        },
+        {
+          "path": "tests/AiDotNet.Tests/UnitTests/Evolution/EvolutionFacadeTestDoubles.cs",
+          "previousPath": null,
+          "sha": "64651f5a6f50b1c7c495cad4f0c9f6963ba48275",
+          "status": "added"
+        },
+        {
+          "path": "tests/AiDotNet.Tests/UnitTests/Evolution/EvolutionMetricQueryTests.cs",
+          "previousPath": null,
+          "sha": "1173dce7ba39a751a036787edf4f39f8a70ff7db",
+          "status": "removed"
+        },
+        {
+          "path": "tests/AiDotNet.Tests/UnitTests/Evolution/EvolutionMigrationTopologyTests.cs",
+          "previousPath": null,
+          "sha": "0bf3c3c010cd16a0b667043b4d19a9e8f5625928",
+          "status": "removed"
+        },
+        {
+          "path": "tests/AiDotNet.Tests/UnitTests/Evolution/EvolutionOptionClassificationTests.cs",
+          "previousPath": null,
+          "sha": "2469c7dd8018348c977d6d15bdf0ef26aa9c1b39",
+          "status": "removed"
+        },
+        {
+          "path": "tests/AiDotNet.Tests/UnitTests/Evolution/EvolutionRebaseTests.cs",
+          "previousPath": null,
+          "sha": "28a5b63d687f798d3f449889f156ad30ec3e650e",
+          "status": "modified"
+        },
+        {
+          "path": "tests/AiDotNet.Tests/UnitTests/Evolution/EvolutionResumeBudgetTests.cs",
+          "previousPath": null,
+          "sha": "3e883c6a9b03949535086b7fc342ee3b6c9dc76a",
+          "status": "removed"
+        },
+        {
+          "path": "tests/AiDotNet.Tests/UnitTests/Evolution/EvolutionSelectionPolicyTests.cs",
+          "previousPath": null,
+          "sha": "abb0dfd0964f80fe1e8e3bf3f36ec3d443460950",
+          "status": "removed"
+        },
+        {
+          "path": "tests/AiDotNet.Tests/UnitTests/Evolution/EvolutionTestDoubles.cs",
+          "previousPath": null,
+          "sha": "6f78599b563e01dba08caab8922efd6a4bee8472",
+          "status": "removed"
+        },
+        {
+          "path": "tests/AiDotNet.Tests/UnitTests/Evolution/EvolutionTraceTests.cs",
+          "previousPath": null,
+          "sha": "436c007f1bb87636460db2aa4c937b6e0cc4efaf",
+          "status": "removed"
+        },
+        {
+          "path": "tests/AiDotNet.Tests/UnitTests/Evolution/EvolutionVariationStateTests.cs",
+          "previousPath": null,
+          "sha": "a0415989ff8a927a93667bc0927443e8096c9745",
+          "status": "removed"
+        },
+        {
+          "path": "tests/AiDotNet.Tests/UnitTests/Evolution/MapElitesArchiveTests.cs",
+          "previousPath": null,
+          "sha": "bc68f24623635a13d3d5d4663e594f10fc96ab3f",
+          "status": "removed"
+        },
+        {
+          "path": "tests/AiDotNet.Tests/UnitTests/Evolution/Programs/CorrectnessGatedProgramFitnessEvaluatorTests.cs",
+          "previousPath": null,
+          "sha": "4453bef2b5e9614f9592c84fbc776f77fc58a976",
+          "status": "added"
+        },
+        {
+          "path": "tests/AiDotNet.Tests/UnitTests/Evolution/Programs/FencedCodeExtractorTests.cs",
+          "previousPath": null,
+          "sha": "eb04105b3aa7f2c812ae9bf154cd69ef6c74428f",
+          "status": "modified"
+        },
+        {
+          "path": "tests/AiDotNet.Tests/UnitTests/Evolution/Programs/LlmExtrasTests.cs",
+          "previousPath": null,
+          "sha": "ad210400524b5df9057c41031033ccfdbdaac33a",
+          "status": "modified"
+        },
+        {
+          "path": "tests/AiDotNet.Tests/UnitTests/Evolution/Programs/LlmProgramVariationOperatorTests.cs",
+          "previousPath": null,
+          "sha": "a6c39491666d49e445239c95e609f2891f2c5dc4",
+          "status": "modified"
+        },
+        {
+          "path": "tests/AiDotNet.Tests/UnitTests/Evolution/Programs/Novelty/ProgramGenomeDistanceTests.cs",
+          "previousPath": null,
+          "sha": "880ae79e3984221416b7df15f2924da25056183b",
+          "status": "modified"
+        },
+        {
+          "path": "tests/AiDotNet.Tests/UnitTests/Evolution/Programs/PersistentProgramFitnessEvaluatorTests.cs",
+          "previousPath": null,
+          "sha": "8a8176fdfa8b2145a295d5bca21c2039a3931a6c",
+          "status": "added"
+        },
+        {
+          "path": "tests/AiDotNet.Tests/UnitTests/Evolution/Programs/ProgramEditBoundaryTests.cs",
+          "previousPath": null,
+          "sha": "c7df1dcbc4d30e9df1f08796975a7c768a4b2ba4",
+          "status": "added"
+        },
+        {
+          "path": "tests/AiDotNet.Tests/UnitTests/Evolution/Programs/ProgramEvolutionCustomizationTests.cs",
+          "previousPath": null,
+          "sha": "74e948752c6cee504cf4f675151005457182749c",
+          "status": "added"
+        },
+        {
+          "path": "tests/AiDotNet.Tests/UnitTests/Evolution/Programs/ProgramEvolutionTaskTests.cs",
+          "previousPath": null,
+          "sha": "f849d8f9351b54939dca29a9d81557c7304f4e97",
+          "status": "modified"
+        },
+        {
+          "path": "tests/AiDotNet.Tests/UnitTests/Evolution/Programs/ProgramFitnessEvaluatorTests.cs",
+          "previousPath": null,
+          "sha": "224e0a92e70ee057a3160baf4b52513933beb963",
+          "status": "modified"
+        },
+        {
+          "path": "tests/AiDotNet.Tests/UnitTests/Evolution/Programs/ProgramGenomeCodecTests.cs",
+          "previousPath": null,
+          "sha": "5e61f6bff853bb77d2ad55aa0b7da8514a707c94",
+          "status": "modified"
+        },
+        {
+          "path": "tests/AiDotNet.Tests/UnitTests/Evolution/Programs/ProgramGenomeTests.cs",
+          "previousPath": null,
+          "sha": "43c3695e05e715eba51e562bbb539f7fdaf76bce",
+          "status": "modified"
+        },
+        {
+          "path": "tests/AiDotNet.Tests/UnitTests/Evolution/Programs/ProgramMeasurementOriginTests.cs",
+          "previousPath": null,
+          "sha": "98524a5214f72ff2e2aae9bccab35c45217ebaf2",
+          "status": "added"
+        },
+        {
+          "path": "tests/AiDotNet.Tests/UnitTests/Evolution/Programs/ProgramMetricAggregatorTests.cs",
+          "previousPath": null,
+          "sha": "ed58e5466d97573f6597989e2330f9807695e3cd",
+          "status": "modified"
+        },
+        {
+          "path": "tests/AiDotNet.Tests/UnitTests/Evolution/Programs/ProgramPromptBuilderTests.cs",
+          "previousPath": null,
+          "sha": "37d6b1900789e474c6329799fd4d6e126346603e",
+          "status": "modified"
+        },
+        {
+          "path": "tests/AiDotNet.Tests/UnitTests/Evolution/Programs/ProgramRunOutputTests.cs",
+          "previousPath": null,
+          "sha": "7f4f98fe358c81085cb916bafb2cd5f53de1bf4f",
+          "status": "modified"
+        },
+        {
+          "path": "tests/AiDotNet.Tests/UnitTests/Evolution/Programs/ProgramSourceIdentityTests.cs",
+          "previousPath": null,
+          "sha": "550435ec5c2975e0e9c887a311dfe3935a50cb0d",
+          "status": "added"
+        },
+        {
+          "path": "tests/AiDotNet.Tests/UnitTests/Evolution/Programs/SandboxedProgramFitnessEvaluatorTests.cs",
+          "previousPath": null,
+          "sha": "b58b56a065708195ff82641818d48a5d86452dd6",
+          "status": "modified"
+        },
+        {
+          "path": "tests/AiDotNet.Tests/UnitTests/Evolution/StableRandomTests.cs",
+          "previousPath": null,
+          "sha": "46add19b7655eb8ac3b3aec7141b2056156b7b78",
+          "status": "removed"
+        },
+        {
+          "path": "tools/AiDotNet.CSharp.Worker/AiDotNet.CSharp.Worker.csproj",
+          "previousPath": null,
+          "sha": "594ee0be98502973d63ebff83a67b345db8912fc",
+          "status": "added"
+        },
+        {
+          "path": "tools/AiDotNet.CSharp.Worker/Program.cs",
+          "previousPath": null,
+          "sha": "6f6fd9187f372d3d06e8d7c7101815b19f6a0b56",
+          "status": "added"
+        },
+        {
+          "path": "tools/AiDotNet.CSharp.Worker/README.md",
+          "previousPath": null,
+          "sha": "da34c9602ee339b99e5e29f6e4a9fba63c71c3fe",
+          "status": "added"
+        },
+        {
+          "path": "tools/AiDotNet.Evolve.Cli/AiDotNet.Evolve.Cli.csproj",
+          "previousPath": null,
+          "sha": "aa40a63e6b0d17564ebfe0f880681dff288a1dd6",
+          "status": "modified"
+        },
+        {
+          "path": "tools/AiDotNet.Evolve.Cli/EvolveCommandLine.cs",
+          "previousPath": null,
+          "sha": "c0fa9ec0a6e7fc03be86fbd1cbde3eccdec24cd8",
+          "status": "modified"
+        },
+        {
+          "path": "tools/AiDotNet.Evolve.Cli/ProgramBenchmark.cs",
+          "previousPath": null,
+          "sha": "900af0789aaffabda0c0c09b0a310d86a600550c",
+          "status": "added"
+        }
+      ]
+    },
+    {
+      "sourcePr": 2163,
+      "sourceHead": "5a1da17bdb13eac7997ce01acbd9441d20413b02",
+      "sourceBase": "feat/evolution-validated-promotion",
+      "title": "docs(roadmap): track US-03 - prevent invalid improvements from winning",
+      "files": [
+        {
+          "path": "docs/evolution-stories/US-03.md",
+          "previousPath": null,
+          "sha": "23cfb6e921afa6615426160e06ab0a96b9ba2e49",
+          "status": "added"
+        }
+      ]
+    },
+    {
+      "sourcePr": 2164,
+      "sourceHead": "4f320e0f38e2419673221a98f6c84865cd215d11",
+      "sourceBase": "feat/evolution-validated-promotion",
+      "title": "docs(roadmap): track US-11 - demonstrate value in consumer workloads",
+      "files": [
+        {
+          "path": "docs/evolution-stories/US-11.md",
+          "previousPath": null,
+          "sha": "f5d3c4f09ad2aeaa91e31d92ade3beb85e2efe42",
+          "status": "added"
+        }
+      ]
+    },
+    {
+      "sourcePr": 2165,
+      "sourceHead": "f45051f463bbd45c8f8aea455126d12d45e33a55",
+      "sourceBase": "feat/evolution-validated-promotion",
+      "title": "docs(roadmap): track US-17 - build a compiler-guided program improvement loop",
+      "files": [
+        {
+          "path": "docs/evolution-stories/US-17.md",
+          "previousPath": null,
+          "sha": "f5c39af6368c72d68bc255087345df6c68608564",
+          "status": "added"
+        }
+      ]
+    },
+    {
+      "sourcePr": 2166,
+      "sourceHead": "a5be94ec5555ff8d2d2c5e8affd4afe93d8b20dd",
+      "sourceBase": "feat/evolution-validated-promotion",
+      "title": "docs(roadmap): track US-18 - reuse experience and detect meaningful novelty",
+      "files": [
+        {
+          "path": "docs/evolution-stories/US-18.md",
+          "previousPath": null,
+          "sha": "25c93fcf568bb06f0343c81f57901ce09e56859e",
+          "status": "added"
+        }
+      ]
+    },
+    {
+      "sourcePr": 2167,
+      "sourceHead": "10b33449415bf0fd25047a594034b1bbdcf1584a",
+      "sourceBase": "feat/evolution-validated-promotion",
+      "title": "docs(roadmap): track US-19 - route models and prompts by measured return",
+      "files": [
+        {
+          "path": "docs/evolution-stories/US-19.md",
+          "previousPath": null,
+          "sha": "c7c228b5b1e3f5609c4eb576b0b6f7fb956326df",
+          "status": "added"
+        }
+      ]
+    },
+    {
+      "sourcePr": 2168,
+      "sourceHead": "9cd7d5d6c366a483874024650d02901f69a1829c",
+      "sourceBase": "feat/evolution-validated-promotion",
+      "title": "docs(roadmap): track US-24 - provide a practical run and inspection experience",
+      "files": [
+        {
+          "path": ".github/workflows/evolution-csharp.yml",
+          "previousPath": null,
+          "sha": "b55e4f41ee475752af429ff9d837b9bc4e0f6d65",
+          "status": "modified"
+        },
+        {
+          "path": "docs/PROGRAM_SAMPLE_EVIDENCE.md",
+          "previousPath": null,
+          "sha": "5105a998cf3326f86af33458676daa6a14bbf4f0",
+          "status": "added"
+        },
+        {
+          "path": "docs/evidence/raw-program-samples/d9eb58f/README.md",
+          "previousPath": null,
+          "sha": "604328215032e2f700298cd8c059f40a83b7241e",
+          "status": "added"
+        },
+        {
+          "path": "docs/evidence/raw-program-samples/d9eb58f/integrity.json",
+          "previousPath": null,
+          "sha": "789744ae879858c23eb77d294481c3c6ef963100",
+          "status": "added"
+        },
+        {
+          "path": "docs/evidence/raw-program-samples/d9eb58f/verification.zip",
+          "previousPath": null,
+          "sha": "1e3fbb43379cb3ee037c50f6f29b319fe5db1215",
+          "status": "added"
+        },
+        {
+          "path": "docs/evidence/raw-program-samples/d9eb58f/verify.py",
+          "previousPath": null,
+          "sha": "d271c9fae4f53cdcff7f5252a710144cfcec11c3",
+          "status": "added"
+        },
+        {
+          "path": "docs/evidence/us24/README.md",
+          "previousPath": null,
+          "sha": "fd9d6f14a99ec6a076ce6a320e6e3c67878a835f",
+          "status": "added"
+        },
+        {
+          "path": "docs/evidence/us24/verification.zip",
+          "previousPath": null,
+          "sha": "9b7fb82d49463af3e05d0e0ce1d162b050fa39bb",
+          "status": "added"
+        },
+        {
+          "path": "docs/evolution-stories/US-24.md",
+          "previousPath": null,
+          "sha": "245edaa6f2087bc876362f5cdf49e956ffc8851b",
+          "status": "added"
+        },
+        {
+          "path": "src/AiModelBuilder.Evolution.cs",
+          "previousPath": null,
+          "sha": "b260834791bb2f8e2915bc8ec3162ab89a389573",
+          "status": "modified"
+        },
+        {
+          "path": "src/AiModelBuilder.EvolutionControl.cs",
+          "previousPath": null,
+          "sha": "c883335fe152109fec1cb72ebd25cd879b29033a",
+          "status": "added"
+        },
+        {
+          "path": "src/AiModelBuilder.EvolutionPreflight.cs",
+          "previousPath": null,
+          "sha": "a011fc699a8062b2716f279e79afb1be14d760de",
+          "status": "added"
+        },
+        {
+          "path": "src/AiModelBuilder.ParsedConfiguration.cs",
+          "previousPath": null,
+          "sha": "0db4204e5a98a41f8221aea56051e294526f56dc",
+          "status": "added"
+        },
+        {
+          "path": "src/AiModelBuilder.ProgramCorrectness.cs",
+          "previousPath": null,
+          "sha": "f79d577fa2d52b0f21b3d80c5f4e5b3f9b82d7b9",
+          "status": "added"
+        },
+        {
+          "path": "src/Configuration/ProgramRunOutputOptions.cs",
+          "previousPath": null,
+          "sha": "a8b0cf94a2c48d439fda1b339e690dbf65e3c67e",
+          "status": "modified"
+        },
+        {
+          "path": "src/Evolution/EvolutionRunControl.cs",
+          "previousPath": null,
+          "sha": "59fa6fff94c8e2e1107febf3febd66ae68123f9b",
+          "status": "added"
+        },
+        {
+          "path": "src/Evolution/FanOutEvolutionObserver.cs",
+          "previousPath": null,
+          "sha": "4ff2644b5edc2ff7b15b59f561c93c41c5a57fca",
+          "status": "added"
+        },
+        {
+          "path": "src/Evolution/Programs/AllPassProgramFitnessEvaluator.cs",
+          "previousPath": null,
+          "sha": "be856260f162a381edb2cb8a65498f94631e7c1d",
+          "status": "added"
+        },
+        {
+          "path": "src/Evolution/Programs/CorrectnessGatedProgramFitnessEvaluator.cs",
+          "previousPath": null,
+          "sha": "74e3365658174aad742222d81917dab2ee6e82e9",
+          "status": "modified"
+        },
+        {
+          "path": "src/Evolution/Programs/DirectoryProgramSampleEvidenceStore.cs",
+          "previousPath": null,
+          "sha": "5f77f6139430b9c890de6157c155ebbaf12bd69e",
+          "status": "added"
+        },
+        {
+          "path": "src/Evolution/Programs/IProgramEvolutionArchiveObserver.cs",
+          "previousPath": null,
+          "sha": "c3538236f36b0ac5b99e449ac1867d689904a9f4",
+          "status": "added"
+        },
+        {
+          "path": "src/Evolution/Programs/IProgramEvolutionTelemetryObserver.cs",
+          "previousPath": null,
+          "sha": "05d0a683da54322c4ee15b0e59c48ebaba568a77",
+          "status": "added"
+        },
+        {
+          "path": "src/Evolution/Programs/Outputs/ProgramRunOutputObserver.cs",
+          "previousPath": null,
+          "sha": "4549f4606b81969814a2e2a5b0381eab38efbe1e",
+          "status": "modified"
+        },
+        {
+          "path": "src/Evolution/Programs/Outputs/ProgramRunOutputRecord.cs",
+          "previousPath": null,
+          "sha": "620ec2e7426b890d74b7982b921a52a9cfe0addf",
+          "status": "modified"
+        },
+        {
+          "path": "src/Evolution/Programs/Outputs/ProgramRunOutputWriter.cs",
+          "previousPath": null,
+          "sha": "7f9ae6b8cca7b51561d518c5c7810b2abf8c6474",
+          "status": "modified"
+        },
+        {
+          "path": "src/Evolution/Programs/ProgramEvolutionPreflightResult.cs",
+          "previousPath": null,
+          "sha": "5e605756bd9f64ff36862b46326e5e3aea29603e",
+          "status": "added"
+        },
+        {
+          "path": "src/Evolution/Programs/ProgramMeasurementObservation.cs",
+          "previousPath": null,
+          "sha": "8aaf2abd740d77f0d2a32f37657eb74273659e10",
+          "status": "added"
+        },
+        {
+          "path": "src/ProgramSynthesis/Execution/ProcessProgramExecutionEngine.cs",
+          "previousPath": null,
+          "sha": "4af0981fdefabdfebc936b2a5cdf61ba72b55588",
+          "status": "modified"
+        },
+        {
+          "path": "src/ProgramSynthesis/Interfaces/IProgramExecutionTelemetrySource.cs",
+          "previousPath": null,
+          "sha": "002ffcd2474aae39365b2179293a9281f47b8777",
+          "status": "added"
+        },
+        {
+          "path": "tests/AiDotNet.Evolution.Compatibility.Tests/AiDotNet.Evolution.Compatibility.Tests.csproj",
+          "previousPath": null,
+          "sha": "b5e7db9a1157b716fab5c38eca46f467b4dfa150",
+          "status": "added"
+        },
+        {
+          "path": "tests/AiDotNet.Evolve.Cli.Tests/CorrectnessCachePolicyTests.cs",
+          "previousPath": null,
+          "sha": "5601fe9d74b074baa6c6afb72a4272247c6cfccd",
+          "status": "added"
+        },
+        {
+          "path": "tests/AiDotNet.Evolve.Cli.Tests/LocalRunControlTests.cs",
+          "previousPath": null,
+          "sha": "72d982461118fc2bf936aa559a0bff8ad5b5273f",
+          "status": "added"
+        },
+        {
+          "path": "tests/AiDotNet.Evolve.Cli.Tests/RunConfigurationTemplateTests.cs",
+          "previousPath": null,
+          "sha": "058381b157d24e855cda8b4c350555fe0762789d",
+          "status": "added"
+        },
+        {
+          "path": "tests/AiDotNet.Evolve.Cli.Tests/RunEvidenceBundleTests.cs",
+          "previousPath": null,
+          "sha": "263723d4b77477219312c33ef81be7b28fb1e7a8",
+          "status": "added"
+        },
+        {
+          "path": "tests/AiDotNet.Evolve.Cli.Tests/RunInspectionTests.cs",
+          "previousPath": null,
+          "sha": "94144b28ecdfd8c1a7ccc3b18e411823f3078a3a",
+          "status": "added"
+        },
+        {
+          "path": "tests/AiDotNet.Evolve.Cli.Tests/RunInterruptPolicyTests.cs",
+          "previousPath": null,
+          "sha": "028d2c8292a78d1f82777b8b247ecc462dc90766",
+          "status": "added"
+        },
+        {
+          "path": "tests/AiDotNet.Evolve.Cli.Tests/RunOutcomeTests.cs",
+          "previousPath": null,
+          "sha": "21ab7987435168388ecfcdde1aa42fb485ed8de2",
+          "status": "added"
+        },
+        {
+          "path": "tests/AiDotNet.Evolve.Cli.Tests/RunRecordTests.cs",
+          "previousPath": null,
+          "sha": "569eb10aa41548d64096120b1e487384e139f0ce",
+          "status": "added"
+        },
+        {
+          "path": "tests/AiDotNet.Evolve.Cli.Tests/RunTelemetryTests.cs",
+          "previousPath": null,
+          "sha": "17da5af28907a7e087294ea7aca404f1e301f855",
+          "status": "added"
+        },
+        {
+          "path": "tests/AiDotNet.Tests/IntegrationTests/Configuration/EvolveCommandLineTests.cs",
+          "previousPath": null,
+          "sha": "1538cf9e290a52fe2fb1fe26516905d7114f5097",
+          "status": "modified"
+        },
+        {
+          "path": "tests/AiDotNet.Tests/UnitTests/Evolution/EvolutionRunControlTests.cs",
+          "previousPath": null,
+          "sha": "9d05e7639ad21b7e1ec4536550b900be07e6e368",
+          "status": "added"
+        },
+        {
+          "path": "tests/AiDotNet.Tests/UnitTests/Evolution/FanOutEvolutionObserverTests.cs",
+          "previousPath": null,
+          "sha": "1c10bfaed9b809869274604b3976ac63c6f7f643",
+          "status": "added"
+        },
+        {
+          "path": "tests/AiDotNet.Tests/UnitTests/Evolution/ParsedEvolutionConfigurationTests.cs",
+          "previousPath": null,
+          "sha": "861010c86d6e4fdb6b50eb3399fb06c9029ff145",
+          "status": "added"
+        },
+        {
+          "path": "tests/AiDotNet.Tests/UnitTests/Evolution/ProgramEvolutionPreflightTests.cs",
+          "previousPath": null,
+          "sha": "69b44e62bab95bf8089b8532c5c78baf20f8463a",
+          "status": "added"
+        },
+        {
+          "path": "tests/AiDotNet.Tests/UnitTests/Evolution/Programs/CorrectnessGateAdversarialTests.cs",
+          "previousPath": null,
+          "sha": "b40e869709a54711d17532196e0478d1c2eb8b50",
+          "status": "added"
+        },
+        {
+          "path": "tests/AiDotNet.Tests/UnitTests/Evolution/Programs/DirectoryProgramSampleEvidenceStoreTests.cs",
+          "previousPath": null,
+          "sha": "84dbf6672c2fcb71ca4cd80b97dc13e20570ab7c",
+          "status": "added"
+        },
+        {
+          "path": "tests/AiDotNet.Tests/UnitTests/Evolution/Programs/ProgramPublicCorrectnessTests.cs",
+          "previousPath": null,
+          "sha": "7e31527fef05a0a51a4f1b725da4a3b39011703c",
+          "status": "added"
+        },
+        {
+          "path": "tests/AiDotNet.Tests/UnitTests/Evolution/Programs/ProgramRunOutputTests.cs",
+          "previousPath": null,
+          "sha": "ffcbe9712c1c34c6f5c99581f2bc80a7d283f6d4",
+          "status": "modified"
+        },
+        {
+          "path": "tools/AiDotNet.Evolve.Cli/EvidenceCommands.cs",
+          "previousPath": null,
+          "sha": "92db87a5dc77a99cd93e5ffc6e39db91b3cdb460",
+          "status": "added"
+        },
+        {
+          "path": "tools/AiDotNet.Evolve.Cli/EvolveCommandLine.cs",
+          "previousPath": null,
+          "sha": "299fddf6775933d04c8021a2f82f69d22d61b2e9",
+          "status": "modified"
+        },
+        {
+          "path": "tools/AiDotNet.Evolve.Cli/LocalRunControl.cs",
+          "previousPath": null,
+          "sha": "a67594d12474b4a05ea24b3aae123ef6095006c0",
+          "status": "added"
+        },
+        {
+          "path": "tools/AiDotNet.Evolve.Cli/Program.cs",
+          "previousPath": null,
+          "sha": "bce953e20d4981f05042b5507deefbf436ea22fa",
+          "status": "modified"
+        },
+        {
+          "path": "tools/AiDotNet.Evolve.Cli/README.md",
+          "previousPath": null,
+          "sha": "a30bdb75a08709597613548321f484b0c61d5da2",
+          "status": "added"
+        },
+        {
+          "path": "tools/AiDotNet.Evolve.Cli/RunConfigurationTemplate.cs",
+          "previousPath": null,
+          "sha": "0e76bcc638a292f4a01dd0d47bb8a42660b8accb",
+          "status": "added"
+        },
+        {
+          "path": "tools/AiDotNet.Evolve.Cli/RunDirectoryLease.cs",
+          "previousPath": null,
+          "sha": "67045de8f6d24f3c9b90f4db0af81f512c635ef3",
+          "status": "added"
+        },
+        {
+          "path": "tools/AiDotNet.Evolve.Cli/RunEvidenceBundle.cs",
+          "previousPath": null,
+          "sha": "e2a4c2677857629a1292f9e43f09c7fdeb84d435",
+          "status": "added"
+        },
+        {
+          "path": "tools/AiDotNet.Evolve.Cli/RunInspection.cs",
+          "previousPath": null,
+          "sha": "9e9cf88936f0d18d9e0e8a14eb77f7634a79cfcd",
+          "status": "added"
+        },
+        {
+          "path": "tools/AiDotNet.Evolve.Cli/RunInterruptPolicy.cs",
+          "previousPath": null,
+          "sha": "c42dff2f5a1e01e8c2bb16a10752b9deeace831d",
+          "status": "added"
+        },
+        {
+          "path": "tools/AiDotNet.Evolve.Cli/RunRecord.cs",
+          "previousPath": null,
+          "sha": "ccf8fad28602172cff8112bcb0ad5a8c712fc28e",
+          "status": "added"
+        }
+      ]
+    },
+    {
+      "sourcePr": 2182,
+      "sourceHead": "de4bc695667bb7765a618a7991b6b2a13657c0de",
+      "sourceBase": "feat/evolution-validated-promotion",
+      "title": "feat(evolution): verify raw observations before fitness reuse",
+      "files": [
+        {
+          "path": "docs/PROGRAM_SAMPLE_EVIDENCE.md",
+          "previousPath": null,
+          "sha": "5105a998cf3326f86af33458676daa6a14bbf4f0",
+          "status": "added"
+        },
+        {
+          "path": "docs/evidence/raw-program-samples/d9eb58f/README.md",
+          "previousPath": null,
+          "sha": "604328215032e2f700298cd8c059f40a83b7241e",
+          "status": "added"
+        },
+        {
+          "path": "docs/evidence/raw-program-samples/d9eb58f/integrity.json",
+          "previousPath": null,
+          "sha": "789744ae879858c23eb77d294481c3c6ef963100",
+          "status": "added"
+        },
+        {
+          "path": "docs/evidence/raw-program-samples/d9eb58f/verification.zip",
+          "previousPath": null,
+          "sha": "1e3fbb43379cb3ee037c50f6f29b319fe5db1215",
+          "status": "added"
+        },
+        {
+          "path": "docs/evidence/raw-program-samples/d9eb58f/verify.py",
+          "previousPath": null,
+          "sha": "d271c9fae4f53cdcff7f5252a710144cfcec11c3",
+          "status": "added"
+        },
+        {
+          "path": "src/Evolution/Programs/DirectoryProgramSampleEvidenceStore.cs",
+          "previousPath": null,
+          "sha": "5f77f6139430b9c890de6157c155ebbaf12bd69e",
+          "status": "added"
+        },
+        {
+          "path": "src/Evolution/Programs/ProgramMeasurementObservation.cs",
+          "previousPath": null,
+          "sha": "8aaf2abd740d77f0d2a32f37657eb74273659e10",
+          "status": "added"
+        },
+        {
+          "path": "tests/AiDotNet.Tests/UnitTests/Evolution/Programs/DirectoryProgramSampleEvidenceStoreTests.cs",
+          "previousPath": null,
+          "sha": "84dbf6672c2fcb71ca4cd80b97dc13e20570ab7c",
+          "status": "added"
+        }
+      ]
+    },
+    {
+      "sourcePr": 2202,
+      "sourceHead": "d4535f7376888a7c2d35d7e6229494c4c60c0ac6",
+      "sourceBase": "feat/evolution-us-24",
+      "title": "feat(evolution): deploy and retune validated programs and models (US-25)",
+      "files": [
+        {
+          "path": ".github/workflows/evolution-csharp.yml",
+          "previousPath": null,
+          "sha": "f3066ee6323394258feecd6550175d389b16609b",
+          "status": "modified"
+        },
+        {
+          "path": "docs/evidence/us25/README.md",
+          "previousPath": null,
+          "sha": "a92e626c616714ef3a12003b808144a1aac173ab",
+          "status": "added"
+        },
+        {
+          "path": "docs/evidence/us25/linux-local.zip",
+          "previousPath": null,
+          "sha": "d995db10b3602962f8c705ac3adbab7a27e102b8",
+          "status": "added"
+        },
+        {
+          "path": "docs/evidence/us25/verification.zip",
+          "previousPath": null,
+          "sha": "c3b6b4952ed85493484b9e3f83e843166f17ddd4",
+          "status": "added"
+        },
+        {
+          "path": "docs/evolution-deployment-lifecycle.md",
+          "previousPath": null,
+          "sha": "4a9c9d6677a1c02c9d8c7fa0c77846fa953517e6",
+          "status": "added"
+        },
+        {
+          "path": "src/Evolution/Deployment/DeploymentEncoding.cs",
+          "previousPath": null,
+          "sha": "69eabb2dc55835ce81494f7cea219a3c7404e414",
+          "status": "added"
+        },
+        {
+          "path": "src/Evolution/Deployment/DeploymentValidationEvidence.cs",
+          "previousPath": null,
+          "sha": "4a6a195ea97fbee9b8437778572998c32b4be2da",
+          "status": "added"
+        },
+        {
+          "path": "src/Evolution/Deployment/EvolutionDeployableArtifact.cs",
+          "previousPath": null,
+          "sha": "405405b4d2411228c1e222082add10e8e2d1fe5f",
+          "status": "added"
+        },
+        {
+          "path": "src/Evolution/Deployment/EvolutionDeploymentArtifactRegistry.cs",
+          "previousPath": null,
+          "sha": "b163d6f6f6478ff420d1aea7ca6159b5d1ffe3e1",
+          "status": "added"
+        },
+        {
+          "path": "src/Evolution/Deployment/EvolutionDeploymentEvaluators.cs",
+          "previousPath": null,
+          "sha": "b0b892c1dd6031315d5d386e7ee6e82eed7e1c03",
+          "status": "added"
+        },
+        {
+          "path": "src/Evolution/Deployment/EvolutionDeploymentLifecycle.cs",
+          "previousPath": null,
+          "sha": "048c2ef7f490cdd91b0745b96e911218d3719602",
+          "status": "added"
+        },
+        {
+          "path": "src/Evolution/Deployment/EvolutionDeploymentPolicy.cs",
+          "previousPath": null,
+          "sha": "865ba44bb878f31a963b70e7ab1720242da55667",
+          "status": "added"
+        },
+        {
+          "path": "src/Evolution/Deployment/EvolutionDeploymentRetuners.cs",
+          "previousPath": null,
+          "sha": "3c046f08fc2c8c32acecc6930dfaae07c776879b",
+          "status": "added"
+        },
+        {
+          "path": "src/Evolution/Deployment/EvolutionDeploymentSelection.cs",
+          "previousPath": null,
+          "sha": "071b2d403d4c8c673de21630b0884780bbe74b7d",
+          "status": "added"
+        },
+        {
+          "path": "tests/AiDotNet.Evolution.Compatibility.Tests/AiDotNet.Evolution.Compatibility.Tests.csproj",
+          "previousPath": null,
+          "sha": "879a4928a4b538b705d49ddebc01d38ece9e6bd4",
+          "status": "modified"
+        },
+        {
+          "path": "tests/AiDotNet.Tests/UnitTests/Evolution/EvolutionDeploymentAdapterTests.cs",
+          "previousPath": null,
+          "sha": "c7f55df7a621bd69467584f647576c08b45008c9",
+          "status": "added"
+        },
+        {
+          "path": "tests/AiDotNet.Tests/UnitTests/Evolution/EvolutionDeploymentAdversarialTests.cs",
+          "previousPath": null,
+          "sha": "462b2150c03bfb53f569e50e11b949ba4ffeccc7",
+          "status": "added"
+        },
+        {
+          "path": "tests/AiDotNet.Tests/UnitTests/Evolution/EvolutionDeploymentLifecycleTests.cs",
+          "previousPath": null,
+          "sha": "28fea15095ad53ac0db251e6c2e99032932e7ff5",
+          "status": "added"
+        }
+      ]
+    },
+    {
+      "sourcePr": 2203,
+      "sourceHead": "9343d45907342eabd1f24cffa4724e7817855bf4",
+      "sourceBase": "feat/evolution-validated-promotion",
+      "title": "feat(benchmarks): US-02 shared program comparison host",
+      "files": [
+        {
+          "path": "benchmarks/EvolutionComparison/EvolutionComparison.csproj",
+          "previousPath": null,
+          "sha": "61551518326e007ac6123df410a7e0c193288536",
+          "status": "added"
+        },
+        {
+          "path": "benchmarks/EvolutionComparison/Program.cs",
+          "previousPath": null,
+          "sha": "f72b202617003527791708ac7ebc8d25b07da9c3",
+          "status": "added"
+        },
+        {
+          "path": "benchmarks/EvolutionComparison/README.md",
+          "previousPath": null,
+          "sha": "2d5ca6c59a6d7fac3f7315b5d555826692e20116",
+          "status": "added"
+        }
+      ]
+    },
+    {
+      "sourcePr": 2210,
+      "sourceHead": "db69ac7252da3cbf656ae9024cdd08427d06f159",
+      "sourceBase": "feat/evolution-us-02-benchmarks",
+      "title": "feat(evaluation): complete US-06 consumer noise workflow and validation",
+      "files": [
+        {
+          "path": ".github/workflows/evolution-csharp.yml",
+          "previousPath": null,
+          "sha": "f61e1c51b70ced2e151d710ea56a5d50ac4fa651",
+          "status": "modified"
+        },
+        {
+          "path": "benchmarks/EvolutionNoise/EvolutionNoise.csproj",
+          "previousPath": null,
+          "sha": "61551518326e007ac6123df410a7e0c193288536",
+          "status": "added"
+        },
+        {
+          "path": "benchmarks/EvolutionNoise/Program.cs",
+          "previousPath": null,
+          "sha": "5ce45aac9dd73fa63b827a994b0ac63f3f587919",
+          "status": "added"
+        },
+        {
+          "path": "benchmarks/EvolutionNoise/README.md",
+          "previousPath": null,
+          "sha": "2fee00735d124c4a28dfed5c4710721fb1bb42cb",
+          "status": "added"
+        },
+        {
+          "path": "benchmarks/EvolutionNoise/Verify-Study.Tests.ps1",
+          "previousPath": null,
+          "sha": "1734cfc353b56b236b63736d290dc3294d80f9a3",
+          "status": "added"
+        },
+        {
+          "path": "benchmarks/EvolutionNoise/Verify-Study.ps1",
+          "previousPath": null,
+          "sha": "57caab7f430ef90b756456a8c78666e8c0a9568d",
+          "status": "added"
+        },
+        {
+          "path": "docs/evidence/us06/README.md",
+          "previousPath": null,
+          "sha": "44a284690c3802d01665dffc65c832f1be0f820b",
+          "status": "added"
+        },
+        {
+          "path": "docs/evidence/us06/consumer-validation.zip",
+          "previousPath": null,
+          "sha": "0212166461b952f6f6a8022f96172c7a4a7a7110",
+          "status": "added"
+        },
+        {
+          "path": "src/Configuration/ProgramNoiseEvaluationOptions.cs",
+          "previousPath": null,
+          "sha": "87add05a7ab47da8def70e92928951c637468a44",
+          "status": "added"
+        },
+        {
+          "path": "src/Evolution/Programs/ProgramNoiseEvaluationSession.cs",
+          "previousPath": null,
+          "sha": "682d34575ad73342d0e7e1ea535c90a104887965",
+          "status": "added"
+        },
+        {
+          "path": "tests/AiDotNet.Tests/UnitTests/Evolution/Programs/ProgramNoiseEvaluationTests.cs",
+          "previousPath": null,
+          "sha": "301f0aa2d2d91d212d853ad83730eb5bad097538",
+          "status": "added"
+        }
+      ]
+    },
+    {
+      "sourcePr": 2212,
+      "sourceHead": "66d7602c92101e5ab2bd9db8cfa7f7526fa2c75d",
+      "sourceBase": "feat/evolution-us-06-noise",
+      "title": "feat(evolution): add US-08 metered program portfolios",
+      "files": [
+        {
+          "path": ".github/workflows/evolution-csharp.yml",
+          "previousPath": null,
+          "sha": "aa739715b2a512572441a77e57059dd4053b5aa6",
+          "status": "modified"
+        },
+        {
+          "path": "benchmarks/EvolutionNoise/Program.cs",
+          "previousPath": null,
+          "sha": "4bc27f2a52b6172a4100a08ceedd5e32cdc8dde0",
+          "status": "modified"
+        },
+        {
+          "path": "benchmarks/EvolutionNoise/README.md",
+          "previousPath": null,
+          "sha": "684c0cc90b27f949fb79cd0a4e408960e79286e9",
+          "status": "modified"
+        },
+        {
+          "path": "benchmarks/EvolutionNoise/Verify-Output.Tests.ps1",
+          "previousPath": null,
+          "sha": "f3e08d3ff34f7aec104533ae6f7410e04f12b61b",
+          "status": "added"
+        },
+        {
+          "path": "docs/evidence/us08/CI_FOLLOWUP.md",
+          "previousPath": null,
+          "sha": "feae481bc8bba936ffe25e56e0d0c83dad5f3505",
+          "status": "added"
+        },
+        {
+          "path": "docs/evidence/us08/README.md",
+          "previousPath": null,
+          "sha": "1b3ea93282e0cdd4bca1be0cf89aec8e5f8d89b1",
+          "status": "added"
+        },
+        {
+          "path": "docs/evidence/us08/verification.zip",
+          "previousPath": null,
+          "sha": "eeb7be1817bb7a286980f5d52ae38d46fabfc1d8",
+          "status": "added"
+        },
+        {
+          "path": "docs/evolution/PROGRAM_PORTFOLIOS.md",
+          "previousPath": null,
+          "sha": "d1ed844863cfcf86df9005aad95548f496d9710b",
+          "status": "added"
+        },
+        {
+          "path": "src/AiDotNet.Evolution.CSharp/CSharpProgramEvolutionExtensions.cs",
+          "previousPath": null,
+          "sha": "88875c34720f1c12bd3fd33cff2218f72af0b35e",
+          "status": "modified"
+        },
+        {
+          "path": "src/AiDotNet.Evolution.CSharp/CSharpProposalSource.cs",
+          "previousPath": null,
+          "sha": "f55b88aafb0ca445cfa55afd2f983c341b9bc712",
+          "status": "modified"
+        },
+        {
+          "path": "src/Configuration/ProgramEvolutionOptions.cs",
+          "previousPath": null,
+          "sha": "a6ae114e3ac75963efd0d635078b67f834a5e0d4",
+          "status": "modified"
+        },
+        {
+          "path": "src/Evolution/Programs/ICostedProgramProposalSource.cs",
+          "previousPath": null,
+          "sha": "8512ad63fd92b2cfef4e8fb1827b846f5f491654",
+          "status": "added"
+        },
+        {
+          "path": "src/Evolution/Programs/IProgramResourceLedgerProvider.cs",
+          "previousPath": null,
+          "sha": "8f97802c56d127b561ae09973871a5258f88e75a",
+          "status": "added"
+        },
+        {
+          "path": "src/Evolution/Programs/MeteredProgramVariationOperator.cs",
+          "previousPath": null,
+          "sha": "d110794632929fa8ac03d59f7bcadb90b669ce14",
+          "status": "added"
+        },
+        {
+          "path": "src/Evolution/Programs/ProgramVariationPortfolio.cs",
+          "previousPath": null,
+          "sha": "18a4b032e26e31ba5f4bf25239cc863f1b422573",
+          "status": "added"
+        },
+        {
+          "path": "tests/AiDotNet.Evolution.CSharp.Tests/CSharpConfigurationTests.cs",
+          "previousPath": null,
+          "sha": "0bf19bcad93be0470686e53dab49d7839fd804a2",
+          "status": "modified"
+        },
+        {
+          "path": "tests/AiDotNet.Evolution.CSharp.Tests/ProgramVariationPortfolioTests.cs",
+          "previousPath": null,
+          "sha": "d3434738ca9a9981bc20bec56eb7393f6c8334d5",
+          "status": "added"
+        }
+      ]
+    }
+  ]
+}

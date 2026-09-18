@@ -22,6 +22,8 @@ public sealed class ResourceMeteredEvolutionTaskTests
         Assert.Equal(8, ledger.Snapshot().Spent["cost_units"]);
         Assert.Equal(6, ledger.Snapshot().Settled);
         Assert.Equal(4, ledger.Snapshot().Receipts.Count(receipt => receipt.Stage == EvolutionResourceStage.Screening));
+        Assert.Equal(4, ledger.Snapshot().Stages.Single(stage => stage.Stage == EvolutionResourceStage.Screening).Spent["cost_units"]);
+        Assert.Equal(4, ledger.Snapshot().Stages.Single(stage => stage.Stage == EvolutionResourceStage.Evaluation).Spent["cost_units"]);
     }
 
     [Fact]
@@ -83,10 +85,15 @@ public sealed class ResourceMeteredEvolutionTaskTests
         var options = Options(1); options.ProposalBatchSize = 1; options.MaxRetries = 1;
         await Engine(new ResourceMeteredEvolutionTask<TestGenome>(new FailOnceEvolutionTask(), firstLedger, new[] { 2m }), options,
             store: checkpoint).RunAsync(new[] { new TestGenome(1) });
-        var resumedLedger = Ledger(20); resumedLedger.RestoreState(firstLedger.CaptureState());
+        var engineCheckpoint = await checkpoint.LoadLatestAsync(options.RunId);
+        var boundary = EvolutionResourceBoundary.Capture(firstLedger, () => System.Text.Json.JsonSerializer.Serialize(engineCheckpoint));
+        var loadedBoundary = EvolutionResourceBoundary.Deserialize(boundary.Serialize(), boundary.Checksum);
+        var resumedLedger = loadedBoundary.RestoreLedger(EvolutionResources.Of("cost_units", 20));
+        var resumedStore = new InMemoryEvolutionCheckpointStore();
+        await resumedStore.SaveAsync(System.Text.Json.JsonSerializer.Deserialize<EvolutionCheckpoint>(loadedBoundary.EngineState)!);
         var resumedOptions = Options(4); resumedOptions.ProposalBatchSize = 1; resumedOptions.Resume = true; resumedOptions.MaxRetries = 1;
         await Engine(new ResourceMeteredEvolutionTask<TestGenome>(new FailOnceEvolutionTask(), resumedLedger, new[] { 2m }), resumedOptions,
-            store: checkpoint).RunAsync(new[] { new TestGenome(1) });
+            store: resumedStore).RunAsync(new[] { new TestGenome(1) });
         var completeLedger = Ledger(20);
         var completeOptions = Options(4); completeOptions.ProposalBatchSize = 1; completeOptions.MaxRetries = 1;
         await Engine(new ResourceMeteredEvolutionTask<TestGenome>(new FailOnceEvolutionTask(), completeLedger, new[] { 2m }), completeOptions,
