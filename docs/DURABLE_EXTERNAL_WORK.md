@@ -154,8 +154,8 @@ durable storage provider; this library does not claim those from an in-process A
 ## Verification
 
 Latest verified runtime: **8aaef1e**, including US-20 cleanup fix **96d245e**.
-**1,000 net10.0 / 1,000 net8.0 / 800 net471 tests pass**, zero skips;
-coverage is **92.96% line / 79.64% branch**, passing the unchanged ratchet. All 139 native
+**953 net10.0 / 953 net8.0 / 752 net471 tests pass**, zero skips;
+coverage is **91.31% line / 77.63% branch**, passing the unchanged ratchet (88.80% / 73.51%). All 139 native
 TypeScript tests, eight Python tests on each managed/native host, and six exported C ABI
 tests pass. Strict .NET 10 native delivery, live-engine and shared-library builds emit
 zero warnings. All three packaged DLLs match their explicit builds. The
