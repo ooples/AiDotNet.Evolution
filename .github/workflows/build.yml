@@ -87,7 +87,14 @@ jobs:
           if ($LASTEXITCODE -ne 0) { throw 'Core package failed.' }
           dotnet pack src/AiDotNet.Evolution.Surrogates/AiDotNet.Evolution.Surrogates.csproj -c Release -o TestResults/surrogate-packages
           if ($LASTEXITCODE -ne 0) { throw 'Surrogate package failed.' }
-          ./eng/Test-SurrogatePackage.ps1 -CorePackagePath TestResults/surrogate-packages/AiDotNet.Evolution.0.1.0-preview.1.nupkg -AdapterPackagePath TestResults/surrogate-packages/AiDotNet.Evolution.Surrogates.0.1.0-preview.1.nupkg -CoreVersion 0.1.0-preview.1 -AdapterVersion 0.1.0-preview.1
+          # READ THE VERSIONS, DO NOT HARDCODE THEM. These were literals, and release-please
+          # bumps only the core project, so the core packed as 0.1.0-preview.2 while this line
+          # still asked for preview.1 and the step failed on a package that had just been built
+          # correctly. The two projects version independently, so each is read from its own file.
+          $coreVersion = ([xml](Get-Content src/AiDotNet.Evolution/AiDotNet.Evolution.csproj)).Project.PropertyGroup.Version | Where-Object { $_ } | Select-Object -First 1
+          $adapterVersion = ([xml](Get-Content src/AiDotNet.Evolution.Surrogates/AiDotNet.Evolution.Surrogates.csproj)).Project.PropertyGroup.Version | Where-Object { $_ } | Select-Object -First 1
+          if (-not $coreVersion -or -not $adapterVersion) { throw 'Could not read a package version from its project file.' }
+          ./eng/Test-SurrogatePackage.ps1 -CorePackagePath "TestResults/surrogate-packages/AiDotNet.Evolution.$coreVersion.nupkg" -AdapterPackagePath "TestResults/surrogate-packages/AiDotNet.Evolution.Surrogates.$adapterVersion.nupkg" -CoreVersion $coreVersion -AdapterVersion $adapterVersion
       - name: Verify multi-fidelity promotion and independent confirmation
         shell: pwsh
         run: ./eng/Test-MultiFidelity.ps1
