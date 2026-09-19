@@ -20,6 +20,16 @@ jobs:
       release_created: ${{ steps.release.outputs.release_created }}
       tag_name: ${{ steps.release.outputs.tag_name }}
     steps:
+      - name: Validate release automation credentials
+        env:
+          GH_TOKEN: ${{ secrets.AUTOFIX_PAT || secrets.GITHUB_TOKEN }}
+        shell: bash
+        run: |
+          set -euo pipefail
+          if ! gh api "repos/$GITHUB_REPOSITORY" --silent 2>/dev/null; then
+            echo '::error::Release credentials cannot access this repository. Replace AUTOFIX_PAT in Actions secrets if configured; an invalid nonempty PAT does not fall back to GITHUB_TOKEN. Never paste the token in logs.'
+            exit 1
+          fi
       - id: release
         uses: googleapis/release-please-action@45996ed1f6d02564a971a2fa1b5860e934307cf7 # v5.0.0
         with:

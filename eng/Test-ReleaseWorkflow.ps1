@@ -10,7 +10,7 @@ $arguments = @(
     $testProject,
     '--configuration', 'Release',
     '--framework', 'net10.0',
-    '--filter', 'FullyQualifiedName~ReleaseWorkflowSecurityContractTests',
+    '--filter', 'FullyQualifiedName~ReleaseWorkflowSecurityContractTests|FullyQualifiedName~ReleasePackageWorkflowTests',
     '--verbosity', 'minimal')
 if ($NoRestore) {
     $arguments += '--no-restore'
