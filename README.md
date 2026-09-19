@@ -13,11 +13,11 @@
 </p>
 
 <p align="center">
-  <img src="https://img.shields.io/badge/third--party%20deps-none-2ea043" alt="No third-party dependencies">
+  <img src="https://img.shields.io/badge/deps-none%20on%20.NET%208%20%2F%2010-2ea043" alt="No third-party dependencies on .NET 8 and .NET 10">
   <img src="https://img.shields.io/badge/LLM-optional-8b5cf6" alt="LLM optional">
   <img src="https://img.shields.io/badge/replay-byte--identical-3b82f6" alt="Deterministic replay">
   <img src="https://img.shields.io/badge/telemetry-none-2ea043" alt="No telemetry">
-  <img src="https://img.shields.io/badge/12-runnable%20examples-0d9488" alt="12 runnable examples">
+  <img src="https://img.shields.io/badge/13-runnable%20examples-0d9488" alt="13 runnable examples">
 </p>
 
 ---
@@ -94,9 +94,13 @@ Three objects: a **space**, a **task** that scores a candidate, and an
 - **LLMs optional.** The engine knows nothing about models or prompts. Supply
   model-driven mutation through a typed contract and it is metered like any
   other operator, or leave it out and pay nothing per evaluation.
-- **Runs where you already are.** .NET 10, .NET 8, and .NET Framework 4.7.1.
-  No third-party dependencies (`System.Text.Json` only, and only on 4.7.1 where
-  it is not in-box).
+- **Runs where you already are.** .NET 10, .NET 8, and .NET Framework 4.7.1,
+  with no third-party dependencies on .NET 8 and 10. Only 4.7.1 pulls one in,
+  `System.Text.Json`, because it is not in-box there.
+- **Evaluation can leave the process.** Hand work to external workers over a
+  durable coordinator that persists work, leases and receipts together, and
+  survives a crash on either side. TypeScript, Python and C ABI bindings ship
+  with it.
 
 ## What people search with it
 
@@ -112,7 +116,7 @@ Three objects: a **space**, a **task** that scores a candidate, and an
 The engine knows nothing about any of these. You implement
 `IEvolutionTask<TGenome>` and it stays out of your domain.
 
-## Twelve examples you can run
+## Thirteen examples you can run
 
 ```bash
 dotnet run --project examples/TypedParameterSearch -c Release
@@ -132,6 +136,7 @@ dotnet run --project examples/TypedParameterSearch -c Release
 | [CompilerGuidedSearch](examples/CompilerGuidedSearch) | Using compiler feedback to steer program improvement |
 | [PolicySearch](examples/PolicySearch) | Searching over search policies themselves, with a held-out panel |
 | [DurableWork](examples/DurableWork) | External workers, crash recovery, and exactly-once receipts |
+| [DurableSession](examples/DurableSession) | A live engine session driven across a durable host process |
 
 ## Measured, not asserted
 
@@ -172,6 +177,7 @@ that skips a test fails the build rather than reporting green.
 | Reusing past evaluations safely | [Persistent reuse](docs/PERSISTENT_EVALUATION_REUSE.md) · [Warm starts](docs/WARM_START_REPERTOIRES.md) |
 | Where a measurement came from | [Measurement origin](docs/MEASUREMENT_ORIGIN.md) |
 | High-dimensional archives | [Centroid archives](docs/CENTROID_ARCHIVES.md) |
+| Work that runs outside the process | [Durable external work](docs/DURABLE_EXTERNAL_WORK.md) · [Worker protocol](docs/DURABLE_WORKER_PROTOCOL.md) · [Work identity](docs/EXTERNAL_WORK_IDENTITY.md) |
 
 ### Contracts you implement
 

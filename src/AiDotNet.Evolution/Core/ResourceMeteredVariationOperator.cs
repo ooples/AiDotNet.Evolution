@@ -1,5 +1,6 @@
 using System.Globalization;
 using System.Text.Json;
+using static AiDotNet.Evolution.ResourceMeteredVariationDocuments;
 
 namespace AiDotNet.Evolution;
 
@@ -122,7 +123,7 @@ public sealed class ResourceMeteredVariationOperator<TGenome> : IOutcomeAwareVar
         using var guard = Enter();
         string backend = _source.CaptureState();
         if (string.IsNullOrEmpty(backend)) throw new InvalidOperationException("Backend checkpoint state must be explicit and nonempty.");
-        string state = JsonSerializer.Serialize(new State { VersionHash = VersionHash, Backend = backend, Pending = _pending }, EvolutionJson.Compact);
+        string state = JsonSerializer.Serialize(new State { VersionHash = VersionHash, Backend = backend, Pending = _pending }, EvolutionStateJsonContext.Default.MeteredVariationState);
         if (state.Length > MaximumStateCharacters) throw new InvalidOperationException("Proposal checkpoint exceeds its bound.");
         return state;
     }
@@ -133,7 +134,7 @@ public sealed class ResourceMeteredVariationOperator<TGenome> : IOutcomeAwareVar
         Guard.NotNull(state); using var guard = Enter();
         if (state.Length > MaximumStateCharacters) throw new InvalidDataException("Proposal checkpoint exceeds its bound.");
         State? restored;
-        try { restored = JsonSerializer.Deserialize<State>(state, EvolutionJson.Compact); }
+        try { restored = JsonSerializer.Deserialize(state, EvolutionStateJsonContext.Default.MeteredVariationState); }
         catch (JsonException exception) { throw new InvalidDataException("Malformed proposal checkpoint.", exception); }
         if (restored is null || restored.VersionHash != VersionHash || string.IsNullOrEmpty(restored.Backend) || restored.Pending is null || restored.Pending.Count > MaximumPending)
             throw new InvalidDataException("Incompatible proposal checkpoint.");
@@ -190,20 +191,5 @@ public sealed class ResourceMeteredVariationOperator<TGenome> : IOutcomeAwareVar
     private static void ValidateIdentity(string value, int limit, string argument)
     {
         if (string.IsNullOrWhiteSpace(value) || value.Length > limit || value.Any(char.IsControl)) throw new ArgumentException("Bounded printable identity required.", argument);
-    }
-    private sealed class Pending
-    {
-        public Pending() { }
-        public Dictionary<string, decimal>? Charged { get; set; }
-        public EvolutionResourceOutcome Outcome { get; set; }
-        public bool ExceededMaximum { get; set; }
-        public bool Dispatched { get; set; }
-    }
-    private sealed class State
-    {
-        public State() { }
-        public string? VersionHash { get; set; }
-        public string? Backend { get; set; }
-        public SortedDictionary<long, Pending>? Pending { get; set; }
     }
 }

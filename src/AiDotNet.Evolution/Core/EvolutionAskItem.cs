@@ -18,11 +18,15 @@ public sealed class EvolutionAskItem<TGenome>
     /// <param name="context">The deterministic per-evaluation context.</param>
     /// <exception cref="ArgumentNullException">Any argument is null.</exception>
     public EvolutionAskItem(EvolutionCandidate<TGenome> candidate, EvolutionEvaluationContext context)
+        : this(candidate, context, null) { }
+
+    internal EvolutionAskItem(EvolutionCandidate<TGenome> candidate, EvolutionEvaluationContext context, EvolutionWorkIdentity? workIdentity)
     {
         Guard.NotNull(candidate);
         Guard.NotNull(context);
         Candidate = candidate;
         Context = context;
+        WorkIdentity = workIdentity;
     }
 
     /// <summary>Gets the candidate awaiting evaluation.</summary>
@@ -38,4 +42,7 @@ public sealed class EvolutionAskItem<TGenome>
 
     /// <summary>Gets the identifier to pass back to <see cref="EvolutionSession{TGenome}.Tell"/>.</summary>
     public long EvaluationId => Candidate.EvaluationId;
+
+    /// <summary>Gets the fenced attempt identity on session-issued work; manually constructed legacy items may omit it.</summary>
+    public EvolutionWorkIdentity? WorkIdentity { get; }
 }
