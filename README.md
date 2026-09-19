@@ -1,98 +1,212 @@
-# AiDotNet.Evolution
+<h1 align="center">AiDotNet.Evolution</h1>
 
-AiDotNet.Evolution is a dependency-light, task-agnostic quality-diversity engine for .NET. It provides deterministic parallel evaluation, typed genome contracts, MAP-Elites archives, island migration, bounded diagnostics, trace output, and checkpoint/resume support.
+<p align="center">
+  <strong>Evolutionary search for .NET that keeps the receipts &mdash;
+  deterministic, budgeted, and resumable.</strong>
+</p>
 
-The package does not depend on AiDotNet or AiDotNet.Tensors. Domain integrations—such as model search, program evolution, and hardware-kernel autotuning—supply typed genomes, validation, variation, and evaluation through the public contracts.
+<p align="center">
+  <a href="https://www.nuget.org/packages/AiDotNet.Evolution"><img src="https://img.shields.io/nuget/vpre/AiDotNet.Evolution?logo=nuget" alt="NuGet"></a>
+  <a href="https://github.com/ooples/AiDotNet.Evolution/actions/workflows/build.yml"><img src="https://github.com/ooples/AiDotNet.Evolution/actions/workflows/build.yml/badge.svg?branch=main" alt="Build and Test"></a>
+  <a href="./LICENSE"><img src="https://img.shields.io/badge/license-Apache--2.0-blue.svg" alt="Apache 2.0"></a>
+  <img src="https://img.shields.io/badge/.NET-10%20%7C%208%20%7C%20Framework%204.7.1-512BD4?logo=dotnet&logoColor=white" alt=".NET 10, .NET 8, .NET Framework 4.7.1">
+</p>
 
-[External sessions](docs/EXTERNAL_WORK_IDENTITY.md) support canonicalization/version fingerprints and fenced work tickets,
-including strict native-host/TypeScript mode. The optional [durable delivery coordinator](docs/DURABLE_EXTERNAL_WORK.md)
-persists work, leases and resource receipts together. The engine bridge and the TypeScript, Python and C ABI
-bindings ship with it. What remains is exact partial-batch search continuation: delivery recovery restores work,
-leases and accounting, not a mid-batch search state, so resuming across a crash mid-batch is a labeled fork rather
-than a resumption until proposal, operator and external-response provenance are persisted too.
+<p align="center">
+  <img src="https://img.shields.io/badge/deps-none%20on%20.NET%208%20%2F%2010-2ea043" alt="No third-party dependencies on .NET 8 and .NET 10">
+  <img src="https://img.shields.io/badge/LLM-optional-8b5cf6" alt="LLM optional">
+  <img src="https://img.shields.io/badge/replay-byte--identical-3b82f6" alt="Deterministic replay">
+  <img src="https://img.shields.io/badge/telemetry-none-2ea043" alt="No telemetry">
+  <img src="https://img.shields.io/badge/12-runnable%20examples-0d9488" alt="12 runnable examples">
+</p>
 
-The initial package version is `0.1.0-preview.1` and targets .NET 10, .NET 8, and .NET Framework 4.7.1.
+---
 
-Optional [cost-aware operator portfolios](docs/OPERATOR_PORTFOLIOS.md) share admission
-budgets across mutation, refinement and consumer-provided model strategies, with
-typed outcome credit and checkpointed learning. The
-[registered local comparison](benchmarks/analysis/PORTFOLIOS.md) requires evidence
-against both a strong static strategy and a uniform mixture before default promotion.
+You have something you can score &mdash; a model config, a GPU kernel, a compiler
+schedule, a prompt, a piece of generated code &mdash; and too many possible
+versions of it to try by hand. **This searches that space for you, in .NET.**
 
-## Core contracts
+It is a quality-diversity engine, so it returns a map of the best candidate of
+each *kind* rather than a thousand variations of one local optimum. It is a
+library: no service, no account, no telemetry.
 
-Optional [Pareto search](docs/PARETO_SEARCH.md) retains feasible objective tradeoffs with separate non-deployable exploration, explicit representatives, front-aware policies and validated checkpoints. [US-09 evidence](benchmarks/evidence/pareto/us09-current-stack/README.md) includes equal-budget scalar comparisons and losing cases.
+## Quick start
 
-- `IEvolutionTask<TGenome>` owns canonical identity, validation, and evaluation.
-- `IVariationOperator<TGenome>` proposes immutable typed genomes; stateful operators can additionally implement
-  `ICheckpointableVariationOperator<TGenome>`.
-- `ISelectionPolicy<TGenome>`, `ICandidateRefiner<TGenome>`, and `IMigrationPolicy<TGenome>` are explicit extension
-  points rather than mode strings.
-- `IEvolutionArchive<TGenome>` controls quality/diversity retention. `MapElitesArchive<TGenome>` is provided.
-- `IEvolutionGenomeCodec<TGenome>` enables checkpoint/resume without imposing a serializer on genome types.
-- Reference-typed genomes implement `IImmutableEvolutionGenome<TGenome>` and return a new, independently owned copy
-  from `CreateOwnedSnapshot`; strings and value types with entirely value-based fields satisfy the boundary directly.
-  A value type holding a reference must also implement the contract because copying the value alone does not copy its
-  reachable state. Nested arrays, collections, and objects must be copied recursively. The engine takes this snapshot
-  once at canonicalization, so archives, migration, and selection do not clone on their hot paths.
+```bash
+dotnet add package AiDotNet.Evolution --prerelease
+```
 
-Evaluation caches inside the engine are run-local memoization keyed by canonical genome identity. Deployment caches
-owned by consumers—such as a GPU kernel autotune cache—remain separate because their keys also need hardware, driver,
-compiler, and correctness-policy fingerprints.
+```csharp
+using AiDotNet.Evolution;
 
-[Portable warm-start repertoires](docs/WARM_START_REPERTOIRES.md) export bounded canonical seeds with applicability
-and prior-cost provenance. Import revalidates seeds under the current task and never imports old fitness;
-persistent evaluation reuse is a separate contract, not checkpoint resume or a deployment-cache hit.
+// 1. Describe the space you want to search.
+EvolutionSearchSpace space = new EvolutionSearchSpaceBuilder()
+    .Add(EvolutionParameter.Integer("depth", 1, 20))
+    .Add(EvolutionParameter.Logarithmic("rate", 0.0001, 1.0))
+    .Build();
 
-[Measurement origin](docs/MEASUREMENT_ORIGIN.md) preserves original sample identities, uncertainty and acquisition
-cost through cache copies, migration, checkpoints and traces; fresh replication rejects declared reused samples.
+// 2. Say how good a candidate is. Anything you can score works here.
+var task = new EvolutionSearchTask(space, "quickstart", "v1", "score-v1", (genome, _, _) =>
+    new ValueTask<EvolutionTaskResult>(EvolutionTaskResult.Completed(
+        quality: -Math.Abs(genome.Number("depth") - 7) - Math.Abs(Math.Log10(genome.Number("rate") / 0.01)),
+        descriptors: new Dictionary<string, double> { ["depth"] = genome.Number("depth") },
+        costUnits: 1)));
 
-[Persistent evaluation reuse](docs/PERSISTENT_EVALUATION_REUSE.md) adds exact-key storage, explicit freshness and
-force-fresh policies, metered store calls and a runnable cold/warm/force-fresh engine example.
+// 3. Run the search.
+var engine = new EvolutionEngine<EvolutionSearchGenome>(
+    task,
+    EvolutionSearchPresets.CreateAdaptiveMixed(space),
+    _ => new MapElitesArchive<EvolutionSearchGenome>(new[] { new EvolutionDescriptorDefinition("depth", 1, 21, 10) }),
+    new EvolutionEngineOptions { RunId = "quickstart", Seed = 42, MaxEvaluationAttempts = 200 });
 
-[Noise-aware confirmation](docs/evolution-stories/US-06.md) adds finite incumbent challenges,
-audits of screen-rejected candidates, charged warmups and independent paired timing confirmation
-for the Evolution-owned program benchmark. Correctness alone does not establish a performance win.
-[Opt-in cheap screening](docs/SCREENING.md) advances candidates to full evaluation, audits a frozen
-sample of rejects and charges every stage; local screening-on/off controls expose savings and overhead.
+EvolutionRunResult<EvolutionSearchGenome> result = await engine.RunAsync(
+    new[] { space.Sample(StableRandom.CreateStream(42, 0)) });
 
-[Feature ablations](docs/evolution-stories/US-07.md) compare 19 search configurations with
-paired quality, diversity, success and cost metrics, plus independent confirmation gates for presets.
+Console.WriteLine($"best quality : {result.Best!.Evaluation.Quality:F4}");
+Console.WriteLine($"depth        : {result.Best.Candidate.CanonicalGenome.Genome.Number("depth")}");
+```
 
-## Integration boundaries
+```text
+best quality : -0.0111
+depth        : 7
+```
 
-The engine intentionally knows nothing about models, prompts, compilers, or hardware. Integrations keep those domain
-objects in their owning repository and implement the typed contracts above:
+Three objects: a **space**, a **task** that scores a candidate, and an
+**engine**. Everything below is optional.
 
-- Evolution-specific program/compiler, AutoML orchestration, and kernel-search integrations belong in this repository.
-  General model, chat-client, and tensor/device primitives remain in AiDotNet and AiDotNet.Tensors.
-- Optional `AiDotNet.Evolution.Programs` and `AiDotNet.Evolution.CSharp` projects target .NET 8 and .NET 10.
-  They provide standalone program contracts, metered portfolios, correctness-gated fitness reuse and compiler-guided
-  improvement without an AiDotNet dependency. See the [migration contract](docs/migration/PROGRAM_RUNTIME_MIGRATION.md).
-  Programs also provides caller-owned model-driven variation, bounded prompts and proposal provenance;
-  see the [standalone comparison host](benchmarks/ProgramEvolutionComparison/README.md).
-- Standalone process execution and input/output fitness are available in `AiDotNet.Evolution.Programs`;
-  see [execution runtime usage and boundaries](docs/migration/EXECUTION_RUNTIME_MIGRATION.md).
-- Script evaluators retain numeric metrics and support explicit scoring policies;
-  see [standalone script evaluation](docs/migration/SCRIPT_METRICS_MIGRATION.md).
-  [Standalone model judging](docs/migration/JUDGE_RUNTIME_MIGRATION.md) supports bounded
-  feedback, weighted panels, and direction-aware scoring through caller-owned providers.
-  [Standalone novelty screening](docs/migration/NOVELTY_MIGRATION.md) adds cheap structural
-  checks, optional embedding/model decisions, and a cost-aware pre-evaluation gate.
-  Other old consumer integrations are still being ported; the [PR audit](docs/migration/AIDOTNET_PR_CLEANUP.md)
-  records what remains. Old AiModelBuilder evolution APIs will be removed in a separate breaking-removal PR,
-  without obsolete forwarding APIs.
-- Compiler schedule search, fusion-policy search, quantization-policy search, optimizer selection, feature selection,
-  architecture search, and prompt/program search can share the engine without sharing domain-specific genomes.
+> The three ids on `EvolutionSearchTask` &mdash; task id, task version,
+> evaluator version &mdash; are how the engine refuses a checkpoint or a cached
+> score produced by a *different* scoring function. Change how you score, bump
+> the evaluator version, and stale results stop being reused.
 
-Finite choices should be represented by enums or other validated value types inside a genome. Strings remain
-appropriate for extensible identifiers, version hashes, metric names, and serialized payloads at an explicit boundary.
+## What it gives you
 
-## Development
+- **Deterministic runs.** Same seed, same result, and every run emits a
+  `StateHash` you can compare. One example runs a search across three processes,
+  kills them mid-flight, and asserts the resumed report is byte-identical to the
+  uninterrupted one.
+- **Budgets you cannot overrun.** Every evaluation is admitted against a
+  resource ledger before it runs and charged after. A worker that dies holding a
+  reservation leaves a retained liability, not a silent refund.
+- **Real checkpoint/resume.** Archives, operator learning, island topology,
+  random streams and the ledger restore together; an incompatible checkpoint is
+  refused rather than reinterpreted.
+- **LLMs optional.** The engine knows nothing about models or prompts. Supply
+  model-driven mutation through a typed contract and it is metered like any
+  other operator, or leave it out and pay nothing per evaluation.
+- **Runs where you already are.** .NET 10, .NET 8, and .NET Framework 4.7.1,
+  with no third-party dependencies on .NET 8 and 10. Only 4.7.1 pulls one in,
+  `System.Text.Json`, because it is not in-box there.
+- **Evaluation can leave the process.** Hand work to external workers over a
+  durable coordinator that persists work, leases and receipts together, and
+  survives a crash on either side. TypeScript, Python and C ABI bindings ship
+  with it.
 
-See [CONTRIBUTING.md](CONTRIBUTING.md) for local validation and
-[repository setup](.github/REPOSITORY_SETUP.md) for CI, security, and release configuration.
+## What people search with it
 
-## License and provenance
+| You want to tune | Your genome is | Your score is |
+| --- | --- | --- |
+| Model hyperparameters | depth, learning rate, family | held-out metric |
+| A GPU kernel or compiler schedule | tile sizes, unroll factors, fusion | measured runtime |
+| Generated code or programs | the program itself | tests passed, then speed |
+| A prompt or agent policy | template and parameter choices | task success rate |
+| Feature subsets | which columns are in | cross-validated score |
+| Deployment configs | replicas, batch size, cache sizes | cost under an SLA |
 
-The project is licensed under Apache License 2.0. The engine was developed in the AiDotNet repository and informed by the Apache-2.0-licensed OpenEvolve project. Original commit authorship is retained in this repository's filtered Git history; see `THIRD-PARTY-NOTICES.md` for upstream attribution.
+The engine knows nothing about any of these. You implement
+`IEvolutionTask<TGenome>` and it stays out of your domain.
+
+## Twelve examples you can run
+
+```bash
+dotnet run --project examples/TypedParameterSearch -c Release
+```
+
+| Example | What it shows |
+| --- | --- |
+| [TypedParameterSearch](examples/TypedParameterSearch) | Mixed integer/real/categorical space with conditional parameters |
+| [ParetoSearch](examples/ParetoSearch) | Competing objectives, keeping the tradeoff front instead of one winner |
+| [AdaptiveIslandSearch](examples/AdaptiveIslandSearch) | Parallel islands, migration, restarting stalled populations |
+| [SurrogateSearch](examples/SurrogateSearch) | A cheap learned model ranks candidates before you pay for real evaluation |
+| [MultiFidelitySearch](examples/MultiFidelitySearch) | Cheap-first screening with successive halving and promotion |
+| [ReplicatedEvaluation](examples/ReplicatedEvaluation) | Noisy scores, repeated sampling, confirmation before believing a win |
+| [PersistentEvaluation](examples/PersistentEvaluation) | Reusing earlier evaluations across runs, with freshness and force-fresh |
+| [OperatorCreditSearch](examples/OperatorCreditSearch) | Learning which mutation strategies earn their cost |
+| [ProposalPipeline](examples/ProposalPipeline) | Overlapping proposal generation with evaluation, bounded in flight |
+| [CompilerGuidedSearch](examples/CompilerGuidedSearch) | Using compiler feedback to steer program improvement |
+| [DurableWork](examples/DurableWork) | External workers, crash recovery, and exactly-once receipts |
+| [DurableSession](examples/DurableSession) | A live engine session driven across a durable host process |
+
+## Measured, not asserted
+
+Results that were not measured are labeled as not measured. The repository ships
+retained evidence &mdash; including failed and discarded campaigns &mdash; each
+with an offline verifier you can run without trusting us.
+
+| Evidence | Scale |
+| --- | --- |
+| [Pareto search](benchmarks/evidence/pareto) | 180 matched-budget runs, reproduced from the recorded state hashes in CI |
+| [Proposal pipeline](benchmarks/evidence/pipeline) | 576 live executions and 576 offline replays; 13,824 proposal calls, 18,432 evaluations |
+| [Surrogate ranking](benchmarks/evidence/surrogates) | 240 runs, 27,248 pilot calls |
+| [Adaptive islands](benchmarks/evidence/adaptive-islands) | 62,720 local objective calls |
+| [Engine performance](benchmarks/evidence/performance) | Isolated per-core measurement, with the failed campaigns retained |
+
+The external harness runs SciPy differential evolution and upstream pyribs
+CMA-ME against **the same C# evaluator** &mdash; no Python reimplementation of
+the objective to tilt the result. See the
+[comparison contract](benchmarks/external/COMPARISON.md) and run it yourself.
+
+`main` enforces a coverage ratchet (≥89.8% line, ≥74.51% branch), builds all
+three target frameworks, and runs 1,400+ tests with zero skips. A pull request
+that skips a test fails the build rather than reporting green.
+
+## Going further
+
+| Capability | Doc |
+| --- | --- |
+| Mixed, conditional and log-scaled spaces | [Typed search spaces](docs/TYPED_SEARCH_SPACES.md) |
+| Competing objectives | [Pareto search](docs/PARETO_SEARCH.md) |
+| Budgets and liabilities | [Resource accounting](docs/RESOURCE_ACCOUNTING.md) |
+| Noisy scores and confirmation | [Replicated evaluation](docs/REPLICATED_EVALUATION.md) |
+| Cheap screening first | [Screening](docs/SCREENING.md) · [Multi-fidelity](docs/MULTI_FIDELITY.md) |
+| Learned candidate ranking | [Surrogate selection](docs/SURROGATE_SELECTION.md) |
+| Which operators earn their keep | [Operator credit](docs/OPERATOR_CREDIT.md) · [Portfolios](docs/OPERATOR_PORTFOLIOS.md) |
+| Parallel islands and restarts | [Adaptive islands](docs/ADAPTIVE_ISLANDS.md) |
+| Overlapping proposal and evaluation | [Proposal pipeline](docs/PROPOSAL_PIPELINE.md) |
+| Reusing past evaluations safely | [Persistent reuse](docs/PERSISTENT_EVALUATION_REUSE.md) · [Warm starts](docs/WARM_START_REPERTOIRES.md) |
+| Where a measurement came from | [Measurement origin](docs/MEASUREMENT_ORIGIN.md) |
+| High-dimensional archives | [Centroid archives](docs/CENTROID_ARCHIVES.md) |
+| Work that runs outside the process | [Durable external work](docs/DURABLE_EXTERNAL_WORK.md) · [Worker protocol](docs/DURABLE_WORKER_PROTOCOL.md) · [Work identity](docs/EXTERNAL_WORK_IDENTITY.md) |
+
+### Contracts you implement
+
+`IEvolutionTask<TGenome>` (identity, validation, evaluation) ·
+`IVariationOperator<TGenome>` (proposes immutable genomes) ·
+`IEvolutionArchive<TGenome>` (what to keep; `MapElitesArchive<TGenome>` ships) ·
+`IEvolutionGenomeCodec<TGenome>` (checkpointing without imposing a serializer) ·
+`ISelectionPolicy<TGenome>`, `ICandidateRefiner<TGenome>`, `IMigrationPolicy<TGenome>`.
+
+Reference-typed genomes implement `IImmutableEvolutionGenome<TGenome>` and return
+an independently owned copy from `CreateOwnedSnapshot`. The engine takes that
+snapshot once at canonicalization, so archives, migration and selection never
+clone on their hot paths.
+
+### Related packages
+
+`AiDotNet.Evolution.Programs` and `AiDotNet.Evolution.CSharp` add standalone
+program contracts, process execution, script metrics, model judging and novelty
+screening. The core package depends on neither AiDotNet nor AiDotNet.Tensors.
+
+## Contributing
+
+See [CONTRIBUTING.md](CONTRIBUTING.md) for local validation, and
+[repository setup](.github/REPOSITORY_SETUP.md) for CI, security and release
+configuration.
+
+## License
+
+Apache License 2.0. This is an independent .NET implementation with its own
+engine, orchestration, persistence and integration contracts; no OpenEvolve
+runtime code is copied or ported. OpenEvolve was reviewed as prior art during
+design, and [THIRD-PARTY-NOTICES.md](THIRD-PARTY-NOTICES.md) records that review
+under its Apache-2.0 terms.
