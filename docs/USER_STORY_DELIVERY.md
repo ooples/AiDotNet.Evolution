@@ -74,7 +74,7 @@ Retargeting after squash/rebase merging needs special care to avoid reintroducin
 | US-23: Warm-start compatible searches and reuse evaluations | [#41](https://github.com/ooples/AiDotNet.Evolution/issues/41) | Core contracts verified by a gated paired campaign with retained evidence; cross-story gates (US-24, US-04/US-06, dependency readiness) remain, so the issue stays open | [AiDotNet.Evolution#96](https://github.com/ooples/AiDotNet.Evolution/pull/96) |
 | US-24: Provide a practical run and inspection experience | [#42](https://github.com/ooples/AiDotNet.Evolution/issues/42) | Partial | [AiDotNet#2168](https://github.com/ooples/AiDotNet/pull/2168) |
 | US-25: Promote validated results and retune when conditions change | [#43](https://github.com/ooples/AiDotNet.Evolution/issues/43) | Partial, companion | [AiDotNet.Tensors#1030](https://github.com/ooples/AiDotNet.Tensors/pull/1030) |
-| US-26: Experiment with evolution of search policies themselves | [#44](https://github.com/ooples/AiDotNet.Evolution/issues/44) | Not implemented | [AiDotNet.Evolution#63](https://github.com/ooples/AiDotNet.Evolution/pull/63) |
+| US-26: Experiment with evolution of search policies themselves | [#44](https://github.com/ooples/AiDotNet.Evolution/issues/44) | Offline optimizer implemented and locally verified; independent competitive validation and dependency/merge gates remain | [AiDotNet.Evolution#63](https://github.com/ooples/AiDotNet.Evolution/pull/63) |
 
 ## Review-readiness audit
 

@@ -124,6 +124,8 @@ jobs:
       - name: Verify gain and all-stage operator credit
         shell: pwsh
         run: ./eng/Test-OperatorCredit.ps1
+      - name: Verify bounded offline policy search
+        run: dotnet run --project examples/PolicySearch -c Release -- "${{ github.workspace }}/TestResults/policy-search/report.json"
       - name: Verify adaptive island replay and evaluation accounting
         run: dotnet run --project examples/AdaptiveIslandSearch -c Release -- 1 64 "${{ github.workspace }}/TestResults/adaptive-islands-smoke.json"
       - name: Verify performance fixture contracts
@@ -191,6 +193,7 @@ jobs:
             TestResults/experiment-reports/**
             TestResults/persistent-evaluation/**/*.json
             TestResults/persistent-evaluation/*.jsonl
+            TestResults/policy-search/*.json
             TestResults/durable-work/**
             TestResults/durable-session/**
             coverage/**/coverage.cobertura.xml
