@@ -20,7 +20,7 @@ internal static class ReuseCampaign
     internal static async Task RunAsync(int seedCount, string revision, string directory)
     {
         if (seedCount is not (2 or 32) || !Path.IsPathFullyQualified(directory) || Directory.Exists(directory) || File.Exists(directory))
-            throw new ArgumentException("--campaign <2-smoke|32-primary> <full-revision|working-tree-smoke> <absolute-new-directory>");
+            throw new ArgumentException("--campaign <2|32> <full-revision|working-tree-smoke> <absolute-new-directory>");
         string? built = typeof(EvolutionEngine<>).Assembly.GetCustomAttribute<AssemblyInformationalVersionAttribute>()?.InformationalVersion;
         if (!(seedCount == 2 && revision == "working-tree-smoke") &&
             (revision.Length != 40 || revision.Any(c => c is not (>= '0' and <= '9') and not (>= 'a' and <= 'f')) || built?.EndsWith("+" + revision, StringComparison.Ordinal) != true))
