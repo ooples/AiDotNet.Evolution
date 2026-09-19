@@ -60,6 +60,15 @@ jobs:
       - run: dotnet build src/AiDotNet.Evolution/AiDotNet.Evolution.csproj --configuration Release --no-restore
       - run: dotnet test tests/AiDotNet.Evolution.Tests/AiDotNet.Evolution.Tests.csproj --configuration Release --framework net10.0 --no-restore --verbosity normal
       - run: dotnet test tests/AiDotNet.Evolution.Tests/AiDotNet.Evolution.Tests.csproj --configuration Release --framework net8.0 --no-restore --verbosity normal
+      - name: Test companion packages
+        shell: pwsh
+        run: |
+          foreach ($project in @('AiDotNet.Evolution.CSharp.Tests', 'AiDotNet.Evolution.Deployment.Tests')) {
+            foreach ($framework in @('net8.0', 'net10.0')) {
+              dotnet test "tests/$project/$project.csproj" -c Release -f $framework --no-restore --verbosity minimal
+              if ($LASTEXITCODE -ne 0) { throw "Failed: $project $framework" }
+            }
+          }
 
   legacy:
     name: Validate release on net471
@@ -90,21 +99,29 @@ jobs:
         with:
           fetch-depth: 0
           ref: ${{ inputs.tag }}
+      - name: Check out packaging tooling from the workflow revision
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          ref: ${{ github.workflow_sha }}
+          path: .release-tooling
+          persist-credentials: false
       - uses: actions/setup-dotnet@a98b56852c35b8e3190ac28c8c2271da59106c68 # v6.0.0
         with:
           dotnet-version: '10.0.x'
           dotnet-quality: preview
-      - run: dotnet restore src/AiDotNet.Evolution/AiDotNet.Evolution.csproj
-      - name: Build every package target on this runner
-        run: dotnet build src/AiDotNet.Evolution/AiDotNet.Evolution.csproj --configuration Release --no-restore
-      - name: Pack exact tag version
-        run: >
-          dotnet pack src/AiDotNet.Evolution/AiDotNet.Evolution.csproj
-          --configuration Release --no-build --no-restore --output out
-          -p:PackageVersion=${{ needs.validate.outputs.version }}
+      - name: Build and pack all release packages in lockstep
+        shell: pwsh
+        env:
+          RELEASE_VERSION: ${{ needs.validate.outputs.version }}
+        run: ./.release-tooling/eng/Pack-Release.ps1 -Version $env:RELEASE_VERSION -OutputDirectory out -SourceDirectory .
       - name: Validate package contents and dependency boundary
         shell: pwsh
-        run: ./eng/Test-Package.ps1 -PackagePath "out/AiDotNet.Evolution.${{ needs.validate.outputs.version }}.nupkg" -ExpectedVersion "${{ needs.validate.outputs.version }}"
+        run: ./.release-tooling/eng/Test-Package.ps1 -PackagePath "out/AiDotNet.Evolution.${{ needs.validate.outputs.version }}.nupkg" -ExpectedVersion "${{ needs.validate.outputs.version }}" -RepositoryRoot . -RequireReleaseTag
+      - name: Verify release package consumers
+        shell: pwsh
+        env:
+          RELEASE_VERSION: ${{ needs.validate.outputs.version }}
+        run: ./.release-tooling/eng/Test-ReleaseConsumers.ps1 -Version $env:RELEASE_VERSION -PackageDirectory out
       - name: Sign NuGet packages when certificate is configured
         shell: pwsh
         env:

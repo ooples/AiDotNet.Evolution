@@ -16,6 +16,26 @@
           "type": "xml",
           "path": "src/AiDotNet.Evolution/AiDotNet.Evolution.csproj",
           "xpath": "//PropertyGroup/Version"
+        },
+        {
+          "type": "xml",
+          "path": "src/AiDotNet.Evolution.Programs/AiDotNet.Evolution.Programs.csproj",
+          "xpath": "//PropertyGroup/Version"
+        },
+        {
+          "type": "xml",
+          "path": "src/AiDotNet.Evolution.CSharp/AiDotNet.Evolution.CSharp.csproj",
+          "xpath": "//PropertyGroup/Version"
+        },
+        {
+          "type": "xml",
+          "path": "src/AiDotNet.Evolution.Deployment/AiDotNet.Evolution.Deployment.csproj",
+          "xpath": "//PropertyGroup/Version"
+        },
+        {
+          "type": "xml",
+          "path": "src/AiDotNet.Evolution.Surrogates/AiDotNet.Evolution.Surrogates.csproj",
+          "xpath": "//PropertyGroup/Version"
         }
       ]
     }

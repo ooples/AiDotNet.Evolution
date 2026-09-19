@@ -367,7 +367,7 @@ jobs:
     needs: [modern, legacy]
     if: "${{ always() && !startsWith(github.head_ref, 'release-please--') && !(github.event_name == 'push' && startsWith(github.event.head_commit.message, 'chore(main): release')) && needs.modern.result == 'success' && needs.legacy.result == 'success' }}"
     runs-on: ubuntu-latest
-    timeout-minutes: 10
+    timeout-minutes: 20
     steps:
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
         with:
@@ -376,10 +376,14 @@ jobs:
         with:
           dotnet-version: '10.0.x'
           dotnet-quality: preview
-      - run: dotnet restore src/AiDotNet.Evolution/AiDotNet.Evolution.csproj
-      - name: Build every package target on this runner
-        run: dotnet build src/AiDotNet.Evolution/AiDotNet.Evolution.csproj --configuration Release --no-restore
-      - run: dotnet pack src/AiDotNet.Evolution/AiDotNet.Evolution.csproj --configuration Release --no-build --no-restore --output artifacts
+      - name: Rehearse all release packages without publishing credentials
+        shell: pwsh
+        run: |
+          [xml] $project = Get-Content -LiteralPath src/AiDotNet.Evolution/AiDotNet.Evolution.csproj -Raw
+          $version = [string] $project.Project.PropertyGroup.Version
+          ./eng/Pack-Release.ps1 -Version $version -OutputDirectory artifacts
+          ./eng/Test-ReleasePackageFailures.ps1 -PackageDirectory artifacts -Version $version
+          ./eng/Test-ReleaseConsumers.ps1 -Version $version -PackageDirectory artifacts
       - name: Validate package contents and dependency boundary
         shell: pwsh
         run: |

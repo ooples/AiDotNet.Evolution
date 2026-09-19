@@ -3,7 +3,11 @@ param(
     [string] $PackagePath,
 
     [Parameter(Mandatory = $true)]
-    [string] $ExpectedVersion
+    [string] $ExpectedVersion,
+
+    [switch] $RequireReleaseTag,
+
+    [string] $RepositoryRoot = (Join-Path $PSScriptRoot '..')
 )
 
 $ErrorActionPreference = 'Stop'
@@ -73,7 +77,7 @@ finally {
     $archive.Dispose()
 }
 
-$repositoryRoot = (Resolve-Path -LiteralPath (Join-Path $PSScriptRoot '..')).Path
+$repositoryRoot = (Resolve-Path -LiteralPath $RepositoryRoot).Path
 $releaseConfigPath = Join-Path $repositoryRoot 'release-please-config.json'
 $releaseManifestPath = Join-Path $repositoryRoot '.release-please-manifest.json'
 $releaseConfig = Get-Content -LiteralPath $releaseConfigPath -Raw | ConvertFrom-Json
@@ -97,12 +101,16 @@ else {
         throw "Released manifest version '$manifestVersion' does not match package version '$ExpectedVersion'."
     }
 
-    $matchingTag = git -C $repositoryRoot tag --list -- "v$manifestVersion"
-    if ($LASTEXITCODE -ne 0) {
-        throw 'Unable to inspect repository release tags.'
-    }
-    if ([string]::IsNullOrWhiteSpace(($matchingTag | Out-String))) {
-        throw "Manifest claims version '$manifestVersion' was released, but tag 'v$manifestVersion' does not exist."
+    # A release PR updates the manifest before release-please creates its tag.
+    # PR package validation must not require a future release side effect.
+    if ($RequireReleaseTag) {
+        $matchingTag = git -C $repositoryRoot tag --list -- "v$manifestVersion"
+        if ($LASTEXITCODE -ne 0) {
+            throw 'Unable to inspect repository release tags.'
+        }
+        if ([string]::IsNullOrWhiteSpace(($matchingTag | Out-String))) {
+            throw "Release tag 'v$manifestVersion' does not exist."
+        }
     }
 }
 
