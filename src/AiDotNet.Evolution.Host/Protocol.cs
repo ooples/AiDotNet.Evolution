@@ -216,6 +216,16 @@ internal sealed class Request
 /// <summary>Everything needed to start a run.</summary>
 internal sealed class RunConfig
 {
+    /// <summary>Enables fenced tells and pins caller-owned task/evaluator semantics.</summary>
+    [JsonPropertyName("taskIdentity")]
+    public TaskIdentityConfig? TaskIdentity { get; set; }
+
+    [JsonPropertyName("evaluationTimeoutMs")]
+    public int? EvaluationTimeoutMs { get; set; }
+
+    [JsonPropertyName("maxRetries")]
+    public int MaxRetries { get; set; }
+
     [JsonPropertyName("parameters")]
     [JsonConverter(typeof(BoundedParameterListConverter))]
     public List<ParameterConfig> Parameters { get; set; } = new();
@@ -298,6 +308,9 @@ internal sealed class DescriptorConfig
 /// <summary>One scored candidate coming back from the client.</summary>
 internal sealed class TellResult
 {
+    [JsonPropertyName("workIdentity")]
+    public WorkIdentityDto? WorkIdentity { get; set; }
+
     [JsonPropertyName("evaluationId")]
     public long EvaluationId { get; set; }
 
@@ -316,6 +329,15 @@ internal sealed class TellResult
 /// <summary>One line back to the client.</summary>
 internal sealed class Response
 {
+    [JsonPropertyName("workIdentityVersion")]
+    public int? WorkIdentityVersion { get; set; }
+
+    [JsonPropertyName("requiresWorkIdentity")]
+    public bool? RequiresWorkIdentity { get; set; }
+
+    [JsonPropertyName("compatibilityHash")]
+    public string? CompatibilityHash { get; set; }
+
     [JsonPropertyName("id")]
     public long Id { get; set; }
 
@@ -349,6 +371,10 @@ internal sealed class Response
 
 internal sealed class Candidate
 {
+    /// <summary>Present on work issued by ask; absent on the archived best summary.</summary>
+    [JsonPropertyName("workIdentity")]
+    public WorkIdentityDto? WorkIdentity { get; set; }
+
     [JsonPropertyName("evaluationId")]
     public long EvaluationId { get; set; }
 
@@ -359,8 +385,49 @@ internal sealed class Candidate
     public double? Quality { get; set; }
 }
 
+internal sealed class TaskIdentityConfig
+{
+    [JsonPropertyName("taskId")]
+    public string TaskId { get; set; } = string.Empty;
+
+    [JsonPropertyName("taskVersionHash")]
+    public string TaskVersionHash { get; set; } = string.Empty;
+
+    [JsonPropertyName("evaluatorVersionHash")]
+    public string EvaluatorVersionHash { get; set; } = string.Empty;
+
+    internal EvolutionExternalTaskIdentity ToIdentity() => new(TaskId, TaskVersionHash, EvaluatorVersionHash);
+}
+
+internal sealed class WorkIdentityDto
+{
+    [JsonPropertyName("runId")]
+    public string RunId { get; set; } = string.Empty;
+
+    [JsonPropertyName("evaluationId")]
+    public long EvaluationId { get; set; }
+
+    [JsonPropertyName("attempt")]
+    public int Attempt { get; set; }
+
+    [JsonPropertyName("leaseId")]
+    public string LeaseId { get; set; } = string.Empty;
+
+    internal EvolutionWorkIdentity ToIdentity() => new(RunId, EvaluationId, Attempt, LeaseId);
+
+    internal static WorkIdentityDto From(EvolutionWorkIdentity identity) => new()
+    {
+        RunId = identity.RunId,
+        EvaluationId = identity.EvaluationId,
+        Attempt = identity.Attempt,
+        LeaseId = identity.LeaseId,
+    };
+}
+
 [JsonSerializable(typeof(Request))]
 [JsonSerializable(typeof(Response))]
+[JsonSerializable(typeof(double[]), TypeInfoPropertyName = "NumericVector")]
+[JsonSerializable(typeof(List<ParameterConfig>), TypeInfoPropertyName = "ParameterDefinitions")]
 [JsonSerializable(typeof(Dictionary<string, double>), TypeInfoPropertyName = "NumericMap")]
 [JsonSourceGenerationOptions(DefaultIgnoreCondition = JsonIgnoreCondition.WhenWritingNull)]
 internal sealed partial class HostJsonContext : JsonSerializerContext;

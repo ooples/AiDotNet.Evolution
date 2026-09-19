@@ -218,4 +218,51 @@ public sealed class CentroidArchiveTests
         var changed = new CentroidArchiveDefinition(definition.Descriptors, new[] { new[] { 0.1 }, new[] { 0.9 } });
         await Assert.ThrowsAsync<InvalidDataException>(async () => await Engine(changed).RunAsync(seeds));
     }
+
+    [Fact]
+    public void ProjectionReportRetainsTransactionVersionsAfterTargetChanges()
+    {
+        var source = MapElitesArchiveTests.Archive();
+        MapElitesArchiveTests.Add(source, 0, "a", 1, 0.1);
+        MapElitesArchiveTests.Add(source, 1, "b", 2, 0.3);
+        var projection = CentroidArchive<TestGenome>.ProjectWithReport(source, Definition());
+        var report = projection.Report;
+        Assert.Equal(1, report.SchemaVersion);
+        Assert.Equal(source.DefinitionHash, report.SourceDefinitionHash);
+        Assert.Equal(source.Version, report.SourceVersion);
+        Assert.Equal(projection.Archive.DefinitionHash, report.TargetDefinitionHash);
+        Assert.Equal(source.Version + 1, report.TargetVersion);
+        Assert.Equal(2, report.SourceEliteCount);
+        Assert.Equal(1, report.RetainedEliteCount);
+        Assert.Equal(1, report.CollisionDiscardedEliteCount);
+        Assert.True(report.DefinitionChanged);
+        Add(projection.Archive, 2, "c", 3, 1);
+        Assert.Equal(2, projection.Archive.Count);
+        Assert.Equal(1, report.RetainedEliteCount);
+        Assert.Equal(report.TargetVersion + 1, projection.Archive.Version);
+        Assert.Equal(2, source.Count);
+    }
+
+    [Fact]
+    public void UnchangedGeometryProjectionReportsNoDefinitionChange()
+    {
+        var source = new CentroidArchive<TestGenome>(Definition());
+        Add(source, 0, "a", 1, 0);
+        Add(source, 1, "b", 2, 1);
+        var projection = CentroidArchive<TestGenome>.ProjectWithReport(source, Definition());
+        Assert.False(projection.Report.DefinitionChanged);
+        Assert.Equal(0, projection.Report.CollisionDiscardedEliteCount);
+        Assert.Equal(2, projection.Report.RetainedEliteCount);
+        Assert.Equal(source.Version + 1, projection.Report.TargetVersion);
+    }
+
+    [Fact]
+    public void ProjectionVersionOverflowLeavesTheSourceUntouched()
+    {
+        var source = new CentroidArchive<TestGenome>(Definition());
+        source.Restore(Array.Empty<EvolutionArchiveEntry<TestGenome>>(), source.Descriptors, long.MaxValue);
+        Assert.Throws<OverflowException>(() => CentroidArchive<TestGenome>.ProjectWithReport(source, Definition()));
+        Assert.Empty(source.Entries);
+        Assert.Equal(long.MaxValue, source.Version);
+    }
 }

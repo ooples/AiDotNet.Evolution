@@ -9,8 +9,15 @@ internal static class Program
 {
     private static async Task<int> Main(string[] args)
     {
+        if (args.Length > 0 && args[0] == "--pareto-study") return await ParetoCampaign.RunAsync(args.Skip(1).ToArray());
+        if (args.Length > 0 && args[0] == "--ablation") return await AblationCampaign.RunAsync(args.Skip(1).ToArray());
+        if (args.Length > 0 && args[0] == "--portfolio-study") return await PortfolioCampaign.RunAsync(args.Skip(1).ToArray());
         if (args.Length > 0 && args[0] == "--archive-partition") return await ArchivePartitionPilot.RunAsync(args.Skip(1).ToArray());
+        if (args.Length > 0 && args[0] == "--archive-resource-case") return await ArchiveResourceCase.RunAsync(args.Skip(1).ToArray());
         if (args.Length > 0 && args[0] == "--numeric-service") return NumericObjectiveService.Run(args.Skip(1).ToArray());
+        if (args.Length > 0 && args[0] == "--suite-numeric-service") return NumericObjectiveService.Run(args.Skip(1).ToArray(), suite: true);
+        if (args.Length > 0 && args[0] == "--suite") return await RepresentativeSuite.RunAsync(args.Skip(1).ToArray());
+        if (args.Length > 0 && args[0] == "--analysis-campaign") return await FixedAnalysisCampaign.RunAsync(args.Skip(1).ToArray());
         int methodCount = Enum.GetValues<QualityMethod>().Length;
         int taskCount = Enum.GetValues<QualityTask>().Length;
         if (args.Length != 4 || !int.TryParse(args[0], out int seeds) || seeds is < 1 or > 1000 ||
@@ -62,27 +69,31 @@ internal static class Program
 internal enum QualityTask { Sphere, ShiftedQuadratic, AnisotropicQuadratic, RippledQuadratic }
 internal enum QualityMethod { RandomSearch, HillClimb, FixedMapElites, AdaptiveMapElites, UniformPortfolioMapElites, DiagonalCma }
 
-internal sealed record RunRecord(QualityTask Task, QualityMethod Method, ulong Seed, string InitialPopulationHash,
+internal sealed record RunRecord(string Task, QualityMethod Method, ulong Seed, string InitialPopulationHash,
     string Status, string? Error, long EvaluatorCalls, long Proposals, double? FinalLoss, double? MeanBestLoss,
     int OccupiedCells, string? StateHash, IReadOnlyList<SampleRecord> Samples,
     IReadOnlyList<EvolutionOperatorStatistics> Operators, EvolutionResourceSnapshot Resources, CmaState? Cma = null);
 internal sealed record CmaState(long Updates, long StalePopulations, long InvalidPopulations, int PendingCount, double StepSize, IReadOnlyList<double> Variances);
 internal sealed record SampleRecord(long EvaluationId, EvolutionEvaluationStatus Status, double? BestLoss,
-    int Attempts, double CostUnits, IReadOnlyList<string> DiagnosticCodes);
+    int Attempts, double CostUnits, IReadOnlyList<string> DiagnosticCodes, double? Quality,
+    IReadOnlyList<double> ConstraintViolations, IReadOnlyDictionary<string, double> Descriptors, string GenomeId);
 
 internal static class QualityExperiment
 {
     internal const int Dimensions = 8;
     internal const int InitialPopulation = 8;
 
-    internal static async Task<RunRecord> RunAsync(QualityTask taskKind, QualityMethod method, ulong seed, int budget)
+    internal static async Task<RunRecord> RunAsync(QualityTask taskKind, QualityMethod method, ulong seed, int budget, SuiteNumericTask? suiteTask = null)
     {
-        var ledger = new EvolutionResourceLedger($"{taskKind}-{method}-{seed}", new EvolutionResources(
-            new Dictionary<string, decimal> { ["cost_units"] = budget, ["proposal_calls"] = budget * 4 }),
+        string taskId = suiteTask?.Id ?? taskKind.ToString();
+        decimal evaluationWork = suiteTask?.WorkUnits ?? 1;
+        var ledger = new EvolutionResourceLedger($"{taskId}-{method}-{seed}", new EvolutionResources(
+            new Dictionary<string, decimal> { ["cost_units"] = budget * evaluationWork, ["proposal_calls"] = budget * 4 }),
             retainedReceiptLimit: 64, maximumOperations: Math.Min(1_000_000, budget * 5));
-        NumericGenome[] seeds = InitialUnits(seed).Select(values => new NumericGenome(ToCoordinates(values))).ToArray();
+        NumericGenome[] seeds = SharedInitialUnits(seed, suiteTask is not null)
+            .Select(values => new NumericGenome(ToCoordinates(values))).ToArray();
         string initialHash = EvolutionHash.Combine(seeds.Select(genome => genome.Identity));
-        var task = new NumericTask(taskKind);
+        var task = new NumericTask(taskKind, suiteTask);
         var observer = new Progress();
         IVariationOperator<NumericGenome> variation = method switch
         {
@@ -106,11 +117,11 @@ internal static class QualityExperiment
             IslandCount = 1,
             MigrationInterval = 0,
             InspirationCount = 0,
-            EnableEvaluationCache = true
+            EnableEvaluationCache = suiteTask is null
         };
         try
         {
-            var meteredTask = new ResourceMeteredEvolutionTask<NumericGenome>(task, ledger, new[] { 1m });
+            var meteredTask = new ResourceMeteredEvolutionTask<NumericGenome>(task, ledger, new[] { evaluationWork });
             var engine = new EvolutionEngine<NumericGenome>(meteredTask, variation,
                 _ => new MapElitesArchive<NumericGenome>(new[]
                 {
@@ -120,13 +131,13 @@ internal static class QualityExperiment
             EvolutionRunResult<NumericGenome> result = await engine.RunAsync(seeds);
             EvolutionResourceSnapshot resources = ledger.Snapshot();
             bool complete = task.Calls == budget && observer.Samples.Sum(sample => sample.Attempts) == budget &&
-                observer.Samples.Sum(sample => sample.CostUnits) == budget && observer.Samples.Count == result.Counters.Proposals &&
-                resources.Spent["cost_units"] == budget && resources.Spent["proposal_calls"] == result.Counters.Proposals - InitialPopulation &&
+                observer.Samples.Sum(sample => sample.CostUnits) == (double)(budget * evaluationWork) && observer.Samples.Count == result.Counters.Proposals &&
+                resources.Spent["cost_units"] == budget * evaluationWork && resources.Spent["proposal_calls"] == result.Counters.Proposals - InitialPopulation &&
                 resources.Reserved.Values.All(amount => amount == 0) && resources.Unknown == 0 && !resources.MaximumViolated &&
                 observer.Samples.All(sample => sample.Status is EvolutionEvaluationStatus.Completed or EvolutionEvaluationStatus.Duplicate);
             double[] curve = observer.Samples.Where(sample => sample.Attempts > 0 && sample.BestLoss.HasValue)
                 .Select(sample => sample.BestLoss!.Value).ToArray();
-            return new RunRecord(taskKind, method, seed, initialHash, complete ? "completed" : "incomplete",
+            return new RunRecord(taskId, method, seed, initialHash, complete ? "completed" : "incomplete",
                 complete ? null : result.StopReason.ToString(), task.Calls, result.Counters.Proposals,
                 observer.BestLoss, curve.Length == 0 ? null : curve.Average(), result.Islands.Sum(island => island.Count),
                 result.StateHash, observer.Samples, Statistics(variation), resources, CmaStatistics(variation));
@@ -134,7 +145,7 @@ internal static class QualityExperiment
         catch (Exception exception) when (exception is not OutOfMemoryException)
         {
             // Failed seeds remain in the denominator and output; never silently drop them from comparisons.
-            return new RunRecord(taskKind, method, seed, initialHash, "failed", exception.GetType().FullName,
+            return new RunRecord(taskId, method, seed, initialHash, "failed", exception.GetType().FullName,
                 task.Calls, observer.Samples.Count, observer.BestLoss, null, 0, null, observer.Samples, Statistics(variation), ledger.Snapshot(), CmaStatistics(variation));
         }
     }
@@ -148,6 +159,21 @@ internal static class QualityExperiment
 
     private static NumericGenome RandomGenome(StableRandom random) =>
         new(Enumerable.Range(0, Dimensions).Select(_ => -5 + 10 * random.NextDouble()));
+
+    internal static double[][] SharedInitialUnits(ulong seed, bool suite)
+    {
+        double[][] units = InitialUnits(seed);
+        if (suite)
+        {
+            // Two shared anchors at opposite corners of the box, identical for every method. Exactly one is
+            // feasible for each constrained family -- the low corner for knapsack, the high corner for
+            // robust-design -- so every constrained family starts from one feasible and one recorded-infeasible
+            // point. Do not describe these as two feasible anchors; the recorded violations disprove it.
+            units[0] = new double[Dimensions];
+            units[1] = Enumerable.Repeat(1d, Dimensions).ToArray();
+        }
+        return units;
+    }
 
     internal static double[][] InitialUnits(ulong seed)
     {
@@ -181,10 +207,10 @@ internal static class QualityExperiment
         public NumericGenome CreateOwnedSnapshot() => new(Coordinates);
     }
 
-    private sealed class NumericTask(QualityTask kind) : IEvolutionTask<NumericGenome>
+    private sealed class NumericTask(QualityTask kind, SuiteNumericTask? suiteTask) : IEvolutionTask<NumericGenome>
     {
-        public string Id => kind.ToString();
-        public string VersionHash => "numeric-development-v1";
+        public string Id => suiteTask?.Id ?? kind.ToString();
+        public string VersionHash => suiteTask?.VersionHash ?? "numeric-development-v1";
         public string EvaluatorVersionHash => VersionHash;
         internal int Calls { get; private set; }
         public ValueTask<EvolutionCanonicalGenome<NumericGenome>> CanonicalizeAsync(NumericGenome genome,
@@ -195,6 +221,13 @@ internal static class QualityExperiment
             cancellationToken.ThrowIfCancellationRequested();
             Calls++;
             IReadOnlyList<double> x = candidate.CanonicalGenome.Genome.Coordinates;
+            if (suiteTask is not null)
+            {
+                var measured = suiteTask.Evaluate(x, Calls - 1);
+                return new(new EvolutionTaskResult(EvolutionEvaluationStatus.Completed, -measured.Loss,
+                    descriptors: new Dictionary<string, double> { ["coordinate-0"] = x[0], ["coordinate-1"] = x[1] },
+                    constraintViolations: new[] { measured.Violation }, costUnits: suiteTask.WorkUnits));
+            }
             double loss = Loss(kind, x);
             return new ValueTask<EvolutionTaskResult>(EvolutionTaskResult.Completed(-loss,
                 new Dictionary<string, double> { ["coordinate-0"] = x[0], ["coordinate-1"] = x[1] }, costUnits: 1));
@@ -272,10 +305,11 @@ internal static class QualityExperiment
         public ValueTask OnEventAsync(EvolutionEvent<NumericGenome> evolutionEvent, CancellationToken cancellationToken = default)
         {
             if (evolutionEvent.Kind != EvolutionEventKind.Evaluated || evolutionEvent.Evaluation is not { } evaluation) return default;
-            if (evaluation.Status == EvolutionEvaluationStatus.Completed && evaluation.Quality is { } quality)
+            if (evaluation.Status == EvolutionEvaluationStatus.Completed && evaluation.ConstraintViolations.All(value => value <= 0) && evaluation.Quality is { } quality)
                 BestLoss = Math.Min(BestLoss ?? double.MaxValue, -quality);
             Samples.Add(new SampleRecord(evaluation.EvaluationId, evaluation.Status, BestLoss, evaluation.Cost.AttemptCount,
-                evaluation.Cost.CostUnits, evaluation.Diagnostics.Select(diagnostic => diagnostic.Code).ToArray()));
+                evaluation.Cost.CostUnits, evaluation.Diagnostics.Select(diagnostic => diagnostic.Code).ToArray(), evaluation.Quality,
+                evaluation.ConstraintViolations, evaluation.Descriptors, evaluation.GenomeId));
             return default;
         }
     }

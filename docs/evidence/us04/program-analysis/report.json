@@ -1,0 +1,362 @@
+{
+  "schema": "evolution-program-analysis-v1",
+  "claim": "none",
+  "purpose": "retrospective-development",
+  "pilot_report_sha256": "8e76d685193ac4eb91440940171f30ee3d1c473659593d924f38da2145fa31dc",
+  "audit_report_sha256": "b973a5a252f6c31552de4a069485250564865db271c823e99febce837070b4b0",
+  "independent_search_runs_per_task_method": 1,
+  "rows": [
+    {
+      "task": "base64_encoding",
+      "mode": "controlled",
+      "method": "aidotnet",
+      "search_seed": 37,
+      "status": "validated",
+      "original_seconds": 0.289907,
+      "deployed_seconds": 0.188675,
+      "speedup": 1.5365416721876244,
+      "model_tokens": 18877,
+      "search_evaluator_seconds": 6.60810859996127,
+      "timing_samples": 6
+    },
+    {
+      "task": "base64_encoding",
+      "mode": "controlled",
+      "method": "openevolve",
+      "search_seed": 37,
+      "status": "validated",
+      "original_seconds": 0.298756,
+      "deployed_seconds": 0.195722,
+      "speedup": 1.5264303450812888,
+      "model_tokens": 19844,
+      "search_evaluator_seconds": 10.164775600016583,
+      "timing_samples": 6
+    },
+    {
+      "task": "base64_encoding",
+      "mode": "controlled",
+      "method": "one-shot",
+      "search_seed": 37,
+      "status": "validated",
+      "original_seconds": 0.273164,
+      "deployed_seconds": 0.186829,
+      "speedup": 1.4621070604670583,
+      "model_tokens": 9921,
+      "search_evaluator_seconds": 6.570957700023428,
+      "timing_samples": 6
+    },
+    {
+      "task": "base64_encoding",
+      "mode": "controlled",
+      "method": "single-parent",
+      "search_seed": 37,
+      "status": "validated",
+      "original_seconds": 0.293274,
+      "deployed_seconds": 0.186015,
+      "speedup": 1.5766147891299087,
+      "model_tokens": 18824,
+      "search_evaluator_seconds": 9.852674699912313,
+      "timing_samples": 6
+    },
+    {
+      "task": "base64_encoding",
+      "mode": "native-bounded",
+      "method": "aidotnet",
+      "search_seed": 37,
+      "status": "validated",
+      "original_seconds": 0.279964,
+      "deployed_seconds": 0.19648,
+      "speedup": 1.4248982084690553,
+      "model_tokens": 19930,
+      "search_evaluator_seconds": 6.973853699979372,
+      "timing_samples": 6
+    },
+    {
+      "task": "base64_encoding",
+      "mode": "native-bounded",
+      "method": "openevolve",
+      "search_seed": 37,
+      "status": "validated",
+      "original_seconds": 0.271125,
+      "deployed_seconds": 0.188963,
+      "speedup": 1.4348046972158572,
+      "model_tokens": 22450,
+      "search_evaluator_seconds": 9.884447500051465,
+      "timing_samples": 6
+    },
+    {
+      "task": "sha256_hashing",
+      "mode": "controlled",
+      "method": "aidotnet",
+      "search_seed": 37,
+      "status": "validated",
+      "original_seconds": 0.220825,
+      "deployed_seconds": 0.192812,
+      "speedup": 1.145286600419061,
+      "model_tokens": 18771,
+      "search_evaluator_seconds": 6.785975499951746,
+      "timing_samples": 6
+    },
+    {
+      "task": "sha256_hashing",
+      "mode": "controlled",
+      "method": "openevolve",
+      "search_seed": 37,
+      "status": "validated",
+      "original_seconds": 0.197478,
+      "deployed_seconds": 0.187479,
+      "speedup": 1.0533339734050213,
+      "model_tokens": 19757,
+      "search_evaluator_seconds": 9.426435799978208,
+      "timing_samples": 6
+    },
+    {
+      "task": "sha256_hashing",
+      "mode": "controlled",
+      "method": "one-shot",
+      "search_seed": 37,
+      "status": "validated",
+      "original_seconds": 0.208857,
+      "deployed_seconds": 0.189421,
+      "speedup": 1.1026074194519087,
+      "model_tokens": 9855,
+      "search_evaluator_seconds": 6.491978399979416,
+      "timing_samples": 6
+    },
+    {
+      "task": "sha256_hashing",
+      "mode": "controlled",
+      "method": "single-parent",
+      "search_seed": 37,
+      "status": "validated",
+      "original_seconds": 0.215251,
+      "deployed_seconds": 0.198257,
+      "speedup": 1.0857170238629659,
+      "model_tokens": 18749,
+      "search_evaluator_seconds": 9.413878400053363,
+      "timing_samples": 6
+    },
+    {
+      "task": "sha256_hashing",
+      "mode": "native-bounded",
+      "method": "aidotnet",
+      "search_seed": 37,
+      "status": "validated",
+      "original_seconds": 0.212423,
+      "deployed_seconds": 0.18774,
+      "speedup": 1.1314743794609567,
+      "model_tokens": 19848,
+      "search_evaluator_seconds": 10.423076900013257,
+      "timing_samples": 6
+    },
+    {
+      "task": "sha256_hashing",
+      "mode": "native-bounded",
+      "method": "openevolve",
+      "search_seed": 37,
+      "status": "validated",
+      "original_seconds": 0.198152,
+      "deployed_seconds": 0.18965,
+      "speedup": 1.0448299499077247,
+      "model_tokens": 22198,
+      "search_evaluator_seconds": 9.990912100067362,
+      "timing_samples": 6
+    },
+    {
+      "task": "count_connected_components",
+      "mode": "controlled",
+      "method": "aidotnet",
+      "search_seed": 37,
+      "status": "validated",
+      "original_seconds": 0.326601,
+      "deployed_seconds": 0.16743,
+      "speedup": 1.950671922594517,
+      "model_tokens": 19945,
+      "search_evaluator_seconds": 10.13289700000314,
+      "timing_samples": 6
+    },
+    {
+      "task": "count_connected_components",
+      "mode": "controlled",
+      "method": "openevolve",
+      "search_seed": 37,
+      "status": "validated",
+      "original_seconds": 0.352925,
+      "deployed_seconds": 0.187309,
+      "speedup": 1.8841860241632808,
+      "model_tokens": 20349,
+      "search_evaluator_seconds": 10.303921599988826,
+      "timing_samples": 6
+    },
+    {
+      "task": "count_connected_components",
+      "mode": "controlled",
+      "method": "one-shot",
+      "search_seed": 37,
+      "status": "validated",
+      "original_seconds": 0.335398,
+      "deployed_seconds": 0.167298,
+      "speedup": 2.004793840930555,
+      "model_tokens": 10129,
+      "search_evaluator_seconds": 7.281985099951271,
+      "timing_samples": 6
+    },
+    {
+      "task": "count_connected_components",
+      "mode": "controlled",
+      "method": "single-parent",
+      "search_seed": 37,
+      "status": "validated",
+      "original_seconds": 0.347108,
+      "deployed_seconds": 0.17285,
+      "speedup": 2.0081457911483946,
+      "model_tokens": 19804,
+      "search_evaluator_seconds": 10.574972500035074,
+      "timing_samples": 6
+    },
+    {
+      "task": "count_connected_components",
+      "mode": "native-bounded",
+      "method": "aidotnet",
+      "search_seed": 37,
+      "status": "validated",
+      "original_seconds": 0.356236,
+      "deployed_seconds": 0.173595,
+      "speedup": 2.052109795789049,
+      "model_tokens": 20158,
+      "search_evaluator_seconds": 10.036595700017642,
+      "timing_samples": 6
+    },
+    {
+      "task": "count_connected_components",
+      "mode": "native-bounded",
+      "method": "openevolve",
+      "search_seed": 37,
+      "status": "validated",
+      "original_seconds": 0.35918,
+      "deployed_seconds": 0.16758,
+      "speedup": 2.1433345267931734,
+      "model_tokens": 21957,
+      "search_evaluator_seconds": 10.26665609999327,
+      "timing_samples": 6
+    }
+  ],
+  "comparisons": [
+    {
+      "mode": "controlled",
+      "comparator": "openevolve",
+      "task_pairs": [
+        {
+          "task": "base64_encoding",
+          "log_runtime_ratio": 0.03666932687752688,
+          "fallback_in_pair": false
+        },
+        {
+          "task": "sha256_hashing",
+          "log_runtime_ratio": -0.028048781765478727,
+          "fallback_in_pair": false
+        },
+        {
+          "task": "count_connected_components",
+          "log_runtime_ratio": 0.112194306081838,
+          "fallback_in_pair": false
+        }
+      ],
+      "descriptive_geometric_runtime_ratio": 1.0410935145565239,
+      "confidence_interval": null,
+      "paired_search_variance": null,
+      "inference_status": "insufficient-independent-search-runs"
+    },
+    {
+      "mode": "controlled",
+      "comparator": "one-shot",
+      "task_pairs": [
+        {
+          "task": "base64_encoding",
+          "log_runtime_ratio": -0.009832198172965661,
+          "fallback_in_pair": false
+        },
+        {
+          "task": "sha256_hashing",
+          "log_runtime_ratio": -0.017743569845884023,
+          "fallback_in_pair": false
+        },
+        {
+          "task": "count_connected_components",
+          "log_runtime_ratio": -0.0007887001197541036,
+          "fallback_in_pair": false
+        }
+      ],
+      "descriptive_geometric_runtime_ratio": 0.9905897335888496,
+      "confidence_interval": null,
+      "paired_search_variance": null,
+      "inference_status": "insufficient-independent-search-runs"
+    },
+    {
+      "mode": "controlled",
+      "comparator": "single-parent",
+      "task_pairs": [
+        {
+          "task": "base64_encoding",
+          "log_runtime_ratio": -0.014198642548086744,
+          "fallback_in_pair": false
+        },
+        {
+          "task": "sha256_hashing",
+          "log_runtime_ratio": 0.02784854794147662,
+          "fallback_in_pair": false
+        },
+        {
+          "task": "count_connected_components",
+          "log_runtime_ratio": 0.03185881289918178,
+          "fallback_in_pair": false
+        }
+      ],
+      "descriptive_geometric_runtime_ratio": 1.0152852147396254,
+      "confidence_interval": null,
+      "paired_search_variance": null,
+      "inference_status": "insufficient-independent-search-runs"
+    },
+    {
+      "mode": "native-bounded",
+      "comparator": "openevolve",
+      "task_pairs": [
+        {
+          "task": "base64_encoding",
+          "log_runtime_ratio": -0.03900941625980117,
+          "fallback_in_pair": false
+        },
+        {
+          "task": "sha256_hashing",
+          "log_runtime_ratio": 0.010122241226062399,
+          "fallback_in_pair": false
+        },
+        {
+          "task": "count_connected_components",
+          "log_runtime_ratio": -0.03526415078301032,
+          "fallback_in_pair": false
+        }
+      ],
+      "descriptive_geometric_runtime_ratio": 0.9788432366468943,
+      "confidence_interval": null,
+      "paired_search_variance": null,
+      "inference_status": "insufficient-independent-search-runs"
+    }
+  ],
+  "known_model_tokens": 331366,
+  "unknown_token_rows": 0,
+  "known_search_evaluator_seconds": 161.184102899977,
+  "unknown_evaluator_rows": 0,
+  "sample_size_plan": null,
+  "superiority_established": false,
+  "progress_curves": null,
+  "progress_curve_status": "not-reconstructed-from-summary-only-input",
+  "limitations": [
+    "Fresh-process batch latency includes startup/imports/serialization, not kernel latency.",
+    "Timing repeats and different tasks cannot replace independent paired search runs.",
+    "Ratios compare selected/deployed runtimes directly, not ratios with different noisy baseline denominators.",
+    "Known cost subtotals are not complete totals when any cost is unknown; equal caps do not imply equal cost.",
+    "No numeric-protocol conversion, final registration, power guarantee or exact provider snapshot is invented.",
+    "Hash consistency is not authentication; source evidence and externally retained hashes require trusted custody."
+  ]
+}
