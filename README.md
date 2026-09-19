@@ -17,7 +17,7 @@
   <img src="https://img.shields.io/badge/LLM-optional-8b5cf6" alt="LLM optional">
   <img src="https://img.shields.io/badge/replay-byte--identical-3b82f6" alt="Deterministic replay">
   <img src="https://img.shields.io/badge/telemetry-none-2ea043" alt="No telemetry">
-  <img src="https://img.shields.io/badge/13-runnable%20examples-0d9488" alt="13 runnable examples">
+  <img src="https://img.shields.io/badge/12-runnable%20examples-0d9488" alt="12 runnable examples">
 </p>
 
 ---
@@ -116,7 +116,7 @@ Three objects: a **space**, a **task** that scores a candidate, and an
 The engine knows nothing about any of these. You implement
 `IEvolutionTask<TGenome>` and it stays out of your domain.
 
-## Thirteen examples you can run
+## Twelve examples you can run
 
 ```bash
 dotnet run --project examples/TypedParameterSearch -c Release
@@ -134,7 +134,6 @@ dotnet run --project examples/TypedParameterSearch -c Release
 | [OperatorCreditSearch](examples/OperatorCreditSearch) | Learning which mutation strategies earn their cost |
 | [ProposalPipeline](examples/ProposalPipeline) | Overlapping proposal generation with evaluation, bounded in flight |
 | [CompilerGuidedSearch](examples/CompilerGuidedSearch) | Using compiler feedback to steer program improvement |
-| [PolicySearch](examples/PolicySearch) | Searching over search policies themselves, with a held-out panel |
 | [DurableWork](examples/DurableWork) | External workers, crash recovery, and exactly-once receipts |
 | [DurableSession](examples/DurableSession) | A live engine session driven across a durable host process |
 
