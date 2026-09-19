@@ -13,6 +13,7 @@ internal static class Program
         if (args.Length > 0 && args[0] == "--ablation") return await AblationCampaign.RunAsync(args.Skip(1).ToArray());
         if (args.Length > 0 && args[0] == "--portfolio-study") return await PortfolioCampaign.RunAsync(args.Skip(1).ToArray());
         if (args.Length > 0 && args[0] == "--archive-partition") return await ArchivePartitionPilot.RunAsync(args.Skip(1).ToArray());
+        if (args.Length > 0 && args[0] == "--archive-resource-case") return await ArchiveResourceCase.RunAsync(args.Skip(1).ToArray());
         if (args.Length > 0 && args[0] == "--numeric-service") return NumericObjectiveService.Run(args.Skip(1).ToArray());
         if (args.Length > 0 && args[0] == "--suite-numeric-service") return NumericObjectiveService.Run(args.Skip(1).ToArray(), suite: true);
         if (args.Length > 0 && args[0] == "--suite") return await RepresentativeSuite.RunAsync(args.Skip(1).ToArray());

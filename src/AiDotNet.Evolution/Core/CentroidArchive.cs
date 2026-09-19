@@ -129,6 +129,12 @@ public sealed class CentroidArchive<TGenome> : ICheckpointableEvolutionArchive<T
     /// Use the same reference partition for both methods when comparing retained quality and coverage.
     /// </remarks>
     public static CentroidArchive<TGenome> Project(IEvolutionArchiveView<TGenome> source, CentroidArchiveDefinition definition)
+        => ProjectWithReport(source, definition).Archive;
+
+    /// <summary>Projects transactionally and captures immutable source/target definition, version and collision metadata.</summary>
+    /// <remarks>No report or target is published if validation, routing or version advancement fails.
+    /// The metadata is for experiment provenance, not a cryptographic proof of evaluation validity.</remarks>
+    public static CentroidArchiveProjection<TGenome> ProjectWithReport(IEvolutionArchiveView<TGenome> source, CentroidArchiveDefinition definition)
     {
         Guard.NotNull(source); Guard.NotNull(definition);
         var staged = new CentroidArchive<TGenome>(definition, source.Direction);
@@ -137,6 +143,7 @@ public sealed class CentroidArchive<TGenome> : ICheckpointableEvolutionArchive<T
             if (staged.TryAdd(entry.Candidate, entry.Evaluation) == EvolutionArchiveInsertionResult.Rejected)
                 throw new ArgumentException("Projection cannot place every retained feasible elite.", nameof(definition));
         staged.Version = checked(Math.Max(snapshot.Version, snapshot.Count) + 1);
-        return staged;
+        return new CentroidArchiveProjection<TGenome>(staged, new EvolutionArchiveProjectionReport(
+            snapshot.DefinitionHash, snapshot.Version, snapshot.Count, staged.DefinitionHash, staged.Version, staged.Count));
     }
 }
