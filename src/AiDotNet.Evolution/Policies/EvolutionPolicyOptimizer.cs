@@ -223,7 +223,21 @@ public sealed class EvolutionPolicyOptimizer
                 token.ThrowIfCancellationRequested();
                 throw new PolicyTrialStopped(EvolutionPolicyCampaignOutcome.InnerTimedOut);
             }
-            observation = await work.ConfigureAwait(false) ?? throw new InvalidOperationException("Policy trial returned no receipt.");
+            // WHICH DEADLINE IS REPORTED MUST NOT DEPEND ON A RACE. Both this task and the engine's
+            // own delay above wait on the same trial token, so either can complete first. When the
+            // delay wins, the branch above reports InnerTimedOut. When a cooperative provider's task
+            // wins by completing itself as canceled, the exception from awaiting it would instead
+            // reach the campaign handler, which sees the caller's token unset and calls it TimedOut --
+            // the campaign deadline, which did not fire. Classify it here so the outcome is the same
+            // whichever task the scheduler happens to complete first.
+            try
+            {
+                observation = await work.ConfigureAwait(false) ?? throw new InvalidOperationException("Policy trial returned no receipt.");
+            }
+            catch (OperationCanceledException) when (!token.IsCancellationRequested && timeout.IsCancellationRequested)
+            {
+                throw new PolicyTrialStopped(EvolutionPolicyCampaignOutcome.InnerTimedOut);
+            }
             var amounts = observation.ActualResources.Amounts;
             if (!amounts.ContainsKey("cost_units") || new[] { PolicyResources.Evaluations, PolicyResources.Proposals, PolicyResources.Restarts }
                 .Any(key => !amounts.TryGetValue(key, out decimal amount) || decimal.Truncate(amount) != amount))
@@ -240,7 +254,11 @@ public sealed class EvolutionPolicyOptimizer
             _inlineEvidenceBytes += observation.EvidenceJson is null ? 0 : System.Text.Encoding.UTF8.GetByteCount(observation.EvidenceJson);
             if (_inlineEvidenceBytes > _options.MaximumInlineEvidenceBytes)
                 throw new PolicyTrialStopped(EvolutionPolicyCampaignOutcome.EvidenceLimit);
-            timeout.Token.ThrowIfCancellationRequested(); // Late quality cannot qualify; its known cost still belongs in the ledger.
+            // Late quality cannot qualify; its known cost still belongs in the ledger. The caller's
+            // cancellation keeps precedence, and the trial's own deadline stays InnerTimedOut here
+            // for the same reason as above.
+            token.ThrowIfCancellationRequested();
+            if (timeout.IsCancellationRequested) throw new PolicyTrialStopped(EvolutionPolicyCampaignOutcome.InnerTimedOut);
             // An over-budget receipt is already Rejected above, so the outcome alone decides here.
             if (outcome != EvolutionResourceOutcome.Completed)
                 throw new PolicyTrialStopped(EvolutionPolicyCampaignOutcome.InvalidOrOverBudgetTrial);

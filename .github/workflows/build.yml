@@ -113,6 +113,14 @@ jobs:
       - name: Verify concurrent proposal pipeline and recorded-response replay
         shell: pwsh
         run: ./eng/Test-ProposalPipeline.ps1
+      - name: Verify durable delivery across coordinator and worker process crashes
+        run: |
+          dotnet build examples/DurableWork -c Release
+          dotnet examples/DurableWork/bin/Release/net10.0/DurableWork.dll verify TestResults/durable-work
+      - name: Verify durable worker protocol against a live engine session
+        run: |
+          dotnet build examples/DurableSession -c Release
+          dotnet examples/DurableSession/bin/Release/net10.0/DurableSession.dll TestResults/durable-session
       - name: Verify gain and all-stage operator credit
         shell: pwsh
         run: ./eng/Test-OperatorCredit.ps1
@@ -149,9 +157,20 @@ jobs:
         run: |
           python3 benchmarks/analysis/analyze_pipeline.py --verify-evidence benchmarks/evidence/pipeline/9c3441d/pilot
           python3 benchmarks/analysis/compare_pipeline_defaults.py --archive benchmarks/evidence/pipeline/9c3441d/default-profiles.zip --verify-comparison benchmarks/evidence/pipeline/9c3441d/default-comparison.json
+      # The external-work evidence is a shipped claim about a real crash-recovery run. Nothing
+      # re-checked it after it was committed, so a later change to the archive -- or a verifier
+      # that stopped verifying -- would have gone unnoticed. It is stdlib-only and offline.
+      - name: Verify retained external-work recovery evidence
+        run: python3 benchmarks/evidence/external-work/8aaef1e/verify.py
       - name: Verify archive partition accounting and replay
         shell: pwsh
         run: ./eng/Test-ArchivePartition.ps1 -SourceRevision '${{ github.sha }}'
+      # GENERATED CODE IS EXCLUDED FROM THE RATCHET, and that is a like-for-like
+      # correction rather than a relaxation. The baseline was recorded on a solution
+      # with one project and no source generators. The host and durable-work ledger use
+      # System.Text.Json source generation because NativeAOT trims the reflection
+      # path. Only GeneratedCodeAttribute is excluded: CompilerGeneratedAttribute
+      # also marks user-written closures and must remain in the measured surface.
       - name: Enforce coverage ratchet
         shell: pwsh
         run: |
@@ -175,6 +194,8 @@ jobs:
             TestResults/persistent-evaluation/**/*.json
             TestResults/persistent-evaluation/*.jsonl
             TestResults/policy-search/*.json
+            TestResults/durable-work/**
+            TestResults/durable-session/**
             coverage/**/coverage.cobertura.xml
             coverage/**/*.dmp
             coverage/**/Sequence_*.xml

@@ -166,6 +166,30 @@ public sealed class EvolutionPolicyOptimizerTests
     }
 
     [Fact]
+    public async Task ACooperativeProviderThatObservesItsOwnDeadlineStillReportsTheInnerTimeout()
+    {
+        // The existing timeout test uses a provider that never completes, so Task.WhenAny picks the
+        // delay branch and the trial classifies itself. A provider that honours the trial token
+        // instead completes its own task as canceled, WhenAny picks the work branch, and the
+        // OperationCanceledException from awaiting it reaches the campaign handler -- which sees the
+        // caller's token unset and calls it TimedOut, the campaign deadline. A cooperative provider
+        // must not change which deadline is reported.
+        var campaign = Campaign((_, _, _, _, token) =>
+        {
+            // Cancel the returned task from the token's own callback, which runs synchronously on
+            // Cancel. The work task is therefore already canceled when WhenAny observes it, so the
+            // work branch wins rather than the engine's own delay branch -- deterministically the
+            // ordering the engine's classification depends on.
+            var pending = new TaskCompletionSource<EvolutionPolicyObservation>(TaskCreationOptions.RunContinuationsAsynchronously);
+            token.Register(() => pending.TrySetCanceled(token));
+            return pending.Task;
+        }, trialTimeout: TimeSpan.FromMilliseconds(250));
+
+        var report = await campaign.RunAsync();
+        Assert.Equal(EvolutionPolicyCampaignOutcome.InnerTimedOut, report.Outcome);
+    }
+
+    [Fact]
     public async Task PoliciesShareMatchedSeedsAndReplaysKeepPlanAndDispatchIdentity()
     {
         var first = await Campaign().RunAsync();
