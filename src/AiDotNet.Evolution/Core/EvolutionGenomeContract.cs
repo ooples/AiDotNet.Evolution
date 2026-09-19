@@ -14,7 +14,7 @@ internal static class EvolutionGenomeContract<TGenome>
         if (genome is not IImmutableEvolutionGenome<TGenome> snapshotProvider)
         {
             throw new ArgumentException(
-                $"Genome type '{typeof(TGenome).FullName}' contains reference state and must implement " +
+                $"Genome type '{typeof(TGenome).FullName}' is not proven deeply immutable and must implement " +
                 $"{typeof(IImmutableEvolutionGenome<TGenome>).Name} before instances can be retained by evolution.",
                 parameterName);
         }
@@ -34,6 +34,16 @@ internal static class EvolutionGenomeContract<TGenome>
         if (type == typeof(string)) return true;
         if (!type.IsValueType || type.IsPointer || type.IsByRef) return false;
         if (type.IsPrimitive || type.IsEnum) return true;
+
+#if NET8_0_OR_GREATER
+        // AOT cannot promise metadata for arbitrary recursively nested user structs. Do not
+        // mistake trimmed/missing fields for proof of immutability. Known BCL values remain
+        // safe; other structs must explicitly implement the same owned-snapshot contract as
+        // reference genomes. The JIT's existing recursive value inspection is unchanged.
+        if (!System.Runtime.CompilerServices.RuntimeFeature.IsDynamicCodeSupported)
+            return type == typeof(decimal) || type == typeof(Guid) || type == typeof(DateTime)
+                || type == typeof(DateTimeOffset) || type == typeof(TimeSpan);
+#endif
 
         // A value type is copied at the archive boundary, but references nested inside it are not. Walk its
         // declared storage once per closed genome type so an array/list hidden in a struct cannot bypass the

@@ -18,6 +18,8 @@ for (const [field, minimum, maximum] of [
   ['maxGenerations', 0, 2_147_483_647],
   ['batchSize', 1, 2_147_483_647],
   ['requestTimeoutMs', 1, 2_147_483_647],
+  ['evaluationTimeoutMs', 1, 2_147_483_647],
+  ['maxRetries', 0, 2_147_483_647],
 ]) {
   for (const value of [minimum - 1, maximum + 1, 1.5, NaN, Infinity]) {
     test(`${field} rejects ${value} before launching a host`, async () => {
