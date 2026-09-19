@@ -12,7 +12,7 @@
   <ItemGroup>
     <ProjectReference Include="../../src/AiDotNet.Evolution.Deployment/AiDotNet.Evolution.Deployment.csproj" />
     <PackageReference Include="AiDotNet" Version="0.231.0" Aliases="AiDotNetConsumer" />
-    <PackageReference Include="Microsoft.NET.Test.Sdk" Version="18.9.0" />
+    <PackageReference Include="Microsoft.NET.Test.Sdk" Version="18.10.1" />
     <PackageReference Include="xunit" Version="2.9.3" />
     <PackageReference Include="xunit.runner.visualstudio" Version="2.8.2" PrivateAssets="all" />
   </ItemGroup>

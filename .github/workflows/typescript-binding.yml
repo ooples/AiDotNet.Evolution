@@ -5,13 +5,19 @@ on:
     branches: [main]
     paths:
       - 'bindings/typescript/**'
+      - 'bindings/python/**'
+      - 'bindings/c/**'
+      - 'src/AiDotNet.Evolution.Native/**'
       - 'src/AiDotNet.Evolution.Host/**'
       - 'src/AiDotNet.Evolution/**'
       - '.github/workflows/typescript-binding.yml'
   pull_request:
-    branches: [main]
+    branches: [main, feat/competitive-evolution-platform]
     paths:
       - 'bindings/typescript/**'
+      - 'bindings/python/**'
+      - 'bindings/c/**'
+      - 'src/AiDotNet.Evolution.Native/**'
       - 'src/AiDotNet.Evolution.Host/**'
       - 'src/AiDotNet.Evolution/**'
       - '.github/workflows/typescript-binding.yml'
@@ -63,11 +69,17 @@ jobs:
 
       - uses: actions/setup-dotnet@a98b56852c35b8e3190ac28c8c2271da59106c68 # v6.0.0
         with:
-          dotnet-version: '8.0.x'
+          dotnet-version: |
+            8.0.x
+            10.0.x
 
-      - uses: actions/setup-node@49933ea5288caeca8642d1e84afbd3f7d6820020 # v4
+      - uses: actions/setup-node@820762786026740c76f36085b0efc47a31fe5020 # v7.0.0
         with:
           node-version: ${{ matrix.node }}
+
+      - uses: actions/setup-python@5fda3b95a4ea91299a34e894583c3862153e4b97 # v7.0.0
+        with:
+          python-version: '3.10'
 
       # The AOT compiler links with the platform toolchain, which is present on the
       # Windows and macOS images but needs the objcopy/ld pieces installed on Ubuntu.
@@ -99,6 +111,24 @@ jobs:
           npm test 2>&1 | tee test-output.txt
           node scripts/check-test-output.mjs test-output.txt
 
+      - name: Test Python durable binding against the real native host
+        shell: pwsh
+        run: |
+          $suffix = if ($IsWindows) { '.exe' } else { '' }
+          $env:AIDOTNET_DURABLE_HOST_PATH = Join-Path $PWD "bindings/typescript/bin/${{ matrix.rid }}/aidotnet-evolution-host$suffix"
+          python -W error::ResourceWarning -m unittest discover -s bindings/python/tests -v
+          if ($LASTEXITCODE -ne 0) { exit $LASTEXITCODE }
+
+      - name: Publish and test the durable C ABI
+        if: matrix.node == '22'
+        shell: pwsh
+        run: |
+          dotnet publish src/AiDotNet.Evolution.Native -c Release -r '${{ matrix.rid }}' -o TestResults/native-library
+          if ($LASTEXITCODE -ne 0) { exit $LASTEXITCODE }
+          $suffix = if ($IsWindows) { '.dll' } elseif ($IsMacOS) { '.dylib' } else { '.so' }
+          python -W error::ResourceWarning bindings/c/test_native.py "TestResults/native-library/aidotnet-evolution-native$suffix"
+          if ($LASTEXITCODE -ne 0) { exit $LASTEXITCODE }
+
       # ONLY THE PRIMARY NODE VERSION PUBLISHES. Two jobs now build linux-x64, and
       # uploading from both would collide on the artifact name -- the extra job exists
       # to test the declared Node minimum, not to produce a second copy of the same
@@ -108,7 +138,7 @@ jobs:
         working-directory: bindings/typescript
         run: npm run package -- ${{ matrix.rid }}
 
-      - uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02 # v4
+      - uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a # v7.0.1
         if: matrix.node == '22'
         with:
           name: evolution-host-${{ matrix.rid }}

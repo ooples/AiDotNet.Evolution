@@ -29,17 +29,23 @@ namespace AiDotNet.Evolution;
 /// different way to reach the same engine, not a second engine.
 /// </para>
 /// <para>
-/// <b>Determinism is preserved but not free.</b> The engine's own ordering is unchanged, and results are applied
-/// through the same code path as a direct evaluation. What the caller controls is when a result arrives: telling
-/// two outstanding candidates in a different order across two runs produces the same archive content, because
-/// placement is keyed on canonical identity rather than arrival, but observer event ORDER will differ. Reproduce a
-/// run by replaying the same asks and tells, not by assuming any interleaving is equivalent.
+/// <b>Determinism follows the engine's dispatch and commit contracts.</b> Canonical identity does not make arbitrary
+/// arrival orders equivalent: opportunistic commits can change feedback, future proposals, and the final archive.
+/// Exact replay requires the same external responses and applicable scheduling provenance; timeouts and retries
+/// can change the trajectory even when the random seed is unchanged.
 /// </para>
 /// <para><b>For Beginners:</b> Normally you give the engine a judge and it runs the whole contest. Here you take
 /// the organizer's clipboard instead: you call <see cref="AskAsync"/> to get the next few entries that need
 /// scoring, score them however you like and whenever you like, then call <see cref="Tell"/> with the scores. The
 /// contest advances only when you say so, which means it can be driven from another language, another process, or
 /// a person clicking a button.</para>
+/// <para>
+/// <b>Determinism is preserved but not free.</b> The engine's own ordering is unchanged, and results are applied
+/// through the same code path as a direct evaluation. What the caller controls is when a result arrives: telling
+/// two outstanding candidates in a different order across two runs produces the same archive content, because
+/// placement is keyed on canonical identity rather than arrival, but observer event ORDER will differ. Reproduce a
+/// run by replaying the same asks and tells, not by assuming any interleaving is equivalent.
+/// </para>
 /// </remarks>
 public sealed class EvolutionSession<TGenome> : IDisposable
 {
@@ -73,6 +79,8 @@ public sealed class EvolutionSession<TGenome> : IDisposable
         new(TaskCreationOptions.RunContinuationsAsynchronously);
 
     private readonly Func<TGenome, string> _identity;
+    private readonly EvolutionExternalTaskIdentity _taskIdentity;
+    private readonly bool _allowLegacyTells;
     private readonly EvolutionEngine<TGenome> _engine;
     private readonly Task _engineRun;
     private int _disposed;
@@ -104,12 +112,33 @@ public sealed class EvolutionSession<TGenome> : IDisposable
         Func<IEvolutionTask<TGenome>, EvolutionEngine<TGenome>> engineFactory,
         IEnumerable<TGenome> initialGenomes,
         Func<TGenome, string> canonicalIdentity)
+        : this(engineFactory, initialGenomes, canonicalIdentity, new EvolutionExternalTaskIdentity("ask-tell", "1", "external"), true) { }
+
+    // RETRIES AND THE LEGACY OVERLOAD. Tell takes a bare evaluation id, which cannot distinguish a
+    // retry from another session's result, so it settles only the first attempt. That does NOT mean a
+    // session built here cannot retry: TellAttempt is available on every session and settles retries
+    // by their full work identity, which is what EvolutionSessionAttemptTests exercises. A caller that
+    // uses Tell exclusively and configures MaxRetries above zero will see Tell return false for the
+    // replacement attempt and, if it ignores that, wait for a completion nobody supplies. Use
+    // TellAttempt for the ask/tell loop, or leave MaxRetries at zero.
+
+    /// <summary>Creates a fingerprinted session requiring fenced <see cref="TellAttempt"/> results.</summary>
+    /// <remarks>Inject the matching genome codec through the engine factory for checkpoints. This local queue is not a durable coordinator.</remarks>
+    public EvolutionSession(Func<IEvolutionTask<TGenome>, EvolutionEngine<TGenome>> engineFactory,
+        IEnumerable<TGenome> initialGenomes, Func<TGenome, string> canonicalIdentity, EvolutionExternalTaskIdentity taskIdentity)
+        : this(engineFactory, initialGenomes, canonicalIdentity, taskIdentity, false) { }
+
+    private EvolutionSession(Func<IEvolutionTask<TGenome>, EvolutionEngine<TGenome>> engineFactory,
+        IEnumerable<TGenome> initialGenomes, Func<TGenome, string> canonicalIdentity, EvolutionExternalTaskIdentity taskIdentity, bool allowLegacyTells)
     {
         Guard.NotNull(engineFactory);
         Guard.NotNull(initialGenomes);
         Guard.NotNull(canonicalIdentity);
+        Guard.NotNull(taskIdentity);
 
         _identity = canonicalIdentity;
+        _taskIdentity = taskIdentity;
+        _allowLegacyTells = allowLegacyTells;
         TGenome[] seeds = MaterializeSeeds(initialGenomes);
         var task = new QueueingTask(this);
         _engine = engineFactory(task)
@@ -162,6 +191,27 @@ public sealed class EvolutionSession<TGenome> : IDisposable
     /// this rather than polling <see cref="IsComplete"/> when the caller has somewhere to await.
     /// </remarks>
     public Task<EvolutionRunResult<TGenome>> Completion => _completion.Task;
+
+    /// <summary>Gets the engine/task/evaluator compatibility fingerprint for this session.</summary>
+    public string CompatibilityHash => _engine.CompatibilityHash;
+
+    /// <summary>Gets the configured run identity, distinct from this live session's instance identity.</summary>
+    public string RunId => _engine.RunId;
+
+    /// <summary>Gets this live session's unique identity; a new process/session never inherits it by reusing a run ID.</summary>
+    public string InstanceId { get; } = Guid.NewGuid().ToString("N");
+
+    internal IEvolutionGenomeCodec<TGenome>? ExternalWorkCodec => _engine.ExternalWorkCodec;
+    internal bool RequiresWorkIdentity => !_allowLegacyTells;
+
+    internal bool IsOutstanding(EvolutionWorkIdentity identity, EvolutionCandidate<TGenome>? candidate = null, EvolutionEvaluationContext? context = null)
+    {
+        lock (_handover)
+            return _outstanding.TryGetValue(identity.EvaluationId, out PendingEvaluation? pending)
+                && pending.Identity.Matches(identity) && !pending.Completion.Task.IsCompleted
+                && (candidate is null || ReferenceEquals(candidate, pending.Candidate))
+                && (context is null || ReferenceEquals(context, pending.Context));
+    }
 
     /// <summary>Requests that the engine stop at the next batch boundary, keeping results found so far.</summary>
     /// <remarks>
@@ -292,39 +342,27 @@ public sealed class EvolutionSession<TGenome> : IDisposable
 
         using var linked = CancellationTokenSource.CreateLinkedTokenSource(
             cancellationToken, _closed.Token);
-        try
+        while (batch.Count == 0)
         {
-            // Block for the first item; take the rest only if they are already there.
-            await _available.WaitAsync(linked.Token).ConfigureAwait(false);
-        }
-        catch (OperationCanceledException) when (_closed.IsCancellationRequested
-            && !cancellationToken.IsCancellationRequested)
-        {
-            // The run finished while we waited. An empty batch is the completion signal.
-            return batch;
-        }
-
-        // ALREADY-SETTLED ENTRIES ARE SKIPPED, not handed out. A stop can settle a
-        // queued evaluation without removing it -- see the double-check in
-        // EvaluateAsync -- and offering the caller a candidate whose result is already
-        // recorded would have them do work that Tell then refuses.
-        if (HandOverNext() is { } first)
-        {
-            batch.Add(new EvolutionAskItem<TGenome>(first.Candidate, first.Context));
-        }
-
-        // Drain what is already queued, taking a permit for each so the count stays
-        // in step with the queue.
-        while (batch.Count < wanted && _available.Wait(0))
-        {
-            if (HandOverNext() is not { } next)
+            try
             {
-                // Permit taken with nothing behind it: hand it back rather than
-                // losing a wakeup a concurrent writer is about to need.
-                _available.Release();
-                break;
+                await _available.WaitAsync(linked.Token).ConfigureAwait(false);
             }
-            batch.Add(new EvolutionAskItem<TGenome>(next.Candidate, next.Context));
+            catch (OperationCanceledException) when (_closed.IsCancellationRequested
+                && !cancellationToken.IsCancellationRequested)
+            {
+                return batch;
+            }
+
+            // A permit may refer only to expired queued work. Consume obsolete permits and continue waiting;
+            // returning an empty batch here falsely tells a remote caller that a retrying run has finished.
+            if (HandOverNext() is { } first)
+                batch.Add(new EvolutionAskItem<TGenome>(first.Candidate, first.Context, first.Identity));
+            while (batch.Count < wanted && _available.Wait(0))
+            {
+                if (HandOverNext() is not { } next) break;
+                batch.Add(new EvolutionAskItem<TGenome>(next.Candidate, next.Context, next.Identity));
+            }
         }
 
         return batch;
@@ -341,13 +379,34 @@ public sealed class EvolutionSession<TGenome> : IDisposable
     /// RETURNS A BOOL RATHER THAN THROWING, because the caller is frequently another language or another process
     /// and a duplicate tell is a routine consequence of a retry, not a programming error. Silently ignoring it
     /// would hide a real bug; throwing across an ABI would turn a recoverable duplicate into a crashed host.
+    /// This compatibility path accepts only first attempts on legacy-constructed sessions; it cannot fence cross-session
+    /// results. Use <see cref="TellAttempt"/> with the session-issued work identity for retries and external transports.
     /// </remarks>
     /// <exception cref="ArgumentNullException"><paramref name="result"/> is null.</exception>
     public bool Tell(long evaluationId, EvolutionTaskResult result)
     {
         Guard.NotNull(result);
-        if (!_outstanding.TryRemove(evaluationId, out PendingEvaluation? pending)) return false;
-        return pending.Completion.TrySetResult(result);
+        lock (_handover)
+        {
+            // Legacy IDs cannot distinguish retries or another session. Keep only the original local first-attempt
+            // compatibility path; fingerprinted sessions require the full token even for their first attempt.
+            if (!_allowLegacyTells || !_outstanding.TryGetValue(evaluationId, out PendingEvaluation? pending) || pending.Context.AttemptCount != 1)
+                return false;
+            _outstanding.TryRemove(evaluationId, out _);
+            return pending.Completion.TrySetResult(result);
+        }
+    }
+
+    /// <summary>Completes exactly the run/evaluation/attempt/lease handed to the caller; stale, cross-session and duplicate results return false.</summary>
+    public bool TellAttempt(EvolutionWorkIdentity identity, EvolutionTaskResult result)
+    {
+        Guard.NotNull(identity); Guard.NotNull(result);
+        lock (_handover)
+        {
+            if (!_outstanding.TryGetValue(identity.EvaluationId, out PendingEvaluation? pending) || !pending.Identity.Matches(identity)) return false;
+            _outstanding.TryRemove(identity.EvaluationId, out _);
+            return pending.Completion.TrySetResult(result);
+        }
     }
 
     /// <summary>Releases the session, stopping the engine and failing anything still outstanding.</summary>
@@ -442,14 +501,16 @@ public sealed class EvolutionSession<TGenome> : IDisposable
 
     private sealed class PendingEvaluation
     {
-        public PendingEvaluation(EvolutionCandidate<TGenome> candidate, EvolutionEvaluationContext context)
+        public PendingEvaluation(EvolutionCandidate<TGenome> candidate, EvolutionEvaluationContext context, string runId)
         {
             Candidate = candidate;
             Context = context;
+            Identity = new EvolutionWorkIdentity(runId, context.EvaluationId, context.AttemptCount, Guid.NewGuid().ToString("N"));
         }
 
         public EvolutionCandidate<TGenome> Candidate { get; }
         public EvolutionEvaluationContext Context { get; }
+        public EvolutionWorkIdentity Identity { get; }
 
         public TaskCompletionSource<EvolutionTaskResult> Completion { get; } =
             new(TaskCreationOptions.RunContinuationsAsynchronously);
@@ -464,11 +525,11 @@ public sealed class EvolutionSession<TGenome> : IDisposable
 
         public QueueingTask(EvolutionSession<TGenome> session) => _session = session;
 
-        public string Id => "ask-tell";
+        public string Id => _session._taskIdentity.TaskId;
 
-        public string VersionHash => "1";
+        public string VersionHash => _session._taskIdentity.TaskVersionHash;
 
-        public string EvaluatorVersionHash => "external";
+        public string EvaluatorVersionHash => _session._taskIdentity.EvaluatorVersionHash;
 
         public ValueTask<EvolutionCanonicalGenome<TGenome>> CanonicalizeAsync(
             TGenome genome,
@@ -500,7 +561,7 @@ public sealed class EvolutionSession<TGenome> : IDisposable
             EvolutionEvaluationContext context,
             CancellationToken cancellationToken = default)
         {
-            var pending = new PendingEvaluation(candidate, context);
+            var pending = new PendingEvaluation(candidate, context, _session._engine.RunId);
 
             if (_session._closed.IsCancellationRequested)
             {
@@ -537,7 +598,14 @@ public sealed class EvolutionSession<TGenome> : IDisposable
                 },
                 pending.Completion);
 
-            return await pending.Completion.Task.ConfigureAwait(false);
+            try { return await pending.Completion.Task.ConfigureAwait(false); }
+            finally
+            {
+                // An expired attempt must not remain outstanding, nor may its cleanup remove a replacement.
+                lock (_session._handover)
+                    if (_session._outstanding.TryGetValue(candidate.EvaluationId, out PendingEvaluation? current) && ReferenceEquals(current, pending))
+                        _session._outstanding.TryRemove(candidate.EvaluationId, out _);
+            }
         }
     }
 }

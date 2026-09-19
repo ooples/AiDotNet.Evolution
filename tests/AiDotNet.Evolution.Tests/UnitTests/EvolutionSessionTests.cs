@@ -241,7 +241,8 @@ public sealed class EvolutionSessionTests
     {
         // Exercise the runtime boundary without lying to nullable analysis or relaxing
         // the public constructor's non-null contract. Reflection wraps the actual guard.
-        ConstructorInfo constructor = Assert.Single(typeof(EvolutionSession<SessionGenome>).GetConstructors());
+        ConstructorInfo constructor = Assert.Single(typeof(EvolutionSession<SessionGenome>).GetConstructors(),
+            candidate => candidate.GetParameters().Length == 3);
         TargetInvocationException invocation = Assert.Throws<TargetInvocationException>(() =>
             constructor.Invoke(new object?[] { engineFactory, initialGenomes, canonicalIdentity }));
         ArgumentNullException argument = Assert.IsType<ArgumentNullException>(invocation.InnerException);
