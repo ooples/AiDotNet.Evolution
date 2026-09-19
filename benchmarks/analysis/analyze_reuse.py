@@ -41,7 +41,12 @@ def validate_plan(plan):
     if plan["SourceRevision"] == "working-tree-smoke":
         require(plan["SeedCount"] == 2, "Primary requires a source pin.")
     else:
-        require(len(plan["SourceRevision"]) == 40 and plan["CoreInformationalVersion"].endswith("+" + plan["SourceRevision"]), "Core/source mismatch.")
+        # A LENGTH CHECK IS NOT AN IDENTITY CHECK. analyze() calls this directly on a supplied
+        # plan.json, so the producer's own validation does not protect it: any forty characters with
+        # a matching version suffix would be reported as a pinned source revision.
+        revision = plan["SourceRevision"]
+        require(len(revision) == 40 and all(c in "0123456789abcdef" for c in revision) and
+                plan["CoreInformationalVersion"].endswith("+" + revision), "Core/source mismatch.")
 
 
 def raw_observation(group, expected_digest, trace, seen_samples, seen_artifacts):
@@ -130,7 +135,13 @@ def validate_run(group, row, plan, prior_files, repertoire_digest, imported, see
     else:
         require(row["PriorCostAttributed"] == 80 and row["CopiedPriorRecords"] == 16 and row["PriorCacheFiles"] == prior_files and
                 row["RepertoireSha256"] == repertoire_digest and row["InitialGenomes"] == imported, "Unequal or unaccounted prior information.")
-    if method == "AlwaysFresh" or phase == "force-fresh":
+    # "prior" belongs here as much as force-fresh: the prior panel is what builds the cache, so a
+    # hit during it means the run started with knowledge it did not pay for. Defence in depth rather
+    # than a reachable hole -- every inconsistent artifact that sets CacheHits is already rejected by
+    # the raw acquisition/reuse accounting below, and a self-consistent one would have to fabricate
+    # matching reuse decisions, origins and raw reads. This makes the contract explicit where it is
+    # stated instead of relying on that reconciliation to imply it.
+    if method == "AlwaysFresh" or phase in ("prior", "force-fresh"):
         require(hits == 0, "Fresh measurement was bypassed.")
     confirmation_mean = None
     if phase == "prior":

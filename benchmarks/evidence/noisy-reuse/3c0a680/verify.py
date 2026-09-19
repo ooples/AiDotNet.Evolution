@@ -82,9 +82,17 @@ with zipfile.ZipFile(io.BytesIO(archive_bytes)) as archive:
     require(smoke["RetainedRunsIncludingPrior"] == 72 and smoke["TotalPhysicalObservations"] == smoke["DistinctPhysicalSampleIds"] == 22400 and
             smoke["ReplayEqualExcludingAcquisitionIdentity"], "Smoke audit differs or loses work.")
     for framework in ("net10.0", "net8.0", "net471"):
-        counters = ET.fromstring(archive.read(f"tests/{framework}.trx")).find(".//{*}Counters")
-        require(counters is not None and all(counters.attrib[key] == "661" for key in ("total", "executed", "passed")) and counters.attrib["failed"] == "0", "Test receipt mismatch.")
-    coverage_name = next(name for name in names if name.startswith("tests/coverage/") and name.endswith("/coverage.cobertura.xml"))
+        # THE FIRST MATCH ANYWHERE IS NOT THE RECEIPT. A descendant search accepts a Counters element
+        # planted at any depth, so a passing decoy could stand in for a failing one at the real
+        # position. Require exactly one, exactly where the schema puts it.
+        run = ET.fromstring(archive.read(f"tests/{framework}.trx"))
+        counters = [element for summary in run.findall("{*}ResultSummary") for element in summary.findall("{*}Counters")]
+        require(len(counters) == 1, "Test receipt is missing or ambiguous.")
+        counters = counters[0]
+        require(all(counters.attrib[key] == "661" for key in ("total", "executed", "passed")) and counters.attrib["failed"] == "0", "Test receipt mismatch.")
+    coverage_names = [name for name in names if name.startswith("tests/coverage/") and name.endswith("/coverage.cobertura.xml")]
+    require(len(coverage_names) == 1, "Coverage receipt is missing or ambiguous.")
+    coverage_name = coverage_names[0]
     coverage = ET.fromstring(archive.read(coverage_name))
     baseline, _ = load_json(ZipPath(archive, children, "coverage-baseline.json"), 4096)
     require(float(coverage.attrib["line-rate"]) * 100 >= baseline["line"] - 1 and float(coverage.attrib["branch-rate"]) * 100 >= baseline["branch"] - 1, "Coverage ratchet failed.")

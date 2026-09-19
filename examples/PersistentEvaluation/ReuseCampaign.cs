@@ -20,7 +20,7 @@ internal static class ReuseCampaign
     internal static async Task RunAsync(int seedCount, string revision, string directory)
     {
         if (seedCount is not (2 or 32) || !Path.IsPathFullyQualified(directory) || Directory.Exists(directory) || File.Exists(directory))
-            throw new ArgumentException("--campaign <2-smoke|32-primary> <full-revision|working-tree-smoke> <absolute-new-directory>");
+            throw new ArgumentException("--campaign <2|32> <full-revision|working-tree-smoke> <absolute-new-directory>");
         string? built = typeof(EvolutionEngine<>).Assembly.GetCustomAttribute<AssemblyInformationalVersionAttribute>()?.InformationalVersion;
         if (!(seedCount == 2 && revision == "working-tree-smoke") &&
             (revision.Length != 40 || revision.Any(c => c is not (>= '0' and <= '9') and not (>= 'a' and <= 'f')) || built?.EndsWith("+" + revision, StringComparison.Ordinal) != true))
@@ -308,9 +308,19 @@ internal static class ReuseCampaign
                 return reused;
             }
             var measured = await _metered.EvaluateAsync(candidate, context, cancellationToken);
+            // A DISCARDED WRITE STATUS IS A SILENT HOLE. The warm phase can only reuse what the prior
+            // phase actually published, but this dropped TryStoreAsync's result, so a
+            // StorageUnavailable left the run reporting Valid with nothing stored -- the validity
+            // predicate counts observations and ledger totals, not publications. Record the status and
+            // refuse anything but Stored for a completed fresh measurement.
+            EvolutionEvaluationCacheWriteStatus? write = null;
             if (!_disabled && measured.Status == EvolutionEvaluationStatus.Completed)
-                await _cache.TryStoreAsync(new EvolutionEvaluationCacheRecord(key, measured, Inner.LastEvidence!), operation, cancellationToken);
-            Decisions.Add(new { EvaluationId = context.EvaluationId, Decision = lookup.Decision, EvidenceSha256 = Inner.LastEvidence, Origin = measured.MeasurementOrigin?.ToJson() });
+            {
+                write = await _cache.TryStoreAsync(new EvolutionEvaluationCacheRecord(key, measured, Inner.LastEvidence!), operation, cancellationToken);
+                if (write != EvolutionEvaluationCacheWriteStatus.Stored)
+                    throw new InvalidOperationException($"A completed fresh measurement was not published: {write}.");
+            }
+            Decisions.Add(new { EvaluationId = context.EvaluationId, Decision = lookup.Decision, EvidenceSha256 = Inner.LastEvidence, Origin = measured.MeasurementOrigin?.ToJson(), Write = write?.ToString() });
             return measured;
         }
     }
