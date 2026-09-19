@@ -8,7 +8,7 @@
     <GenerateDocumentationFile>true</GenerateDocumentationFile>
     <Deterministic>true</Deterministic>
     <ContinuousIntegrationBuild Condition="'$(CI)' == 'true'">true</ContinuousIntegrationBuild>
-    <Version>0.1.0-preview.1</Version>
+    <Version>0.1.1</Version>
     <PackageId>AiDotNet.Evolution.Surrogates</PackageId>
     <Description>Optional bounded numeric surrogate adapters with explicit reliability diagnostics for AiDotNet.Evolution.</Description>
     <Authors>ooples</Authors>
@@ -22,8 +22,8 @@
     <SymbolPackageFormat>snupkg</SymbolPackageFormat>
   </PropertyGroup>
   <ItemGroup>
-    <ProjectReference Include="../AiDotNet.Evolution/AiDotNet.Evolution.csproj" />
-    <None Include="README.md" Pack="true" PackagePath="/" />
-    <PackageReference Include="Microsoft.SourceLink.GitHub" Version="10.0.401" PrivateAssets="All" />
+    <ProjectReference Include="../AiDotNet.Evolution/AiDotNet.Evolution.csproj"/>
+    <None Include="README.md" Pack="true" PackagePath="/"/>
+    <PackageReference Include="Microsoft.SourceLink.GitHub" Version="10.0.401" PrivateAssets="All"/>
   </ItemGroup>
 </Project>

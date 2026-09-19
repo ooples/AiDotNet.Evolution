@@ -1,5 +1,12 @@
 # Changelog
 
+## [0.1.1](https://github.com/ooples/AiDotNet.Evolution/compare/v0.1.0...v0.1.1) (2026-09-19)
+
+
+### Bug Fixes
+
+* **release:** publish all Evolution packages and validate before tagging ([#104](https://github.com/ooples/AiDotNet.Evolution/issues/104)) ([7de3011](https://github.com/ooples/AiDotNet.Evolution/commit/7de30119328557b8e04b937620fd1b06eefda56d))
+
 ## [0.1.0](https://github.com/ooples/AiDotNet.Evolution/compare/v0.1.0-preview.2...v0.1.0) (2026-09-16)
 
 
