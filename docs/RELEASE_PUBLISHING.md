@@ -13,7 +13,12 @@ through project references, rejects stale output, checks package inventory,
 internal dependency versions, assemblies, and licenses. Adding a packable source
 project without updating this set fails the rehearsal. Release-please updates all
 five project versions. CI uses the same packer and package-only consumer checks;
-six negative fixtures verify that malformed packages are rejected.
+eight negative fixtures verify that malformed packages are rejected, including
+a dependency removed from just one framework group and an entirely missing group.
+Consumer restores use an isolated NuGet configuration mapping the five exact
+product IDs exclusively to the local output, with a fresh cache and explicit
+origin checks. An offline competing-feed regression proves that a same-version
+product on the dependency feed cannot substitute for missing local output.
 
 The release workflow builds tagged product source. Packaging helpers and consumer
 fixtures come from the immutable workflow revision in a separate checkout, so a

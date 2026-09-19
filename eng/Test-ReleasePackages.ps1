@@ -34,8 +34,24 @@ foreach ($id in $ids) {
             'AiDotNet.Evolution.CSharp' { 'AiDotNet.Evolution.Programs' }
             'AiDotNet.Evolution.Deployment' { 'AiDotNet.Evolution.Programs' }
         }
-        if ($requiredDependency -and $requiredDependency -notin @($dependencies.id)) {
-            throw "Missing internal dependency: $id -> $requiredDependency"
+        if ($requiredDependency) {
+            $groups = @($spec.SelectNodes('//*[local-name()="dependencies"]/*[local-name()="group"]'))
+            if ($groups.Count -eq 0) {
+                if ($requiredDependency -notin @($dependencies.id)) { throw "Missing internal dependency: $id -> $requiredDependency" }
+            } else {
+                foreach ($group in $groups) {
+                    $groupDependencies = @($group.SelectNodes('*[local-name()="dependency"]'))
+                    if ($requiredDependency -notin @($groupDependencies.id)) {
+                        throw "Missing internal dependency: $id [$($group.targetFramework)] -> $requiredDependency"
+                    }
+                }
+                foreach ($framework in $frameworks) {
+                    $nuspecFramework = if ($framework -eq 'net471') { '.NETFramework4.7.1' } else { $framework }
+                    if ($nuspecFramework -notin @($groups.targetFramework)) {
+                        throw "Missing dependency group: $id [$nuspecFramework]"
+                    }
+                }
+            }
         }
         foreach ($dependency in $dependencies) {
             if ($dependency.id -in $ids -and $dependency.version -notin @($ExpectedVersion, "[$ExpectedVersion, )", "[$ExpectedVersion]")) {
