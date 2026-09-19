@@ -130,7 +130,13 @@ def validate_run(group, row, plan, prior_files, repertoire_digest, imported, see
     else:
         require(row["PriorCostAttributed"] == 80 and row["CopiedPriorRecords"] == 16 and row["PriorCacheFiles"] == prior_files and
                 row["RepertoireSha256"] == repertoire_digest and row["InitialGenomes"] == imported, "Unequal or unaccounted prior information.")
-    if method == "AlwaysFresh" or phase == "force-fresh":
+    # "prior" belongs here as much as force-fresh: the prior panel is what builds the cache, so a
+    # hit during it means the run started with knowledge it did not pay for. Defence in depth rather
+    # than a reachable hole -- every inconsistent artifact that sets CacheHits is already rejected by
+    # the raw acquisition/reuse accounting below, and a self-consistent one would have to fabricate
+    # matching reuse decisions, origins and raw reads. This makes the contract explicit where it is
+    # stated instead of relying on that reconciliation to imply it.
+    if method == "AlwaysFresh" or phase in ("prior", "force-fresh"):
         require(hits == 0, "Fresh measurement was bypassed.")
     confirmation_mean = None
     if phase == "prior":

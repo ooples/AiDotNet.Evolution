@@ -308,9 +308,19 @@ internal static class ReuseCampaign
                 return reused;
             }
             var measured = await _metered.EvaluateAsync(candidate, context, cancellationToken);
+            // A DISCARDED WRITE STATUS IS A SILENT HOLE. The warm phase can only reuse what the prior
+            // phase actually published, but this dropped TryStoreAsync's result, so a
+            // StorageUnavailable left the run reporting Valid with nothing stored -- the validity
+            // predicate counts observations and ledger totals, not publications. Record the status and
+            // refuse anything but Stored for a completed fresh measurement.
+            EvolutionEvaluationCacheWriteStatus? write = null;
             if (!_disabled && measured.Status == EvolutionEvaluationStatus.Completed)
-                await _cache.TryStoreAsync(new EvolutionEvaluationCacheRecord(key, measured, Inner.LastEvidence!), operation, cancellationToken);
-            Decisions.Add(new { EvaluationId = context.EvaluationId, Decision = lookup.Decision, EvidenceSha256 = Inner.LastEvidence, Origin = measured.MeasurementOrigin?.ToJson() });
+            {
+                write = await _cache.TryStoreAsync(new EvolutionEvaluationCacheRecord(key, measured, Inner.LastEvidence!), operation, cancellationToken);
+                if (write != EvolutionEvaluationCacheWriteStatus.Stored)
+                    throw new InvalidOperationException($"A completed fresh measurement was not published: {write}.");
+            }
+            Decisions.Add(new { EvaluationId = context.EvaluationId, Decision = lookup.Decision, EvidenceSha256 = Inner.LastEvidence, Origin = measured.MeasurementOrigin?.ToJson(), Write = write?.ToString() });
             return measured;
         }
     }
