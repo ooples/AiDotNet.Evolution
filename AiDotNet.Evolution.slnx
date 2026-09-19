@@ -12,6 +12,7 @@
     <Project Path="examples/OperatorCreditSearch/OperatorCreditSearch.csproj" />
     <Project Path="examples/ParetoSearch/ParetoSearch.csproj" />
     <Project Path="examples/PersistentEvaluation/PersistentEvaluation.csproj" />
+    <Project Path="examples/PolicySearch/PolicySearch.csproj" />
     <Project Path="examples/ReplicatedEvaluation/ReplicatedEvaluation.csproj" />
     <Project Path="examples/SurrogateSearch/SurrogateSearch.csproj" />
     <Project Path="examples/TypedParameterSearch/TypedParameterSearch.csproj" />
