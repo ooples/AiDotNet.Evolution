@@ -1,0 +1,27 @@
+name: GPU consumer contracts
+on:
+  pull_request:
+    branches: [main]
+    paths:
+      - 'benchmarks/EvolutionGpu/**'
+      - 'eng/Test-GpuConsumer.ps1'
+      - '.github/workflows/gpu-consumer.yml'
+  push:
+    branches: [main]
+    paths:
+      - 'benchmarks/EvolutionGpu/**'
+      - 'eng/Test-GpuConsumer.ps1'
+      - '.github/workflows/gpu-consumer.yml'
+permissions:
+  contents: read
+jobs:
+  contracts:
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1
+      - uses: actions/setup-dotnet@a98b56852c35b8e3190ac28c8c2271da59106c68
+        with:
+          dotnet-version: '10.0.x'
+      - shell: pwsh
+        run: ./eng/Test-GpuConsumer.ps1 -ContractsOnly
