@@ -222,7 +222,7 @@ public sealed class EvolutionResourceLedger
                     Outcome = operation.Receipt?.Outcome
                 }).ToArray()
             };
-            string json = JsonSerializer.Serialize(state);
+            string json = JsonSerializer.Serialize(state, EvolutionWorkJsonContext.Default.ResourceLedgerState);
             if (json.Length > 64 * 1024 * 1024) throw new InvalidOperationException("Resource checkpoint exceeds 64 MiB.");
             return json;
         }
@@ -235,7 +235,7 @@ public sealed class EvolutionResourceLedger
     {
         Guard.NotNull(json);
         if (json.Length > 64 * 1024 * 1024) throw new ArgumentException("Resource checkpoint exceeds 64 MiB.", nameof(json));
-        State state = JsonSerializer.Deserialize<State>(json) ?? throw new ArgumentException("Missing resource state.", nameof(json));
+        State state = JsonSerializer.Deserialize(json, EvolutionWorkJsonContext.Default.ResourceLedgerState) ?? throw new ArgumentException("Missing resource state.", nameof(json));
         if (state.ConfigurationHash != ConfigurationHash || state.Denied < 0 || state.Operations is null ||
             state.Operations.Length > MaximumOperations || state.ReceiptOrder is null || state.ReceiptOrder.Length > RetainedReceiptLimit)
             throw new ArgumentException("Incompatible or invalid resource state.", nameof(json));
@@ -352,7 +352,7 @@ public sealed class EvolutionResourceLedger
         public EvolutionResourceReceipt? Receipt { get; set; }
     }
 
-    private sealed class State
+    internal sealed class State
     {
         public string ConfigurationHash { get; set; } = string.Empty;
         public long Denied { get; set; }
@@ -360,7 +360,7 @@ public sealed class EvolutionResourceLedger
         public string[]? ReceiptOrder { get; set; }
     }
 
-    private sealed class OperationState
+    internal sealed class OperationState
     {
         public string Id { get; set; } = string.Empty;
         public EvolutionResourceStage Stage { get; set; }

@@ -115,23 +115,23 @@ public sealed class EvolutionMeasurementOrigin
     /// <summary>Serializes bounded metadata without genome or diagnostic bodies; caller labels must not contain secrets.</summary>
     public string ToJson()
     {
-        string json = JsonSerializer.Serialize(new
+        string json = JsonSerializer.Serialize(new MeasurementOriginDocument
         {
             SchemaVersion = 1,
-            ScopeKey,
-            SourceRunId,
-            SourceEvaluationId,
-            SampleIds,
-            ObservedAt,
-            OriginalCostUnits,
-            CostUnit,
-            StatisticsVersion,
-            Kind,
-            StandardError,
-            LowerConfidenceBound,
-            UpperConfidenceBound,
-            ConfidenceLevel
-        }, EvolutionJson.Compact);
+            ScopeKey = ScopeKey,
+            SourceRunId = SourceRunId,
+            SourceEvaluationId = SourceEvaluationId,
+            SampleIds = SampleIds.ToArray(),
+            ObservedAt = ObservedAt,
+            OriginalCostUnits = OriginalCostUnits,
+            CostUnit = CostUnit,
+            StatisticsVersion = StatisticsVersion,
+            Kind = Kind,
+            StandardError = StandardError,
+            LowerConfidenceBound = LowerConfidenceBound,
+            UpperConfidenceBound = UpperConfidenceBound,
+            ConfidenceLevel = ConfidenceLevel
+        }, EvolutionStateJsonContext.Default.MeasurementOriginDocument);
         ValidateSize(json);
         return json;
     }

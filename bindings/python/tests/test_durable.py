@@ -1,0 +1,207 @@
+import json
+import os
+import signal
+import sys
+import tempfile
+import time
+import unittest
+from pathlib import Path
+
+sys.path.insert(0, str(Path(__file__).resolve().parents[1]))
+from aidotnet_evolution import DurableWorkClient, DurableWorkError, parse_evaluation_payload
+from aidotnet_evolution.durable import _lease, _normalize_timestamp, _parse_timestamp
+
+ROOT = Path(__file__).resolve().parents[3]
+DLL = os.environ.get("AIDOTNET_DURABLE_HOST_DLL")
+HOST = os.environ.get("AIDOTNET_DURABLE_HOST_PATH")
+if not DLL and not HOST:
+    # Local source-tree default. CI supplies the binary built for its target explicitly.
+    DLL = str(ROOT / "src/AiDotNet.Evolution.Host/bin/Release/net10.0/aidotnet-evolution-host.dll")
+TRANSPORT = {"host_path": HOST} if HOST else {"host_path": "dotnet", "host_args": [DLL]}
+JOB = {"evaluationId": "9223372036854775807", "attempt": 1, "canonicalGenomeId": "integer:7", "payload": "7",
+    "estimated": {"cost": "1"}, "maximum": {"cost": "5"}}
+
+
+def config(directory):
+    return {"directory": directory, "runId": "run", "compatibilityHash": "compat", "limits": {"cost": "100"}}
+
+
+def worker(name):
+    return {"workerId": name, "compatibilityHash": "compat"}
+
+
+def receipt(lease):
+    return {"identity": lease["identity"], "workerId": lease["workerId"], "payload": "49", "provenance": "local-square-v1",
+        "actual": {"cost": "0.1234567890123456789012345678"}, "outcome": "completed"}
+
+
+class DurableTests(unittest.TestCase):
+    def test_live_host_preserves_exact_identity_receipt_and_reopen(self):
+        with tempfile.TemporaryDirectory(prefix="evolution-py-work-") as directory:
+            with DurableWorkClient(config(directory), **TRANSPORT) as client:
+                self.assertTrue(client.enqueue(JOB))
+                self.assertFalse(client.enqueue(JOB))
+                lease = client.claim(worker("one"))
+                self.assertEqual(JOB["evaluationId"], lease["identity"]["evaluationId"])
+                self.assertIsNone(client.claim(worker("two")))
+                self.assertEqual("renewed", client.heartbeat(lease["identity"], "one"))
+            with DurableWorkClient(config(directory), **TRANSPORT) as client:
+                self.assertTrue(client.status()["wasRecovered"])
+                page = client.unsettled("one")
+                self.assertEqual(lease["identity"], page["lease"]["identity"])
+                self.assertIsNone(client.unsettled("one", page["nextAfterLeaseId"])["lease"])
+                self.assertEqual("accepted", client.commit(receipt(lease)))
+                self.assertEqual("duplicate", client.commit(receipt(lease)))
+                self.assertEqual(receipt(lease)["actual"], client.delivery(lease["identity"], "one")["actual"])
+            with DurableWorkClient(config(directory), **TRANSPORT) as client:
+                self.assertEqual("49", client.result(JOB["evaluationId"], 1)["payload"])
+                self.assertEqual("1", client.status()["settled"])
+                self.assertEqual("0", client.status()["reserved"]["cost"])
+
+    def test_real_process_kill_does_not_forget_dispatch_reservation(self):
+        with tempfile.TemporaryDirectory(prefix="evolution-py-kill-") as directory:
+            client = DurableWorkClient(config(directory), **TRANSPORT)
+            try:
+                client.enqueue(JOB)
+                lease = client.claim(worker("one"))
+                os.kill(client.pid, signal.SIGTERM)
+                with self.assertRaises(DurableWorkError):
+                    client.status()
+            finally:
+                try:
+                    client.close()
+                except DurableWorkError:
+                    pass
+            with DurableWorkClient(config(directory), **TRANSPORT) as restored:
+                self.assertEqual("5", restored.status()["reserved"]["cost"])
+                self.assertEqual(lease["identity"], restored.unsettled("one")["lease"]["identity"])
+                self.assertIsNone(restored.claim(worker("one")))
+                self.assertEqual("accepted", restored.commit(receipt(lease)))
+
+    def test_matching_cancel_and_stale_commit_keep_cost(self):
+        with tempfile.TemporaryDirectory(prefix="evolution-py-cancel-") as directory:
+            with DurableWorkClient(config(directory), **TRANSPORT) as client:
+                client.enqueue({**JOB, "tags": ["gpu"], "minimumResources": {"gpu_slots": "1"}})
+                self.assertIsNone(client.claim(worker("cpu")))
+                lease = client.claim({**worker("gpu"), "tags": ["gpu"], "capacity": {"gpu_slots": "1"}})
+                self.assertTrue(client.cancel(JOB["evaluationId"], 1))
+                self.assertEqual("canceled", client.heartbeat(lease["identity"], "gpu"))
+                self.assertEqual("5", client.status()["reserved"]["cost"])
+                self.assertEqual("stale", client.commit(receipt(lease)))
+                self.assertEqual("duplicate-stale", client.commit(receipt(lease)))
+                self.assertIsNone(client.result(JOB["evaluationId"], 1))
+
+    def test_a_dead_host_still_reports_the_durable_error_and_closes_every_stream(self):
+        # _terminate kills the host and then closes its pipes. Closing stdin flushes what is still
+        # buffered, and on POSIX that raises BrokenPipeError once the reader is gone. Unguarded, that
+        # escaped _fatal BEFORE it could raise, so the caller saw an unrelated pipe error instead of
+        # the DurableWorkError saying what to reconcile, and stdout/stderr were left open.
+        class DeadStream:
+            def __init__(self, fails):
+                self.fails, self.closed = fails, False
+
+            def close(self):
+                self.closed = True
+                if self.fails:
+                    raise BrokenPipeError(32, "Broken pipe")
+
+        class DeadProcess:
+            def __init__(self):
+                self.stdin, self.stdout, self.stderr = DeadStream(True), DeadStream(False), DeadStream(False)
+                self.killed = False
+
+            def poll(self):
+                return None
+
+            def kill(self):
+                self.killed = True
+
+            def wait(self, timeout=None):
+                return 0
+
+        client = DurableWorkClient.__new__(DurableWorkClient)
+        process = DeadProcess()
+        client._process = process
+        client._failed = None
+
+        with self.assertRaises(DurableWorkError) as caught:
+            client._fatal("Durable pipe failed; reconcile unacknowledged work.")
+
+        self.assertIn("reconcile", str(caught.exception))
+        self.assertTrue(process.killed)
+        # Every stream is closed even though the first one raised.
+        self.assertTrue(process.stdin.closed)
+        self.assertTrue(process.stdout.closed)
+        self.assertTrue(process.stderr.closed)
+
+    def test_dotnet_tick_precision_timestamps_are_accepted_on_every_supported_python(self):
+        # The host writes .NET round-trip timestamps, which carry 100-nanosecond ticks and therefore
+        # SEVEN fractional-second digits. datetime.fromisoformat accepts only three or six before
+        # Python 3.11, so on 3.10 -- which this binding supports and CI pins -- every real lease was
+        # rejected as an invalid claim response and three live-host tests failed.
+        lease = {"identity": {"runId": "run", "evaluationId": "9223372036854775807", "attempt": 1,
+                              "leaseId": "01a2d4c85b4d45cabe5d4f40a80feea4"},
+                 "workerId": "one", "canonicalGenomeId": "integer:7", "payload": "7",
+                 "deliveryNumber": 1, "expiresAt": "2026-09-17T23:05:49.7461110+00:00"}
+        self.assertTrue(_lease(lease))
+
+        for stamp in ["2026-09-17T23:05:49.7461110+00:00", "2026-09-17T23:05:49.7461110Z",
+                      "2026-09-17T23:05:49.746111+00:00", "2026-09-17T23:05:49.746+00:00",
+                      "2026-09-17T23:05:49.74+00:00", "2026-09-17T23:05:49Z"]:
+            with self.subTest(stamp=stamp):
+                parsed = _parse_timestamp(stamp)
+                self.assertIsNotNone(parsed.utcoffset())
+                self.assertEqual(49, parsed.second)
+
+        # Asserted on the NORMALISED TEXT, not only on the parsed result: Python 3.11+ parses seven
+        # digits natively, so a result-only assertion would pass on a modern interpreter even with the
+        # normalisation removed, and the breakage would reappear only on the 3.10 job.
+        for stamp, expected in [("2026-09-17T23:05:49.7461110+00:00", ".746111"),
+                                ("2026-09-17T23:05:49.74+00:00", ".740000"),
+                                ("2026-09-17T23:05:49.746111+00:00", ".746111")]:
+            with self.subTest(stamp=stamp):
+                normalized = _normalize_timestamp(stamp)
+                self.assertIn(expected, normalized)
+                self.assertRegex(normalized, r"\.[0-9]{6}[+-]")
+        self.assertNotIn(".", _normalize_timestamp("2026-09-17T23:05:49Z"))
+
+        # Truncation must not round or shift the instant.
+        self.assertEqual(746111, _parse_timestamp("2026-09-17T23:05:49.7461119+00:00").microsecond)
+        # A malformed stamp must still be refused rather than normalised into something parseable.
+        self.assertFalse(_lease(dict(lease, expiresAt="not-a-timestamp")))
+
+    def test_envelope_preserves_all_bits_and_rejects_numeric_seed(self):
+        payload = {"schema": 1, "genomePayload": "7", "canonicalGenomeId": "integer:7", "evaluationId": JOB["evaluationId"],
+            "attempt": 2, "rootSeed": "18446744073709551615", "seedStream": "18446744073709551614"}
+        self.assertEqual(payload, parse_evaluation_payload(json.dumps(payload)))
+        for change in [{"rootSeed": 18446744073709551615}, {"rootSeed": "01"}, {"schema": True}, {"attempt": True},
+                {"rootSeed": "18446744073709551616"}, {"evaluationId": 9223372036854775807}]:
+            with self.subTest(change=change), self.assertRaises(DurableWorkError):
+                parse_evaluation_payload(json.dumps({**payload, **change}))
+
+    def test_bad_configuration_is_rejected_before_spawn(self):
+        with self.assertRaises(DurableWorkError):
+            DurableWorkClient({**config("unused"), "limits": {"cost": 1.25}}, host_path="must-not-run")
+        for timeout in [0, -1, float("nan"), True]:
+            with self.subTest(timeout=timeout), self.assertRaises(DurableWorkError):
+                DurableWorkClient(config("unused"), host_path="must-not-run", request_timeout=timeout)
+
+    def test_fake_protocol_downgrade_and_transport_failures(self):
+        fake = str(Path(__file__).with_name("fake_host.py"))
+        with self.assertRaisesRegex(DurableWorkError, "downgrade"):
+            DurableWorkClient(config("unused"), host_path=sys.executable, host_args=[fake, "downgrade"], request_timeout=2)
+        for mode, message in [("invalid-claim", "Invalid claim"), ("uncorrelated", "correlation"), ("oversized", "Oversized"), ("timeout", "timed out")]:
+            with self.subTest(mode=mode):
+                client = DurableWorkClient(config("unused"), host_path=sys.executable, host_args=[fake, mode], request_timeout=2)
+                started = time.monotonic()
+                try:
+                    with self.assertRaisesRegex(DurableWorkError, message):
+                        client.claim(worker("one"))
+                    self.assertLess(time.monotonic() - started, 8)
+                finally:
+                    with self.assertRaises(DurableWorkError):
+                        client.close()
+
+
+if __name__ == "__main__":
+    unittest.main()

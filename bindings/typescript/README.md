@@ -80,6 +80,45 @@ A pending `ask()` does not prevent `tell()` or `close()` from being processed. C
 cancels pending asks with an error, not an empty successful batch. The native protocol
 permits up to 32 waiting asks and returns a correlated error when that bound is exceeded.
 
+## Strict external-work identity
+
+For new external integrations, enable strict mode and return the whole issued ticket:
+
+```ts
+const session = await openSession({
+  parameters, descriptors,
+  taskIdentity: {
+    taskId: 'training-search',
+    taskVersionHash: 'task-data-and-canonicalization-v1',
+    evaluatorVersionHash: 'training-protocol-v1',
+  },
+  evaluationTimeoutMs: 60_000,
+  maxRetries: 1,
+});
+const batch = await session.ask(8);
+await session.tell(batch.map(candidate => ({
+  evaluationId: candidate.evaluationId,
+  workIdentity: candidate.workIdentity,
+  quality: score(candidate.parameters),
+  descriptors: describe(candidate.parameters),
+})));
+await session.close();
+```
+
+The example supplies domain-specific `parameters`, `descriptors`, `score` and `describe`.
+For a complete search, place ask/tell inside the loop above, or use `evolve` with the same
+ticket-preserving result mapping. Handle close failures as shown above.
+
+Strict mode verifies the host's fencing capability at open; an old host cannot silently
+ignore the new fields. `session.compatibilityHash` pins the task, evaluator, parameter codec,
+archive and engine contract. Version fingerprints are the caller's responsibility.
+
+A retry reuses the evaluation ID but gets a different ticket. Never substitute the newest
+ticket for an old worker's result. Stale and duplicate results return zero acceptance;
+missing/malformed tickets are rejected. Timeout does not kill remote work or refund its cost.
+Configurations without `taskIdentity` preserve the legacy numeric-ID mode; retries require
+strict mode. Neither mode currently persists host sessions across process restarts.
+
 ## Reporting a failure
 
 A candidate that could not be evaluated is not a candidate that scored zero.
@@ -168,3 +207,38 @@ After publishing the three packages at the versions in `optionalDependencies`:
 ## Licence
 
 Apache-2.0.
+## Durable worker/control client
+
+`DurableWorkClient` uses the host's separate `--durable` mode. It recovers delivery state,
+not an engine's lost proposal/operator state. Use the same directory, run ID, compatibility,
+limits and options when reopening; all evaluation IDs and resource amounts are exact strings.
+
+```typescript
+import { DurableWorkClient } from '@aidotnet/evolution';
+
+const work = await DurableWorkClient.open({
+  directory: '/owned/run-work', runId: 'example',
+  compatibilityHash: 'task-codec-evaluator-v1', limits: { evaluation_calls: '100' },
+});
+try {
+  await work.enqueue({ evaluationId: '1', attempt: 1, canonicalGenomeId: 'integer:7', payload: '7',
+    estimated: { evaluation_calls: '1' }, maximum: { evaluation_calls: '1' } });
+  const lease = await work.claim({ workerId: 'process-incarnation-1', compatibilityHash: 'task-codec-evaluator-v1' });
+  if (lease !== null) {
+    // Toy evaluator. Production workers durably record execution IDs and receipts;
+    // do not repeat a physical operation just because its reply was lost.
+    // BigInt, not Number: payloads are strings on the wire precisely because a double
+    // silently rounds past 2^53, and squaring reaches that from a nine-digit input.
+    await work.commit({ identity: lease.identity, workerId: lease.workerId,
+      payload: (BigInt(lease.payload) ** 2n).toString(), provenance: 'integer-square-v1',
+      actual: { evaluation_calls: '1' }, outcome: 'completed' });
+  }
+} finally { await work.close(); }
+```
+
+Null claims mean unavailable now, never completion. Use `heartbeat`, `cancel`, `result`,
+`delivery`, `unsettled` and `status` for supervision/reconciliation. Timeouts or malformed
+replies tear down the owned endpoint; they never trigger automatic physical retries. A lost
+receipt leaves its original reservation unresolved. `parseDurableEvaluationPayload` retains
+all UInt64 seed bits from an engine bridge. This is trusted local IPC, not a network service
+or an automatic search-fork controller. See [the complete wire and recovery contract](../../docs/DURABLE_WORKER_PROTOCOL.md).

@@ -12,6 +12,10 @@ namespace AiDotNet.Evolution;
 /// is already value-based satisfy the engine boundary without implementing this interface. A value type containing
 /// a reference must implement the contract because copying the value alone does not copy the referenced object.
 /// </para>
+/// <para>Under NativeAOT, arbitrary user-struct field metadata is not guaranteed. Custom structs must implement
+/// this interface even when all their fields are values; missing reflection metadata is not evidence of deep
+/// immutability. Strings, primitives, enums, decimal, Guid, DateTime, DateTimeOffset and TimeSpan remain implicitly
+/// owned. Dynamic-code-enabled managed execution retains recursive inspection of value-only structs.</para>
 /// <para>
 /// The engine calls this operation exactly once when a canonical genome crosses the retention boundary, avoiding
 /// repeated cloning on archive, migration, and selection hot paths. Reference types must return a different instance;
