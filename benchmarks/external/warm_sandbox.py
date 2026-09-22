@@ -1,10 +1,18 @@
-"""Externally timed warm transactions with independently read cgroup-v2 resources.
+"""Externally timed warm transactions with independently read cgroup resources.
 
 The workload stays nonroot with all capabilities dropped. Host-initiated probes
 run read-only as UID0, preventing the candidate UID from signalling or ptracing
 them. Resource totals INCLUDE probe overhead; memory.peak is a cgroup lifetime
 peak including initialization, not isolated candidate RSS. No privileged container
 or host filesystem mount is added. A failed probe closes sandbox admission.
+
+BOTH CGROUP VERSIONS, because the counters were v2-only and Docker Desktop on WSL2 can run
+v1: there every warm evaluation raised "cat: /sys/fs/cgroup/cpu.stat: No such file" and
+no campaign could run at all. v1 exposes the same two lifetime quantities --
+cpuacct.usage (cumulative CPU, ns) and memory.max_usage_in_bytes (lifetime peak, page
+cache included exactly as memory.peak includes it) -- so the metric is unchanged.
+The version comes from the Docker DAEMON, never from inside the untrusted container, and
+is recorded in the evidence identity so v1 and v2 measurements are never silently pooled.
 """
 import datetime
 import hashlib
@@ -18,16 +26,30 @@ from pathlib import Path
 
 from docker_sandbox import DockerSandbox, MAX_OUTPUT, MAX_REQUEST, OWNER, docker, encode, unique_json
 
-PROBE = ["/bin/cat", "/sys/fs/cgroup/cpu.stat", "/sys/fs/cgroup/memory.peak"]
+# Per cgroup version, the lifetime CPU and memory-peak counters the host probe reads.
+PROBES = {
+    "2": ["/bin/cat", "/sys/fs/cgroup/cpu.stat", "/sys/fs/cgroup/memory.peak"],
+    "1": ["/bin/cat", "/sys/fs/cgroup/cpuacct/cpuacct.usage",
+          "/sys/fs/cgroup/memory/memory.max_usage_in_bytes"],
+}
+COUNTER_FILES = {version: probe[1:] for version, probe in PROBES.items()}
+
+
+def host_cgroup_version():
+    """The daemon's cgroup version. Refuses anything it cannot measure."""
+    version = docker("info", "--format", "{{.CgroupVersion}}").stdout.decode("ascii").strip()
+    if version not in PROBES:
+        raise RuntimeError(f"Unsupported cgroup version {version!r}")
+    return version
 
 
 class CandidateExited(Exception):
     """A terminal candidate is not a Docker infrastructure outage."""
 
 
-def kernel_resources(container):
+def kernel_resources(container, version="2"):
     try:
-        raw = docker("exec", "--user", "0:0", container, *PROBE, timeout=10).stdout
+        raw = docker("exec", "--user", "0:0", container, *PROBES[version], timeout=10).stdout
     except RuntimeError:
         state = unique_json(docker("inspect", container).stdout)[0]["State"]
         if not state["Running"]:
@@ -35,21 +57,29 @@ def kernel_resources(container):
         raise
     try:
         lines = raw.decode("ascii").splitlines()
-        counters = dict(line.split() for line in lines[:-1])
-        if len(counters) != len(lines) - 1:
-            raise ValueError("Duplicate kernel counter")
-        result = dict(cpu_usec=int(counters["usage_usec"]), memory_peak_bytes=int(lines[-1]))
+        if version == "1":
+            # Exactly two single-integer files; anything else is a probe we do not understand.
+            if len(lines) != 2:
+                raise ValueError("Unexpected cgroup-v1 counter shape")
+            cpu_ns, peak = (int(line) for line in lines)
+            result = dict(cpu_usec=cpu_ns // 1000, memory_peak_bytes=peak)
+        else:
+            counters = dict(line.split() for line in lines[:-1])
+            if len(counters) != len(lines) - 1:
+                raise ValueError("Duplicate kernel counter")
+            result = dict(cpu_usec=int(counters["usage_usec"]), memory_peak_bytes=int(lines[-1]))
     except (ValueError, KeyError, IndexError, UnicodeError) as error:
-        raise RuntimeError("Missing or invalid cgroup-v2 resource counters") from error
+        raise RuntimeError(f"Missing or invalid cgroup-v{version} resource counters") from error
     if (not isinstance(result, dict) or set(result) != {"cpu_usec", "memory_peak_bytes"} or
             any(type(v) is not int or v < 0 for v in result.values()) or result["memory_peak_bytes"] == 0):
-        raise RuntimeError("Missing or invalid cgroup-v2 resource counters")
+        raise RuntimeError(f"Missing or invalid cgroup-v{version} resource counters")
     return result
 
 
 class WarmDockerSandbox(DockerSandbox):
     def __init__(self, image, evidence, *, seconds=15, memory_mib=512):
         super().__init__(image, evidence, seconds=seconds, memory_mib=memory_mib)
+        self.cgroup_version = host_cgroup_version()
         folder = Path(__file__).with_name("sandbox")
         self.identity.update(schema="evolution-warm-docker-v1", metric="host_request_to_response_seconds",
                              includes="Input transport, solve, copying and serialization; NOT isolated kernel time",
@@ -57,6 +87,13 @@ class WarmDockerSandbox(DockerSandbox):
                              worker_sha256=hashlib.sha256((folder / "warm_worker.py").read_bytes()).hexdigest(),
                              wire_sha256=hashlib.sha256((folder / "wire_codec.py").read_bytes()).hexdigest(),
                              codec_sha256=hashlib.sha256((folder / "worker.py").read_bytes()).hexdigest())
+        # v2 IDENTITY IS LEFT BYTE-IDENTICAL: it is copied into manifests that are digested
+        # and compared (warm_evaluator.py, warm_screening.py), so changing it would silently
+        # change every existing v2 digest. Only a v1 host is marked, and differently.
+        if self.cgroup_version == "1":
+            self.identity.update(cgroup_version="1",
+                                 resource_metric="cgroup-v1 cumulative cpuacct.usage and lifetime "
+                                                 "memory.max_usage_in_bytes, INCLUDING probes/startup")
         (self.root / "environment.json").write_bytes(encode(self.identity))
 
     def command(self, name, bundle):
@@ -156,7 +193,7 @@ class WarmDockerSandbox(DockerSandbox):
                 row["status"] = "invalid-output"
             else:
                 row["startup_seconds"] = ready[1] - dispatched
-                before = kernel_resources(container)
+                before = kernel_resources(container, self.cgroup_version)
                 row["kernel_before"] = before
                 sent = time.monotonic()
                 write_errors = []
@@ -185,7 +222,7 @@ class WarmDockerSandbox(DockerSandbox):
                         row["status"] = "invalid-output"
                     else:
                         row["elapsed_seconds"] = response[1] - sent
-                        after = kernel_resources(container)
+                        after = kernel_resources(container, self.cgroup_version)
                         row["kernel_after"] = after
                         if after["cpu_usec"] < before["cpu_usec"] or after["memory_peak_bytes"] < before["memory_peak_bytes"]:
                             raise RuntimeError("Cgroup counters regressed")
