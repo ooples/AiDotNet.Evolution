@@ -7,7 +7,7 @@ projects. The pinned AiDotNet 0.231.0 package supplies only model primitives, th
 it does not supply the Evolution implementation under test.
 
 Relocated from AiDotNet PRs #2210/#2212, source tip `66d7602c92101e5ab2bd9db8cfa7f7526fa2c75d`.
-Original BSL license: `../../src/AiDotNet.Evolution.Programs/Legacy/AIDOTNET-LICENSE.txt`.
+Original BSL license: `../../src/AiDotNet.Evolution.Programs/AIDOTNET-LICENSE.txt`.
 Run from this repository root:
 
 ```powershell

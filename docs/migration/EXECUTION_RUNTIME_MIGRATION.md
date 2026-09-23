@@ -19,7 +19,7 @@ the builder, CLI, artifact/output observers or novelty orchestration.
 source blobs, verified against Git object hashes. It includes the complete original
 test-doubles file; only its execution doubles are needed here. Existing model doubles
 and newer task/correctness implementations are not overwritten. Imported files retain
-the original license under `src/AiDotNet.Evolution.Programs/Legacy/AIDOTNET-LICENSE.txt`.
+the original license under `src/AiDotNet.Evolution.Programs/AIDOTNET-LICENSE.txt`.
 
 The original generic ProgramSynthesis DTO/interfaces can still serve unrelated
 AiDotNet synthesis code. Their presence there is not permission to keep Evolution

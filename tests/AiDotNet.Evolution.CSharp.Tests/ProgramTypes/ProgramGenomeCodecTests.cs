@@ -1,4 +1,4 @@
-// Source: ooples/AiDotNet 66d7602c92101e5ab2bd9db8cfa7f7526fa2c75d:tests/AiDotNet.Tests/UnitTests/Evolution/Programs/ProgramGenomeCodecTests.cs; original BSL license retained in Programs/Legacy/AIDOTNET-LICENSE.txt.
+// Source: ooples/AiDotNet 66d7602c92101e5ab2bd9db8cfa7f7526fa2c75d:tests/AiDotNet.Tests/UnitTests/Evolution/Programs/ProgramGenomeCodecTests.cs; original BSL license retained in src/AiDotNet.Evolution.Programs/AIDOTNET-LICENSE.txt.
 using System.IO;
 using AiDotNet.Evolution.Programs;
 using Xunit;

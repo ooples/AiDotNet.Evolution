@@ -1,4 +1,4 @@
-// Source: ooples/AiDotNet de4bc695667bb7765a618a7991b6b2a13657c0de:tests/AiDotNet.Tests/UnitTests/Evolution/Programs/DirectoryProgramSampleEvidenceStoreTests.cs; original BSL license retained in Programs/Legacy/AIDOTNET-LICENSE.txt.
+// Source: ooples/AiDotNet de4bc695667bb7765a618a7991b6b2a13657c0de:tests/AiDotNet.Tests/UnitTests/Evolution/Programs/DirectoryProgramSampleEvidenceStoreTests.cs; original BSL license retained in src/AiDotNet.Evolution.Programs/AIDOTNET-LICENSE.txt.
 using System.IO;
 using System.Text;
 using System.Text.Json;
