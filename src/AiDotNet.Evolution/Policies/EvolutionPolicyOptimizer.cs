@@ -1,3 +1,4 @@
+using System.Diagnostics.CodeAnalysis;
 using System.Diagnostics;
 using System.Globalization;
 using System.Text.Json;
@@ -11,6 +12,7 @@ namespace AiDotNet.Evolution;
 /// An uncooperative provider may still run and owns its own process/device containment. Never launch replacement
 /// campaigns over such work without a separately coordinated global resource/admission policy.
 /// </remarks>
+[Experimental("AIDEVO002")]
 public sealed class EvolutionPolicyOptimizer
 {
     private readonly EvolutionPolicySpace _space;

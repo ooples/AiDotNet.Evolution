@@ -20,4 +20,13 @@
     <ProjectReference Include="../AiDotNet.Evolution/AiDotNet.Evolution.csproj" />
     <PackageReference Include="Newtonsoft.Json" Version="13.0.4" />
   </ItemGroup>
+  <!-- V1-11: the public API is declared (PublicAPI.*.txt) and every change to it must be too. -->
+  <PropertyGroup>
+    <EnablePackageValidation>true</EnablePackageValidation>
+  </PropertyGroup>
+  <ItemGroup>
+    <PackageReference Include="Microsoft.CodeAnalysis.PublicApiAnalyzers" Version="5.6.0" PrivateAssets="all" />
+    <AdditionalFiles Include="PublicAPI.Shipped.txt" />
+    <AdditionalFiles Include="PublicAPI.Unshipped.txt" />
+  </ItemGroup>
 </Project>

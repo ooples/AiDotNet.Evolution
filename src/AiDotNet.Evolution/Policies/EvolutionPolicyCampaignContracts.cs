@@ -1,3 +1,4 @@
+using System.Diagnostics.CodeAnalysis;
 using System.Text.Json;
 using System.Text.Json.Serialization;
 
@@ -7,6 +8,7 @@ namespace AiDotNet.Evolution;
 /// <remarks>Only development observations may influence candidate selection; held-out observations are
 /// measured after the champion is frozen and never fed back into it.</remarks>
 [JsonConverter(typeof(EvolutionPolicyTrialPhaseConverter))]
+[Experimental("AIDEVO002")]
 public enum EvolutionPolicyTrialPhase
 {
     /// <summary>The selection panel. Its observations choose the champion.</summary>
@@ -20,6 +22,7 @@ public enum EvolutionPolicyTrialPhase
 /// they are serialized into retained reports -- so they are an enumerated contract rather than free text a
 /// future edit could silently reword.</remarks>
 [JsonConverter(typeof(EvolutionPolicyCampaignOutcomeConverter))]
+[Experimental("AIDEVO002")]
 public enum EvolutionPolicyCampaignOutcome
 {
     /// <summary>An unrecoverable or unclassified failure. This is the initial value, so an interrupted

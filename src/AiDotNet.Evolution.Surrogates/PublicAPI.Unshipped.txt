@@ -1,0 +1,39 @@
+#nullable enable
+[AIDEVO001]AiDotNet.Evolution.Surrogates.NumericSurrogateOptions
+[AIDEVO001]AiDotNet.Evolution.Surrogates.NumericSurrogateOptions.CalibrationQuantile.get -> double
+[AIDEVO001]AiDotNet.Evolution.Surrogates.NumericSurrogateOptions.CoordinateCost.get -> decimal
+[AIDEVO001]AiDotNet.Evolution.Surrogates.NumericSurrogateOptions.InferenceBaseCost.get -> decimal
+[AIDEVO001]AiDotNet.Evolution.Surrogates.NumericSurrogateOptions.MaximumDistance.get -> double
+[AIDEVO001]AiDotNet.Evolution.Surrogates.NumericSurrogateOptions.MaximumRelativeMeanAbsoluteError.get -> double
+[AIDEVO001]AiDotNet.Evolution.Surrogates.NumericSurrogateOptions.MinimumValidationCoverage.get -> double
+[AIDEVO001]AiDotNet.Evolution.Surrogates.NumericSurrogateOptions.Neighbors.get -> int
+[AIDEVO001]AiDotNet.Evolution.Surrogates.NumericSurrogateOptions.NumericSurrogateOptions(double qualityMinimum, double qualityMaximum, int neighbors = 3, double maximumDistance = 0.25, double calibrationQuantile = 0.9, double minimumValidationCoverage = 0.6, double maximumRelativeMeanAbsoluteError = 0.15, decimal coordinateCost = 0.000001, decimal trainingBaseCost = 0.02, decimal inferenceBaseCost = 0.005) -> void
+[AIDEVO001]AiDotNet.Evolution.Surrogates.NumericSurrogateOptions.QualityMaximum.get -> double
+[AIDEVO001]AiDotNet.Evolution.Surrogates.NumericSurrogateOptions.QualityMinimum.get -> double
+[AIDEVO001]AiDotNet.Evolution.Surrogates.NumericSurrogateOptions.TrainingBaseCost.get -> decimal
+[AIDEVO001]AiDotNet.Evolution.Surrogates.NumericSurrogateOptions.VersionHash.get -> string!
+[AIDEVO001]AiDotNet.Evolution.Surrogates.NumericSurrogateValidation
+[AIDEVO001]AiDotNet.Evolution.Surrogates.NumericSurrogateValidation.CalibrationGroups.get -> int
+[AIDEVO001]AiDotNet.Evolution.Surrogates.NumericSurrogateValidation.CoordinateWork.get -> long
+[AIDEVO001]AiDotNet.Evolution.Surrogates.NumericSurrogateValidation.EmpiricalCoverage.get -> double
+[AIDEVO001]AiDotNet.Evolution.Surrogates.NumericSurrogateValidation.IsReliable.get -> bool
+[AIDEVO001]AiDotNet.Evolution.Surrogates.NumericSurrogateValidation.Reason.get -> string!
+[AIDEVO001]AiDotNet.Evolution.Surrogates.NumericSurrogateValidation.RelativeMeanAbsoluteError.get -> double
+[AIDEVO001]AiDotNet.Evolution.Surrogates.NumericSurrogateValidation.ResidualRadius.get -> double
+[AIDEVO001]AiDotNet.Evolution.Surrogates.NumericSurrogateValidation.TrainingGroups.get -> int
+[AIDEVO001]AiDotNet.Evolution.Surrogates.NumericSurrogateValidation.ValidationGroups.get -> int
+[AIDEVO001]AiDotNet.Evolution.Surrogates.ValidatedNearestNeighborModel
+[AIDEVO001]AiDotNet.Evolution.Surrogates.ValidatedNearestNeighborModel.CalibrationGenomeIds.get -> System.Collections.Generic.IReadOnlyList<string!>!
+[AIDEVO001]AiDotNet.Evolution.Surrogates.ValidatedNearestNeighborModel.IsReliable.get -> bool
+[AIDEVO001]AiDotNet.Evolution.Surrogates.ValidatedNearestNeighborModel.PredictAsync(System.Collections.Generic.IReadOnlyList<AiDotNet.Evolution.EvolutionCanonicalGenome<AiDotNet.Evolution.EvolutionSearchGenome!>!>! candidates, System.Threading.CancellationToken cancellationToken = default(System.Threading.CancellationToken)) -> System.Threading.Tasks.ValueTask<AiDotNet.Evolution.EvolutionResourceResult<System.Collections.Generic.IReadOnlyList<AiDotNet.Evolution.EvolutionSurrogatePrediction!>!>!>
+[AIDEVO001]AiDotNet.Evolution.Surrogates.ValidatedNearestNeighborModel.TrainingGenomeIds.get -> System.Collections.Generic.IReadOnlyList<string!>!
+[AIDEVO001]AiDotNet.Evolution.Surrogates.ValidatedNearestNeighborModel.Validation.get -> AiDotNet.Evolution.Surrogates.NumericSurrogateValidation!
+[AIDEVO001]AiDotNet.Evolution.Surrogates.ValidatedNearestNeighborModel.ValidationGenomeIds.get -> System.Collections.Generic.IReadOnlyList<string!>!
+[AIDEVO001]AiDotNet.Evolution.Surrogates.ValidatedNearestNeighborModel.ValidationReport.get -> AiDotNet.Evolution.EvolutionSurrogateValidationReport!
+[AIDEVO001]AiDotNet.Evolution.Surrogates.ValidatedNearestNeighborModel.VersionHash.get -> string!
+[AIDEVO001]AiDotNet.Evolution.Surrogates.ValidatedNearestNeighborTrainer
+[AIDEVO001]AiDotNet.Evolution.Surrogates.ValidatedNearestNeighborTrainer.FitAsync(System.Collections.Generic.IReadOnlyList<AiDotNet.Evolution.EvolutionSurrogateObservation<AiDotNet.Evolution.EvolutionSearchGenome!>!>! observations, System.Threading.CancellationToken cancellationToken = default(System.Threading.CancellationToken)) -> System.Threading.Tasks.ValueTask<AiDotNet.Evolution.EvolutionResourceResult<AiDotNet.Evolution.IEvolutionSurrogateModel<AiDotNet.Evolution.EvolutionSearchGenome!>!>!>
+[AIDEVO001]AiDotNet.Evolution.Surrogates.ValidatedNearestNeighborTrainer.MaximumInferenceCost(int candidates = 64, int trainingObservations = 256) -> AiDotNet.Evolution.EvolutionResources!
+[AIDEVO001]AiDotNet.Evolution.Surrogates.ValidatedNearestNeighborTrainer.MaximumTrainingCost(int observations = 256) -> AiDotNet.Evolution.EvolutionResources!
+[AIDEVO001]AiDotNet.Evolution.Surrogates.ValidatedNearestNeighborTrainer.ValidatedNearestNeighborTrainer(AiDotNet.Evolution.EvolutionSearchSpace! space, AiDotNet.Evolution.Surrogates.NumericSurrogateOptions! options) -> void
+[AIDEVO001]AiDotNet.Evolution.Surrogates.ValidatedNearestNeighborTrainer.VersionHash.get -> string!

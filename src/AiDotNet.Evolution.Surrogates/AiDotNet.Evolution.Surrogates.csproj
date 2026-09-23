@@ -1,5 +1,7 @@
 <Project Sdk="Microsoft.NET.Sdk">
   <PropertyGroup>
+    <!-- The owning assembly uses its own experimental surfaces; consumers still receive AIDEVO00x. -->
+    <NoWarn>$(NoWarn);AIDEVO001;AIDEVO002;AIDEVO003</NoWarn>
     <TargetFrameworks>net10.0;net8.0;net471</TargetFrameworks>
     <ImplicitUsings>enable</ImplicitUsings>
     <Nullable>enable</Nullable>
@@ -25,5 +27,14 @@
     <ProjectReference Include="../AiDotNet.Evolution/AiDotNet.Evolution.csproj" />
     <None Include="README.md" Pack="true" PackagePath="/" />
     <PackageReference Include="Microsoft.SourceLink.GitHub" Version="10.0.401" PrivateAssets="All" />
+  </ItemGroup>
+  <!-- V1-11: the public API is declared (PublicAPI.*.txt) and every change to it must be too. -->
+  <PropertyGroup>
+    <EnablePackageValidation>true</EnablePackageValidation>
+  </PropertyGroup>
+  <ItemGroup>
+    <PackageReference Include="Microsoft.CodeAnalysis.PublicApiAnalyzers" Version="5.6.0" PrivateAssets="all" />
+    <AdditionalFiles Include="PublicAPI.Shipped.txt" />
+    <AdditionalFiles Include="PublicAPI.Unshipped.txt" />
   </ItemGroup>
 </Project>

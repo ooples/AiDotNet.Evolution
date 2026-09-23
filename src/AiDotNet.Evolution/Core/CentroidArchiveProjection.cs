@@ -1,3 +1,4 @@
+using System.Diagnostics.CodeAnalysis;
 namespace AiDotNet.Evolution;
 
 /// <summary>A completed offline projection and immutable provenance captured at publication.</summary>
@@ -5,6 +6,7 @@ namespace AiDotNet.Evolution;
 /// <remarks>The source is unchanged. The returned archive belongs to the caller and can subsequently
 /// change; the report still describes this completed projection. Retain the report and full target
 /// geometry with experiment/checkpoint configuration. It does not authorize reuse across task semantics.</remarks>
+[Experimental("AIDEVO003")]
 public sealed class CentroidArchiveProjection<TGenome>
 {
     internal CentroidArchiveProjection(CentroidArchive<TGenome> archive, EvolutionArchiveProjectionReport report)
@@ -20,6 +22,7 @@ public sealed class CentroidArchiveProjection<TGenome>
 }
 
 /// <summary>Bounded metadata for an offline archive remap, without genome or evaluation payloads.</summary>
+[Experimental("AIDEVO003")]
 public sealed class EvolutionArchiveProjectionReport
 {
     internal EvolutionArchiveProjectionReport(string sourceDefinitionHash, long sourceVersion, int sourceCount,

@@ -1,6 +1,8 @@
+using System.Diagnostics.CodeAnalysis;
 namespace AiDotNet.Evolution;
 
 /// <summary>Frozen limits and predeclared family-level acceptance gates for one opt-in offline campaign.</summary>
+[Experimental("AIDEVO002")]
 public sealed class EvolutionPolicyOptimizationOptions
 {
     /// <summary>Creates a bounded campaign with independent development and held-out panels.</summary>
