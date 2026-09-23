@@ -23,6 +23,7 @@
     <Project Path="src/AiDotNet.Evolution.Programs/AiDotNet.Evolution.Programs.csproj" />
     <Project Path="src/AiDotNet.Evolution.CSharp/AiDotNet.Evolution.CSharp.csproj" />
     <Project Path="src/AiDotNet.Evolution/AiDotNet.Evolution.csproj" />
+    <Project Path="src/AiDotNet.Evolution.Cli/AiDotNet.Evolution.Cli.csproj" />
     <Project Path="src/AiDotNet.Evolution.Host/AiDotNet.Evolution.Host.csproj" />
   </Folder>
   <Folder Name="/tests/">

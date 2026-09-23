@@ -35,5 +35,6 @@
   -->
   <ItemGroup Condition="'$(TargetFramework)' != 'net471'">
     <ProjectReference Include="..\..\src\AiDotNet.Evolution.Host\AiDotNet.Evolution.Host.csproj" />
+    <ProjectReference Include="..\..\src\AiDotNet.Evolution.Cli\AiDotNet.Evolution.Cli.csproj" Condition="'$(TargetFramework)' != 'net471'" />
   </ItemGroup>
 </Project>
