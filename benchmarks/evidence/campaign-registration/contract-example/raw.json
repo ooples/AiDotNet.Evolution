@@ -1,0 +1,212 @@
+[
+ {
+  "Family": "algotune",
+  "Arm": "aidotnet",
+  "Seed": 1021334267,
+  "Status": "completed",
+  "Value": 2.0
+ },
+ {
+  "Family": "algotune",
+  "Arm": "openevolve-recommended",
+  "Seed": 1021334267,
+  "Status": "completed",
+  "Value": 1.0
+ },
+ {
+  "Family": "algotune",
+  "Arm": "openevolve-matched",
+  "Seed": 1021334267,
+  "Status": "completed",
+  "Value": 1.0
+ },
+ {
+  "Family": "sr",
+  "Arm": "aidotnet",
+  "Seed": 1021334267,
+  "Status": "completed",
+  "Value": 0.1
+ },
+ {
+  "Family": "sr",
+  "Arm": "openevolve-recommended",
+  "Seed": 1021334267,
+  "Status": "failed",
+  "Value": null
+ },
+ {
+  "Family": "algotune",
+  "Arm": "aidotnet",
+  "Seed": 4144568897,
+  "Status": "completed",
+  "Value": 2.01
+ },
+ {
+  "Family": "algotune",
+  "Arm": "openevolve-recommended",
+  "Seed": 4144568897,
+  "Status": "completed",
+  "Value": 1.0
+ },
+ {
+  "Family": "algotune",
+  "Arm": "openevolve-matched",
+  "Seed": 4144568897,
+  "Status": "completed",
+  "Value": 1.0
+ },
+ {
+  "Family": "sr",
+  "Arm": "aidotnet",
+  "Seed": 4144568897,
+  "Status": "completed",
+  "Value": 0.101
+ },
+ {
+  "Family": "sr",
+  "Arm": "openevolve-recommended",
+  "Seed": 4144568897,
+  "Status": "completed",
+  "Value": 0.5
+ },
+ {
+  "Family": "algotune",
+  "Arm": "aidotnet",
+  "Seed": 3747846770,
+  "Status": "completed",
+  "Value": 2.02
+ },
+ {
+  "Family": "algotune",
+  "Arm": "openevolve-recommended",
+  "Seed": 3747846770,
+  "Status": "completed",
+  "Value": 1.0
+ },
+ {
+  "Family": "algotune",
+  "Arm": "openevolve-matched",
+  "Seed": 3747846770,
+  "Status": "completed",
+  "Value": 1.0
+ },
+ {
+  "Family": "sr",
+  "Arm": "aidotnet",
+  "Seed": 3747846770,
+  "Status": "completed",
+  "Value": 0.10200000000000001
+ },
+ {
+  "Family": "sr",
+  "Arm": "openevolve-recommended",
+  "Seed": 3747846770,
+  "Status": "completed",
+  "Value": 0.5
+ },
+ {
+  "Family": "algotune",
+  "Arm": "aidotnet",
+  "Seed": 642934908,
+  "Status": "completed",
+  "Value": 2.03
+ },
+ {
+  "Family": "algotune",
+  "Arm": "openevolve-recommended",
+  "Seed": 642934908,
+  "Status": "completed",
+  "Value": 1.0
+ },
+ {
+  "Family": "algotune",
+  "Arm": "openevolve-matched",
+  "Seed": 642934908,
+  "Status": "completed",
+  "Value": 1.0
+ },
+ {
+  "Family": "sr",
+  "Arm": "aidotnet",
+  "Seed": 642934908,
+  "Status": "completed",
+  "Value": 0.10300000000000001
+ },
+ {
+  "Family": "sr",
+  "Arm": "openevolve-recommended",
+  "Seed": 642934908,
+  "Status": "completed",
+  "Value": 0.5
+ },
+ {
+  "Family": "algotune",
+  "Arm": "aidotnet",
+  "Seed": 2456304472,
+  "Status": "completed",
+  "Value": 2.04
+ },
+ {
+  "Family": "algotune",
+  "Arm": "openevolve-recommended",
+  "Seed": 2456304472,
+  "Status": "completed",
+  "Value": 1.0
+ },
+ {
+  "Family": "algotune",
+  "Arm": "openevolve-matched",
+  "Seed": 2456304472,
+  "Status": "completed",
+  "Value": 1.0
+ },
+ {
+  "Family": "sr",
+  "Arm": "aidotnet",
+  "Seed": 2456304472,
+  "Status": "completed",
+  "Value": 0.10400000000000001
+ },
+ {
+  "Family": "sr",
+  "Arm": "openevolve-recommended",
+  "Seed": 2456304472,
+  "Status": "completed",
+  "Value": 0.5
+ },
+ {
+  "Family": "algotune",
+  "Arm": "aidotnet",
+  "Seed": 3661313923,
+  "Status": "completed",
+  "Value": 2.05
+ },
+ {
+  "Family": "algotune",
+  "Arm": "openevolve-recommended",
+  "Seed": 3661313923,
+  "Status": "completed",
+  "Value": 1.0
+ },
+ {
+  "Family": "algotune",
+  "Arm": "openevolve-matched",
+  "Seed": 3661313923,
+  "Status": "completed",
+  "Value": 1.0
+ },
+ {
+  "Family": "sr",
+  "Arm": "aidotnet",
+  "Seed": 3661313923,
+  "Status": "completed",
+  "Value": 0.10500000000000001
+ },
+ {
+  "Family": "sr",
+  "Arm": "openevolve-recommended",
+  "Seed": 3661313923,
+  "Status": "completed",
+  "Value": 0.5
+ }
+]

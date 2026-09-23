@@ -1,0 +1,68 @@
+{
+  "Campaign": "contract-example (synthetic fixture, not a campaign result)",
+  "Endpoints": [
+    {
+      "Config": "recommended",
+      "Direction": "maximize",
+      "Failures": {
+        "aidotnet": 0,
+        "openevolve-recommended": 0
+      },
+      "Family": "algotune",
+      "HolmAdjustedP": 0.0014992503748125937,
+      "Interval95": [
+        1.0116666666666665,
+        1.0383333333333333
+      ],
+      "MeanDifference": 1.025,
+      "Metric": "speedup",
+      "N": 6,
+      "OneSidedP": 0.0004997501249375312,
+      "Superior": true
+    },
+    {
+      "Config": "matched",
+      "Direction": "maximize",
+      "Failures": {
+        "aidotnet": 0,
+        "openevolve-matched": 0
+      },
+      "Family": "algotune",
+      "HolmAdjustedP": 0.0014992503748125937,
+      "Interval95": [
+        1.0116666666666665,
+        1.0383333333333333
+      ],
+      "MeanDifference": 1.025,
+      "Metric": "speedup",
+      "N": 6,
+      "OneSidedP": 0.0004997501249375312,
+      "Superior": true
+    },
+    {
+      "Config": "recommended",
+      "Direction": "minimize",
+      "Failures": {
+        "aidotnet": 0,
+        "openevolve-recommended": 1
+      },
+      "Family": "sr",
+      "HolmAdjustedP": 0.0014992503748125937,
+      "Interval95": [
+        0.3961666666666667,
+        500000.14866666665
+      ],
+      "MeanDifference": 166666.98083333333,
+      "Metric": "nmse",
+      "N": 6,
+      "OneSidedP": 0.0004997501249375312,
+      "Superior": true
+    }
+  ],
+  "FamilywiseAlpha": 0.05,
+  "IntervalNote": "Interval95 is descriptive and unadjusted; the decision is Holm on one-sided bootstrap p",
+  "OpenEvolveGate": true,
+  "RawSha256": "b233f633e2c841865fa1238566ef22622a2e1a4dec82ea2d713b3e688aaa9f46",
+  "RegistrationSha256": "13c6477632ba25cccab1df13b00c627eb54a374283134d8c09a67eb569954768",
+  "Schema": "evolution-campaign-report-v1"
+}

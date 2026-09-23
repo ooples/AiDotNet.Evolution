@@ -1,0 +1,73 @@
+{
+  "Schema": "evolution-campaign-registration-v1",
+  "Spec": {
+    "Campaign": "contract-example (synthetic fixture, not a campaign result)",
+    "Budget": {
+      "ModelTokens": 1000,
+      "ModelCalls": 10,
+      "WallSeconds": 60
+    },
+    "Models": [
+      "haiku",
+      "opus"
+    ],
+    "SeedCount": 6,
+    "BootstrapSamples": 2000,
+    "BootstrapSeed": 11,
+    "FamilywiseAlpha": 0.05,
+    "Families": [
+      {
+        "Family": "algotune",
+        "Configs": [
+          "recommended",
+          "matched"
+        ],
+        "Endpoint": {
+          "Metric": "speedup",
+          "Direction": "maximize",
+          "FailureValue": 0.0
+        }
+      },
+      {
+        "Family": "sr",
+        "Configs": [
+          "recommended"
+        ],
+        "Endpoint": {
+          "Metric": "nmse",
+          "Direction": "minimize",
+          "FailureValue": 1000000.0
+        }
+      }
+    ],
+    "TestPartitionHashes": {
+      "algotune": "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
+      "sr": "bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb"
+    },
+    "Published": {
+      "Family": "algotune",
+      "Problems": [
+        "p1",
+        "p2",
+        "p3"
+      ]
+    }
+  },
+  "Seeds": [
+    1021334267,
+    4144568897,
+    3747846770,
+    642934908,
+    2456304472,
+    3661313923
+  ],
+  "Arms": [
+    "aidotnet",
+    "openevolve-recommended",
+    "openevolve-matched"
+  ],
+  "StoppingRule": "Fixed N = SeedCount per arm; no interim analysis, no extension, no re-run",
+  "DecisionRule": "Holm step-down over every family x config one-sided bootstrap p; all must reject; ties fail",
+  "PublishedRule": "Strict majority of pre-declared problems matched or beaten (assumption A1)",
+  "RegistrationSha256": "13c6477632ba25cccab1df13b00c627eb54a374283134d8c09a67eb569954768"
+}
