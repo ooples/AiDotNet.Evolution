@@ -9,10 +9,16 @@ import tempfile
 import sys
 import unittest
 
-sys.path.insert(0, str(Path(__file__).resolve().parents[1]))
+# AIDOTNET_PYTHON_INSTALLED=1 tests the installed wheel instead of the source tree (the packaging check in CI).
+if os.environ.get("AIDOTNET_PYTHON_INSTALLED") != "1":
+    sys.path.insert(0, str(Path(__file__).resolve().parents[1]))
 from aidotnet_evolution import DurableWorkClient, DurableWorkError
 
 ROOT = Path(__file__).resolve().parents[3]
+if os.environ.get("AIDOTNET_PYTHON_INSTALLED") == "1":
+    import aidotnet_evolution
+    if Path(aidotnet_evolution.__file__).resolve().is_relative_to(ROOT / "bindings"):
+        raise ImportError("AIDOTNET_PYTHON_INSTALLED=1 but aidotnet_evolution was imported from the source tree")
 SUITE = json.loads((ROOT / "conformance/durable-v1/scenarios.json").read_text(encoding="utf-8"))
 DLL = os.environ.get("AIDOTNET_DURABLE_HOST_DLL") or str(ROOT / "src/AiDotNet.Evolution.Host/bin/Release/net10.0/aidotnet-evolution-host.dll")
 HOST = os.environ.get("AIDOTNET_DURABLE_HOST_PATH")

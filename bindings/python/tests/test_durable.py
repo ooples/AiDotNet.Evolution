@@ -7,7 +7,9 @@ import time
 import unittest
 from pathlib import Path
 
-sys.path.insert(0, str(Path(__file__).resolve().parents[1]))
+# AIDOTNET_PYTHON_INSTALLED=1 tests the installed wheel instead of the source tree (the packaging check in CI).
+if os.environ.get("AIDOTNET_PYTHON_INSTALLED") != "1":
+    sys.path.insert(0, str(Path(__file__).resolve().parents[1]))
 from aidotnet_evolution import DurableWorkClient, DurableWorkError, parse_evaluation_payload
 from aidotnet_evolution.durable import _lease, _normalize_timestamp, _parse_timestamp
 
