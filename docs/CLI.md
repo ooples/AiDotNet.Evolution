@@ -63,6 +63,7 @@ run file's directory. Unknown fields are refused, and enums are written as names
 | `budget.parallelism` | no (1) | Concurrent evaluations. It is also the proposal batch size, so a graceful stop takes effect within one round. |
 | `output` | yes | Holds `checkpoints/`, one `trace-NNN.jsonl` per run or resume session, and `best.<ext>`. |
 | `direction` | no (`Maximize`) | `Maximize` or `Minimize` the evaluator's `quality`. |
+| `warmStart` | no | A `repertoire-NNN.json` written by an earlier run. Its programs join the seeds and are evaluated afresh; see [Warm start](#warm-start). `run` uses it and `resume` ignores it. |
 | `runtimeVersion` | no | The interpreter image identity. It is part of the checkpoint compatibility hash, so it must not change between `run` and `resume`. Change it when the interpreter or its packages change, and the old checkpoint is then refused rather than silently mixed. |
 
 A minimal evaluator:
@@ -97,3 +98,16 @@ provision (see [execution migration](migration/EXECUTION_RUNTIME_MIGRATION.md)).
 
 Each session writes its own trace, starting at `trace-000.jsonl`. `inspect`, `report` and `export` read one
 session's trace.
+
+## Warm start
+
+Every session also writes `repertoire-NNN.json` beside its trace. It holds the archive's elites, best first (at most
+256), and cites the session's trace by SHA-256. It is written without any evaluator or model call. A later run
+names it in `warmStart` (see [Portable warm-start repertoires](WARM_START_REPERTOIRES.md)).
+
+- The file is checksummed. A tampered or oversized file is refused with exit code `2`, before any model call.
+- Import requires the same task and genome schema. A changed evaluator is allowed, because every imported program is
+  evaluated afresh under the new run's evaluator. No quality, descriptor or measurement is carried over.
+- The summary's `WarmStart` object reports the source run and how many programs were accepted, duplicated or rejected.
+  It also gives `PriorCostUnits` and `CostUnit`: what building the repertoire cost the earlier run. That cost is
+  reported beside this session's own spend. It is never charged again or folded into it.
