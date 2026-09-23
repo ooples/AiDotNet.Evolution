@@ -57,3 +57,25 @@ python -W error::ResourceWarning -m unittest discover -s bindings/python/tests -
 Run that command from the repository root. To test a managed host, set
 `AIDOTNET_DURABLE_HOST_DLL` instead. Tests include a real child-process kill after dispatch,
 exact decimal/Int64 recovery, cancellation/hardware matching, malformed replies and timeouts.
+
+## Serving an unmodified OpenEvolve evaluator
+
+`load_openevolve_evaluator` loads an OpenEvolve `evaluator.py` as OpenEvolve does. The file's directory goes on
+`sys.path`, and each candidate is written to its own temporary file whose path is passed to `evaluate(program_path)`.
+The evaluator may return a metrics dict or an `EvaluationResult`, and both its metrics and artifacts are kept.
+`serve` claims leases until none is available and commits one receipt per lease. When the evaluator raises, the
+lease gets a `failed` receipt that carries only the exception type. A commit error is raised to the caller;
+`serve` never re-runs the evaluator to retry a commit.
+
+```python
+from aidotnet_evolution import DurableWorkClient, load_openevolve_evaluator, serve
+
+evaluate = load_openevolve_evaluator("examples/function_minimization/evaluator.py")
+with DurableWorkClient(config, host_path="/path/to/aidotnet-evolution-host") as work:
+    serve(work, {"workerId": "worker-1", "compatibilityHash": config["compatibilityHash"]}, evaluate,
+          provenance="function-minimization-evaluator", actual={"evaluations": "1"})
+```
+
+Evaluators that import `openevolve.evaluation_result` need OpenEvolve installed, exactly as when OpenEvolve runs
+them. `benchmarks/external/run_upstream_evaluator_through_worker.py` checks an example's files against the pinned
+OpenEvolve commit, byte for byte, before running them. Cascade stages (`evaluate_stage1`, ...) are not invoked.
