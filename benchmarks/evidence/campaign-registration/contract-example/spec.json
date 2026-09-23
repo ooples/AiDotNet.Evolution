@@ -1,0 +1,53 @@
+{
+  "Campaign": "contract-example (synthetic fixture, not a campaign result)",
+  "Budget": {
+    "ModelTokens": 1000,
+    "ModelCalls": 10,
+    "WallSeconds": 60
+  },
+  "Models": [
+    "haiku",
+    "opus"
+  ],
+  "SeedCount": 6,
+  "BootstrapSamples": 2000,
+  "BootstrapSeed": 11,
+  "FamilywiseAlpha": 0.05,
+  "Families": [
+    {
+      "Family": "algotune",
+      "Configs": [
+        "recommended",
+        "matched"
+      ],
+      "Endpoint": {
+        "Metric": "speedup",
+        "Direction": "maximize",
+        "FailureValue": 0.0
+      }
+    },
+    {
+      "Family": "sr",
+      "Configs": [
+        "recommended"
+      ],
+      "Endpoint": {
+        "Metric": "nmse",
+        "Direction": "minimize",
+        "FailureValue": 1000000.0
+      }
+    }
+  ],
+  "TestPartitionHashes": {
+    "algotune": "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
+    "sr": "bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb"
+  },
+  "Published": {
+    "Family": "algotune",
+    "Problems": [
+      "p1",
+      "p2",
+      "p3"
+    ]
+  }
+}

@@ -158,6 +158,13 @@ jobs:
         run: dotnet run --project benchmarks/AiDotNet.Evolution.Performance -c Release --no-build -- --profile TestResults/performance '${{ github.sha }}' --smoke
       - name: Verify paired analysis contracts
         run: python3 -m unittest discover -s benchmarks/analysis -v
+      - name: Verify the pre-registered campaign report reproduces byte-for-byte
+        working-directory: benchmarks/analysis
+        run: >-
+          python3 campaign_registration.py check
+          --registration ../evidence/campaign-registration/contract-example/frozen/registration.json
+          --raw ../evidence/campaign-registration/contract-example/raw.json
+          --report ../evidence/campaign-registration/contract-example/report.json
       - name: Verify frozen feature-ablation campaign
         run: |
           python3 benchmarks/analysis/ablation.py register benchmarks/AiDotNet.Evolution.Quality/bin/Release/net10.0/AiDotNet.Evolution.Quality.dll TestResults/ablation-plan.json --seeds 2 --budget 16
