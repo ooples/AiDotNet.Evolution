@@ -1,5 +1,9 @@
 using System.Security.Cryptography;
 using System.Text;
+#if NET8_0_OR_GREATER
+using System.Buffers;
+using System.Globalization;
+#endif
 
 namespace AiDotNet.Evolution;
 
@@ -10,6 +14,11 @@ namespace AiDotNet.Evolution;
 /// </remarks>
 public static class EvolutionHash
 {
+#if NET8_0_OR_GREATER
+    // Inputs up to this many UTF-8 bytes are encoded on the stack; larger ones rent from the shared pool.
+    private const int StackBytes = 512;
+#endif
+
     /// <summary>Encodes a double by its exact IEEE 754 bit pattern for cross-framework identity.</summary>
     public static string EncodeDouble(double value) => BitConverter.DoubleToInt64Bits(value)
         .ToString(System.Globalization.CultureInfo.InvariantCulture);
@@ -33,17 +42,41 @@ public static class EvolutionHash
     public static string Compute(string value)
     {
         if (value is null) throw new ArgumentNullException(nameof(value));
-        byte[] bytes = Encoding.UTF8.GetBytes(value);
-#if NET5_0_OR_GREATER
-        // One-shot: no per-call algorithm object or native handle (hashing is on every identity path).
-        byte[] hash = SHA256.HashData(bytes);
+#if NET8_0_OR_GREATER
+        // Hashing is on every identity path: encode into stack or pooled bytes, so the digest string is the only allocation.
+        int maximum = Encoding.UTF8.GetMaxByteCount(value.Length);
+        if (maximum <= StackBytes)
+        {
+            Span<byte> bytes = stackalloc byte[StackBytes];
+            return Digest(bytes[..Encoding.UTF8.GetBytes(value, bytes)]);
+        }
+        byte[] rented = ArrayPool<byte>.Shared.Rent(maximum);
+        try { return Digest(rented.AsSpan(0, Encoding.UTF8.GetBytes(value, rented))); }
+        finally { ArrayPool<byte>.Shared.Return(rented); }
 #else
+        byte[] bytes = Encoding.UTF8.GetBytes(value);
         byte[] hash;
         using (SHA256 sha = SHA256.Create()) hash = sha.ComputeHash(bytes);
-#endif
         return ToLowerHex(hash);
+#endif
     }
 
+#if NET8_0_OR_GREATER
+    // SHA-256 of the bytes as 64 lowercase hex digits, the same digits as ToString("x2") per byte.
+    private static string Digest(ReadOnlySpan<byte> data)
+    {
+        const string digits = "0123456789abcdef";
+        Span<byte> hash = stackalloc byte[32];
+        SHA256.HashData(data, hash);
+        Span<char> chars = stackalloc char[64];
+        for (int i = 0; i < hash.Length; i++)
+        {
+            chars[2 * i] = digits[hash[i] >> 4];
+            chars[(2 * i) + 1] = digits[hash[i] & 0xF];
+        }
+        return new string(chars);
+    }
+#else
     // Same lowercase digits as ToString("x2") per byte, written into one buffer instead of 32 strings.
     private static string ToLowerHex(byte[] hash)
     {
@@ -56,6 +89,7 @@ public static class EvolutionHash
         }
         return new string(chars);
     }
+#endif
 
     /// <summary>Computes an unambiguous hash of an ordered sequence of string components.</summary>
     /// <param name="values">The ordered components to combine.</param>
@@ -69,24 +103,66 @@ public static class EvolutionHash
     public static string Combine(IEnumerable<string> values)
     {
         if (values is null) throw new ArgumentNullException(nameof(values));
+#if NET8_0_OR_GREATER
+        // Hashes exactly the UTF-8 of "len:value;" per component, the bytes the concatenated string encodes to: every
+        // component sits between ASCII separators, so encoding each one alone cannot split a surrogate pair. The
+        // sequence is enumerated once, because callers pass lazy sequences that compute their components.
+        byte[] buffer = ArrayPool<byte>.Shared.Rent(1024);
+        int written = 0, count = 0;
+        long characters = 0;
+        try
+        {
+            foreach (string value in values)
+            {
+                ValidateComponent(value, count, characters);
+                int needed = 11 + 2 + Encoding.UTF8.GetMaxByteCount(value.Length);
+                if (buffer.Length - written < needed) buffer = Grow(buffer, written, (long)written + needed);
+                value.Length.TryFormat(buffer.AsSpan(written), out int digits, default, CultureInfo.InvariantCulture);
+                written += digits;
+                buffer[written++] = (byte)':';
+                written += Encoding.UTF8.GetBytes(value, buffer.AsSpan(written));
+                buffer[written++] = (byte)';';
+                characters += digits + value.Length + 2;
+                count++;
+            }
+            return Digest(buffer.AsSpan(0, written));
+        }
+        finally { ArrayPool<byte>.Shared.Return(buffer); }
+#else
         var builder = new StringBuilder();
         int count = 0;
         foreach (string value in values)
         {
-            if (count == EvolutionCollectionLimits.MaximumHashComponents)
-                throw new ArgumentException(
-                    $"At most {EvolutionCollectionLimits.MaximumHashComponents} components may be combined.",
-                    nameof(values));
-            if (value is null) throw new ArgumentException("Hash components cannot be null.", nameof(values));
-            long required = (long)builder.Length + value.Length + 32;
-            if (required > EvolutionCollectionLimits.MaximumHashCharacters)
-                throw new ArgumentException(
-                    $"Combined hash input may contain at most {EvolutionCollectionLimits.MaximumHashCharacters} characters.",
-                    nameof(values));
+            ValidateComponent(value, count, builder.Length);
             builder.Append(value.Length.ToString(System.Globalization.CultureInfo.InvariantCulture))
                 .Append(':').Append(value).Append(';');
             count++;
         }
         return Compute(builder.ToString());
+#endif
     }
+
+    private static void ValidateComponent(string? value, int count, long characters)
+    {
+        if (count == EvolutionCollectionLimits.MaximumHashComponents)
+            throw new ArgumentException(
+                $"At most {EvolutionCollectionLimits.MaximumHashComponents} components may be combined.",
+                "values");
+        if (value is null) throw new ArgumentException("Hash components cannot be null.", "values");
+        long required = characters + value.Length + 32;
+        if (required > EvolutionCollectionLimits.MaximumHashCharacters)
+            throw new ArgumentException(
+                $"Combined hash input may contain at most {EvolutionCollectionLimits.MaximumHashCharacters} characters.",
+                "values");
+    }
+
+#if NET8_0_OR_GREATER
+    private static byte[] Grow(byte[] buffer, int written, long needed)
+    {
+        byte[] larger = ArrayPool<byte>.Shared.Rent((int)Math.Max(needed, 2L * buffer.Length));
+        buffer.AsSpan(0, written).CopyTo(larger);
+        ArrayPool<byte>.Shared.Return(buffer);
+        return larger;
+    }
+#endif
 }
