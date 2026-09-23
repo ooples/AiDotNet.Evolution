@@ -136,6 +136,64 @@ public sealed class CliRunTests
     }
 
     [Fact]
+    public void A_warm_start_seeds_a_new_run_with_the_earlier_runs_programs_and_reports_their_cost_separately()
+    {
+        using var first = new TemporaryDirectory();
+        using var second = new TemporaryDirectory();
+        using var model = new FakeChatModel();
+        foreach (string directory in new[] { first.Path, second.Path })
+            File.WriteAllText(Path.Combine(directory, "initial.py"), "X = 0\n");
+        File.WriteAllText(Path.Combine(first.Path, "evaluator.py"), Evaluator);
+        // The new run's evaluator differs: seeds are evaluated afresh, so an evaluator change is allowed.
+        File.WriteAllText(Path.Combine(second.Path, "evaluator.py"), "# revised evaluator\n" + Evaluator);
+
+        var (code, _, error) = Run("run", WriteRun(first.Path, model.Endpoint, maxEvaluations: 4));
+        Assert.True(code == 0, error);
+        string repertoire = Path.Combine(first.Path, "out", "repertoire-000.json");
+        Assert.True(File.Exists(repertoire));
+
+        string warm = WriteRun(second.Path, model.Endpoint, maxEvaluations: 2,
+            extra: ",\n  \"warmStart\": \"" + repertoire.Replace('\\', '/') + "\"");
+        (code, string output, error) = Run("run", warm);
+        Assert.True(code == 0, error);
+        using JsonDocument summary = JsonDocument.Parse(output);
+        JsonElement warmStart = summary.RootElement.GetProperty("WarmStart");
+        Assert.Equal(1, warmStart.GetProperty("Accepted").GetInt32()); // one length cell: the earlier best, X = 3
+        Assert.Equal(0, warmStart.GetProperty("Rejected").GetInt32());
+        Assert.Equal(4d, warmStart.GetProperty("PriorCostUnits").GetDouble()); // the earlier run's attempts, not re-charged here
+        Assert.Equal("evaluation-attempts-v1", warmStart.GetProperty("CostUnit").GetString());
+        Assert.Equal(3d, summary.RootElement.GetProperty("BestQuality").GetDouble()); // reached with no model call at all
+        Assert.Equal(0, summary.RootElement.GetProperty("ModelUsage").GetProperty("ChatCalls").GetInt64());
+        Assert.Equal(3, model.Calls); // only the first run's proposals
+    }
+
+    [Fact]
+    public void A_tampered_warm_start_is_refused_before_any_work()
+    {
+        using var first = new TemporaryDirectory();
+        using var model = new FakeChatModel();
+        File.WriteAllText(Path.Combine(first.Path, "initial.py"), "X = 0\n");
+        File.WriteAllText(Path.Combine(first.Path, "evaluator.py"), Evaluator);
+        Assert.Equal(0, Run("run", WriteRun(first.Path, model.Endpoint, maxEvaluations: 2)).Code);
+        string repertoire = Path.Combine(first.Path, "out", "repertoire-000.json");
+        string tampered = Path.Combine(first.Path, "tampered.json");
+        // Inside the checksummed payload (escaped JSON): the provenance's source run id.
+        string quote = "\\u" + "0022"; // how the envelope escapes a quote inside its payload string
+        string runId = quote + "SourceRunId" + quote + ":" + quote + "cli-ru";
+        File.WriteAllText(tampered, File.ReadAllText(repertoire).Replace(runId + "n", runId + "x"));
+        Assert.NotEqual(File.ReadAllText(repertoire), File.ReadAllText(tampered));
+        int callsBefore = model.Calls;
+
+        var (code, _, error) = Run("run", WriteRun(first.Path, model.Endpoint, maxEvaluations: 2, output: "out-2",
+            extra: ",\n  \"warmStart\": \"tampered.json\""));
+        Assert.Equal(2, code);
+        Assert.StartsWith("error:", error);
+        Assert.Equal(callsBefore, model.Calls);
+        Assert.False(Directory.Exists(Path.Combine(first.Path, "out-2", "checkpoints")) &&
+            Directory.EnumerateFileSystemEntries(Path.Combine(first.Path, "out-2", "checkpoints")).Any());
+    }
+
+    [Fact]
     public void A_model_endpoint_that_never_answers_is_an_error_not_a_result()
     {
         using var directory = new TemporaryDirectory();

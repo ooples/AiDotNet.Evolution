@@ -29,6 +29,8 @@ internal sealed class RunFile
     public string? TaskDescription { get; init; }
     /// <summary>Identity of the interpreter image; part of the checkpoint compatibility hash, so it must be stable across resumes.</summary>
     public string RuntimeVersion { get; init; } = "aidotnet-evolve-local";
+    /// <summary>A repertoire exported by an earlier run whose programs join the seeds; used by <c>run</c>, ignored by <c>resume</c>.</summary>
+    public string? WarmStart { get; init; }
 }
 
 internal sealed class RunModel
@@ -112,6 +114,37 @@ internal static class RunCommand
             MaxOutputTokens = run.Model.MaxOutputTokens
         });
         var descriptors = new[] { new EvolutionDescriptorDefinition("length", 0, run.Budget.MaxProgramChars, 64) };
+        var codec = new ProgramGenomeCodec();
+        EvolutionReuseScope scope = Scope(task, codec, run);
+
+        // Warm start: the earlier run's programs become seeds and are evaluated afresh here. Their old measurements and
+        // the cost of building them are reported beside this session's own spend, never folded into it.
+        var seeds = new List<ProgramGenome> { new(initial, run.Language) };
+        object? warmStart = null;
+        if (run.WarmStart is not null && resume)
+        {
+            warmStart = new { Ignored = "resume restores the checkpoint's population; warmStart applies to run only" };
+        }
+        else if (run.WarmStart is not null)
+        {
+            string path = Path.Combine(baseDirectory, run.WarmStart);
+            if (new FileInfo(path).Length > MaxRepertoireBytes) throw new InvalidDataException(path + " exceeds " + MaxRepertoireBytes + " bytes.");
+            EvolutionRepertoire repertoire = EvolutionRepertoire.FromJson(File.ReadAllText(path, new UTF8Encoding(false, true)));
+            EvolutionRepertoireImport<ProgramGenome> imported = repertoire.ImportAsync(task, codec, scope, cancellationToken).GetAwaiter().GetResult();
+            string initialId = task.CanonicalizeAsync(seeds[0], cancellationToken).GetAwaiter().GetResult().Id;
+            seeds.AddRange(imported.Seeds.Where(seed => seed.Id != initialId).Select(seed => seed.Genome));
+            warmStart = new
+            {
+                Source = path,
+                repertoire.Provenance.SourceRunId,
+                Accepted = imported.Decisions.Count(d => d.Status == EvolutionRepertoireImportStatus.Accepted),
+                Duplicate = imported.Decisions.Count(d => d.Status == EvolutionRepertoireImportStatus.Duplicate),
+                Rejected = imported.Decisions.Count(d => d.Status == EvolutionRepertoireImportStatus.Rejected),
+                repertoire.Provenance.PriorCostUnits,
+                repertoire.Provenance.CostUnit
+            };
+        }
+
         var options = new EvolutionEngineOptions
         {
             RunId = run.RunId,
@@ -131,11 +164,11 @@ internal static class RunCommand
         using (var tracer = new EvolutionTraceObserver<ProgramGenome>(new EvolutionTraceOptions { Enabled = true, Path = tracePath }, run.RunId, descriptors))
         {
             var engine = new EvolutionEngine<ProgramGenome>(task, variation, _ => new MapElitesArchive<ProgramGenome>(descriptors), options,
-                observer: tracer, checkpointStore: checkpoints, genomeCodec: new ProgramGenomeCodec());
+                observer: tracer, checkpointStore: checkpoints, genomeCodec: codec);
             interrupt.Attach(engine.RequestStop);
             try
             {
-                result = engine.RunAsync(new[] { new ProgramGenome(initial, run.Language) }, cancellationToken).GetAwaiter().GetResult();
+                result = engine.RunAsync(seeds, cancellationToken).GetAwaiter().GetResult();
             }
             catch (OperationCanceledException) when (cancellationToken.IsCancellationRequested)
             {
@@ -145,6 +178,7 @@ internal static class RunCommand
         }
 
         EvolutionArchiveEntry<ProgramGenome>? best = result.Best;
+        string? repertoirePath = ExportRepertoire(result, task, codec, scope, run, tracePath, cancellationToken);
         output.WriteLine(JsonSerializer.Serialize(new
         {
             RunId = run.RunId,
@@ -154,6 +188,8 @@ internal static class RunCommand
             BestQuality = best?.Evaluation.Quality,
             Trace = tracePath,
             Checkpoints = Path.Combine(outputDirectory, "checkpoints"),
+            Repertoire = repertoirePath,
+            WarmStart = warmStart,
             ModelUsage = variation.GetUsage()
         }, Program.Json));
         if (best is not null)
@@ -169,6 +205,40 @@ internal static class RunCommand
             return ModelUnavailableExitCode;
         }
         return 0;
+    }
+
+    private const int MaxRepertoireBytes = 8 * 1024 * 1024;
+    private const int MaxRepertoireSeeds = 256;
+
+    /// <summary>The reuse identity of this run's programs. Facets the CLI cannot observe carry explicit versioned labels.</summary>
+    private static EvolutionReuseScope Scope(ProgramEvolutionTask task, ProgramGenomeCodec codec, RunFile run) =>
+        new(task.Id, task.VersionHash, task.EvaluatorVersionHash, codec.Id, codec.VersionHash,
+            constraintsVersion: "evaluator-defined-v1", dataVersion: "evaluator-defined-v1", fidelityVersion: "single-fidelity-v1",
+            compilerVersion: "not-applicable-v1", runtimeVersion: run.RuntimeVersion, hardwareVersion: "not-recorded-v1",
+            correctnessPolicyVersion: "evaluator-defined-v1");
+
+    /// <summary>Writes the session's archive elites, best first, as <c>repertoire-NNN.json</c> beside its trace.</summary>
+    /// <remarks>No evaluator or model call is made. The prior cost is the run's evaluation attempts so far.</remarks>
+    private static string? ExportRepertoire(EvolutionRunResult<ProgramGenome> result, ProgramEvolutionTask task, ProgramGenomeCodec codec,
+        EvolutionReuseScope scope, RunFile run, string tracePath, CancellationToken cancellationToken)
+    {
+        bool minimize = run.Direction == EvolutionOptimizationDirection.Minimize;
+        IEnumerable<EvolutionArchiveEntry<ProgramGenome>> entries = result.Islands.SelectMany(island => island.Entries);
+        ProgramGenome[] elites = (minimize ? entries.OrderBy(e => e.Evaluation.Quality) : entries.OrderByDescending(e => e.Evaluation.Quality))
+            .Take(MaxRepertoireSeeds).Select(e => e.Candidate.CanonicalGenome.Genome).ToArray();
+        if (elites.Length == 0) return null;
+        string evidence = File.Exists(tracePath)
+            ? Convert.ToHexString(System.Security.Cryptography.SHA256.HashData(File.ReadAllBytes(tracePath))).ToLowerInvariant()
+            : throw new InvalidDataException("The session trace is missing, so the repertoire has no evidence to cite: " + tracePath);
+        var provenance = new EvolutionRepertoireProvenance(run.RunId, result.StateHash, evidence, DateTimeOffset.UtcNow,
+            result.Counters.EvaluationAttempts, "evaluation-attempts-v1");
+        EvolutionRepertoire repertoire = EvolutionRepertoire.ExportAsync(elites, task, codec, scope, provenance, cancellationToken).GetAwaiter().GetResult();
+        string path = Path.Combine(Path.GetDirectoryName(tracePath) ?? ".",
+            "repertoire-" + Path.GetFileNameWithoutExtension(tracePath).Substring("trace-".Length) + ".json");
+        using (var stream = new FileStream(path, FileMode.CreateNew, FileAccess.Write))
+        using (var writer = new StreamWriter(stream, new UTF8Encoding(false)))
+            writer.Write(repertoire.ToJson());
+        return path;
     }
 
     internal static RunFile Load(string path)
