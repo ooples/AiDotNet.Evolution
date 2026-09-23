@@ -121,6 +121,25 @@ jobs:
           python -W error::ResourceWarning -m unittest discover -s bindings/python/tests -v
           if ($LASTEXITCODE -ne 0) { exit $LASTEXITCODE }
 
+      # The package users install, not the source tree: build the wheel, install it into a clean venv and run the same
+      # suite (including the shared conformance scenarios) with the source path disabled. test_conformance refuses to
+      # import from the source tree in this mode, so a shadowed import cannot pass as a packaging check.
+      - name: Test the built Python wheel from a clean venv
+        shell: pwsh
+        run: |
+          $suffix = if ($IsWindows) { '.exe' } else { '' }
+          $work = Join-Path $env:RUNNER_TEMP 'python-wheel'
+          python -m pip wheel --no-deps -w (Join-Path $work 'dist') bindings/python
+          if ($LASTEXITCODE -ne 0) { exit $LASTEXITCODE }
+          python -m venv (Join-Path $work 'venv')
+          $python = if ($IsWindows) { Join-Path $work 'venv/Scripts/python.exe' } else { Join-Path $work 'venv/bin/python' }
+          & $python -m pip install (Get-ChildItem (Join-Path $work 'dist/*.whl')).FullName
+          if ($LASTEXITCODE -ne 0) { exit $LASTEXITCODE }
+          $env:AIDOTNET_PYTHON_INSTALLED = '1'
+          $env:AIDOTNET_DURABLE_HOST_PATH = Join-Path $PWD "bindings/typescript/bin/${{ matrix.rid }}/aidotnet-evolution-host$suffix"
+          & $python -W error::ResourceWarning -m unittest discover -s bindings/python/tests -v
+          if ($LASTEXITCODE -ne 0) { exit $LASTEXITCODE }
+
       - name: Publish and test the durable C ABI
         if: matrix.node == '22'
         shell: pwsh
