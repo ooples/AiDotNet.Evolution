@@ -107,8 +107,12 @@ public sealed class PythonProgramCompiler : IProgramCompiler
     {
         var start = new ProcessStartInfo(_python)
         {
-            RedirectStandardInput = true, RedirectStandardOutput = true, RedirectStandardError = true, UseShellExecute = false,
-            StandardOutputEncoding = new UTF8Encoding(false), StandardErrorEncoding = new UTF8Encoding(false)
+            RedirectStandardInput = true,
+            RedirectStandardOutput = true,
+            RedirectStandardError = true,
+            UseShellExecute = false,
+            StandardOutputEncoding = new UTF8Encoding(false),
+            StandardErrorEncoding = new UTF8Encoding(false)
         };
         foreach (string argument in new[] { "-I", "-S", "-B", "-c", Helper, mode }) start.ArgumentList.Add(argument);
         start.Environment["PYTHONIOENCODING"] = "utf-8";
