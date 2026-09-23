@@ -54,15 +54,24 @@ public sealed class EvolutionArchiveSnapshot<TGenome> : IEvolutionParetoArchiveV
             source.Entries,
             EvolutionCollectionLimits.MaximumResultEntries,
             nameof(source));
-        if (descriptors.Any(descriptor => descriptor is null) || unorderedEntries.Any(entry => entry is null))
-            throw new ArgumentException("Archive views cannot contain null values.", nameof(source));
-        // CopyBounded already owns this array. Sort it in place instead of allocating LINQ's key/map/output arrays.
+        foreach (EvolutionDescriptorDefinition descriptor in descriptors)
+            if (descriptor is null) throw new ArgumentException("Archive views cannot contain null values.", nameof(source));
+        // CopyBounded already owns this array. Views normally list entries in cell-key order already (the pipeline
+        // snapshots every wave), so check that in one pass and sort in place only when it does not hold.
         EvolutionArchiveEntry<TGenome>[] entries = unorderedEntries;
-        Array.Sort(entries, (left, right) => StringComparer.Ordinal.Compare(left.Cell.StableKey, right.Cell.StableKey));
-        if (source.Count != entries.Length || entries.Any(entry =>
-                entry.Evaluation.Status != EvolutionEvaluationStatus.Completed ||
-                entry.Evaluation.Direction != source.Direction))
+        bool sorted = true;
+        for (int i = 0; i < entries.Length; i++)
+        {
+            EvolutionArchiveEntry<TGenome> entry = entries[i];
+            if (entry is null) throw new ArgumentException("Archive views cannot contain null values.", nameof(source));
+            if (i > 0 && StringComparer.Ordinal.Compare(entries[i - 1].Cell.StableKey, entry.Cell.StableKey) > 0) sorted = false;
+        }
+        if (!sorted) Array.Sort(entries, (left, right) => StringComparer.Ordinal.Compare(left.Cell.StableKey, right.Cell.StableKey));
+        if (source.Count != entries.Length)
             throw new ArgumentException("The archive view contains inconsistent entries.", nameof(source));
+        foreach (EvolutionArchiveEntry<TGenome> entry in entries)
+            if (entry.Evaluation.Status != EvolutionEvaluationStatus.Completed || entry.Evaluation.Direction != source.Direction)
+                throw new ArgumentException("The archive view contains inconsistent entries.", nameof(source));
 
         _descriptors = Array.AsReadOnly(descriptors);
         _entries = Array.AsReadOnly(entries);

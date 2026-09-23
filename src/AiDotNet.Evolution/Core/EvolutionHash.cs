@@ -142,6 +142,40 @@ public static class EvolutionHash
 #endif
     }
 
+    /// <summary>The raw 32 bytes of <see cref="Combine"/>'s digest (the bytes its hex string spells), without hex.</summary>
+    internal static byte[] CombineBytes(IReadOnlyList<string> values)
+    {
+        if (values is null) throw new ArgumentNullException(nameof(values));
+#if NET8_0_OR_GREATER
+        byte[] buffer = ArrayPool<byte>.Shared.Rent(1024);
+        int written = 0;
+        long characters = 0;
+        try
+        {
+            for (int count = 0; count < values.Count; count++)
+            {
+                string value = values[count];
+                ValidateComponent(value, count, characters);
+                int needed = 11 + 2 + Encoding.UTF8.GetMaxByteCount(value.Length);
+                if (buffer.Length - written < needed) buffer = Grow(buffer, written, (long)written + needed);
+                value.Length.TryFormat(buffer.AsSpan(written), out int digits, default, CultureInfo.InvariantCulture);
+                written += digits;
+                buffer[written++] = (byte)':';
+                written += Encoding.UTF8.GetBytes(value, buffer.AsSpan(written));
+                buffer[written++] = (byte)';';
+                characters += digits + value.Length + 2;
+            }
+            return SHA256.HashData(buffer.AsSpan(0, written));
+        }
+        finally { ArrayPool<byte>.Shared.Return(buffer); }
+#else
+        string hex = Combine(values);
+        var digest = new byte[32];
+        for (int i = 0; i < 32; i++) digest[i] = Convert.ToByte(hex.Substring(2 * i, 2), 16);
+        return digest;
+#endif
+    }
+
     private static void ValidateComponent(string? value, int count, long characters)
     {
         if (count == EvolutionCollectionLimits.MaximumHashComponents)

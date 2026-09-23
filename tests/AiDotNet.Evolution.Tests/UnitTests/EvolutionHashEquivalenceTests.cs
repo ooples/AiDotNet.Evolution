@@ -58,6 +58,17 @@ public sealed class EvolutionHashEquivalenceTests
     }
 
     [Fact]
+    public void CombineBytes_are_exactly_the_bytes_Combine_spells_in_hex()
+    {
+        var random = new Random(31);
+        for (int trial = 0; trial < 300; trial++)
+        {
+            string[] parts = RandomStrings(random.Next(0, 30), 2000 + trial).ToArray();
+            Assert.Equal(EvolutionHash.Combine(parts), string.Concat(EvolutionHash.CombineBytes(parts).Select(b => b.ToString("x2", System.Globalization.CultureInfo.InvariantCulture))));
+        }
+    }
+
+    [Fact]
     public void Combine_enumerates_a_lazy_sequence_once_and_keeps_its_argument_checks()
     {
         int pulls = 0;
