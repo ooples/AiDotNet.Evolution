@@ -13,7 +13,7 @@
     <PackageId>AiDotNet.Evolution.Cli</PackageId>
     <Description>Run and resume AiDotNet.Evolution program evolutions; inspect, compare, export and report runs from their trace files.</Description>
     <IsPackable>true</IsPackable>
-    <Version>0.1.0</Version>
+    <Version>0.1.0-preview.1</Version>
   </PropertyGroup>
   <ItemGroup>
     <InternalsVisibleTo Include="AiDotNet.Evolution.Tests" />
