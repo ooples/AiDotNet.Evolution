@@ -387,9 +387,23 @@ public sealed partial class EvolutionEngine<TGenome>
             if (_pipelineEvaluationRate is not null) await _pipelineEvaluationRate.WaitAsync(cancellationToken).ConfigureAwait(false);
             if (_pipelineStatistics is not null) { _pipelineStatistics.Started(1); pipelineTimer = Stopwatch.StartNew(); }
             Stopwatch timer = Stopwatch.StartNew();
-            EvolutionTaskResult result = _pipelineStatistics is null
-                ? await EvaluateAttemptAsync(item, cancellationToken).ConfigureAwait(false)
-                : await Task.Run(() => EvaluateAttemptAsync(item, cancellationToken), CancellationToken.None).ConfigureAwait(false);
+            EvolutionTaskResult result;
+            if (_pipelineStatistics is null || Volatile.Read(ref _pipelineInlineEvaluations))
+            {
+                // As for proposals: an evaluator that returns promptly needs no thread-pool hop, which measured as the
+                // ZeroLatency pipeline's remaining per-evaluation cost (worker wake/park). The first call that blocks past
+                // the budget before returning switches this run to offloading, so a synchronously blocking evaluator can
+                // hold the loop at most once. Commit order is independent of where the work ran.
+                long started = Stopwatch.GetTimestamp();
+                Task<EvolutionTaskResult> inline = EvaluateAttemptAsync(item, cancellationToken);
+                if (_pipelineStatistics is not null && Stopwatch.GetTimestamp() - started > InlineProposalBudgetTicks)
+                    Volatile.Write(ref _pipelineInlineEvaluations, false);
+                result = await inline.ConfigureAwait(false);
+            }
+            else
+            {
+                result = await Task.Run(() => EvaluateAttemptAsync(item, cancellationToken), CancellationToken.None).ConfigureAwait(false);
+            }
             timer.Stop();
             item.Elapsed += timer.Elapsed;
             AccumulateAttemptMetadata(item, result);

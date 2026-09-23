@@ -19,6 +19,7 @@ public sealed partial class EvolutionEngine<TGenome>
     private async Task<EvolutionStopReason> RunPipelineLoopAsync(TGenome[] seeds, int seedIndex, Stopwatch runTimer, CancellationToken cancellationToken)
     {
         Volatile.Write(ref _pipelineInlineProposals, true); // each run re-learns its source
+        Volatile.Write(ref _pipelineInlineEvaluations, true); // and its evaluator
         EvolutionPipelineOptions settings = _options.Pipeline;
         if (SupportsConcurrentPipelineProposals() != _pipelineConcurrentProposals)
             throw new InvalidOperationException("The configured proposal concurrency capability changed after engine construction.");
@@ -200,6 +201,7 @@ public sealed partial class EvolutionEngine<TGenome>
 
     private static readonly long InlineProposalBudgetTicks = Stopwatch.Frequency / 10_000; // 100 microseconds
     private bool _pipelineInlineProposals = true;
+    private bool _pipelineInlineEvaluations = true;
 
     private List<PipelineProposal> PlanPipelineWave(TGenome[] seeds, ref int seedIndex, int limit,
         Dictionary<int, PipelineArchiveContext> snapshots)
