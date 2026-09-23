@@ -1,1 +1,147 @@
 #nullable enable
+AiDotNet.Evolution.AutoML.IMapElitesAutoMLModel<T, TInput, TOutput>
+AiDotNet.Evolution.AutoML.IMapElitesAutoMLModel<T, TInput, TOutput>.Archive.get -> System.Collections.Generic.IReadOnlyList<AiDotNet.Evolution.AutoML.MapElitesAutoMLArchiveEntry!>!
+AiDotNet.Evolution.AutoML.IMapElitesAutoMLModel<T, TInput, TOutput>.ArchiveStateHash.get -> string!
+AiDotNet.Evolution.AutoML.MapElitesAutoML<T, TInput, TOutput>
+AiDotNet.Evolution.AutoML.MapElitesAutoML<T, TInput, TOutput>.Archive.get -> System.Collections.Generic.IReadOnlyList<AiDotNet.Evolution.AutoML.MapElitesAutoMLArchiveEntry!>!
+AiDotNet.Evolution.AutoML.MapElitesAutoML<T, TInput, TOutput>.ArchiveStateHash.get -> string!
+AiDotNet.Evolution.AutoML.MapElitesAutoML<T, TInput, TOutput>.MapElitesAutoML(AiDotNet.Evolution.AutoML.MapElitesAutoMLOptions? options = null, System.Random? random = null) -> void
+AiDotNet.Evolution.AutoML.MapElitesAutoMLArchiveEntry
+AiDotNet.Evolution.AutoML.MapElitesAutoMLArchiveEntry.CellBins.get -> System.Collections.Generic.IReadOnlyList<int>!
+AiDotNet.Evolution.AutoML.MapElitesAutoMLArchiveEntry.Descriptors.get -> System.Collections.Generic.IReadOnlyDictionary<string!, double>!
+AiDotNet.Evolution.AutoML.MapElitesAutoMLArchiveEntry.EvaluationId.get -> long
+AiDotNet.Evolution.AutoML.MapElitesAutoMLArchiveEntry.ModelType.get -> System.Type!
+AiDotNet.Evolution.AutoML.MapElitesAutoMLArchiveEntry.Parameters.get -> System.Collections.Generic.IReadOnlyDictionary<string!, object!>!
+AiDotNet.Evolution.AutoML.MapElitesAutoMLArchiveEntry.Score.get -> double
+AiDotNet.Evolution.AutoML.MapElitesAutoMLArchiveEntry.SpecificationId.get -> string!
+AiDotNet.Evolution.AutoML.MapElitesAutoMLOptions
+AiDotNet.Evolution.AutoML.MapElitesAutoMLOptions.ArchiveCapacity.get -> int
+AiDotNet.Evolution.AutoML.MapElitesAutoMLOptions.ArchiveCapacity.set -> void
+AiDotNet.Evolution.AutoML.MapElitesAutoMLOptions.ComplexityBinCount.get -> int
+AiDotNet.Evolution.AutoML.MapElitesAutoMLOptions.ComplexityBinCount.set -> void
+AiDotNet.Evolution.AutoML.MapElitesAutoMLOptions.ExplorationProbability.get -> double
+AiDotNet.Evolution.AutoML.MapElitesAutoMLOptions.ExplorationProbability.set -> void
+AiDotNet.Evolution.AutoML.MapElitesAutoMLOptions.InitialPopulationSize.get -> int
+AiDotNet.Evolution.AutoML.MapElitesAutoMLOptions.InitialPopulationSize.set -> void
+AiDotNet.Evolution.AutoML.MapElitesAutoMLOptions.InspirationCount.get -> int
+AiDotNet.Evolution.AutoML.MapElitesAutoMLOptions.InspirationCount.set -> void
+AiDotNet.Evolution.AutoML.MapElitesAutoMLOptions.IslandCount.get -> int
+AiDotNet.Evolution.AutoML.MapElitesAutoMLOptions.IslandCount.set -> void
+AiDotNet.Evolution.AutoML.MapElitesAutoMLOptions.MapElitesAutoMLOptions() -> void
+AiDotNet.Evolution.AutoML.MapElitesAutoMLOptions.MaxProposalMultiplier.get -> int
+AiDotNet.Evolution.AutoML.MapElitesAutoMLOptions.MaxProposalMultiplier.set -> void
+AiDotNet.Evolution.AutoML.MapElitesAutoMLOptions.MigrantsPerIsland.get -> int
+AiDotNet.Evolution.AutoML.MapElitesAutoMLOptions.MigrantsPerIsland.set -> void
+AiDotNet.Evolution.AutoML.MapElitesAutoMLOptions.MigrationInterval.get -> int
+AiDotNet.Evolution.AutoML.MapElitesAutoMLOptions.MigrationInterval.set -> void
+AiDotNet.Evolution.AutoML.MapElitesAutoMLOptions.MutationProbability.get -> double
+AiDotNet.Evolution.AutoML.MapElitesAutoMLOptions.MutationProbability.set -> void
+AiDotNet.Evolution.AutoML.MapElitesAutoMLOptions.Seed.get -> ulong
+AiDotNet.Evolution.AutoML.MapElitesAutoMLOptions.Seed.set -> void
+AiDotNet.Evolution.Deployment.EvolutionDeployableArtifact
+AiDotNet.Evolution.Deployment.EvolutionDeployableArtifact.CopyPayload() -> byte[]!
+AiDotNet.Evolution.Deployment.EvolutionDeployableArtifact.Envelope.get -> AiDotNet.Evolution.Deployment.EvolutionDeploymentEnvelope!
+AiDotNet.Evolution.Deployment.EvolutionDeployableArtifact.Format.get -> string!
+AiDotNet.Evolution.Deployment.EvolutionDeployableArtifact.Id.get -> string!
+AiDotNet.Evolution.Deployment.EvolutionDeployableArtifact.Kind.get -> AiDotNet.Evolution.Deployment.EvolutionDeploymentArtifactKind
+AiDotNet.Evolution.Deployment.EvolutionDeployableArtifact.PayloadHash.get -> string!
+AiDotNet.Evolution.Deployment.EvolutionDeployableArtifact.PayloadLength.get -> int
+AiDotNet.Evolution.Deployment.EvolutionDeployableArtifact.ReadProgram() -> AiDotNet.Evolution.Programs.ProgramGenome!
+AiDotNet.Evolution.Deployment.EvolutionDeployableArtifact.RestoreModel<TModel>(System.Func<TModel!>! factory, string! serializationVersion) -> TModel!
+AiDotNet.Evolution.Deployment.EvolutionDeployableArtifact.TypeIdentity.get -> string!
+AiDotNet.Evolution.Deployment.EvolutionDeploymentArtifactKind
+AiDotNet.Evolution.Deployment.EvolutionDeploymentArtifactKind.Program = 0 -> AiDotNet.Evolution.Deployment.EvolutionDeploymentArtifactKind
+AiDotNet.Evolution.Deployment.EvolutionDeploymentArtifactKind.TrainedModel = 1 -> AiDotNet.Evolution.Deployment.EvolutionDeploymentArtifactKind
+AiDotNet.Evolution.Deployment.EvolutionDeploymentArtifactRegistry
+AiDotNet.Evolution.Deployment.EvolutionDeploymentArtifactRegistry.EvolutionDeploymentArtifactRegistry(string! directory) -> void
+AiDotNet.Evolution.Deployment.EvolutionDeploymentArtifactRegistry.IsQuarantined(string! artifactId) -> bool
+AiDotNet.Evolution.Deployment.EvolutionDeploymentArtifactRegistry.Load(string! artifactId, AiDotNet.Evolution.Deployment.EvolutionDeploymentEnvelope! envelope) -> AiDotNet.Evolution.Deployment.EvolutionDeployableArtifact!
+AiDotNet.Evolution.Deployment.EvolutionDeploymentArtifactRegistry.ReadEvidence(string! evidenceId) -> byte[]!
+AiDotNet.Evolution.Deployment.EvolutionDeploymentArtifactRegistry.RetainEvidence(byte[]! evidence) -> string!
+AiDotNet.Evolution.Deployment.EvolutionDeploymentArtifactRegistry.Stage(AiDotNet.Evolution.Deployment.EvolutionDeployableArtifact! artifact) -> string!
+AiDotNet.Evolution.Deployment.EvolutionDeploymentDecision
+AiDotNet.Evolution.Deployment.EvolutionDeploymentDecision.Activated.get -> bool
+AiDotNet.Evolution.Deployment.EvolutionDeploymentDecision.ArtifactId.get -> string?
+AiDotNet.Evolution.Deployment.EvolutionDeploymentDecision.EvidenceId.get -> string?
+AiDotNet.Evolution.Deployment.EvolutionDeploymentDecision.Outcome.get -> string!
+AiDotNet.Evolution.Deployment.EvolutionDeploymentEnvelope
+AiDotNet.Evolution.Deployment.EvolutionDeploymentEnvelope.CompilerHash.get -> string!
+AiDotNet.Evolution.Deployment.EvolutionDeploymentEnvelope.DatasetHash.get -> string!
+AiDotNet.Evolution.Deployment.EvolutionDeploymentEnvelope.DeviceHash.get -> string!
+AiDotNet.Evolution.Deployment.EvolutionDeploymentEnvelope.EvolutionDeploymentEnvelope(string! runtimeHash, string! deviceHash, string! compilerHash, string! datasetHash, string! workloadHash, string! validationProtocolHash) -> void
+AiDotNet.Evolution.Deployment.EvolutionDeploymentEnvelope.Key.get -> string!
+AiDotNet.Evolution.Deployment.EvolutionDeploymentEnvelope.RuntimeHash.get -> string!
+AiDotNet.Evolution.Deployment.EvolutionDeploymentEnvelope.ValidationProtocolHash.get -> string!
+AiDotNet.Evolution.Deployment.EvolutionDeploymentEnvelope.WorkloadHash.get -> string!
+AiDotNet.Evolution.Deployment.EvolutionDeploymentEvaluators
+AiDotNet.Evolution.Deployment.EvolutionDeploymentLifecycle
+AiDotNet.Evolution.Deployment.EvolutionDeploymentLifecycle.AdmittedRetunes.get -> int
+AiDotNet.Evolution.Deployment.EvolutionDeploymentLifecycle.EvolutionDeploymentLifecycle(AiDotNet.Evolution.Deployment.EvolutionDeploymentArtifactRegistry! registry, AiDotNet.Evolution.Deployment.EvolutionDeploymentEnvelope! initialEnvelope, AiDotNet.Evolution.Deployment.EvolutionDeploymentPolicy! policy, System.Func<AiDotNet.Evolution.Deployment.EvolutionDeploymentEnvelope!, AiDotNet.Evolution.Deployment.EvolutionDeployableArtifact!>! knownValidFallback, System.Func<AiDotNet.Evolution.Deployment.EvolutionDeployableArtifact!, int, System.Threading.CancellationToken, System.Threading.Tasks.ValueTask<AiDotNet.Evolution.Deployment.EvolutionDeploymentMeasurement!>>! evaluator) -> void
+AiDotNet.Evolution.Deployment.EvolutionDeploymentLifecycle.ObserveAsync(AiDotNet.Evolution.Deployment.EvolutionDeploymentSelection! observed, System.Collections.Generic.IReadOnlyList<AiDotNet.Evolution.Deployment.EvolutionDeploymentMeasurement!>! measurements, System.DateTimeOffset observedAt, System.Threading.CancellationToken cancellationToken = default(System.Threading.CancellationToken)) -> System.Threading.Tasks.Task<AiDotNet.Evolution.Deployment.EvolutionDeploymentDecision!>!
+AiDotNet.Evolution.Deployment.EvolutionDeploymentLifecycle.PromoteAsync(AiDotNet.Evolution.Deployment.EvolutionDeployableArtifact! candidate, System.Threading.CancellationToken cancellationToken = default(System.Threading.CancellationToken)) -> System.Threading.Tasks.Task<AiDotNet.Evolution.Deployment.EvolutionDeploymentDecision!>!
+AiDotNet.Evolution.Deployment.EvolutionDeploymentLifecycle.RetunePendingAsync(System.Func<AiDotNet.Evolution.Deployment.EvolutionDeploymentRetuneRequest!, System.Threading.CancellationToken, System.Threading.Tasks.Task<AiDotNet.Evolution.Deployment.EvolutionDeployableArtifact!>!>! retuner, System.Func<System.Threading.CancellationToken, System.Threading.Tasks.Task!>! idleGate, System.Threading.CancellationToken cancellationToken = default(System.Threading.CancellationToken)) -> System.Threading.Tasks.Task<AiDotNet.Evolution.Deployment.EvolutionDeploymentDecision!>!
+AiDotNet.Evolution.Deployment.EvolutionDeploymentLifecycle.RetuneRequested.get -> bool
+AiDotNet.Evolution.Deployment.EvolutionDeploymentLifecycle.Select(AiDotNet.Evolution.Deployment.EvolutionDeploymentEnvelope! observed) -> AiDotNet.Evolution.Deployment.EvolutionDeploymentSelection!
+AiDotNet.Evolution.Deployment.EvolutionDeploymentLifecycle.StorageFaulted.get -> bool
+AiDotNet.Evolution.Deployment.EvolutionDeploymentMeasurement
+AiDotNet.Evolution.Deployment.EvolutionDeploymentMeasurement.CorrectnessPassed.get -> bool
+AiDotNet.Evolution.Deployment.EvolutionDeploymentMeasurement.CostUnits.get -> double
+AiDotNet.Evolution.Deployment.EvolutionDeploymentMeasurement.Direction.get -> AiDotNet.Evolution.EvolutionOptimizationDirection
+AiDotNet.Evolution.Deployment.EvolutionDeploymentMeasurement.Elapsed.get -> System.TimeSpan
+AiDotNet.Evolution.Deployment.EvolutionDeploymentMeasurement.EvolutionDeploymentMeasurement(bool correctnessPassed, double quality, AiDotNet.Evolution.EvolutionOptimizationDirection direction, System.TimeSpan elapsed, double costUnits, bool isFresh = true, bool hasQuality = true) -> void
+AiDotNet.Evolution.Deployment.EvolutionDeploymentMeasurement.HasQuality.get -> bool
+AiDotNet.Evolution.Deployment.EvolutionDeploymentMeasurement.IsFresh.get -> bool
+AiDotNet.Evolution.Deployment.EvolutionDeploymentMeasurement.Quality.get -> double
+AiDotNet.Evolution.Deployment.EvolutionDeploymentPolicy
+AiDotNet.Evolution.Deployment.EvolutionDeploymentPolicy.AllowBestEffortPersistence.get -> bool
+AiDotNet.Evolution.Deployment.EvolutionDeploymentPolicy.ConsecutiveRegressions.get -> int
+AiDotNet.Evolution.Deployment.EvolutionDeploymentPolicy.Cooldown.get -> System.TimeSpan
+AiDotNet.Evolution.Deployment.EvolutionDeploymentPolicy.Direction.get -> AiDotNet.Evolution.EvolutionOptimizationDirection
+AiDotNet.Evolution.Deployment.EvolutionDeploymentPolicy.EvolutionDeploymentPolicy(bool allowBestEffortPersistence, AiDotNet.Evolution.EvolutionOptimizationDirection direction, int pairedSamples = 7, double minimumMeanGain = 0, double maximumPValue = 0.05, double maximumP95LatencyRatio = 1.1, int maximumRetunes = 3, int searchEvaluations = 50, int searchProposals = 100, System.TimeSpan? timeout = null, System.TimeSpan? gracePeriod = null, System.TimeSpan? cooldown = null, int monitoringSamples = 7, int consecutiveRegressions = 2, double maximumQualityDrop = 0.01, double maximumMonitoredLatencyRatio = 1.2) -> void
+AiDotNet.Evolution.Deployment.EvolutionDeploymentPolicy.GracePeriod.get -> System.TimeSpan
+AiDotNet.Evolution.Deployment.EvolutionDeploymentPolicy.MaximumMonitoredLatencyRatio.get -> double
+AiDotNet.Evolution.Deployment.EvolutionDeploymentPolicy.MaximumP95LatencyRatio.get -> double
+AiDotNet.Evolution.Deployment.EvolutionDeploymentPolicy.MaximumPValue.get -> double
+AiDotNet.Evolution.Deployment.EvolutionDeploymentPolicy.MaximumQualityDrop.get -> double
+AiDotNet.Evolution.Deployment.EvolutionDeploymentPolicy.MaximumRetunes.get -> int
+AiDotNet.Evolution.Deployment.EvolutionDeploymentPolicy.MinimumMeanGain.get -> double
+AiDotNet.Evolution.Deployment.EvolutionDeploymentPolicy.MonitoringSamples.get -> int
+AiDotNet.Evolution.Deployment.EvolutionDeploymentPolicy.PairedSamples.get -> int
+AiDotNet.Evolution.Deployment.EvolutionDeploymentPolicy.SearchEvaluations.get -> int
+AiDotNet.Evolution.Deployment.EvolutionDeploymentPolicy.SearchProposals.get -> int
+AiDotNet.Evolution.Deployment.EvolutionDeploymentPolicy.Timeout.get -> System.TimeSpan
+AiDotNet.Evolution.Deployment.EvolutionDeploymentRetuneRequest
+AiDotNet.Evolution.Deployment.EvolutionDeploymentRetuneRequest.Envelope.get -> AiDotNet.Evolution.Deployment.EvolutionDeploymentEnvelope!
+AiDotNet.Evolution.Deployment.EvolutionDeploymentRetuneRequest.MaximumEvaluations.get -> int
+AiDotNet.Evolution.Deployment.EvolutionDeploymentRetuneRequest.MaximumProposals.get -> int
+AiDotNet.Evolution.Deployment.EvolutionDeploymentRetuneRequest.Timeout.get -> System.TimeSpan
+AiDotNet.Evolution.Deployment.EvolutionDeploymentRetuners
+AiDotNet.Evolution.Deployment.EvolutionDeploymentSelection
+AiDotNet.Evolution.Deployment.EvolutionDeploymentSelection.Artifact.get -> AiDotNet.Evolution.Deployment.EvolutionDeployableArtifact!
+AiDotNet.Evolution.Deployment.EvolutionDeploymentSelection.IsFallback.get -> bool
+AiDotNet.Evolution.Deployment.EvolutionDeploymentSelection.Revision.get -> string?
+AiDotNet.Evolution.Deployment.ProgramDeploymentSearchOptions
+AiDotNet.Evolution.Deployment.ProgramDeploymentSearchOptions.CustomFitnessEvaluator.get -> AiDotNet.Evolution.Programs.IProgramFitnessEvaluator?
+AiDotNet.Evolution.Deployment.ProgramDeploymentSearchOptions.CustomFitnessEvaluator.set -> void
+AiDotNet.Evolution.Deployment.ProgramDeploymentSearchOptions.CustomVariation.get -> AiDotNet.Evolution.Programs.IProgramVariationOperator?
+AiDotNet.Evolution.Deployment.ProgramDeploymentSearchOptions.CustomVariation.set -> void
+AiDotNet.Evolution.Deployment.ProgramDeploymentSearchOptions.Engine.get -> AiDotNet.Evolution.EvolutionEngineOptions!
+AiDotNet.Evolution.Deployment.ProgramDeploymentSearchOptions.Engine.set -> void
+AiDotNet.Evolution.Deployment.ProgramDeploymentSearchOptions.Language.get -> AiDotNet.Evolution.Programs.ProgramLanguage
+AiDotNet.Evolution.Deployment.ProgramDeploymentSearchOptions.Language.set -> void
+AiDotNet.Evolution.Deployment.ProgramDeploymentSearchOptions.MaxProgramChars.get -> int
+AiDotNet.Evolution.Deployment.ProgramDeploymentSearchOptions.MaxProgramChars.set -> void
+AiDotNet.Evolution.Deployment.ProgramDeploymentSearchOptions.ProgramDeploymentSearchOptions() -> void
+AiDotNet.Evolution.Deployment.ProgramDeploymentSearchOptions.ResourceAccounting.get -> AiDotNet.Evolution.Programs.ProgramEvolutionResourceOptions?
+AiDotNet.Evolution.Deployment.ProgramDeploymentSearchOptions.ResourceAccounting.set -> void
+AiDotNet.Evolution.Deployment.ProgramDeploymentSearchOptions.SeedPrograms.get -> System.Collections.Generic.List<string!>!
+AiDotNet.Evolution.Deployment.ProgramDeploymentSearchOptions.SeedPrograms.set -> void
+const AiDotNet.Evolution.Deployment.EvolutionDeployableArtifact.MaximumPayloadBytes = 67108864 -> int
+override AiDotNet.Evolution.AutoML.MapElitesAutoML<T, TInput, TOutput>.SearchAsync(TInput inputs, TOutput targets, TInput validationInputs, TOutput validationTargets, System.TimeSpan timeLimit, System.Threading.CancellationToken cancellationToken = default(System.Threading.CancellationToken)) -> System.Threading.Tasks.Task<AiDotNet.Interfaces.IFullModel<T, TInput, TOutput>!>!
+override AiDotNet.Evolution.AutoML.MapElitesAutoML<T, TInput, TOutput>.SuggestNextTrialAsync() -> System.Threading.Tasks.Task<System.Collections.Generic.Dictionary<string!, object!>!>!
+static AiDotNet.Evolution.Deployment.EvolutionDeployableArtifact.FromModel(AiDotNet.Interfaces.IModelSerializer! model, string! serializationVersion, AiDotNet.Evolution.Deployment.EvolutionDeploymentEnvelope! envelope) -> AiDotNet.Evolution.Deployment.EvolutionDeployableArtifact!
+static AiDotNet.Evolution.Deployment.EvolutionDeployableArtifact.FromProgram(AiDotNet.Evolution.Programs.ProgramGenome! program, AiDotNet.Evolution.Deployment.EvolutionDeploymentEnvelope! envelope) -> AiDotNet.Evolution.Deployment.EvolutionDeployableArtifact!
+static AiDotNet.Evolution.Deployment.EvolutionDeploymentEvaluators.Model<TModel>(string! serializationVersion, System.Func<string!, TModel!>! modelFactory, System.Func<TModel!, int, System.Threading.CancellationToken, System.Threading.Tasks.ValueTask<AiDotNet.Evolution.Deployment.EvolutionDeploymentMeasurement!>>! evaluate) -> System.Func<AiDotNet.Evolution.Deployment.EvolutionDeployableArtifact!, int, System.Threading.CancellationToken, System.Threading.Tasks.ValueTask<AiDotNet.Evolution.Deployment.EvolutionDeploymentMeasurement!>>!
+static AiDotNet.Evolution.Deployment.EvolutionDeploymentEvaluators.Program(AiDotNet.Evolution.Programs.IProgramFitnessEvaluator! correctness, AiDotNet.Evolution.Programs.IProgramFitnessEvaluator! fitness, ulong rootSeed = 1234) -> System.Func<AiDotNet.Evolution.Deployment.EvolutionDeployableArtifact!, int, System.Threading.CancellationToken, System.Threading.Tasks.ValueTask<AiDotNet.Evolution.Deployment.EvolutionDeploymentMeasurement!>>!
+static AiDotNet.Evolution.Deployment.EvolutionDeploymentRetuners.AutoML<T, TInput, TOutput>(System.Func<AiDotNet.Evolution.Deployment.EvolutionDeploymentEnvelope!, (TInput TrainingInputs, TOutput TrainingTargets, TInput ValidationInputs, TOutput ValidationTargets)>! dataFactory, System.Action<AiDotNet.Evolution.AutoML.MapElitesAutoML<T, TInput, TOutput>!, AiDotNet.Evolution.Deployment.EvolutionDeploymentEnvelope!>! configure, string! serializationVersion, AiDotNet.Evolution.AutoML.MapElitesAutoMLOptions? options = null) -> System.Func<AiDotNet.Evolution.Deployment.EvolutionDeploymentRetuneRequest!, System.Threading.CancellationToken, System.Threading.Tasks.Task<AiDotNet.Evolution.Deployment.EvolutionDeployableArtifact!>!>!
+static AiDotNet.Evolution.Deployment.EvolutionDeploymentRetuners.Program(System.Func<AiDotNet.Evolution.Deployment.EvolutionDeploymentEnvelope!, AiDotNet.Evolution.Deployment.ProgramDeploymentSearchOptions!>! optionsFactory, System.Func<AiDotNet.Evolution.Deployment.EvolutionDeploymentEnvelope!, AiDotNet.Evolution.Programs.IProgramFitnessEvaluator!>! correctnessFactory, AiDotNet.Evolution.EvolutionOptimizationDirection direction) -> System.Func<AiDotNet.Evolution.Deployment.EvolutionDeploymentRetuneRequest!, System.Threading.CancellationToken, System.Threading.Tasks.Task<AiDotNet.Evolution.Deployment.EvolutionDeployableArtifact!>!>!

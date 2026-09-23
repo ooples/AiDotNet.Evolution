@@ -1,1 +1,1599 @@
 #nullable enable
+AiDotNet.Evolution.Programs.CompilationDiagnostic
+AiDotNet.Evolution.Programs.CompilationDiagnostic.Code.get -> string?
+AiDotNet.Evolution.Programs.CompilationDiagnostic.Code.init -> void
+AiDotNet.Evolution.Programs.CompilationDiagnostic.Column.get -> int?
+AiDotNet.Evolution.Programs.CompilationDiagnostic.Column.init -> void
+AiDotNet.Evolution.Programs.CompilationDiagnostic.CompilationDiagnostic() -> void
+AiDotNet.Evolution.Programs.CompilationDiagnostic.FilePath.get -> string?
+AiDotNet.Evolution.Programs.CompilationDiagnostic.FilePath.init -> void
+AiDotNet.Evolution.Programs.CompilationDiagnostic.Line.get -> int?
+AiDotNet.Evolution.Programs.CompilationDiagnostic.Line.init -> void
+AiDotNet.Evolution.Programs.CompilationDiagnostic.Message.get -> string!
+AiDotNet.Evolution.Programs.CompilationDiagnostic.Message.init -> void
+AiDotNet.Evolution.Programs.CompilationDiagnostic.Severity.get -> AiDotNet.Evolution.Programs.CompilationDiagnosticSeverity
+AiDotNet.Evolution.Programs.CompilationDiagnostic.Severity.init -> void
+AiDotNet.Evolution.Programs.CompilationDiagnostic.Tool.get -> string?
+AiDotNet.Evolution.Programs.CompilationDiagnostic.Tool.init -> void
+AiDotNet.Evolution.Programs.CompilationDiagnosticSeverity
+AiDotNet.Evolution.Programs.CompilationDiagnosticSeverity.Error = 2 -> AiDotNet.Evolution.Programs.CompilationDiagnosticSeverity
+AiDotNet.Evolution.Programs.CompilationDiagnosticSeverity.Info = 0 -> AiDotNet.Evolution.Programs.CompilationDiagnosticSeverity
+AiDotNet.Evolution.Programs.CompilationDiagnosticSeverity.Warning = 1 -> AiDotNet.Evolution.Programs.CompilationDiagnosticSeverity
+AiDotNet.Evolution.Programs.DelegateProgramFitnessEvaluator
+AiDotNet.Evolution.Programs.DelegateProgramFitnessEvaluator.DelegateProgramFitnessEvaluator(System.Func<AiDotNet.Evolution.Programs.ProgramGenome!, AiDotNet.Evolution.EvolutionEvaluationContext!, System.Threading.CancellationToken, System.Threading.Tasks.ValueTask<AiDotNet.Evolution.EvolutionTaskResult!>>! evaluate, string! id = "delegate-program-evaluator", string! versionHash = "delegate-program-evaluator-v1") -> void
+AiDotNet.Evolution.Programs.DelegateProgramFitnessEvaluator.DelegateProgramFitnessEvaluator(System.Func<AiDotNet.Evolution.Programs.ProgramGenome!, double>! score, string! id = "delegate-program-evaluator", string! versionHash = "delegate-program-evaluator-v1", AiDotNet.Evolution.EvolutionOptimizationDirection direction = AiDotNet.Evolution.EvolutionOptimizationDirection.Maximize) -> void
+AiDotNet.Evolution.Programs.DelegateProgramFitnessEvaluator.EvaluateAsync(AiDotNet.Evolution.Programs.ProgramGenome! candidate, AiDotNet.Evolution.EvolutionEvaluationContext! context, System.Threading.CancellationToken cancellationToken = default(System.Threading.CancellationToken)) -> System.Threading.Tasks.ValueTask<AiDotNet.Evolution.EvolutionTaskResult!>
+AiDotNet.Evolution.Programs.DelegateProgramFitnessEvaluator.Id.get -> string!
+AiDotNet.Evolution.Programs.DelegateProgramFitnessEvaluator.VersionHash.get -> string!
+AiDotNet.Evolution.Programs.DirectoryProgramSampleEvidenceStore
+AiDotNet.Evolution.Programs.DirectoryProgramSampleEvidenceStore.DirectoryPath.get -> string!
+AiDotNet.Evolution.Programs.DirectoryProgramSampleEvidenceStore.DirectoryProgramSampleEvidenceStore(string! directory, string! captureVersion, System.Func<AiDotNet.Evolution.Programs.ProgramGenome!, AiDotNet.Evolution.EvolutionTaskResult!, AiDotNet.Evolution.EvolutionEvaluationContext!, System.Threading.CancellationToken, System.Threading.Tasks.ValueTask<System.Collections.Generic.IReadOnlyList<AiDotNet.Evolution.Programs.ProgramMeasurementObservation!>?>>! capture, int maximumEntries = 4096) -> void
+AiDotNet.Evolution.Programs.DirectoryProgramSampleEvidenceStore.HasTemporaryCleanupFailure.get -> bool
+AiDotNet.Evolution.Programs.DirectoryProgramSampleEvidenceStore.MaximumEntries.get -> int
+AiDotNet.Evolution.Programs.DirectoryProgramSampleEvidenceStore.RetainAsync(AiDotNet.Evolution.Programs.ProgramGenome! candidate, AiDotNet.Evolution.EvolutionTaskResult! measurement, AiDotNet.Evolution.EvolutionEvaluationContext! context, System.Threading.CancellationToken cancellationToken = default(System.Threading.CancellationToken)) -> System.Threading.Tasks.ValueTask<string?>
+AiDotNet.Evolution.Programs.DirectoryProgramSampleEvidenceStore.VerifyAsync(AiDotNet.Evolution.Programs.ProgramGenome! candidate, AiDotNet.Evolution.EvolutionTaskResult! measurement, string! evidenceSha256, AiDotNet.Evolution.EvolutionEvaluationContext! context, System.Threading.CancellationToken cancellationToken = default(System.Threading.CancellationToken)) -> System.Threading.Tasks.ValueTask<bool>
+AiDotNet.Evolution.Programs.DirectoryProgramSampleEvidenceStore.VersionHash.get -> string!
+AiDotNet.Evolution.Programs.EditTarget
+AiDotNet.Evolution.Programs.EditTarget.<Clone>$() -> AiDotNet.Evolution.Programs.EditTarget!
+AiDotNet.Evolution.Programs.EditTarget.Deconstruct(out string! File, out int Start, out int Length, out string! Kind, out string! ExpectedHash) -> void
+AiDotNet.Evolution.Programs.EditTarget.EditTarget(string! File, int Start, int Length, string! Kind, string! ExpectedHash) -> void
+AiDotNet.Evolution.Programs.EditTarget.Equals(AiDotNet.Evolution.Programs.EditTarget? other) -> bool
+AiDotNet.Evolution.Programs.EditTarget.ExpectedHash.get -> string!
+AiDotNet.Evolution.Programs.EditTarget.ExpectedHash.init -> void
+AiDotNet.Evolution.Programs.EditTarget.File.get -> string!
+AiDotNet.Evolution.Programs.EditTarget.File.init -> void
+AiDotNet.Evolution.Programs.EditTarget.Kind.get -> string!
+AiDotNet.Evolution.Programs.EditTarget.Kind.init -> void
+AiDotNet.Evolution.Programs.EditTarget.Length.get -> int
+AiDotNet.Evolution.Programs.EditTarget.Length.init -> void
+AiDotNet.Evolution.Programs.EditTarget.Start.get -> int
+AiDotNet.Evolution.Programs.EditTarget.Start.init -> void
+AiDotNet.Evolution.Programs.EvolveBlock
+AiDotNet.Evolution.Programs.EvolveBlockExtractionResult
+AiDotNet.Evolution.Programs.EvolveBlockExtractionResult.Diagnostics.get -> System.Collections.Generic.IReadOnlyList<string!>!
+AiDotNet.Evolution.Programs.EvolveBlockExtractionResult.HasRegions.get -> bool
+AiDotNet.Evolution.Programs.EvolveBlockExtractionResult.IsWellFormed.get -> bool
+AiDotNet.Evolution.Programs.EvolveBlockExtractionResult.Regions.get -> System.Collections.Generic.IReadOnlyList<AiDotNet.Evolution.Programs.EvolveBlockRegion>!
+AiDotNet.Evolution.Programs.EvolveBlockExtractionResult.Status.get -> AiDotNet.Evolution.Programs.EvolveBlockStatus
+AiDotNet.Evolution.Programs.EvolveBlockExtractionResult.TryGetPrimaryRegion(out AiDotNet.Evolution.Programs.EvolveBlockRegion region) -> bool
+AiDotNet.Evolution.Programs.EvolveBlockMarkers
+AiDotNet.Evolution.Programs.EvolveBlockMarkers.End.get -> string!
+AiDotNet.Evolution.Programs.EvolveBlockMarkers.Equals(AiDotNet.Evolution.Programs.EvolveBlockMarkers other) -> bool
+AiDotNet.Evolution.Programs.EvolveBlockMarkers.EvolveBlockMarkers() -> void
+AiDotNet.Evolution.Programs.EvolveBlockMarkers.EvolveBlockMarkers(string! start, string! end) -> void
+AiDotNet.Evolution.Programs.EvolveBlockMarkers.Start.get -> string!
+AiDotNet.Evolution.Programs.EvolveBlockRegion
+AiDotNet.Evolution.Programs.EvolveBlockRegion.Body.get -> string!
+AiDotNet.Evolution.Programs.EvolveBlockRegion.BodyLineCount.get -> int
+AiDotNet.Evolution.Programs.EvolveBlockRegion.EndLineIndex.get -> int
+AiDotNet.Evolution.Programs.EvolveBlockRegion.Equals(AiDotNet.Evolution.Programs.EvolveBlockRegion other) -> bool
+AiDotNet.Evolution.Programs.EvolveBlockRegion.EvolveBlockRegion() -> void
+AiDotNet.Evolution.Programs.EvolveBlockRegion.IsEmpty.get -> bool
+AiDotNet.Evolution.Programs.EvolveBlockRegion.NewLine.get -> string!
+AiDotNet.Evolution.Programs.EvolveBlockRegion.Prefix.get -> string!
+AiDotNet.Evolution.Programs.EvolveBlockRegion.Rewrite(string! replacement) -> string!
+AiDotNet.Evolution.Programs.EvolveBlockRegion.StartLineIndex.get -> int
+AiDotNet.Evolution.Programs.EvolveBlockRegion.Suffix.get -> string!
+AiDotNet.Evolution.Programs.EvolveBlockRegion.ToSource() -> string!
+AiDotNet.Evolution.Programs.EvolveBlockStatus
+AiDotNet.Evolution.Programs.EvolveBlockStatus.Complete = 1 -> AiDotNet.Evolution.Programs.EvolveBlockStatus
+AiDotNet.Evolution.Programs.EvolveBlockStatus.NotPresent = 0 -> AiDotNet.Evolution.Programs.EvolveBlockStatus
+AiDotNet.Evolution.Programs.EvolveBlockStatus.RestartedBlock = 3 -> AiDotNet.Evolution.Programs.EvolveBlockStatus
+AiDotNet.Evolution.Programs.EvolveBlockStatus.UnmatchedEnd = 2 -> AiDotNet.Evolution.Programs.EvolveBlockStatus
+AiDotNet.Evolution.Programs.EvolveBlockStatus.Unterminated = 4 -> AiDotNet.Evolution.Programs.EvolveBlockStatus
+AiDotNet.Evolution.Programs.FencedCodeBlock
+AiDotNet.Evolution.Programs.FencedCodeBlock.Content.get -> string!
+AiDotNet.Evolution.Programs.FencedCodeBlock.FencedCodeBlock(string! label, string! content, int startLine, int fenceLength) -> void
+AiDotNet.Evolution.Programs.FencedCodeBlock.FenceLength.get -> int
+AiDotNet.Evolution.Programs.FencedCodeBlock.IsUnlabeled.get -> bool
+AiDotNet.Evolution.Programs.FencedCodeBlock.Label.get -> string!
+AiDotNet.Evolution.Programs.FencedCodeBlock.Language.get -> AiDotNet.Evolution.Programs.ProgramLanguage?
+AiDotNet.Evolution.Programs.FencedCodeBlock.StartLine.get -> int
+AiDotNet.Evolution.Programs.FencedCodeExtractionResult
+AiDotNet.Evolution.Programs.FencedCodeExtractionResult.Blocks.get -> System.Collections.Generic.IReadOnlyList<AiDotNet.Evolution.Programs.FencedCodeBlock!>!
+AiDotNet.Evolution.Programs.FencedCodeExtractionResult.Code.get -> string!
+AiDotNet.Evolution.Programs.FencedCodeExtractionResult.Diagnostics.get -> System.Collections.Generic.IReadOnlyList<string!>!
+AiDotNet.Evolution.Programs.FencedCodeExtractionResult.HasCode.get -> bool
+AiDotNet.Evolution.Programs.FencedCodeExtractionResult.IsConfident.get -> bool
+AiDotNet.Evolution.Programs.FencedCodeExtractionResult.SelectionSource.get -> AiDotNet.Evolution.Programs.FencedCodeSelectionSource
+AiDotNet.Evolution.Programs.FencedCodeExtractor
+AiDotNet.Evolution.Programs.FencedCodeSelectionSource
+AiDotNet.Evolution.Programs.FencedCodeSelectionSource.LanguageLabeledFence = 1 -> AiDotNet.Evolution.Programs.FencedCodeSelectionSource
+AiDotNet.Evolution.Programs.FencedCodeSelectionSource.None = 0 -> AiDotNet.Evolution.Programs.FencedCodeSelectionSource
+AiDotNet.Evolution.Programs.FencedCodeSelectionSource.OtherLabeledFence = 3 -> AiDotNet.Evolution.Programs.FencedCodeSelectionSource
+AiDotNet.Evolution.Programs.FencedCodeSelectionSource.RawResponse = 4 -> AiDotNet.Evolution.Programs.FencedCodeSelectionSource
+AiDotNet.Evolution.Programs.FencedCodeSelectionSource.UnlabeledFence = 2 -> AiDotNet.Evolution.Programs.FencedCodeSelectionSource
+AiDotNet.Evolution.Programs.ICostedProgramProposalSource
+AiDotNet.Evolution.Programs.ICostedProgramProposalSource.GetUsage() -> AiDotNet.Evolution.Programs.ProgramEvolutionLlmUsage!
+AiDotNet.Evolution.Programs.ImprovementOptions
+AiDotNet.Evolution.Programs.ImprovementOptions.<Clone>$() -> AiDotNet.Evolution.Programs.ImprovementOptions!
+AiDotNet.Evolution.Programs.ImprovementOptions.AuditCost.get -> decimal
+AiDotNet.Evolution.Programs.ImprovementOptions.AuditCost.init -> void
+AiDotNet.Evolution.Programs.ImprovementOptions.AuditDirectory.get -> string!
+AiDotNet.Evolution.Programs.ImprovementOptions.AuditDirectory.init -> void
+AiDotNet.Evolution.Programs.ImprovementOptions.BuildCost.get -> decimal
+AiDotNet.Evolution.Programs.ImprovementOptions.BuildCost.init -> void
+AiDotNet.Evolution.Programs.ImprovementOptions.Deconstruct(out string! RunId, out string! MeasuredBottleneck, out string! OracleIdentity, out string! AuditDirectory, out int MaxRepairs, out decimal SetupCost, out decimal BuildCost, out decimal PatchCost, out decimal AuditCost, out decimal ModelMaximum, out decimal VerificationMaximum, out double MinimumSpeedup) -> void
+AiDotNet.Evolution.Programs.ImprovementOptions.Equals(AiDotNet.Evolution.Programs.ImprovementOptions? other) -> bool
+AiDotNet.Evolution.Programs.ImprovementOptions.ImprovementOptions(string! RunId, string! MeasuredBottleneck, string! OracleIdentity, string! AuditDirectory, int MaxRepairs = 2, decimal SetupCost = 1, decimal BuildCost = 1, decimal PatchCost = 1, decimal AuditCost = 1, decimal ModelMaximum = 10, decimal VerificationMaximum = 10, double MinimumSpeedup = 1) -> void
+AiDotNet.Evolution.Programs.ImprovementOptions.MaxRepairs.get -> int
+AiDotNet.Evolution.Programs.ImprovementOptions.MaxRepairs.init -> void
+AiDotNet.Evolution.Programs.ImprovementOptions.MeasuredBottleneck.get -> string!
+AiDotNet.Evolution.Programs.ImprovementOptions.MeasuredBottleneck.init -> void
+AiDotNet.Evolution.Programs.ImprovementOptions.MinimumSpeedup.get -> double
+AiDotNet.Evolution.Programs.ImprovementOptions.MinimumSpeedup.init -> void
+AiDotNet.Evolution.Programs.ImprovementOptions.ModelMaximum.get -> decimal
+AiDotNet.Evolution.Programs.ImprovementOptions.ModelMaximum.init -> void
+AiDotNet.Evolution.Programs.ImprovementOptions.OracleIdentity.get -> string!
+AiDotNet.Evolution.Programs.ImprovementOptions.OracleIdentity.init -> void
+AiDotNet.Evolution.Programs.ImprovementOptions.PatchCost.get -> decimal
+AiDotNet.Evolution.Programs.ImprovementOptions.PatchCost.init -> void
+AiDotNet.Evolution.Programs.ImprovementOptions.RunId.get -> string!
+AiDotNet.Evolution.Programs.ImprovementOptions.RunId.init -> void
+AiDotNet.Evolution.Programs.ImprovementOptions.SetupCost.get -> decimal
+AiDotNet.Evolution.Programs.ImprovementOptions.SetupCost.init -> void
+AiDotNet.Evolution.Programs.ImprovementOptions.VerificationMaximum.get -> decimal
+AiDotNet.Evolution.Programs.ImprovementOptions.VerificationMaximum.init -> void
+AiDotNet.Evolution.Programs.ImprovementResult
+AiDotNet.Evolution.Programs.ImprovementResult.<Clone>$() -> AiDotNet.Evolution.Programs.ImprovementResult!
+AiDotNet.Evolution.Programs.ImprovementResult.Attempts.get -> int
+AiDotNet.Evolution.Programs.ImprovementResult.Attempts.init -> void
+AiDotNet.Evolution.Programs.ImprovementResult.BaselineConfirmation.get -> AiDotNet.Evolution.Programs.VerificationReceipt?
+AiDotNet.Evolution.Programs.ImprovementResult.BaselineConfirmation.init -> void
+AiDotNet.Evolution.Programs.ImprovementResult.Candidate.get -> AiDotNet.Evolution.Programs.ProgramArtifact?
+AiDotNet.Evolution.Programs.ImprovementResult.Candidate.init -> void
+AiDotNet.Evolution.Programs.ImprovementResult.CandidateConfirmation.get -> AiDotNet.Evolution.Programs.VerificationReceipt?
+AiDotNet.Evolution.Programs.ImprovementResult.CandidateConfirmation.init -> void
+AiDotNet.Evolution.Programs.ImprovementResult.Deconstruct(out bool Promoted, out AiDotNet.Evolution.Programs.ProgramArtifact! Incumbent, out AiDotNet.Evolution.Programs.ProgramArtifact? Candidate, out int Attempts, out string! Reason, out AiDotNet.Evolution.Programs.VerificationReceipt? BaselineConfirmation, out AiDotNet.Evolution.Programs.VerificationReceipt? CandidateConfirmation) -> void
+AiDotNet.Evolution.Programs.ImprovementResult.Equals(AiDotNet.Evolution.Programs.ImprovementResult? other) -> bool
+AiDotNet.Evolution.Programs.ImprovementResult.ImprovementResult(bool Promoted, AiDotNet.Evolution.Programs.ProgramArtifact! Incumbent, AiDotNet.Evolution.Programs.ProgramArtifact? Candidate, int Attempts, string! Reason, AiDotNet.Evolution.Programs.VerificationReceipt? BaselineConfirmation, AiDotNet.Evolution.Programs.VerificationReceipt? CandidateConfirmation) -> void
+AiDotNet.Evolution.Programs.ImprovementResult.Incumbent.get -> AiDotNet.Evolution.Programs.ProgramArtifact!
+AiDotNet.Evolution.Programs.ImprovementResult.Incumbent.init -> void
+AiDotNet.Evolution.Programs.ImprovementResult.Promoted.get -> bool
+AiDotNet.Evolution.Programs.ImprovementResult.Promoted.init -> void
+AiDotNet.Evolution.Programs.ImprovementResult.Reason.get -> string!
+AiDotNet.Evolution.Programs.ImprovementResult.Reason.init -> void
+AiDotNet.Evolution.Programs.InputOutputProgramFitnessEvaluator
+AiDotNet.Evolution.Programs.InputOutputProgramFitnessEvaluator.Comparison.get -> AiDotNet.Evolution.Programs.ProgramOutputComparison
+AiDotNet.Evolution.Programs.InputOutputProgramFitnessEvaluator.EvaluateAsync(AiDotNet.Evolution.Programs.ProgramGenome! candidate, AiDotNet.Evolution.EvolutionEvaluationContext! context, System.Threading.CancellationToken cancellationToken = default(System.Threading.CancellationToken)) -> System.Threading.Tasks.ValueTask<AiDotNet.Evolution.EvolutionTaskResult!>
+AiDotNet.Evolution.Programs.InputOutputProgramFitnessEvaluator.Examples.get -> System.Collections.Generic.IReadOnlyList<AiDotNet.Evolution.Programs.ProgramInputOutputExample!>!
+AiDotNet.Evolution.Programs.InputOutputProgramFitnessEvaluator.Id.get -> string!
+AiDotNet.Evolution.Programs.InputOutputProgramFitnessEvaluator.InputOutputProgramFitnessEvaluator(AiDotNet.Evolution.Programs.IProgramExecutionEngine! engine, System.Collections.Generic.IEnumerable<AiDotNet.Evolution.Programs.ProgramInputOutputExample!>! examples, AiDotNet.Evolution.Programs.ProgramOutputComparison comparison = AiDotNet.Evolution.Programs.ProgramOutputComparison.TrimmedOrdinal, string! id = "program-io-evaluator") -> void
+AiDotNet.Evolution.Programs.InputOutputProgramFitnessEvaluator.VersionHash.get -> string!
+AiDotNet.Evolution.Programs.IProgramChatClient
+AiDotNet.Evolution.Programs.IProgramChatClient.GetResponseAsync(System.Collections.Generic.IReadOnlyList<AiDotNet.Evolution.Programs.ProgramChatMessage!>! messages, AiDotNet.Evolution.Programs.ProgramChatOptions? options = null, System.Threading.CancellationToken cancellationToken = default(System.Threading.CancellationToken)) -> System.Threading.Tasks.Task<AiDotNet.Evolution.Programs.ProgramChatResponse!>!
+AiDotNet.Evolution.Programs.IProgramChatClient.ModelId.get -> string!
+AiDotNet.Evolution.Programs.IProgramChatClientDecorator
+AiDotNet.Evolution.Programs.IProgramChatClientDecorator.Inner.get -> AiDotNet.Evolution.Programs.IProgramChatClient!
+AiDotNet.Evolution.Programs.IProgramCompiler
+AiDotNet.Evolution.Programs.IProgramCompiler.Apply(AiDotNet.Evolution.Programs.ProgramSnapshot! parent, AiDotNet.Evolution.Programs.PatchPlan! plan, System.Threading.CancellationToken cancellationToken) -> AiDotNet.Evolution.Programs.ProgramSnapshot!
+AiDotNet.Evolution.Programs.IProgramCompiler.Build(AiDotNet.Evolution.Programs.ProgramSnapshot! source, System.Threading.CancellationToken cancellationToken) -> AiDotNet.Evolution.Programs.ProgramBuild!
+AiDotNet.Evolution.Programs.IProgramCompiler.Catalog(AiDotNet.Evolution.Programs.ProgramSnapshot! source, System.Threading.CancellationToken cancellationToken) -> System.Collections.Generic.IReadOnlyList<AiDotNet.Evolution.Programs.EditTarget!>!
+AiDotNet.Evolution.Programs.IProgramDescriptor
+AiDotNet.Evolution.Programs.IProgramDescriptor.Compute(AiDotNet.Evolution.Programs.ProgramGenome! genome) -> double
+AiDotNet.Evolution.Programs.IProgramDescriptor.Name.get -> string!
+AiDotNet.Evolution.Programs.IProgramExecutionEngine
+AiDotNet.Evolution.Programs.IProgramExecutionEngine.ExecuteAsync(AiDotNet.Evolution.Programs.ProgramExecuteRequest! request, System.Threading.CancellationToken cancellationToken = default(System.Threading.CancellationToken)) -> System.Threading.Tasks.Task<AiDotNet.Evolution.Programs.ProgramExecuteResponse!>!
+AiDotNet.Evolution.Programs.IProgramExecutionEngine.Id.get -> string!
+AiDotNet.Evolution.Programs.IProgramExecutionEngine.TryExecute(AiDotNet.Evolution.Programs.ProgramLanguage language, string! sourceCode, string! input, out string! output, out string? errorMessage, System.Threading.CancellationToken cancellationToken = default(System.Threading.CancellationToken)) -> bool
+AiDotNet.Evolution.Programs.IProgramExecutionEngine.VersionHash.get -> string!
+AiDotNet.Evolution.Programs.IProgramExecutionTelemetrySource
+AiDotNet.Evolution.Programs.IProgramExecutionTelemetrySource.ActiveExecutionCount.get -> int
+AiDotNet.Evolution.Programs.IProgramExecutionTelemetrySource.QueuedExecutionCount.get -> int
+AiDotNet.Evolution.Programs.IProgramFitnessEvaluator
+AiDotNet.Evolution.Programs.IProgramFitnessEvaluator.EvaluateAsync(AiDotNet.Evolution.Programs.ProgramGenome! candidate, AiDotNet.Evolution.EvolutionEvaluationContext! context, System.Threading.CancellationToken cancellationToken = default(System.Threading.CancellationToken)) -> System.Threading.Tasks.ValueTask<AiDotNet.Evolution.EvolutionTaskResult!>
+AiDotNet.Evolution.Programs.IProgramFitnessEvaluator.Id.get -> string!
+AiDotNet.Evolution.Programs.IProgramFitnessEvaluator.VersionHash.get -> string!
+AiDotNet.Evolution.Programs.IProgramMeasurementEvidenceStore
+AiDotNet.Evolution.Programs.IProgramMeasurementEvidenceStore.RetainAsync(AiDotNet.Evolution.Programs.ProgramGenome! candidate, AiDotNet.Evolution.EvolutionTaskResult! measurement, AiDotNet.Evolution.EvolutionEvaluationContext! context, System.Threading.CancellationToken cancellationToken = default(System.Threading.CancellationToken)) -> System.Threading.Tasks.ValueTask<string?>
+AiDotNet.Evolution.Programs.IProgramMeasurementEvidenceStore.VerifyAsync(AiDotNet.Evolution.Programs.ProgramGenome! candidate, AiDotNet.Evolution.EvolutionTaskResult! measurement, string! evidenceSha256, AiDotNet.Evolution.EvolutionEvaluationContext! context, System.Threading.CancellationToken cancellationToken = default(System.Threading.CancellationToken)) -> System.Threading.Tasks.ValueTask<bool>
+AiDotNet.Evolution.Programs.IProgramMeasurementEvidenceStore.VersionHash.get -> string!
+AiDotNet.Evolution.Programs.IProgramResourceLedgerProvider
+AiDotNet.Evolution.Programs.IProgramResourceLedgerProvider.Ledger.get -> AiDotNet.Evolution.EvolutionResourceLedger!
+AiDotNet.Evolution.Programs.IProgramVariationOperator
+AiDotNet.Evolution.Programs.IProgramVariationOperator.GetUsage() -> AiDotNet.Evolution.Programs.ProgramEvolutionLlmUsage!
+AiDotNet.Evolution.Programs.IProposalProvenanceSink
+AiDotNet.Evolution.Programs.IProposalProvenanceSink.RecordAsync(AiDotNet.Evolution.Programs.Provenance.ProposalProvenanceRecord! record, System.Threading.CancellationToken cancellationToken = default(System.Threading.CancellationToken)) -> System.Threading.Tasks.Task!
+AiDotNet.Evolution.Programs.IRebasableProgramDescriptor
+AiDotNet.Evolution.Programs.IRebasableProgramDescriptor.Rebase(System.Collections.Generic.IReadOnlyList<AiDotNet.Evolution.Programs.ProgramGenome!>! references) -> AiDotNet.Evolution.Programs.IRebasableProgramDescriptor!
+AiDotNet.Evolution.Programs.IVersionedProgramDescriptor
+AiDotNet.Evolution.Programs.IVersionedProgramDescriptor.VersionHash.get -> string!
+AiDotNet.Evolution.Programs.LlmFeedbackOptions
+AiDotNet.Evolution.Programs.LlmFeedbackOptions.CarryCritiqueForward.get -> bool
+AiDotNet.Evolution.Programs.LlmFeedbackOptions.CarryCritiqueForward.set -> void
+AiDotNet.Evolution.Programs.LlmFeedbackOptions.Clone() -> AiDotNet.Evolution.Programs.LlmFeedbackOptions!
+AiDotNet.Evolution.Programs.LlmFeedbackOptions.CombinedBlend.get -> double
+AiDotNet.Evolution.Programs.LlmFeedbackOptions.CombinedBlend.set -> void
+AiDotNet.Evolution.Programs.LlmFeedbackOptions.Criteria.get -> System.Collections.Generic.IList<string!>!
+AiDotNet.Evolution.Programs.LlmFeedbackOptions.Criteria.set -> void
+AiDotNet.Evolution.Programs.LlmFeedbackOptions.CritiqueField.get -> string!
+AiDotNet.Evolution.Programs.LlmFeedbackOptions.CritiqueField.set -> void
+AiDotNet.Evolution.Programs.LlmFeedbackOptions.Enabled.get -> bool
+AiDotNet.Evolution.Programs.LlmFeedbackOptions.Enabled.set -> void
+AiDotNet.Evolution.Programs.LlmFeedbackOptions.JudgeCallCostUnits.get -> double
+AiDotNet.Evolution.Programs.LlmFeedbackOptions.JudgeCallCostUnits.set -> void
+AiDotNet.Evolution.Programs.LlmFeedbackOptions.JudgeWithEveryEnsembleMember.get -> bool
+AiDotNet.Evolution.Programs.LlmFeedbackOptions.JudgeWithEveryEnsembleMember.set -> void
+AiDotNet.Evolution.Programs.LlmFeedbackOptions.LlmFeedbackOptions() -> void
+AiDotNet.Evolution.Programs.LlmFeedbackOptions.MaxCritiqueChars.get -> int
+AiDotNet.Evolution.Programs.LlmFeedbackOptions.MaxCritiqueChars.set -> void
+AiDotNet.Evolution.Programs.LlmFeedbackOptions.MaxJudgeRetries.get -> int
+AiDotNet.Evolution.Programs.LlmFeedbackOptions.MaxJudgeRetries.set -> void
+AiDotNet.Evolution.Programs.LlmFeedbackOptions.MaxOutputTokens.get -> int?
+AiDotNet.Evolution.Programs.LlmFeedbackOptions.MaxOutputTokens.set -> void
+AiDotNet.Evolution.Programs.LlmFeedbackOptions.MaxResponseChars.get -> int
+AiDotNet.Evolution.Programs.LlmFeedbackOptions.MaxResponseChars.set -> void
+AiDotNet.Evolution.Programs.LlmFeedbackOptions.MetricPrefix.get -> string!
+AiDotNet.Evolution.Programs.LlmFeedbackOptions.MetricPrefix.set -> void
+AiDotNet.Evolution.Programs.LlmFeedbackOptions.RecordObjectives.get -> bool
+AiDotNet.Evolution.Programs.LlmFeedbackOptions.RecordObjectives.set -> void
+AiDotNet.Evolution.Programs.LlmFeedbackOptions.RequestJsonResponseFormat.get -> bool
+AiDotNet.Evolution.Programs.LlmFeedbackOptions.RequestJsonResponseFormat.set -> void
+AiDotNet.Evolution.Programs.LlmFeedbackOptions.ResponseSchema.get -> string?
+AiDotNet.Evolution.Programs.LlmFeedbackOptions.ResponseSchema.set -> void
+AiDotNet.Evolution.Programs.LlmFeedbackOptions.RunOnFailedEvaluations.get -> bool
+AiDotNet.Evolution.Programs.LlmFeedbackOptions.RunOnFailedEvaluations.set -> void
+AiDotNet.Evolution.Programs.LlmFeedbackOptions.Temperature.get -> double?
+AiDotNet.Evolution.Programs.LlmFeedbackOptions.Temperature.set -> void
+AiDotNet.Evolution.Programs.LlmFeedbackOptions.Validate() -> void
+AiDotNet.Evolution.Programs.LlmFeedbackOptions.Weight.get -> double
+AiDotNet.Evolution.Programs.LlmFeedbackOptions.Weight.set -> void
+AiDotNet.Evolution.Programs.LlmJudgeProgramFitnessEvaluator
+AiDotNet.Evolution.Programs.LlmJudgeProgramFitnessEvaluator.EvaluateAsync(AiDotNet.Evolution.Programs.ProgramGenome! candidate, AiDotNet.Evolution.EvolutionEvaluationContext! context, System.Threading.CancellationToken cancellationToken = default(System.Threading.CancellationToken)) -> System.Threading.Tasks.ValueTask<AiDotNet.Evolution.EvolutionTaskResult!>
+AiDotNet.Evolution.Programs.LlmJudgeProgramFitnessEvaluator.GetOptions() -> AiDotNet.Evolution.Programs.LlmFeedbackOptions!
+AiDotNet.Evolution.Programs.LlmJudgeProgramFitnessEvaluator.Id.get -> string!
+AiDotNet.Evolution.Programs.LlmJudgeProgramFitnessEvaluator.Inner.get -> AiDotNet.Evolution.Programs.IProgramFitnessEvaluator!
+AiDotNet.Evolution.Programs.LlmJudgeProgramFitnessEvaluator.JudgeCalls.get -> long
+AiDotNet.Evolution.Programs.LlmJudgeProgramFitnessEvaluator.JudgeFailures.get -> long
+AiDotNet.Evolution.Programs.LlmJudgeProgramFitnessEvaluator.LlmJudgeProgramFitnessEvaluator(AiDotNet.Evolution.Programs.IProgramChatClient! chatClient, AiDotNet.Evolution.Programs.IProgramFitnessEvaluator! inner, AiDotNet.Evolution.Prompts.ProgramPromptBuilder? promptBuilder = null, AiDotNet.Evolution.Programs.LlmFeedbackOptions? options = null, string! id = "llm-judge-program-evaluator") -> void
+AiDotNet.Evolution.Programs.LlmJudgeProgramFitnessEvaluator.VersionHash.get -> string!
+AiDotNet.Evolution.Programs.LlmProgramVariationOperator
+AiDotNet.Evolution.Programs.LlmProgramVariationOperator.CaptureState() -> string!
+AiDotNet.Evolution.Programs.LlmProgramVariationOperator.GetProgramOptions() -> AiDotNet.Evolution.Programs.ProgramProposalOptions!
+AiDotNet.Evolution.Programs.LlmProgramVariationOperator.GetRecentAttempts() -> System.Collections.Generic.IReadOnlyList<AiDotNet.Evolution.Programs.ProgramProposalAttempt!>!
+AiDotNet.Evolution.Programs.LlmProgramVariationOperator.GetUsage() -> AiDotNet.Evolution.Programs.ProgramEvolutionLlmUsage!
+AiDotNet.Evolution.Programs.LlmProgramVariationOperator.GetVariationOptions() -> AiDotNet.Evolution.Programs.LlmProgramVariationOptions!
+AiDotNet.Evolution.Programs.LlmProgramVariationOperator.Id.get -> string!
+AiDotNet.Evolution.Programs.LlmProgramVariationOperator.LlmProgramVariationOperator(AiDotNet.Evolution.Programs.IProgramChatClient! chatClient, AiDotNet.Evolution.Programs.ProgramProposalOptions? programOptions = null, AiDotNet.Evolution.Programs.LlmProgramVariationOptions? variationOptions = null, string! id = "llm-program-variation", AiDotNet.Evolution.Prompts.ProgramPromptBuilder? promptBuilder = null, AiDotNet.Evolution.Programs.IProposalProvenanceSink? provenanceSink = null, AiDotNet.Evolution.Programs.ProposalProvenanceOptions? provenanceOptions = null) -> void
+AiDotNet.Evolution.Programs.LlmProgramVariationOperator.PromptBuilder.get -> AiDotNet.Evolution.Prompts.ProgramPromptBuilder!
+AiDotNet.Evolution.Programs.LlmProgramVariationOperator.ProposeAsync(AiDotNet.Evolution.EvolutionVariationContext<AiDotNet.Evolution.Programs.ProgramGenome!>! context, System.Threading.CancellationToken cancellationToken = default(System.Threading.CancellationToken)) -> System.Threading.Tasks.ValueTask<AiDotNet.Evolution.Programs.ProgramGenome!>
+AiDotNet.Evolution.Programs.LlmProgramVariationOperator.ProvenanceFailureCount.get -> long
+AiDotNet.Evolution.Programs.LlmProgramVariationOperator.RestoreState(string! state) -> void
+AiDotNet.Evolution.Programs.LlmProgramVariationOperator.VersionHash.get -> string!
+AiDotNet.Evolution.Programs.LlmProgramVariationOptions
+AiDotNet.Evolution.Programs.LlmProgramVariationOptions.ArtifactDiagnosticPrefix.get -> string!
+AiDotNet.Evolution.Programs.LlmProgramVariationOptions.ArtifactDiagnosticPrefix.set -> void
+AiDotNet.Evolution.Programs.LlmProgramVariationOptions.Clone() -> AiDotNet.Evolution.Programs.LlmProgramVariationOptions!
+AiDotNet.Evolution.Programs.LlmProgramVariationOptions.FeatureBinCounts.get -> System.Collections.Generic.IList<int>!
+AiDotNet.Evolution.Programs.LlmProgramVariationOptions.FeatureBinCounts.set -> void
+AiDotNet.Evolution.Programs.LlmProgramVariationOptions.FeatureDimensions.get -> System.Collections.Generic.IList<string!>!
+AiDotNet.Evolution.Programs.LlmProgramVariationOptions.FeatureDimensions.set -> void
+AiDotNet.Evolution.Programs.LlmProgramVariationOptions.IncludeParentMetrics.get -> bool
+AiDotNet.Evolution.Programs.LlmProgramVariationOptions.IncludeParentMetrics.set -> void
+AiDotNet.Evolution.Programs.LlmProgramVariationOptions.LlmProgramVariationOptions() -> void
+AiDotNet.Evolution.Programs.LlmProgramVariationOptions.MaxEmptyNeighborCells.get -> int
+AiDotNet.Evolution.Programs.LlmProgramVariationOptions.MaxEmptyNeighborCells.set -> void
+AiDotNet.Evolution.Programs.LlmProgramVariationOptions.MaxInspirations.get -> int
+AiDotNet.Evolution.Programs.LlmProgramVariationOptions.MaxInspirations.set -> void
+AiDotNet.Evolution.Programs.LlmProgramVariationOptions.MaxOutputTokens.get -> int?
+AiDotNet.Evolution.Programs.LlmProgramVariationOptions.MaxOutputTokens.set -> void
+AiDotNet.Evolution.Programs.LlmProgramVariationOptions.MaxPreviousAttempts.get -> int
+AiDotNet.Evolution.Programs.LlmProgramVariationOptions.MaxPreviousAttempts.set -> void
+AiDotNet.Evolution.Programs.LlmProgramVariationOptions.MaxPromptProgramChars.get -> int
+AiDotNet.Evolution.Programs.LlmProgramVariationOptions.MaxPromptProgramChars.set -> void
+AiDotNet.Evolution.Programs.LlmProgramVariationOptions.MaxProposalRetries.get -> int
+AiDotNet.Evolution.Programs.LlmProgramVariationOptions.MaxProposalRetries.set -> void
+AiDotNet.Evolution.Programs.LlmProgramVariationOptions.MaxRecordedAttempts.get -> int
+AiDotNet.Evolution.Programs.LlmProgramVariationOptions.MaxRecordedAttempts.set -> void
+AiDotNet.Evolution.Programs.LlmProgramVariationOptions.MaxTopPrograms.get -> int
+AiDotNet.Evolution.Programs.LlmProgramVariationOptions.MaxTopPrograms.set -> void
+AiDotNet.Evolution.Programs.LlmProgramVariationOptions.Mode.get -> AiDotNet.Evolution.Programs.ProgramEvolutionMode
+AiDotNet.Evolution.Programs.LlmProgramVariationOptions.Mode.set -> void
+AiDotNet.Evolution.Programs.LlmProgramVariationOptions.SamplesPerAttempt.get -> int
+AiDotNet.Evolution.Programs.LlmProgramVariationOptions.SamplesPerAttempt.set -> void
+AiDotNet.Evolution.Programs.LlmProgramVariationOptions.Seed.get -> int?
+AiDotNet.Evolution.Programs.LlmProgramVariationOptions.Seed.set -> void
+AiDotNet.Evolution.Programs.LlmProgramVariationOptions.SystemMessage.get -> string?
+AiDotNet.Evolution.Programs.LlmProgramVariationOptions.SystemMessage.set -> void
+AiDotNet.Evolution.Programs.LlmProgramVariationOptions.Temperature.get -> double?
+AiDotNet.Evolution.Programs.LlmProgramVariationOptions.Temperature.set -> void
+AiDotNet.Evolution.Programs.LlmProgramVariationOptions.Validate() -> void
+AiDotNet.Evolution.Programs.MeteredProgramVariationOperator
+AiDotNet.Evolution.Programs.MeteredProgramVariationOperator.CaptureState() -> string!
+AiDotNet.Evolution.Programs.MeteredProgramVariationOperator.CostUnitVersionHash.get -> string!
+AiDotNet.Evolution.Programs.MeteredProgramVariationOperator.GetProposalCost(long generation) -> AiDotNet.Evolution.EvolutionProposalCost!
+AiDotNet.Evolution.Programs.MeteredProgramVariationOperator.GetUsage() -> AiDotNet.Evolution.Programs.ProgramEvolutionLlmUsage!
+AiDotNet.Evolution.Programs.MeteredProgramVariationOperator.Id.get -> string!
+AiDotNet.Evolution.Programs.MeteredProgramVariationOperator.Ledger.get -> AiDotNet.Evolution.EvolutionResourceLedger!
+AiDotNet.Evolution.Programs.MeteredProgramVariationOperator.MeteredProgramVariationOperator(AiDotNet.Evolution.Programs.ICostedProgramProposalSource! source, AiDotNet.Evolution.EvolutionResourceLedger! ledger, AiDotNet.Evolution.EvolutionResources! maximumProposalResources, string! costUnitVersionHash) -> void
+AiDotNet.Evolution.Programs.MeteredProgramVariationOperator.Observe(AiDotNet.Evolution.EvolutionEvaluation! evaluation, AiDotNet.Evolution.EvolutionArchiveInsertionResult? insertionResult) -> void
+AiDotNet.Evolution.Programs.MeteredProgramVariationOperator.ProposeAsync(AiDotNet.Evolution.EvolutionVariationContext<AiDotNet.Evolution.Programs.ProgramGenome!>! context, System.Threading.CancellationToken cancellationToken = default(System.Threading.CancellationToken)) -> System.Threading.Tasks.ValueTask<AiDotNet.Evolution.Programs.ProgramGenome!>
+AiDotNet.Evolution.Programs.MeteredProgramVariationOperator.RestoreState(string! state) -> void
+AiDotNet.Evolution.Programs.MeteredProgramVariationOperator.VersionHash.get -> string!
+AiDotNet.Evolution.Programs.Metrics.ProgramMetricAggregationResult
+AiDotNet.Evolution.Programs.Metrics.ProgramMetricAggregationResult.ContributingMetrics.get -> System.Collections.Generic.IReadOnlyList<string!>!
+AiDotNet.Evolution.Programs.Metrics.ProgramMetricAggregationResult.HasFiniteValue.get -> bool
+AiDotNet.Evolution.Programs.Metrics.ProgramMetricAggregationResult.Issues.get -> System.Collections.Generic.IReadOnlyList<AiDotNet.Evolution.Programs.Metrics.ProgramMetricIssue!>!
+AiDotNet.Evolution.Programs.Metrics.ProgramMetricAggregationResult.ProgramMetricAggregationResult(double value, AiDotNet.Evolution.Programs.ProgramMetricAggregationStrategy strategy, bool usedCombinedScore, System.Collections.Generic.IEnumerable<string!>! contributingMetrics, System.Collections.Generic.IEnumerable<AiDotNet.Evolution.Programs.Metrics.ProgramMetricIssue!>! issues) -> void
+AiDotNet.Evolution.Programs.Metrics.ProgramMetricAggregationResult.Strategy.get -> AiDotNet.Evolution.Programs.ProgramMetricAggregationStrategy
+AiDotNet.Evolution.Programs.Metrics.ProgramMetricAggregationResult.UsedCombinedScore.get -> bool
+AiDotNet.Evolution.Programs.Metrics.ProgramMetricAggregationResult.Value.get -> double
+AiDotNet.Evolution.Programs.Metrics.ProgramMetricAggregator
+AiDotNet.Evolution.Programs.Metrics.ProgramMetricAggregator.Aggregate(System.Collections.Generic.IReadOnlyDictionary<string!, AiDotNet.Evolution.Programs.Metrics.ProgramMetricValue!>! metrics) -> AiDotNet.Evolution.Programs.Metrics.ProgramMetricAggregationResult!
+AiDotNet.Evolution.Programs.Metrics.ProgramMetricAggregator.Aggregate(System.Collections.Generic.IReadOnlyDictionary<string!, double>! metrics) -> AiDotNet.Evolution.Programs.Metrics.ProgramMetricAggregationResult!
+AiDotNet.Evolution.Programs.Metrics.ProgramMetricAggregator.GetOptions() -> AiDotNet.Evolution.Programs.ProgramMetricAggregationOptions!
+AiDotNet.Evolution.Programs.Metrics.ProgramMetricAggregator.PreferredDirection.get -> AiDotNet.Evolution.EvolutionOptimizationDirection
+AiDotNet.Evolution.Programs.Metrics.ProgramMetricAggregator.ProgramMetricAggregator(AiDotNet.Evolution.Programs.ProgramMetricAggregationOptions? options = null) -> void
+AiDotNet.Evolution.Programs.Metrics.ProgramMetricIssue
+AiDotNet.Evolution.Programs.Metrics.ProgramMetricIssue.Description.get -> string!
+AiDotNet.Evolution.Programs.Metrics.ProgramMetricIssue.MetricName.get -> string!
+AiDotNet.Evolution.Programs.Metrics.ProgramMetricIssue.ProgramMetricIssue(string! metricName, AiDotNet.Evolution.Programs.ProgramMetricIssueReason reason, string! description) -> void
+AiDotNet.Evolution.Programs.Metrics.ProgramMetricIssue.Reason.get -> AiDotNet.Evolution.Programs.ProgramMetricIssueReason
+AiDotNet.Evolution.Programs.Metrics.ProgramMetricValue
+AiDotNet.Evolution.Programs.Metrics.ProgramMetricValue.Equals(AiDotNet.Evolution.Programs.Metrics.ProgramMetricValue? other) -> bool
+AiDotNet.Evolution.Programs.Metrics.ProgramMetricValue.FlagValue.get -> bool
+AiDotNet.Evolution.Programs.Metrics.ProgramMetricValue.Kind.get -> AiDotNet.Evolution.Programs.ProgramMetricValueKind
+AiDotNet.Evolution.Programs.Metrics.ProgramMetricValue.TextValue.get -> string!
+AiDotNet.Evolution.Programs.Metrics.ProgramMetricValue.TryGetNumber(bool allowTextConversion, out double value) -> bool
+AiDotNet.Evolution.Programs.Novelty.EmbeddingBatch
+AiDotNet.Evolution.Programs.Novelty.EmbeddingBatch.FailureReason.get -> string!
+AiDotNet.Evolution.Programs.Novelty.EmbeddingBatch.Succeeded.get -> bool
+AiDotNet.Evolution.Programs.Novelty.EmbeddingBatch.Vectors.get -> System.Collections.Generic.IReadOnlyList<AiDotNet.Evolution.Programs.Novelty.EmbeddingVector!>!
+AiDotNet.Evolution.Programs.Novelty.EmbeddingCosineGenomeDistance
+AiDotNet.Evolution.Programs.Novelty.EmbeddingCosineGenomeDistance.CacheCapacity.get -> int
+AiDotNet.Evolution.Programs.Novelty.EmbeddingCosineGenomeDistance.Clear() -> void
+AiDotNet.Evolution.Programs.Novelty.EmbeddingCosineGenomeDistance.Client.get -> AiDotNet.Evolution.Programs.Novelty.IProgramEmbeddingClient!
+AiDotNet.Evolution.Programs.Novelty.EmbeddingCosineGenomeDistance.CosineComparisons.get -> long
+AiDotNet.Evolution.Programs.Novelty.EmbeddingCosineGenomeDistance.Distance(AiDotNet.Evolution.Programs.ProgramGenome! first, AiDotNet.Evolution.Programs.ProgramGenome! second) -> double
+AiDotNet.Evolution.Programs.Novelty.EmbeddingCosineGenomeDistance.EmbeddingCosineGenomeDistance(AiDotNet.Evolution.Programs.Novelty.IProgramEmbeddingClient! client, AiDotNet.Evolution.IGenomeDistance<AiDotNet.Evolution.Programs.ProgramGenome!>? fallback = null, int cacheCapacity = 1024) -> void
+AiDotNet.Evolution.Programs.Novelty.EmbeddingCosineGenomeDistance.Fallback.get -> AiDotNet.Evolution.IGenomeDistance<AiDotNet.Evolution.Programs.ProgramGenome!>!
+AiDotNet.Evolution.Programs.Novelty.EmbeddingCosineGenomeDistance.FallbackComparisons.get -> long
+AiDotNet.Evolution.Programs.Novelty.EmbeddingCosineGenomeDistance.Id.get -> string!
+AiDotNet.Evolution.Programs.Novelty.EmbeddingCosineGenomeDistance.IsPrimed(AiDotNet.Evolution.Programs.ProgramGenome! genome) -> bool
+AiDotNet.Evolution.Programs.Novelty.EmbeddingCosineGenomeDistance.PrimeAsync(System.Collections.Generic.IEnumerable<AiDotNet.Evolution.Programs.ProgramGenome!>! genomes, System.Threading.CancellationToken cancellationToken = default(System.Threading.CancellationToken)) -> System.Threading.Tasks.ValueTask<bool>
+AiDotNet.Evolution.Programs.Novelty.EmbeddingCosineGenomeDistance.PrimedCount.get -> int
+AiDotNet.Evolution.Programs.Novelty.EmbeddingCosineGenomeDistance.PrimeRequests.get -> long
+AiDotNet.Evolution.Programs.Novelty.EmbeddingCosineGenomeDistance.Similarity(AiDotNet.Evolution.Programs.ProgramGenome! first, AiDotNet.Evolution.Programs.ProgramGenome! second) -> double?
+AiDotNet.Evolution.Programs.Novelty.EmbeddingCosineGenomeDistance.VersionHash.get -> string!
+AiDotNet.Evolution.Programs.Novelty.EmbeddingNoveltyOptions
+AiDotNet.Evolution.Programs.Novelty.EmbeddingNoveltyOptions.EmbeddingNoveltyOptions(double structuralNoveltyThreshold = 0.15, double embeddingSimilarityThreshold = 0.99, int maxEmbeddingComparisons = 8, bool failOpenOnEmbeddingFailure = true, bool failOpenOnJudgeFailure = true, int maxTrackedGenomes = 512) -> void
+AiDotNet.Evolution.Programs.Novelty.EmbeddingNoveltyOptions.EmbeddingSimilarityThreshold.get -> double
+AiDotNet.Evolution.Programs.Novelty.EmbeddingNoveltyOptions.FailOpenOnEmbeddingFailure.get -> bool
+AiDotNet.Evolution.Programs.Novelty.EmbeddingNoveltyOptions.FailOpenOnJudgeFailure.get -> bool
+AiDotNet.Evolution.Programs.Novelty.EmbeddingNoveltyOptions.MaxEmbeddingComparisons.get -> int
+AiDotNet.Evolution.Programs.Novelty.EmbeddingNoveltyOptions.MaxTrackedGenomes.get -> int
+AiDotNet.Evolution.Programs.Novelty.EmbeddingNoveltyOptions.StructuralNoveltyThreshold.get -> double
+AiDotNet.Evolution.Programs.Novelty.EmbeddingNoveltyOptions.ToVersionString() -> string!
+AiDotNet.Evolution.Programs.Novelty.EmbeddingVector
+AiDotNet.Evolution.Programs.Novelty.EmbeddingVector.Components.get -> System.Collections.Generic.IReadOnlyList<double>!
+AiDotNet.Evolution.Programs.Novelty.EmbeddingVector.Dimensions.get -> int
+AiDotNet.Evolution.Programs.Novelty.EmbeddingVector.EmbeddingVector(System.Collections.Generic.IEnumerable<double>! components) -> void
+AiDotNet.Evolution.Programs.Novelty.EmbeddingVector.Magnitude.get -> double
+AiDotNet.Evolution.Programs.Novelty.IProgramEmbeddingClient
+AiDotNet.Evolution.Programs.Novelty.IProgramEmbeddingClient.EmbedAsync(System.Collections.Generic.IReadOnlyList<string!>! texts, System.Threading.CancellationToken cancellationToken = default(System.Threading.CancellationToken)) -> System.Threading.Tasks.ValueTask<AiDotNet.Evolution.Programs.Novelty.EmbeddingBatch!>
+AiDotNet.Evolution.Programs.Novelty.IProgramEmbeddingClient.ModelId.get -> string!
+AiDotNet.Evolution.Programs.Novelty.IProgramEmbeddingClient.VersionHash.get -> string!
+AiDotNet.Evolution.Programs.Novelty.IProgramNoveltyJudge
+AiDotNet.Evolution.Programs.Novelty.IProgramNoveltyJudge.Id.get -> string!
+AiDotNet.Evolution.Programs.Novelty.IProgramNoveltyJudge.JudgeAsync(AiDotNet.Evolution.Programs.ProgramGenome! candidate, AiDotNet.Evolution.Programs.ProgramGenome! incumbent, System.Threading.CancellationToken cancellationToken = default(System.Threading.CancellationToken)) -> System.Threading.Tasks.ValueTask<AiDotNet.Evolution.Programs.Novelty.ProgramNoveltyVerdict>
+AiDotNet.Evolution.Programs.Novelty.IProgramNoveltyJudge.VersionHash.get -> string!
+AiDotNet.Evolution.Programs.Novelty.LlmProgramNoveltyJudge
+AiDotNet.Evolution.Programs.Novelty.LlmProgramNoveltyJudge.Id.get -> string!
+AiDotNet.Evolution.Programs.Novelty.LlmProgramNoveltyJudge.JudgeAsync(AiDotNet.Evolution.Programs.ProgramGenome! candidate, AiDotNet.Evolution.Programs.ProgramGenome! incumbent, System.Threading.CancellationToken cancellationToken = default(System.Threading.CancellationToken)) -> System.Threading.Tasks.ValueTask<AiDotNet.Evolution.Programs.Novelty.ProgramNoveltyVerdict>
+AiDotNet.Evolution.Programs.Novelty.LlmProgramNoveltyJudge.Judgements.get -> long
+AiDotNet.Evolution.Programs.Novelty.LlmProgramNoveltyJudge.LlmProgramNoveltyJudge(AiDotNet.Evolution.Programs.IProgramChatClient! chatClient, int maxProgramBytes = 12000, double? temperature = null, int? maxOutputTokens = 256, string! id = "llm-program-novelty-judge") -> void
+AiDotNet.Evolution.Programs.Novelty.LlmProgramNoveltyJudge.MaxOutputTokens.get -> int?
+AiDotNet.Evolution.Programs.Novelty.LlmProgramNoveltyJudge.MaxProgramBytes.get -> int
+AiDotNet.Evolution.Programs.Novelty.LlmProgramNoveltyJudge.Temperature.get -> double?
+AiDotNet.Evolution.Programs.Novelty.LlmProgramNoveltyJudge.UnavailableAnswers.get -> long
+AiDotNet.Evolution.Programs.Novelty.LlmProgramNoveltyJudge.VersionHash.get -> string!
+AiDotNet.Evolution.Programs.Novelty.NoveltyGatingProgramFitnessEvaluator
+AiDotNet.Evolution.Programs.Novelty.NoveltyGatingProgramFitnessEvaluator.AcceptedCount.get -> long
+AiDotNet.Evolution.Programs.Novelty.NoveltyGatingProgramFitnessEvaluator.EvaluateAsync(AiDotNet.Evolution.Programs.ProgramGenome! candidate, AiDotNet.Evolution.EvolutionEvaluationContext! context, System.Threading.CancellationToken cancellationToken = default(System.Threading.CancellationToken)) -> System.Threading.Tasks.ValueTask<AiDotNet.Evolution.EvolutionTaskResult!>
+AiDotNet.Evolution.Programs.Novelty.NoveltyGatingProgramFitnessEvaluator.GetLastDecision() -> AiDotNet.Evolution.Programs.Novelty.ProgramNoveltyDecision?
+AiDotNet.Evolution.Programs.Novelty.NoveltyGatingProgramFitnessEvaluator.GetRememberedGenomes() -> System.Collections.Generic.IReadOnlyList<AiDotNet.Evolution.Programs.ProgramGenome!>!
+AiDotNet.Evolution.Programs.Novelty.NoveltyGatingProgramFitnessEvaluator.Id.get -> string!
+AiDotNet.Evolution.Programs.Novelty.NoveltyGatingProgramFitnessEvaluator.Inner.get -> AiDotNet.Evolution.Programs.IProgramFitnessEvaluator!
+AiDotNet.Evolution.Programs.Novelty.NoveltyGatingProgramFitnessEvaluator.NoveltyGatingProgramFitnessEvaluator(AiDotNet.Evolution.Programs.IProgramFitnessEvaluator! inner, AiDotNet.Evolution.Programs.Novelty.ProgramNoveltyPolicy? policy = null, string! id = "novelty-gating-program-evaluator") -> void
+AiDotNet.Evolution.Programs.Novelty.NoveltyGatingProgramFitnessEvaluator.Policy.get -> AiDotNet.Evolution.Programs.Novelty.ProgramNoveltyPolicy!
+AiDotNet.Evolution.Programs.Novelty.NoveltyGatingProgramFitnessEvaluator.RejectedCount.get -> long
+AiDotNet.Evolution.Programs.Novelty.NoveltyGatingProgramFitnessEvaluator.Remember(AiDotNet.Evolution.Programs.ProgramGenome! genome) -> void
+AiDotNet.Evolution.Programs.Novelty.NoveltyGatingProgramFitnessEvaluator.Reset() -> void
+AiDotNet.Evolution.Programs.Novelty.NoveltyGatingProgramFitnessEvaluator.TrackedCount.get -> int
+AiDotNet.Evolution.Programs.Novelty.NoveltyGatingProgramFitnessEvaluator.VersionHash.get -> string!
+AiDotNet.Evolution.Programs.Novelty.ProgramLineEditDistance
+AiDotNet.Evolution.Programs.Novelty.ProgramLineEditDistance.Distance(AiDotNet.Evolution.Programs.ProgramGenome! first, AiDotNet.Evolution.Programs.ProgramGenome! second) -> double
+AiDotNet.Evolution.Programs.Novelty.ProgramLineEditDistance.Id.get -> string!
+AiDotNet.Evolution.Programs.Novelty.ProgramLineEditDistance.MaxComparedLines.get -> int
+AiDotNet.Evolution.Programs.Novelty.ProgramLineEditDistance.ProgramLineEditDistance(int maxComparedLines = 2000) -> void
+AiDotNet.Evolution.Programs.Novelty.ProgramLineEditDistance.VersionHash.get -> string!
+AiDotNet.Evolution.Programs.Novelty.ProgramNoveltyDecision
+AiDotNet.Evolution.Programs.Novelty.ProgramNoveltyDecision.CostUnits.get -> double
+AiDotNet.Evolution.Programs.Novelty.ProgramNoveltyDecision.DecidedBy.get -> AiDotNet.Evolution.Programs.Novelty.ProgramNoveltyStage
+AiDotNet.Evolution.Programs.Novelty.ProgramNoveltyDecision.EmbeddingRequests.get -> int
+AiDotNet.Evolution.Programs.Novelty.ProgramNoveltyDecision.EmbeddingSimilarity.get -> double?
+AiDotNet.Evolution.Programs.Novelty.ProgramNoveltyDecision.IsNovel.get -> bool
+AiDotNet.Evolution.Programs.Novelty.ProgramNoveltyDecision.JudgeRequests.get -> int
+AiDotNet.Evolution.Programs.Novelty.ProgramNoveltyDecision.NearestGenomeId.get -> string?
+AiDotNet.Evolution.Programs.Novelty.ProgramNoveltyDecision.NearestStructuralDistance.get -> double?
+AiDotNet.Evolution.Programs.Novelty.ProgramNoveltyDecision.ProgramNoveltyDecision(bool isNovel, AiDotNet.Evolution.Programs.Novelty.ProgramNoveltyStage decidedBy, string! reason, string? nearestGenomeId = null, double? nearestStructuralDistance = null, double? embeddingSimilarity = null, int structuralComparisons = 0, int embeddingRequests = 0, int judgeRequests = 0) -> void
+AiDotNet.Evolution.Programs.Novelty.ProgramNoveltyDecision.Reason.get -> string!
+AiDotNet.Evolution.Programs.Novelty.ProgramNoveltyDecision.StructuralComparisons.get -> int
+AiDotNet.Evolution.Programs.Novelty.ProgramNoveltyDecision.WasFree.get -> bool
+AiDotNet.Evolution.Programs.Novelty.ProgramNoveltyPolicy
+AiDotNet.Evolution.Programs.Novelty.ProgramNoveltyPolicy.Decisions.get -> long
+AiDotNet.Evolution.Programs.Novelty.ProgramNoveltyPolicy.EmbeddingRequests.get -> long
+AiDotNet.Evolution.Programs.Novelty.ProgramNoveltyPolicy.EvaluateAsync(AiDotNet.Evolution.Programs.ProgramGenome! candidate, System.Collections.Generic.IReadOnlyList<AiDotNet.Evolution.Programs.ProgramGenome!>! known, System.Threading.CancellationToken cancellationToken = default(System.Threading.CancellationToken)) -> System.Threading.Tasks.ValueTask<AiDotNet.Evolution.Programs.Novelty.ProgramNoveltyDecision!>
+AiDotNet.Evolution.Programs.Novelty.ProgramNoveltyPolicy.FreeDecisions.get -> long
+AiDotNet.Evolution.Programs.Novelty.ProgramNoveltyPolicy.HasEmbeddingStage.get -> bool
+AiDotNet.Evolution.Programs.Novelty.ProgramNoveltyPolicy.HasJudgeStage.get -> bool
+AiDotNet.Evolution.Programs.Novelty.ProgramNoveltyPolicy.JudgeRequests.get -> long
+AiDotNet.Evolution.Programs.Novelty.ProgramNoveltyPolicy.Options.get -> AiDotNet.Evolution.Programs.Novelty.EmbeddingNoveltyOptions!
+AiDotNet.Evolution.Programs.Novelty.ProgramNoveltyPolicy.ProgramNoveltyPolicy(AiDotNet.Evolution.Programs.Novelty.EmbeddingNoveltyOptions? options = null, AiDotNet.Evolution.IGenomeDistance<AiDotNet.Evolution.Programs.ProgramGenome!>? structuralDistance = null, AiDotNet.Evolution.Programs.Novelty.IProgramEmbeddingClient? embeddingClient = null, AiDotNet.Evolution.Programs.Novelty.IProgramNoveltyJudge? judge = null) -> void
+AiDotNet.Evolution.Programs.Novelty.ProgramNoveltyPolicy.StructuralComparisons.get -> long
+AiDotNet.Evolution.Programs.Novelty.ProgramNoveltyPolicy.StructuralDistance.get -> AiDotNet.Evolution.IGenomeDistance<AiDotNet.Evolution.Programs.ProgramGenome!>!
+AiDotNet.Evolution.Programs.Novelty.ProgramNoveltyPolicy.VersionHash.get -> string!
+AiDotNet.Evolution.Programs.Novelty.ProgramNoveltyStage
+AiDotNet.Evolution.Programs.Novelty.ProgramNoveltyStage.Embedding = 2 -> AiDotNet.Evolution.Programs.Novelty.ProgramNoveltyStage
+AiDotNet.Evolution.Programs.Novelty.ProgramNoveltyStage.LanguageModel = 3 -> AiDotNet.Evolution.Programs.Novelty.ProgramNoveltyStage
+AiDotNet.Evolution.Programs.Novelty.ProgramNoveltyStage.None = 0 -> AiDotNet.Evolution.Programs.Novelty.ProgramNoveltyStage
+AiDotNet.Evolution.Programs.Novelty.ProgramNoveltyStage.Structural = 1 -> AiDotNet.Evolution.Programs.Novelty.ProgramNoveltyStage
+AiDotNet.Evolution.Programs.Novelty.ProgramNoveltyVerdict
+AiDotNet.Evolution.Programs.Novelty.ProgramNoveltyVerdict.NotNovel = 2 -> AiDotNet.Evolution.Programs.Novelty.ProgramNoveltyVerdict
+AiDotNet.Evolution.Programs.Novelty.ProgramNoveltyVerdict.Novel = 1 -> AiDotNet.Evolution.Programs.Novelty.ProgramNoveltyVerdict
+AiDotNet.Evolution.Programs.Novelty.ProgramNoveltyVerdict.Unavailable = 0 -> AiDotNet.Evolution.Programs.Novelty.ProgramNoveltyVerdict
+AiDotNet.Evolution.Programs.Novelty.ProgramTokenSetDistance
+AiDotNet.Evolution.Programs.Novelty.ProgramTokenSetDistance.ClearMemo() -> void
+AiDotNet.Evolution.Programs.Novelty.ProgramTokenSetDistance.Distance(AiDotNet.Evolution.Programs.ProgramGenome! first, AiDotNet.Evolution.Programs.ProgramGenome! second) -> double
+AiDotNet.Evolution.Programs.Novelty.ProgramTokenSetDistance.Id.get -> string!
+AiDotNet.Evolution.Programs.Novelty.ProgramTokenSetDistance.MemoCapacity.get -> int
+AiDotNet.Evolution.Programs.Novelty.ProgramTokenSetDistance.ProgramTokenSetDistance(int memoCapacity = 1024) -> void
+AiDotNet.Evolution.Programs.Novelty.ProgramTokenSetDistance.VersionHash.get -> string!
+AiDotNet.Evolution.Programs.PatchPlan
+AiDotNet.Evolution.Programs.PatchPlan.<Clone>$() -> AiDotNet.Evolution.Programs.PatchPlan!
+AiDotNet.Evolution.Programs.PatchPlan.Deconstruct(out string! ParentFingerprint, out string! Hypothesis, out System.Collections.Generic.IReadOnlyList<AiDotNet.Evolution.Programs.SourceEdit!>! Edits) -> void
+AiDotNet.Evolution.Programs.PatchPlan.Edits.get -> System.Collections.Generic.IReadOnlyList<AiDotNet.Evolution.Programs.SourceEdit!>!
+AiDotNet.Evolution.Programs.PatchPlan.Edits.init -> void
+AiDotNet.Evolution.Programs.PatchPlan.Equals(AiDotNet.Evolution.Programs.PatchPlan? other) -> bool
+AiDotNet.Evolution.Programs.PatchPlan.Hypothesis.get -> string!
+AiDotNet.Evolution.Programs.PatchPlan.Hypothesis.init -> void
+AiDotNet.Evolution.Programs.PatchPlan.ParentFingerprint.get -> string!
+AiDotNet.Evolution.Programs.PatchPlan.ParentFingerprint.init -> void
+AiDotNet.Evolution.Programs.PatchPlan.PatchPlan(string! ParentFingerprint, string! Hypothesis, System.Collections.Generic.IReadOnlyList<AiDotNet.Evolution.Programs.SourceEdit!>! Edits) -> void
+AiDotNet.Evolution.Programs.PersistentProgramFitnessEvaluator
+AiDotNet.Evolution.Programs.PersistentProgramFitnessEvaluator.EvaluateAsync(AiDotNet.Evolution.Programs.ProgramGenome! candidate, AiDotNet.Evolution.EvolutionEvaluationContext! context, System.Threading.CancellationToken cancellationToken = default(System.Threading.CancellationToken)) -> System.Threading.Tasks.ValueTask<AiDotNet.Evolution.EvolutionTaskResult!>
+AiDotNet.Evolution.Programs.PersistentProgramFitnessEvaluator.Id.get -> string!
+AiDotNet.Evolution.Programs.PersistentProgramFitnessEvaluator.Ledger.get -> AiDotNet.Evolution.EvolutionResourceLedger!
+AiDotNet.Evolution.Programs.PersistentProgramFitnessEvaluator.PersistentProgramFitnessEvaluator(AiDotNet.Evolution.Programs.IProgramFitnessEvaluator! inner, AiDotNet.Evolution.IEvolutionEvaluationStore! store, AiDotNet.Evolution.Programs.IProgramMeasurementEvidenceStore! evidence, AiDotNet.Evolution.EvolutionReuseScope! scope, AiDotNet.Evolution.EvolutionEvaluationReusePolicy! policy, AiDotNet.Evolution.EvolutionResourceLedger! ledger, string! measurementVersion, string! runId, bool forceFresh = false, System.Func<System.DateTimeOffset>? utcNow = null) -> void
+AiDotNet.Evolution.Programs.PersistentProgramFitnessEvaluator.Scope.get -> AiDotNet.Evolution.EvolutionReuseScope!
+AiDotNet.Evolution.Programs.PersistentProgramFitnessEvaluator.VersionHash.get -> string!
+AiDotNet.Evolution.Programs.ProcessProgramExecutionEngine
+AiDotNet.Evolution.Programs.ProcessProgramExecutionEngine.ActiveExecutionCount.get -> int
+AiDotNet.Evolution.Programs.ProcessProgramExecutionEngine.CanEnforceMemoryLimit.get -> bool
+AiDotNet.Evolution.Programs.ProcessProgramExecutionEngine.Dispose() -> void
+AiDotNet.Evolution.Programs.ProcessProgramExecutionEngine.ExecuteAsync(AiDotNet.Evolution.Programs.ProgramExecuteRequest! request, System.Threading.CancellationToken cancellationToken = default(System.Threading.CancellationToken)) -> System.Threading.Tasks.Task<AiDotNet.Evolution.Programs.ProgramExecuteResponse!>!
+AiDotNet.Evolution.Programs.ProcessProgramExecutionEngine.GetOptions() -> AiDotNet.Evolution.Programs.ProgramSandboxOptions!
+AiDotNet.Evolution.Programs.ProcessProgramExecutionEngine.Id.get -> string!
+AiDotNet.Evolution.Programs.ProcessProgramExecutionEngine.ProcessProgramExecutionEngine(AiDotNet.Evolution.Programs.ProgramSandboxOptions! options) -> void
+AiDotNet.Evolution.Programs.ProcessProgramExecutionEngine.QueuedExecutionCount.get -> int
+AiDotNet.Evolution.Programs.ProcessProgramExecutionEngine.TryExecute(AiDotNet.Evolution.Programs.ProgramLanguage language, string! sourceCode, string! input, out string! output, out string? errorMessage, System.Threading.CancellationToken cancellationToken = default(System.Threading.CancellationToken)) -> bool
+AiDotNet.Evolution.Programs.ProcessProgramExecutionEngine.VersionHash.get -> string!
+AiDotNet.Evolution.Programs.ProgramArtifact
+AiDotNet.Evolution.Programs.ProgramArtifact.ApiFingerprint.get -> string!
+AiDotNet.Evolution.Programs.ProgramArtifact.CompilerFingerprint.get -> string!
+AiDotNet.Evolution.Programs.ProgramArtifact.Fingerprint.get -> string!
+AiDotNet.Evolution.Programs.ProgramArtifact.GetImage() -> byte[]!
+AiDotNet.Evolution.Programs.ProgramArtifact.ImageFingerprint.get -> string!
+AiDotNet.Evolution.Programs.ProgramArtifact.ProgramArtifact(AiDotNet.Evolution.Programs.ProgramSnapshot! source, string! compilerFingerprint, string! apiFingerprint, byte[]! image) -> void
+AiDotNet.Evolution.Programs.ProgramArtifact.Source.get -> AiDotNet.Evolution.Programs.ProgramSnapshot!
+AiDotNet.Evolution.Programs.ProgramBuild
+AiDotNet.Evolution.Programs.ProgramBuild.<Clone>$() -> AiDotNet.Evolution.Programs.ProgramBuild!
+AiDotNet.Evolution.Programs.ProgramBuild.Artifact.get -> AiDotNet.Evolution.Programs.ProgramArtifact?
+AiDotNet.Evolution.Programs.ProgramBuild.Artifact.init -> void
+AiDotNet.Evolution.Programs.ProgramBuild.Deconstruct(out AiDotNet.Evolution.Programs.ProgramArtifact? Artifact, out string! Feedback) -> void
+AiDotNet.Evolution.Programs.ProgramBuild.Equals(AiDotNet.Evolution.Programs.ProgramBuild? other) -> bool
+AiDotNet.Evolution.Programs.ProgramBuild.Feedback.get -> string!
+AiDotNet.Evolution.Programs.ProgramBuild.Feedback.init -> void
+AiDotNet.Evolution.Programs.ProgramBuild.ProgramBuild(AiDotNet.Evolution.Programs.ProgramArtifact? Artifact, string! Feedback) -> void
+AiDotNet.Evolution.Programs.ProgramChatMessage
+AiDotNet.Evolution.Programs.ProgramChatMessage.ProgramChatMessage(AiDotNet.Evolution.Programs.ProgramChatRole role, string! text) -> void
+AiDotNet.Evolution.Programs.ProgramChatMessage.Role.get -> AiDotNet.Evolution.Programs.ProgramChatRole
+AiDotNet.Evolution.Programs.ProgramChatMessage.Text.get -> string!
+AiDotNet.Evolution.Programs.ProgramChatOptions
+AiDotNet.Evolution.Programs.ProgramChatOptions.MaxOutputTokens.get -> int?
+AiDotNet.Evolution.Programs.ProgramChatOptions.MaxOutputTokens.set -> void
+AiDotNet.Evolution.Programs.ProgramChatOptions.ProgramChatOptions() -> void
+AiDotNet.Evolution.Programs.ProgramChatOptions.ResponseFormat.get -> AiDotNet.Evolution.Programs.ProgramChatResponseFormat
+AiDotNet.Evolution.Programs.ProgramChatOptions.ResponseFormat.set -> void
+AiDotNet.Evolution.Programs.ProgramChatOptions.Seed.get -> int?
+AiDotNet.Evolution.Programs.ProgramChatOptions.Seed.set -> void
+AiDotNet.Evolution.Programs.ProgramChatOptions.Temperature.get -> double?
+AiDotNet.Evolution.Programs.ProgramChatOptions.Temperature.set -> void
+AiDotNet.Evolution.Programs.ProgramChatResponse
+AiDotNet.Evolution.Programs.ProgramChatResponse.Message.get -> AiDotNet.Evolution.Programs.ProgramChatMessage!
+AiDotNet.Evolution.Programs.ProgramChatResponse.ModelId.get -> string?
+AiDotNet.Evolution.Programs.ProgramChatResponse.ProgramChatResponse(AiDotNet.Evolution.Programs.ProgramChatMessage! message, AiDotNet.Evolution.Programs.ProgramChatUsage? usage = null, string? modelId = null) -> void
+AiDotNet.Evolution.Programs.ProgramChatResponse.Text.get -> string!
+AiDotNet.Evolution.Programs.ProgramChatResponse.Usage.get -> AiDotNet.Evolution.Programs.ProgramChatUsage?
+AiDotNet.Evolution.Programs.ProgramChatResponseFormat
+AiDotNet.Evolution.Programs.ProgramChatResponseFormat.Json = 1 -> AiDotNet.Evolution.Programs.ProgramChatResponseFormat
+AiDotNet.Evolution.Programs.ProgramChatResponseFormat.Text = 0 -> AiDotNet.Evolution.Programs.ProgramChatResponseFormat
+AiDotNet.Evolution.Programs.ProgramChatRole
+AiDotNet.Evolution.Programs.ProgramChatRole.Assistant = 2 -> AiDotNet.Evolution.Programs.ProgramChatRole
+AiDotNet.Evolution.Programs.ProgramChatRole.System = 0 -> AiDotNet.Evolution.Programs.ProgramChatRole
+AiDotNet.Evolution.Programs.ProgramChatRole.User = 1 -> AiDotNet.Evolution.Programs.ProgramChatRole
+AiDotNet.Evolution.Programs.ProgramChatUsage
+AiDotNet.Evolution.Programs.ProgramChatUsage.InputTokens.get -> int
+AiDotNet.Evolution.Programs.ProgramChatUsage.OutputTokens.get -> int
+AiDotNet.Evolution.Programs.ProgramChatUsage.ProgramChatUsage(int inputTokens, int outputTokens) -> void
+AiDotNet.Evolution.Programs.ProgramChatUsage.TotalTokens.get -> long
+AiDotNet.Evolution.Programs.ProgramDescriptorSet
+AiDotNet.Evolution.Programs.ProgramDescriptorSet.Compute(AiDotNet.Evolution.Programs.ProgramGenome! genome) -> System.Collections.Generic.IReadOnlyDictionary<string!, double>!
+AiDotNet.Evolution.Programs.ProgramDescriptorSet.Count.get -> int
+AiDotNet.Evolution.Programs.ProgramDescriptorSet.Descriptors.get -> System.Collections.Generic.IReadOnlyList<AiDotNet.Evolution.Programs.IProgramDescriptor!>!
+AiDotNet.Evolution.Programs.ProgramDescriptorSet.HasRebasableDescriptors.get -> bool
+AiDotNet.Evolution.Programs.ProgramDescriptorSet.Names.get -> System.Collections.Generic.IReadOnlyList<string!>!
+AiDotNet.Evolution.Programs.ProgramDescriptorSet.ProgramDescriptorSet(params AiDotNet.Evolution.Programs.IProgramDescriptor![]! descriptors) -> void
+AiDotNet.Evolution.Programs.ProgramDescriptorSet.ProgramDescriptorSet(System.Collections.Generic.IEnumerable<AiDotNet.Evolution.Programs.IProgramDescriptor!>! descriptors) -> void
+AiDotNet.Evolution.Programs.ProgramDescriptorSet.Rebase(System.Collections.Generic.IReadOnlyList<AiDotNet.Evolution.Programs.ProgramGenome!>! references) -> AiDotNet.Evolution.Programs.ProgramDescriptorSet!
+AiDotNet.Evolution.Programs.ProgramDescriptorSet.VersionHash.get -> string!
+AiDotNet.Evolution.Programs.ProgramDiff
+AiDotNet.Evolution.Programs.ProgramDiffApplyResult
+AiDotNet.Evolution.Programs.ProgramDiffApplyResult.AppliedCount.get -> int
+AiDotNet.Evolution.Programs.ProgramDiffApplyResult.Failures.get -> System.Collections.Generic.IReadOnlyList<AiDotNet.Evolution.Programs.ProgramDiffFailure!>!
+AiDotNet.Evolution.Programs.ProgramDiffApplyResult.IsSuccess.get -> bool
+AiDotNet.Evolution.Programs.ProgramDiffApplyResult.IsUnchanged.get -> bool
+AiDotNet.Evolution.Programs.ProgramDiffApplyResult.ModifiedSource.get -> string!
+AiDotNet.Evolution.Programs.ProgramDiffApplyResult.OriginalSource.get -> string!
+AiDotNet.Evolution.Programs.ProgramDiffApplyResult.UnifiedDiff.get -> string!
+AiDotNet.Evolution.Programs.ProgramDiffBlock
+AiDotNet.Evolution.Programs.ProgramDiffBlock.IsDeletion.get -> bool
+AiDotNet.Evolution.Programs.ProgramDiffBlock.Ordinal.get -> int
+AiDotNet.Evolution.Programs.ProgramDiffBlock.ProgramDiffBlock(string! searchText, string! replaceText, int ordinal = 0, int responseLine = 0) -> void
+AiDotNet.Evolution.Programs.ProgramDiffBlock.ReplaceText.get -> string!
+AiDotNet.Evolution.Programs.ProgramDiffBlock.ResponseLine.get -> int
+AiDotNet.Evolution.Programs.ProgramDiffBlock.SearchText.get -> string!
+AiDotNet.Evolution.Programs.ProgramDiffFailure
+AiDotNet.Evolution.Programs.ProgramDiffFailure.BlockOrdinal.get -> int
+AiDotNet.Evolution.Programs.ProgramDiffFailure.Message.get -> string!
+AiDotNet.Evolution.Programs.ProgramDiffFailure.ProgramDiffFailure(AiDotNet.Evolution.Programs.ProgramDiffFailureReason reason, string! message, int blockOrdinal = -1, string! searchExcerpt = "") -> void
+AiDotNet.Evolution.Programs.ProgramDiffFailure.Reason.get -> AiDotNet.Evolution.Programs.ProgramDiffFailureReason
+AiDotNet.Evolution.Programs.ProgramDiffFailure.SearchExcerpt.get -> string!
+AiDotNet.Evolution.Programs.ProgramDiffFailure.ToDiagnostic() -> AiDotNet.Evolution.EvolutionDiagnostic!
+AiDotNet.Evolution.Programs.ProgramDiffFailureReason
+AiDotNet.Evolution.Programs.ProgramDiffFailureReason.AmbiguousTarget = 8 -> AiDotNet.Evolution.Programs.ProgramDiffFailureReason
+AiDotNet.Evolution.Programs.ProgramDiffFailureReason.BlockLimitExceeded = 4 -> AiDotNet.Evolution.Programs.ProgramDiffFailureReason
+AiDotNet.Evolution.Programs.ProgramDiffFailureReason.CarriageReturnRejected = 7 -> AiDotNet.Evolution.Programs.ProgramDiffFailureReason
+AiDotNet.Evolution.Programs.ProgramDiffFailureReason.EmptySearchText = 1 -> AiDotNet.Evolution.Programs.ProgramDiffFailureReason
+AiDotNet.Evolution.Programs.ProgramDiffFailureReason.LimitExceeded = 9 -> AiDotNet.Evolution.Programs.ProgramDiffFailureReason
+AiDotNet.Evolution.Programs.ProgramDiffFailureReason.MalformedBlock = 0 -> AiDotNet.Evolution.Programs.ProgramDiffFailureReason
+AiDotNet.Evolution.Programs.ProgramDiffFailureReason.NoBlocksFound = 5 -> AiDotNet.Evolution.Programs.ProgramDiffFailureReason
+AiDotNet.Evolution.Programs.ProgramDiffFailureReason.OutsideEvolveBlock = 3 -> AiDotNet.Evolution.Programs.ProgramDiffFailureReason
+AiDotNet.Evolution.Programs.ProgramDiffFailureReason.ResultUnchanged = 6 -> AiDotNet.Evolution.Programs.ProgramDiffFailureReason
+AiDotNet.Evolution.Programs.ProgramDiffFailureReason.SearchTextNotFound = 2 -> AiDotNet.Evolution.Programs.ProgramDiffFailureReason
+AiDotNet.Evolution.Programs.ProgramDiffOptions
+AiDotNet.Evolution.Programs.ProgramDiffOptions.AllowCarriageReturns.get -> bool
+AiDotNet.Evolution.Programs.ProgramDiffOptions.AllowCarriageReturns.set -> void
+AiDotNet.Evolution.Programs.ProgramDiffOptions.Clone() -> AiDotNet.Evolution.Programs.ProgramDiffOptions!
+AiDotNet.Evolution.Programs.ProgramDiffOptions.DividerMarker.get -> string!
+AiDotNet.Evolution.Programs.ProgramDiffOptions.DividerMarker.set -> void
+AiDotNet.Evolution.Programs.ProgramDiffOptions.FuzzyWhitespace.get -> bool
+AiDotNet.Evolution.Programs.ProgramDiffOptions.FuzzyWhitespace.set -> void
+AiDotNet.Evolution.Programs.ProgramDiffOptions.MaxBlocks.get -> int
+AiDotNet.Evolution.Programs.ProgramDiffOptions.MaxBlocks.set -> void
+AiDotNet.Evolution.Programs.ProgramDiffOptions.MaxFailureExcerptLength.get -> int
+AiDotNet.Evolution.Programs.ProgramDiffOptions.MaxFailureExcerptLength.set -> void
+AiDotNet.Evolution.Programs.ProgramDiffOptions.MaxResponseChars.get -> int
+AiDotNet.Evolution.Programs.ProgramDiffOptions.MaxResponseChars.set -> void
+AiDotNet.Evolution.Programs.ProgramDiffOptions.ProgramDiffOptions() -> void
+AiDotNet.Evolution.Programs.ProgramDiffOptions.RejectWhenNoBlockApplied.get -> bool
+AiDotNet.Evolution.Programs.ProgramDiffOptions.RejectWhenNoBlockApplied.set -> void
+AiDotNet.Evolution.Programs.ProgramDiffOptions.ReplaceMarker.get -> string!
+AiDotNet.Evolution.Programs.ProgramDiffOptions.ReplaceMarker.set -> void
+AiDotNet.Evolution.Programs.ProgramDiffOptions.SearchMarker.get -> string!
+AiDotNet.Evolution.Programs.ProgramDiffOptions.SearchMarker.set -> void
+AiDotNet.Evolution.Programs.ProgramDiffOptions.Validate() -> void
+AiDotNet.Evolution.Programs.ProgramDiffParseResult
+AiDotNet.Evolution.Programs.ProgramDiffParseResult.Blocks.get -> System.Collections.Generic.IReadOnlyList<AiDotNet.Evolution.Programs.ProgramDiffBlock!>!
+AiDotNet.Evolution.Programs.ProgramDiffParseResult.Failures.get -> System.Collections.Generic.IReadOnlyList<AiDotNet.Evolution.Programs.ProgramDiffFailure!>!
+AiDotNet.Evolution.Programs.ProgramDiffParseResult.HasBlocks.get -> bool
+AiDotNet.Evolution.Programs.ProgramDiffParseResult.IsSuccess.get -> bool
+AiDotNet.Evolution.Programs.ProgramDiffTargetSplit
+AiDotNet.Evolution.Programs.ProgramDiffTargetSplit.DescriptionBlocks.get -> System.Collections.Generic.IReadOnlyList<AiDotNet.Evolution.Programs.ProgramDiffBlock!>!
+AiDotNet.Evolution.Programs.ProgramDiffTargetSplit.Failures.get -> System.Collections.Generic.IReadOnlyList<AiDotNet.Evolution.Programs.ProgramDiffFailure!>!
+AiDotNet.Evolution.Programs.ProgramDiffTargetSplit.IsSuccess.get -> bool
+AiDotNet.Evolution.Programs.ProgramDiffTargetSplit.ProgramBlocks.get -> System.Collections.Generic.IReadOnlyList<AiDotNet.Evolution.Programs.ProgramDiffBlock!>!
+AiDotNet.Evolution.Programs.ProgramDiffTargetSplit.ProgramDiffTargetSplit(System.Collections.Generic.IReadOnlyList<AiDotNet.Evolution.Programs.ProgramDiffBlock!>! programBlocks, System.Collections.Generic.IReadOnlyList<AiDotNet.Evolution.Programs.ProgramDiffBlock!>! descriptionBlocks, System.Collections.Generic.IReadOnlyList<AiDotNet.Evolution.Programs.ProgramDiffFailure!>! failures) -> void
+AiDotNet.Evolution.Programs.ProgramDiversityDescriptor
+AiDotNet.Evolution.Programs.ProgramDiversityDescriptor.Compute(AiDotNet.Evolution.Programs.ProgramGenome! genome) -> double
+AiDotNet.Evolution.Programs.ProgramDiversityDescriptor.Name.get -> string!
+AiDotNet.Evolution.Programs.ProgramDiversityDescriptor.ProgramDiversityDescriptor(System.Collections.Generic.IEnumerable<AiDotNet.Evolution.Programs.ProgramGenome!>! referenceGenomes) -> void
+AiDotNet.Evolution.Programs.ProgramDiversityDescriptor.ProgramDiversityDescriptor(System.Collections.Generic.IEnumerable<AiDotNet.Evolution.Programs.ProgramGenome!>! referenceGenomes, string! name) -> void
+AiDotNet.Evolution.Programs.ProgramDiversityDescriptor.ProgramDiversityDescriptor(System.Collections.Generic.IEnumerable<string!>! referenceSources) -> void
+AiDotNet.Evolution.Programs.ProgramDiversityDescriptor.ProgramDiversityDescriptor(System.Collections.Generic.IEnumerable<string!>! referenceSources, string! name) -> void
+AiDotNet.Evolution.Programs.ProgramDiversityDescriptor.Rebase(System.Collections.Generic.IReadOnlyList<AiDotNet.Evolution.Programs.ProgramGenome!>! references) -> AiDotNet.Evolution.Programs.IRebasableProgramDescriptor!
+AiDotNet.Evolution.Programs.ProgramDiversityDescriptor.ReferenceSources.get -> System.Collections.Generic.IReadOnlyList<string!>!
+AiDotNet.Evolution.Programs.ProgramDiversityDescriptor.VersionHash.get -> string!
+AiDotNet.Evolution.Programs.ProgramEvolution
+AiDotNet.Evolution.Programs.ProgramEvolutionLlmUsage
+AiDotNet.Evolution.Programs.ProgramEvolutionLlmUsage.AbandonedProposals.get -> long
+AiDotNet.Evolution.Programs.ProgramEvolutionLlmUsage.AbandonRate.get -> double
+AiDotNet.Evolution.Programs.ProgramEvolutionLlmUsage.Add(AiDotNet.Evolution.Programs.ProgramEvolutionLlmUsage! other) -> AiDotNet.Evolution.Programs.ProgramEvolutionLlmUsage!
+AiDotNet.Evolution.Programs.ProgramEvolutionLlmUsage.CallsPerProposal.get -> double
+AiDotNet.Evolution.Programs.ProgramEvolutionLlmUsage.ChatCalls.get -> long
+AiDotNet.Evolution.Programs.ProgramEvolutionLlmUsage.InputTokens.get -> long
+AiDotNet.Evolution.Programs.ProgramEvolutionLlmUsage.OutputTokens.get -> long
+AiDotNet.Evolution.Programs.ProgramEvolutionLlmUsage.ProgramEvolutionLlmUsage(long proposals = 0, long chatCalls = 0, long retries = 0, long abandonedProposals = 0, long providerErrors = 0, long inputTokens = 0, long outputTokens = 0) -> void
+AiDotNet.Evolution.Programs.ProgramEvolutionLlmUsage.Proposals.get -> long
+AiDotNet.Evolution.Programs.ProgramEvolutionLlmUsage.ProviderErrors.get -> long
+AiDotNet.Evolution.Programs.ProgramEvolutionLlmUsage.Retries.get -> long
+AiDotNet.Evolution.Programs.ProgramEvolutionLlmUsage.TotalTokens.get -> long
+AiDotNet.Evolution.Programs.ProgramEvolutionMode
+AiDotNet.Evolution.Programs.ProgramEvolutionMode.Diff = 0 -> AiDotNet.Evolution.Programs.ProgramEvolutionMode
+AiDotNet.Evolution.Programs.ProgramEvolutionMode.FullRewrite = 1 -> AiDotNet.Evolution.Programs.ProgramEvolutionMode
+AiDotNet.Evolution.Programs.ProgramEvolutionPromptOptions
+AiDotNet.Evolution.Programs.ProgramEvolutionPromptOptions.ArtifactSecurityFilter.get -> bool
+AiDotNet.Evolution.Programs.ProgramEvolutionPromptOptions.ArtifactSecurityFilter.set -> void
+AiDotNet.Evolution.Programs.ProgramEvolutionPromptOptions.AutoFullRewriteBelowChars.get -> int
+AiDotNet.Evolution.Programs.ProgramEvolutionPromptOptions.AutoFullRewriteBelowChars.set -> void
+AiDotNet.Evolution.Programs.ProgramEvolutionPromptOptions.BuildTemplateSet() -> AiDotNet.Evolution.Prompts.ProgramPromptTemplateSet!
+AiDotNet.Evolution.Programs.ProgramEvolutionPromptOptions.Clone() -> AiDotNet.Evolution.Programs.ProgramEvolutionPromptOptions!
+AiDotNet.Evolution.Programs.ProgramEvolutionPromptOptions.ComprehensiveImplementationMinLines.get -> int?
+AiDotNet.Evolution.Programs.ProgramEvolutionPromptOptions.ComprehensiveImplementationMinLines.set -> void
+AiDotNet.Evolution.Programs.ProgramEvolutionPromptOptions.ConciseImplementationMaxLines.get -> int?
+AiDotNet.Evolution.Programs.ProgramEvolutionPromptOptions.ConciseImplementationMaxLines.set -> void
+AiDotNet.Evolution.Programs.ProgramEvolutionPromptOptions.CustomVariables.get -> System.Collections.Generic.IDictionary<string!, string!>!
+AiDotNet.Evolution.Programs.ProgramEvolutionPromptOptions.CustomVariables.set -> void
+AiDotNet.Evolution.Programs.ProgramEvolutionPromptOptions.EvaluatorSystemMessage.get -> string?
+AiDotNet.Evolution.Programs.ProgramEvolutionPromptOptions.EvaluatorSystemMessage.set -> void
+AiDotNet.Evolution.Programs.ProgramEvolutionPromptOptions.EvolutionMode.get -> AiDotNet.Evolution.Programs.ProgramPromptEvolutionMode
+AiDotNet.Evolution.Programs.ProgramEvolutionPromptOptions.EvolutionMode.set -> void
+AiDotNet.Evolution.Programs.ProgramEvolutionPromptOptions.ExtraSystemText.get -> string?
+AiDotNet.Evolution.Programs.ProgramEvolutionPromptOptions.ExtraSystemText.set -> void
+AiDotNet.Evolution.Programs.ProgramEvolutionPromptOptions.FitnessStableBand.get -> double
+AiDotNet.Evolution.Programs.ProgramEvolutionPromptOptions.FitnessStableBand.set -> void
+AiDotNet.Evolution.Programs.ProgramEvolutionPromptOptions.FragmentOverrides.get -> System.Collections.Generic.IDictionary<AiDotNet.Evolution.Programs.ProgramPromptFragmentKey, string!>!
+AiDotNet.Evolution.Programs.ProgramEvolutionPromptOptions.FragmentOverrides.set -> void
+AiDotNet.Evolution.Programs.ProgramEvolutionPromptOptions.IncludeArtifacts.get -> bool
+AiDotNet.Evolution.Programs.ProgramEvolutionPromptOptions.IncludeArtifacts.set -> void
+AiDotNet.Evolution.Programs.ProgramEvolutionPromptOptions.IncludeChangesUnderChars.get -> int?
+AiDotNet.Evolution.Programs.ProgramEvolutionPromptOptions.IncludeChangesUnderChars.set -> void
+AiDotNet.Evolution.Programs.ProgramEvolutionPromptOptions.IncludeCoverageHints.get -> bool
+AiDotNet.Evolution.Programs.ProgramEvolutionPromptOptions.IncludeCoverageHints.set -> void
+AiDotNet.Evolution.Programs.ProgramEvolutionPromptOptions.IncludeDiagnostics.get -> bool
+AiDotNet.Evolution.Programs.ProgramEvolutionPromptOptions.IncludeDiagnostics.set -> void
+AiDotNet.Evolution.Programs.ProgramEvolutionPromptOptions.IncludeFeatureCoordinates.get -> bool
+AiDotNet.Evolution.Programs.ProgramEvolutionPromptOptions.IncludeFeatureCoordinates.set -> void
+AiDotNet.Evolution.Programs.ProgramEvolutionPromptOptions.IncludeInspirations.get -> bool
+AiDotNet.Evolution.Programs.ProgramEvolutionPromptOptions.IncludeInspirations.set -> void
+AiDotNet.Evolution.Programs.ProgramEvolutionPromptOptions.IncludePreviousAttempts.get -> bool
+AiDotNet.Evolution.Programs.ProgramEvolutionPromptOptions.IncludePreviousAttempts.set -> void
+AiDotNet.Evolution.Programs.ProgramEvolutionPromptOptions.InitialChangesDescription.get -> string?
+AiDotNet.Evolution.Programs.ProgramEvolutionPromptOptions.InitialChangesDescription.set -> void
+AiDotNet.Evolution.Programs.ProgramEvolutionPromptOptions.MaxArtifactBytes.get -> int
+AiDotNet.Evolution.Programs.ProgramEvolutionPromptOptions.MaxArtifactBytes.set -> void
+AiDotNet.Evolution.Programs.ProgramEvolutionPromptOptions.MaxArtifactCount.get -> int
+AiDotNet.Evolution.Programs.ProgramEvolutionPromptOptions.MaxArtifactCount.set -> void
+AiDotNet.Evolution.Programs.ProgramEvolutionPromptOptions.MaxDiagnostics.get -> int
+AiDotNet.Evolution.Programs.ProgramEvolutionPromptOptions.MaxDiagnostics.set -> void
+AiDotNet.Evolution.Programs.ProgramEvolutionPromptOptions.MaxProgramSnippetChars.get -> int
+AiDotNet.Evolution.Programs.ProgramEvolutionPromptOptions.MaxProgramSnippetChars.set -> void
+AiDotNet.Evolution.Programs.ProgramEvolutionPromptOptions.MaxPromptChars.get -> int
+AiDotNet.Evolution.Programs.ProgramEvolutionPromptOptions.MaxPromptChars.set -> void
+AiDotNet.Evolution.Programs.ProgramEvolutionPromptOptions.NumDiversePrograms.get -> int
+AiDotNet.Evolution.Programs.ProgramEvolutionPromptOptions.NumDiversePrograms.set -> void
+AiDotNet.Evolution.Programs.ProgramEvolutionPromptOptions.NumPreviousAttempts.get -> int
+AiDotNet.Evolution.Programs.ProgramEvolutionPromptOptions.NumPreviousAttempts.set -> void
+AiDotNet.Evolution.Programs.ProgramEvolutionPromptOptions.NumTopPrograms.get -> int
+AiDotNet.Evolution.Programs.ProgramEvolutionPromptOptions.NumTopPrograms.set -> void
+AiDotNet.Evolution.Programs.ProgramEvolutionPromptOptions.ProgramEvolutionPromptOptions() -> void
+AiDotNet.Evolution.Programs.ProgramEvolutionPromptOptions.ProgramsAsChangesDescription.get -> bool
+AiDotNet.Evolution.Programs.ProgramEvolutionPromptOptions.ProgramsAsChangesDescription.set -> void
+AiDotNet.Evolution.Programs.ProgramEvolutionPromptOptions.ResolveEvolutionMode(int parentLength) -> AiDotNet.Evolution.Programs.ProgramPromptEvolutionMode
+AiDotNet.Evolution.Programs.ProgramEvolutionPromptOptions.ScoreDecimals.get -> int
+AiDotNet.Evolution.Programs.ProgramEvolutionPromptOptions.ScoreDecimals.set -> void
+AiDotNet.Evolution.Programs.ProgramEvolutionPromptOptions.SuggestSimplificationAfterChars.get -> int?
+AiDotNet.Evolution.Programs.ProgramEvolutionPromptOptions.SuggestSimplificationAfterChars.set -> void
+AiDotNet.Evolution.Programs.ProgramEvolutionPromptOptions.SystemMessage.get -> string?
+AiDotNet.Evolution.Programs.ProgramEvolutionPromptOptions.SystemMessage.set -> void
+AiDotNet.Evolution.Programs.ProgramEvolutionPromptOptions.SystemMessageMode.get -> AiDotNet.Evolution.Programs.ProgramPromptSystemMessageMode
+AiDotNet.Evolution.Programs.ProgramEvolutionPromptOptions.SystemMessageMode.set -> void
+AiDotNet.Evolution.Programs.ProgramEvolutionPromptOptions.TaskDescription.get -> string?
+AiDotNet.Evolution.Programs.ProgramEvolutionPromptOptions.TaskDescription.set -> void
+AiDotNet.Evolution.Programs.ProgramEvolutionPromptOptions.TemplateDirectory.get -> string?
+AiDotNet.Evolution.Programs.ProgramEvolutionPromptOptions.TemplateDirectory.set -> void
+AiDotNet.Evolution.Programs.ProgramEvolutionPromptOptions.TemplateOverrides.get -> System.Collections.Generic.IDictionary<AiDotNet.Evolution.Programs.ProgramPromptTemplateKey, string!>!
+AiDotNet.Evolution.Programs.ProgramEvolutionPromptOptions.TemplateOverrides.set -> void
+AiDotNet.Evolution.Programs.ProgramEvolutionPromptOptions.TemplateVariations.get -> System.Collections.Generic.IDictionary<string!, System.Collections.Generic.IReadOnlyList<string!>!>!
+AiDotNet.Evolution.Programs.ProgramEvolutionPromptOptions.TemplateVariations.set -> void
+AiDotNet.Evolution.Programs.ProgramEvolutionPromptOptions.UseTemplateStochasticity.get -> bool
+AiDotNet.Evolution.Programs.ProgramEvolutionPromptOptions.UseTemplateStochasticity.set -> void
+AiDotNet.Evolution.Programs.ProgramEvolutionPromptOptions.Validate() -> void
+AiDotNet.Evolution.Programs.ProgramEvolutionResourceOptions
+AiDotNet.Evolution.Programs.ProgramEvolutionResourceOptions.CostUnitVersionHash.get -> string!
+AiDotNet.Evolution.Programs.ProgramEvolutionResourceOptions.Ledger.get -> AiDotNet.Evolution.EvolutionResourceLedger!
+AiDotNet.Evolution.Programs.ProgramEvolutionResourceOptions.MaximumEvaluationCostUnits.get -> decimal
+AiDotNet.Evolution.Programs.ProgramEvolutionResourceOptions.ProgramEvolutionResourceOptions(AiDotNet.Evolution.EvolutionResourceLedger! ledger, decimal maximumEvaluationCostUnits, string! costUnitVersionHash) -> void
+AiDotNet.Evolution.Programs.ProgramEvolutionTask
+AiDotNet.Evolution.Programs.ProgramEvolutionTask.CanonicalizeAsync(AiDotNet.Evolution.Programs.ProgramGenome! genome, System.Threading.CancellationToken cancellationToken = default(System.Threading.CancellationToken)) -> System.Threading.Tasks.ValueTask<AiDotNet.Evolution.EvolutionCanonicalGenome<AiDotNet.Evolution.Programs.ProgramGenome!>!>
+AiDotNet.Evolution.Programs.ProgramEvolutionTask.Descriptors.get -> AiDotNet.Evolution.Programs.ProgramDescriptorSet!
+AiDotNet.Evolution.Programs.ProgramEvolutionTask.EvaluateAsync(AiDotNet.Evolution.EvolutionCandidate<AiDotNet.Evolution.Programs.ProgramGenome!>! candidate, AiDotNet.Evolution.EvolutionEvaluationContext! context, System.Threading.CancellationToken cancellationToken = default(System.Threading.CancellationToken)) -> System.Threading.Tasks.ValueTask<AiDotNet.Evolution.EvolutionTaskResult!>
+AiDotNet.Evolution.Programs.ProgramEvolutionTask.EvaluatorVersionHash.get -> string!
+AiDotNet.Evolution.Programs.ProgramEvolutionTask.GetOptions() -> AiDotNet.Evolution.Programs.ProgramTaskOptions!
+AiDotNet.Evolution.Programs.ProgramEvolutionTask.Id.get -> string!
+AiDotNet.Evolution.Programs.ProgramEvolutionTask.ProgramEvolutionTask(AiDotNet.Evolution.Programs.IProgramFitnessEvaluator! evaluator, AiDotNet.Evolution.Programs.ProgramDescriptorSet? descriptors = null, AiDotNet.Evolution.Programs.ProgramTaskOptions? options = null, string! id = "program-evolution") -> void
+AiDotNet.Evolution.Programs.ProgramEvolutionTask.VersionHash.get -> string!
+AiDotNet.Evolution.Programs.ProgramExecuteErrorCode
+AiDotNet.Evolution.Programs.ProgramExecuteErrorCode.CompilationFailed = 8 -> AiDotNet.Evolution.Programs.ProgramExecuteErrorCode
+AiDotNet.Evolution.Programs.ProgramExecuteErrorCode.ExecutionFailed = 9 -> AiDotNet.Evolution.Programs.ProgramExecuteErrorCode
+AiDotNet.Evolution.Programs.ProgramExecuteErrorCode.InvalidRequest = 1 -> AiDotNet.Evolution.Programs.ProgramExecuteErrorCode
+AiDotNet.Evolution.Programs.ProgramExecuteErrorCode.LanguageNotDetected = 5 -> AiDotNet.Evolution.Programs.ProgramExecuteErrorCode
+AiDotNet.Evolution.Programs.ProgramExecuteErrorCode.None = 0 -> AiDotNet.Evolution.Programs.ProgramExecuteErrorCode
+AiDotNet.Evolution.Programs.ProgramExecuteErrorCode.SourceCodeRequired = 2 -> AiDotNet.Evolution.Programs.ProgramExecuteErrorCode
+AiDotNet.Evolution.Programs.ProgramExecuteErrorCode.SourceCodeTooLarge = 3 -> AiDotNet.Evolution.Programs.ProgramExecuteErrorCode
+AiDotNet.Evolution.Programs.ProgramExecuteErrorCode.SqlNotSupported = 6 -> AiDotNet.Evolution.Programs.ProgramExecuteErrorCode
+AiDotNet.Evolution.Programs.ProgramExecuteErrorCode.StdInTooLarge = 4 -> AiDotNet.Evolution.Programs.ProgramExecuteErrorCode
+AiDotNet.Evolution.Programs.ProgramExecuteErrorCode.TimeoutOrCanceled = 7 -> AiDotNet.Evolution.Programs.ProgramExecuteErrorCode
+AiDotNet.Evolution.Programs.ProgramExecuteRequest
+AiDotNet.Evolution.Programs.ProgramExecuteRequest.AllowedLanguages.get -> System.Collections.Generic.List<AiDotNet.Evolution.Programs.ProgramLanguage>!
+AiDotNet.Evolution.Programs.ProgramExecuteRequest.AllowedLanguages.set -> void
+AiDotNet.Evolution.Programs.ProgramExecuteRequest.AllowUndetectedLanguageFallback.get -> bool
+AiDotNet.Evolution.Programs.ProgramExecuteRequest.AllowUndetectedLanguageFallback.set -> void
+AiDotNet.Evolution.Programs.ProgramExecuteRequest.CompileOnly.get -> bool
+AiDotNet.Evolution.Programs.ProgramExecuteRequest.CompileOnly.set -> void
+AiDotNet.Evolution.Programs.ProgramExecuteRequest.Language.get -> AiDotNet.Evolution.Programs.ProgramLanguage
+AiDotNet.Evolution.Programs.ProgramExecuteRequest.Language.set -> void
+AiDotNet.Evolution.Programs.ProgramExecuteRequest.PreferredLanguage.get -> AiDotNet.Evolution.Programs.ProgramLanguage?
+AiDotNet.Evolution.Programs.ProgramExecuteRequest.PreferredLanguage.set -> void
+AiDotNet.Evolution.Programs.ProgramExecuteRequest.ProgramExecuteRequest() -> void
+AiDotNet.Evolution.Programs.ProgramExecuteRequest.SourceCode.get -> string!
+AiDotNet.Evolution.Programs.ProgramExecuteRequest.SourceCode.set -> void
+AiDotNet.Evolution.Programs.ProgramExecuteRequest.StdIn.get -> string?
+AiDotNet.Evolution.Programs.ProgramExecuteRequest.StdIn.set -> void
+AiDotNet.Evolution.Programs.ProgramExecuteResponse
+AiDotNet.Evolution.Programs.ProgramExecuteResponse.CompilationAttempted.get -> bool
+AiDotNet.Evolution.Programs.ProgramExecuteResponse.CompilationAttempted.init -> void
+AiDotNet.Evolution.Programs.ProgramExecuteResponse.CompilationDiagnostics.get -> System.Collections.Generic.List<AiDotNet.Evolution.Programs.CompilationDiagnostic!>!
+AiDotNet.Evolution.Programs.ProgramExecuteResponse.CompilationDiagnostics.init -> void
+AiDotNet.Evolution.Programs.ProgramExecuteResponse.CompilationSucceeded.get -> bool?
+AiDotNet.Evolution.Programs.ProgramExecuteResponse.CompilationSucceeded.init -> void
+AiDotNet.Evolution.Programs.ProgramExecuteResponse.Error.get -> string?
+AiDotNet.Evolution.Programs.ProgramExecuteResponse.Error.init -> void
+AiDotNet.Evolution.Programs.ProgramExecuteResponse.ErrorCode.get -> AiDotNet.Evolution.Programs.ProgramExecuteErrorCode?
+AiDotNet.Evolution.Programs.ProgramExecuteResponse.ErrorCode.init -> void
+AiDotNet.Evolution.Programs.ProgramExecuteResponse.ExitCode.get -> int
+AiDotNet.Evolution.Programs.ProgramExecuteResponse.ExitCode.init -> void
+AiDotNet.Evolution.Programs.ProgramExecuteResponse.Language.get -> AiDotNet.Evolution.Programs.ProgramLanguage
+AiDotNet.Evolution.Programs.ProgramExecuteResponse.Language.init -> void
+AiDotNet.Evolution.Programs.ProgramExecuteResponse.ProgramExecuteResponse() -> void
+AiDotNet.Evolution.Programs.ProgramExecuteResponse.StdErr.get -> string!
+AiDotNet.Evolution.Programs.ProgramExecuteResponse.StdErr.init -> void
+AiDotNet.Evolution.Programs.ProgramExecuteResponse.StdErrTruncated.get -> bool
+AiDotNet.Evolution.Programs.ProgramExecuteResponse.StdErrTruncated.init -> void
+AiDotNet.Evolution.Programs.ProgramExecuteResponse.StdOut.get -> string!
+AiDotNet.Evolution.Programs.ProgramExecuteResponse.StdOut.init -> void
+AiDotNet.Evolution.Programs.ProgramExecuteResponse.StdOutTruncated.get -> bool
+AiDotNet.Evolution.Programs.ProgramExecuteResponse.StdOutTruncated.init -> void
+AiDotNet.Evolution.Programs.ProgramExecuteResponse.Success.get -> bool
+AiDotNet.Evolution.Programs.ProgramExecuteResponse.Success.init -> void
+AiDotNet.Evolution.Programs.ProgramGenome
+AiDotNet.Evolution.Programs.ProgramGenome.CreateOwnedSnapshot() -> AiDotNet.Evolution.Programs.ProgramGenome!
+AiDotNet.Evolution.Programs.ProgramGenome.Description.get -> string?
+AiDotNet.Evolution.Programs.ProgramGenome.Equals(AiDotNet.Evolution.Programs.ProgramGenome? other) -> bool
+AiDotNet.Evolution.Programs.ProgramGenome.Id.get -> string!
+AiDotNet.Evolution.Programs.ProgramGenome.Language.get -> AiDotNet.Evolution.Programs.ProgramLanguage
+AiDotNet.Evolution.Programs.ProgramGenome.LineCount.get -> int
+AiDotNet.Evolution.Programs.ProgramGenome.NormalizedSource.get -> string!
+AiDotNet.Evolution.Programs.ProgramGenome.ProgramGenome(string! source, AiDotNet.Evolution.Programs.ProgramLanguage language = AiDotNet.Evolution.Programs.ProgramLanguage.Generic, string? description = null) -> void
+AiDotNet.Evolution.Programs.ProgramGenome.Source.get -> string!
+AiDotNet.Evolution.Programs.ProgramGenome.WithDescription(string? description) -> AiDotNet.Evolution.Programs.ProgramGenome!
+AiDotNet.Evolution.Programs.ProgramGenome.WithSource(string! source, string? description = null) -> AiDotNet.Evolution.Programs.ProgramGenome!
+AiDotNet.Evolution.Programs.ProgramGenomeCodec
+AiDotNet.Evolution.Programs.ProgramGenomeCodec.Deserialize(string! payload) -> AiDotNet.Evolution.Programs.ProgramGenome!
+AiDotNet.Evolution.Programs.ProgramGenomeCodec.Id.get -> string!
+AiDotNet.Evolution.Programs.ProgramGenomeCodec.ProgramGenomeCodec() -> void
+AiDotNet.Evolution.Programs.ProgramGenomeCodec.Serialize(AiDotNet.Evolution.Programs.ProgramGenome! genome) -> string!
+AiDotNet.Evolution.Programs.ProgramGenomeCodec.VersionHash.get -> string!
+AiDotNet.Evolution.Programs.ProgramImprovement
+AiDotNet.Evolution.Programs.ProgramInputOutputExample
+AiDotNet.Evolution.Programs.ProgramInputOutputExample.ExpectedOutput.get -> string!
+AiDotNet.Evolution.Programs.ProgramInputOutputExample.ExpectedOutput.set -> void
+AiDotNet.Evolution.Programs.ProgramInputOutputExample.Input.get -> string!
+AiDotNet.Evolution.Programs.ProgramInputOutputExample.Input.set -> void
+AiDotNet.Evolution.Programs.ProgramInputOutputExample.ProgramInputOutputExample() -> void
+AiDotNet.Evolution.Programs.ProgramInterpreterSpecification
+AiDotNet.Evolution.Programs.ProgramInterpreterSpecification.CompileArgumentTemplate.get -> string?
+AiDotNet.Evolution.Programs.ProgramInterpreterSpecification.Executable.get -> string!
+AiDotNet.Evolution.Programs.ProgramInterpreterSpecification.ProgramInterpreterSpecification(string! executable, string! runArgumentTemplate, string? compileArgumentTemplate = null) -> void
+AiDotNet.Evolution.Programs.ProgramInterpreterSpecification.RunArgumentTemplate.get -> string!
+AiDotNet.Evolution.Programs.ProgramInterpreterSpecification.SupportsCompileOnly.get -> bool
+AiDotNet.Evolution.Programs.ProgramJudgeMember
+AiDotNet.Evolution.Programs.ProgramJudgeMember.Client.get -> AiDotNet.Evolution.Programs.IProgramChatClient!
+AiDotNet.Evolution.Programs.ProgramJudgeMember.ProgramJudgeMember(AiDotNet.Evolution.Programs.IProgramChatClient! client, double weight = 1) -> void
+AiDotNet.Evolution.Programs.ProgramJudgeMember.Weight.get -> double
+AiDotNet.Evolution.Programs.ProgramJudgePanel
+AiDotNet.Evolution.Programs.ProgramJudgePanel.GetAllResponsesAsync(System.Collections.Generic.IReadOnlyList<AiDotNet.Evolution.Programs.ProgramChatMessage!>! messages, AiDotNet.Evolution.Programs.ProgramChatOptions? options = null, System.Threading.CancellationToken cancellationToken = default(System.Threading.CancellationToken)) -> System.Threading.Tasks.Task<System.Collections.Generic.IReadOnlyList<AiDotNet.Evolution.Programs.ProgramChatResponse?>!>!
+AiDotNet.Evolution.Programs.ProgramJudgePanel.GetResponseAsync(System.Collections.Generic.IReadOnlyList<AiDotNet.Evolution.Programs.ProgramChatMessage!>! messages, AiDotNet.Evolution.Programs.ProgramChatOptions? options = null, System.Threading.CancellationToken cancellationToken = default(System.Threading.CancellationToken)) -> System.Threading.Tasks.Task<AiDotNet.Evolution.Programs.ProgramChatResponse!>!
+AiDotNet.Evolution.Programs.ProgramJudgePanel.Members.get -> System.Collections.Generic.IReadOnlyList<AiDotNet.Evolution.Programs.ProgramJudgeMember!>!
+AiDotNet.Evolution.Programs.ProgramJudgePanel.ModelId.get -> string!
+AiDotNet.Evolution.Programs.ProgramJudgePanel.ProgramJudgePanel(System.Collections.Generic.IEnumerable<AiDotNet.Evolution.Programs.ProgramJudgeMember!>! members) -> void
+AiDotNet.Evolution.Programs.ProgramLanguage
+AiDotNet.Evolution.Programs.ProgramLanguage.C = 6 -> AiDotNet.Evolution.Programs.ProgramLanguage
+AiDotNet.Evolution.Programs.ProgramLanguage.CPlusPlus = 5 -> AiDotNet.Evolution.Programs.ProgramLanguage
+AiDotNet.Evolution.Programs.ProgramLanguage.CSharp = 1 -> AiDotNet.Evolution.Programs.ProgramLanguage
+AiDotNet.Evolution.Programs.ProgramLanguage.Generic = 10 -> AiDotNet.Evolution.Programs.ProgramLanguage
+AiDotNet.Evolution.Programs.ProgramLanguage.Go = 7 -> AiDotNet.Evolution.Programs.ProgramLanguage
+AiDotNet.Evolution.Programs.ProgramLanguage.Java = 2 -> AiDotNet.Evolution.Programs.ProgramLanguage
+AiDotNet.Evolution.Programs.ProgramLanguage.JavaScript = 3 -> AiDotNet.Evolution.Programs.ProgramLanguage
+AiDotNet.Evolution.Programs.ProgramLanguage.Python = 0 -> AiDotNet.Evolution.Programs.ProgramLanguage
+AiDotNet.Evolution.Programs.ProgramLanguage.Rust = 8 -> AiDotNet.Evolution.Programs.ProgramLanguage
+AiDotNet.Evolution.Programs.ProgramLanguage.SQL = 9 -> AiDotNet.Evolution.Programs.ProgramLanguage
+AiDotNet.Evolution.Programs.ProgramLanguage.TypeScript = 4 -> AiDotNet.Evolution.Programs.ProgramLanguage
+AiDotNet.Evolution.Programs.ProgramLanguageDetector
+AiDotNet.Evolution.Programs.ProgramLengthDescriptor
+AiDotNet.Evolution.Programs.ProgramLengthDescriptor.Compute(AiDotNet.Evolution.Programs.ProgramGenome! genome) -> double
+AiDotNet.Evolution.Programs.ProgramLengthDescriptor.Name.get -> string!
+AiDotNet.Evolution.Programs.ProgramLengthDescriptor.ProgramLengthDescriptor(string! name = "length") -> void
+AiDotNet.Evolution.Programs.ProgramMeasurementObservation
+AiDotNet.Evolution.Programs.ProgramMeasurementObservation.ProgramMeasurementObservation(string! sampleId, double value) -> void
+AiDotNet.Evolution.Programs.ProgramMeasurementObservation.SampleId.get -> string!
+AiDotNet.Evolution.Programs.ProgramMeasurementObservation.Value.get -> double
+AiDotNet.Evolution.Programs.ProgramMeasurementStatistics
+AiDotNet.Evolution.Programs.ProgramMetricAggregationOptions
+AiDotNet.Evolution.Programs.ProgramMetricAggregationOptions.AllowTextMetricConversion.get -> bool
+AiDotNet.Evolution.Programs.ProgramMetricAggregationOptions.AllowTextMetricConversion.set -> void
+AiDotNet.Evolution.Programs.ProgramMetricAggregationOptions.AugmentationCoefficient.get -> double
+AiDotNet.Evolution.Programs.ProgramMetricAggregationOptions.AugmentationCoefficient.set -> void
+AiDotNet.Evolution.Programs.ProgramMetricAggregationOptions.Clone() -> AiDotNet.Evolution.Programs.ProgramMetricAggregationOptions!
+AiDotNet.Evolution.Programs.ProgramMetricAggregationOptions.CombinedScoreKey.get -> string!
+AiDotNet.Evolution.Programs.ProgramMetricAggregationOptions.CombinedScoreKey.set -> void
+AiDotNet.Evolution.Programs.ProgramMetricAggregationOptions.ExcludedFeatureDimensions.get -> System.Collections.Generic.ICollection<string!>!
+AiDotNet.Evolution.Programs.ProgramMetricAggregationOptions.ExcludedFeatureDimensions.set -> void
+AiDotNet.Evolution.Programs.ProgramMetricAggregationOptions.ProgramMetricAggregationOptions() -> void
+AiDotNet.Evolution.Programs.ProgramMetricAggregationOptions.ReferencePoint.get -> System.Collections.Generic.IDictionary<string!, double>!
+AiDotNet.Evolution.Programs.ProgramMetricAggregationOptions.ReferencePoint.set -> void
+AiDotNet.Evolution.Programs.ProgramMetricAggregationOptions.RequireAllWeightedMetrics.get -> bool
+AiDotNet.Evolution.Programs.ProgramMetricAggregationOptions.RequireAllWeightedMetrics.set -> void
+AiDotNet.Evolution.Programs.ProgramMetricAggregationOptions.Strategy.get -> AiDotNet.Evolution.Programs.ProgramMetricAggregationStrategy
+AiDotNet.Evolution.Programs.ProgramMetricAggregationOptions.Strategy.set -> void
+AiDotNet.Evolution.Programs.ProgramMetricAggregationOptions.Validate() -> void
+AiDotNet.Evolution.Programs.ProgramMetricAggregationOptions.Weights.get -> System.Collections.Generic.IDictionary<string!, double>!
+AiDotNet.Evolution.Programs.ProgramMetricAggregationOptions.Weights.set -> void
+AiDotNet.Evolution.Programs.ProgramMetricAggregationStrategy
+AiDotNet.Evolution.Programs.ProgramMetricAggregationStrategy.CombinedScoreOrMean = 0 -> AiDotNet.Evolution.Programs.ProgramMetricAggregationStrategy
+AiDotNet.Evolution.Programs.ProgramMetricAggregationStrategy.Mean = 1 -> AiDotNet.Evolution.Programs.ProgramMetricAggregationStrategy
+AiDotNet.Evolution.Programs.ProgramMetricAggregationStrategy.Tchebycheff = 3 -> AiDotNet.Evolution.Programs.ProgramMetricAggregationStrategy
+AiDotNet.Evolution.Programs.ProgramMetricAggregationStrategy.Weighted = 2 -> AiDotNet.Evolution.Programs.ProgramMetricAggregationStrategy
+AiDotNet.Evolution.Programs.ProgramMetricIssueReason
+AiDotNet.Evolution.Programs.ProgramMetricIssueReason.BooleanFlag = 1 -> AiDotNet.Evolution.Programs.ProgramMetricIssueReason
+AiDotNet.Evolution.Programs.ProgramMetricIssueReason.ExcludedFeatureDimension = 5 -> AiDotNet.Evolution.Programs.ProgramMetricIssueReason
+AiDotNet.Evolution.Programs.ProgramMetricIssueReason.MissingMetric = 4 -> AiDotNet.Evolution.Programs.ProgramMetricIssueReason
+AiDotNet.Evolution.Programs.ProgramMetricIssueReason.NonNumericText = 0 -> AiDotNet.Evolution.Programs.ProgramMetricIssueReason
+AiDotNet.Evolution.Programs.ProgramMetricIssueReason.NoNumericValues = 7 -> AiDotNet.Evolution.Programs.ProgramMetricIssueReason
+AiDotNet.Evolution.Programs.ProgramMetricIssueReason.NotANumber = 2 -> AiDotNet.Evolution.Programs.ProgramMetricIssueReason
+AiDotNet.Evolution.Programs.ProgramMetricIssueReason.NotFinite = 3 -> AiDotNet.Evolution.Programs.ProgramMetricIssueReason
+AiDotNet.Evolution.Programs.ProgramMetricIssueReason.NoWeightDeclared = 6 -> AiDotNet.Evolution.Programs.ProgramMetricIssueReason
+AiDotNet.Evolution.Programs.ProgramMetricValueKind
+AiDotNet.Evolution.Programs.ProgramMetricValueKind.Flag = 1 -> AiDotNet.Evolution.Programs.ProgramMetricValueKind
+AiDotNet.Evolution.Programs.ProgramMetricValueKind.Number = 0 -> AiDotNet.Evolution.Programs.ProgramMetricValueKind
+AiDotNet.Evolution.Programs.ProgramMetricValueKind.Text = 2 -> AiDotNet.Evolution.Programs.ProgramMetricValueKind
+AiDotNet.Evolution.Programs.ProgramNoiseEvaluationOptions
+AiDotNet.Evolution.Programs.ProgramNoiseEvaluationOptions.AuditCandidates.get -> int
+AiDotNet.Evolution.Programs.ProgramNoiseEvaluationOptions.Confidence.get -> double
+AiDotNet.Evolution.Programs.ProgramNoiseEvaluationOptions.ConfirmationSamples.get -> int
+AiDotNet.Evolution.Programs.ProgramNoiseEvaluationOptions.MaximumChallenges.get -> int
+AiDotNet.Evolution.Programs.ProgramNoiseEvaluationOptions.MinimumImprovement.get -> double
+AiDotNet.Evolution.Programs.ProgramNoiseEvaluationOptions.ProgramNoiseEvaluationOptions(int screenSamples = 2, int searchSamples = 4, int confirmationSamples = 128, int auditCandidates = 8, int maximumChallenges = 16, double minimumQuality = 0, double maximumQuality = 1, double screenThreshold = 0.5, double usefulThreshold = 0.5, double minimumImprovement = 0.01, decimal maximumCostPerSample = 2, double confidence = 0.95, AiDotNet.Evolution.EvolutionOptimizationDirection direction = AiDotNet.Evolution.EvolutionOptimizationDirection.Maximize) -> void
+AiDotNet.Evolution.Programs.ProgramNoiseEvaluationOptions.ScreenPlan.get -> AiDotNet.Evolution.EvolutionReplicationPlan!
+AiDotNet.Evolution.Programs.ProgramNoiseEvaluationOptions.ScreenThreshold.get -> double
+AiDotNet.Evolution.Programs.ProgramNoiseEvaluationOptions.SearchSamples.get -> int
+AiDotNet.Evolution.Programs.ProgramNoiseEvaluationOptions.UsefulThreshold.get -> double
+AiDotNet.Evolution.Programs.ProgramNoiseEvaluationSession
+AiDotNet.Evolution.Programs.ProgramNoiseEvaluationSession.ChallengeAsync(int slot, AiDotNet.Evolution.Programs.ProgramGenome! candidate, AiDotNet.Evolution.Programs.ProgramGenome! incumbent, ulong seed, System.Threading.CancellationToken cancellationToken = default(System.Threading.CancellationToken)) -> System.Threading.Tasks.ValueTask<AiDotNet.Evolution.EvolutionIncumbentChallengeReport!>
+AiDotNet.Evolution.Programs.ProgramNoiseEvaluationSession.ProgramNoiseEvaluationSession(AiDotNet.Evolution.Programs.ProgramNoiseEvaluationOptions! options, AiDotNet.Evolution.EvolutionResourceLedger! ledger, AiDotNet.Evolution.Programs.IProgramFitnessEvaluator! correctness, AiDotNet.Evolution.Programs.IProgramFitnessEvaluator! screen, AiDotNet.Evolution.Programs.IProgramFitnessEvaluator! full, AiDotNet.Evolution.Programs.IProgramFitnessEvaluator! confirmationCorrectness, AiDotNet.Evolution.Programs.IProgramFitnessEvaluator! confirmation) -> void
+AiDotNet.Evolution.Programs.ProgramNoiseEvaluationSession.ScreenAndAuditAsync(string! batchId, System.Collections.Generic.IEnumerable<AiDotNet.Evolution.Programs.ProgramGenome!>! candidates, ulong searchSeed, ulong auditSeed, System.Threading.CancellationToken cancellationToken = default(System.Threading.CancellationToken)) -> System.Threading.Tasks.ValueTask<AiDotNet.Evolution.Programs.ProgramNoiseScreenReport!>
+AiDotNet.Evolution.Programs.ProgramNoiseEvaluationSession.VersionHash.get -> string!
+AiDotNet.Evolution.Programs.ProgramNoiseScreenEntry
+AiDotNet.Evolution.Programs.ProgramNoiseScreenEntry.Genome.get -> AiDotNet.Evolution.Programs.ProgramGenome!
+AiDotNet.Evolution.Programs.ProgramNoiseScreenEntry.Measurements.get -> AiDotNet.Evolution.EvolutionReplicationReport!
+AiDotNet.Evolution.Programs.ProgramNoiseScreenEntry.Passed.get -> bool
+AiDotNet.Evolution.Programs.ProgramNoiseScreenReport
+AiDotNet.Evolution.Programs.ProgramNoiseScreenReport.Audit.get -> AiDotNet.Evolution.EvolutionRejectionAuditReport?
+AiDotNet.Evolution.Programs.ProgramNoiseScreenReport.AuditDispatched.get -> bool
+AiDotNet.Evolution.Programs.ProgramNoiseScreenReport.Canceled.get -> bool
+AiDotNet.Evolution.Programs.ProgramNoiseScreenReport.ChargedCostUnits.get -> decimal
+AiDotNet.Evolution.Programs.ProgramNoiseScreenReport.Entries.get -> System.Collections.Generic.IReadOnlyList<AiDotNet.Evolution.Programs.ProgramNoiseScreenEntry!>!
+AiDotNet.Evolution.Programs.ProgramNoiseScreenReport.IsComplete.get -> bool
+AiDotNet.Evolution.Programs.ProgramNoiseScreenReport.Requested.get -> int
+AiDotNet.Evolution.Programs.ProgramOutputComparison
+AiDotNet.Evolution.Programs.ProgramOutputComparison.NormalizedWhitespace = 3 -> AiDotNet.Evolution.Programs.ProgramOutputComparison
+AiDotNet.Evolution.Programs.ProgramOutputComparison.Ordinal = 0 -> AiDotNet.Evolution.Programs.ProgramOutputComparison
+AiDotNet.Evolution.Programs.ProgramOutputComparison.TrimmedOrdinal = 1 -> AiDotNet.Evolution.Programs.ProgramOutputComparison
+AiDotNet.Evolution.Programs.ProgramOutputComparison.TrimmedOrdinalIgnoreCase = 2 -> AiDotNet.Evolution.Programs.ProgramOutputComparison
+AiDotNet.Evolution.Programs.ProgramPlanner
+AiDotNet.Evolution.Programs.ProgramPromptEvolutionMode
+AiDotNet.Evolution.Programs.ProgramPromptEvolutionMode.AutoBySize = 2 -> AiDotNet.Evolution.Programs.ProgramPromptEvolutionMode
+AiDotNet.Evolution.Programs.ProgramPromptEvolutionMode.Diff = 0 -> AiDotNet.Evolution.Programs.ProgramPromptEvolutionMode
+AiDotNet.Evolution.Programs.ProgramPromptEvolutionMode.FullRewrite = 1 -> AiDotNet.Evolution.Programs.ProgramPromptEvolutionMode
+AiDotNet.Evolution.Programs.ProgramPromptExampleKind
+AiDotNet.Evolution.Programs.ProgramPromptExampleKind.Diverse = 1 -> AiDotNet.Evolution.Programs.ProgramPromptExampleKind
+AiDotNet.Evolution.Programs.ProgramPromptExampleKind.Inspiration = 2 -> AiDotNet.Evolution.Programs.ProgramPromptExampleKind
+AiDotNet.Evolution.Programs.ProgramPromptExampleKind.Migrant = 3 -> AiDotNet.Evolution.Programs.ProgramPromptExampleKind
+AiDotNet.Evolution.Programs.ProgramPromptExampleKind.Random = 4 -> AiDotNet.Evolution.Programs.ProgramPromptExampleKind
+AiDotNet.Evolution.Programs.ProgramPromptExampleKind.TopProgram = 0 -> AiDotNet.Evolution.Programs.ProgramPromptExampleKind
+AiDotNet.Evolution.Programs.ProgramPromptFragmentKey
+AiDotNet.Evolution.Programs.ProgramPromptFragmentKey.ArtifactTitle = 26 -> AiDotNet.Evolution.Programs.ProgramPromptFragmentKey
+AiDotNet.Evolution.Programs.ProgramPromptFragmentKey.ArtifactTruncated = 27 -> AiDotNet.Evolution.Programs.ProgramPromptFragmentKey
+AiDotNet.Evolution.Programs.ProgramPromptFragmentKey.AttemptAllMetricsImproved = 9 -> AiDotNet.Evolution.Programs.ProgramPromptFragmentKey
+AiDotNet.Evolution.Programs.ProgramPromptFragmentKey.AttemptAllMetricsRegressed = 10 -> AiDotNet.Evolution.Programs.ProgramPromptFragmentKey
+AiDotNet.Evolution.Programs.ProgramPromptFragmentKey.AttemptMixedMetrics = 11 -> AiDotNet.Evolution.Programs.ProgramPromptFragmentKey
+AiDotNet.Evolution.Programs.ProgramPromptFragmentKey.AttemptUnknownChanges = 8 -> AiDotNet.Evolution.Programs.ProgramPromptFragmentKey
+AiDotNet.Evolution.Programs.ProgramPromptFragmentKey.CodeTooLong = 5 -> AiDotNet.Evolution.Programs.ProgramPromptFragmentKey
+AiDotNet.Evolution.Programs.ProgramPromptFragmentKey.CoverageHint = 7 -> AiDotNet.Evolution.Programs.ProgramPromptFragmentKey
+AiDotNet.Evolution.Programs.ProgramPromptFragmentKey.DiverseProgramMetricsPrefix = 14 -> AiDotNet.Evolution.Programs.ProgramPromptFragmentKey
+AiDotNet.Evolution.Programs.ProgramPromptFragmentKey.DiverseProgramsTitle = 13 -> AiDotNet.Evolution.Programs.ProgramPromptFragmentKey
+AiDotNet.Evolution.Programs.ProgramPromptFragmentKey.ExploringRegion = 3 -> AiDotNet.Evolution.Programs.ProgramPromptFragmentKey
+AiDotNet.Evolution.Programs.ProgramPromptFragmentKey.FitnessDeclined = 1 -> AiDotNet.Evolution.Programs.ProgramPromptFragmentKey
+AiDotNet.Evolution.Programs.ProgramPromptFragmentKey.FitnessImproved = 0 -> AiDotNet.Evolution.Programs.ProgramPromptFragmentKey
+AiDotNet.Evolution.Programs.ProgramPromptFragmentKey.FitnessStable = 2 -> AiDotNet.Evolution.Programs.ProgramPromptFragmentKey
+AiDotNet.Evolution.Programs.ProgramPromptFragmentKey.InspirationChangesPrefix = 22 -> AiDotNet.Evolution.Programs.ProgramPromptFragmentKey
+AiDotNet.Evolution.Programs.ProgramPromptFragmentKey.InspirationComprehensiveImplementation = 29 -> AiDotNet.Evolution.Programs.ProgramPromptFragmentKey
+AiDotNet.Evolution.Programs.ProgramPromptFragmentKey.InspirationConciseImplementation = 28 -> AiDotNet.Evolution.Programs.ProgramPromptFragmentKey
+AiDotNet.Evolution.Programs.ProgramPromptFragmentKey.InspirationMetricsAlternative = 24 -> AiDotNet.Evolution.Programs.ProgramPromptFragmentKey
+AiDotNet.Evolution.Programs.ProgramPromptFragmentKey.InspirationMetricsExcellent = 23 -> AiDotNet.Evolution.Programs.ProgramPromptFragmentKey
+AiDotNet.Evolution.Programs.ProgramPromptFragmentKey.InspirationNoFeatures = 25 -> AiDotNet.Evolution.Programs.ProgramPromptFragmentKey
+AiDotNet.Evolution.Programs.ProgramPromptFragmentKey.InspirationTypeAlternative = 19 -> AiDotNet.Evolution.Programs.ProgramPromptFragmentKey
+AiDotNet.Evolution.Programs.ProgramPromptFragmentKey.InspirationTypeDiverse = 15 -> AiDotNet.Evolution.Programs.ProgramPromptFragmentKey
+AiDotNet.Evolution.Programs.ProgramPromptFragmentKey.InspirationTypeExperimental = 20 -> AiDotNet.Evolution.Programs.ProgramPromptFragmentKey
+AiDotNet.Evolution.Programs.ProgramPromptFragmentKey.InspirationTypeExploratory = 21 -> AiDotNet.Evolution.Programs.ProgramPromptFragmentKey
+AiDotNet.Evolution.Programs.ProgramPromptFragmentKey.InspirationTypeHighPerformer = 18 -> AiDotNet.Evolution.Programs.ProgramPromptFragmentKey
+AiDotNet.Evolution.Programs.ProgramPromptFragmentKey.InspirationTypeMigrant = 16 -> AiDotNet.Evolution.Programs.ProgramPromptFragmentKey
+AiDotNet.Evolution.Programs.ProgramPromptFragmentKey.InspirationTypeRandom = 17 -> AiDotNet.Evolution.Programs.ProgramPromptFragmentKey
+AiDotNet.Evolution.Programs.ProgramPromptFragmentKey.NoFeatureCoordinates = 4 -> AiDotNet.Evolution.Programs.ProgramPromptFragmentKey
+AiDotNet.Evolution.Programs.ProgramPromptFragmentKey.NoSpecificGuidance = 6 -> AiDotNet.Evolution.Programs.ProgramPromptFragmentKey
+AiDotNet.Evolution.Programs.ProgramPromptFragmentKey.TopProgramMetricsPrefix = 12 -> AiDotNet.Evolution.Programs.ProgramPromptFragmentKey
+AiDotNet.Evolution.Programs.ProgramPromptSystemMessageMode
+AiDotNet.Evolution.Programs.ProgramPromptSystemMessageMode.Literal = 1 -> AiDotNet.Evolution.Programs.ProgramPromptSystemMessageMode
+AiDotNet.Evolution.Programs.ProgramPromptSystemMessageMode.TemplateKey = 0 -> AiDotNet.Evolution.Programs.ProgramPromptSystemMessageMode
+AiDotNet.Evolution.Programs.ProgramPromptTemplateKey
+AiDotNet.Evolution.Programs.ProgramPromptTemplateKey.DiffUser = 2 -> AiDotNet.Evolution.Programs.ProgramPromptTemplateKey
+AiDotNet.Evolution.Programs.ProgramPromptTemplateKey.Evaluation = 9 -> AiDotNet.Evolution.Programs.ProgramPromptTemplateKey
+AiDotNet.Evolution.Programs.ProgramPromptTemplateKey.EvaluatorSystemMessage = 1 -> AiDotNet.Evolution.Programs.ProgramPromptTemplateKey
+AiDotNet.Evolution.Programs.ProgramPromptTemplateKey.EvolutionHistory = 4 -> AiDotNet.Evolution.Programs.ProgramPromptTemplateKey
+AiDotNet.Evolution.Programs.ProgramPromptTemplateKey.FullRewriteUser = 3 -> AiDotNet.Evolution.Programs.ProgramPromptTemplateKey
+AiDotNet.Evolution.Programs.ProgramPromptTemplateKey.InspirationProgram = 8 -> AiDotNet.Evolution.Programs.ProgramPromptTemplateKey
+AiDotNet.Evolution.Programs.ProgramPromptTemplateKey.InspirationsSection = 7 -> AiDotNet.Evolution.Programs.ProgramPromptTemplateKey
+AiDotNet.Evolution.Programs.ProgramPromptTemplateKey.PreviousAttempt = 5 -> AiDotNet.Evolution.Programs.ProgramPromptTemplateKey
+AiDotNet.Evolution.Programs.ProgramPromptTemplateKey.SystemMessage = 0 -> AiDotNet.Evolution.Programs.ProgramPromptTemplateKey
+AiDotNet.Evolution.Programs.ProgramPromptTemplateKey.SystemMessageChangesDescription = 10 -> AiDotNet.Evolution.Programs.ProgramPromptTemplateKey
+AiDotNet.Evolution.Programs.ProgramPromptTemplateKey.SystemMessageWithChangesDescription = 11 -> AiDotNet.Evolution.Programs.ProgramPromptTemplateKey
+AiDotNet.Evolution.Programs.ProgramPromptTemplateKey.TopProgram = 6 -> AiDotNet.Evolution.Programs.ProgramPromptTemplateKey
+AiDotNet.Evolution.Programs.ProgramPromptTemplateKey.UserMessageWithChangesDescription = 12 -> AiDotNet.Evolution.Programs.ProgramPromptTemplateKey
+AiDotNet.Evolution.Programs.ProgramProposalAttempt
+AiDotNet.Evolution.Programs.ProgramProposalAttempt.AttemptNumber.get -> int
+AiDotNet.Evolution.Programs.ProgramProposalAttempt.Detail.get -> string!
+AiDotNet.Evolution.Programs.ProgramProposalAttempt.InputTokens.get -> int
+AiDotNet.Evolution.Programs.ProgramProposalAttempt.IsAccepted.get -> bool
+AiDotNet.Evolution.Programs.ProgramProposalAttempt.Outcome.get -> AiDotNet.Evolution.Programs.ProgramProposalOutcome
+AiDotNet.Evolution.Programs.ProgramProposalAttempt.OutputTokens.get -> int
+AiDotNet.Evolution.Programs.ProgramProposalAttempt.ParentGenomeId.get -> string!
+AiDotNet.Evolution.Programs.ProgramProposalAttempt.ProgramProposalAttempt(string! parentGenomeId, int attemptNumber, AiDotNet.Evolution.Programs.ProgramProposalOutcome outcome, string? detail = null, int inputTokens = 0, int outputTokens = 0) -> void
+AiDotNet.Evolution.Programs.ProgramProposalAttempt.TotalTokens.get -> long
+AiDotNet.Evolution.Programs.ProgramProposalOptions
+AiDotNet.Evolution.Programs.ProgramProposalOptions.ProgramProposalOptions() -> void
+AiDotNet.Evolution.Programs.ProgramProposalOptions.Prompt.get -> AiDotNet.Evolution.Programs.ProgramEvolutionPromptOptions!
+AiDotNet.Evolution.Programs.ProgramProposalOptions.Prompt.set -> void
+AiDotNet.Evolution.Programs.ProgramProposalOptions.TaskDescription.get -> string?
+AiDotNet.Evolution.Programs.ProgramProposalOptions.TaskDescription.set -> void
+AiDotNet.Evolution.Programs.ProgramProposalOutcome
+AiDotNet.Evolution.Programs.ProgramProposalOutcome.Accepted = 0 -> AiDotNet.Evolution.Programs.ProgramProposalOutcome
+AiDotNet.Evolution.Programs.ProgramProposalOutcome.EmptyResponse = 1 -> AiDotNet.Evolution.Programs.ProgramProposalOutcome
+AiDotNet.Evolution.Programs.ProgramProposalOutcome.Exhausted = 6 -> AiDotNet.Evolution.Programs.ProgramProposalOutcome
+AiDotNet.Evolution.Programs.ProgramProposalOutcome.ParseFailed = 2 -> AiDotNet.Evolution.Programs.ProgramProposalOutcome
+AiDotNet.Evolution.Programs.ProgramProposalOutcome.ProviderError = 5 -> AiDotNet.Evolution.Programs.ProgramProposalOutcome
+AiDotNet.Evolution.Programs.ProgramProposalOutcome.TooLong = 4 -> AiDotNet.Evolution.Programs.ProgramProposalOutcome
+AiDotNet.Evolution.Programs.ProgramProposalOutcome.Unchanged = 3 -> AiDotNet.Evolution.Programs.ProgramProposalOutcome
+AiDotNet.Evolution.Programs.ProgramSandboxLimitOptions
+AiDotNet.Evolution.Programs.ProgramSandboxLimitOptions.Clone() -> AiDotNet.Evolution.Programs.ProgramSandboxLimitOptions!
+AiDotNet.Evolution.Programs.ProgramSandboxLimitOptions.CpuLimit.get -> double
+AiDotNet.Evolution.Programs.ProgramSandboxLimitOptions.CpuLimit.set -> void
+AiDotNet.Evolution.Programs.ProgramSandboxLimitOptions.GetMemoryLimitBytes() -> long
+AiDotNet.Evolution.Programs.ProgramSandboxLimitOptions.GetTimeLimit() -> System.TimeSpan
+AiDotNet.Evolution.Programs.ProgramSandboxLimitOptions.MaxConcurrentExecutions.get -> int
+AiDotNet.Evolution.Programs.ProgramSandboxLimitOptions.MaxConcurrentExecutions.set -> void
+AiDotNet.Evolution.Programs.ProgramSandboxLimitOptions.MaxSourceCodeChars.get -> int
+AiDotNet.Evolution.Programs.ProgramSandboxLimitOptions.MaxSourceCodeChars.set -> void
+AiDotNet.Evolution.Programs.ProgramSandboxLimitOptions.MaxStdErrChars.get -> int
+AiDotNet.Evolution.Programs.ProgramSandboxLimitOptions.MaxStdErrChars.set -> void
+AiDotNet.Evolution.Programs.ProgramSandboxLimitOptions.MaxStdInChars.get -> int
+AiDotNet.Evolution.Programs.ProgramSandboxLimitOptions.MaxStdInChars.set -> void
+AiDotNet.Evolution.Programs.ProgramSandboxLimitOptions.MaxStdOutChars.get -> int
+AiDotNet.Evolution.Programs.ProgramSandboxLimitOptions.MaxStdOutChars.set -> void
+AiDotNet.Evolution.Programs.ProgramSandboxLimitOptions.MemoryLimitMb.get -> int
+AiDotNet.Evolution.Programs.ProgramSandboxLimitOptions.MemoryLimitMb.set -> void
+AiDotNet.Evolution.Programs.ProgramSandboxLimitOptions.ProgramSandboxLimitOptions() -> void
+AiDotNet.Evolution.Programs.ProgramSandboxLimitOptions.TimeLimitSeconds.get -> int
+AiDotNet.Evolution.Programs.ProgramSandboxLimitOptions.TimeLimitSeconds.set -> void
+AiDotNet.Evolution.Programs.ProgramSandboxLimitOptions.Validate() -> void
+AiDotNet.Evolution.Programs.ProgramSandboxMode
+AiDotNet.Evolution.Programs.ProgramSandboxMode.InProcessUnsafe = 2 -> AiDotNet.Evolution.Programs.ProgramSandboxMode
+AiDotNet.Evolution.Programs.ProgramSandboxMode.OutOfProcessWorker = 0 -> AiDotNet.Evolution.Programs.ProgramSandboxMode
+AiDotNet.Evolution.Programs.ProgramSandboxMode.Serving = 1 -> AiDotNet.Evolution.Programs.ProgramSandboxMode
+AiDotNet.Evolution.Programs.ProgramSandboxOptions
+AiDotNet.Evolution.Programs.ProgramSandboxOptions.AllowUnsafeInProcessExecution.get -> bool
+AiDotNet.Evolution.Programs.ProgramSandboxOptions.AllowUnsafeInProcessExecution.set -> void
+AiDotNet.Evolution.Programs.ProgramSandboxOptions.Clone() -> AiDotNet.Evolution.Programs.ProgramSandboxOptions!
+AiDotNet.Evolution.Programs.ProgramSandboxOptions.Interpreters.get -> System.Collections.Generic.IDictionary<AiDotNet.Evolution.Programs.ProgramLanguage, AiDotNet.Evolution.Programs.ProgramInterpreterSpecification!>!
+AiDotNet.Evolution.Programs.ProgramSandboxOptions.Limits.get -> AiDotNet.Evolution.Programs.ProgramSandboxLimitOptions!
+AiDotNet.Evolution.Programs.ProgramSandboxOptions.Limits.set -> void
+AiDotNet.Evolution.Programs.ProgramSandboxOptions.Mode.get -> AiDotNet.Evolution.Programs.ProgramSandboxMode
+AiDotNet.Evolution.Programs.ProgramSandboxOptions.Mode.set -> void
+AiDotNet.Evolution.Programs.ProgramSandboxOptions.ProgramSandboxOptions() -> void
+AiDotNet.Evolution.Programs.ProgramSandboxOptions.RuntimeVersion.get -> string!
+AiDotNet.Evolution.Programs.ProgramSandboxOptions.RuntimeVersion.set -> void
+AiDotNet.Evolution.Programs.ProgramSandboxOptions.SetInterpreter(AiDotNet.Evolution.Programs.ProgramLanguage language, AiDotNet.Evolution.Programs.ProgramInterpreterSpecification! specification) -> void
+AiDotNet.Evolution.Programs.ProgramSandboxOptions.TryGetInterpreter(AiDotNet.Evolution.Programs.ProgramLanguage language, out AiDotNet.Evolution.Programs.ProgramInterpreterSpecification? specification) -> bool
+AiDotNet.Evolution.Programs.ProgramSandboxOptions.Validate() -> void
+AiDotNet.Evolution.Programs.ProgramSandboxOptions.WorkingDirectory.get -> string?
+AiDotNet.Evolution.Programs.ProgramSandboxOptions.WorkingDirectory.set -> void
+AiDotNet.Evolution.Programs.ProgramSnapshot
+AiDotNet.Evolution.Programs.ProgramSnapshot.Files.get -> System.Collections.Generic.IReadOnlyDictionary<string!, string!>!
+AiDotNet.Evolution.Programs.ProgramSnapshot.Fingerprint.get -> string!
+AiDotNet.Evolution.Programs.ProgramSnapshot.ProgramSnapshot(System.Collections.Generic.IEnumerable<System.Collections.Generic.KeyValuePair<string!, string!>>! files) -> void
+AiDotNet.Evolution.Programs.ProgramTaskOptions
+AiDotNet.Evolution.Programs.ProgramTaskOptions.Diff.get -> AiDotNet.Evolution.Programs.ProgramDiffOptions!
+AiDotNet.Evolution.Programs.ProgramTaskOptions.Diff.set -> void
+AiDotNet.Evolution.Programs.ProgramTaskOptions.EnforceEvolveBlocks.get -> bool
+AiDotNet.Evolution.Programs.ProgramTaskOptions.EnforceEvolveBlocks.set -> void
+AiDotNet.Evolution.Programs.ProgramTaskOptions.EvolveBlockEndMarker.get -> string?
+AiDotNet.Evolution.Programs.ProgramTaskOptions.EvolveBlockEndMarker.set -> void
+AiDotNet.Evolution.Programs.ProgramTaskOptions.EvolveBlockStartMarker.get -> string?
+AiDotNet.Evolution.Programs.ProgramTaskOptions.EvolveBlockStartMarker.set -> void
+AiDotNet.Evolution.Programs.ProgramTaskOptions.Language.get -> AiDotNet.Evolution.Programs.ProgramLanguage
+AiDotNet.Evolution.Programs.ProgramTaskOptions.Language.set -> void
+AiDotNet.Evolution.Programs.ProgramTaskOptions.MaxProgramChars.get -> int
+AiDotNet.Evolution.Programs.ProgramTaskOptions.MaxProgramChars.set -> void
+AiDotNet.Evolution.Programs.ProgramTaskOptions.ProgramTaskOptions() -> void
+AiDotNet.Evolution.Programs.ProgramTaskOptions.ResolveEvolveBlockMarkers() -> AiDotNet.Evolution.Programs.EvolveBlockMarkers
+AiDotNet.Evolution.Programs.ProgramTaskOptions.ResourceAccounting.get -> AiDotNet.Evolution.Programs.ProgramEvolutionResourceOptions?
+AiDotNet.Evolution.Programs.ProgramTaskOptions.ResourceAccounting.set -> void
+AiDotNet.Evolution.Programs.ProgramTokenComplexityDescriptor
+AiDotNet.Evolution.Programs.ProgramTokenComplexityDescriptor.Compute(AiDotNet.Evolution.Programs.ProgramGenome! genome) -> double
+AiDotNet.Evolution.Programs.ProgramTokenComplexityDescriptor.Name.get -> string!
+AiDotNet.Evolution.Programs.ProgramTokenComplexityDescriptor.ProgramTokenComplexityDescriptor(string! name = "tokenComplexity") -> void
+AiDotNet.Evolution.Programs.ProgramVariationPortfolio
+AiDotNet.Evolution.Programs.ProgramVariationPortfolio.CaptureState() -> string!
+AiDotNet.Evolution.Programs.ProgramVariationPortfolio.CostUnitVersionHash.get -> string!
+AiDotNet.Evolution.Programs.ProgramVariationPortfolio.CreditCommitted -> System.Action<AiDotNet.Evolution.EvolutionOperatorCredit!>?
+AiDotNet.Evolution.Programs.ProgramVariationPortfolio.CreditNotificationFailures.get -> long
+AiDotNet.Evolution.Programs.ProgramVariationPortfolio.GetProposalCost(long generation) -> AiDotNet.Evolution.EvolutionProposalCost!
+AiDotNet.Evolution.Programs.ProgramVariationPortfolio.GetUsage() -> AiDotNet.Evolution.Programs.ProgramEvolutionLlmUsage!
+AiDotNet.Evolution.Programs.ProgramVariationPortfolio.Id.get -> string!
+AiDotNet.Evolution.Programs.ProgramVariationPortfolio.LastCredit.get -> AiDotNet.Evolution.EvolutionOperatorCredit?
+AiDotNet.Evolution.Programs.ProgramVariationPortfolio.Ledger.get -> AiDotNet.Evolution.EvolutionResourceLedger!
+AiDotNet.Evolution.Programs.ProgramVariationPortfolio.Observe(AiDotNet.Evolution.EvolutionEvaluation! evaluation, AiDotNet.Evolution.EvolutionArchiveInsertionResult? insertionResult) -> void
+AiDotNet.Evolution.Programs.ProgramVariationPortfolio.ProgramVariationPortfolio(System.Collections.Generic.IEnumerable<AiDotNet.Evolution.Programs.IProgramVariationOperator!>! operators, AiDotNet.Evolution.EvolutionOperatorRewardPolicy! rewardPolicy, double explorationProbability = 0.1) -> void
+AiDotNet.Evolution.Programs.ProgramVariationPortfolio.ProposeAsync(AiDotNet.Evolution.EvolutionVariationContext<AiDotNet.Evolution.Programs.ProgramGenome!>! context, System.Threading.CancellationToken cancellationToken = default(System.Threading.CancellationToken)) -> System.Threading.Tasks.ValueTask<AiDotNet.Evolution.Programs.ProgramGenome!>
+AiDotNet.Evolution.Programs.ProgramVariationPortfolio.RestoreState(string! state) -> void
+AiDotNet.Evolution.Programs.ProgramVariationPortfolio.Statistics.get -> System.Collections.Generic.IReadOnlyList<AiDotNet.Evolution.EvolutionOperatorStatistics!>!
+AiDotNet.Evolution.Programs.ProgramVariationPortfolio.VersionHash.get -> string!
+AiDotNet.Evolution.Programs.ProgramVerifier
+AiDotNet.Evolution.Programs.ProposalProvenanceOptions
+AiDotNet.Evolution.Programs.ProposalProvenanceOptions.Clone() -> AiDotNet.Evolution.Programs.ProposalProvenanceOptions!
+AiDotNet.Evolution.Programs.ProposalProvenanceOptions.Enabled.get -> bool
+AiDotNet.Evolution.Programs.ProposalProvenanceOptions.Enabled.set -> void
+AiDotNet.Evolution.Programs.ProposalProvenanceOptions.FlushEveryRecords.get -> int
+AiDotNet.Evolution.Programs.ProposalProvenanceOptions.FlushEveryRecords.set -> void
+AiDotNet.Evolution.Programs.ProposalProvenanceOptions.IncludePromptText.get -> bool
+AiDotNet.Evolution.Programs.ProposalProvenanceOptions.IncludePromptText.set -> void
+AiDotNet.Evolution.Programs.ProposalProvenanceOptions.IncludeResponseText.get -> bool
+AiDotNet.Evolution.Programs.ProposalProvenanceOptions.IncludeResponseText.set -> void
+AiDotNet.Evolution.Programs.ProposalProvenanceOptions.MaxPromptBytes.get -> int
+AiDotNet.Evolution.Programs.ProposalProvenanceOptions.MaxPromptBytes.set -> void
+AiDotNet.Evolution.Programs.ProposalProvenanceOptions.MaxResponseBytes.get -> int
+AiDotNet.Evolution.Programs.ProposalProvenanceOptions.MaxResponseBytes.set -> void
+AiDotNet.Evolution.Programs.ProposalProvenanceOptions.MaxSegmentBytes.get -> long
+AiDotNet.Evolution.Programs.ProposalProvenanceOptions.MaxSegmentBytes.set -> void
+AiDotNet.Evolution.Programs.ProposalProvenanceOptions.ProposalProvenanceOptions() -> void
+AiDotNet.Evolution.Programs.ProposalProvenanceOptions.RecordFailedAttempts.get -> bool
+AiDotNet.Evolution.Programs.ProposalProvenanceOptions.RecordFailedAttempts.set -> void
+AiDotNet.Evolution.Programs.ProposalProvenanceOptions.Validate() -> void
+AiDotNet.Evolution.Programs.Provenance.InMemoryProposalProvenanceSink
+AiDotNet.Evolution.Programs.Provenance.InMemoryProposalProvenanceSink.Clear() -> void
+AiDotNet.Evolution.Programs.Provenance.InMemoryProposalProvenanceSink.GetRecords() -> System.Collections.Generic.IReadOnlyList<AiDotNet.Evolution.Programs.Provenance.ProposalProvenanceRecord!>!
+AiDotNet.Evolution.Programs.Provenance.InMemoryProposalProvenanceSink.InMemoryProposalProvenanceSink(int capacity = 1024) -> void
+AiDotNet.Evolution.Programs.Provenance.InMemoryProposalProvenanceSink.RecordAsync(AiDotNet.Evolution.Programs.Provenance.ProposalProvenanceRecord! record, System.Threading.CancellationToken cancellationToken = default(System.Threading.CancellationToken)) -> System.Threading.Tasks.Task!
+AiDotNet.Evolution.Programs.Provenance.InMemoryProposalProvenanceSink.TotalRecorded.get -> long
+AiDotNet.Evolution.Programs.Provenance.JsonLinesProposalProvenanceSink
+AiDotNet.Evolution.Programs.Provenance.JsonLinesProposalProvenanceSink.BaseName.get -> string!
+AiDotNet.Evolution.Programs.Provenance.JsonLinesProposalProvenanceSink.DirectoryPath.get -> string!
+AiDotNet.Evolution.Programs.Provenance.JsonLinesProposalProvenanceSink.Dispose() -> void
+AiDotNet.Evolution.Programs.Provenance.JsonLinesProposalProvenanceSink.FlushAsync(System.Threading.CancellationToken cancellationToken = default(System.Threading.CancellationToken)) -> System.Threading.Tasks.Task!
+AiDotNet.Evolution.Programs.Provenance.JsonLinesProposalProvenanceSink.GetSegmentPaths() -> System.Collections.Generic.IReadOnlyList<string!>!
+AiDotNet.Evolution.Programs.Provenance.JsonLinesProposalProvenanceSink.JsonLinesProposalProvenanceSink(string! directoryPath, AiDotNet.Evolution.Programs.ProposalProvenanceOptions? options = null, string? baseName = null) -> void
+AiDotNet.Evolution.Programs.Provenance.JsonLinesProposalProvenanceSink.PendingRecords.get -> int
+AiDotNet.Evolution.Programs.Provenance.JsonLinesProposalProvenanceSink.RecordAsync(AiDotNet.Evolution.Programs.Provenance.ProposalProvenanceRecord! record, System.Threading.CancellationToken cancellationToken = default(System.Threading.CancellationToken)) -> System.Threading.Tasks.Task!
+AiDotNet.Evolution.Programs.Provenance.JsonLinesProposalProvenanceSink.RecordsWritten.get -> long
+AiDotNet.Evolution.Programs.Provenance.JsonLinesProposalProvenanceSink.SegmentsWritten.get -> int
+AiDotNet.Evolution.Programs.Provenance.ProposalProvenanceLineage
+AiDotNet.Evolution.Programs.Provenance.ProposalProvenanceLineage.Depth.get -> int
+AiDotNet.Evolution.Programs.Provenance.ProposalProvenanceLineage.FinalGenomeId.get -> string!
+AiDotNet.Evolution.Programs.Provenance.ProposalProvenanceLineage.ProposalProvenanceLineage(string! finalGenomeId, System.Collections.Generic.IReadOnlyList<AiDotNet.Evolution.Programs.Provenance.ProposalProvenanceLineageStep!>! steps) -> void
+AiDotNet.Evolution.Programs.Provenance.ProposalProvenanceLineage.RootGenomeId.get -> string!
+AiDotNet.Evolution.Programs.Provenance.ProposalProvenanceLineage.Steps.get -> System.Collections.Generic.IReadOnlyList<AiDotNet.Evolution.Programs.Provenance.ProposalProvenanceLineageStep!>!
+AiDotNet.Evolution.Programs.Provenance.ProposalProvenanceLineage.TotalTokens.get -> long
+AiDotNet.Evolution.Programs.Provenance.ProposalProvenanceLineageStep
+AiDotNet.Evolution.Programs.Provenance.ProposalProvenanceLineageStep.ChildGenomeId.get -> string!
+AiDotNet.Evolution.Programs.Provenance.ProposalProvenanceLineageStep.ParentGenomeId.get -> string!
+AiDotNet.Evolution.Programs.Provenance.ProposalProvenanceLineageStep.ProposalProvenanceLineageStep(int stepIndex, AiDotNet.Evolution.Programs.Provenance.ProposalProvenanceRecord! record) -> void
+AiDotNet.Evolution.Programs.Provenance.ProposalProvenanceLineageStep.Record.get -> AiDotNet.Evolution.Programs.Provenance.ProposalProvenanceRecord!
+AiDotNet.Evolution.Programs.Provenance.ProposalProvenanceLineageStep.StepIndex.get -> int
+AiDotNet.Evolution.Programs.Provenance.ProposalProvenanceReader
+AiDotNet.Evolution.Programs.Provenance.ProposalProvenanceReadResult
+AiDotNet.Evolution.Programs.Provenance.ProposalProvenanceReadResult.BytesRead.get -> long
+AiDotNet.Evolution.Programs.Provenance.ProposalProvenanceReadResult.Files.get -> System.Collections.Generic.IReadOnlyList<string!>!
+AiDotNet.Evolution.Programs.Provenance.ProposalProvenanceReadResult.HasIncompleteTail.get -> bool
+AiDotNet.Evolution.Programs.Provenance.ProposalProvenanceReadResult.IsComplete.get -> bool
+AiDotNet.Evolution.Programs.Provenance.ProposalProvenanceReadResult.MalformedLineCount.get -> int
+AiDotNet.Evolution.Programs.Provenance.ProposalProvenanceReadResult.ProposalProvenanceReadResult(System.Collections.Generic.IReadOnlyList<AiDotNet.Evolution.Programs.Provenance.ProposalProvenanceRecord!>! records, System.Collections.Generic.IReadOnlyList<string!>! files, int malformedLineCount, bool hasIncompleteTail, long bytesRead) -> void
+AiDotNet.Evolution.Programs.Provenance.ProposalProvenanceReadResult.Records.get -> System.Collections.Generic.IReadOnlyList<AiDotNet.Evolution.Programs.Provenance.ProposalProvenanceRecord!>!
+AiDotNet.Evolution.Programs.Provenance.ProposalProvenanceRecord
+AiDotNet.Evolution.Programs.Provenance.ProposalProvenanceRecord.AttemptNumber.get -> int
+AiDotNet.Evolution.Programs.Provenance.ProposalProvenanceRecord.ChildGenomeId.get -> string!
+AiDotNet.Evolution.Programs.Provenance.ProposalProvenanceRecord.ChildGenomeId.init -> void
+AiDotNet.Evolution.Programs.Provenance.ProposalProvenanceRecord.Detail.get -> string!
+AiDotNet.Evolution.Programs.Provenance.ProposalProvenanceRecord.Detail.init -> void
+AiDotNet.Evolution.Programs.Provenance.ProposalProvenanceRecord.EvaluationId.get -> long
+AiDotNet.Evolution.Programs.Provenance.ProposalProvenanceRecord.Generation.get -> long
+AiDotNet.Evolution.Programs.Provenance.ProposalProvenanceRecord.Generation.init -> void
+AiDotNet.Evolution.Programs.Provenance.ProposalProvenanceRecord.InputTokens.get -> int
+AiDotNet.Evolution.Programs.Provenance.ProposalProvenanceRecord.InputTokens.init -> void
+AiDotNet.Evolution.Programs.Provenance.ProposalProvenanceRecord.InspirationIds.get -> System.Collections.Generic.IReadOnlyList<string!>!
+AiDotNet.Evolution.Programs.Provenance.ProposalProvenanceRecord.InspirationIds.init -> void
+AiDotNet.Evolution.Programs.Provenance.ProposalProvenanceRecord.IsAccepted.get -> bool
+AiDotNet.Evolution.Programs.Provenance.ProposalProvenanceRecord.Island.get -> int
+AiDotNet.Evolution.Programs.Provenance.ProposalProvenanceRecord.Island.init -> void
+AiDotNet.Evolution.Programs.Provenance.ProposalProvenanceRecord.LatencyMilliseconds.get -> double
+AiDotNet.Evolution.Programs.Provenance.ProposalProvenanceRecord.LatencyMilliseconds.init -> void
+AiDotNet.Evolution.Programs.Provenance.ProposalProvenanceRecord.ModelId.get -> string!
+AiDotNet.Evolution.Programs.Provenance.ProposalProvenanceRecord.ModelId.init -> void
+AiDotNet.Evolution.Programs.Provenance.ProposalProvenanceRecord.OperatorId.get -> string!
+AiDotNet.Evolution.Programs.Provenance.ProposalProvenanceRecord.OperatorId.init -> void
+AiDotNet.Evolution.Programs.Provenance.ProposalProvenanceRecord.OperatorVersionHash.get -> string!
+AiDotNet.Evolution.Programs.Provenance.ProposalProvenanceRecord.OperatorVersionHash.init -> void
+AiDotNet.Evolution.Programs.Provenance.ProposalProvenanceRecord.Outcome.get -> AiDotNet.Evolution.Programs.ProgramProposalOutcome
+AiDotNet.Evolution.Programs.Provenance.ProposalProvenanceRecord.OutputTokens.get -> int
+AiDotNet.Evolution.Programs.Provenance.ProposalProvenanceRecord.OutputTokens.init -> void
+AiDotNet.Evolution.Programs.Provenance.ProposalProvenanceRecord.ParentGenomeId.get -> string!
+AiDotNet.Evolution.Programs.Provenance.ProposalProvenanceRecord.ParentIds.get -> System.Collections.Generic.IReadOnlyList<string!>!
+AiDotNet.Evolution.Programs.Provenance.ProposalProvenanceRecord.ParentIds.init -> void
+AiDotNet.Evolution.Programs.Provenance.ProposalProvenanceRecord.PromptHash.get -> string!
+AiDotNet.Evolution.Programs.Provenance.ProposalProvenanceRecord.PromptHash.init -> void
+AiDotNet.Evolution.Programs.Provenance.ProposalProvenanceRecord.PromptTemplateKey.get -> string!
+AiDotNet.Evolution.Programs.Provenance.ProposalProvenanceRecord.PromptTemplateKey.init -> void
+AiDotNet.Evolution.Programs.Provenance.ProposalProvenanceRecord.PromptText.get -> string!
+AiDotNet.Evolution.Programs.Provenance.ProposalProvenanceRecord.PromptText.init -> void
+AiDotNet.Evolution.Programs.Provenance.ProposalProvenanceRecord.PromptTruncated.get -> bool
+AiDotNet.Evolution.Programs.Provenance.ProposalProvenanceRecord.PromptTruncated.init -> void
+AiDotNet.Evolution.Programs.Provenance.ProposalProvenanceRecord.ProposalId.get -> string!
+AiDotNet.Evolution.Programs.Provenance.ProposalProvenanceRecord.ProposalProvenanceRecord(string! proposalId, long evaluationId, string! parentGenomeId, int attemptNumber, AiDotNet.Evolution.Programs.ProgramProposalOutcome outcome) -> void
+AiDotNet.Evolution.Programs.Provenance.ProposalProvenanceRecord.RequestedAtUtc.get -> System.DateTimeOffset
+AiDotNet.Evolution.Programs.Provenance.ProposalProvenanceRecord.RequestedAtUtc.init -> void
+AiDotNet.Evolution.Programs.Provenance.ProposalProvenanceRecord.ResponseText.get -> string!
+AiDotNet.Evolution.Programs.Provenance.ProposalProvenanceRecord.ResponseText.init -> void
+AiDotNet.Evolution.Programs.Provenance.ProposalProvenanceRecord.ResponseTruncated.get -> bool
+AiDotNet.Evolution.Programs.Provenance.ProposalProvenanceRecord.ResponseTruncated.init -> void
+AiDotNet.Evolution.Programs.Provenance.ProposalProvenanceRecord.SchemaVersion.get -> int
+AiDotNet.Evolution.Programs.Provenance.ProposalProvenanceRecord.TotalTokens.get -> int
+AiDotNet.Evolution.Programs.SandboxedProgramFitnessEvaluator
+AiDotNet.Evolution.Programs.SandboxedProgramFitnessEvaluator.Comparison.get -> AiDotNet.Evolution.Programs.ProgramOutputComparison
+AiDotNet.Evolution.Programs.SandboxedProgramFitnessEvaluator.EvaluateAsync(AiDotNet.Evolution.Programs.ProgramGenome! candidate, AiDotNet.Evolution.EvolutionEvaluationContext! context, System.Threading.CancellationToken cancellationToken = default(System.Threading.CancellationToken)) -> System.Threading.Tasks.ValueTask<AiDotNet.Evolution.EvolutionTaskResult!>
+AiDotNet.Evolution.Programs.SandboxedProgramFitnessEvaluator.Examples.get -> System.Collections.Generic.IReadOnlyList<AiDotNet.Evolution.Programs.ProgramInputOutputExample!>!
+AiDotNet.Evolution.Programs.SandboxedProgramFitnessEvaluator.Id.get -> string!
+AiDotNet.Evolution.Programs.SandboxedProgramFitnessEvaluator.SandboxedProgramFitnessEvaluator(AiDotNet.Evolution.Programs.IProgramExecutionEngine! engine, System.Collections.Generic.IEnumerable<AiDotNet.Evolution.Programs.ProgramInputOutputExample!>! examples, AiDotNet.Evolution.Programs.ProgramOutputComparison comparison = AiDotNet.Evolution.Programs.ProgramOutputComparison.TrimmedOrdinal, string! id = "program-sandbox-evaluator") -> void
+AiDotNet.Evolution.Programs.SandboxedProgramFitnessEvaluator.VersionHash.get -> string!
+AiDotNet.Evolution.Programs.ScriptProgramEvaluationOptions
+AiDotNet.Evolution.Programs.ScriptProgramEvaluationOptions.Clone() -> AiDotNet.Evolution.Programs.ScriptProgramEvaluationOptions!
+AiDotNet.Evolution.Programs.ScriptProgramEvaluationOptions.Direction.get -> AiDotNet.Evolution.EvolutionOptimizationDirection
+AiDotNet.Evolution.Programs.ScriptProgramEvaluationOptions.Direction.set -> void
+AiDotNet.Evolution.Programs.ScriptProgramEvaluationOptions.EntryPointMarker.get -> string!
+AiDotNet.Evolution.Programs.ScriptProgramEvaluationOptions.EntryPointMarker.set -> void
+AiDotNet.Evolution.Programs.ScriptProgramEvaluationOptions.EvaluatorScript.get -> string?
+AiDotNet.Evolution.Programs.ScriptProgramEvaluationOptions.EvaluatorScript.set -> void
+AiDotNet.Evolution.Programs.ScriptProgramEvaluationOptions.EvaluatorScriptLanguage.get -> AiDotNet.Evolution.Programs.ProgramLanguage
+AiDotNet.Evolution.Programs.ScriptProgramEvaluationOptions.EvaluatorScriptLanguage.set -> void
+AiDotNet.Evolution.Programs.ScriptProgramEvaluationOptions.MaxArtifactCount.get -> int
+AiDotNet.Evolution.Programs.ScriptProgramEvaluationOptions.MaxArtifactCount.set -> void
+AiDotNet.Evolution.Programs.ScriptProgramEvaluationOptions.MaxArtifactLength.get -> int
+AiDotNet.Evolution.Programs.ScriptProgramEvaluationOptions.MaxArtifactLength.set -> void
+AiDotNet.Evolution.Programs.ScriptProgramEvaluationOptions.MaxJsonDepth.get -> int
+AiDotNet.Evolution.Programs.ScriptProgramEvaluationOptions.MaxJsonDepth.set -> void
+AiDotNet.Evolution.Programs.ScriptProgramEvaluationOptions.MaxMetricCount.get -> int
+AiDotNet.Evolution.Programs.ScriptProgramEvaluationOptions.MaxMetricCount.set -> void
+AiDotNet.Evolution.Programs.ScriptProgramEvaluationOptions.MaxResponseChars.get -> int
+AiDotNet.Evolution.Programs.ScriptProgramEvaluationOptions.MaxResponseChars.set -> void
+AiDotNet.Evolution.Programs.ScriptProgramEvaluationOptions.RequireEntryPoint.get -> bool
+AiDotNet.Evolution.Programs.ScriptProgramEvaluationOptions.RequireEntryPoint.set -> void
+AiDotNet.Evolution.Programs.ScriptProgramEvaluationOptions.RetainArtifactText.get -> bool
+AiDotNet.Evolution.Programs.ScriptProgramEvaluationOptions.RetainArtifactText.set -> void
+AiDotNet.Evolution.Programs.ScriptProgramEvaluationOptions.ScriptProgramEvaluationOptions() -> void
+AiDotNet.Evolution.Programs.ScriptProgramEvaluationOptions.Validate() -> void
+AiDotNet.Evolution.Programs.ScriptProgramFitnessEvaluator
+AiDotNet.Evolution.Programs.ScriptProgramFitnessEvaluator.EvaluateAsync(AiDotNet.Evolution.Programs.ProgramGenome! candidate, AiDotNet.Evolution.EvolutionEvaluationContext! context, System.Threading.CancellationToken cancellationToken = default(System.Threading.CancellationToken)) -> System.Threading.Tasks.ValueTask<AiDotNet.Evolution.EvolutionTaskResult!>
+AiDotNet.Evolution.Programs.ScriptProgramFitnessEvaluator.EvaluatorScriptLanguage.get -> AiDotNet.Evolution.Programs.ProgramLanguage
+AiDotNet.Evolution.Programs.ScriptProgramFitnessEvaluator.GetOptions() -> AiDotNet.Evolution.Programs.ScriptProgramEvaluationOptions!
+AiDotNet.Evolution.Programs.ScriptProgramFitnessEvaluator.Id.get -> string!
+AiDotNet.Evolution.Programs.ScriptProgramFitnessEvaluator.ScriptProgramFitnessEvaluator(AiDotNet.Evolution.Programs.IProgramExecutionEngine! engine, string! evaluatorScript, AiDotNet.Evolution.Programs.ScriptProgramEvaluationOptions? options = null, string! id = "program-script-evaluator", AiDotNet.Evolution.Programs.Metrics.ProgramMetricAggregator? metricAggregator = null) -> void
+AiDotNet.Evolution.Programs.ScriptProgramFitnessEvaluator.VersionHash.get -> string!
+AiDotNet.Evolution.Programs.SearchRequest
+AiDotNet.Evolution.Programs.SearchRequest.<Clone>$() -> AiDotNet.Evolution.Programs.SearchRequest!
+AiDotNet.Evolution.Programs.SearchRequest.Attempt.get -> int
+AiDotNet.Evolution.Programs.SearchRequest.Attempt.init -> void
+AiDotNet.Evolution.Programs.SearchRequest.Deconstruct(out AiDotNet.Evolution.Programs.ProgramSnapshot! Parent, out string! MeasuredBottleneck, out System.Collections.Generic.IReadOnlyList<AiDotNet.Evolution.Programs.EditTarget!>! Targets, out string! Feedback, out int Attempt) -> void
+AiDotNet.Evolution.Programs.SearchRequest.Equals(AiDotNet.Evolution.Programs.SearchRequest? other) -> bool
+AiDotNet.Evolution.Programs.SearchRequest.Feedback.get -> string!
+AiDotNet.Evolution.Programs.SearchRequest.Feedback.init -> void
+AiDotNet.Evolution.Programs.SearchRequest.MeasuredBottleneck.get -> string!
+AiDotNet.Evolution.Programs.SearchRequest.MeasuredBottleneck.init -> void
+AiDotNet.Evolution.Programs.SearchRequest.Parent.get -> AiDotNet.Evolution.Programs.ProgramSnapshot!
+AiDotNet.Evolution.Programs.SearchRequest.Parent.init -> void
+AiDotNet.Evolution.Programs.SearchRequest.SearchRequest(AiDotNet.Evolution.Programs.ProgramSnapshot! Parent, string! MeasuredBottleneck, System.Collections.Generic.IReadOnlyList<AiDotNet.Evolution.Programs.EditTarget!>! Targets, string! Feedback, int Attempt) -> void
+AiDotNet.Evolution.Programs.SearchRequest.Targets.get -> System.Collections.Generic.IReadOnlyList<AiDotNet.Evolution.Programs.EditTarget!>!
+AiDotNet.Evolution.Programs.SearchRequest.Targets.init -> void
+AiDotNet.Evolution.Programs.SourceEdit
+AiDotNet.Evolution.Programs.SourceEdit.<Clone>$() -> AiDotNet.Evolution.Programs.SourceEdit!
+AiDotNet.Evolution.Programs.SourceEdit.Deconstruct(out AiDotNet.Evolution.Programs.EditTarget! Target, out string! Replacement) -> void
+AiDotNet.Evolution.Programs.SourceEdit.Equals(AiDotNet.Evolution.Programs.SourceEdit? other) -> bool
+AiDotNet.Evolution.Programs.SourceEdit.Replacement.get -> string!
+AiDotNet.Evolution.Programs.SourceEdit.Replacement.init -> void
+AiDotNet.Evolution.Programs.SourceEdit.SourceEdit(AiDotNet.Evolution.Programs.EditTarget! Target, string! Replacement) -> void
+AiDotNet.Evolution.Programs.SourceEdit.Target.get -> AiDotNet.Evolution.Programs.EditTarget!
+AiDotNet.Evolution.Programs.SourceEdit.Target.init -> void
+AiDotNet.Evolution.Programs.VerificationReceipt
+AiDotNet.Evolution.Programs.VerificationReceipt.<Clone>$() -> AiDotNet.Evolution.Programs.VerificationReceipt!
+AiDotNet.Evolution.Programs.VerificationReceipt.ArtifactFingerprint.get -> string!
+AiDotNet.Evolution.Programs.VerificationReceipt.ArtifactFingerprint.init -> void
+AiDotNet.Evolution.Programs.VerificationReceipt.Correct.get -> bool
+AiDotNet.Evolution.Programs.VerificationReceipt.Correct.init -> void
+AiDotNet.Evolution.Programs.VerificationReceipt.Deconstruct(out string! Nonce, out string! ArtifactFingerprint, out string! OracleIdentity, out bool Correct, out double Duration, out string! Feedback) -> void
+AiDotNet.Evolution.Programs.VerificationReceipt.Duration.get -> double
+AiDotNet.Evolution.Programs.VerificationReceipt.Duration.init -> void
+AiDotNet.Evolution.Programs.VerificationReceipt.Equals(AiDotNet.Evolution.Programs.VerificationReceipt? other) -> bool
+AiDotNet.Evolution.Programs.VerificationReceipt.Feedback.get -> string!
+AiDotNet.Evolution.Programs.VerificationReceipt.Feedback.init -> void
+AiDotNet.Evolution.Programs.VerificationReceipt.Nonce.get -> string!
+AiDotNet.Evolution.Programs.VerificationReceipt.Nonce.init -> void
+AiDotNet.Evolution.Programs.VerificationReceipt.OracleIdentity.get -> string!
+AiDotNet.Evolution.Programs.VerificationReceipt.OracleIdentity.init -> void
+AiDotNet.Evolution.Programs.VerificationReceipt.VerificationReceipt(string! Nonce, string! ArtifactFingerprint, string! OracleIdentity, bool Correct, double Duration, string! Feedback) -> void
+AiDotNet.Evolution.Programs.VerificationRequest
+AiDotNet.Evolution.Programs.VerificationRequest.<Clone>$() -> AiDotNet.Evolution.Programs.VerificationRequest!
+AiDotNet.Evolution.Programs.VerificationRequest.Artifact.get -> AiDotNet.Evolution.Programs.ProgramArtifact!
+AiDotNet.Evolution.Programs.VerificationRequest.Artifact.init -> void
+AiDotNet.Evolution.Programs.VerificationRequest.Deconstruct(out string! Nonce, out AiDotNet.Evolution.Programs.ProgramArtifact! Artifact) -> void
+AiDotNet.Evolution.Programs.VerificationRequest.Equals(AiDotNet.Evolution.Programs.VerificationRequest? other) -> bool
+AiDotNet.Evolution.Programs.VerificationRequest.Nonce.get -> string!
+AiDotNet.Evolution.Programs.VerificationRequest.Nonce.init -> void
+AiDotNet.Evolution.Programs.VerificationRequest.VerificationRequest(string! Nonce, AiDotNet.Evolution.Programs.ProgramArtifact! Artifact) -> void
+AiDotNet.Evolution.Prompts.ProgramPromptArtifact
+AiDotNet.Evolution.Prompts.ProgramPromptArtifact.Content.get -> string!
+AiDotNet.Evolution.Prompts.ProgramPromptArtifact.Name.get -> string!
+AiDotNet.Evolution.Prompts.ProgramPromptArtifact.ProgramPromptArtifact(string! name, string! content) -> void
+AiDotNet.Evolution.Prompts.ProgramPromptAttempt
+AiDotNet.Evolution.Prompts.ProgramPromptAttempt.AttemptNumber.get -> int
+AiDotNet.Evolution.Prompts.ProgramPromptAttempt.ChangesDescription.get -> string?
+AiDotNet.Evolution.Prompts.ProgramPromptAttempt.Metrics.get -> System.Collections.Generic.IReadOnlyDictionary<string!, double>!
+AiDotNet.Evolution.Prompts.ProgramPromptAttempt.ParentMetrics.get -> System.Collections.Generic.IReadOnlyDictionary<string!, double>!
+AiDotNet.Evolution.Prompts.ProgramPromptAttempt.ProgramPromptAttempt(int attemptNumber, string? changesDescription = null, System.Collections.Generic.IReadOnlyDictionary<string!, double>? metrics = null, System.Collections.Generic.IReadOnlyDictionary<string!, double>? parentMetrics = null) -> void
+AiDotNet.Evolution.Prompts.ProgramPromptBuilder
+AiDotNet.Evolution.Prompts.ProgramPromptBuilder.Build(AiDotNet.Evolution.Prompts.ProgramPromptContext! context, AiDotNet.Evolution.StableRandom? random = null) -> AiDotNet.Evolution.Prompts.ProgramPromptResult!
+AiDotNet.Evolution.Prompts.ProgramPromptBuilder.BuildEvaluationMessages(AiDotNet.Evolution.Programs.ProgramGenome! program, System.Collections.Generic.IReadOnlyList<string!>! criteria, string? responseSchema = null) -> System.Collections.Generic.IReadOnlyList<AiDotNet.Evolution.Programs.ProgramChatMessage!>!
+AiDotNet.Evolution.Prompts.ProgramPromptBuilder.GetProgramOptions() -> AiDotNet.Evolution.Programs.ProgramProposalOptions!
+AiDotNet.Evolution.Prompts.ProgramPromptBuilder.GetPromptOptions() -> AiDotNet.Evolution.Programs.ProgramEvolutionPromptOptions!
+AiDotNet.Evolution.Prompts.ProgramPromptBuilder.ProgramPromptBuilder(AiDotNet.Evolution.Programs.ProgramEvolutionPromptOptions? promptOptions = null, AiDotNet.Evolution.Programs.ProgramProposalOptions? programOptions = null, AiDotNet.Evolution.Prompts.ProgramPromptTemplateSet? templateSet = null) -> void
+AiDotNet.Evolution.Prompts.ProgramPromptBuilder.Templates.get -> AiDotNet.Evolution.Prompts.ProgramPromptTemplateSet!
+AiDotNet.Evolution.Prompts.ProgramPromptBuilder.VersionHash.get -> string!
+AiDotNet.Evolution.Prompts.ProgramPromptContext
+AiDotNet.Evolution.Prompts.ProgramPromptContext.Artifacts.get -> System.Collections.Generic.IReadOnlyList<AiDotNet.Evolution.Prompts.ProgramPromptArtifact!>!
+AiDotNet.Evolution.Prompts.ProgramPromptContext.Artifacts.set -> void
+AiDotNet.Evolution.Prompts.ProgramPromptContext.ChangesDescription.get -> string?
+AiDotNet.Evolution.Prompts.ProgramPromptContext.ChangesDescription.set -> void
+AiDotNet.Evolution.Prompts.ProgramPromptContext.Diagnostics.get -> System.Collections.Generic.IReadOnlyList<AiDotNet.Evolution.EvolutionDiagnostic!>!
+AiDotNet.Evolution.Prompts.ProgramPromptContext.Diagnostics.set -> void
+AiDotNet.Evolution.Prompts.ProgramPromptContext.Direction.get -> AiDotNet.Evolution.EvolutionOptimizationDirection
+AiDotNet.Evolution.Prompts.ProgramPromptContext.Direction.set -> void
+AiDotNet.Evolution.Prompts.ProgramPromptContext.EmptyNeighborCells.get -> System.Collections.Generic.IReadOnlyList<string!>!
+AiDotNet.Evolution.Prompts.ProgramPromptContext.EmptyNeighborCells.set -> void
+AiDotNet.Evolution.Prompts.ProgramPromptContext.FeatureBinCounts.get -> System.Collections.Generic.IReadOnlyList<int>!
+AiDotNet.Evolution.Prompts.ProgramPromptContext.FeatureBinCounts.set -> void
+AiDotNet.Evolution.Prompts.ProgramPromptContext.FeatureBins.get -> System.Collections.Generic.IReadOnlyList<int>!
+AiDotNet.Evolution.Prompts.ProgramPromptContext.FeatureBins.set -> void
+AiDotNet.Evolution.Prompts.ProgramPromptContext.FeatureDimensions.get -> System.Collections.Generic.IReadOnlyList<string!>!
+AiDotNet.Evolution.Prompts.ProgramPromptContext.FeatureDimensions.set -> void
+AiDotNet.Evolution.Prompts.ProgramPromptContext.Inspirations.get -> System.Collections.Generic.IReadOnlyList<AiDotNet.Evolution.Prompts.ProgramPromptExample!>!
+AiDotNet.Evolution.Prompts.ProgramPromptContext.Inspirations.set -> void
+AiDotNet.Evolution.Prompts.ProgramPromptContext.Parent.get -> AiDotNet.Evolution.Programs.ProgramGenome!
+AiDotNet.Evolution.Prompts.ProgramPromptContext.ParentDescriptors.get -> System.Collections.Generic.IReadOnlyDictionary<string!, double>!
+AiDotNet.Evolution.Prompts.ProgramPromptContext.ParentDescriptors.set -> void
+AiDotNet.Evolution.Prompts.ProgramPromptContext.ParentMetrics.get -> System.Collections.Generic.IReadOnlyDictionary<string!, double>!
+AiDotNet.Evolution.Prompts.ProgramPromptContext.ParentMetrics.set -> void
+AiDotNet.Evolution.Prompts.ProgramPromptContext.ParentQuality.get -> double?
+AiDotNet.Evolution.Prompts.ProgramPromptContext.ParentQuality.set -> void
+AiDotNet.Evolution.Prompts.ProgramPromptContext.PreviousAttempts.get -> System.Collections.Generic.IReadOnlyList<AiDotNet.Evolution.Prompts.ProgramPromptAttempt!>!
+AiDotNet.Evolution.Prompts.ProgramPromptContext.PreviousAttempts.set -> void
+AiDotNet.Evolution.Prompts.ProgramPromptContext.PreviousQuality.get -> double?
+AiDotNet.Evolution.Prompts.ProgramPromptContext.PreviousQuality.set -> void
+AiDotNet.Evolution.Prompts.ProgramPromptContext.ProgramPromptContext(AiDotNet.Evolution.Programs.ProgramGenome! parent) -> void
+AiDotNet.Evolution.Prompts.ProgramPromptContext.TopPrograms.get -> System.Collections.Generic.IReadOnlyList<AiDotNet.Evolution.Prompts.ProgramPromptExample!>!
+AiDotNet.Evolution.Prompts.ProgramPromptContext.TopPrograms.set -> void
+AiDotNet.Evolution.Prompts.ProgramPromptContext.Validate() -> void
+AiDotNet.Evolution.Prompts.ProgramPromptExample
+AiDotNet.Evolution.Prompts.ProgramPromptExample.ChangesDescription.get -> string?
+AiDotNet.Evolution.Prompts.ProgramPromptExample.Descriptors.get -> System.Collections.Generic.IReadOnlyDictionary<string!, double>!
+AiDotNet.Evolution.Prompts.ProgramPromptExample.Genome.get -> AiDotNet.Evolution.Programs.ProgramGenome!
+AiDotNet.Evolution.Prompts.ProgramPromptExample.Kind.get -> AiDotNet.Evolution.Programs.ProgramPromptExampleKind
+AiDotNet.Evolution.Prompts.ProgramPromptExample.ProgramPromptExample(AiDotNet.Evolution.Programs.ProgramGenome! genome, AiDotNet.Evolution.Programs.ProgramPromptExampleKind kind = AiDotNet.Evolution.Programs.ProgramPromptExampleKind.TopProgram, double? quality = null, System.Collections.Generic.IReadOnlyDictionary<string!, double>? descriptors = null, string? changesDescription = null) -> void
+AiDotNet.Evolution.Prompts.ProgramPromptExample.Quality.get -> double?
+AiDotNet.Evolution.Prompts.ProgramPromptResult
+AiDotNet.Evolution.Prompts.ProgramPromptResult.Messages.get -> System.Collections.Generic.IReadOnlyList<AiDotNet.Evolution.Programs.ProgramChatMessage!>!
+AiDotNet.Evolution.Prompts.ProgramPromptResult.Mode.get -> AiDotNet.Evolution.Programs.ProgramPromptEvolutionMode
+AiDotNet.Evolution.Prompts.ProgramPromptResult.ProgramPromptResult(string! systemText, string! userText, AiDotNet.Evolution.Programs.ProgramPromptEvolutionMode mode, AiDotNet.Evolution.Programs.ProgramPromptTemplateKey userTemplateKey, System.Collections.Generic.IReadOnlyDictionary<string!, string!>! variationChoices, bool wasTruncated) -> void
+AiDotNet.Evolution.Prompts.ProgramPromptResult.SystemText.get -> string!
+AiDotNet.Evolution.Prompts.ProgramPromptResult.TotalLength.get -> int
+AiDotNet.Evolution.Prompts.ProgramPromptResult.UserTemplateKey.get -> AiDotNet.Evolution.Programs.ProgramPromptTemplateKey
+AiDotNet.Evolution.Prompts.ProgramPromptResult.UserText.get -> string!
+AiDotNet.Evolution.Prompts.ProgramPromptResult.VariationChoices.get -> System.Collections.Generic.IReadOnlyDictionary<string!, string!>!
+AiDotNet.Evolution.Prompts.ProgramPromptResult.WasTruncated.get -> bool
+AiDotNet.Evolution.Prompts.ProgramPromptTemplate
+AiDotNet.Evolution.Prompts.ProgramPromptTemplate.ContainsPlaceholder(string! name) -> bool
+AiDotNet.Evolution.Prompts.ProgramPromptTemplate.IsConstant.get -> bool
+AiDotNet.Evolution.Prompts.ProgramPromptTemplate.Placeholders.get -> System.Collections.Generic.IReadOnlyList<string!>!
+AiDotNet.Evolution.Prompts.ProgramPromptTemplate.ProgramPromptTemplate(string! text) -> void
+AiDotNet.Evolution.Prompts.ProgramPromptTemplate.Render(System.Collections.Generic.IReadOnlyDictionary<string!, string!>! values) -> string!
+AiDotNet.Evolution.Prompts.ProgramPromptTemplate.Text.get -> string!
+AiDotNet.Evolution.Prompts.ProgramPromptTemplateSet
+AiDotNet.Evolution.Prompts.ProgramPromptTemplateSet.GetFragment(AiDotNet.Evolution.Programs.ProgramPromptFragmentKey key) -> AiDotNet.Evolution.Prompts.ProgramPromptTemplate!
+AiDotNet.Evolution.Prompts.ProgramPromptTemplateSet.GetTemplate(AiDotNet.Evolution.Programs.ProgramPromptTemplateKey key) -> AiDotNet.Evolution.Prompts.ProgramPromptTemplate!
+AiDotNet.Evolution.Prompts.ProgramPromptTemplateSet.RenderFragment(AiDotNet.Evolution.Programs.ProgramPromptFragmentKey key) -> string!
+AiDotNet.Evolution.Prompts.ProgramPromptTemplateSet.RenderFragment(AiDotNet.Evolution.Programs.ProgramPromptFragmentKey key, System.Collections.Generic.IReadOnlyDictionary<string!, string!>! values) -> string!
+AiDotNet.Evolution.Prompts.ProgramPromptTemplateSet.VersionHash.get -> string!
+AiDotNet.Evolution.Prompts.ProgramPromptTemplateSet.With(AiDotNet.Evolution.Programs.ProgramPromptTemplateKey key, string! text) -> AiDotNet.Evolution.Prompts.ProgramPromptTemplateSet!
+AiDotNet.Evolution.Prompts.ProgramPromptTemplateSet.WithFragment(AiDotNet.Evolution.Programs.ProgramPromptFragmentKey key, string! text) -> AiDotNet.Evolution.Prompts.ProgramPromptTemplateSet!
+AiDotNet.Evolution.Prompts.PromptTextRedactor
+const AiDotNet.Evolution.Programs.DirectoryProgramSampleEvidenceStore.MaximumArtifactBytes = 2097152 -> int
+const AiDotNet.Evolution.Programs.EvolveBlock.DefaultEndMarker = "# EVOLVE-BLOCK-END" -> string!
+const AiDotNet.Evolution.Programs.EvolveBlock.DefaultStartMarker = "# EVOLVE-BLOCK-START" -> string!
+const AiDotNet.Evolution.Programs.EvolveBlock.SlashEndMarker = "// EVOLVE-BLOCK-END" -> string!
+const AiDotNet.Evolution.Programs.EvolveBlock.SlashStartMarker = "// EVOLVE-BLOCK-START" -> string!
+const AiDotNet.Evolution.Programs.EvolveBlock.SqlEndMarker = "-- EVOLVE-BLOCK-END" -> string!
+const AiDotNet.Evolution.Programs.EvolveBlock.SqlStartMarker = "-- EVOLVE-BLOCK-START" -> string!
+const AiDotNet.Evolution.Programs.EvolveBlockExtractionResult.MaxDiagnostics = 32 -> int
+const AiDotNet.Evolution.Programs.LlmFeedbackOptions.AverageMetricSuffix = "average" -> string!
+const AiDotNet.Evolution.Programs.LlmFeedbackOptions.CritiqueArtifactKey = "llm_judge_critique" -> string!
+const AiDotNet.Evolution.Programs.LlmFeedbackOptions.DefaultCritiqueField = "reasoning" -> string!
+const AiDotNet.Evolution.Programs.LlmFeedbackOptions.DefaultMetricPrefix = "llm_" -> string!
+const AiDotNet.Evolution.Programs.LlmProgramVariationOptions.DefaultArtifactDiagnosticPrefix = "program_script_artifact" -> string!
+const AiDotNet.Evolution.Programs.Metrics.ProgramMetricAggregator.AggregateMetricName = "(aggregate)" -> string!
+const AiDotNet.Evolution.Programs.Metrics.ProgramMetricIssue.MaxDescriptionLength = 256 -> int
+const AiDotNet.Evolution.Programs.Metrics.ProgramMetricValue.MaxTextLength = 4096 -> int
+const AiDotNet.Evolution.Programs.Novelty.EmbeddingBatch.MaximumVectors = 257 -> int
+const AiDotNet.Evolution.Programs.Novelty.EmbeddingCosineGenomeDistance.MetricId = "program-embedding-cosine" -> string!
+const AiDotNet.Evolution.Programs.Novelty.EmbeddingNoveltyOptions.DefaultEmbeddingSimilarityThreshold = 0.99 -> double
+const AiDotNet.Evolution.Programs.Novelty.EmbeddingNoveltyOptions.DefaultMaxEmbeddingComparisons = 8 -> int
+const AiDotNet.Evolution.Programs.Novelty.EmbeddingNoveltyOptions.DefaultMaxTrackedGenomes = 512 -> int
+const AiDotNet.Evolution.Programs.Novelty.EmbeddingNoveltyOptions.DefaultStructuralNoveltyThreshold = 0.15 -> double
+const AiDotNet.Evolution.Programs.Novelty.EmbeddingVector.MaximumDimensions = 16384 -> int
+const AiDotNet.Evolution.Programs.Novelty.LlmProgramNoveltyJudge.DefaultMaxProgramBytes = 12000 -> int
+const AiDotNet.Evolution.Programs.Novelty.LlmProgramNoveltyJudge.MaxResponseChars = 65536 -> int
+const AiDotNet.Evolution.Programs.Novelty.NoveltyGatingProgramFitnessEvaluator.RejectionCode = "program_not_novel" -> string!
+const AiDotNet.Evolution.Programs.Novelty.ProgramLineEditDistance.DefaultMaxComparedLines = 2000 -> int
+const AiDotNet.Evolution.Programs.Novelty.ProgramLineEditDistance.MetricId = "program-line-edit" -> string!
+const AiDotNet.Evolution.Programs.Novelty.ProgramNoveltyDecision.MaxReasonLength = 240 -> int
+const AiDotNet.Evolution.Programs.Novelty.ProgramTokenSetDistance.DefaultMemoCapacity = 1024 -> int
+const AiDotNet.Evolution.Programs.Novelty.ProgramTokenSetDistance.MetricId = "program-token-set" -> string!
+const AiDotNet.Evolution.Programs.PersistentProgramFitnessEvaluator.EvidenceInvocationResource = "program_evidence_invocations" -> string!
+const AiDotNet.Evolution.Programs.ProgramDiffOptions.DefaultDividerMarker = "=======" -> string!
+const AiDotNet.Evolution.Programs.ProgramDiffOptions.DefaultReplaceMarker = ">>>>>>> REPLACE" -> string!
+const AiDotNet.Evolution.Programs.ProgramDiffOptions.DefaultSearchMarker = "<<<<<<< SEARCH" -> string!
+const AiDotNet.Evolution.Programs.ProgramDiversityDescriptor.DefaultName = "diversity" -> string!
+const AiDotNet.Evolution.Programs.ProgramGenome.MaxDescriptionLength = 4096 -> int
+const AiDotNet.Evolution.Programs.ProgramGenome.MaxSourceLength = 1048576 -> int
+const AiDotNet.Evolution.Programs.ProgramGenomeCodec.PayloadVersion = 1 -> int
+const AiDotNet.Evolution.Programs.ProgramImprovement.CostResource = "program_work_units" -> string!
+const AiDotNet.Evolution.Programs.ProgramInterpreterSpecification.SourcePlaceholder = "{source}" -> string!
+const AiDotNet.Evolution.Programs.ProgramInterpreterSpecification.WorkspacePlaceholder = "{workspace}" -> string!
+const AiDotNet.Evolution.Programs.ProgramLengthDescriptor.DefaultName = "length" -> string!
+const AiDotNet.Evolution.Programs.ProgramMeasurementStatistics.Version = "program-scalar-mean-standard-error-v1" -> string!
+const AiDotNet.Evolution.Programs.ProgramMetricAggregationOptions.DefaultCombinedScoreKey = "combined_score" -> string!
+const AiDotNet.Evolution.Programs.ProgramMetricAggregationOptions.MaxReportedIssues = 256 -> int
+const AiDotNet.Evolution.Programs.ProgramProposalAttempt.MaxDetailLength = 240 -> int
+const AiDotNet.Evolution.Programs.ProgramSandboxLimitOptions.MaxConcurrencyLimit = 4096 -> int
+const AiDotNet.Evolution.Programs.ProgramSandboxLimitOptions.MaxMemoryLimitMb = 1048576 -> int
+const AiDotNet.Evolution.Programs.ProgramSandboxLimitOptions.MaxTimeLimitSeconds = 3600 -> int
+const AiDotNet.Evolution.Programs.ProgramSnapshot.MaximumCharacters = 262144 -> int
+const AiDotNet.Evolution.Programs.ProgramTokenComplexityDescriptor.DefaultName = "tokenComplexity" -> string!
+const AiDotNet.Evolution.Programs.Provenance.InMemoryProposalProvenanceSink.DefaultCapacity = 1024 -> int
+const AiDotNet.Evolution.Programs.Provenance.JsonLinesProposalProvenanceSink.DefaultBaseName = "provenance" -> string!
+const AiDotNet.Evolution.Programs.Provenance.JsonLinesProposalProvenanceSink.SegmentExtension = ".jsonl" -> string!
+const AiDotNet.Evolution.Programs.Provenance.ProposalProvenanceReader.DefaultMaxTotalBytes = 268435456 -> long
+const AiDotNet.Evolution.Programs.Provenance.ProposalProvenanceRecord.CurrentSchemaVersion = 1 -> int
+const AiDotNet.Evolution.Programs.Provenance.ProposalProvenanceRecord.MaxDetailLength = 240 -> int
+const AiDotNet.Evolution.Programs.Provenance.ProposalProvenanceRecord.MaxIdentifierLength = 160 -> int
+const AiDotNet.Evolution.Programs.Provenance.ProposalProvenanceRecord.MaxRelatedIdentifiers = 16 -> int
+const AiDotNet.Evolution.Programs.Provenance.ProposalProvenanceRecord.MaxTextLength = 32768 -> int
+const AiDotNet.Evolution.Programs.ScriptProgramEvaluationOptions.MaxArtifactCountCeiling = 16 -> int
+const AiDotNet.Evolution.Programs.ScriptProgramEvaluationOptions.MaxArtifactLengthCeiling = 4000 -> int
+const AiDotNet.Evolution.Prompts.ProgramPromptArtifact.MaxNameLength = 128 -> int
+const AiDotNet.Evolution.Prompts.ProgramPromptAttempt.MaxChangesLength = 4096 -> int
+const AiDotNet.Evolution.Prompts.ProgramPromptTemplate.MaxTextLength = 262144 -> int
+const AiDotNet.Evolution.Prompts.ProgramPromptTemplateSet.FragmentsFileName = "fragments.json" -> string!
+const AiDotNet.Evolution.Prompts.ProgramPromptTemplateSet.MaxFragmentLength = 4096 -> int
+const AiDotNet.Evolution.Prompts.PromptTextRedactor.RedactionMarker = "<redacted>" -> string!
+override AiDotNet.Evolution.Programs.EditTarget.Equals(object? obj) -> bool
+override AiDotNet.Evolution.Programs.EditTarget.GetHashCode() -> int
+override AiDotNet.Evolution.Programs.EditTarget.ToString() -> string!
+override AiDotNet.Evolution.Programs.EvolveBlockMarkers.Equals(object? obj) -> bool
+override AiDotNet.Evolution.Programs.EvolveBlockMarkers.GetHashCode() -> int
+override AiDotNet.Evolution.Programs.EvolveBlockMarkers.ToString() -> string!
+override AiDotNet.Evolution.Programs.EvolveBlockRegion.Equals(object? obj) -> bool
+override AiDotNet.Evolution.Programs.EvolveBlockRegion.GetHashCode() -> int
+override AiDotNet.Evolution.Programs.EvolveBlockRegion.ToString() -> string!
+override AiDotNet.Evolution.Programs.FencedCodeBlock.ToString() -> string!
+override AiDotNet.Evolution.Programs.ImprovementOptions.Equals(object? obj) -> bool
+override AiDotNet.Evolution.Programs.ImprovementOptions.GetHashCode() -> int
+override AiDotNet.Evolution.Programs.ImprovementOptions.ToString() -> string!
+override AiDotNet.Evolution.Programs.ImprovementResult.Equals(object? obj) -> bool
+override AiDotNet.Evolution.Programs.ImprovementResult.GetHashCode() -> int
+override AiDotNet.Evolution.Programs.ImprovementResult.ToString() -> string!
+override AiDotNet.Evolution.Programs.Metrics.ProgramMetricAggregationResult.ToString() -> string!
+override AiDotNet.Evolution.Programs.Metrics.ProgramMetricIssue.ToString() -> string!
+override AiDotNet.Evolution.Programs.Metrics.ProgramMetricValue.Equals(object? obj) -> bool
+override AiDotNet.Evolution.Programs.Metrics.ProgramMetricValue.GetHashCode() -> int
+override AiDotNet.Evolution.Programs.Metrics.ProgramMetricValue.ToString() -> string!
+override AiDotNet.Evolution.Programs.Novelty.EmbeddingBatch.ToString() -> string!
+override AiDotNet.Evolution.Programs.Novelty.EmbeddingVector.ToString() -> string!
+override AiDotNet.Evolution.Programs.Novelty.ProgramNoveltyDecision.ToString() -> string!
+override AiDotNet.Evolution.Programs.PatchPlan.Equals(object? obj) -> bool
+override AiDotNet.Evolution.Programs.PatchPlan.GetHashCode() -> int
+override AiDotNet.Evolution.Programs.PatchPlan.ToString() -> string!
+override AiDotNet.Evolution.Programs.ProgramBuild.Equals(object? obj) -> bool
+override AiDotNet.Evolution.Programs.ProgramBuild.GetHashCode() -> int
+override AiDotNet.Evolution.Programs.ProgramBuild.ToString() -> string!
+override AiDotNet.Evolution.Programs.ProgramDiffBlock.ToString() -> string!
+override AiDotNet.Evolution.Programs.ProgramDiffFailure.ToString() -> string!
+override AiDotNet.Evolution.Programs.ProgramEvolutionLlmUsage.ToString() -> string!
+override AiDotNet.Evolution.Programs.ProgramGenome.Equals(object? obj) -> bool
+override AiDotNet.Evolution.Programs.ProgramGenome.GetHashCode() -> int
+override AiDotNet.Evolution.Programs.ProgramGenome.ToString() -> string!
+override AiDotNet.Evolution.Programs.ProgramMetricAggregationOptions.ToString() -> string!
+override AiDotNet.Evolution.Programs.ProgramProposalAttempt.ToString() -> string!
+override AiDotNet.Evolution.Programs.ProgramProposalOptions.Clone() -> AiDotNet.Evolution.Programs.ProgramProposalOptions!
+override AiDotNet.Evolution.Programs.ProgramProposalOptions.Validate() -> void
+override AiDotNet.Evolution.Programs.Provenance.ProposalProvenanceLineage.ToString() -> string!
+override AiDotNet.Evolution.Programs.Provenance.ProposalProvenanceLineageStep.ToString() -> string!
+override AiDotNet.Evolution.Programs.Provenance.ProposalProvenanceReadResult.ToString() -> string!
+override AiDotNet.Evolution.Programs.Provenance.ProposalProvenanceRecord.ToString() -> string!
+override AiDotNet.Evolution.Programs.SearchRequest.Equals(object? obj) -> bool
+override AiDotNet.Evolution.Programs.SearchRequest.GetHashCode() -> int
+override AiDotNet.Evolution.Programs.SearchRequest.ToString() -> string!
+override AiDotNet.Evolution.Programs.SourceEdit.Equals(object? obj) -> bool
+override AiDotNet.Evolution.Programs.SourceEdit.GetHashCode() -> int
+override AiDotNet.Evolution.Programs.SourceEdit.ToString() -> string!
+override AiDotNet.Evolution.Programs.VerificationReceipt.Equals(object? obj) -> bool
+override AiDotNet.Evolution.Programs.VerificationReceipt.GetHashCode() -> int
+override AiDotNet.Evolution.Programs.VerificationReceipt.ToString() -> string!
+override AiDotNet.Evolution.Programs.VerificationRequest.Equals(object? obj) -> bool
+override AiDotNet.Evolution.Programs.VerificationRequest.GetHashCode() -> int
+override AiDotNet.Evolution.Programs.VerificationRequest.ToString() -> string!
+override AiDotNet.Evolution.Prompts.ProgramPromptArtifact.ToString() -> string!
+override AiDotNet.Evolution.Prompts.ProgramPromptAttempt.ToString() -> string!
+override AiDotNet.Evolution.Prompts.ProgramPromptExample.ToString() -> string!
+override AiDotNet.Evolution.Prompts.ProgramPromptResult.ToString() -> string!
+override AiDotNet.Evolution.Prompts.ProgramPromptTemplate.ToString() -> string!
+override AiDotNet.Evolution.Prompts.ProgramPromptTemplateSet.ToString() -> string!
+static AiDotNet.Evolution.Programs.EditTarget.operator !=(AiDotNet.Evolution.Programs.EditTarget? left, AiDotNet.Evolution.Programs.EditTarget? right) -> bool
+static AiDotNet.Evolution.Programs.EditTarget.operator ==(AiDotNet.Evolution.Programs.EditTarget? left, AiDotNet.Evolution.Programs.EditTarget? right) -> bool
+static AiDotNet.Evolution.Programs.EvolveBlock.ContainsStartMarker(string! source, AiDotNet.Evolution.Programs.EvolveBlockMarkers markers = default(AiDotNet.Evolution.Programs.EvolveBlockMarkers)) -> bool
+static AiDotNet.Evolution.Programs.EvolveBlock.Extract(string! source) -> AiDotNet.Evolution.Programs.EvolveBlockExtractionResult!
+static AiDotNet.Evolution.Programs.EvolveBlock.Extract(string! source, AiDotNet.Evolution.Programs.EvolveBlockMarkers markers) -> AiDotNet.Evolution.Programs.EvolveBlockExtractionResult!
+static AiDotNet.Evolution.Programs.EvolveBlock.Extract(string! source, AiDotNet.Evolution.Programs.ProgramLanguage language) -> AiDotNet.Evolution.Programs.EvolveBlockExtractionResult!
+static AiDotNet.Evolution.Programs.EvolveBlock.TryReplaceAll(string! source, System.Collections.Generic.IReadOnlyList<string!>! replacements, AiDotNet.Evolution.Programs.EvolveBlockMarkers markers, out string! rewritten) -> bool
+static AiDotNet.Evolution.Programs.EvolveBlock.TryReplaceFirst(string! source, string! replacement, AiDotNet.Evolution.Programs.EvolveBlockMarkers markers, out string! rewritten) -> bool
+static AiDotNet.Evolution.Programs.EvolveBlock.Wrap(string! source, AiDotNet.Evolution.Programs.EvolveBlockMarkers markers = default(AiDotNet.Evolution.Programs.EvolveBlockMarkers)) -> string!
+static AiDotNet.Evolution.Programs.EvolveBlockMarkers.DoubleDash.get -> AiDotNet.Evolution.Programs.EvolveBlockMarkers
+static AiDotNet.Evolution.Programs.EvolveBlockMarkers.ForLanguage(AiDotNet.Evolution.Programs.ProgramLanguage language) -> AiDotNet.Evolution.Programs.EvolveBlockMarkers
+static AiDotNet.Evolution.Programs.EvolveBlockMarkers.Hash.get -> AiDotNet.Evolution.Programs.EvolveBlockMarkers
+static AiDotNet.Evolution.Programs.EvolveBlockMarkers.operator !=(AiDotNet.Evolution.Programs.EvolveBlockMarkers left, AiDotNet.Evolution.Programs.EvolveBlockMarkers right) -> bool
+static AiDotNet.Evolution.Programs.EvolveBlockMarkers.operator ==(AiDotNet.Evolution.Programs.EvolveBlockMarkers left, AiDotNet.Evolution.Programs.EvolveBlockMarkers right) -> bool
+static AiDotNet.Evolution.Programs.EvolveBlockMarkers.Slash.get -> AiDotNet.Evolution.Programs.EvolveBlockMarkers
+static AiDotNet.Evolution.Programs.EvolveBlockRegion.operator !=(AiDotNet.Evolution.Programs.EvolveBlockRegion left, AiDotNet.Evolution.Programs.EvolveBlockRegion right) -> bool
+static AiDotNet.Evolution.Programs.EvolveBlockRegion.operator ==(AiDotNet.Evolution.Programs.EvolveBlockRegion left, AiDotNet.Evolution.Programs.EvolveBlockRegion right) -> bool
+static AiDotNet.Evolution.Programs.FencedCodeExtractor.Extract(string! response, AiDotNet.Evolution.Programs.ProgramLanguage language = AiDotNet.Evolution.Programs.ProgramLanguage.Generic, bool allowRawFallback = true) -> AiDotNet.Evolution.Programs.FencedCodeExtractionResult!
+static AiDotNet.Evolution.Programs.FencedCodeExtractor.ExtractBlocks(string! response) -> System.Collections.Generic.IReadOnlyList<AiDotNet.Evolution.Programs.FencedCodeBlock!>!
+static AiDotNet.Evolution.Programs.FencedCodeExtractor.ExtractExact(string! response, AiDotNet.Evolution.Programs.ProgramLanguage language) -> AiDotNet.Evolution.Programs.FencedCodeExtractionResult!
+static AiDotNet.Evolution.Programs.ImprovementOptions.operator !=(AiDotNet.Evolution.Programs.ImprovementOptions? left, AiDotNet.Evolution.Programs.ImprovementOptions? right) -> bool
+static AiDotNet.Evolution.Programs.ImprovementOptions.operator ==(AiDotNet.Evolution.Programs.ImprovementOptions? left, AiDotNet.Evolution.Programs.ImprovementOptions? right) -> bool
+static AiDotNet.Evolution.Programs.ImprovementResult.operator !=(AiDotNet.Evolution.Programs.ImprovementResult? left, AiDotNet.Evolution.Programs.ImprovementResult? right) -> bool
+static AiDotNet.Evolution.Programs.ImprovementResult.operator ==(AiDotNet.Evolution.Programs.ImprovementResult? left, AiDotNet.Evolution.Programs.ImprovementResult? right) -> bool
+static AiDotNet.Evolution.Programs.Metrics.ProgramMetricAggregator.UpstreamFitnessScore(System.Collections.Generic.IReadOnlyDictionary<string!, AiDotNet.Evolution.Programs.Metrics.ProgramMetricValue!>! metrics, System.Collections.Generic.IEnumerable<string!>? featureDimensions = null) -> AiDotNet.Evolution.Programs.Metrics.ProgramMetricAggregationResult!
+static AiDotNet.Evolution.Programs.Metrics.ProgramMetricValue.Flag(bool value) -> AiDotNet.Evolution.Programs.Metrics.ProgramMetricValue!
+static AiDotNet.Evolution.Programs.Metrics.ProgramMetricValue.Number(double value) -> AiDotNet.Evolution.Programs.Metrics.ProgramMetricValue!
+static AiDotNet.Evolution.Programs.Metrics.ProgramMetricValue.Text(string! value) -> AiDotNet.Evolution.Programs.Metrics.ProgramMetricValue!
+static AiDotNet.Evolution.Programs.Novelty.EmbeddingBatch.Failure(string! reason) -> AiDotNet.Evolution.Programs.Novelty.EmbeddingBatch!
+static AiDotNet.Evolution.Programs.Novelty.EmbeddingBatch.Success(System.Collections.Generic.IEnumerable<AiDotNet.Evolution.Programs.Novelty.EmbeddingVector!>! vectors) -> AiDotNet.Evolution.Programs.Novelty.EmbeddingBatch!
+static AiDotNet.Evolution.Programs.Novelty.EmbeddingVector.CosineSimilarity(AiDotNet.Evolution.Programs.Novelty.EmbeddingVector! first, AiDotNet.Evolution.Programs.Novelty.EmbeddingVector! second) -> double
+static AiDotNet.Evolution.Programs.Novelty.LlmProgramNoveltyJudge.ParseVerdict(string! answer) -> AiDotNet.Evolution.Programs.Novelty.ProgramNoveltyVerdict
+static AiDotNet.Evolution.Programs.Novelty.ProgramLineEditDistance.ComputeDistance(string! first, string! second, int maxComparedLines = 2000) -> double
+static AiDotNet.Evolution.Programs.Novelty.ProgramTokenSetDistance.ComputeDistance(string! first, string! second) -> double
+static AiDotNet.Evolution.Programs.PatchPlan.operator !=(AiDotNet.Evolution.Programs.PatchPlan? left, AiDotNet.Evolution.Programs.PatchPlan? right) -> bool
+static AiDotNet.Evolution.Programs.PatchPlan.operator ==(AiDotNet.Evolution.Programs.PatchPlan? left, AiDotNet.Evolution.Programs.PatchPlan? right) -> bool
+static AiDotNet.Evolution.Programs.ProgramBuild.operator !=(AiDotNet.Evolution.Programs.ProgramBuild? left, AiDotNet.Evolution.Programs.ProgramBuild? right) -> bool
+static AiDotNet.Evolution.Programs.ProgramBuild.operator ==(AiDotNet.Evolution.Programs.ProgramBuild? left, AiDotNet.Evolution.Programs.ProgramBuild? right) -> bool
+static AiDotNet.Evolution.Programs.ProgramChatMessage.Assistant(string! text) -> AiDotNet.Evolution.Programs.ProgramChatMessage!
+static AiDotNet.Evolution.Programs.ProgramChatMessage.System(string! text) -> AiDotNet.Evolution.Programs.ProgramChatMessage!
+static AiDotNet.Evolution.Programs.ProgramChatMessage.User(string! text) -> AiDotNet.Evolution.Programs.ProgramChatMessage!
+static AiDotNet.Evolution.Programs.ProgramDescriptorSet.CreateDefault(System.Collections.Generic.IEnumerable<string!>! referenceSources) -> AiDotNet.Evolution.Programs.ProgramDescriptorSet!
+static AiDotNet.Evolution.Programs.ProgramDescriptorSet.Empty() -> AiDotNet.Evolution.Programs.ProgramDescriptorSet!
+static AiDotNet.Evolution.Programs.ProgramDiff.Apply(string! source, System.Collections.Generic.IReadOnlyList<AiDotNet.Evolution.Programs.ProgramDiffBlock!>! blocks, AiDotNet.Evolution.Programs.ProgramTaskOptions? options = null) -> AiDotNet.Evolution.Programs.ProgramDiffApplyResult!
+static AiDotNet.Evolution.Programs.ProgramDiff.ApplyResponse(string! source, string! response, AiDotNet.Evolution.Programs.ProgramTaskOptions? options = null) -> AiDotNet.Evolution.Programs.ProgramDiffApplyResult!
+static AiDotNet.Evolution.Programs.ProgramDiff.CreateUnifiedDiff(string! original, string! modified, int contextLines = 3) -> string!
+static AiDotNet.Evolution.Programs.ProgramDiff.FormatSummary(System.Collections.Generic.IReadOnlyList<AiDotNet.Evolution.Programs.ProgramDiffBlock!>! blocks, int maxLineLength = 100, int maxLines = 30) -> string!
+static AiDotNet.Evolution.Programs.ProgramDiff.Parse(string! response, AiDotNet.Evolution.Programs.ProgramDiffOptions? options = null) -> AiDotNet.Evolution.Programs.ProgramDiffParseResult!
+static AiDotNet.Evolution.Programs.ProgramDiff.SplitByTarget(System.Collections.Generic.IReadOnlyList<AiDotNet.Evolution.Programs.ProgramDiffBlock!>! blocks, string! source, string! changesDescription, AiDotNet.Evolution.Programs.ProgramTaskOptions? options = null) -> AiDotNet.Evolution.Programs.ProgramDiffTargetSplit!
+static AiDotNet.Evolution.Programs.ProgramDiversityDescriptor.ComputeDistance(string! first, string! second) -> double
+static AiDotNet.Evolution.Programs.ProgramEvolution.CreateEngine(AiDotNet.Evolution.Programs.IProgramVariationOperator! variation, AiDotNet.Evolution.Programs.IProgramFitnessEvaluator! correctness, AiDotNet.Evolution.Programs.IProgramFitnessEvaluator! fitness, AiDotNet.Evolution.Programs.ProgramEvolutionResourceOptions! resources, AiDotNet.Evolution.EvolutionEngineOptions! options, System.Func<int, AiDotNet.Evolution.IEvolutionArchive<AiDotNet.Evolution.Programs.ProgramGenome!>!>! archiveFactory, AiDotNet.Evolution.IEvolutionObserver<AiDotNet.Evolution.Programs.ProgramGenome!>? observer = null) -> AiDotNet.Evolution.EvolutionEngine<AiDotNet.Evolution.Programs.ProgramGenome!>!
+static AiDotNet.Evolution.Programs.ProgramEvolutionLlmUsage.Empty.get -> AiDotNet.Evolution.Programs.ProgramEvolutionLlmUsage!
+static AiDotNet.Evolution.Programs.ProgramEvolutionPromptOptions.TryParseTemplateKey(string? name, out AiDotNet.Evolution.Programs.ProgramPromptTemplateKey key) -> bool
+static AiDotNet.Evolution.Programs.ProgramGenome.ComputeId(string! source, AiDotNet.Evolution.Programs.ProgramLanguage language = AiDotNet.Evolution.Programs.ProgramLanguage.Generic) -> string!
+static AiDotNet.Evolution.Programs.ProgramGenome.Normalize(string! source) -> string!
+static AiDotNet.Evolution.Programs.ProgramGenome.operator !=(AiDotNet.Evolution.Programs.ProgramGenome? left, AiDotNet.Evolution.Programs.ProgramGenome? right) -> bool
+static AiDotNet.Evolution.Programs.ProgramGenome.operator ==(AiDotNet.Evolution.Programs.ProgramGenome? left, AiDotNet.Evolution.Programs.ProgramGenome? right) -> bool
+static AiDotNet.Evolution.Programs.ProgramImprovement.RunAsync(AiDotNet.Evolution.Programs.ProgramSnapshot! parent, System.Func<AiDotNet.Evolution.Programs.IProgramCompiler!>! compilerFactory, AiDotNet.Evolution.Programs.ProgramPlanner! planner, AiDotNet.Evolution.Programs.ProgramVerifier! searchVerifier, AiDotNet.Evolution.Programs.ProgramVerifier! heldOutVerifier, AiDotNet.Evolution.EvolutionResourceLedger! ledger, AiDotNet.Evolution.Programs.ImprovementOptions! options, System.Threading.CancellationToken cancellationToken = default(System.Threading.CancellationToken)) -> System.Threading.Tasks.Task<AiDotNet.Evolution.Programs.ImprovementResult!>!
+static AiDotNet.Evolution.Programs.ProgramImprovement.Units(decimal amount) -> AiDotNet.Evolution.EvolutionResources!
+static AiDotNet.Evolution.Programs.ProgramInterpreterSpecification.Expand(string! template, string! sourcePath, string! workspacePath, bool quoteWithDoubleQuotes) -> string!
+static AiDotNet.Evolution.Programs.ProgramInterpreterSpecification.QuoteForCommandLine(string! value) -> string!
+static AiDotNet.Evolution.Programs.ProgramInterpreterSpecification.QuoteForPosixShell(string! value) -> string!
+static AiDotNet.Evolution.Programs.ProgramLanguageDetector.Detect(string! source, AiDotNet.Evolution.Programs.ProgramLanguage fallback = AiDotNet.Evolution.Programs.ProgramLanguage.Generic) -> AiDotNet.Evolution.Programs.ProgramLanguage
+static AiDotNet.Evolution.Programs.ProgramLanguageDetector.GetFenceLabel(AiDotNet.Evolution.Programs.ProgramLanguage language) -> string!
+static AiDotNet.Evolution.Programs.ProgramLanguageDetector.GetFileExtension(AiDotNet.Evolution.Programs.ProgramLanguage language) -> string!
+static AiDotNet.Evolution.Programs.ProgramLanguageDetector.GetLineCommentPrefix(AiDotNet.Evolution.Programs.ProgramLanguage language) -> string!
+static AiDotNet.Evolution.Programs.ProgramLanguageDetector.TryDetect(string! source, out AiDotNet.Evolution.Programs.ProgramLanguage language) -> bool
+static AiDotNet.Evolution.Programs.ProgramLanguageDetector.TryGetLanguageForFenceLabel(string? label, out AiDotNet.Evolution.Programs.ProgramLanguage language) -> bool
+static AiDotNet.Evolution.Programs.ProgramLanguageDetector.TryGetLanguageForFileExtension(string? extension, out AiDotNet.Evolution.Programs.ProgramLanguage language) -> bool
+static AiDotNet.Evolution.Programs.ProgramMeasurementStatistics.Calculate(System.Collections.Generic.IEnumerable<AiDotNet.Evolution.Programs.ProgramMeasurementObservation!>! observations) -> (double Mean, double StandardError)
+static AiDotNet.Evolution.Programs.ProgramSandboxOptions.CreateDefaultInterpreters() -> System.Collections.Generic.Dictionary<AiDotNet.Evolution.Programs.ProgramLanguage, AiDotNet.Evolution.Programs.ProgramInterpreterSpecification!>!
+static AiDotNet.Evolution.Programs.ProgramSnapshot.Digest(byte[]! value) -> string!
+static AiDotNet.Evolution.Programs.ProgramSnapshot.Digest(string! value) -> string!
+static AiDotNet.Evolution.Programs.ProgramTokenComplexityDescriptor.CountTokens(string! source) -> int
+static AiDotNet.Evolution.Programs.Provenance.JsonLinesProposalProvenanceSink.EnumerateSegments(string! directoryPath, string? baseName = null) -> System.Collections.Generic.IReadOnlyList<string!>!
+static AiDotNet.Evolution.Programs.Provenance.ProposalProvenanceReader.BuildLineage(string! genomeId, System.Collections.Generic.IReadOnlyList<AiDotNet.Evolution.Programs.Provenance.ProposalProvenanceRecord!>! records) -> AiDotNet.Evolution.Programs.Provenance.ProposalProvenanceLineage!
+static AiDotNet.Evolution.Programs.Provenance.ProposalProvenanceReader.BuildLineages(System.Collections.Generic.IReadOnlyList<AiDotNet.Evolution.Programs.Provenance.ProposalProvenanceRecord!>! records) -> System.Collections.Generic.IReadOnlyList<AiDotNet.Evolution.Programs.Provenance.ProposalProvenanceLineage!>!
+static AiDotNet.Evolution.Programs.Provenance.ProposalProvenanceReader.Read(string! path, long maxTotalBytes = 268435456) -> AiDotNet.Evolution.Programs.Provenance.ProposalProvenanceReadResult!
+static AiDotNet.Evolution.Programs.Provenance.ProposalProvenanceReader.TryParse(string! line) -> AiDotNet.Evolution.Programs.Provenance.ProposalProvenanceRecord?
+static AiDotNet.Evolution.Programs.SearchRequest.operator !=(AiDotNet.Evolution.Programs.SearchRequest? left, AiDotNet.Evolution.Programs.SearchRequest? right) -> bool
+static AiDotNet.Evolution.Programs.SearchRequest.operator ==(AiDotNet.Evolution.Programs.SearchRequest? left, AiDotNet.Evolution.Programs.SearchRequest? right) -> bool
+static AiDotNet.Evolution.Programs.SourceEdit.operator !=(AiDotNet.Evolution.Programs.SourceEdit? left, AiDotNet.Evolution.Programs.SourceEdit? right) -> bool
+static AiDotNet.Evolution.Programs.SourceEdit.operator ==(AiDotNet.Evolution.Programs.SourceEdit? left, AiDotNet.Evolution.Programs.SourceEdit? right) -> bool
+static AiDotNet.Evolution.Programs.VerificationReceipt.operator !=(AiDotNet.Evolution.Programs.VerificationReceipt? left, AiDotNet.Evolution.Programs.VerificationReceipt? right) -> bool
+static AiDotNet.Evolution.Programs.VerificationReceipt.operator ==(AiDotNet.Evolution.Programs.VerificationReceipt? left, AiDotNet.Evolution.Programs.VerificationReceipt? right) -> bool
+static AiDotNet.Evolution.Programs.VerificationRequest.operator !=(AiDotNet.Evolution.Programs.VerificationRequest? left, AiDotNet.Evolution.Programs.VerificationRequest? right) -> bool
+static AiDotNet.Evolution.Programs.VerificationRequest.operator ==(AiDotNet.Evolution.Programs.VerificationRequest? left, AiDotNet.Evolution.Programs.VerificationRequest? right) -> bool
+static AiDotNet.Evolution.Prompts.ProgramPromptBuilder.ToCriterionFieldName(string! criterion) -> string!
+static AiDotNet.Evolution.Prompts.ProgramPromptTemplateSet.CreateDefault() -> AiDotNet.Evolution.Prompts.ProgramPromptTemplateSet!
+static AiDotNet.Evolution.Prompts.ProgramPromptTemplateSet.DeclaredFragmentArguments(AiDotNet.Evolution.Programs.ProgramPromptFragmentKey key) -> System.Collections.Generic.IReadOnlyList<string!>!
+static AiDotNet.Evolution.Prompts.ProgramPromptTemplateSet.FragmentKeys.get -> System.Collections.Generic.IReadOnlyList<AiDotNet.Evolution.Programs.ProgramPromptFragmentKey>!
+static AiDotNet.Evolution.Prompts.ProgramPromptTemplateSet.FragmentName(AiDotNet.Evolution.Programs.ProgramPromptFragmentKey key) -> string!
+static AiDotNet.Evolution.Prompts.ProgramPromptTemplateSet.LoadFromDirectory(string! directory) -> AiDotNet.Evolution.Prompts.ProgramPromptTemplateSet!
+static AiDotNet.Evolution.Prompts.ProgramPromptTemplateSet.LoadFromDirectory(string! directory, AiDotNet.Evolution.Prompts.ProgramPromptTemplateSet! baseSet) -> AiDotNet.Evolution.Prompts.ProgramPromptTemplateSet!
+static AiDotNet.Evolution.Prompts.ProgramPromptTemplateSet.RequiredPlaceholders(AiDotNet.Evolution.Programs.ProgramPromptTemplateKey key) -> System.Collections.Generic.IReadOnlyList<string!>!
+static AiDotNet.Evolution.Prompts.ProgramPromptTemplateSet.SuppliedPlaceholders(AiDotNet.Evolution.Programs.ProgramPromptTemplateKey key) -> System.Collections.Generic.IReadOnlyList<string!>!
+static AiDotNet.Evolution.Prompts.ProgramPromptTemplateSet.TemplateFileStem(AiDotNet.Evolution.Programs.ProgramPromptTemplateKey key) -> string!
+static AiDotNet.Evolution.Prompts.ProgramPromptTemplateSet.TemplateKeys.get -> System.Collections.Generic.IReadOnlyList<AiDotNet.Evolution.Programs.ProgramPromptTemplateKey>!
+static AiDotNet.Evolution.Prompts.PromptTextRedactor.BoundToUtf8Bytes(string! text, int maxBytes, out bool wasTruncated) -> string!
+static AiDotNet.Evolution.Prompts.PromptTextRedactor.FormatBytes(int bytes) -> string!
+static AiDotNet.Evolution.Prompts.PromptTextRedactor.Redact(string! text) -> string!
+static AiDotNet.Evolution.Prompts.PromptTextRedactor.RedactAndBound(string! text, int maxBytes, string! truncationMarker, out bool wasTruncated) -> string!
+virtual AiDotNet.Evolution.Programs.ProgramPlanner.Invoke(AiDotNet.Evolution.Programs.SearchRequest! request, System.Threading.CancellationToken cancellationToken) -> System.Threading.Tasks.ValueTask<AiDotNet.Evolution.EvolutionResourceResult<AiDotNet.Evolution.Programs.PatchPlan!>!>
+virtual AiDotNet.Evolution.Programs.ProgramTaskOptions.Clone() -> AiDotNet.Evolution.Programs.ProgramTaskOptions!
+virtual AiDotNet.Evolution.Programs.ProgramTaskOptions.Validate() -> void
+virtual AiDotNet.Evolution.Programs.ProgramVerifier.Invoke(AiDotNet.Evolution.Programs.VerificationRequest! request, System.Threading.CancellationToken cancellationToken) -> System.Threading.Tasks.ValueTask<AiDotNet.Evolution.EvolutionResourceResult<AiDotNet.Evolution.Programs.VerificationReceipt!>!>

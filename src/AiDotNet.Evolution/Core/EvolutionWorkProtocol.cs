@@ -21,7 +21,10 @@ public sealed partial class EvolutionWorkProtocol : IDisposable
     private bool _closed;
 
     /// <summary>Creates a protocol endpoint that owns the coordinator opened by its first open command.</summary>
-    public EvolutionWorkProtocol(Func<DateTimeOffset>? utcNow = null) { _utcNow = utcNow; _ownsCoordinator = true; }
+    public EvolutionWorkProtocol() : this((Func<DateTimeOffset>?)null) { }
+
+    /// <summary>Creates a self-owning endpoint with an injected clock (null uses the system clock).</summary>
+    public EvolutionWorkProtocol(Func<DateTimeOffset>? utcNow) { _utcNow = utcNow; _ownsCoordinator = true; }
 
     /// <summary>Creates an endpoint for an already attached live-session coordinator, without taking ownership.</summary>
     /// <remarks>The caller must keep the coordinator alive and handle bridge delivery/reconciliation. Open is then refused.</remarks>

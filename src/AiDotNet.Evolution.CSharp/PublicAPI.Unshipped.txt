@@ -1,1 +1,118 @@
 #nullable enable
+AiDotNet.Evolution.CSharp.CompilerChatMessage
+AiDotNet.Evolution.CSharp.CompilerChatMessage.<Clone>$() -> AiDotNet.Evolution.CSharp.CompilerChatMessage!
+AiDotNet.Evolution.CSharp.CompilerChatMessage.CompilerChatMessage(string! Role, string! Text) -> void
+AiDotNet.Evolution.CSharp.CompilerChatMessage.Deconstruct(out string! Role, out string! Text) -> void
+AiDotNet.Evolution.CSharp.CompilerChatMessage.Equals(AiDotNet.Evolution.CSharp.CompilerChatMessage? other) -> bool
+AiDotNet.Evolution.CSharp.CompilerChatMessage.Role.get -> string!
+AiDotNet.Evolution.CSharp.CompilerChatMessage.Role.init -> void
+AiDotNet.Evolution.CSharp.CompilerChatMessage.Text.get -> string!
+AiDotNet.Evolution.CSharp.CompilerChatMessage.Text.init -> void
+AiDotNet.Evolution.CSharp.CompilerChatOptions
+AiDotNet.Evolution.CSharp.CompilerChatOptions.<Clone>$() -> AiDotNet.Evolution.CSharp.CompilerChatOptions!
+AiDotNet.Evolution.CSharp.CompilerChatOptions.CompilerChatOptions() -> void
+AiDotNet.Evolution.CSharp.CompilerChatOptions.Equals(AiDotNet.Evolution.CSharp.CompilerChatOptions? other) -> bool
+AiDotNet.Evolution.CSharp.CompilerChatOptions.MaxOutputTokens.get -> int
+AiDotNet.Evolution.CSharp.CompilerChatOptions.MaxOutputTokens.init -> void
+AiDotNet.Evolution.CSharp.CompilerChatOptions.Seed.get -> int?
+AiDotNet.Evolution.CSharp.CompilerChatOptions.Seed.init -> void
+AiDotNet.Evolution.CSharp.CompilerChatOptions.Temperature.get -> double
+AiDotNet.Evolution.CSharp.CompilerChatOptions.Temperature.init -> void
+AiDotNet.Evolution.CSharp.CompilerChatResponse
+AiDotNet.Evolution.CSharp.CompilerChatResponse.CompilerChatResponse(AiDotNet.Evolution.CSharp.CompilerChatMessage! message, string? modelId = null, AiDotNet.Evolution.CSharp.CompilerChatUsage? usage = null) -> void
+AiDotNet.Evolution.CSharp.CompilerChatResponse.ModelId.get -> string?
+AiDotNet.Evolution.CSharp.CompilerChatResponse.Text.get -> string!
+AiDotNet.Evolution.CSharp.CompilerChatResponse.Usage.get -> AiDotNet.Evolution.CSharp.CompilerChatUsage?
+AiDotNet.Evolution.CSharp.CompilerChatUsage
+AiDotNet.Evolution.CSharp.CompilerChatUsage.<Clone>$() -> AiDotNet.Evolution.CSharp.CompilerChatUsage!
+AiDotNet.Evolution.CSharp.CompilerChatUsage.CompilerChatUsage(long inputTokens, long outputTokens) -> void
+AiDotNet.Evolution.CSharp.CompilerChatUsage.Equals(AiDotNet.Evolution.CSharp.CompilerChatUsage? other) -> bool
+AiDotNet.Evolution.CSharp.CompilerChatUsage.InputTokens.get -> long
+AiDotNet.Evolution.CSharp.CompilerChatUsage.OutputTokens.get -> long
+AiDotNet.Evolution.CSharp.CSharpProgramCompiler
+AiDotNet.Evolution.CSharp.CSharpProgramCompiler.Apply(AiDotNet.Evolution.Programs.ProgramSnapshot! parent, AiDotNet.Evolution.Programs.PatchPlan! plan, System.Threading.CancellationToken cancellationToken = default(System.Threading.CancellationToken)) -> AiDotNet.Evolution.Programs.ProgramSnapshot!
+AiDotNet.Evolution.CSharp.CSharpProgramCompiler.Build(AiDotNet.Evolution.Programs.ProgramSnapshot! source, System.Threading.CancellationToken cancellationToken = default(System.Threading.CancellationToken)) -> AiDotNet.Evolution.Programs.ProgramBuild!
+AiDotNet.Evolution.CSharp.CSharpProgramCompiler.Catalog(AiDotNet.Evolution.Programs.ProgramSnapshot! source, System.Threading.CancellationToken cancellationToken = default(System.Threading.CancellationToken)) -> System.Collections.Generic.IReadOnlyList<AiDotNet.Evolution.Programs.EditTarget!>!
+AiDotNet.Evolution.CSharp.CSharpProgramCompiler.CSharpProgramCompiler(System.Collections.Generic.IEnumerable<string!>! referencePaths, string! targetIdentity, int timeoutSeconds = 10) -> void
+AiDotNet.Evolution.CSharp.CSharpProgramCompiler.Fingerprint.get -> string!
+AiDotNet.Evolution.CSharp.CSharpProgramEvolutionOptions
+AiDotNet.Evolution.CSharp.CSharpProgramEvolutionOptions.AuditCostUnits.get -> decimal
+AiDotNet.Evolution.CSharp.CSharpProgramEvolutionOptions.AuditCostUnits.set -> void
+AiDotNet.Evolution.CSharp.CSharpProgramEvolutionOptions.AuditDirectory.get -> string!
+AiDotNet.Evolution.CSharp.CSharpProgramEvolutionOptions.AuditDirectory.set -> void
+AiDotNet.Evolution.CSharp.CSharpProgramEvolutionOptions.CompilationCostUnits.get -> decimal
+AiDotNet.Evolution.CSharp.CSharpProgramEvolutionOptions.CompilationCostUnits.set -> void
+AiDotNet.Evolution.CSharp.CSharpProgramEvolutionOptions.CompilationTimeoutSeconds.get -> int
+AiDotNet.Evolution.CSharp.CSharpProgramEvolutionOptions.CompilationTimeoutSeconds.set -> void
+AiDotNet.Evolution.CSharp.CSharpProgramEvolutionOptions.CostUnitVersionHash.get -> string!
+AiDotNet.Evolution.CSharp.CSharpProgramEvolutionOptions.CostUnitVersionHash.set -> void
+AiDotNet.Evolution.CSharp.CSharpProgramEvolutionOptions.CSharpProgramEvolutionOptions() -> void
+AiDotNet.Evolution.CSharp.CSharpProgramEvolutionOptions.Id.get -> string!
+AiDotNet.Evolution.CSharp.CSharpProgramEvolutionOptions.Id.set -> void
+AiDotNet.Evolution.CSharp.CSharpProgramEvolutionOptions.InputTokenCostUnits.get -> decimal
+AiDotNet.Evolution.CSharp.CSharpProgramEvolutionOptions.InputTokenCostUnits.set -> void
+AiDotNet.Evolution.CSharp.CSharpProgramEvolutionOptions.MaxCatalogNodes.get -> int
+AiDotNet.Evolution.CSharp.CSharpProgramEvolutionOptions.MaxCatalogNodes.set -> void
+AiDotNet.Evolution.CSharp.CSharpProgramEvolutionOptions.MaxEdits.get -> int
+AiDotNet.Evolution.CSharp.CSharpProgramEvolutionOptions.MaxEdits.set -> void
+AiDotNet.Evolution.CSharp.CSharpProgramEvolutionOptions.MaxInputTokens.get -> int
+AiDotNet.Evolution.CSharp.CSharpProgramEvolutionOptions.MaxInputTokens.set -> void
+AiDotNet.Evolution.CSharp.CSharpProgramEvolutionOptions.MaxOutputTokens.get -> int
+AiDotNet.Evolution.CSharp.CSharpProgramEvolutionOptions.MaxOutputTokens.set -> void
+AiDotNet.Evolution.CSharp.CSharpProgramEvolutionOptions.MaxRepairs.get -> int
+AiDotNet.Evolution.CSharp.CSharpProgramEvolutionOptions.MaxRepairs.set -> void
+AiDotNet.Evolution.CSharp.CSharpProgramEvolutionOptions.MaxResponseChars.get -> int
+AiDotNet.Evolution.CSharp.CSharpProgramEvolutionOptions.MaxResponseChars.set -> void
+AiDotNet.Evolution.CSharp.CSharpProgramEvolutionOptions.MaxSourceChars.get -> int
+AiDotNet.Evolution.CSharp.CSharpProgramEvolutionOptions.MaxSourceChars.set -> void
+AiDotNet.Evolution.CSharp.CSharpProgramEvolutionOptions.ModelCallCostUnits.get -> decimal
+AiDotNet.Evolution.CSharp.CSharpProgramEvolutionOptions.ModelCallCostUnits.set -> void
+AiDotNet.Evolution.CSharp.CSharpProgramEvolutionOptions.ModelVersionIdentity.get -> string!
+AiDotNet.Evolution.CSharp.CSharpProgramEvolutionOptions.ModelVersionIdentity.set -> void
+AiDotNet.Evolution.CSharp.CSharpProgramEvolutionOptions.OutputTokenCostUnits.get -> decimal
+AiDotNet.Evolution.CSharp.CSharpProgramEvolutionOptions.OutputTokenCostUnits.set -> void
+AiDotNet.Evolution.CSharp.CSharpProgramEvolutionOptions.ParseCostUnits.get -> decimal
+AiDotNet.Evolution.CSharp.CSharpProgramEvolutionOptions.ParseCostUnits.set -> void
+AiDotNet.Evolution.CSharp.CSharpProgramEvolutionOptions.ReferencePaths.get -> System.Collections.Generic.IList<string!>!
+AiDotNet.Evolution.CSharp.CSharpProgramEvolutionOptions.ReferencePaths.set -> void
+AiDotNet.Evolution.CSharp.CSharpProgramEvolutionOptions.SetupCostUnits.get -> decimal
+AiDotNet.Evolution.CSharp.CSharpProgramEvolutionOptions.SetupCostUnits.set -> void
+AiDotNet.Evolution.CSharp.CSharpProgramEvolutionOptions.TargetIdentity.get -> string!
+AiDotNet.Evolution.CSharp.CSharpProgramEvolutionOptions.TargetIdentity.set -> void
+AiDotNet.Evolution.CSharp.CSharpProgramSourceOptions
+AiDotNet.Evolution.CSharp.CSharpProgramSourceOptions.CSharpProgramSourceOptions() -> void
+AiDotNet.Evolution.CSharp.CSharpProgramSourceOptions.EnforceEvolveBlocks.get -> bool
+AiDotNet.Evolution.CSharp.CSharpProgramSourceOptions.EnforceEvolveBlocks.set -> void
+AiDotNet.Evolution.CSharp.CSharpProgramSourceOptions.EvolveBlockEndMarker.get -> string?
+AiDotNet.Evolution.CSharp.CSharpProgramSourceOptions.EvolveBlockEndMarker.set -> void
+AiDotNet.Evolution.CSharp.CSharpProgramSourceOptions.EvolveBlockStartMarker.get -> string?
+AiDotNet.Evolution.CSharp.CSharpProgramSourceOptions.EvolveBlockStartMarker.set -> void
+AiDotNet.Evolution.CSharp.CSharpProgramSourceOptions.Language.get -> AiDotNet.Evolution.Programs.ProgramLanguage
+AiDotNet.Evolution.CSharp.CSharpProgramSourceOptions.Language.set -> void
+AiDotNet.Evolution.CSharp.CSharpProgramSourceOptions.MaxProgramChars.get -> int
+AiDotNet.Evolution.CSharp.CSharpProgramSourceOptions.MaxProgramChars.set -> void
+AiDotNet.Evolution.CSharp.CSharpProgramSourceOptions.TaskDescription.get -> string?
+AiDotNet.Evolution.CSharp.CSharpProgramSourceOptions.TaskDescription.set -> void
+AiDotNet.Evolution.CSharp.CSharpProgramVariation
+AiDotNet.Evolution.CSharp.ICSharpProposalClient
+AiDotNet.Evolution.CSharp.ICSharpProposalClient.GetResponseAsync(System.Collections.Generic.IReadOnlyList<AiDotNet.Evolution.CSharp.CompilerChatMessage!>! messages, AiDotNet.Evolution.CSharp.CompilerChatOptions? options = null, System.Threading.CancellationToken cancellationToken = default(System.Threading.CancellationToken)) -> System.Threading.Tasks.Task<AiDotNet.Evolution.CSharp.CompilerChatResponse!>!
+AiDotNet.Evolution.CSharp.ICSharpProposalClient.ModelId.get -> string!
+override AiDotNet.Evolution.CSharp.CompilerChatMessage.Equals(object? obj) -> bool
+override AiDotNet.Evolution.CSharp.CompilerChatMessage.GetHashCode() -> int
+override AiDotNet.Evolution.CSharp.CompilerChatMessage.ToString() -> string!
+override AiDotNet.Evolution.CSharp.CompilerChatOptions.Equals(object? obj) -> bool
+override AiDotNet.Evolution.CSharp.CompilerChatOptions.GetHashCode() -> int
+override AiDotNet.Evolution.CSharp.CompilerChatOptions.ToString() -> string!
+override AiDotNet.Evolution.CSharp.CompilerChatUsage.Equals(object? obj) -> bool
+override AiDotNet.Evolution.CSharp.CompilerChatUsage.GetHashCode() -> int
+override AiDotNet.Evolution.CSharp.CompilerChatUsage.ToString() -> string!
+static AiDotNet.Evolution.CSharp.CompilerChatMessage.Assistant(string! text) -> AiDotNet.Evolution.CSharp.CompilerChatMessage!
+static AiDotNet.Evolution.CSharp.CompilerChatMessage.operator !=(AiDotNet.Evolution.CSharp.CompilerChatMessage? left, AiDotNet.Evolution.CSharp.CompilerChatMessage? right) -> bool
+static AiDotNet.Evolution.CSharp.CompilerChatMessage.operator ==(AiDotNet.Evolution.CSharp.CompilerChatMessage? left, AiDotNet.Evolution.CSharp.CompilerChatMessage? right) -> bool
+static AiDotNet.Evolution.CSharp.CompilerChatMessage.System(string! text) -> AiDotNet.Evolution.CSharp.CompilerChatMessage!
+static AiDotNet.Evolution.CSharp.CompilerChatMessage.User(string! text) -> AiDotNet.Evolution.CSharp.CompilerChatMessage!
+static AiDotNet.Evolution.CSharp.CompilerChatOptions.operator !=(AiDotNet.Evolution.CSharp.CompilerChatOptions? left, AiDotNet.Evolution.CSharp.CompilerChatOptions? right) -> bool
+static AiDotNet.Evolution.CSharp.CompilerChatOptions.operator ==(AiDotNet.Evolution.CSharp.CompilerChatOptions? left, AiDotNet.Evolution.CSharp.CompilerChatOptions? right) -> bool
+static AiDotNet.Evolution.CSharp.CompilerChatUsage.operator !=(AiDotNet.Evolution.CSharp.CompilerChatUsage? left, AiDotNet.Evolution.CSharp.CompilerChatUsage? right) -> bool
+static AiDotNet.Evolution.CSharp.CompilerChatUsage.operator ==(AiDotNet.Evolution.CSharp.CompilerChatUsage? left, AiDotNet.Evolution.CSharp.CompilerChatUsage? right) -> bool
+static AiDotNet.Evolution.CSharp.CSharpProgramVariation.Create(AiDotNet.Evolution.CSharp.ICSharpProposalClient! client, AiDotNet.Evolution.CSharp.CSharpProgramSourceOptions! programOptions, AiDotNet.Evolution.CSharp.CSharpProgramEvolutionOptions! compilerOptions, AiDotNet.Evolution.Programs.ProgramEvolutionResourceOptions! resources) -> AiDotNet.Evolution.Programs.MeteredProgramVariationOperator!
