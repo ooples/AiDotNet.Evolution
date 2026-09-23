@@ -33,6 +33,44 @@ PROBES = {
           "/sys/fs/cgroup/memory/memory.max_usage_in_bytes"],
 }
 COUNTER_FILES = {version: probe[1:] for version, probe in PROBES.items()}
+# cgroup-v1 counters live under each controller's mount point, which is host layout:
+# /sys/fs/cgroup/cpuacct, a co-mounted /sys/fs/cgroup/cpu,cpuacct, or anything else. They
+# are therefore resolved from the container's own mount table, not assumed.
+V1_COUNTERS = (("cpuacct", "cpuacct.usage"), ("memory", "memory.max_usage_in_bytes"))
+
+
+def v1_counter_files(mountinfo):
+    """The cgroup-v1 CPU and memory-peak files named by a /proc/self/mountinfo table."""
+    points = {controller: [] for controller, _ in V1_COUNTERS}
+    for line in mountinfo.splitlines():
+        fields = line.split()
+        if "-" not in fields:
+            raise RuntimeError("Unreadable mountinfo line")
+        separator = fields.index("-")
+        if separator < 6 or len(fields) < separator + 4 or fields[separator + 1] != "cgroup":
+            continue
+        # Mount points escape whitespace and backslash as octal (\040); commas are literal.
+        point = re.sub(r"\\([0-7]{3})", lambda match: chr(int(match.group(1), 8)), fields[4])
+        options = set(fields[separator + 3].split(","))
+        for controller in points:
+            if controller in options:
+                points[controller].append(point)
+    files = []
+    for controller, name in V1_COUNTERS:
+        if len(set(points[controller])) != 1:
+            raise RuntimeError(f"Expected exactly one cgroup-v1 {controller} mount, found {points[controller]}")
+        files.append(points[controller][0].rstrip("/") + "/" + name)
+    return files
+
+
+def resolve_counter_files(container, version):
+    if version != "1":
+        return list(COUNTER_FILES[version])
+    raw = probe_container(container, ["/bin/cat", "/proc/self/mountinfo"])
+    try:
+        return v1_counter_files(raw.decode("utf-8"))
+    except UnicodeError as error:
+        raise RuntimeError("Unreadable container mountinfo") from error
 
 
 def host_cgroup_version():
@@ -47,14 +85,18 @@ class CandidateExited(Exception):
     """A terminal candidate is not a Docker infrastructure outage."""
 
 
-def kernel_resources(container, version="2"):
+def probe_container(container, argv):
     try:
-        raw = docker("exec", "--user", "0:0", container, *PROBES[version], timeout=10).stdout
+        return docker("exec", "--user", "0:0", container, *argv, timeout=10).stdout
     except RuntimeError:
         state = unique_json(docker("inspect", container).stdout)[0]["State"]
         if not state["Running"]:
             raise CandidateExited("Candidate exited before resource capture") from None
         raise
+
+
+def kernel_resources(container, version="2", counter_files=None):
+    raw = probe_container(container, PROBES[version] if counter_files is None else ["/bin/cat", *counter_files])
     try:
         lines = raw.decode("ascii").splitlines()
         if version == "1":
@@ -80,6 +122,8 @@ class WarmDockerSandbox(DockerSandbox):
     def __init__(self, image, evidence, *, seconds=15, memory_mib=512):
         super().__init__(image, evidence, seconds=seconds, memory_mib=memory_mib)
         self.cgroup_version = host_cgroup_version()
+        # Resolved from the first container's mount table; v2 paths are fixed.
+        self.counter_files = None if self.cgroup_version == "1" else list(COUNTER_FILES[self.cgroup_version])
         folder = Path(__file__).with_name("sandbox")
         self.identity.update(schema="evolution-warm-docker-v1", metric="host_request_to_response_seconds",
                              includes="Input transport, solve, copying and serialization; NOT isolated kernel time",
@@ -193,7 +237,9 @@ class WarmDockerSandbox(DockerSandbox):
                 row["status"] = "invalid-output"
             else:
                 row["startup_seconds"] = ready[1] - dispatched
-                before = kernel_resources(container, self.cgroup_version)
+                if self.counter_files is None:
+                    self.counter_files = resolve_counter_files(container, self.cgroup_version)
+                before = kernel_resources(container, self.cgroup_version, self.counter_files)
                 row["kernel_before"] = before
                 sent = time.monotonic()
                 write_errors = []
@@ -222,7 +268,7 @@ class WarmDockerSandbox(DockerSandbox):
                         row["status"] = "invalid-output"
                     else:
                         row["elapsed_seconds"] = response[1] - sent
-                        after = kernel_resources(container, self.cgroup_version)
+                        after = kernel_resources(container, self.cgroup_version, self.counter_files)
                         row["kernel_after"] = after
                         if after["cpu_usec"] < before["cpu_usec"] or after["memory_peak_bytes"] < before["memory_peak_bytes"]:
                             raise RuntimeError("Cgroup counters regressed")
