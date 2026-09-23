@@ -59,5 +59,34 @@ class OracleTests(unittest.TestCase):
                 k.open_seal(record["path"], "0" * 64)
 
 
+class ReviewRegressionTests(unittest.TestCase):
+    def test_a_small_offset_only_on_the_timed_shape_is_caught_for_every_task(self):
+        for task in k.TASKS:
+            body = k.initial(task).replace("def kernel(", "def _correct(", 1)
+            args = ", ".join(["x"] + list(k.TASKS[task]["params"]))
+            offset = body + f"\ndef kernel({args}):\n    y = _correct({args})\n    return y + 1e-3 if x.shape[0] > 1000 else y\n"
+            timed = k.problems(task, k.DEV_SEEDS[:1], mode="timed")
+            verify = k.problems(task, k.DEV_SEEDS[:1], mode="verify")
+            with self.subTest(task=task):
+                self.assertTrue(k.validate_outputs(task, verify, run_host(task, offset, verify)), "exact on the verify shape")
+                self.assertFalse(k.validate_outputs(task, timed, run_host(task, offset, timed)), "+1e-3 on the timed shape")
+
+    def test_malformed_outputs_fail_without_raising(self):
+        problems = k.problems("softmax", k.DEV_SEEDS[:1], mode="verify")
+        good = run_host("softmax", k.initial("softmax"), problems)
+        for bad in ([dict(good[0], outputs=[["x"] * 96] * 64)], [dict(good[0], outputs=[None])],
+                    [{"outputs": good[0]["outputs"]}], [dict(good[0], kernel_seconds=-1.0)]):
+            self.assertFalse(k.validate_outputs("softmax", problems, bad))
+
+    def test_non_numeric_kernel_output_is_rejected_in_the_harness(self):
+        problems = k.problems("softmax", k.DEV_SEEDS[:1], mode="verify")
+        result = run_host("softmax", "def kernel(x):\n    return xp.full(x.shape, 'a', dtype=object)\n", problems)
+        self.assertEqual({"error": "shape or dtype"}, result[0])
+
+    def test_the_harness_reports_kernel_only_time(self):
+        problems = k.problems("rmsnorm", k.DEV_SEEDS[:1], mode="timed", repeats=2)
+        output = run_host("rmsnorm", k.initial("rmsnorm"), problems)[0]
+        self.assertGreater(output["kernel_seconds"], 0)
+
 if __name__ == "__main__":
     unittest.main()

@@ -63,9 +63,20 @@ def inputs(xp, task, seed, rows, cols):
 
 
 def weights(xp, seed, size):
-    k = xp.arange(PROJECTIONS, dtype=xp.float64)[:, None]
-    n = xp.arange(size, dtype=xp.float64)[None, :]
-    return xp.cos(0.7071 * (k + 1) * n + 0.5 * seed + k)
+    """Seeded Rademacher (+/-1) projections from a SplitMix64 hash of (seed, k, index); identical in
+    numpy and cupy. Unlike a smooth basis they do not cancel a uniform offset: a constant error e
+    moves each projection by about e*sqrt(size)."""
+    mask = (1 << 64) - 1
+    n = xp.arange(size, dtype=xp.uint64)
+    rows = []
+    for k in range(PROJECTIONS):
+        offset = ((seed * 0xBF58476D1CE4E5B9) + ((k + 1) * 0x94D049BB133111EB)) & mask
+        z = n * xp.uint64(0x9E3779B97F4A7C15) + xp.uint64(offset)
+        z = (z ^ (z >> xp.uint64(30))) * xp.uint64(0xBF58476D1CE4E5B9)
+        z = (z ^ (z >> xp.uint64(27))) * xp.uint64(0x94D049BB133111EB)
+        z = z ^ (z >> xp.uint64(31))
+        rows.append((z & xp.uint64(1)).astype(xp.float64) * 2.0 - 1.0)
+    return xp.stack(rows)
 
 
 def reference(task, x, params):
@@ -93,6 +104,7 @@ def trusted_suffix(task, backend):
 
 # ---- trusted harness (appended after the candidate; defines Solver last) ----
 import math as _math
+import time as _time
 import numpy as _np
 import {xp} as _xp
 _TASK, _PROJECTIONS = {task!r}, {PROJECTIONS}
@@ -104,12 +116,22 @@ class Solver:
     def solve(self, problem):
         rows, cols = problem["shape"]
         outputs = []
+        kernel_seconds = 0.0
         for offset in range(problem["repeats"]):
             seed = problem["seed"] + offset
             x, params = _inputs(_xp, _TASK, seed, rows, cols)
-            y = _xp.asarray(kernel(x, *params))
-            if y.shape != (rows, cols):
-                return {{"error": "shape"}}
+            if _xp.__name__ == "cupy":
+                _start, _stop = _xp.cuda.Event(), _xp.cuda.Event()
+                _start.record()
+                y = _xp.asarray(kernel(x, *params))
+                _stop.record(); _stop.synchronize()
+                kernel_seconds += _xp.cuda.get_elapsed_time(_start, _stop) / 1000.0
+            else:
+                _t0 = _time.perf_counter()
+                y = _xp.asarray(kernel(x, *params))
+                kernel_seconds += _time.perf_counter() - _t0
+            if y.shape != (rows, cols) or y.dtype.kind not in "fiu":
+                return {{"error": "shape or dtype"}}
             if problem["mode"] == "verify":
                 outputs.append(_xp.asnumpy(y).tolist() if _xp.__name__ == "cupy" else y.tolist())
             else:
@@ -117,7 +139,7 @@ class Solver:
                 outputs.append([float(v) for v in (digest.get() if _xp.__name__ == "cupy" else digest)])
         if _xp.__name__ == "cupy":
             _xp.cuda.Device().synchronize()
-        return {{"outputs": outputs}}
+        return {{"outputs": outputs, "kernel_seconds": kernel_seconds}}
 '''
 
 
@@ -142,28 +164,32 @@ def problems(task, seeds, *, mode, repeats=1):
     return [dict(mode=mode, seed=int(seed), shape=list(shape), repeats=repeats) for seed in seeds]
 
 
-def validate(task, problem_list, outputs):
+def validate_outputs(task, problem_list, outputs):
     """True only if every output matches the FP64 reference (full values, or digests)."""
     if not isinstance(outputs, list) or len(outputs) != len(problem_list):
         return False
     for problem, output in zip(problem_list, outputs):
-        if not isinstance(output, dict) or "outputs" not in output or len(output["outputs"]) != problem["repeats"]:
+        if (not isinstance(output, dict) or not isinstance(output.get("outputs"), list) or
+                len(output["outputs"]) != problem["repeats"] or type(output.get("kernel_seconds")) not in (int, float) or
+                not math.isfinite(output["kernel_seconds"]) or output["kernel_seconds"] < 0):
             return False
         rows, cols = problem["shape"]
         for offset, value in enumerate(output["outputs"]):
             seed = problem["seed"] + offset
             x, params = inputs(np, task, seed, rows, cols)
             expected = reference(task, x, params)
-            if problem["mode"] == "verify":
+            try:
                 got = np.asarray(value, dtype=np.float64)
+            except (TypeError, ValueError):
+                return False  # malformed output is a failed candidate, never an exception
+            if problem["mode"] == "verify":
                 if got.shape != expected.shape or not np.all(np.isfinite(got)) or \
                         not np.allclose(got, expected, rtol=RTOL, atol=ATOL):
                     return False
             else:
                 want = weights(np, seed, rows * cols) @ expected.reshape(-1)
-                got = np.asarray(value, dtype=np.float64)
-                scale = np.sqrt(rows * cols) * (np.abs(expected).max() + 1.0)
-                if got.shape != want.shape or not np.all(np.isfinite(got)) or np.any(np.abs(got - want) > 1e-4 * scale):
+                tolerance = 1e-4 * (np.linalg.norm(expected) + 1.0)
+                if got.shape != want.shape or not np.all(np.isfinite(got)) or np.any(np.abs(got - want) > tolerance):
                     return False
     return True
 
@@ -195,6 +221,34 @@ def open_seal(path, expected_sha256):
     return json.loads(body)
 
 
+def kernel_evaluator(sandbox, task, backend, problems, identity, samples=1):
+    """Evaluate a candidate `kernel` in the sandbox; duration_seconds is the harness's kernel-only time.
+
+    Kernel time comes from CUDA events (GPU) or perf_counter (CPU) around the kernel call alone, so input
+    generation and digests are excluded. The host refuses a reported kernel time above its own
+    request-to-response wall time, which it measures independently."""
+    from warm_evaluator import WarmEvaluator
+    captured = []
+
+    def validate(outputs):
+        ok = validate_outputs(task, problems, outputs)
+        captured.append(sum(o["kernel_seconds"] for o in outputs) if ok else None)
+        return ok
+
+    evaluator = WarmEvaluator(sandbox, "Solver", problems, validate, identity=identity, samples=samples)
+
+    def run(source):
+        captured.clear()
+        result = evaluator(program(task, backend, source))
+        kernel = [value for value in captured if value is not None]
+        if result["status"] != "valid" or len(kernel) != len(result["samples"]) or not kernel:
+            return dict(result, status="invalid", duration_seconds=None)
+        if any(k > host for k, host in zip(kernel, result["samples"])):
+            return dict(result, status="invalid", duration_seconds=None, reason="kernel time exceeds host wall time")
+        return dict(result, duration_seconds=statistics.median(kernel), host_seconds=result["duration_seconds"])
+    return run
+
+
 def speedup(reference_timer, candidate_timer, samples=5):
     ratios = []
     for _ in range(samples):
@@ -205,3 +259,7 @@ def speedup(reference_timer, candidate_timer, samples=5):
             return dict(speedup=None, ratios=ratios)
         ratios.append(base["duration_seconds"] / cand["duration_seconds"])
     return dict(speedup=statistics.median(ratios), ratios=ratios)
+
+
+# Kept for callers that validate a whole output list directly.
+validate = validate_outputs
