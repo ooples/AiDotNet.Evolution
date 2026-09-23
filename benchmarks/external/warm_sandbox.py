@@ -119,8 +119,8 @@ def kernel_resources(container, version="2", counter_files=None):
 
 
 class WarmDockerSandbox(DockerSandbox):
-    def __init__(self, image, evidence, *, seconds=15, memory_mib=512):
-        super().__init__(image, evidence, seconds=seconds, memory_mib=memory_mib)
+    def __init__(self, image, evidence, *, seconds=15, memory_mib=512, gpus=False):
+        super().__init__(image, evidence, seconds=seconds, memory_mib=memory_mib, gpus=gpus)
         self.cgroup_version = host_cgroup_version()
         # Resolved from the first container's mount table; v2 paths are fixed.
         self.counter_files = None if self.cgroup_version == "1" else list(COUNTER_FILES[self.cgroup_version])
