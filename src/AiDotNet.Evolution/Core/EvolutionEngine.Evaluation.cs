@@ -87,7 +87,7 @@ public sealed partial class EvolutionEngine<TGenome>
         }
         var artifactFingerprint = snapshots is null ? null : new StringBuilder();
         if (artifactFingerprint is not null) AppendArtifacts(artifactFingerprint, parentArtifacts);
-        string? identity = snapshots is null ? null : EvolutionHash.Combine(new[] { "pipeline-proposal-v2-content", _options.RunId, _compatibilityHash,
+        string? identity = snapshots is null ? null : EvolutionHash.Combine(new[] { "pipeline-proposal-v3-content", _options.RunId, _compatibilityHash,
             evaluationId.ToString(CultureInfo.InvariantCulture), generation.ToString(CultureInfo.InvariantCulture),
             island.ToString(CultureInfo.InvariantCulture), view.DefinitionHash, view.Version.ToString(CultureInfo.InvariantCulture),
             snapshotHash!, FingerprintPipelineEvaluation(selection.Parent.Evaluation), EvolutionHash.Compute(artifactFingerprint!.ToString()) }
@@ -158,37 +158,74 @@ public sealed partial class EvolutionEngine<TGenome>
             return EvolutionHash.Compute(builder.ToString());
         };
 
+    internal static string FingerprintPipelineEvaluationForTests(EvolutionEvaluation evaluation) => FingerprintPipelineEvaluation(evaluation);
+
     private static string FingerprintPipelineEvaluation(EvolutionEvaluation evaluation) =>
         PipelineFingerprints.GetValue(evaluation, ComputePipelineFingerprint);
 
-    private sealed class PipelineArchiveContext
+    internal sealed class PipelineArchiveContext
     {
         public PipelineArchiveContext(EvolutionArchiveSnapshot<TGenome> archive)
         {
             Archive = archive;
-            // Byte-for-byte the digest Combine gave over [definition, version, (cell, fingerprint) per elite], but without
-            // Combine's 4096-component cap, which made pipeline proposals throw once an island held 2048 elites. Each
-            // elite's encoded pair is computed once per immutable entry, not re-encoded every wave.
-            Fingerprint = EvolutionHash.CombineEncoded(new[]
-                {
-                    EvolutionHash.EncodeComponent(archive.DefinitionHash),
-                    EvolutionHash.EncodeComponent(archive.Version.ToString(CultureInfo.InvariantCulture))
-                }
-                .Concat(archive.Entries.Select(entry => PipelineEntryFragments.GetValue(entry, EncodeEntryCallback))));
+            // Protocol v3: the archive commitment is the sum mod 2^256 of one SHA-256 digest per elite over (cell, evaluation
+            // fingerprint), bound with definition, version and count. Each digest is computed once per immutable entry, so a
+            // wave costs one table lookup and a 256-bit add per elite instead of hashing the whole archive again (v2), and
+            // there is no component cap. It is order-independent, which is sound because a cell holds exactly one entry, and
+            // it is a function of the entries alone, so a resumed run recomputes the same value. It commits the proposal
+            // context for deterministic replay and is not designed to resist adversarially chosen colliding archives.
+            Fingerprint = ArchiveFingerprint(archive);
         }
 
-        private static byte[] EncodeEntry(EvolutionArchiveEntry<TGenome> entry)
+        /// <summary>The v3 archive commitment for pipeline proposal identities; internal for direct testing.</summary>
+        internal static string ArchiveFingerprint(IEvolutionArchiveView<TGenome> archive)
         {
-            byte[] cell = EvolutionHash.EncodeComponent(entry.Cell.StableKey);
-            byte[] evaluation = EvolutionHash.EncodeComponent(FingerprintPipelineEvaluation(entry.Evaluation));
-            var both = new byte[cell.Length + evaluation.Length];
-            Buffer.BlockCopy(cell, 0, both, 0, cell.Length);
-            Buffer.BlockCopy(evaluation, 0, both, cell.Length, evaluation.Length);
-            return both;
+            ulong s0 = 0, s1 = 0, s2 = 0, s3 = 0;
+            foreach (EvolutionArchiveEntry<TGenome> entry in archive.Entries)
+            {
+                byte[] digest = PipelineEntryDigests.GetValue(entry, DigestEntryCallback);
+                ulong carry = Add(ref s0, Limb(digest, 0), 0);
+                carry = Add(ref s1, Limb(digest, 8), carry);
+                carry = Add(ref s2, Limb(digest, 16), carry);
+                Add(ref s3, Limb(digest, 24), carry);
+            }
+            return EvolutionHash.Combine(new[]
+            {
+                "pipeline-archive-v3", archive.DefinitionHash, archive.Version.ToString(CultureInfo.InvariantCulture),
+                archive.Count.ToString(CultureInfo.InvariantCulture),
+                string.Concat(s3.ToString("x16", CultureInfo.InvariantCulture), s2.ToString("x16", CultureInfo.InvariantCulture),
+                    s1.ToString("x16", CultureInfo.InvariantCulture), s0.ToString("x16", CultureInfo.InvariantCulture))
+            });
         }
 
-        private static readonly System.Runtime.CompilerServices.ConditionalWeakTable<EvolutionArchiveEntry<TGenome>, byte[]> PipelineEntryFragments = new();
-        private static readonly System.Runtime.CompilerServices.ConditionalWeakTable<EvolutionArchiveEntry<TGenome>, byte[]>.CreateValueCallback EncodeEntryCallback = EncodeEntry;
+        // Explicit little-endian, so the identity does not depend on the host's byte order.
+        private static ulong Limb(byte[] bytes, int offset)
+        {
+            ulong value = 0;
+            for (int i = 7; i >= 0; i--) value = (value << 8) | bytes[offset + i];
+            return value;
+        }
+
+        private static ulong Add(ref ulong limb, ulong value, ulong carry)
+        {
+            ulong sum = unchecked(limb + value);
+            ulong carried = sum < limb ? 1UL : 0UL;
+            ulong total = unchecked(sum + carry);
+            if (total < sum) carried = 1UL;
+            limb = total;
+            return carried;
+        }
+
+        private static byte[] DigestEntry(EvolutionArchiveEntry<TGenome> entry)
+        {
+            string hex = EvolutionHash.Combine(new[] { entry.Cell.StableKey, FingerprintPipelineEvaluation(entry.Evaluation) });
+            var digest = new byte[32];
+            for (int i = 0; i < 32; i++) digest[i] = Convert.ToByte(hex.Substring(2 * i, 2), 16);
+            return digest;
+        }
+
+        private static readonly System.Runtime.CompilerServices.ConditionalWeakTable<EvolutionArchiveEntry<TGenome>, byte[]> PipelineEntryDigests = new();
+        private static readonly System.Runtime.CompilerServices.ConditionalWeakTable<EvolutionArchiveEntry<TGenome>, byte[]>.CreateValueCallback DigestEntryCallback = DigestEntry;
         public EvolutionArchiveSnapshot<TGenome> Archive { get; }
         public string Fingerprint { get; }
     }
