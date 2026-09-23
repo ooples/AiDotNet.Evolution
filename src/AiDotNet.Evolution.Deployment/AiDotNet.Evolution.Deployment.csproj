@@ -4,21 +4,21 @@
     <ImplicitUsings>enable</ImplicitUsings>
     <Nullable>enable</Nullable>
     <TreatWarningsAsErrors>true</TreatWarningsAsErrors>
-    <Version>0.1.0-preview.1</Version>
+    <Version>0.2.0</Version>
     <PackageLicenseFile>AIDOTNET-LICENSE.txt</PackageLicenseFile>
     <PackageReadmeFile>README.md</PackageReadmeFile>
     <RepositoryUrl>https://github.com/ooples/AiDotNet.Evolution</RepositoryUrl>
     <Description>Optional standalone Evolution deployment lifecycle and MAP-Elites model consumer.</Description>
   </PropertyGroup>
   <ItemGroup>
-    <None Include="README.md" Pack="true" PackagePath="README.md" />
-    <ProjectReference Include="../AiDotNet.Evolution.Programs/AiDotNet.Evolution.Programs.csproj" />
-    <PackageReference Include="AiDotNet" Version="0.231.0" Aliases="AiDotNetConsumer" />
+    <None Include="README.md" Pack="true" PackagePath="README.md"/>
+    <ProjectReference Include="../AiDotNet.Evolution.Programs/AiDotNet.Evolution.Programs.csproj"/>
+    <PackageReference Include="AiDotNet" Version="0.231.0" Aliases="AiDotNetConsumer"/>
     <!-- #126: intelmkl.redist.win-x64 (via AiDotNet, Windows only) asks for these at exact lower bounds that were
          never published; pinning the versions NuGet resolves anyway removes NU1603 without suppressing it. -->
-    <PackageReference Include="intelopenmp.redist.win" Version="2026.0.0.944" Condition="$([MSBuild]::IsOSPlatform('Windows'))" />
-    <PackageReference Include="inteltbb.redist.win" Version="2023.0.0.716" Condition="$([MSBuild]::IsOSPlatform('Windows'))" />
-    <InternalsVisibleTo Include="AiDotNetTests" />
-    <None Include="../AiDotNet.Evolution.Programs/Legacy/AIDOTNET-LICENSE.txt" Pack="true" PackagePath="AIDOTNET-LICENSE.txt" />
+    <PackageReference Include="intelopenmp.redist.win" Version="2026.0.0.944" Condition="$([MSBuild]::IsOSPlatform('Windows'))"/>
+    <PackageReference Include="inteltbb.redist.win" Version="2023.0.0.716" Condition="$([MSBuild]::IsOSPlatform('Windows'))"/>
+    <InternalsVisibleTo Include="AiDotNetTests"/>
+    <None Include="../AiDotNet.Evolution.Programs/Legacy/AIDOTNET-LICENSE.txt" Pack="true" PackagePath="AIDOTNET-LICENSE.txt"/>
   </ItemGroup>
 </Project>

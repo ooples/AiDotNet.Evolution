@@ -1,5 +1,19 @@
 # Changelog
 
+## [0.2.0](https://github.com/ooples/AiDotNet.Evolution/compare/v0.1.0...v0.2.0) (2026-09-23)
+
+
+### Features
+
+* **benchmarks:** GPU/CPU kernel family with an FP64 host oracle (V1-04c) ([#134](https://github.com/ooples/AiDotNet.Evolution/issues/134)) ([46e1141](https://github.com/ooples/AiDotNet.Evolution/commit/46e1141859bf8c8d8709343ec142114e9790d34e))
+
+
+### Bug Fixes
+
+* **build:** Windows solution restore and format gate (V1-00, [#126](https://github.com/ooples/AiDotNet.Evolution/issues/126)) ([#136](https://github.com/ooples/AiDotNet.Evolution/issues/136)) ([91b0b3c](https://github.com/ooples/AiDotNet.Evolution/commit/91b0b3c61d74edaddc5a859a28f3b56eadc0c883))
+* **release:** publish all Evolution packages and validate before tagging ([#104](https://github.com/ooples/AiDotNet.Evolution/issues/104)) ([7de3011](https://github.com/ooples/AiDotNet.Evolution/commit/7de30119328557b8e04b937620fd1b06eefda56d))
+* **sandbox:** measure warm resources on cgroup-v1 hosts, and audit v1 story issues ([#127](https://github.com/ooples/AiDotNet.Evolution/issues/127)) ([5e131ce](https://github.com/ooples/AiDotNet.Evolution/commit/5e131cee21159b92e7e2356473e7ee94535bb4fd))
+
 ## [0.1.0](https://github.com/ooples/AiDotNet.Evolution/compare/v0.1.0-preview.2...v0.1.0) (2026-09-16)
 
 
