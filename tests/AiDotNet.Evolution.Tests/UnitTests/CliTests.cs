@@ -5,6 +5,7 @@ using Xunit;
 namespace AiDotNet.Evolution.Tests;
 
 /// <summary>V1-26: the aidotnet-evolve commands against a real engine trace.</summary>
+[Collection(ConsoleCollection.Name)]
 public sealed class CliTests
 {
     private static async Task<string> Trace(string directory, string name, int attempts)
@@ -74,5 +75,11 @@ public sealed class CliTests
         Assert.Equal(2, Run("inspect").Code);
         Assert.Equal(2, Run("inspect", Path.Combine(Path.GetTempPath(), Guid.NewGuid().ToString("N") + ".jsonl")).Code);
     }
+}
+/// <summary>Tests that redirect the process-wide Console must not run in parallel with each other.</summary>
+[CollectionDefinition(Name, DisableParallelization = true)]
+public sealed class ConsoleCollection
+{
+    public const string Name = "Console";
 }
 #endif

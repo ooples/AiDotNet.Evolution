@@ -6,11 +6,13 @@ using AiDotNet.Evolution;
 
 namespace AiDotNet.Evolution.Cli;
 
-/// <summary>aidotnet-evolve: inspect, compare, export and report runs from their trace files.</summary>
+/// <summary>aidotnet-evolve: run and resume evolutions; inspect, compare, export and report runs from their trace files.</summary>
 public static class Program
 {
     private const string Usage = """
         Usage:
+          aidotnet-evolve run     <run.json>
+          aidotnet-evolve resume  <run.json>
           aidotnet-evolve inspect <trace>
           aidotnet-evolve compare <traceA> <traceB>
           aidotnet-evolve export  <trace> <output-directory>
@@ -23,6 +25,8 @@ public static class Program
         {
             return args switch
             {
+                ["run", string runFile] => Evolve(runFile, resume: false),
+                ["resume", string runFile] => Evolve(runFile, resume: true),
                 ["inspect", string trace] => Print(JsonSerializer.Serialize(TraceAnalysis.Load(trace).Summary(), Json)),
                 ["compare", string a, string b] => Print(JsonSerializer.Serialize(TraceAnalysis.Compare(TraceAnalysis.Load(a), TraceAnalysis.Load(b)), Json)),
                 ["export", string trace, string output] => Export(trace, output),
@@ -30,13 +34,24 @@ public static class Program
                 _ => Fail(Usage)
             };
         }
-        catch (Exception exception) when (exception is IOException or InvalidDataException or ArgumentException or UnauthorizedAccessException or JsonException)
+        catch (Exception exception) when (exception is IOException or InvalidDataException or ArgumentException or UnauthorizedAccessException or JsonException or
+            HttpRequestException or NotSupportedException or InvalidOperationException)
         {
             return Fail("error: " + exception.Message);
         }
     }
 
     internal static readonly JsonSerializerOptions Json = new() { WriteIndented = true };
+
+    /// <summary>The first Ctrl+C stops at the next batch boundary and reports results; a second aborts. Either way <c>resume</c> continues.</summary>
+    private static int Evolve(string runFile, bool resume)
+    {
+        using var interrupt = new RunInterrupt();
+        ConsoleCancelEventHandler handler = (_, e) => { e.Cancel = true; interrupt.Press(); };
+        Console.CancelKeyPress += handler;
+        try { return RunCommand.Execute(runFile, resume, Console.Out, Console.Error, interrupt); }
+        finally { Console.CancelKeyPress -= handler; }
+    }
 
     private static int Print(string text) { Console.WriteLine(text); return 0; }
     private static int Fail(string text) { Console.Error.WriteLine(text); return 2; }
