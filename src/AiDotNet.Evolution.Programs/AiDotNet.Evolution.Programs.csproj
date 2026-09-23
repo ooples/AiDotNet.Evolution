@@ -11,7 +11,7 @@
     <PackageReadmeFile>README.md</PackageReadmeFile>
   </PropertyGroup>
   <ItemGroup>
-    <None Include="Legacy/AIDOTNET-LICENSE.txt" Pack="true" PackagePath="AIDOTNET-LICENSE.txt" />
+    <None Include="AIDOTNET-LICENSE.txt" Pack="true" PackagePath="AIDOTNET-LICENSE.txt" />
     <None Include="../../LICENSE" Pack="true" PackagePath="APACHE-LICENSE.txt" />
     <InternalsVisibleTo Include="AiDotNet.Evolution.CSharp.Tests" />
     <InternalsVisibleTo Include="AiDotNet.Evolution.CSharp" />
