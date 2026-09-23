@@ -64,7 +64,7 @@ foreach ($id in $ids) {
                 throw "Release dependency drift: $id -> $($dependency.id) $($dependency.version)"
             }
         }
-        if ($id -in @('AiDotNet.Evolution', 'AiDotNet.Evolution.Surrogates', 'AiDotNet.Evolution.Cli')) {
+        if ($id -in @('AiDotNet.Evolution', 'AiDotNet.Evolution.Surrogates')) {
             if ($metadata.license.InnerText -cne 'Apache-2.0') { throw "Invalid license: $id" }
         } elseif ($null -eq $archive.GetEntry('AIDOTNET-LICENSE.txt') -or $metadata.license.InnerText -cne 'AIDOTNET-LICENSE.txt') {
             throw "Missing original license: $id"
