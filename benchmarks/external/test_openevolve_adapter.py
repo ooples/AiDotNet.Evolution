@@ -122,5 +122,88 @@ class NativeConfigTests(unittest.TestCase):
         models = self.run_native("matched")
         self.assertTrue(models[0]["request"]["system"].startswith("Contract fixture only."))
 
+class ResumeTests(unittest.TestCase):
+    def test_a_killed_openevolve_search_resumes_from_checkpoint_losing_at_most_one_iteration(self):
+        import hashlib
+        import time
+        import openevolve_configs
+        upstream = os.environ.get("EVOLUTION_OPENEVOLVE_CHECKOUT")
+        if not upstream:
+            raise RuntimeError("Set EVOLUTION_OPENEVOLVE_CHECKOUT to the pinned checkout for this integration gate")
+        iterations, kill_after = 6, 3
+        initial = "def solve(x):\n    return x + 1\n"
+        record = openevolve_configs.matched({"haiku": 1.0}, "Contract fixture only.", iterations=iterations, seed=37)
+        live_calls = []
+
+        def generate(system, messages, model=None):
+            digest = hashlib.sha256((system + json.dumps(messages)).encode()).hexdigest()[:8]
+            live_calls.append(digest)
+            return {"text": f"```python\ndef solve(x):\n    v_{digest} = 1\n    return x + v_{digest}\n```",
+                    "cost_units": 10, "cost_metric": "reported_input_plus_cache_plus_output_tokens"}
+
+        def evaluate(code):
+            return dict(candidate_hash=candidate_hash(code), status="valid", quality=float(len(code) % 7),
+                        work_units=1, unknown_work=False)
+
+        with tempfile.TemporaryDirectory() as directory:
+            root = Path(directory)
+            (root / "initial.py").write_text(initial, encoding="utf-8")
+            (root / "task.txt").write_text("unused", encoding="utf-8")
+            (root / "record.json").write_text(json.dumps(record), encoding="utf-8")
+            journal = root / "journal.jsonl"
+
+            def command(count, *extra):
+                return [sys.executable, "-X", "utf8", str(Path(__file__).with_name("openevolve_adapter.py")),
+                        "--upstream", upstream, "--initial", str(root / "initial.py"), "--output", str(root / "run"),
+                        "--model", "unused", "--iterations", str(count), "--seed", "37", "--task", str(root / "task.txt"),
+                        "--mode", "matched", "--config-record", str(root / "record.json"), *extra]
+
+            def broker(resume, lost=0):
+                # Work lost after the last checkpoint is interruption cost, not search budget:
+                # the resumed arm gets it back, so an interruption cannot shrink either arm's search.
+                return ProgramBroker(generate, evaluate, model_calls=iterations + lost, evaluations=iterations + 1 + lost,
+                                     seconds=300, initial=initial, model_tokens=10_000 + 10 * lost, journal=journal,
+                                     resume=resume)
+
+            with broker("replay") as first:
+                environment = dict(os.environ, EVOLUTION_BROKER_ENDPOINT=first.endpoint,
+                                   EVOLUTION_BROKER_CAPABILITY=first.capability)
+                child = subprocess.Popen(command(iterations), env=environment,
+                                         stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL)
+                deadline = time.monotonic() + 120
+                while sum(r["operation"] == "model" and r["status"] == "completed" for r in first.rows) < kill_after:
+                    self.assertLess(time.monotonic(), deadline, "search never reached the kill point")
+                    self.assertIsNone(child.poll(), "search finished before it could be killed")
+                    time.sleep(0.01)
+                child.kill()
+                child.wait(timeout=30)
+            from openevolve_adapter import latest_checkpoint
+            found = latest_checkpoint(root / "run")
+            self.assertIsNotNone(found, "no complete checkpoint was saved before the kill")
+            checkpoints = [found[1]]
+            prior_calls = sum(e["operation"] == "model" for e in ProgramBroker.__init__.__globals__["ReplayJournal"](journal).entries.values())
+            lost = prior_calls - checkpoints[-1]
+            # OpenEvolve keeps batch_size = 2 x parallel_evaluations iterations in flight by design,
+            # and a kill can tear the newest checkpoint, so resume can trail completed work by up to
+            # 3 iterations. That is upstream's structural bound; the lost work is granted back below.
+            self.assertLessEqual(lost, 3, "at most OpenEvolve's in-flight batch plus a torn checkpoint is lost")
+            with broker("continue", lost) as second:
+                self.assertEqual(prior_calls, second.prior["model"])
+                self.assertEqual(10 * prior_calls, second.model_tokens, "journaled work stays recorded")
+                remaining = iterations - checkpoints[-1]
+                environment = dict(os.environ, EVOLUTION_BROKER_ENDPOINT=second.endpoint,
+                                   EVOLUTION_BROKER_CAPABILITY=second.capability)
+                live_before = len(live_calls)
+                result = subprocess.run(command(remaining, "--resume"), env=environment, capture_output=True, timeout=180)
+                self.assertEqual(0, result.returncode, result.stderr.decode(errors="replace")[-4000:])
+                self.assertFalse(second.closed)
+                self.assertTrue(all(r["status"] == "completed" for r in second.rows))
+                new_calls = sum(r["operation"] == "model" for r in second.rows)
+                self.assertEqual(remaining, new_calls, result.stderr.decode(errors="replace")[-3000:])
+                self.assertEqual(new_calls, len(live_calls) - live_before)
+                self.assertEqual(iterations, checkpoints[-1] + new_calls, "the search gets exactly its iterations")
+                self.assertEqual(0, sum(r["request"].get("code") == initial for r in second.rows if r["operation"] == "evaluate"),
+                                 "the resumed run does not re-evaluate the initial program")
+
 if __name__ == "__main__":
     unittest.main()

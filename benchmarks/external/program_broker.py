@@ -7,7 +7,10 @@ from __future__ import annotations
 
 from http.server import BaseHTTPRequestHandler, ThreadingHTTPServer
 import json
+import hashlib
 import math
+import os
+from pathlib import Path
 import secrets
 import socket
 import threading
@@ -24,6 +27,59 @@ CHAT_PATH = "/v1/chat/completions"
 # Accepted and recorded, never honoured: the subscription CLI exposes no sampling controls,
 # so they are identical (the CLI default) for every arm and are declared as such.
 IGNORED_SAMPLING = ("temperature", "top_p", "max_tokens", "max_completion_tokens", "seed", "reasoning_effort")
+
+
+class ReplayJournal:
+    """Append-only record of completed broker work, so a killed search resumes by replay.
+
+    Each completed model call or evaluation is appended and fsynced with its sequence number
+    and request hash. On resume the optimizer is re-run from its seed; while its requests
+    match the journal they are answered from it (no new model or evaluation work), and the
+    first unjournaled request continues live. Only the one request in flight at the kill is
+    lost. A request that differs from its journaled one means the run is not deterministic
+    under replay, and is refused rather than spliced.
+    """
+    def __init__(self, path):
+        self.path = Path(path)
+        self.entries, self.torn = {}, 0
+        if self.path.exists():
+            lines = self.path.read_bytes().split(b"\n")
+            for index, line in enumerate(lines):
+                if not line:
+                    continue
+                try:
+                    entry = json.loads(line)
+                except ValueError:
+                    # Only the final line can be torn by a kill mid-write; that is the lost entry.
+                    if index != len(lines) - 1 and any(lines[index + 1:]):
+                        raise ValueError("Replay journal is corrupt before its end") from None
+                    self.torn += 1
+                    continue
+                self.entries[entry["sequence"]] = entry
+        self.replayed = self.appended = 0
+
+    @staticmethod
+    def request_hash(operation, payload):
+        return hashlib.sha256(json.dumps([operation, payload], sort_keys=True, allow_nan=False).encode()).hexdigest()
+
+    def lookup(self, sequence, operation, payload):
+        entry = self.entries.get(sequence)
+        if entry is None:
+            return None
+        if entry["operation"] != operation or entry["request_sha256"] != self.request_hash(operation, payload):
+            raise ValueError(f"Replay diverged at sequence {sequence}; the resumed run is not the journaled one")
+        self.replayed += 1
+        return entry["outcome"]
+
+    def append(self, sequence, operation, payload, outcome):
+        line = json.dumps(dict(sequence=sequence, operation=operation, outcome=outcome,
+                               request_sha256=self.request_hash(operation, payload)), allow_nan=False) + "\n"
+        with self.path.open("ab") as stream:
+            stream.write(line.encode("utf-8"))
+            stream.flush()
+            os.fsync(stream.fileno())
+        self.entries[sequence] = json.loads(line)
+        self.appended += 1
 
 
 def chat_request(body):
@@ -80,19 +136,24 @@ def request(endpoint, capability, operation, payload):
 
 
 class ProgramBroker:
-    def __init__(self, generate, evaluate, *, model_calls, evaluations, seconds, initial, model_tokens=100000):
+    def __init__(self, generate, evaluate, *, model_calls, evaluations, seconds, initial, model_tokens=100000, journal=None, resume="replay"):
         if (type(model_calls) is not int or not 1 <= model_calls <= 64
                 or type(evaluations) is not int or not 2 <= evaluations <= 65
                 or type(seconds) not in (int, float) or not math.isfinite(seconds) or not 0 < seconds <= 3600
                 or type(model_tokens) is not int or not 1 <= model_tokens <= 10000000):
             raise ValueError("Invalid broker budget")
         self.initial_hash = candidate_hash(initial)
+        if resume not in ("replay", "continue"):
+            raise ValueError("resume must be 'replay' or 'continue'")
+        self.journal = None if journal is None else ReplayJournal(journal)
+        self.resume = resume
         self.generate, self.evaluate = generate, evaluate
         self.limits = {"model": model_calls, "evaluate": evaluations}
         self.seconds = seconds
         self.started = time.monotonic()
         self.rows = []
-        self.closed = False
+        self.closed = False  # a failure closed admission
+        self.shut = False    # the broker exited; not a failure
         self.model_tokens = 0
         self.model_token_cap = model_tokens
         self.attempted = {"model": 0, "evaluate": 0}
@@ -100,6 +161,20 @@ class ProgramBroker:
         self.evaluation_seconds = 0.0
         self.has_valid_evaluation = False
         self.capability = secrets.token_hex(32)
+        # Continue mode: an optimizer that resumes from its OWN checkpoint (OpenEvolve, whose
+        # prompts are not a pure function of the seed, so replay diverges) is charged the
+        # journaled work as prior spend, and nothing is served from the journal.
+        self.prior = {"model": 0, "evaluate": 0}
+        if self.journal is not None and resume == "continue":
+            for entry in sorted(self.journal.entries.values(), key=lambda e: e["sequence"]):
+                operation, outcome = entry["operation"], entry["outcome"]
+                self.attempted[operation] += 1
+                self.prior[operation] += 1
+                if operation == "model":
+                    self.model_tokens += outcome["cost_units"]
+                else:
+                    self.evaluation_seconds += outcome["work_units"]
+                    self.has_valid_evaluation |= outcome["status"] == "valid"
         # Every authenticated chat request, counted before it is parsed, so a refused prompt
         # is still visible: received minus recorded model rows is the unrecorded-prompt count.
         self.chat_received = 0
@@ -172,6 +247,10 @@ class ProgramBroker:
 
     def __exit__(self, *args):
         self.server.shutdown()
+        # Wait out any dispatch still running on a handler thread, then refuse the rest, so
+        # no work (or journal append) can land after the broker is reported closed.
+        with self._admission:
+            self.shut = True
         self.thread.join(timeout=315)
         self.server.server_close()
 
@@ -180,7 +259,7 @@ class ProgramBroker:
             return self._dispatch(operation, payload)
 
     def _dispatch(self, operation, payload):
-        if (operation not in self.limits or self.closed or time.monotonic() - self.started >= self.seconds
+        if (operation not in self.limits or self.closed or self.shut or time.monotonic() - self.started >= self.seconds
                 or self.attempted[operation] >= self.limits[operation]):
             raise ValueError("Independent broker admission closed")
         if not isinstance(payload, dict):
@@ -198,9 +277,17 @@ class ProgramBroker:
                "sequence": sum(self.attempted.values()), "started_elapsed_seconds": time.monotonic() - self.started}
         self.rows.append(row)
         known_work = False
+        row["replayed"] = False
         try:
+            # Replayed work is validated and budgeted exactly as live work: it was really spent.
+            # A divergence raises inside the try, so it closes admission like any other failure.
+            replay = (self.journal.lookup(row["sequence"], operation, payload)
+                      if self.journal is not None and self.resume == "replay" else None)
+            row["replayed"] = replay is not None
             if operation == "model":
-                if "model" in payload:
+                if replay is not None:
+                    measured = replay
+                elif "model" in payload:
                     measured = self.generate(payload["system"], payload["messages"], model=payload["model"])
                 else:
                     measured = self.generate(payload["system"], payload["messages"])
@@ -212,12 +299,14 @@ class ProgramBroker:
                 self.model_tokens += measured["cost_units"]
                 known_work = True
                 row["model_usage"] = {"cost_units": measured["cost_units"], "cost_metric": measured["cost_metric"]}
+                # Provider backoff is the provider's queue, not search work; reported apart.
+                row["throttle_seconds"] = float(measured.get("throttle_seconds", 0.0))
                 result = measured["text"]
                 if self.model_tokens > self.model_token_cap:
                     row.update(status="budget-exceeded", result=result)
                     raise ValueError("Actual token cost exceeded the declared cap; result is not admissible")
             else:
-                result = self.evaluate(payload["code"])
+                result = replay if replay is not None else self.evaluate(payload["code"])
                 if (isinstance(result, dict) and result.get("unknown_work") is False and
                         type(result.get("work_units")) in (int, float) and math.isfinite(result["work_units"]) and result["work_units"] >= 0):
                     self.evaluation_seconds += result["work_units"]
@@ -233,6 +322,8 @@ class ProgramBroker:
                 if result["status"] == "valid":
                     self.has_valid_evaluation = True
             row.update(status="completed", result=result)
+            if self.journal is not None and replay is None:
+                self.journal.append(row["sequence"], operation, payload, measured if operation == "model" else result)
             return result
         except Exception:
             self.closed = True

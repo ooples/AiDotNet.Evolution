@@ -37,6 +37,8 @@ FORCED = (
     (("evaluator", "cascade_evaluation"), False, "The broker exposes one-stage evaluation to every arm"),
     (("evaluator", "use_llm_feedback"), False, "LLM feedback is extra model work our arm does not receive"),
     (("language",), "python", "The reference worker language for every arm"),
+    (("checkpoint_interval",), 1, "Checkpoint every iteration so a killed run resumes losing at most the in-flight "
+                                  "iteration; saving a checkpoint does not change the search"),
 )
 # Declared, not applied: true of both systems because they share the transport.
 TRANSPORT_LIMITS = ("Sampling fields (temperature, top_p, max_tokens, seed) reach the shim and are recorded but not "

@@ -42,6 +42,30 @@ def evaluate(program_path):
 NATIVE_MODES = ("recommended", "matched")
 
 
+def latest_checkpoint(output):
+    """(path, iteration) of the newest COMPLETE OpenEvolve checkpoint, or None.
+
+    Upstream writes a checkpoint non-atomically (program files, then metadata.json last), so
+    a kill can leave the newest one torn; resuming from it silently loads 0 programs and
+    "succeeds" with nothing evolved. A checkpoint counts only if its metadata parses, names
+    its own iteration, and every program it references has a readable file.
+    """
+    saved = sorted(Path(output, "checkpoints").glob("checkpoint_*"), key=lambda p: int(p.name.split("_")[1]), reverse=True)
+    for path in saved:
+        iteration = int(path.name.split("_")[1])
+        try:
+            metadata = json.loads((path / "metadata.json").read_text(encoding="utf-8"))
+            ids = {program for island in metadata["islands"] for program in island} | set(metadata["archive"])
+            if metadata["last_iteration"] != iteration or not ids:
+                continue
+            for program in ids:
+                json.loads((path / "programs" / f"{program}.json").read_text(encoding="utf-8"))
+        except (OSError, ValueError, KeyError, TypeError):
+            continue
+        return str(path), iteration
+    return None
+
+
 def native_config(record, endpoint, capability):
     """A built config record as an upstream Config whose native OpenAI client calls the broker shim."""
     from openevolve import Config
@@ -56,14 +80,16 @@ def native_config(record, endpoint, capability):
     return config
 
 
-async def run(upstream, initial, output, model, iterations, seed, task, mode, selection_profile="default", config_record=None):
+async def run(upstream, initial, output, model, iterations, seed, task, mode, selection_profile="default", config_record=None,
+              resume=False):
     upstream = Path(upstream).resolve(strict=True)
     actual = subprocess.check_output(["git", "rev-parse", "HEAD"], cwd=upstream, text=True).strip()
     changes = subprocess.check_output(["git", "status", "--porcelain", "--untracked-files=no"], cwd=upstream, text=True)
     if actual != REVISION or changes.strip():
         raise ValueError("OpenEvolve checkout is not the exact clean pinned source")
     if (not 1 <= iterations <= 64 or not 0 <= seed < 2**32 or mode not in ("controlled", "native-bounded", *NATIVE_MODES) or
-            selection_profile not in ("default", "best") or (mode in NATIVE_MODES) != (config_record is not None)):
+            selection_profile not in ("default", "best") or (mode in NATIVE_MODES) != (config_record is not None)
+            or (resume and mode not in NATIVE_MODES)):
         raise ValueError("Invalid bounded OpenEvolve run")
     import openevolve
     from openevolve import Config, OpenEvolve
@@ -71,14 +97,23 @@ async def run(upstream, initial, output, model, iterations, seed, task, mode, se
     if Path(openevolve.__file__).resolve().parent.parent != upstream:
         raise ValueError("Installed OpenEvolve is not the declared source checkout")
     destination = Path(output)
-    destination.mkdir(parents=True, exist_ok=False)
+    destination.mkdir(parents=True, exist_ok=resume)
     if mode in NATIVE_MODES:
         record = json.loads(Path(config_record).read_text(encoding="utf-8"))
         config = native_config(record, os.environ["EVOLUTION_BROKER_ENDPOINT"], os.environ["EVOLUTION_BROKER_CAPABILITY"])
-        if config.max_iterations != iterations or config.random_seed != seed:
+        checkpoint = None
+        if resume:
+            # OpenEvolve's own checkpoint (saved every iteration); `iterations` is what remains.
+            found = latest_checkpoint(destination)
+            if found is None:
+                raise ValueError("Nothing to resume: no complete OpenEvolve checkpoint was saved")
+            checkpoint = found[0]
+            if not 1 <= iterations <= config.max_iterations or config.random_seed != seed:
+                raise ValueError("Resumed budget exceeds the declared run")
+        elif config.max_iterations != iterations or config.random_seed != seed:
             raise ValueError("Config budget differs from the declared run")
         engine = OpenEvolve(str(initial), str(Path(__file__).resolve()), config, str(destination))
-        best = await engine.run(iterations=iterations)
+        best = await engine.run(iterations=iterations, checkpoint_path=checkpoint)
         result = dict(schema="openevolve-broker-run-v1", revision=actual, mode=mode, iterations=iterations, seed=seed,
                       models=record["models"], changes=record["changes"], differences=record.get("differences", []),
                       transport_limits=record["transport_limits"],
@@ -144,9 +179,10 @@ def main():
     parser.add_argument("--mode", choices=("controlled", "native-bounded", *NATIVE_MODES), required=True)
     parser.add_argument("--selection-profile", choices=("default", "best"), default="default")
     parser.add_argument("--config-record", type=Path, help="A built recommended/matched record (native modes only)")
+    parser.add_argument("--resume", action="store_true", help="Resume a native-mode run from its latest checkpoint")
     args = parser.parse_args()
     asyncio.run(run(args.upstream, args.initial, args.output, args.model, args.iterations, args.seed, args.task, args.mode,
-                    args.selection_profile, args.config_record))
+                    args.selection_profile, args.config_record, args.resume))
 
 
 if __name__ == "__main__":
