@@ -9,6 +9,7 @@
     <PackageReadmeFile>README.md</PackageReadmeFile>
     <RepositoryUrl>https://github.com/ooples/AiDotNet.Evolution</RepositoryUrl>
     <Description>Optional standalone Evolution deployment lifecycle and MAP-Elites model consumer.</Description>
+    <EnablePackageValidation>true</EnablePackageValidation>
   </PropertyGroup>
   <ItemGroup>
     <None Include="README.md" Pack="true" PackagePath="README.md" />
@@ -22,9 +23,6 @@
     <None Include="../AiDotNet.Evolution.Programs/Legacy/AIDOTNET-LICENSE.txt" Pack="true" PackagePath="AIDOTNET-LICENSE.txt" />
   </ItemGroup>
   <!-- V1-11: the public API is declared (PublicAPI.*.txt) and every change to it must be too. -->
-  <PropertyGroup>
-    <EnablePackageValidation>true</EnablePackageValidation>
-  </PropertyGroup>
   <ItemGroup>
     <PackageReference Include="Microsoft.CodeAnalysis.PublicApiAnalyzers" Version="5.6.0" PrivateAssets="all" />
     <AdditionalFiles Include="PublicAPI.Shipped.txt" />
