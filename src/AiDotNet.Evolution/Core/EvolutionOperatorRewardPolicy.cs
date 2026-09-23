@@ -50,7 +50,33 @@ public sealed class EvolutionOperatorRewardPolicy
     /// <summary>Gets the fixed positive unit cost below which gain is not amplified.</summary>
     public double MinimumCostUnits { get; }
     /// <summary>Gets the immutable reward semantics fingerprint.</summary>
-    public string VersionHash { get; }
+    public string VersionHash { get; private set; }
+
+    /// <summary>Gets the portfolio-wide outcome age after which an arm's estimate is stale and re-probed, or null to never re-probe.</summary>
+    public int? MaximumEstimateAge { get; private set; }
+
+    /// <summary>Gets the half-life, in the arm's own outcomes, of its reward history, or null for an equal-weight mean.</summary>
+    public int? HalfLifeOutcomes { get; private set; }
+
+    /// <summary>Returns these semantics with explicit handling of stale estimates, for changing model behavior.</summary>
+    /// <param name="maximumEstimateAge">Portfolio-wide outcomes after which an arm with no newer outcome is re-probed once.</param>
+    /// <param name="halfLifeOutcomes">Optional half-life that down-weights an arm's older outcomes; null keeps the plain mean.</param>
+    /// <remarks>Both values enter <see cref="VersionHash"/>, so checkpoints never mix aging semantics.</remarks>
+    public EvolutionOperatorRewardPolicy WithEstimateAging(int maximumEstimateAge, int? halfLifeOutcomes = null)
+    {
+        if (maximumEstimateAge < 1) throw new ArgumentOutOfRangeException(nameof(maximumEstimateAge), "At least one outcome is required.");
+        if (halfLifeOutcomes is < 1) throw new ArgumentOutOfRangeException(nameof(halfLifeOutcomes), "A half-life must be at least one outcome.");
+        if (MaximumEstimateAge is not null) throw new InvalidOperationException("Estimate aging is already configured.");
+        var aged = new EvolutionOperatorRewardPolicy(Kind, CostBasis, CostUnitVersionHash, QualityScale, MinimumCostUnits)
+        {
+            MaximumEstimateAge = maximumEstimateAge,
+            HalfLifeOutcomes = halfLifeOutcomes
+        };
+        aged.VersionHash = EvolutionHash.Combine(new[] { VersionHash, "estimate-aging-v1",
+            maximumEstimateAge.ToString(System.Globalization.CultureInfo.InvariantCulture),
+            halfLifeOutcomes?.ToString(System.Globalization.CultureInfo.InvariantCulture) ?? "none" });
+        return aged;
+    }
 
     internal double Reward(double? parentQuality, EvolutionOptimizationDirection parentDirection, EvolutionEvaluation evaluation,
         EvolutionArchiveInsertionResult? insertion, EvolutionProposalCost? proposalCost)
