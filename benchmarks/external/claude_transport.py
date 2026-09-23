@@ -178,6 +178,22 @@ class ExclusiveWorkspace:
         finally:
             handle.close()
 
+def reconcile_receipts(evidence):
+    """Every admitted call directory must hold a receipt; returns the coverage record."""
+    root = Path(evidence)
+    calls = sorted((path for path in root.iterdir() if path.is_dir()), key=lambda path: int(path.name))
+    if [path.name for path in calls] != [str(index) for index in range(len(calls))]:
+        raise ValueError("Call directories are not a gap-free sequence")
+    receipts, missing = [], []
+    for path in calls:
+        try:
+            receipts.append(json.loads((path / "receipt.json").read_text(encoding="utf-8")))
+        except (OSError, ValueError):
+            missing.append(path.name)
+    return dict(calls=len(calls), receipts=len(receipts), missing=missing,
+                coverage=len(receipts) / len(calls) if calls else None, rows=receipts)
+
+
 class ClaudeTransport:
     def __init__(self, executable, model, evidence, max_calls, *, timeout=300, canary_baseline=None):
         self.executable = verified_executable(executable)
@@ -274,12 +290,19 @@ class ClaudeTransport:
                     with tempfile.TemporaryFile() as stdin:
                         stdin.write(prompt.encode("utf-8"))
                         stdin.seek(0)
+                        spawned = time.monotonic()
                         process = subprocess.Popen(command, stdin=stdin, stdout=stdout, stderr=stderr, cwd=cwd,
                                                    env=self.environment, start_new_session=os.name != "nt")
-                        while process.poll() is None:
-                            if time.monotonic() - started >= self.timeout or max(stdout.tell(), stderr.tell()) > MAX_OUTPUT:
-                                raise TimeoutError("Generation time or output bound exceeded")
-                            time.sleep(0.05)
+                        # wait() returns as the CLI exits; a sleep-poll would add up to its
+                        # interval to every call and be charged as transport overhead.
+                        while True:
+                            try:
+                                process.wait(timeout=0.05)
+                                break
+                            except subprocess.TimeoutExpired:
+                                if time.monotonic() - started >= self.timeout or max(stdout.tell(), stderr.tell()) > MAX_OUTPUT:
+                                    raise TimeoutError("Generation time or output bound exceeded") from None
+                        receipt["cli_process_seconds"] = time.monotonic() - spawned
                         if process.returncode:
                             raise ValueError("Claude generation exited unsuccessfully")
                 with (directory / "events.jsonl").open("rb") as events:
@@ -301,6 +324,9 @@ class ClaudeTransport:
                 kill_owned(process)
             elapsed = time.monotonic() - started
             receipt["elapsed_seconds"] = elapsed
+            if "cli_process_seconds" in receipt:
+                # Everything the transport adds around the CLI process: workspace, files, parsing.
+                receipt["transport_overhead_seconds"] = max(0.0, elapsed - receipt["cli_process_seconds"])
             # Wall time the engine should be charged for: throttle backoff is the provider's
             # queue, not search work, so it is reported separately rather than hidden.
             receipt["elapsed_excluding_retry_delay_seconds"] = max(0.0, elapsed - receipt.get("retry_delay_seconds", 0.0))

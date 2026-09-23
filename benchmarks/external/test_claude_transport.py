@@ -10,6 +10,7 @@ import unittest
 from unittest.mock import patch
 
 from claude_transport import (CANARY_PROMPT, MAX_OUTPUT, PINNED_CLI, ClaudeTransport, ExclusiveWorkspace, parse_events,
+                              reconcile_receipts,
                               scrubbed_environment, verified_executable)
 
 
@@ -152,6 +153,34 @@ class IsolationTests(unittest.TestCase):
                 with self.subTest(model=model, calls=calls, baseline=baseline), self.assertRaises(ValueError):
                     ClaudeTransport(sys.executable, model, Path(directory) / f"e{calls}{baseline}", calls,
                                     canary_baseline=baseline)
+
+
+class ReceiptTests(unittest.TestCase):
+    def test_a_failed_spawn_still_leaves_a_failed_receipt(self):
+        with tempfile.TemporaryDirectory() as directory:
+            transport = ClaudeTransport(sys.executable, "haiku", Path(directory) / "e", 2)
+            with patch.object(ClaudeTransport, "_version", return_value=PINNED_CLI), \
+                    patch("claude_transport.subprocess.Popen", side_effect=OSError("spawn failed")):
+                with self.assertRaises(OSError):
+                    transport.generate("system", [])
+            record = reconcile_receipts(Path(directory) / "e")
+            self.assertEqual((1, 1, [], 1.0), (record["calls"], record["receipts"], record["missing"], record["coverage"]))
+            row = record["rows"][0]
+            self.assertEqual(("failed", True, 0), (row["status"], row["unknown_usage"], row["api_key_calls"]))
+            self.assertNotIn("transport_overhead_seconds", row)
+            self.assertTrue(transport.failed)
+
+    def test_reconciliation_reports_missing_receipts_and_refuses_gaps(self):
+        with tempfile.TemporaryDirectory() as directory:
+            root = Path(directory)
+            for name in ("0", "1"):
+                (root / name).mkdir()
+            (root / "0" / "receipt.json").write_text('{"status": "completed"}', encoding="utf-8")
+            record = reconcile_receipts(root)
+            self.assertEqual((2, 1, ["1"], 0.5), (record["calls"], record["receipts"], record["missing"], record["coverage"]))
+            (root / "3").mkdir()
+            with self.assertRaisesRegex(ValueError, "gap-free"):
+                reconcile_receipts(root)
 
 
 class WorkspaceTests(unittest.TestCase):
