@@ -5,10 +5,97 @@ import time
 import unittest
 from unittest.mock import patch
 
-from warm_sandbox import WarmDockerSandbox, kernel_resources, CandidateExited
+from warm_sandbox import (WarmDockerSandbox, kernel_resources, CandidateExited, COUNTER_FILES,
+                          host_cgroup_version, resolve_counter_files, v1_counter_files)
+
+
+def mountinfo(*mounts):
+    return "".join(f"{index} 20 0:{index} /docker/c {point} ro,nosuid master:{index} - {fstype} cgroup rw,{options}\n"
+                   for index, (point, fstype, options) in enumerate(mounts, 30))
+
+
+class CgroupV1LayoutTests(unittest.TestCase):
+    def test_separate_and_co_mounted_controllers_both_resolve(self):
+        separate = mountinfo(("/sys/fs/cgroup/cpu", "cgroup", "cpu"), ("/sys/fs/cgroup/cpuacct", "cgroup", "cpuacct"),
+                             ("/sys/fs/cgroup/memory", "cgroup", "memory"))
+        self.assertEqual(["/sys/fs/cgroup/cpuacct/cpuacct.usage", "/sys/fs/cgroup/memory/memory.max_usage_in_bytes"],
+                         v1_counter_files(separate))
+        co_mounted = mountinfo(("/sys/fs/cgroup/cpu,cpuacct", "cgroup", "cpu,cpuacct"),
+                               ("/sys/fs/cgroup/memory", "cgroup", "memory"), ("/sys/fs/cgroup/unified", "cgroup2", "nsdelegate"))
+        self.assertEqual(["/sys/fs/cgroup/cpu,cpuacct/cpuacct.usage", "/sys/fs/cgroup/memory/memory.max_usage_in_bytes"],
+                         v1_counter_files(co_mounted))
+
+    def test_escaped_mount_points_are_decoded(self):
+        table = mountinfo(("/sys/fs/cgroup/odd\\040name", "cgroup", "cpuacct"), ("/m", "cgroup", "memory"))
+        self.assertEqual("/sys/fs/cgroup/odd name/cpuacct.usage", v1_counter_files(table)[0])
+
+    def test_missing_ambiguous_or_unreadable_layouts_are_refused(self):
+        for table in (mountinfo(("/sys/fs/cgroup/memory", "cgroup", "memory")),
+                      mountinfo(("/a", "cgroup", "cpuacct"), ("/b", "cgroup", "cpu,cpuacct"), ("/m", "cgroup", "memory")),
+                      mountinfo(("/a", "cgroup2", "cpuacct"), ("/m", "cgroup", "memory")),
+                      "30 20 0:30 / /x rw\n"):
+            with self.subTest(table=table), self.assertRaises(RuntimeError):
+                v1_counter_files(table)
+
+    def test_v2_needs_no_lookup_and_v1_reads_the_container_mount_table(self):
+        from types import SimpleNamespace
+        with patch("warm_sandbox.docker") as call:
+            self.assertEqual(COUNTER_FILES["2"], resolve_counter_files("fixture", "2"))
+            call.assert_not_called()
+        table = mountinfo(("/sys/fs/cgroup/cpu,cpuacct", "cgroup", "cpu,cpuacct"), ("/sys/fs/cgroup/memory", "cgroup", "memory"))
+        with patch("warm_sandbox.docker", return_value=SimpleNamespace(stdout=table.encode())) as call:
+            files = resolve_counter_files("fixture", "1")
+            self.assertEqual(("exec", "--user", "0:0", "fixture", "/bin/cat", "/proc/self/mountinfo"), call.call_args.args)
+        with patch("warm_sandbox.docker", return_value=SimpleNamespace(stdout=b"2500999\n7340032\n")) as call:
+            self.assertEqual(dict(cpu_usec=2500, memory_peak_bytes=7340032), kernel_resources("fixture", "1", files))
+            self.assertEqual(("/bin/cat", *files), call.call_args.args[4:])
 
 
 class KernelCounterTests(unittest.TestCase):
+    def test_cgroup_v1_counters_convert_nanoseconds_and_keep_the_peak(self):
+        from types import SimpleNamespace
+        with patch("warm_sandbox.docker", return_value=SimpleNamespace(stdout=b"2500999\n7340032\n")):
+            self.assertEqual(dict(cpu_usec=2500, memory_peak_bytes=7340032), kernel_resources("fixture", "1"))
+
+    def test_cgroup_v1_rejects_an_unexpected_shape_and_a_zero_peak(self):
+        from types import SimpleNamespace
+        for raw in (b"2500999\n", b"1\n2\n3\n", b"usage_usec 5\n7340032\n", b"2500999\n0\n", b"-1\n7340032\n"):
+            with patch("warm_sandbox.docker", return_value=SimpleNamespace(stdout=raw)):
+                with self.assertRaises(RuntimeError, msg=raw):
+                    kernel_resources("fixture", "1")
+
+    def test_v2_identity_is_byte_identical_and_only_v1_is_marked(self):
+        # The identity is copied into digested, compared manifests; a v2 change would
+        # silently invalidate every existing v2 digest.
+        import tempfile as _tempfile
+        from docker_sandbox import DockerSandbox
+
+        def base_init(self, image, evidence, **_):
+            self.identity, self.root = {"schema": "evolution-docker-evaluator-v1"}, Path(evidence)
+            self.root.mkdir(parents=True)
+
+        for version in ("2", "1"):
+            with patch.object(DockerSandbox, "__init__", base_init), \
+                    patch("warm_sandbox.host_cgroup_version", return_value=version):
+                box = WarmDockerSandbox("sha256:" + "0" * 64, Path(_tempfile.mkdtemp()) / "e")
+            if version == "2":
+                self.assertNotIn("cgroup_version", box.identity)
+                self.assertEqual("cgroup-v2 cumulative CPU and lifetime memory.peak, INCLUDING probes/startup",
+                                 box.identity["resource_metric"])
+            else:
+                self.assertEqual("1", box.identity["cgroup_version"])
+                self.assertIn("cgroup-v1", box.identity["resource_metric"])
+
+    def test_host_cgroup_version_comes_from_the_daemon_and_refuses_unknowns(self):
+        from types import SimpleNamespace
+        for reported, expected in ((b"1\n", "1"), (b"2\n", "2")):
+            with patch("warm_sandbox.docker", return_value=SimpleNamespace(stdout=reported)) as call:
+                self.assertEqual(expected, host_cgroup_version())
+                self.assertEqual("info", call.call_args.args[0])
+        with patch("warm_sandbox.docker", return_value=SimpleNamespace(stdout=b"3\n")):
+            with self.assertRaises(RuntimeError):
+                host_cgroup_version()
+
     def test_missing_peak_cannot_become_zero(self):
         from types import SimpleNamespace
         with patch("warm_sandbox.docker", return_value=SimpleNamespace(stdout=b'{"cpu_usec":3}')):
@@ -80,11 +167,19 @@ class Solver:
         self.assertEqual("completed",good["status"])
 
     def test_no_container_privileges_or_writable_kernel_counters(self):
-        row = self.run_source("""import os
+        # The counter paths are the ones THIS host's probe reads. A fixed v2 path on a v1
+        # host does not exist, so the write fails for the wrong reason and proves nothing.
+        self.assertEqual("completed", self.run_source("class Solver:\n def solve(self,p): return 1")["status"])
+        counters = self.sandbox.counter_files
+        for path in counters:
+            self.assertEqual("exists", self.run_source(
+                f"import os\nclass Solver:\n def solve(self,p): return 'exists' if os.path.exists({path!r}) else 'missing'"
+            )["output"][0], path)
+        row = self.run_source(f"""import os
 class Solver:
  def solve(self,p):
   blocked=[]
-  for path in ('/sys/fs/cgroup/memory.peak','/work/worker.py','/etc/probe'):
+  for path in {tuple(counters) + ('/work/worker.py','/etc/probe')!r}:
    try: open(path,'w').write('0')
    except OSError: blocked.append(path)
   try: os.setuid(0)
@@ -92,7 +187,7 @@ class Solver:
   return blocked
 """)
         self.assertEqual("completed",row["status"])
-        self.assertEqual(4,len(row["output"][0]))
+        self.assertEqual(len(counters) + 3,len(row["output"][0]))
 
     def test_probe_failure_closes_admission_and_keeps_unknown_work(self):
         with patch("warm_sandbox.kernel_resources",side_effect=RuntimeError("kernel counter missing")):
