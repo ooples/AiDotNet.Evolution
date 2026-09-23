@@ -11,8 +11,18 @@ public sealed class CliTests
     private static async Task<string> Trace(string directory, string name, int attempts)
     {
         string path = Path.Combine(directory, name + ".jsonl");
-        var options = new EvolutionEngineOptions { RunId = name, MaxEvaluationAttempts = attempts, MaxProposals = attempts, MaxGenerations = attempts,
-            ProposalBatchSize = 1, MaxDegreeOfParallelism = 1, IslandCount = 1, MigrationInterval = 0, CheckpointInterval = 0 };
+        var options = new EvolutionEngineOptions
+        {
+            RunId = name,
+            MaxEvaluationAttempts = attempts,
+            MaxProposals = attempts,
+            MaxGenerations = attempts,
+            ProposalBatchSize = 1,
+            MaxDegreeOfParallelism = 1,
+            IslandCount = 1,
+            MigrationInterval = 0,
+            CheckpointInterval = 0
+        };
         using (var tracer = new EvolutionTraceObserver<TestGenome>(new EvolutionTraceOptions { Enabled = true, Path = path }, name))
             await new EvolutionEngine<TestGenome>(new SyntheticEvolutionTask(), new IncrementVariation(),
                 _ => new MapElitesArchive<TestGenome>(new[] { new EvolutionDescriptorDefinition("x", 0, 100, 100) }), options, observer: tracer)
