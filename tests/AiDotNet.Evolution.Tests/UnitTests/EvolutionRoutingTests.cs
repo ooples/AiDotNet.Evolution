@@ -105,6 +105,40 @@ public sealed class EvolutionRoutingTests
     private static EscalatingVariationOperator<TestGenome> Ladder() =>
         new(new IVariationOperator<TestGenome>[] { new Failing("cheap"), new Unique("strong") }, 3);
 
+    [Fact]
+    public async Task A_canceled_proposal_leaves_no_pending_outcome_so_its_generation_can_be_proposed_again()
+    {
+        // The engine rethrows a cancellation instead of committing an outcome, so Observe never clears the generation.
+        var (candidate, evaluation) = MapElitesArchiveTests.Create(0, "parent", 0, 0);
+        var entry = new EvolutionArchiveEntry<TestGenome>(new EvolutionCellKey(new[] { 0 }), candidate, evaluation);
+        EvolutionVariationContext<TestGenome> Context() => new(entry, Array.Empty<EvolutionArchiveEntry<TestGenome>>(), StableRandom.CreateStream(1, 1), 7, 0);
+        var tier = new CancelingDuringCall("cheap");
+        var ladder = new EscalatingVariationOperator<TestGenome>(new IVariationOperator<TestGenome>[] { tier, new Unique("strong") }, 3);
+
+        for (int attempt = 0; attempt < 2; attempt++)
+        {
+            using var run = new CancellationTokenSource();
+            tier.Source = run;
+            // The second attempt reuses generation 7; it must be canceled again, not refused as a repeated proposal.
+            await Assert.ThrowsAnyAsync<OperationCanceledException>(() => ladder.ProposeAsync(Context(), run.Token).AsTask());
+        }
+    }
+
+    // Cancels the caller's token during the delegated call, as a run being stopped mid-proposal does.
+    private sealed class CancelingDuringCall(string id) : IVariationOperator<TestGenome>
+    {
+        public CancellationTokenSource? Source { get; set; }
+        public string Id => id;
+        public string VersionHash => "v1";
+        public async ValueTask<TestGenome> ProposeAsync(EvolutionVariationContext<TestGenome> context, CancellationToken cancellationToken = default)
+        {
+            await Task.Yield();
+            Source?.Cancel();
+            cancellationToken.ThrowIfCancellationRequested();
+            return new TestGenome(0);
+        }
+    }
+
     private sealed class Unique(string id) : IVariationOperator<TestGenome>
     {
         public string Id => id;

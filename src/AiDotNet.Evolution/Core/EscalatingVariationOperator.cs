@@ -94,7 +94,7 @@ public sealed class EscalatingVariationOperator<TGenome> : IOutcomeAwareVariatio
     public IReadOnlyList<long> TierSuccesses => Array.AsReadOnly(_state.Successes);
 
     /// <inheritdoc/>
-    public ValueTask<TGenome> ProposeAsync(EvolutionVariationContext<TGenome> context, CancellationToken cancellationToken = default)
+    public async ValueTask<TGenome> ProposeAsync(EvolutionVariationContext<TGenome> context, CancellationToken cancellationToken = default)
     {
         Guard.NotNull(context);
         cancellationToken.ThrowIfCancellationRequested();
@@ -104,7 +104,18 @@ public sealed class EscalatingVariationOperator<TGenome> : IOutcomeAwareVariatio
         int tier = _state.Tier;
         _state.Pending.Add(context.Generation, tier);
         _state.Proposals[tier] = checked(_state.Proposals[tier] + 1);
-        return _tiers[tier].ProposeAsync(context, cancellationToken);
+        try
+        {
+            return await _tiers[tier].ProposeAsync(context, cancellationToken).ConfigureAwait(false);
+        }
+        catch (OperationCanceledException) when (cancellationToken.IsCancellationRequested)
+        {
+            // The engine rethrows a cancellation instead of committing an outcome, so Observe would never clear this
+            // generation: a stopped run would leave it pending, the next proposal with that generation would be refused as
+            // a repeat, and repeated cancellations could exhaust MaximumPending. The dispatched proposal still counts.
+            _state.Pending.Remove(context.Generation);
+            throw;
+        }
     }
 
     /// <inheritdoc/>
