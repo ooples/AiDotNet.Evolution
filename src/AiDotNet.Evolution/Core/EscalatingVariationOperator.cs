@@ -65,8 +65,14 @@ public sealed class EscalatingVariationOperator<TGenome> : IOutcomeAwareVariatio
         if (failuresBeforeEscalation < 1) throw new ArgumentOutOfRangeException(nameof(failuresBeforeEscalation));
         _tiers = tiers.ToArray();
         _failuresBeforeEscalation = failuresBeforeEscalation;
-        _state = new State { Proposals = new long[_tiers.Length], Outcomes = new long[_tiers.Length], Successes = new long[_tiers.Length],
-            Charged = new Dictionary<string, decimal>[_tiers.Length], Receipts = new long[_tiers.Length] };
+        _state = new State
+        {
+            Proposals = new long[_tiers.Length],
+            Outcomes = new long[_tiers.Length],
+            Successes = new long[_tiers.Length],
+            Charged = new Dictionary<string, decimal>[_tiers.Length],
+            Receipts = new long[_tiers.Length]
+        };
         for (int i = 0; i < _tiers.Length; i++) _state.Charged[i] = new Dictionary<string, decimal>(StringComparer.Ordinal);
         Id = "escalating(" + string.Join(",", _tiers.Select(tier => tier.Id)) + ")";
         VersionHash = EvolutionHash.Combine(new[] { "escalating-variation-v1",
@@ -160,7 +166,10 @@ public sealed class EscalatingVariationOperator<TGenome> : IOutcomeAwareVariatio
         _state.Children = _tiers.Select(tier => (tier as ICheckpointableVariationOperator<TGenome>)?.CaptureState()).ToArray();
         _state.Log = _escalations.Select(e => new LoggedEscalation
         {
-            Generation = e.Generation, FromTier = e.FromTier, ToTier = e.ToTier, ConsecutiveFailures = e.ConsecutiveFailures,
+            Generation = e.Generation,
+            FromTier = e.FromTier,
+            ToTier = e.ToTier,
+            ConsecutiveFailures = e.ConsecutiveFailures,
             IncrementalCost = e.IncrementalCost is null ? null : new Dictionary<string, decimal>(e.IncrementalCost.Amounts.ToDictionary(p => p.Key, p => p.Value), StringComparer.Ordinal)
         }).ToArray();
         _state.VersionHash = VersionHash;
@@ -195,7 +204,8 @@ public sealed class EscalatingVariationOperator<TGenome> : IOutcomeAwareVariatio
         _escalations.Clear();
         foreach (LoggedEscalation e in restored.Log)
             _escalations.Add(new EvolutionEscalation(e.Generation, e.FromTier, e.ToTier, _tiers[e.FromTier].Id, _tiers[e.ToTier].Id,
-                e.ConsecutiveFailures) { IncrementalCost = e.IncrementalCost is null ? null : new EvolutionResources(e.IncrementalCost) });
+                e.ConsecutiveFailures)
+            { IncrementalCost = e.IncrementalCost is null ? null : new EvolutionResources(e.IncrementalCost) });
         restored.Children = null; restored.Log = null;
         _state = restored;
     }
