@@ -55,7 +55,10 @@ public sealed partial class EvolutionWorkProtocol : IDisposable
                     ?? throw new ArgumentException("Unknown durable worker operation: " + op);
                 return Reply(id, writer => Dispatch(request, operation, writer));
             }
-            catch (Exception ex) when (ex is ArgumentException or JsonException or IOException or InvalidOperationException or OverflowException)
+            // InvalidDataException is not an IOException: without it an incompatible reopen escaped ProcessJson and
+            // terminated the host instead of returning the protocol error (found by conformance/durable-v1).
+            catch (Exception ex) when (ex is ArgumentException or JsonException or IOException or InvalidDataException or
+                InvalidOperationException or OverflowException)
             {
                 return Reply(id, writer =>
                 {
