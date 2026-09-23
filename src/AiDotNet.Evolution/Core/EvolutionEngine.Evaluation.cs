@@ -85,18 +85,27 @@ public sealed partial class EvolutionEngine<TGenome>
             view = snapshot.Archive;
             snapshotHash = snapshot.Fingerprint;
         }
-        var artifactFingerprint = snapshots is null ? null : new StringBuilder();
-        if (artifactFingerprint is not null) AppendArtifacts(artifactFingerprint, parentArtifacts);
+        // Most proposals have no parent artifacts; their fingerprint is a constant computed once.
+        string? artifactHash = snapshots is null ? null : parentArtifacts.Count == 0 ? EmptyArtifactsHash : HashArtifacts(parentArtifacts);
         string? identity = snapshots is null ? null : EvolutionHash.Combine(new[] { "pipeline-proposal-v3-content", _options.RunId, _compatibilityHash,
             evaluationId.ToString(CultureInfo.InvariantCulture), generation.ToString(CultureInfo.InvariantCulture),
             island.ToString(CultureInfo.InvariantCulture), view.DefinitionHash, view.Version.ToString(CultureInfo.InvariantCulture),
-            snapshotHash!, FingerprintPipelineEvaluation(selection.Parent.Evaluation), EvolutionHash.Compute(artifactFingerprint!.ToString()) }
+            snapshotHash!, FingerprintPipelineEvaluation(selection.Parent.Evaluation), artifactHash! }
             .Concat(selection.Inspirations.Select(entry => FingerprintPipelineEvaluation(entry.Evaluation))));
         var context = snapshots is null
             ? new EvolutionVariationContext<TGenome>(selection.Parent, selection.Inspirations, proposalRandom, generation, island, parentArtifacts, view)
             : new EvolutionVariationContext<TGenome>(selection.Parent, selection.Inspirations, proposalRandom, generation, island, parentArtifacts, view, identity!, evaluationId);
         return new VariationRequest(evaluationId, island, lineage, context);
     }
+
+    private static string HashArtifacts(IReadOnlyList<EvolutionArtifact> artifacts)
+    {
+        var builder = new StringBuilder();
+        AppendArtifacts(builder, artifacts);
+        return EvolutionHash.Compute(builder.ToString());
+    }
+
+    private static readonly string EmptyArtifactsHash = HashArtifacts(Array.Empty<EvolutionArtifact>());
 
     /// <summary>Runs only the external proposal call; no engine archive/counter/artifact mutation occurs here.</summary>
     private async Task<VariationResponse> InvokeVariationAsync(VariationRequest request, CancellationToken cancellationToken)
@@ -218,10 +227,7 @@ public sealed partial class EvolutionEngine<TGenome>
 
         private static byte[] DigestEntry(EvolutionArchiveEntry<TGenome> entry)
         {
-            string hex = EvolutionHash.Combine(new[] { entry.Cell.StableKey, FingerprintPipelineEvaluation(entry.Evaluation) });
-            var digest = new byte[32];
-            for (int i = 0; i < 32; i++) digest[i] = Convert.ToByte(hex.Substring(2 * i, 2), 16);
-            return digest;
+            return EvolutionHash.CombineBytes(new[] { entry.Cell.StableKey, FingerprintPipelineEvaluation(entry.Evaluation) });
         }
 
         private static readonly System.Runtime.CompilerServices.ConditionalWeakTable<EvolutionArchiveEntry<TGenome>, byte[]> PipelineEntryDigests = new();
