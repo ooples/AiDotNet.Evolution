@@ -143,14 +143,23 @@ public sealed partial class EvolutionEngine<TGenome>
         public bool Failed { get; } = failed;
     }
 
-    private static string FingerprintPipelineEvaluation(EvolutionEvaluation evaluation)
-    {
-        var builder = new StringBuilder();
-        // Reuse checkpoint/state-hash semantics: include measurements, costs, origins, lineage and artifacts,
-        // but not callback elapsed time. A version counter plus genome ID does not identify observed evidence.
-        AppendEvaluation(builder, evaluation);
-        return EvolutionHash.Compute(builder.ToString());
-    }
+    // An evaluation is immutable, so its fingerprint is a pure function of the instance. Pipeline
+    // snapshots re-fingerprint every archive entry each wave, and every proposal re-fingerprints its
+    // parent and inspirations; without this memo the same evidence was serialized and SHA-256 hashed
+    // repeatedly (the ZeroLatency pipeline regression). Weak keys never extend an evaluation's lifetime.
+    private static readonly System.Runtime.CompilerServices.ConditionalWeakTable<EvolutionEvaluation, string> PipelineFingerprints = new();
+    private static readonly System.Runtime.CompilerServices.ConditionalWeakTable<EvolutionEvaluation, string>.CreateValueCallback ComputePipelineFingerprint =
+        static evaluation =>
+        {
+            var builder = new StringBuilder();
+            // Reuse checkpoint/state-hash semantics: include measurements, costs, origins, lineage and artifacts,
+            // but not callback elapsed time. A version counter plus genome ID does not identify observed evidence.
+            AppendEvaluation(builder, evaluation);
+            return EvolutionHash.Compute(builder.ToString());
+        };
+
+    private static string FingerprintPipelineEvaluation(EvolutionEvaluation evaluation) =>
+        PipelineFingerprints.GetValue(evaluation, ComputePipelineFingerprint);
 
     private sealed class PipelineArchiveContext
     {
