@@ -39,7 +39,8 @@ def _safe_import(name, *args, **kwargs):
 
 def data_cells(notebook_path, expected_sha256=None):
     """(section heading, namespace) for every '#@title Data' cell, executed with numpy only."""
-    raw = Path(notebook_path).read_bytes()
+    # Hash the canonical LF bytes: a Windows checkout with autocrlf stores the same commit as CRLF.
+    raw = Path(notebook_path).read_bytes().replace(b"\r\n", b"\n")
     digest = hashlib.sha256(raw).hexdigest()
     if expected_sha256 is not None and digest != expected_sha256:
         raise ValueError("Published notebook does not match its pinned hash")

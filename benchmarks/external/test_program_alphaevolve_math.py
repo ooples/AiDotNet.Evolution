@@ -7,7 +7,7 @@ import numpy as np
 
 import alphaevolve_math as am
 
-NOTEBOOK_SHA256 = "be1e1f31bc3e6c789ece06b3489901981039f0e08248f7f1b5f7d1bd40d9ad51"
+NOTEBOOK_SHA256 = "2cce2543e48c89aa3e91614272a698a0147dd2548ea11cf92f1292b7435d38ff"
 
 
 def published():
