@@ -29,8 +29,12 @@ namespace AiDotNet.Evolution.Programs;
 /// descriptor coordinates. Everything about running the code stays in your evaluator, so nothing here executes
 /// generated program text.</para>
 /// </remarks>
-public sealed class ProgramEvolutionTask : IEvolutionTask<ProgramGenome>
+public sealed class ProgramEvolutionTask : IEvolutionTask<ProgramGenome>, IEvolutionLatencyProfile
 {
+    /// <inheritdoc/>
+    /// <remarks>Forwards the program evaluator's declaration.</remarks>
+    public bool IsLatencyBound => _evaluator is IEvolutionLatencyProfile { IsLatencyBound: true };
+
     private readonly IProgramFitnessEvaluator _evaluator;
     private readonly ProgramDescriptorSet _descriptors;
     private readonly ProgramTaskOptions _options;

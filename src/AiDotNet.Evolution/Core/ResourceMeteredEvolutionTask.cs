@@ -12,8 +12,12 @@ namespace AiDotNet.Evolution;
 /// Missing/unrepresentable receipts retain conservative engine-visible costs and cannot produce a successful candidate.
 /// A producer maximum violation retains its actual charge and fails that evaluation, not only subsequent admission.
 /// </remarks>
-public sealed class ResourceMeteredEvolutionTask<TGenome> : ICascadeEvolutionTask<TGenome>
+public sealed class ResourceMeteredEvolutionTask<TGenome> : ICascadeEvolutionTask<TGenome>, IEvolutionLatencyProfile
 {
+    /// <inheritdoc/>
+    /// <remarks>Forwards the metered task's declaration.</remarks>
+    public bool IsLatencyBound => _inner is IEvolutionLatencyProfile { IsLatencyBound: true };
+
     private readonly IEvolutionTask<TGenome> _inner;
     private readonly EvolutionResourceLedger _ledger;
     private readonly decimal[] _maxima;

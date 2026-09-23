@@ -7,8 +7,12 @@ namespace AiDotNet.Evolution.Programs;
 /// are checkpointed together; persist the matching ledger separately. This adapter does not enable automatic
 /// facade resume or infer API pricing, token counts, compiler cost, or free work from missing usage.</remarks>
 public sealed class MeteredProgramVariationOperator : IProgramVariationOperator,
-    IOutcomeAwareVariationOperator<ProgramGenome>, IEvolutionProposalCostProvider, IProgramResourceLedgerProvider
+    IOutcomeAwareVariationOperator<ProgramGenome>, IEvolutionProposalCostProvider, IProgramResourceLedgerProvider, IEvolutionLatencyProfile
 {
+    /// <inheritdoc/>
+    /// <remarks>Forwards the metered proposal source's declaration.</remarks>
+    public bool IsLatencyBound => _source is IEvolutionLatencyProfile { IsLatencyBound: true };
+
     private readonly ICostedProgramProposalSource _source;
     private readonly ResourceMeteredVariationOperator<ProgramGenome> _metered;
 
