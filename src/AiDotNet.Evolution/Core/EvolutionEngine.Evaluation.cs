@@ -166,9 +166,29 @@ public sealed partial class EvolutionEngine<TGenome>
         public PipelineArchiveContext(EvolutionArchiveSnapshot<TGenome> archive)
         {
             Archive = archive;
-            Fingerprint = EvolutionHash.Combine(new[] { archive.DefinitionHash, archive.Version.ToString(CultureInfo.InvariantCulture) }
-                .Concat(archive.Entries.SelectMany(entry => new[] { entry.Cell.StableKey, FingerprintPipelineEvaluation(entry.Evaluation) })));
+            // Byte-for-byte the digest Combine gave over [definition, version, (cell, fingerprint) per elite], but without
+            // Combine's 4096-component cap, which made pipeline proposals throw once an island held 2048 elites. Each
+            // elite's encoded pair is computed once per immutable entry, not re-encoded every wave.
+            Fingerprint = EvolutionHash.CombineEncoded(new[]
+                {
+                    EvolutionHash.EncodeComponent(archive.DefinitionHash),
+                    EvolutionHash.EncodeComponent(archive.Version.ToString(CultureInfo.InvariantCulture))
+                }
+                .Concat(archive.Entries.Select(entry => PipelineEntryFragments.GetValue(entry, EncodeEntryCallback))));
         }
+
+        private static byte[] EncodeEntry(EvolutionArchiveEntry<TGenome> entry)
+        {
+            byte[] cell = EvolutionHash.EncodeComponent(entry.Cell.StableKey);
+            byte[] evaluation = EvolutionHash.EncodeComponent(FingerprintPipelineEvaluation(entry.Evaluation));
+            var both = new byte[cell.Length + evaluation.Length];
+            Buffer.BlockCopy(cell, 0, both, 0, cell.Length);
+            Buffer.BlockCopy(evaluation, 0, both, cell.Length, evaluation.Length);
+            return both;
+        }
+
+        private static readonly System.Runtime.CompilerServices.ConditionalWeakTable<EvolutionArchiveEntry<TGenome>, byte[]> PipelineEntryFragments = new();
+        private static readonly System.Runtime.CompilerServices.ConditionalWeakTable<EvolutionArchiveEntry<TGenome>, byte[]>.CreateValueCallback EncodeEntryCallback = EncodeEntry;
         public EvolutionArchiveSnapshot<TGenome> Archive { get; }
         public string Fingerprint { get; }
     }
