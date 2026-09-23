@@ -1,0 +1,147 @@
+{
+ "story": "V1-04b #112",
+ "upstream": "oripress/AlgoTune dff9914c",
+ "contract": "strict-upstream-v1",
+ "tasks": 11,
+ "mutants": 168,
+ "false_accepts": 0,
+ "per_task": [
+  {
+   "task": "base64_encoding",
+   "mutants": 3,
+   "false_accepts": 0,
+   "accepted": [],
+   "kinds": {
+    "bytes": 3,
+    "tolerance_edge": 0
+   },
+   "within_tolerance_rejected": 0,
+   "within_tolerance": 0
+  },
+  {
+   "task": "convolve_1d",
+   "mutants": 6,
+   "false_accepts": 0,
+   "accepted": [],
+   "kinds": {
+    "array": 3,
+    "tolerance_edge": 3
+   },
+   "within_tolerance_rejected": 0,
+   "within_tolerance": 3
+  },
+  {
+   "task": "correlate_1d",
+   "mutants": 30,
+   "false_accepts": 0,
+   "accepted": [],
+   "kinds": {
+    "drop": 3,
+    "array": 24,
+    "tolerance_edge": 3
+   },
+   "within_tolerance_rejected": 0,
+   "within_tolerance": 3
+  },
+  {
+   "task": "count_connected_components",
+   "mutants": 3,
+   "false_accepts": 0,
+   "accepted": [],
+   "kinds": {
+    "number": 3,
+    "tolerance_edge": 0
+   },
+   "within_tolerance_rejected": 0,
+   "within_tolerance": 0
+  },
+  {
+   "task": "matrix_multiplication",
+   "mutants": 6,
+   "false_accepts": 0,
+   "accepted": [],
+   "kinds": {
+    "array": 3,
+    "tolerance_edge": 3
+   },
+   "within_tolerance_rejected": 0,
+   "within_tolerance": 3
+  },
+  {
+   "task": "minimum_spanning_tree",
+   "mutants": 39,
+   "false_accepts": 0,
+   "accepted": [],
+   "kinds": {
+    "drop": 12,
+    "number": 24,
+    "tolerance_edge": 3
+   },
+   "within_tolerance_rejected": 3,
+   "within_tolerance": 3
+  },
+  {
+   "task": "outer_product",
+   "mutants": 6,
+   "false_accepts": 0,
+   "accepted": [],
+   "kinds": {
+    "array": 3,
+    "tolerance_edge": 3
+   },
+   "within_tolerance_rejected": 0,
+   "within_tolerance": 3
+  },
+  {
+   "task": "sha256_hashing",
+   "mutants": 3,
+   "false_accepts": 0,
+   "accepted": [],
+   "kinds": {
+    "bytes": 3,
+    "tolerance_edge": 0
+   },
+   "within_tolerance_rejected": 0,
+   "within_tolerance": 0
+  },
+  {
+   "task": "shortest_path_dijkstra",
+   "mutants": 39,
+   "false_accepts": 0,
+   "accepted": [],
+   "kinds": {
+    "drop": 18,
+    "number": 18,
+    "tolerance_edge": 3
+   },
+   "within_tolerance_rejected": 3,
+   "within_tolerance": 3
+  },
+  {
+   "task": "stable_matching",
+   "mutants": 27,
+   "false_accepts": 0,
+   "accepted": [],
+   "kinds": {
+    "drop": 3,
+    "number": 24,
+    "tolerance_edge": 0
+   },
+   "within_tolerance_rejected": 0,
+   "within_tolerance": 0
+  },
+  {
+   "task": "unit_simplex_projection",
+   "mutants": 6,
+   "false_accepts": 0,
+   "accepted": [],
+   "kinds": {
+    "array": 3,
+    "tolerance_edge": 3
+   },
+   "within_tolerance_rejected": 3,
+   "within_tolerance": 3
+  }
+ ],
+ "within_tolerance_note": "A 0.1x-tolerance perturbation is rejected on minimum_spanning_tree (weights copied from the input must match), shortest_path_dijkstra (the distance diagonal must be exactly 0; upstream logs it) and unit_simplex_projection (not yet attributed). These are rejections of near-correct outputs, never false accepts."
+}
