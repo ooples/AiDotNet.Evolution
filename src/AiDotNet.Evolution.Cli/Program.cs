@@ -144,8 +144,12 @@ internal sealed class TraceAnalysis
             best.Descriptors,
             Lineage = lineage,
             SourceTrace = System.IO.Path.GetFileName(Path),
-            Environment = new { Os = RuntimeInformation.OSDescription, Runtime = RuntimeInformation.FrameworkDescription,
-                Architecture = RuntimeInformation.ProcessArchitecture.ToString() },
+            Environment = new
+            {
+                Os = RuntimeInformation.OSDescription,
+                Runtime = RuntimeInformation.FrameworkDescription,
+                Architecture = RuntimeInformation.ProcessArchitecture.ToString()
+            },
             Limitations = "Identity, evidence and lineage only: traces carry no program source and no credentials."
         };
     }
@@ -157,11 +161,16 @@ internal sealed class TraceAnalysis
             EvolutionTraceRecord? best = t.Best;
             var progress = t.Progress();
             var reached = best is null ? default : progress.First(p => p.BestSoFar == best.Quality);
-            return new { t.Path, Records = t.Records.Count, BestQuality = best?.Quality,
+            return new
+            {
+                t.Path,
+                Records = t.Records.Count,
+                BestQuality = best?.Quality,
                 EvaluationsToBest = best is null ? (int?)null : t.Records.TakeWhile(r => r.Sequence <= reached.Sequence).Count(),
                 CostToBest = best is null ? (double?)null : reached.CumulativeCost,
                 TotalCostUnits = t.Records.Sum(r => r.CostUnits),
-                ValidRate = t.Records.Count(Valid) / (double)t.Records.Count };
+                ValidRate = t.Records.Count(Valid) / (double)t.Records.Count
+            };
         }
         if (a.Direction != b.Direction) throw new ArgumentException("The traces optimize in different directions.");
         return new { Direction = a.Direction.ToString(), A = Side(a), B = Side(b) };

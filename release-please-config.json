@@ -14,6 +14,11 @@
       "extra-files": [
         {
           "type": "xml",
+          "path": "src/AiDotNet.Evolution.Cli/AiDotNet.Evolution.Cli.csproj",
+          "xpath": "//PropertyGroup/Version"
+        },
+        {
+          "type": "xml",
           "path": "src/AiDotNet.Evolution/AiDotNet.Evolution.csproj",
           "xpath": "//PropertyGroup/Version"
         },
