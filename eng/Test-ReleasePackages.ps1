@@ -5,7 +5,9 @@ param(
 )
 $ErrorActionPreference = 'Stop'
 $ids = @('AiDotNet.Evolution', 'AiDotNet.Evolution.Programs', 'AiDotNet.Evolution.CSharp',
-    'AiDotNet.Evolution.Deployment', 'AiDotNet.Evolution.Surrogates')
+    'AiDotNet.Evolution.Deployment', 'AiDotNet.Evolution.Surrogates', 'AiDotNet.Evolution.Cli')
+# dotnet tool packages: assemblies under tools/<tfm>/any, a DotnetTool package type, and no dependency groups.
+$tools = @{ 'AiDotNet.Evolution.Cli' = 'aidotnet-evolve' }
 $packages = @(Get-ChildItem -LiteralPath $PackageDirectory -Filter '*.nupkg')
 $expectedNames = @($ids | ForEach-Object { "$_.${ExpectedVersion}.nupkg" })
 if (Compare-Object ($expectedNames | Sort-Object) (@($packages.Name) | Sort-Object)) {
@@ -24,7 +26,11 @@ foreach ($id in $ids) {
         $frameworks = @('net8.0', 'net10.0')
         if ($id -in @('AiDotNet.Evolution', 'AiDotNet.Evolution.Surrogates')) { $frameworks += 'net471' }
         foreach ($framework in $frameworks) {
-            if ($null -eq $archive.GetEntry("lib/$framework/$id.dll")) { throw "Missing $framework assembly: $id" }
+            $assembly = if ($tools.ContainsKey($id)) { "tools/$framework/any/$($tools[$id]).dll" } else { "lib/$framework/$id.dll" }
+            if ($null -eq $archive.GetEntry($assembly)) { throw "Missing $framework assembly: $id" }
+        }
+        if ($tools.ContainsKey($id) -and 'DotnetTool' -notin @($spec.SelectNodes('//*[local-name()="packageType"]').name)) {
+            throw "Not a dotnet tool package: $id"
         }
         if ($null -eq $archive.GetEntry('README.md')) { throw "Missing README: $id" }
         $dependencies = @($spec.SelectNodes('//*[local-name()="dependency"]'))
@@ -58,7 +64,7 @@ foreach ($id in $ids) {
                 throw "Release dependency drift: $id -> $($dependency.id) $($dependency.version)"
             }
         }
-        if ($id -in @('AiDotNet.Evolution', 'AiDotNet.Evolution.Surrogates')) {
+        if ($id -in @('AiDotNet.Evolution', 'AiDotNet.Evolution.Surrogates', 'AiDotNet.Evolution.Cli')) {
             if ($metadata.license.InnerText -cne 'Apache-2.0') { throw "Invalid license: $id" }
         } elseif ($null -eq $archive.GetEntry('AIDOTNET-LICENSE.txt') -or $metadata.license.InnerText -cne 'AIDOTNET-LICENSE.txt') {
             throw "Missing original license: $id"
