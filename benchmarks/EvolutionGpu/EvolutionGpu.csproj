@@ -1,0 +1,15 @@
+<Project Sdk="Microsoft.NET.Sdk">
+  <PropertyGroup>
+    <OutputType>Exe</OutputType>
+    <TargetFramework>net10.0</TargetFramework>
+    <ImplicitUsings>enable</ImplicitUsings>
+    <Nullable>enable</Nullable>
+    <TreatWarningsAsErrors>true</TreatWarningsAsErrors>
+    <IsPackable>false</IsPackable>
+  </PropertyGroup>
+  <ItemGroup>
+    <ProjectReference Include="../../src/AiDotNet.Evolution/AiDotNet.Evolution.csproj" />
+    <ProjectReference Include="$(TensorsProject)" Condition="'$(TensorsProject)' != ''" />
+    <PackageReference Include="AiDotNet.Tensors" Version="0.130.3" Condition="'$(TensorsProject)' == ''" />
+  </ItemGroup>
+</Project>
