@@ -1,3 +1,4 @@
+using System.Diagnostics.CodeAnalysis;
 using System.Globalization;
 
 namespace AiDotNet.Evolution.Surrogates;
@@ -11,6 +12,7 @@ namespace AiDotNet.Evolution.Surrogates;
 /// Adaptive collection and drift can invalidate generalization; empirical held-out coverage is not a formal coverage guarantee.
 /// All declared tariffs are explicit work-unit prices, not measured elapsed CPU or monetary costs.
 /// </remarks>
+[Experimental("AIDEVO001")]
 public sealed class ValidatedNearestNeighborTrainer : IEvolutionSurrogateTrainer<EvolutionSearchGenome>
 {
     private readonly EvolutionSearchSpace _space;
@@ -135,6 +137,7 @@ internal sealed class NumericPoint
 }
 
 /// <summary>A detached numeric predictor with auditable partitions and explicit reliability/domain checks.</summary>
+[Experimental("AIDEVO001")]
 public sealed class ValidatedNearestNeighborModel : IEvolutionSurrogateModel<EvolutionSearchGenome>, IEvolutionSurrogateDiagnosticModel
 {
     private readonly EvolutionSearchSpace _space;

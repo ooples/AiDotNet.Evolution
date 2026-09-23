@@ -1,7 +1,9 @@
+using System.Diagnostics.CodeAnalysis;
 namespace AiDotNet.Evolution;
 
 /// <summary>A feasible, freshly measured search outcome; constructing this contract does not prove evaluator correctness.</summary>
 /// <typeparam name="TGenome">The immutable genome representation.</typeparam>
+[Experimental("AIDEVO001")]
 public sealed class EvolutionSurrogateObservation<TGenome>
 {
     /// <summary>Validates candidate/evaluation identity and rejects failures, cache hits, zero-attempt and infeasible records.</summary>
@@ -23,6 +25,7 @@ public sealed class EvolutionSurrogateObservation<TGenome>
 }
 
 /// <summary>Unvalidated model output, deliberately separate from task/evaluation result types.</summary>
+[Experimental("AIDEVO001")]
 public sealed class EvolutionSurrogatePrediction
 {
     /// <summary>Creates one finite prediction. Uncertainty is a backend-defined nonnegative quality-scale estimate, not a confidence interval.</summary>
@@ -45,6 +48,7 @@ public sealed class EvolutionSurrogatePrediction
 }
 
 /// <summary>The acquisition or explicit uniform-fallback path used for a proposal pool.</summary>
+[Experimental("AIDEVO001")]
 public enum EvolutionSurrogateSelectionReason
 {
     /// <summary>Selected by direction-aware optimistic acquisition.</summary>
@@ -71,6 +75,7 @@ public enum EvolutionSurrogateSelectionReason
 
 /// <summary>A candidate selection and unvalidated prediction audit; no archive admission or deployment authorization.</summary>
 /// <typeparam name="TGenome">The immutable genome representation.</typeparam>
+[Experimental("AIDEVO001")]
 public sealed class EvolutionSurrogateSelection<TGenome>
 {
     internal EvolutionSurrogateSelection(EvolutionCanonicalGenome<TGenome> candidate, EvolutionSurrogateSelectionReason reason,

@@ -17,11 +17,15 @@ namespace AiDotNet.Evolution;
 /// </remarks>
 public static class EvolutionArchiveQuery
 {
-    /// <summary>Returns the archive's best elite by a named metric.</summary>
+    /// <summary>Returns the archive's best elite by a named metric, in the archive's own direction.</summary>
+    public static EvolutionArchiveEntry<TGenome>? BestBy<TGenome>(this IEvolutionArchiveView<TGenome> archive, string metric) =>
+        BestBy(archive, metric, null);
+
+    /// <summary>Returns the archive's best elite by a named metric; null direction means the archive's own.</summary>
     public static EvolutionArchiveEntry<TGenome>? BestBy<TGenome>(
         this IEvolutionArchiveView<TGenome> archive,
         string metric,
-        EvolutionOptimizationDirection? direction = null)
+        EvolutionOptimizationDirection? direction)
     {
         Guard.NotNull(archive);
         Guard.NotNullOrWhiteSpace(metric);
@@ -37,12 +41,17 @@ public static class EvolutionArchiveQuery
         return best;
     }
 
-    /// <summary>Returns the archive's best elites by a named metric, best first.</summary>
+    /// <summary>Returns the archive's best elites by a named metric, best first, in the archive's own direction.</summary>
+    public static IReadOnlyList<EvolutionArchiveEntry<TGenome>> TopBy<TGenome>(
+        this IEvolutionArchiveView<TGenome> archive, string metric, int count) =>
+        TopBy(archive, metric, count, null);
+
+    /// <summary>Returns the archive's best elites by a named metric, best first; null direction means the archive's own.</summary>
     public static IReadOnlyList<EvolutionArchiveEntry<TGenome>> TopBy<TGenome>(
         this IEvolutionArchiveView<TGenome> archive,
         string metric,
         int count,
-        EvolutionOptimizationDirection? direction = null)
+        EvolutionOptimizationDirection? direction)
     {
         Guard.NotNull(archive);
         Guard.NotNullOrWhiteSpace(metric);
@@ -75,11 +84,15 @@ public static class EvolutionArchiveQuery
         return CollectNames(archive.Entries);
     }
 
-    /// <summary>Returns the run's best elite by a named metric across every island.</summary>
+    /// <summary>Returns the run's best elite by a named metric across every island, in the run's own direction.</summary>
+    public static EvolutionArchiveEntry<TGenome>? BestBy<TGenome>(this EvolutionRunResult<TGenome> result, string metric) =>
+        BestBy(result, metric, null);
+
+    /// <summary>Returns the run's best elite by a named metric across every island; null direction means the run's own.</summary>
     public static EvolutionArchiveEntry<TGenome>? BestBy<TGenome>(
         this EvolutionRunResult<TGenome> result,
         string metric,
-        EvolutionOptimizationDirection? direction = null)
+        EvolutionOptimizationDirection? direction)
     {
         Guard.NotNull(result);
         Guard.NotNullOrWhiteSpace(metric);
@@ -97,12 +110,17 @@ public static class EvolutionArchiveQuery
         return best;
     }
 
-    /// <summary>Returns the run's best distinct elites by a named metric across every island, best first.</summary>
+    /// <summary>Returns the run's best distinct elites by a named metric, best first, in the run's own direction.</summary>
+    public static IReadOnlyList<EvolutionArchiveEntry<TGenome>> TopBy<TGenome>(
+        this EvolutionRunResult<TGenome> result, string metric, int count) =>
+        TopBy(result, metric, count, null);
+
+    /// <summary>Returns the run's best distinct elites by a named metric, best first; null direction means the run's own.</summary>
     public static IReadOnlyList<EvolutionArchiveEntry<TGenome>> TopBy<TGenome>(
         this EvolutionRunResult<TGenome> result,
         string metric,
         int count,
-        EvolutionOptimizationDirection? direction = null)
+        EvolutionOptimizationDirection? direction)
     {
         Guard.NotNull(result);
         Guard.NotNullOrWhiteSpace(metric);

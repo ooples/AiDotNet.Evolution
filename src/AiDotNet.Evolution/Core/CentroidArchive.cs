@@ -1,3 +1,4 @@
+using System.Diagnostics.CodeAnalysis;
 namespace AiDotNet.Evolution;
 
 /// <summary>Optional scalar-best-per-centroid repertoire, retaining at most K measured feasible elites.</summary>
@@ -7,6 +8,7 @@ namespace AiDotNet.Evolution;
 /// named descriptors. Definition identity includes the fixed partition and direction. Checkpoints require the
 /// same definition supplied by the archive factory; changing geometry requires explicit offline projection.
 /// </remarks>
+[Experimental("AIDEVO003")]
 public sealed class CentroidArchive<TGenome> : ICheckpointableEvolutionArchive<TGenome>, IEvolutionArchiveCellCount,
     IEvolutionArchiveMutationSource<TGenome>
 {

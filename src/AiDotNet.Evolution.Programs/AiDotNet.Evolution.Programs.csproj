@@ -9,6 +9,7 @@
     <RepositoryUrl>https://github.com/ooples/AiDotNet.Evolution</RepositoryUrl>
     <PackageLicenseFile>AIDOTNET-LICENSE.txt</PackageLicenseFile>
     <PackageReadmeFile>README.md</PackageReadmeFile>
+    <EnablePackageValidation>true</EnablePackageValidation>
   </PropertyGroup>
   <ItemGroup>
     <None Include="Legacy/AIDOTNET-LICENSE.txt" Pack="true" PackagePath="AIDOTNET-LICENSE.txt" />
@@ -19,5 +20,11 @@
     <None Include="../../docs/COMPILER_GUIDED_PROGRAMS.md" Pack="true" PackagePath="README.md" />
     <ProjectReference Include="../AiDotNet.Evolution/AiDotNet.Evolution.csproj" />
     <PackageReference Include="Newtonsoft.Json" Version="13.0.4" />
+  </ItemGroup>
+  <!-- V1-11: the public API is declared (PublicAPI.*.txt) and every change to it must be too. -->
+  <ItemGroup>
+    <PackageReference Include="Microsoft.CodeAnalysis.PublicApiAnalyzers" Version="5.6.0" PrivateAssets="all" />
+    <AdditionalFiles Include="PublicAPI.Shipped.txt" />
+    <AdditionalFiles Include="PublicAPI.Unshipped.txt" />
   </ItemGroup>
 </Project>
