@@ -1,0 +1,10 @@
+{
+  "story": "V1-04c #29",
+  "partition": "dev",
+  "hardware": "NVIDIA GeForce GTX 1660 Ti, driver 616.56, in the hardened GPU sandbox (Dockerfile.gpu)",
+  "task": "softmax",
+  "comparison": "a hand-written fused CUDA RawKernel (one block per row) vs the initial multi-pass CuPy program, 40 timed repeats of 4096x1024 per request",
+  "speedup_median": 1.219,
+  "ratios": [1.235, 1.125, 1.253, 1.177, 1.219],
+  "reading": "Headroom exists on dev data (R7). The ratio is end-to-end per request (container, JIT, input generation, digests), so kernel-only gains are larger. No claim beyond this card (R11)."
+}
