@@ -294,6 +294,7 @@ jobs:
       EVOLUTION_OPENEVOLVE_CHECKOUT: ${{ github.workspace }}/.local/openevolve-upstream
       EVOLUTION_PROFILE_UPSTREAM: ${{ github.workspace }}/.local/openevolve-upstream
       EVOLUTION_CORRECTNESS_UPSTREAM: ${{ github.workspace }}/.local/correctness-algotune
+      EVOLUTION_ALPHAEVOLVE_RESULTS: ${{ github.workspace }}/.local/alphaevolve-results
       EVOLUTION_PROFILE_DLL: ${{ github.workspace }}/benchmarks/EvolutionComparison/bin/Release/net10.0/EvolutionComparison.dll
     steps:
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1
@@ -310,6 +311,12 @@ jobs:
           repository: oripress/AlgoTune
           ref: dff9914c10800c7a031c9e8c3d4d1c8cd1b38906
           path: .local/correctness-algotune
+          persist-credentials: false
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1
+        with:
+          repository: google-deepmind/alphaevolve_results
+          ref: 4226acbf237ff9ad10ba7673a2af127a2d8a5971
+          path: .local/alphaevolve-results
           persist-credentials: false
       - uses: actions/setup-dotnet@a98b56852c35b8e3190ac28c8c2271da59106c68
         with:
