@@ -99,15 +99,20 @@ class FamilyTests(unittest.TestCase):
             raise RuntimeError("Set EVOLUTION_ALPHAEVOLVE_RESULTS to the pinned alphaevolve_results checkout")
         self.problems = am.family(Path(root) / "mathematical_results.ipynb", NOTEBOOK_SHA256)
 
-    def test_every_published_construction_verifies_and_pending_ones_are_declared(self):
-        self.assertEqual(34, len(self.problems))
+    def test_every_published_construction_verifies(self):
+        self.assertEqual(36, len(self.problems))
         self.assertEqual([], [r["id"] for r in am.self_test(self.problems) if not r["matches"]])
         rows = am.manifest(self.problems)
         self.assertEqual(36, len(rows))
-        self.assertEqual({"independent", "pending"}, {r["verifier"] for r in rows})
+        self.assertEqual({"independent"}, {r["verifier"] for r in rows})
         self.assertTrue(all(r["citation"].startswith("https://github.com/google-deepmind/alphaevolve_results/blob/")
                             and r["direction"] in ("minimize", "maximize") for r in rows))
         self.assertTrue(all("construction" not in r for r in rows), "the manifest never carries a construction")
+
+    def test_b4_reproduces_the_prior_state_of_the_art_too(self):
+        # Goncalves et al. (2017) coefficients: the notebook says they round to 0.3523.
+        self.assertEqual(0.3523, round(am.hermite_bound([-113 / 100, 1 / 25, 1 / 3240]), 4))
+        self.assertIsNone(am.laguerre_bound([1.0, 1.0] + list(range(3, 13))), "roots must be distinct")
 
     def test_contamination_screens(self):
         by_id = {p["id"]: p for p in self.problems}

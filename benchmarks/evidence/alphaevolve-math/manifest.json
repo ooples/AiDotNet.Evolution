@@ -3,8 +3,8 @@
  "source": "https://github.com/google-deepmind/alphaevolve_results/blob/4226acbf237ff9ad10ba7673a2af127a2d8a5971/mathematical_results.ipynb",
  "notebook_sha256": "be1e1f31bc3e6c789ece06b3489901981039f0e08248f7f1b5f7d1bd40d9ad51",
  "problems": 36,
- "verified": 34,
- "pending": 2,
+ "verified": 36,
+ "pending": 0,
  "rows": [
   {
    "id": "tensor-245-0.5*Z",
@@ -491,8 +491,10 @@
    "published_decimals": 4,
    "proven_optimal": false,
    "citation": "https://github.com/google-deepmind/alphaevolve_results/blob/4226acbf237ff9ad10ba7673a2af127a2d8a5971/mathematical_results.ipynb",
-   "verifier": "pending",
-   "pending_reason": "Hermite formulation needs exact real-root isolation of P/x^2; verifier not yet built"
+   "verifier": "independent",
+   "derived_from": null,
+   "self_test_value": 0.35209910442252773,
+   "self_test_matches": true
   },
   {
    "id": "c4-uncertainty-laguerre",
@@ -503,8 +505,10 @@
    "published_decimals": 4,
    "proven_optimal": false,
    "citation": "https://github.com/google-deepmind/alphaevolve_results/blob/4226acbf237ff9ad10ba7673a2af127a2d8a5971/mathematical_results.ipynb",
-   "verifier": "pending",
-   "pending_reason": "Cohn-Goncalves Laguerre formulation needs an exact linear solve with double-root conditions"
+   "verifier": "independent",
+   "derived_from": null,
+   "self_test_value": 0.3215872333529007,
+   "self_test_matches": true
   }
  ]
 }

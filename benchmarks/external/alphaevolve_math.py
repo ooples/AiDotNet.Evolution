@@ -15,6 +15,7 @@ from __future__ import annotations
 import hashlib
 import json
 from pathlib import Path
+import math
 import re
 
 import numpy as np
@@ -425,13 +426,202 @@ def self_test(problems):
         rows.append(dict(id=pr["id"], published=pr["published_value"], verified=value, matches=matches_published(pr, value)))
     return rows
 
+# --------------------------------------------------- B.4 uncertainty inequality (Hermite form)
+from fractions import Fraction
+
+
+def _hermite(n):
+    """Physicists' Hermite polynomial H_n as integer coefficients, lowest degree first."""
+    previous, current = [1], [0, 2]
+    if n == 0:
+        return previous
+    for k in range(1, n):
+        shifted = [0] + [2 * c for c in current]
+        scaled = [2 * k * c for c in previous] + [0, 0]
+        previous, current = current, [a - b for a, b in zip(shifted, scaled + [0] * (len(shifted) - len(scaled)))]
+    return current
+
+
+def _evaluate(poly, x):
+    total = Fraction(0)
+    for coefficient in reversed(poly):
+        total = total * x + coefficient
+    return total
+
+
+def hermite_bound(coefficients):
+    """C4 upper bound from f(x) = P(x) e^{-pi x^2}, P = sum c_i H_{4i} + c_last H_{4m}.
+    c_last forces P(0) = 0; P is signed to be positive at infinity; the bound is r^2/(2 pi)
+    for r the largest root of P/x^2 where the sign changes. All arithmetic is exact."""
+    c = [Fraction(v) for v in coefficients]
+    if len(c) < 1:
+        return None
+    polys = [_hermite(4 * i) for i in range(len(c) + 1)]
+    size = len(polys[-1])
+    def combine(weights):
+        out = [Fraction(0)] * size
+        for w, poly in zip(weights, polys):
+            for d, a in enumerate(poly):
+                out[d] += w * a
+        return out
+    partial = combine(c)
+    last = -partial[0] / polys[-1][0]
+    p = combine(c + [last])
+    if p[-1] < 0:
+        p = [-a for a in p]
+    if p[0] != 0 or p[1] != 0:
+        return None  # an even P with P(0)=0 is divisible by x^2
+    g = p[2:]
+    candidates = [r.real for r in np.roots([float(a) for a in reversed(g)]) if abs(r.imag) < 1e-9 and r.real > 0]
+    largest = None
+    for root in candidates:
+        lo, hi = Fraction(root) - Fraction(1, 10 ** 9), Fraction(root) + Fraction(1, 10 ** 9)
+        flo, fhi = _evaluate(g, lo), _evaluate(g, hi)
+        if (flo > 0) == (fhi > 0) or flo == 0 or fhi == 0:
+            continue  # not a sign change at this root
+        for _ in range(60):  # exact bisection
+            mid = (lo + hi) / 2
+            if (_evaluate(g, mid) > 0) == (flo > 0):
+                lo = mid
+            else:
+                hi = mid
+        largest = hi if largest is None else max(largest, hi)
+    return None if largest is None else float(largest * largest) / (2 * math.pi)
+
+
+def b4_hermite_problem(notebook_path):
+    """The coefficients sit in a cell that imports sympy; they are read as literals, not run."""
+    import ast
+    cells = json.loads(Path(notebook_path).read_bytes())["cells"]
+    for cell in cells:
+        source = "".join(cell["source"])
+        match = re.search(r"coefficients_alphaevolve\s*=\s*np\.array\((\[[^\]]*\])\)", source)
+        if match:
+            values = ast.literal_eval(match.group(1))
+            return dict(id="c4-uncertainty-hermite", section="B.4", kind="analytic", direction="minimize",
+                        published_value=0.3521, published_decimals=4, proven_optimal=False, citation=CITATION,
+                        construction_variable="coefficients_alphaevolve", construction=values,
+                        _check=lambda v, ns: hermite_bound(v), _namespace={})
+    raise ValueError("B.4 coefficients not found")
+
+
+# ------------------------------------------- B.4 uncertainty inequality (Laguerre form, A+(1))
+
+def _laguerre(k, alpha):
+    """Generalised Laguerre L_k^(alpha), exact, lowest degree first."""
+    coefficients = []
+    for i in range(k + 1):
+        binomial = Fraction(1)
+        for j in range(1, k - i + 1):
+            binomial *= Fraction(alpha + i + j) / j
+        coefficients.append((-1) ** i * binomial / math.factorial(i))
+    return coefficients
+
+
+def _derivative(poly):
+    return [d * c for d, c in enumerate(poly)][1:]
+
+
+def _poly_mul(a, b):
+    out = [Fraction(0)] * (len(a) + len(b) - 1)
+    for i, x in enumerate(a):
+        for j, y in enumerate(b):
+            out[i + j] += x * y
+    return out
+
+
+def _poly_divmod(numerator, divisor):
+    numerator = list(numerator)
+    quotient = [Fraction(0)] * (len(numerator) - len(divisor) + 1)
+    for shift in range(len(quotient) - 1, -1, -1):
+        factor = numerator[shift + len(divisor) - 1] / divisor[-1]
+        quotient[shift] = factor
+        for i, c in enumerate(divisor):
+            numerator[shift + i] -= factor * c
+    return quotient, numerator[:len(divisor) - 1]
+
+
+def _solve(matrix, rhs):
+    """Exact Gauss-Jordan elimination over the rationals."""
+    n = len(matrix)
+    a = [row[:] + [value] for row, value in zip(matrix, rhs)]
+    for col in range(n):
+        pivot = next(r for r in range(col, n) if a[r][col] != 0)
+        a[col], a[pivot] = a[pivot], a[col]
+        inverse = 1 / a[col][col]
+        a[col] = [v * inverse for v in a[col]]
+        for r in range(n):
+            if r != col and a[r][col] != 0:
+                factor = a[r][col]
+                a[r] = [v - factor * w for v, w in zip(a[r], a[col])]
+    return [row[-1] for row in a]
+
+
+def _largest_sign_change(poly):
+    candidates = [r.real for r in np.roots([float(a) for a in reversed(poly)]) if abs(r.imag) < 1e-7 and r.real > 0]
+    largest = None
+    for root in candidates:
+        lo, hi = Fraction(root) - Fraction(1, 10 ** 8), Fraction(root) + Fraction(1, 10 ** 8)
+        flo, fhi = _evaluate(poly, lo), _evaluate(poly, hi)
+        if flo == 0 or fhi == 0 or (flo > 0) == (fhi > 0):
+            continue
+        for _ in range(60):
+            mid = (lo + hi) / 2
+            if (_evaluate(poly, mid) > 0) == (flo > 0):
+                lo = mid
+            else:
+                hi = mid
+        largest = hi if largest is None else max(largest, hi)
+    return largest
+
+
+def laguerre_bound(zs, m=12, n=1):
+    """C4 upper bound from the Cohn-Goncalves construction with double roots at zs."""
+    z = sorted(Fraction(v) for v in zs)
+    if len(z) != m or len(set(z)) != m or any(v <= 0 for v in z):
+        return None
+    alpha = Fraction(n, 2) - 1
+    polys = [_laguerre(k, alpha) for k in range(0, 4 * m + 4, 2)]
+    if len(polys) < 2 * m + 2:
+        return None
+    derivatives = [_derivative(p) for p in polys]
+    rows = [[_evaluate(p, 0) for p in polys], [_evaluate(d, 0) for d in derivatives]]
+    for zi in z:
+        rows.append([_evaluate(p, zi) for p in polys])
+        rows.append([_evaluate(d, zi) for d in derivatives])
+    rhs = [Fraction(0)] * len(rows)
+    rhs[1] = Fraction(1)
+    weights = _solve(rows, rhs)
+    g = [Fraction(0)] * len(polys[-1])
+    for w, p in zip(weights, polys):
+        for d, c in enumerate(p):
+            g[d] += w * c
+    divisor = [Fraction(0), Fraction(1)]
+    for zi in z:
+        divisor = _poly_mul(divisor, _poly_mul([-zi, Fraction(1)], [-zi, Fraction(1)]))
+    quotient, remainder = _poly_divmod(g, divisor)
+    if any(r != 0 for r in remainder):
+        return None  # the double roots do not hold exactly
+    largest = _largest_sign_change(quotient)
+    return None if largest is None else float(largest) / (2 * math.pi)
+
+
+def b4_laguerre_problem(notebook_path):
+    import ast
+    for cell in json.loads(Path(notebook_path).read_bytes())["cells"]:
+        source = "".join(cell["source"])
+        match = re.search(r"zs\s*=\s*(\[[^\]]*\])", source)
+        if match and "Config with twelve roots" in source:
+            values = ast.literal_eval(match.group(1))
+            return dict(id="c4-uncertainty-laguerre", section="B.4", kind="analytic", direction="minimize",
+                        published_value=0.3216, published_decimals=4, proven_optimal=False, citation=CITATION,
+                        construction_variable="zs", construction=values,
+                        _check=lambda v, ns: laguerre_bound(v), _namespace={})
+    raise ValueError("B.4 Laguerre roots not found")
+
+
 # ------------------------------------------------------------- manifest and contamination
-PENDING = [
-    dict(id="c4-uncertainty-hermite", section="B.4", direction="minimize", published_value=0.3521, published_decimals=4,
-         reason="Hermite formulation needs exact real-root isolation of P/x^2; verifier not yet built"),
-    dict(id="c4-uncertainty-laguerre", section="B.4", direction="minimize", published_value=0.3216, published_decimals=4,
-         reason="Cohn-Goncalves Laguerre formulation needs an exact linear solve with double-root conditions"),
-]
+PENDING = []
 WINDOW = 8
 
 
@@ -494,4 +684,5 @@ def manifest(problems):
 def family(notebook_path, expected_sha256):
     cells, _ = data_cells(notebook_path, expected_sha256)
     tensors = tensor_problems(cells)
-    return tensors + derived_problems(tensors) + b_problems(cells)
+    return (tensors + derived_problems(tensors) + b_problems(cells) +
+            [b4_hermite_problem(notebook_path), b4_laguerre_problem(notebook_path)])
