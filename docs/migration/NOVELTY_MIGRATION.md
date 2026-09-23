@@ -6,7 +6,7 @@ The migration preserves token-set and bounded line-edit metrics, optional batche
 embeddings, optional model judging, explicit provider-failure policies, and a
 pre-evaluation fitness gate. Twenty-one original source/test Git blobs at
 `9cd7d5d6c366a483874024650d02901f69a1829c` are byte-verified in
-`aidotnet-novelty-original.zip`. The original license remains in Programs/Legacy.
+`aidotnet-novelty-original.zip`. The original license remains in `src/AiDotNet.Evolution.Programs/AIDOTNET-LICENSE.txt`.
 
 ## Caller-owned contracts
 

@@ -20,7 +20,7 @@ The original BSL license remains in the Programs package.
 | Six `ProgramDiff*` implementation/result files, options and failure enum | Programs SEARCH/REPLACE parsing, routing, application and diagnostics |
 | Three fenced-code files and selection enum | Programs display extraction and public exact executable-source extraction |
 | `ProgramLanguageDetector` | Programs deterministic detection, filename and fence-label mappings |
-| Five original test files | CSharp.Tests/Legacy, compiled against Evolution-owned types |
+| Five original test files | CSharp.Tests/ProgramTypes, compiled against Evolution-owned types |
 | `ProgramEvolutionOptions` task/edit subset | New `ProgramTaskOptions`; complete old facade options preserved in the archive, **not claimed migrated** |
 
 Existing newer genome, correctness, measurement, compiler and deployment implementations

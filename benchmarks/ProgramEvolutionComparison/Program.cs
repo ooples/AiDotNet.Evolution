@@ -1,5 +1,5 @@
 // Migrated from ooples/AiDotNet 9343d45907342eabd1f24cffa4724e7817855bf4:benchmarks/EvolutionComparison/Program.cs
-// Original license retained in src/AiDotNet.Evolution.Programs/Legacy/AIDOTNET-LICENSE.txt.
+// Original license retained in src/AiDotNet.Evolution.Programs/AIDOTNET-LICENSE.txt.
 using System.Net.Http.Headers;
 using System.Security.Cryptography;
 using System.Text;

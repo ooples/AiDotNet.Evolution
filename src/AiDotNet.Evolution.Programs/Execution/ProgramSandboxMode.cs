@@ -1,5 +1,5 @@
 // Migrated from ooples/AiDotNet 9cd7d5d6c366a483874024650d02901f69a1829c:src/Enums/ProgramSandboxMode.cs
-// Original license retained in ../Legacy/AIDOTNET-LICENSE.txt.
+// Original license retained in src/AiDotNet.Evolution.Programs/AIDOTNET-LICENSE.txt.
 namespace AiDotNet.Evolution.Programs;
 
 /// <summary>Requested execution boundary. The process runner implements only OutOfProcessWorker.</summary>

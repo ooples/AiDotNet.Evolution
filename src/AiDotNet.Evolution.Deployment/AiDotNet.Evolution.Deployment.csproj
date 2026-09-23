@@ -15,6 +15,6 @@
     <ProjectReference Include="../AiDotNet.Evolution.Programs/AiDotNet.Evolution.Programs.csproj" />
     <PackageReference Include="AiDotNet" Version="0.231.0" Aliases="AiDotNetConsumer" />
     <InternalsVisibleTo Include="AiDotNetTests" />
-    <None Include="../AiDotNet.Evolution.Programs/Legacy/AIDOTNET-LICENSE.txt" Pack="true" PackagePath="AIDOTNET-LICENSE.txt" />
+    <None Include="../AiDotNet.Evolution.Programs/AIDOTNET-LICENSE.txt" Pack="true" PackagePath="AIDOTNET-LICENSE.txt" />
   </ItemGroup>
 </Project>
