@@ -33,13 +33,28 @@ public static class EvolutionHash
     public static string Compute(string value)
     {
         if (value is null) throw new ArgumentNullException(nameof(value));
-        using (SHA256 sha = SHA256.Create())
+        byte[] bytes = Encoding.UTF8.GetBytes(value);
+#if NET5_0_OR_GREATER
+        // One-shot: no per-call algorithm object or native handle (hashing is on every identity path).
+        byte[] hash = SHA256.HashData(bytes);
+#else
+        byte[] hash;
+        using (SHA256 sha = SHA256.Create()) hash = sha.ComputeHash(bytes);
+#endif
+        return ToLowerHex(hash);
+    }
+
+    // Same lowercase digits as ToString("x2") per byte, written into one buffer instead of 32 strings.
+    private static string ToLowerHex(byte[] hash)
+    {
+        const string digits = "0123456789abcdef";
+        var chars = new char[hash.Length * 2];
+        for (int i = 0; i < hash.Length; i++)
         {
-            byte[] hash = sha.ComputeHash(Encoding.UTF8.GetBytes(value));
-            var result = new StringBuilder(hash.Length * 2);
-            foreach (byte item in hash) result.Append(item.ToString("x2", System.Globalization.CultureInfo.InvariantCulture));
-            return result.ToString();
+            chars[2 * i] = digits[hash[i] >> 4];
+            chars[(2 * i) + 1] = digits[hash[i] & 0xF];
         }
+        return new string(chars);
     }
 
     /// <summary>Computes an unambiguous hash of an ordered sequence of string components.</summary>

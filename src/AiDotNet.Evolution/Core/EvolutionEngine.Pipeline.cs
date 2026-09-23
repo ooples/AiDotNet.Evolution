@@ -18,6 +18,7 @@ public sealed partial class EvolutionEngine<TGenome>
 
     private async Task<EvolutionStopReason> RunPipelineLoopAsync(TGenome[] seeds, int seedIndex, Stopwatch runTimer, CancellationToken cancellationToken)
     {
+        Volatile.Write(ref _pipelineInlineProposals, true); // each run re-learns its source
         EvolutionPipelineOptions settings = _options.Pipeline;
         if (SupportsConcurrentPipelineProposals() != _pipelineConcurrentProposals)
             throw new InvalidOperationException("The configured proposal concurrency capability changed after engine construction.");
@@ -173,15 +174,32 @@ public sealed partial class EvolutionEngine<TGenome>
         try { await slots.WaitAsync(cancellationToken).ConfigureAwait(false); }
         catch { _pipelineStatistics.CancelQueued(0); throw; }
         _pipelineStatistics.Claim(0);
-        Stopwatch? timer = null;
+        long started = 0;
         try
         {
             await rate.WaitAsync(cancellationToken).ConfigureAwait(false);
-            _pipelineStatistics.Started(0); timer = Stopwatch.StartNew();
+            _pipelineStatistics.Started(0); started = Stopwatch.GetTimestamp();
+            if (Volatile.Read(ref _pipelineInlineProposals))
+            {
+                // A source that returns promptly (completed, or genuinely asynchronous) needs no thread hop;
+                // the hop was the ZeroLatency pipeline's fixed per-proposal cost. The first call that blocks
+                // past the budget before returning switches this run to offloading, so a synchronously
+                // blocking source can hold the loop at most once.
+                Task<VariationResponse> inline = InvokeVariationAsync(request, cancellationToken);
+                if (Stopwatch.GetTimestamp() - started > InlineProposalBudgetTicks) Volatile.Write(ref _pipelineInlineProposals, false);
+                return await inline.ConfigureAwait(false);
+            }
             return await Task.Run(() => InvokeVariationAsync(request, cancellationToken), CancellationToken.None).ConfigureAwait(false);
         }
-        finally { _pipelineStatistics.Released(0, timer?.Elapsed.TotalSeconds ?? 0); slots.Release(); }
+        finally
+        {
+            double seconds = started == 0 ? 0 : (Stopwatch.GetTimestamp() - started) / (double)Stopwatch.Frequency;
+            _pipelineStatistics.Released(0, seconds); slots.Release();
+        }
     }
+
+    private static readonly long InlineProposalBudgetTicks = Stopwatch.Frequency / 10_000; // 100 microseconds
+    private bool _pipelineInlineProposals = true;
 
     private List<PipelineProposal> PlanPipelineWave(TGenome[] seeds, ref int seedIndex, int limit,
         Dictionary<int, PipelineArchiveContext> snapshots)

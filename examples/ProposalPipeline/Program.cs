@@ -29,6 +29,23 @@ if (args.Length == 1 && args[0] == "--verify-replay")
     return 0;
 }
 
+if (args.Length == 3 && args[0] == "--profile")
+{
+    // Repeats the exact ZeroLatency workload in one process so a profiler sees a steady window.
+    string method = args[1];
+    int count = int.Parse(args[2], System.Globalization.CultureInfo.InvariantCulture);
+    for (int warm = 0; warm < 20; warm++) await Run("Sphere", "ZeroLatency", method, (ulong)warm, 0, null);
+    using var allocations = Environment.GetEnvironmentVariable("EVOLUTION_ALLOCATION_TYPES") == "1" ? new AllocationListener() : null;
+    long allocated = GC.GetTotalAllocatedBytes(precise: true);
+    var clock = Stopwatch.StartNew();
+    for (int run = 0; run < count; run++)
+        if (!(await Run("Sphere", "ZeroLatency", method, (ulong)(run % 16), 0, null)).Valid) throw new InvalidOperationException("Profile run failed.");
+    clock.Stop();
+    Console.WriteLine(JsonSerializer.Serialize(new { Method = method, Runs = count, MeanMilliseconds = clock.Elapsed.TotalMilliseconds / count,
+        MeanAllocatedBytes = (GC.GetTotalAllocatedBytes(precise: true) - allocated) / count }));
+    allocations?.Print(count);
+    return 0;
+}
 int seeds = 1, repetitions = 1;
 if (args.Length > 3 || (args.Length > 0 && !int.TryParse(args[0], out seeds)) || seeds is < 1 or > 16 ||
     (args.Length > 1 && !int.TryParse(args[1], out repetitions)) || repetitions is < 1 or > 5)
@@ -198,3 +215,31 @@ static async Task<Execution> Run(string family, string profile, string method, u
 
 internal sealed record ResponseTape(ProposalResponse[] Proposals, EvaluationResponse[] Evaluations);
 internal sealed record Execution(object Evidence, string? StateHash, string LogicalEvidence, FixtureProposalSource Source, FixtureTask Task, bool Valid);
+
+/// <summary>Allocation sampling by type from the runtime's GC AllocationTick events (about every 100 KB).</summary>
+internal sealed class AllocationListener : System.Diagnostics.Tracing.EventListener
+{
+    private readonly Dictionary<string, long> _bytes = new();
+
+    protected override void OnEventSourceCreated(System.Diagnostics.Tracing.EventSource source)
+    {
+        if (source.Name == "Microsoft-Windows-DotNETRuntime")
+            EnableEvents(source, System.Diagnostics.Tracing.EventLevel.Verbose, (System.Diagnostics.Tracing.EventKeywords)0x1);
+    }
+
+    protected override void OnEventWritten(System.Diagnostics.Tracing.EventWrittenEventArgs data)
+    {
+        if (data.EventName is null || !data.EventName.StartsWith("GCAllocationTick", StringComparison.Ordinal) || data.Payload is null) return;
+        int type = data.PayloadNames!.IndexOf("TypeName"), amount = data.PayloadNames.IndexOf("AllocationAmount64");
+        if (type < 0 || amount < 0) return;
+        string name = data.Payload[type] as string ?? "?";
+        lock (_bytes) _bytes[name] = _bytes.GetValueOrDefault(name) + Convert.ToInt64(data.Payload[amount], System.Globalization.CultureInfo.InvariantCulture);
+    }
+
+    public void Print(int runs)
+    {
+        lock (_bytes)
+            foreach (var entry in _bytes.OrderByDescending(pair => pair.Value).Take(25))
+                Console.WriteLine($"{entry.Value / runs,10} B per run  {entry.Key}");
+    }
+}
