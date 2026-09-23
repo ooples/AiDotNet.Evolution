@@ -50,5 +50,47 @@ class TensorTests(unittest.TestCase):
         self.assertIs(np, am._safe_import("numpy"))
 
 
+class AnalyticTests(unittest.TestCase):
+    def setUp(self):
+        self.problems = {p["id"]: p for p in am.b_problems(published())}
+
+    def test_every_published_b_construction_reproduces_its_published_value(self):
+        self.assertEqual(16, len(self.problems))
+        self.assertEqual([], [r for r in am.self_test(self.problems.values()) if not r["matches"]])
+
+    def test_constraint_violations_are_rejected_not_scored(self):
+        p = self.problems
+        h1 = np.array(p["c1-autocorrelation"]["construction"], dtype=float)
+        negative = h1.copy(); negative[3] = -0.5
+        self.assertIsNone(am.verify(p["c1-autocorrelation"], negative))
+        erdos = np.array(p["c5-erdos-overlap"]["construction"], dtype=float)
+        over = erdos.copy(); over[0] = 1.5
+        shifted = erdos.copy(); shifted[0] = min(1.0, shifted[0] + 0.01)
+        self.assertIsNone(am.verify(p["c5-erdos-overlap"], over))
+        if shifted[0] != erdos[0]:
+            self.assertIsNone(am.verify(p["c5-erdos-overlap"], shifted), "sum must stay exactly n/2")
+        u = np.array(p["c6-sums-differences-2003"]["construction"])
+        self.assertIsNone(am.verify(p["c6-sums-differences-2003"], u + 1), "U must contain 0")
+        self.assertIsNone(am.verify(p["c6-sums-differences-2003"], np.append(u, u[5])), "U is a set")
+        self.assertIsNone(am.verify(p["c6-sums-differences-2003"], u.astype(float)), "integers only")
+        circles = np.array(p["circles-square-26"]["construction"], dtype=float)
+        grown = circles.copy(); grown[0, 2] *= 1.05
+        outside = circles.copy(); outside[1, 0] = 1.0
+        self.assertIsNone(am.verify(p["circles-square-26"], grown), "overlap or overflow")
+        self.assertIsNone(am.verify(p["circles-square-26"], outside))
+        rectangle = np.array(p["circles-rectangle-21"]["construction"], dtype=float)
+        stretched = rectangle.copy(); stretched[0, 0] += 0.2
+        self.assertIsNone(am.verify(p["circles-rectangle-21"], stretched), "perimeter or overlap")
+        triangle = np.array(p["heilbronn-triangle-11"]["construction"], dtype=float)
+        escaped = triangle.copy(); escaped[0] = [10.0, 10.0]
+        self.assertIsNone(am.verify(p["heilbronn-triangle-11"], escaped), "points stay inside the triangle")
+        ratio = np.array(p["maxmin-ratio-2d-16"]["construction"], dtype=float)
+        collapsed = ratio.copy(); collapsed[1] = collapsed[0]
+        self.assertIsNone(am.verify(p["maxmin-ratio-2d-16"], collapsed))
+        centers = np.array(p["kissing-11"]["construction"])
+        close = centers.copy(); close[1] = close[0] // 2 + close[1] // 2
+        self.assertIsNone(am.verify(p["kissing-11"], close), "a too-close pair breaks the kissing lemma")
+        self.assertIsNone(am.verify(p["kissing-11"], centers[:, :10]), "dimension is part of the problem")
+
 if __name__ == "__main__":
     unittest.main()
