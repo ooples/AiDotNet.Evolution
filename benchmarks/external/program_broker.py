@@ -120,6 +120,14 @@ class ProgramBroker:
             def log_message(self, *args):
                 pass
 
+            def handle(self):
+                # A keep-alive peer that exits resets its idle connection; that is the end of
+                # the connection, not a failure (any request it made is already a row).
+                try:
+                    super().handle()
+                except (ConnectionResetError, ConnectionAbortedError, BrokenPipeError):
+                    self.close_connection = True
+
             def do_POST(self):
                 if not secrets.compare_digest(self.headers.get("Authorization", ""), "Bearer " + broker.capability):
                     self.send_error(403)

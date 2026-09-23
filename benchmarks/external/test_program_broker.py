@@ -113,5 +113,27 @@ class ChatShimTests(unittest.TestCase):
             self.assertEqual((2, 1, 5), (broker.chat_received, sum(r["operation"] == "model" for r in broker.rows),
                                          broker.model_tokens))
 
+class KeepAliveTests(unittest.TestCase):
+    def test_a_keep_alive_client_that_exits_is_a_close_not_a_server_error(self):
+        import subprocess
+        import sys
+        initial = "def solve(x):\n    return x\n"
+        child = ("import http.client, json, os, sys\n"
+                 "c = http.client.HTTPConnection('127.0.0.1', int(sys.argv[1]))\n"
+                 "c.request('POST', '/evaluate', json.dumps({'code': sys.argv[3]}).encode(), {'Authorization': 'Bearer ' + sys.argv[2]})\n"
+                 "c.getresponse().read()\n"
+                 "os._exit(0)\n")
+        evaluate = lambda code: dict(candidate_hash=candidate_hash(code), status="valid", quality=1.0,
+                                     work_units=0, unknown_work=False)
+        with ProgramBroker(Mock(), evaluate, model_calls=1, evaluations=2, seconds=30, initial=initial) as broker:
+            errors = Mock()
+            broker.server.handle_error = errors
+            subprocess.run([sys.executable, "-c", child, broker.endpoint.rsplit(":", 1)[1], broker.capability, initial],
+                           check=True, timeout=30)
+            import time
+            time.sleep(0.5)
+            errors.assert_not_called()
+            self.assertEqual(["completed"], [row["status"] for row in broker.rows])
+
 if __name__ == "__main__":
     unittest.main()
