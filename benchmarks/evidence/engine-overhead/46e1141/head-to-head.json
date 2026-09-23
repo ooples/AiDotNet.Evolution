@@ -1,0 +1,2235 @@
+{
+ "story": "V1-30 #120",
+ "repeats": 9,
+ "sizes": {
+  "aidotnet": 2000,
+  "openevolve": 100
+ },
+ "method": "(T(2N)-T(N))/N, fresh processes, null LLM and evaluator",
+ "headline": false,
+ "note": "A C# controller vs a Python one is expected to favour us (R12); not a headline claim.",
+ "summary": [
+  {
+   "workers": 1,
+   "aidotnet_us_per_eval": 185.76095,
+   "openevolve_us_per_eval": 17953.590000106487,
+   "ratio_ours_over_theirs": 0.010346730096816192,
+   "ratio_ci95": [
+    -0.06821766117644501,
+    0.06391667213814138
+   ],
+   "aidotnet_peak_mb": 49.32421875,
+   "openevolve_peak_mb": 150.3984375
+  },
+  {
+   "workers": 2,
+   "aidotnet_us_per_eval": 196.08865000000003,
+   "openevolve_us_per_eval": 9582.886999996845,
+   "ratio_ours_over_theirs": 0.020462377360816693,
+   "ratio_ci95": [
+    0.01570571000213713,
+    0.03153350992164874
+   ],
+   "aidotnet_peak_mb": 49.16796875,
+   "openevolve_peak_mb": 222.40625
+  },
+  {
+   "workers": 4,
+   "aidotnet_us_per_eval": 184.7309,
+   "openevolve_us_per_eval": 5164.9880000331905,
+   "ratio_ours_over_theirs": 0.03576598822665472,
+   "ratio_ci95": [
+    -0.068699957358336,
+    0.09075990724020731
+   ],
+   "aidotnet_peak_mb": 48.37890625,
+   "openevolve_peak_mb": 366.59765625
+  },
+  {
+   "workers": 8,
+   "aidotnet_us_per_eval": 173.60025,
+   "openevolve_us_per_eval": 5508.38000010117,
+   "ratio_ours_over_theirs": 0.03151566340681136,
+   "ratio_ci95": [
+    0.017857159697195545,
+    0.08457887328049565
+   ],
+   "aidotnet_peak_mb": 48.36328125,
+   "openevolve_peak_mb": 654.58203125
+  },
+  {
+   "workers": 16,
+   "aidotnet_us_per_eval": 164.39105,
+   "openevolve_us_per_eval": 4614.970000111498,
+   "ratio_ours_over_theirs": 0.035621260809068814,
+   "ratio_ci95": [
+    0.013826824712052507,
+    0.08725344392487189
+   ],
+   "aidotnet_peak_mb": 47.7734375,
+   "openevolve_peak_mb": 1184.4140625
+  }
+ ],
+ "rows": [
+  {
+   "system": "aidotnet",
+   "workers": 1,
+   "repeat": 0,
+   "n": 2000,
+   "small": {
+    "System": "aidotnet",
+    "Evaluations": 2000,
+    "Workers": 1,
+    "Islands": 1,
+    "Seconds": 0.5032902,
+    "PeakWorkingSetBytes": 45146112,
+    "AllocatedBytes": 183509536
+   },
+   "large": {
+    "System": "aidotnet",
+    "Evaluations": 4000,
+    "Workers": 1,
+    "Islands": 1,
+    "Seconds": 1.3880616,
+    "PeakWorkingSetBytes": 50745344,
+    "AllocatedBytes": 366460008
+   },
+   "per_eval_seconds": 0.0004423856999999999
+  },
+  {
+   "system": "openevolve",
+   "workers": 1,
+   "repeat": 0,
+   "n": 100,
+   "small": {
+    "System": "openevolve",
+    "Evaluations": 100,
+    "Workers": 1,
+    "Islands": 1,
+    "Seconds": 5.247247299994342,
+    "PeakWorkingSetBytes": 156069888
+   },
+   "large": {
+    "System": "openevolve",
+    "Evaluations": 200,
+    "Workers": 1,
+    "Islands": 1,
+    "Seconds": 5.556416399995214,
+    "PeakWorkingSetBytes": 158060544
+   },
+   "per_eval_seconds": 0.0030916910000087228
+  },
+  {
+   "system": "aidotnet",
+   "workers": 1,
+   "repeat": 1,
+   "n": 2000,
+   "small": {
+    "System": "aidotnet",
+    "Evaluations": 2000,
+    "Workers": 1,
+    "Islands": 1,
+    "Seconds": 0.9029656,
+    "PeakWorkingSetBytes": 45416448,
+    "AllocatedBytes": 183509496
+   },
+   "large": {
+    "System": "aidotnet",
+    "Evaluations": 4000,
+    "Workers": 1,
+    "Islands": 1,
+    "Seconds": 0.9186303,
+    "PeakWorkingSetBytes": 51552256,
+    "AllocatedBytes": 366461312
+   },
+   "per_eval_seconds": 7.832349999999988e-06
+  },
+  {
+   "system": "openevolve",
+   "workers": 1,
+   "repeat": 1,
+   "n": 100,
+   "small": {
+    "System": "openevolve",
+    "Evaluations": 100,
+    "Workers": 1,
+    "Islands": 1,
+    "Seconds": 4.480229099994176,
+    "PeakWorkingSetBytes": 155762688
+   },
+   "large": {
+    "System": "openevolve",
+    "Evaluations": 200,
+    "Workers": 1,
+    "Islands": 1,
+    "Seconds": 7.583427700010361,
+    "PeakWorkingSetBytes": 157609984
+   },
+   "per_eval_seconds": 0.03103198600016185
+  },
+  {
+   "system": "aidotnet",
+   "workers": 1,
+   "repeat": 2,
+   "n": 2000,
+   "small": {
+    "System": "aidotnet",
+    "Evaluations": 2000,
+    "Workers": 1,
+    "Islands": 1,
+    "Seconds": 0.475169,
+    "PeakWorkingSetBytes": 45117440,
+    "AllocatedBytes": 183509536
+   },
+   "large": {
+    "System": "aidotnet",
+    "Evaluations": 4000,
+    "Workers": 1,
+    "Islands": 1,
+    "Seconds": 0.8466909,
+    "PeakWorkingSetBytes": 51531776,
+    "AllocatedBytes": 366461152
+   },
+   "per_eval_seconds": 0.00018576095
+  },
+  {
+   "system": "openevolve",
+   "workers": 1,
+   "repeat": 2,
+   "n": 100,
+   "small": {
+    "System": "openevolve",
+    "Evaluations": 100,
+    "Workers": 1,
+    "Islands": 1,
+    "Seconds": 4.0178530999983195,
+    "PeakWorkingSetBytes": 156463104
+   },
+   "large": {
+    "System": "openevolve",
+    "Evaluations": 200,
+    "Workers": 1,
+    "Islands": 1,
+    "Seconds": 5.849717100005364,
+    "PeakWorkingSetBytes": 157351936
+   },
+   "per_eval_seconds": 0.018318640000070444
+  },
+  {
+   "system": "aidotnet",
+   "workers": 1,
+   "repeat": 3,
+   "n": 2000,
+   "small": {
+    "System": "aidotnet",
+    "Evaluations": 2000,
+    "Workers": 1,
+    "Islands": 1,
+    "Seconds": 0.458063,
+    "PeakWorkingSetBytes": 44224512,
+    "AllocatedBytes": 183497200
+   },
+   "large": {
+    "System": "aidotnet",
+    "Evaluations": 4000,
+    "Workers": 1,
+    "Islands": 1,
+    "Seconds": 0.9664114,
+    "PeakWorkingSetBytes": 51720192,
+    "AllocatedBytes": 366460344
+   },
+   "per_eval_seconds": 0.00025417420000000004
+  },
+  {
+   "system": "openevolve",
+   "workers": 1,
+   "repeat": 3,
+   "n": 100,
+   "small": {
+    "System": "openevolve",
+    "Evaluations": 100,
+    "Workers": 1,
+    "Islands": 1,
+    "Seconds": 3.8014734000025783,
+    "PeakWorkingSetBytes": 156205056
+   },
+   "large": {
+    "System": "openevolve",
+    "Evaluations": 200,
+    "Workers": 1,
+    "Islands": 1,
+    "Seconds": 5.308931100007612,
+    "PeakWorkingSetBytes": 157704192
+   },
+   "per_eval_seconds": 0.01507457700005034
+  },
+  {
+   "system": "aidotnet",
+   "workers": 1,
+   "repeat": 4,
+   "n": 2000,
+   "small": {
+    "System": "aidotnet",
+    "Evaluations": 2000,
+    "Workers": 1,
+    "Islands": 1,
+    "Seconds": 0.5741197,
+    "PeakWorkingSetBytes": 45215744,
+    "AllocatedBytes": 183510680
+   },
+   "large": {
+    "System": "aidotnet",
+    "Evaluations": 4000,
+    "Workers": 1,
+    "Islands": 1,
+    "Seconds": 0.872201,
+    "PeakWorkingSetBytes": 51728384,
+    "AllocatedBytes": 366460344
+   },
+   "per_eval_seconds": 0.00014904065
+  },
+  {
+   "system": "openevolve",
+   "workers": 1,
+   "repeat": 4,
+   "n": 100,
+   "small": {
+    "System": "openevolve",
+    "Evaluations": 100,
+    "Workers": 1,
+    "Islands": 1,
+    "Seconds": 5.361791099989205,
+    "PeakWorkingSetBytes": 154865664
+   },
+   "large": {
+    "System": "openevolve",
+    "Evaluations": 200,
+    "Workers": 1,
+    "Islands": 1,
+    "Seconds": 5.1433129999932135,
+    "PeakWorkingSetBytes": 157872128
+   },
+   "per_eval_seconds": -0.002184780999959912
+  },
+  {
+   "system": "aidotnet",
+   "workers": 1,
+   "repeat": 5,
+   "n": 2000,
+   "small": {
+    "System": "aidotnet",
+    "Evaluations": 2000,
+    "Workers": 1,
+    "Islands": 1,
+    "Seconds": 0.4130186,
+    "PeakWorkingSetBytes": 44310528,
+    "AllocatedBytes": 183507984
+   },
+   "large": {
+    "System": "aidotnet",
+    "Evaluations": 4000,
+    "Workers": 1,
+    "Islands": 1,
+    "Seconds": 0.7655794,
+    "PeakWorkingSetBytes": 52047872,
+    "AllocatedBytes": 366453576
+   },
+   "per_eval_seconds": 0.00017628040000000001
+  },
+  {
+   "system": "openevolve",
+   "workers": 1,
+   "repeat": 5,
+   "n": 100,
+   "small": {
+    "System": "openevolve",
+    "Evaluations": 100,
+    "Workers": 1,
+    "Islands": 1,
+    "Seconds": 4.030490799996187,
+    "PeakWorkingSetBytes": 156487680
+   },
+   "large": {
+    "System": "openevolve",
+    "Evaluations": 200,
+    "Workers": 1,
+    "Islands": 1,
+    "Seconds": 6.087303299995256,
+    "PeakWorkingSetBytes": 157716480
+   },
+   "per_eval_seconds": 0.020568124999990688
+  },
+  {
+   "system": "aidotnet",
+   "workers": 1,
+   "repeat": 6,
+   "n": 2000,
+   "small": {
+    "System": "aidotnet",
+    "Evaluations": 2000,
+    "Workers": 1,
+    "Islands": 1,
+    "Seconds": 0.4894147,
+    "PeakWorkingSetBytes": 44998656,
+    "AllocatedBytes": 183509536
+   },
+   "large": {
+    "System": "aidotnet",
+    "Evaluations": 4000,
+    "Workers": 1,
+    "Islands": 1,
+    "Seconds": 0.8552437,
+    "PeakWorkingSetBytes": 51830784,
+    "AllocatedBytes": 366456096
+   },
+   "per_eval_seconds": 0.00018291450000000004
+  },
+  {
+   "system": "openevolve",
+   "workers": 1,
+   "repeat": 6,
+   "n": 100,
+   "small": {
+    "System": "openevolve",
+    "Evaluations": 100,
+    "Workers": 1,
+    "Islands": 1,
+    "Seconds": 3.4662988999916706,
+    "PeakWorkingSetBytes": 156573696
+   },
+   "large": {
+    "System": "openevolve",
+    "Evaluations": 200,
+    "Workers": 1,
+    "Islands": 1,
+    "Seconds": 5.261657900002319,
+    "PeakWorkingSetBytes": 157589504
+   },
+   "per_eval_seconds": 0.017953590000106486
+  },
+  {
+   "system": "aidotnet",
+   "workers": 1,
+   "repeat": 7,
+   "n": 2000,
+   "small": {
+    "System": "aidotnet",
+    "Evaluations": 2000,
+    "Workers": 1,
+    "Islands": 1,
+    "Seconds": 0.4331731,
+    "PeakWorkingSetBytes": 45043712,
+    "AllocatedBytes": 183509536
+   },
+   "large": {
+    "System": "aidotnet",
+    "Evaluations": 4000,
+    "Workers": 1,
+    "Islands": 1,
+    "Seconds": 0.8283943,
+    "PeakWorkingSetBytes": 51613696,
+    "AllocatedBytes": 366456096
+   },
+   "per_eval_seconds": 0.00019761060000000002
+  },
+  {
+   "system": "openevolve",
+   "workers": 1,
+   "repeat": 7,
+   "n": 100,
+   "small": {
+    "System": "openevolve",
+    "Evaluations": 100,
+    "Workers": 1,
+    "Islands": 1,
+    "Seconds": 9.590458899998339,
+    "PeakWorkingSetBytes": 156573696
+   },
+   "large": {
+    "System": "openevolve",
+    "Evaluations": 200,
+    "Workers": 1,
+    "Islands": 1,
+    "Seconds": 7.305528299999423,
+    "PeakWorkingSetBytes": 157970432
+   },
+   "per_eval_seconds": -0.022849305999989154
+  },
+  {
+   "system": "aidotnet",
+   "workers": 1,
+   "repeat": 8,
+   "n": 2000,
+   "small": {
+    "System": "aidotnet",
+    "Evaluations": 2000,
+    "Workers": 1,
+    "Islands": 1,
+    "Seconds": 0.4380697,
+    "PeakWorkingSetBytes": 45150208,
+    "AllocatedBytes": 183510456
+   },
+   "large": {
+    "System": "aidotnet",
+    "Evaluations": 4000,
+    "Workers": 1,
+    "Islands": 1,
+    "Seconds": 0.8259233,
+    "PeakWorkingSetBytes": 51953664,
+    "AllocatedBytes": 366456096
+   },
+   "per_eval_seconds": 0.0001939268
+  },
+  {
+   "system": "openevolve",
+   "workers": 1,
+   "repeat": 8,
+   "n": 100,
+   "small": {
+    "System": "openevolve",
+    "Evaluations": 100,
+    "Workers": 1,
+    "Islands": 1,
+    "Seconds": 3.7927846999955364,
+    "PeakWorkingSetBytes": 156413952
+   },
+   "large": {
+    "System": "openevolve",
+    "Evaluations": 200,
+    "Workers": 1,
+    "Islands": 1,
+    "Seconds": 6.0690664000139805,
+    "PeakWorkingSetBytes": 156360704
+   },
+   "per_eval_seconds": 0.02276281700018444
+  },
+  {
+   "system": "aidotnet",
+   "workers": 2,
+   "repeat": 0,
+   "n": 2000,
+   "small": {
+    "System": "aidotnet",
+    "Evaluations": 2000,
+    "Workers": 2,
+    "Islands": 1,
+    "Seconds": 0.4346199,
+    "PeakWorkingSetBytes": 45494272,
+    "AllocatedBytes": 183509560
+   },
+   "large": {
+    "System": "aidotnet",
+    "Evaluations": 4000,
+    "Workers": 2,
+    "Islands": 1,
+    "Seconds": 0.8270808,
+    "PeakWorkingSetBytes": 51793920,
+    "AllocatedBytes": 366447672
+   },
+   "per_eval_seconds": 0.00019623044999999997
+  },
+  {
+   "system": "openevolve",
+   "workers": 2,
+   "repeat": 0,
+   "n": 100,
+   "small": {
+    "System": "openevolve",
+    "Evaluations": 100,
+    "Workers": 2,
+    "Islands": 1,
+    "Seconds": 3.611600999996881,
+    "PeakWorkingSetBytes": 232026112
+   },
+   "large": {
+    "System": "openevolve",
+    "Evaluations": 200,
+    "Workers": 2,
+    "Islands": 1,
+    "Seconds": 4.449562599998899,
+    "PeakWorkingSetBytes": 233160704
+   },
+   "per_eval_seconds": 0.008379616000020178
+  },
+  {
+   "system": "aidotnet",
+   "workers": 2,
+   "repeat": 1,
+   "n": 2000,
+   "small": {
+    "System": "aidotnet",
+    "Evaluations": 2000,
+    "Workers": 2,
+    "Islands": 1,
+    "Seconds": 0.5092073,
+    "PeakWorkingSetBytes": 44998656,
+    "AllocatedBytes": 183509536
+   },
+   "large": {
+    "System": "aidotnet",
+    "Evaluations": 4000,
+    "Workers": 2,
+    "Islands": 1,
+    "Seconds": 0.9204241,
+    "PeakWorkingSetBytes": 51916800,
+    "AllocatedBytes": 366460344
+   },
+   "per_eval_seconds": 0.00020560839999999997
+  },
+  {
+   "system": "openevolve",
+   "workers": 2,
+   "repeat": 1,
+   "n": 100,
+   "small": {
+    "System": "openevolve",
+    "Evaluations": 100,
+    "Workers": 2,
+    "Islands": 1,
+    "Seconds": 3.038515699998243,
+    "PeakWorkingSetBytes": 231591936
+   },
+   "large": {
+    "System": "openevolve",
+    "Evaluations": 200,
+    "Workers": 2,
+    "Islands": 1,
+    "Seconds": 4.110603399996762,
+    "PeakWorkingSetBytes": 233594880
+   },
+   "per_eval_seconds": 0.010720876999985194
+  },
+  {
+   "system": "aidotnet",
+   "workers": 2,
+   "repeat": 2,
+   "n": 2000,
+   "small": {
+    "System": "aidotnet",
+    "Evaluations": 2000,
+    "Workers": 2,
+    "Islands": 1,
+    "Seconds": 0.491252,
+    "PeakWorkingSetBytes": 45142016,
+    "AllocatedBytes": 183509536
+   },
+   "large": {
+    "System": "aidotnet",
+    "Evaluations": 4000,
+    "Workers": 2,
+    "Islands": 1,
+    "Seconds": 0.7964185,
+    "PeakWorkingSetBytes": 51556352,
+    "AllocatedBytes": 366461312
+   },
+   "per_eval_seconds": 0.00015258325
+  },
+  {
+   "system": "openevolve",
+   "workers": 2,
+   "repeat": 2,
+   "n": 100,
+   "small": {
+    "System": "openevolve",
+    "Evaluations": 100,
+    "Workers": 2,
+    "Islands": 1,
+    "Seconds": 3.0869936999952188,
+    "PeakWorkingSetBytes": 231419904
+   },
+   "large": {
+    "System": "openevolve",
+    "Evaluations": 200,
+    "Workers": 2,
+    "Islands": 1,
+    "Seconds": 4.007022100005997,
+    "PeakWorkingSetBytes": 233021440
+   },
+   "per_eval_seconds": 0.009200284000107785
+  },
+  {
+   "system": "aidotnet",
+   "workers": 2,
+   "repeat": 3,
+   "n": 2000,
+   "small": {
+    "System": "aidotnet",
+    "Evaluations": 2000,
+    "Workers": 2,
+    "Islands": 1,
+    "Seconds": 0.431669,
+    "PeakWorkingSetBytes": 45195264,
+    "AllocatedBytes": 183511392
+   },
+   "large": {
+    "System": "aidotnet",
+    "Evaluations": 4000,
+    "Workers": 2,
+    "Islands": 1,
+    "Seconds": 0.7114351,
+    "PeakWorkingSetBytes": 49319936,
+    "AllocatedBytes": 366457216
+   },
+   "per_eval_seconds": 0.00013988304999999998
+  },
+  {
+   "system": "openevolve",
+   "workers": 2,
+   "repeat": 3,
+   "n": 100,
+   "small": {
+    "System": "openevolve",
+    "Evaluations": 100,
+    "Workers": 2,
+    "Islands": 1,
+    "Seconds": 2.8779509000014514,
+    "PeakWorkingSetBytes": 231342080
+   },
+   "large": {
+    "System": "openevolve",
+    "Evaluations": 200,
+    "Workers": 2,
+    "Islands": 1,
+    "Seconds": 4.11715930000355,
+    "PeakWorkingSetBytes": 233431040
+   },
+   "per_eval_seconds": 0.012392084000020986
+  },
+  {
+   "system": "aidotnet",
+   "workers": 2,
+   "repeat": 4,
+   "n": 2000,
+   "small": {
+    "System": "aidotnet",
+    "Evaluations": 2000,
+    "Workers": 2,
+    "Islands": 1,
+    "Seconds": 0.3973769,
+    "PeakWorkingSetBytes": 45232128,
+    "AllocatedBytes": 183509536
+   },
+   "large": {
+    "System": "aidotnet",
+    "Evaluations": 4000,
+    "Workers": 2,
+    "Islands": 1,
+    "Seconds": 0.794129,
+    "PeakWorkingSetBytes": 51863552,
+    "AllocatedBytes": 366443760
+   },
+   "per_eval_seconds": 0.00019837605
+  },
+  {
+   "system": "openevolve",
+   "workers": 2,
+   "repeat": 4,
+   "n": 100,
+   "small": {
+    "System": "openevolve",
+    "Evaluations": 100,
+    "Workers": 2,
+    "Islands": 1,
+    "Seconds": 3.3230661999987205,
+    "PeakWorkingSetBytes": 231174144
+   },
+   "large": {
+    "System": "openevolve",
+    "Evaluations": 200,
+    "Workers": 2,
+    "Islands": 1,
+    "Seconds": 3.8031935000035446,
+    "PeakWorkingSetBytes": 232861696
+   },
+   "per_eval_seconds": 0.004801273000048241
+  },
+  {
+   "system": "aidotnet",
+   "workers": 2,
+   "repeat": 5,
+   "n": 2000,
+   "small": {
+    "System": "aidotnet",
+    "Evaluations": 2000,
+    "Workers": 2,
+    "Islands": 1,
+    "Seconds": 0.3863191,
+    "PeakWorkingSetBytes": 44867584,
+    "AllocatedBytes": 183509536
+   },
+   "large": {
+    "System": "aidotnet",
+    "Evaluations": 4000,
+    "Workers": 2,
+    "Islands": 1,
+    "Seconds": 0.727485,
+    "PeakWorkingSetBytes": 50589696,
+    "AllocatedBytes": 366444904
+   },
+   "per_eval_seconds": 0.00017058295
+  },
+  {
+   "system": "openevolve",
+   "workers": 2,
+   "repeat": 5,
+   "n": 100,
+   "small": {
+    "System": "openevolve",
+    "Evaluations": 100,
+    "Workers": 2,
+    "Islands": 1,
+    "Seconds": 3.31997529999353,
+    "PeakWorkingSetBytes": 231383040
+   },
+   "large": {
+    "System": "openevolve",
+    "Evaluations": 200,
+    "Workers": 2,
+    "Islands": 1,
+    "Seconds": 3.860932999989018,
+    "PeakWorkingSetBytes": 233500672
+   },
+   "per_eval_seconds": 0.0054095769999548795
+  },
+  {
+   "system": "aidotnet",
+   "workers": 2,
+   "repeat": 6,
+   "n": 2000,
+   "small": {
+    "System": "aidotnet",
+    "Evaluations": 2000,
+    "Workers": 2,
+    "Islands": 1,
+    "Seconds": 0.4064051,
+    "PeakWorkingSetBytes": 45023232,
+    "AllocatedBytes": 183511824
+   },
+   "large": {
+    "System": "aidotnet",
+    "Evaluations": 4000,
+    "Workers": 2,
+    "Islands": 1,
+    "Seconds": 0.8126982,
+    "PeakWorkingSetBytes": 50225152,
+    "AllocatedBytes": 366457240
+   },
+   "per_eval_seconds": 0.00020314655000000002
+  },
+  {
+   "system": "openevolve",
+   "workers": 2,
+   "repeat": 6,
+   "n": 100,
+   "small": {
+    "System": "openevolve",
+    "Evaluations": 100,
+    "Workers": 2,
+    "Islands": 1,
+    "Seconds": 3.079854899988277,
+    "PeakWorkingSetBytes": 231395328
+   },
+   "large": {
+    "System": "openevolve",
+    "Evaluations": 200,
+    "Workers": 2,
+    "Islands": 1,
+    "Seconds": 4.051369399996474,
+    "PeakWorkingSetBytes": 233152512
+   },
+   "per_eval_seconds": 0.009715145000081976
+  },
+  {
+   "system": "aidotnet",
+   "workers": 2,
+   "repeat": 7,
+   "n": 2000,
+   "small": {
+    "System": "aidotnet",
+    "Evaluations": 2000,
+    "Workers": 2,
+    "Islands": 1,
+    "Seconds": 0.3855396,
+    "PeakWorkingSetBytes": 44896256,
+    "AllocatedBytes": 183509536
+   },
+   "large": {
+    "System": "aidotnet",
+    "Evaluations": 4000,
+    "Workers": 2,
+    "Islands": 1,
+    "Seconds": 0.7777169,
+    "PeakWorkingSetBytes": 51167232,
+    "AllocatedBytes": 366456072
+   },
+   "per_eval_seconds": 0.00019608865000000003
+  },
+  {
+   "system": "openevolve",
+   "workers": 2,
+   "repeat": 7,
+   "n": 100,
+   "small": {
+    "System": "openevolve",
+    "Evaluations": 100,
+    "Workers": 2,
+    "Islands": 1,
+    "Seconds": 2.9925618000124814,
+    "PeakWorkingSetBytes": 231448576
+   },
+   "large": {
+    "System": "openevolve",
+    "Evaluations": 200,
+    "Workers": 2,
+    "Islands": 1,
+    "Seconds": 4.311106599998311,
+    "PeakWorkingSetBytes": 233209856
+   },
+   "per_eval_seconds": 0.013185447999858298
+  },
+  {
+   "system": "aidotnet",
+   "workers": 2,
+   "repeat": 8,
+   "n": 2000,
+   "small": {
+    "System": "aidotnet",
+    "Evaluations": 2000,
+    "Workers": 2,
+    "Islands": 1,
+    "Seconds": 0.4048875,
+    "PeakWorkingSetBytes": 45002752,
+    "AllocatedBytes": 183509536
+   },
+   "large": {
+    "System": "aidotnet",
+    "Evaluations": 4000,
+    "Workers": 2,
+    "Islands": 1,
+    "Seconds": 0.7113108,
+    "PeakWorkingSetBytes": 51830784,
+    "AllocatedBytes": 366456096
+   },
+   "per_eval_seconds": 0.00015321165
+  },
+  {
+   "system": "openevolve",
+   "workers": 2,
+   "repeat": 8,
+   "n": 100,
+   "small": {
+    "System": "openevolve",
+    "Evaluations": 100,
+    "Workers": 2,
+    "Islands": 1,
+    "Seconds": 3.008770500004175,
+    "PeakWorkingSetBytes": 231817216
+   },
+   "large": {
+    "System": "openevolve",
+    "Evaluations": 200,
+    "Workers": 2,
+    "Islands": 1,
+    "Seconds": 3.9670592000038596,
+    "PeakWorkingSetBytes": 233312256
+   },
+   "per_eval_seconds": 0.009582886999996845
+  },
+  {
+   "system": "aidotnet",
+   "workers": 4,
+   "repeat": 0,
+   "n": 2000,
+   "small": {
+    "System": "aidotnet",
+    "Evaluations": 2000,
+    "Workers": 4,
+    "Islands": 1,
+    "Seconds": 0.4150791,
+    "PeakWorkingSetBytes": 44990464,
+    "AllocatedBytes": 183511824
+   },
+   "large": {
+    "System": "aidotnet",
+    "Evaluations": 4000,
+    "Workers": 4,
+    "Islands": 1,
+    "Seconds": 0.7338201,
+    "PeakWorkingSetBytes": 49274880,
+    "AllocatedBytes": 366456096
+   },
+   "per_eval_seconds": 0.0001593705
+  },
+  {
+   "system": "openevolve",
+   "workers": 4,
+   "repeat": 0,
+   "n": 100,
+   "small": {
+    "System": "openevolve",
+    "Evaluations": 100,
+    "Workers": 4,
+    "Islands": 1,
+    "Seconds": 3.0904025999916485,
+    "PeakWorkingSetBytes": 382025728
+   },
+   "large": {
+    "System": "openevolve",
+    "Evaluations": 200,
+    "Workers": 4,
+    "Islands": 1,
+    "Seconds": 3.5337961000041105,
+    "PeakWorkingSetBytes": 385011712
+   },
+   "per_eval_seconds": 0.00443393500012462
+  },
+  {
+   "system": "aidotnet",
+   "workers": 4,
+   "repeat": 1,
+   "n": 2000,
+   "small": {
+    "System": "aidotnet",
+    "Evaluations": 2000,
+    "Workers": 4,
+    "Islands": 1,
+    "Seconds": 0.709508,
+    "PeakWorkingSetBytes": 45084672,
+    "AllocatedBytes": 183509536
+   },
+   "large": {
+    "System": "aidotnet",
+    "Evaluations": 4000,
+    "Workers": 4,
+    "Islands": 1,
+    "Seconds": 1.4015585,
+    "PeakWorkingSetBytes": 49864704,
+    "AllocatedBytes": 366459944
+   },
+   "per_eval_seconds": 0.00034602524999999994
+  },
+  {
+   "system": "openevolve",
+   "workers": 4,
+   "repeat": 1,
+   "n": 100,
+   "small": {
+    "System": "openevolve",
+    "Evaluations": 100,
+    "Workers": 4,
+    "Islands": 1,
+    "Seconds": 6.428113500005566,
+    "PeakWorkingSetBytes": 381353984
+   },
+   "large": {
+    "System": "openevolve",
+    "Evaluations": 200,
+    "Workers": 4,
+    "Islands": 1,
+    "Seconds": 7.536933299998054,
+    "PeakWorkingSetBytes": 384405504
+   },
+   "per_eval_seconds": 0.011088197999924887
+  },
+  {
+   "system": "aidotnet",
+   "workers": 4,
+   "repeat": 2,
+   "n": 2000,
+   "small": {
+    "System": "aidotnet",
+    "Evaluations": 2000,
+    "Workers": 4,
+    "Islands": 1,
+    "Seconds": 0.8533955,
+    "PeakWorkingSetBytes": 45064192,
+    "AllocatedBytes": 183509536
+   },
+   "large": {
+    "System": "aidotnet",
+    "Evaluations": 4000,
+    "Workers": 4,
+    "Islands": 1,
+    "Seconds": 0.8301941,
+    "PeakWorkingSetBytes": 54194176,
+    "AllocatedBytes": 366461488
+   },
+   "per_eval_seconds": -1.1600699999999963e-05
+  },
+  {
+   "system": "openevolve",
+   "workers": 4,
+   "repeat": 2,
+   "n": 100,
+   "small": {
+    "System": "openevolve",
+    "Evaluations": 100,
+    "Workers": 4,
+    "Islands": 1,
+    "Seconds": 4.608841500012204,
+    "PeakWorkingSetBytes": 381886464
+   },
+   "large": {
+    "System": "openevolve",
+    "Evaluations": 200,
+    "Workers": 4,
+    "Islands": 1,
+    "Seconds": 6.546692700008862,
+    "PeakWorkingSetBytes": 384417792
+   },
+   "per_eval_seconds": 0.019378511999966576
+  },
+  {
+   "system": "aidotnet",
+   "workers": 4,
+   "repeat": 3,
+   "n": 2000,
+   "small": {
+    "System": "aidotnet",
+    "Evaluations": 2000,
+    "Workers": 4,
+    "Islands": 1,
+    "Seconds": 0.4634785,
+    "PeakWorkingSetBytes": 44879872,
+    "AllocatedBytes": 183509536
+   },
+   "large": {
+    "System": "aidotnet",
+    "Evaluations": 4000,
+    "Workers": 4,
+    "Islands": 1,
+    "Seconds": 0.8605154,
+    "PeakWorkingSetBytes": 48877568,
+    "AllocatedBytes": 366448008
+   },
+   "per_eval_seconds": 0.00019851845
+  },
+  {
+   "system": "openevolve",
+   "workers": 4,
+   "repeat": 3,
+   "n": 100,
+   "small": {
+    "System": "openevolve",
+    "Evaluations": 100,
+    "Workers": 4,
+    "Islands": 1,
+    "Seconds": 3.736689400000614,
+    "PeakWorkingSetBytes": 381665280
+   },
+   "large": {
+    "System": "openevolve",
+    "Evaluations": 200,
+    "Workers": 4,
+    "Islands": 1,
+    "Seconds": 4.253188200003933,
+    "PeakWorkingSetBytes": 384245760
+   },
+   "per_eval_seconds": 0.00516498800003319
+  },
+  {
+   "system": "aidotnet",
+   "workers": 4,
+   "repeat": 4,
+   "n": 2000,
+   "small": {
+    "System": "aidotnet",
+    "Evaluations": 2000,
+    "Workers": 4,
+    "Islands": 1,
+    "Seconds": 0.4656137,
+    "PeakWorkingSetBytes": 45260800,
+    "AllocatedBytes": 183509536
+   },
+   "large": {
+    "System": "aidotnet",
+    "Evaluations": 4000,
+    "Workers": 4,
+    "Islands": 1,
+    "Seconds": 0.8350755,
+    "PeakWorkingSetBytes": 50728960,
+    "AllocatedBytes": 366460344
+   },
+   "per_eval_seconds": 0.00018473089999999998
+  },
+  {
+   "system": "openevolve",
+   "workers": 4,
+   "repeat": 4,
+   "n": 100,
+   "small": {
+    "System": "openevolve",
+    "Evaluations": 100,
+    "Workers": 4,
+    "Islands": 1,
+    "Seconds": 3.5945445999968797,
+    "PeakWorkingSetBytes": 380215296
+   },
+   "large": {
+    "System": "openevolve",
+    "Evaluations": 200,
+    "Workers": 4,
+    "Islands": 1,
+    "Seconds": 3.7980825999984518,
+    "PeakWorkingSetBytes": 382164992
+   },
+   "per_eval_seconds": 0.0020353800000157208
+  },
+  {
+   "system": "aidotnet",
+   "workers": 4,
+   "repeat": 5,
+   "n": 2000,
+   "small": {
+    "System": "aidotnet",
+    "Evaluations": 2000,
+    "Workers": 4,
+    "Islands": 1,
+    "Seconds": 0.4404158,
+    "PeakWorkingSetBytes": 44511232,
+    "AllocatedBytes": 183509536
+   },
+   "large": {
+    "System": "aidotnet",
+    "Evaluations": 4000,
+    "Workers": 4,
+    "Islands": 1,
+    "Seconds": 0.820622,
+    "PeakWorkingSetBytes": 51662848,
+    "AllocatedBytes": 366461312
+   },
+   "per_eval_seconds": 0.00019010309999999996
+  },
+  {
+   "system": "openevolve",
+   "workers": 4,
+   "repeat": 5,
+   "n": 100,
+   "small": {
+    "System": "openevolve",
+    "Evaluations": 100,
+    "Workers": 4,
+    "Islands": 1,
+    "Seconds": 3.8333637000032468,
+    "PeakWorkingSetBytes": 381595648
+   },
+   "large": {
+    "System": "openevolve",
+    "Evaluations": 200,
+    "Workers": 4,
+    "Islands": 1,
+    "Seconds": 3.304071999998996,
+    "PeakWorkingSetBytes": 384626688
+   },
+   "per_eval_seconds": -0.005292917000042507
+  },
+  {
+   "system": "aidotnet",
+   "workers": 4,
+   "repeat": 6,
+   "n": 2000,
+   "small": {
+    "System": "aidotnet",
+    "Evaluations": 2000,
+    "Workers": 4,
+    "Islands": 1,
+    "Seconds": 0.3967597,
+    "PeakWorkingSetBytes": 44322816,
+    "AllocatedBytes": 183509536
+   },
+   "large": {
+    "System": "aidotnet",
+    "Evaluations": 4000,
+    "Workers": 4,
+    "Islands": 1,
+    "Seconds": 0.7969982,
+    "PeakWorkingSetBytes": 50675712,
+    "AllocatedBytes": 366463600
+   },
+   "per_eval_seconds": 0.00020011925
+  },
+  {
+   "system": "openevolve",
+   "workers": 4,
+   "repeat": 6,
+   "n": 100,
+   "small": {
+    "System": "openevolve",
+    "Evaluations": 100,
+    "Workers": 4,
+    "Islands": 1,
+    "Seconds": 2.7346069000050193,
+    "PeakWorkingSetBytes": 382201856
+   },
+   "large": {
+    "System": "openevolve",
+    "Evaluations": 200,
+    "Workers": 4,
+    "Islands": 1,
+    "Seconds": 3.762893000006443,
+    "PeakWorkingSetBytes": 384098304
+   },
+   "per_eval_seconds": 0.010282861000014236
+  },
+  {
+   "system": "aidotnet",
+   "workers": 4,
+   "repeat": 7,
+   "n": 2000,
+   "small": {
+    "System": "aidotnet",
+    "Evaluations": 2000,
+    "Workers": 4,
+    "Islands": 1,
+    "Seconds": 0.4453947,
+    "PeakWorkingSetBytes": 45314048,
+    "AllocatedBytes": 183509536
+   },
+   "large": {
+    "System": "aidotnet",
+    "Evaluations": 4000,
+    "Workers": 4,
+    "Islands": 1,
+    "Seconds": 0.7550533,
+    "PeakWorkingSetBytes": 53915648,
+    "AllocatedBytes": 366461488
+   },
+   "per_eval_seconds": 0.00015482930000000004
+  },
+  {
+   "system": "openevolve",
+   "workers": 4,
+   "repeat": 7,
+   "n": 100,
+   "small": {
+    "System": "openevolve",
+    "Evaluations": 100,
+    "Workers": 4,
+    "Islands": 1,
+    "Seconds": 4.688912300000084,
+    "PeakWorkingSetBytes": 378679296
+   },
+   "large": {
+    "System": "openevolve",
+    "Evaluations": 200,
+    "Workers": 4,
+    "Islands": 1,
+    "Seconds": 4.4635419999976875,
+    "PeakWorkingSetBytes": 384647168
+   },
+   "per_eval_seconds": -0.002253703000023961
+  },
+  {
+   "system": "aidotnet",
+   "workers": 4,
+   "repeat": 8,
+   "n": 2000,
+   "small": {
+    "System": "aidotnet",
+    "Evaluations": 2000,
+    "Workers": 4,
+    "Islands": 1,
+    "Seconds": 0.4210898,
+    "PeakWorkingSetBytes": 44310528,
+    "AllocatedBytes": 183507984
+   },
+   "large": {
+    "System": "aidotnet",
+    "Evaluations": 4000,
+    "Workers": 4,
+    "Islands": 1,
+    "Seconds": 0.7339281,
+    "PeakWorkingSetBytes": 51949568,
+    "AllocatedBytes": 366453576
+   },
+   "per_eval_seconds": 0.00015641914999999998
+  },
+  {
+   "system": "openevolve",
+   "workers": 4,
+   "repeat": 8,
+   "n": 100,
+   "small": {
+    "System": "openevolve",
+    "Evaluations": 100,
+    "Workers": 4,
+    "Islands": 1,
+    "Seconds": 2.822222899994813,
+    "PeakWorkingSetBytes": 381190144
+   },
+   "large": {
+    "System": "openevolve",
+    "Evaluations": 200,
+    "Workers": 4,
+    "Islands": 1,
+    "Seconds": 3.631635500001721,
+    "PeakWorkingSetBytes": 383688704
+   },
+   "per_eval_seconds": 0.008094126000069082
+  },
+  {
+   "system": "aidotnet",
+   "workers": 8,
+   "repeat": 0,
+   "n": 2000,
+   "small": {
+    "System": "aidotnet",
+    "Evaluations": 2000,
+    "Workers": 8,
+    "Islands": 1,
+    "Seconds": 0.4266432,
+    "PeakWorkingSetBytes": 45039616,
+    "AllocatedBytes": 183507984
+   },
+   "large": {
+    "System": "aidotnet",
+    "Evaluations": 4000,
+    "Workers": 8,
+    "Islands": 1,
+    "Seconds": 0.8222827,
+    "PeakWorkingSetBytes": 51744768,
+    "AllocatedBytes": 366454720
+   },
+   "per_eval_seconds": 0.00019781975000000002
+  },
+  {
+   "system": "openevolve",
+   "workers": 8,
+   "repeat": 0,
+   "n": 100,
+   "small": {
+    "System": "openevolve",
+    "Evaluations": 100,
+    "Workers": 8,
+    "Islands": 1,
+    "Seconds": 3.703712300004554,
+    "PeakWorkingSetBytes": 674172928
+   },
+   "large": {
+    "System": "openevolve",
+    "Evaluations": 200,
+    "Workers": 8,
+    "Islands": 1,
+    "Seconds": 4.004727100007585,
+    "PeakWorkingSetBytes": 686379008
+   },
+   "per_eval_seconds": 0.003010148000030313
+  },
+  {
+   "system": "aidotnet",
+   "workers": 8,
+   "repeat": 1,
+   "n": 2000,
+   "small": {
+    "System": "aidotnet",
+    "Evaluations": 2000,
+    "Workers": 8,
+    "Islands": 1,
+    "Seconds": 0.4733039,
+    "PeakWorkingSetBytes": 45096960,
+    "AllocatedBytes": 183507984
+   },
+   "large": {
+    "System": "aidotnet",
+    "Evaluations": 4000,
+    "Workers": 8,
+    "Islands": 1,
+    "Seconds": 0.7280867,
+    "PeakWorkingSetBytes": 50028544,
+    "AllocatedBytes": 366454720
+   },
+   "per_eval_seconds": 0.0001273914
+  },
+  {
+   "system": "openevolve",
+   "workers": 8,
+   "repeat": 1,
+   "n": 100,
+   "small": {
+    "System": "openevolve",
+    "Evaluations": 100,
+    "Workers": 8,
+    "Islands": 1,
+    "Seconds": 3.4150039999949513,
+    "PeakWorkingSetBytes": 674258944
+   },
+   "large": {
+    "System": "openevolve",
+    "Evaluations": 200,
+    "Workers": 8,
+    "Islands": 1,
+    "Seconds": 4.4117661000054795,
+    "PeakWorkingSetBytes": 685641728
+   },
+   "per_eval_seconds": 0.009967621000105282
+  },
+  {
+   "system": "aidotnet",
+   "workers": 8,
+   "repeat": 2,
+   "n": 2000,
+   "small": {
+    "System": "aidotnet",
+    "Evaluations": 2000,
+    "Workers": 8,
+    "Islands": 1,
+    "Seconds": 0.3848481,
+    "PeakWorkingSetBytes": 45596672,
+    "AllocatedBytes": 183509128
+   },
+   "large": {
+    "System": "aidotnet",
+    "Evaluations": 4000,
+    "Workers": 8,
+    "Islands": 1,
+    "Seconds": 0.7161268,
+    "PeakWorkingSetBytes": 50536448,
+    "AllocatedBytes": 366455864
+   },
+   "per_eval_seconds": 0.00016563934999999996
+  },
+  {
+   "system": "openevolve",
+   "workers": 8,
+   "repeat": 2,
+   "n": 100,
+   "small": {
+    "System": "openevolve",
+    "Evaluations": 100,
+    "Workers": 8,
+    "Islands": 1,
+    "Seconds": 3.5221714000072097,
+    "PeakWorkingSetBytes": 667881472
+   },
+   "large": {
+    "System": "openevolve",
+    "Evaluations": 200,
+    "Workers": 8,
+    "Islands": 1,
+    "Seconds": 3.7090683999995235,
+    "PeakWorkingSetBytes": 687362048
+   },
+   "per_eval_seconds": 0.001868969999923138
+  },
+  {
+   "system": "aidotnet",
+   "workers": 8,
+   "repeat": 3,
+   "n": 2000,
+   "small": {
+    "System": "aidotnet",
+    "Evaluations": 2000,
+    "Workers": 8,
+    "Islands": 1,
+    "Seconds": 0.3960861,
+    "PeakWorkingSetBytes": 45015040,
+    "AllocatedBytes": 183507984
+   },
+   "large": {
+    "System": "aidotnet",
+    "Evaluations": 4000,
+    "Workers": 8,
+    "Islands": 1,
+    "Seconds": 0.728148,
+    "PeakWorkingSetBytes": 51146752,
+    "AllocatedBytes": 366453576
+   },
+   "per_eval_seconds": 0.00016603095
+  },
+  {
+   "system": "openevolve",
+   "workers": 8,
+   "repeat": 3,
+   "n": 100,
+   "small": {
+    "System": "openevolve",
+    "Evaluations": 100,
+    "Workers": 8,
+    "Islands": 1,
+    "Seconds": 3.416803699990851,
+    "PeakWorkingSetBytes": 669618176
+   },
+   "large": {
+    "System": "openevolve",
+    "Evaluations": 200,
+    "Workers": 8,
+    "Islands": 1,
+    "Seconds": 3.967641700000968,
+    "PeakWorkingSetBytes": 686096384
+   },
+   "per_eval_seconds": 0.005508380000101169
+  },
+  {
+   "system": "aidotnet",
+   "workers": 8,
+   "repeat": 4,
+   "n": 2000,
+   "small": {
+    "System": "aidotnet",
+    "Evaluations": 2000,
+    "Workers": 8,
+    "Islands": 1,
+    "Seconds": 0.3938832,
+    "PeakWorkingSetBytes": 44892160,
+    "AllocatedBytes": 183510272
+   },
+   "large": {
+    "System": "aidotnet",
+    "Evaluations": 4000,
+    "Workers": 8,
+    "Islands": 1,
+    "Seconds": 0.750973,
+    "PeakWorkingSetBytes": 51580928,
+    "AllocatedBytes": 366453576
+   },
+   "per_eval_seconds": 0.0001785449
+  },
+  {
+   "system": "openevolve",
+   "workers": 8,
+   "repeat": 4,
+   "n": 100,
+   "small": {
+    "System": "openevolve",
+    "Evaluations": 100,
+    "Workers": 8,
+    "Islands": 1,
+    "Seconds": 3.1977780000015628,
+    "PeakWorkingSetBytes": 670318592
+   },
+   "large": {
+    "System": "openevolve",
+    "Evaluations": 200,
+    "Workers": 8,
+    "Islands": 1,
+    "Seconds": 4.388050800000201,
+    "PeakWorkingSetBytes": 686571520
+   },
+   "per_eval_seconds": 0.011902727999986382
+  },
+  {
+   "system": "aidotnet",
+   "workers": 8,
+   "repeat": 5,
+   "n": 2000,
+   "small": {
+    "System": "aidotnet",
+    "Evaluations": 2000,
+    "Workers": 8,
+    "Islands": 1,
+    "Seconds": 0.4320729,
+    "PeakWorkingSetBytes": 45002752,
+    "AllocatedBytes": 183509128
+   },
+   "large": {
+    "System": "aidotnet",
+    "Evaluations": 4000,
+    "Workers": 8,
+    "Islands": 1,
+    "Seconds": 0.7872896,
+    "PeakWorkingSetBytes": 50712576,
+    "AllocatedBytes": 366454720
+   },
+   "per_eval_seconds": 0.00017760835000000004
+  },
+  {
+   "system": "openevolve",
+   "workers": 8,
+   "repeat": 5,
+   "n": 100,
+   "small": {
+    "System": "openevolve",
+    "Evaluations": 100,
+    "Workers": 8,
+    "Islands": 1,
+    "Seconds": 3.8058765000023413,
+    "PeakWorkingSetBytes": 671182848
+   },
+   "large": {
+    "System": "openevolve",
+    "Evaluations": 200,
+    "Workers": 8,
+    "Islands": 1,
+    "Seconds": 4.0017165999888675,
+    "PeakWorkingSetBytes": 685887488
+   },
+   "per_eval_seconds": 0.0019584009998652617
+  },
+  {
+   "system": "aidotnet",
+   "workers": 8,
+   "repeat": 6,
+   "n": 2000,
+   "small": {
+    "System": "aidotnet",
+    "Evaluations": 2000,
+    "Workers": 8,
+    "Islands": 1,
+    "Seconds": 0.3990495,
+    "PeakWorkingSetBytes": 44912640,
+    "AllocatedBytes": 183509128
+   },
+   "large": {
+    "System": "aidotnet",
+    "Evaluations": 4000,
+    "Workers": 8,
+    "Islands": 1,
+    "Seconds": 0.74625,
+    "PeakWorkingSetBytes": 50237440,
+    "AllocatedBytes": 366454720
+   },
+   "per_eval_seconds": 0.00017360025
+  },
+  {
+   "system": "openevolve",
+   "workers": 8,
+   "repeat": 6,
+   "n": 100,
+   "small": {
+    "System": "openevolve",
+    "Evaluations": 100,
+    "Workers": 8,
+    "Islands": 1,
+    "Seconds": 3.42512749999878,
+    "PeakWorkingSetBytes": 668413952
+   },
+   "large": {
+    "System": "openevolve",
+    "Evaluations": 200,
+    "Workers": 8,
+    "Islands": 1,
+    "Seconds": 4.060768900002586,
+    "PeakWorkingSetBytes": 686792704
+   },
+   "per_eval_seconds": 0.0063564140000380576
+  },
+  {
+   "system": "aidotnet",
+   "workers": 8,
+   "repeat": 7,
+   "n": 2000,
+   "small": {
+    "System": "aidotnet",
+    "Evaluations": 2000,
+    "Workers": 8,
+    "Islands": 1,
+    "Seconds": 0.3926473,
+    "PeakWorkingSetBytes": 44908544,
+    "AllocatedBytes": 183509128
+   },
+   "large": {
+    "System": "aidotnet",
+    "Evaluations": 4000,
+    "Workers": 8,
+    "Islands": 1,
+    "Seconds": 0.7486341,
+    "PeakWorkingSetBytes": 50520064,
+    "AllocatedBytes": 366454720
+   },
+   "per_eval_seconds": 0.0001779934
+  },
+  {
+   "system": "openevolve",
+   "workers": 8,
+   "repeat": 7,
+   "n": 100,
+   "small": {
+    "System": "openevolve",
+    "Evaluations": 100,
+    "Workers": 8,
+    "Islands": 1,
+    "Seconds": 3.5489866999996593,
+    "PeakWorkingSetBytes": 674607104
+   },
+   "large": {
+    "System": "openevolve",
+    "Evaluations": 200,
+    "Workers": 8,
+    "Islands": 1,
+    "Seconds": 3.7685382000054233,
+    "PeakWorkingSetBytes": 686493696
+   },
+   "per_eval_seconds": 0.0021955150000576395
+  },
+  {
+   "system": "aidotnet",
+   "workers": 8,
+   "repeat": 8,
+   "n": 2000,
+   "small": {
+    "System": "aidotnet",
+    "Evaluations": 2000,
+    "Workers": 8,
+    "Islands": 1,
+    "Seconds": 0.386844,
+    "PeakWorkingSetBytes": 45576192,
+    "AllocatedBytes": 183509128
+   },
+   "large": {
+    "System": "aidotnet",
+    "Evaluations": 4000,
+    "Workers": 8,
+    "Islands": 1,
+    "Seconds": 0.6983253,
+    "PeakWorkingSetBytes": 51757056,
+    "AllocatedBytes": 366453576
+   },
+   "per_eval_seconds": 0.00015574065
+  },
+  {
+   "system": "openevolve",
+   "workers": 8,
+   "repeat": 8,
+   "n": 100,
+   "small": {
+    "System": "openevolve",
+    "Evaluations": 100,
+    "Workers": 8,
+    "Islands": 1,
+    "Seconds": 3.2326002000045264,
+    "PeakWorkingSetBytes": 672145408
+   },
+   "large": {
+    "System": "openevolve",
+    "Evaluations": 200,
+    "Workers": 8,
+    "Islands": 1,
+    "Seconds": 3.8846724000031827,
+    "PeakWorkingSetBytes": 686067712
+   },
+   "per_eval_seconds": 0.0065207219999865625
+  },
+  {
+   "system": "aidotnet",
+   "workers": 16,
+   "repeat": 0,
+   "n": 2000,
+   "small": {
+    "System": "aidotnet",
+    "Evaluations": 2000,
+    "Workers": 16,
+    "Islands": 1,
+    "Seconds": 0.4143464,
+    "PeakWorkingSetBytes": 45146112,
+    "AllocatedBytes": 183507984
+   },
+   "large": {
+    "System": "aidotnet",
+    "Evaluations": 4000,
+    "Workers": 16,
+    "Islands": 1,
+    "Seconds": 0.7047754,
+    "PeakWorkingSetBytes": 49848320,
+    "AllocatedBytes": 366453576
+   },
+   "per_eval_seconds": 0.00014521450000000002
+  },
+  {
+   "system": "openevolve",
+   "workers": 16,
+   "repeat": 0,
+   "n": 100,
+   "small": {
+    "System": "openevolve",
+    "Evaluations": 100,
+    "Workers": 16,
+    "Islands": 1,
+    "Seconds": 4.200324800011003,
+    "PeakWorkingSetBytes": 1190236160
+   },
+   "large": {
+    "System": "openevolve",
+    "Evaluations": 200,
+    "Workers": 16,
+    "Islands": 1,
+    "Seconds": 4.7983545000024606,
+    "PeakWorkingSetBytes": 1247379456
+   },
+   "per_eval_seconds": 0.005980296999914572
+  },
+  {
+   "system": "aidotnet",
+   "workers": 16,
+   "repeat": 1,
+   "n": 2000,
+   "small": {
+    "System": "aidotnet",
+    "Evaluations": 2000,
+    "Workers": 16,
+    "Islands": 1,
+    "Seconds": 0.3683655,
+    "PeakWorkingSetBytes": 44347392,
+    "AllocatedBytes": 183509128
+   },
+   "large": {
+    "System": "aidotnet",
+    "Evaluations": 4000,
+    "Workers": 16,
+    "Islands": 1,
+    "Seconds": 0.6927214,
+    "PeakWorkingSetBytes": 48562176,
+    "AllocatedBytes": 366453552
+   },
+   "per_eval_seconds": 0.00016217795000000003
+  },
+  {
+   "system": "openevolve",
+   "workers": 16,
+   "repeat": 1,
+   "n": 100,
+   "small": {
+    "System": "openevolve",
+    "Evaluations": 100,
+    "Workers": 16,
+    "Islands": 1,
+    "Seconds": 4.245571099992958,
+    "PeakWorkingSetBytes": 1173643264
+   },
+   "large": {
+    "System": "openevolve",
+    "Evaluations": 200,
+    "Workers": 16,
+    "Islands": 1,
+    "Seconds": 6.178402200006531,
+    "PeakWorkingSetBytes": 1253429248
+   },
+   "per_eval_seconds": 0.019328311000135726
+  },
+  {
+   "system": "aidotnet",
+   "workers": 16,
+   "repeat": 2,
+   "n": 2000,
+   "small": {
+    "System": "aidotnet",
+    "Evaluations": 2000,
+    "Workers": 16,
+    "Islands": 1,
+    "Seconds": 0.3706389,
+    "PeakWorkingSetBytes": 44990464,
+    "AllocatedBytes": 183509128
+   },
+   "large": {
+    "System": "aidotnet",
+    "Evaluations": 4000,
+    "Workers": 16,
+    "Islands": 1,
+    "Seconds": 0.7008895,
+    "PeakWorkingSetBytes": 51453952,
+    "AllocatedBytes": 366453552
+   },
+   "per_eval_seconds": 0.00016512530000000004
+  },
+  {
+   "system": "openevolve",
+   "workers": 16,
+   "repeat": 2,
+   "n": 100,
+   "small": {
+    "System": "openevolve",
+    "Evaluations": 100,
+    "Workers": 16,
+    "Islands": 1,
+    "Seconds": 4.614004899995052,
+    "PeakWorkingSetBytes": 1179901952
+   },
+   "large": {
+    "System": "openevolve",
+    "Evaluations": 200,
+    "Workers": 16,
+    "Islands": 1,
+    "Seconds": 4.773684700005106,
+    "PeakWorkingSetBytes": 1241948160
+   },
+   "per_eval_seconds": 0.0015967980001005343
+  },
+  {
+   "system": "aidotnet",
+   "workers": 16,
+   "repeat": 3,
+   "n": 2000,
+   "small": {
+    "System": "aidotnet",
+    "Evaluations": 2000,
+    "Workers": 16,
+    "Islands": 1,
+    "Seconds": 0.379741,
+    "PeakWorkingSetBytes": 44920832,
+    "AllocatedBytes": 183507984
+   },
+   "large": {
+    "System": "aidotnet",
+    "Evaluations": 4000,
+    "Workers": 16,
+    "Islands": 1,
+    "Seconds": 0.7085231,
+    "PeakWorkingSetBytes": 48431104,
+    "AllocatedBytes": 366453552
+   },
+   "per_eval_seconds": 0.00016439105
+  },
+  {
+   "system": "openevolve",
+   "workers": 16,
+   "repeat": 3,
+   "n": 100,
+   "small": {
+    "System": "openevolve",
+    "Evaluations": 100,
+    "Workers": 16,
+    "Islands": 1,
+    "Seconds": 4.487040599997272,
+    "PeakWorkingSetBytes": 1181941760
+   },
+   "large": {
+    "System": "openevolve",
+    "Evaluations": 200,
+    "Workers": 16,
+    "Islands": 1,
+    "Seconds": 4.948537600008422,
+    "PeakWorkingSetBytes": 1247813632
+   },
+   "per_eval_seconds": 0.004614970000111498
+  },
+  {
+   "system": "aidotnet",
+   "workers": 16,
+   "repeat": 4,
+   "n": 2000,
+   "small": {
+    "System": "aidotnet",
+    "Evaluations": 2000,
+    "Workers": 16,
+    "Islands": 1,
+    "Seconds": 0.3639036,
+    "PeakWorkingSetBytes": 44441600,
+    "AllocatedBytes": 183495648
+   },
+   "large": {
+    "System": "aidotnet",
+    "Evaluations": 4000,
+    "Workers": 16,
+    "Islands": 1,
+    "Seconds": 0.7065251,
+    "PeakWorkingSetBytes": 50130944,
+    "AllocatedBytes": 366453552
+   },
+   "per_eval_seconds": 0.00017131075000000002
+  },
+  {
+   "system": "openevolve",
+   "workers": 16,
+   "repeat": 4,
+   "n": 100,
+   "small": {
+    "System": "openevolve",
+    "Evaluations": 100,
+    "Workers": 16,
+    "Islands": 1,
+    "Seconds": 4.547039099998074,
+    "PeakWorkingSetBytes": 1182560256
+   },
+   "large": {
+    "System": "openevolve",
+    "Evaluations": 200,
+    "Workers": 16,
+    "Islands": 1,
+    "Seconds": 4.805962799990084,
+    "PeakWorkingSetBytes": 1246769152
+   },
+   "per_eval_seconds": 0.0025892369999201037
+  },
+  {
+   "system": "aidotnet",
+   "workers": 16,
+   "repeat": 5,
+   "n": 2000,
+   "small": {
+    "System": "aidotnet",
+    "Evaluations": 2000,
+    "Workers": 16,
+    "Islands": 1,
+    "Seconds": 0.414609,
+    "PeakWorkingSetBytes": 45084672,
+    "AllocatedBytes": 183509128
+   },
+   "large": {
+    "System": "aidotnet",
+    "Evaluations": 4000,
+    "Workers": 16,
+    "Islands": 1,
+    "Seconds": 0.72703,
+    "PeakWorkingSetBytes": 51970048,
+    "AllocatedBytes": 366454720
+   },
+   "per_eval_seconds": 0.00015621049999999998
+  },
+  {
+   "system": "openevolve",
+   "workers": 16,
+   "repeat": 5,
+   "n": 100,
+   "small": {
+    "System": "openevolve",
+    "Evaluations": 100,
+    "Workers": 16,
+    "Islands": 1,
+    "Seconds": 4.270421599998372,
+    "PeakWorkingSetBytes": 1177387008
+   },
+   "large": {
+    "System": "openevolve",
+    "Evaluations": 200,
+    "Workers": 16,
+    "Islands": 1,
+    "Seconds": 5.085390799999004,
+    "PeakWorkingSetBytes": 1235828736
+   },
+   "per_eval_seconds": 0.008149692000006325
+  },
+  {
+   "system": "aidotnet",
+   "workers": 16,
+   "repeat": 6,
+   "n": 2000,
+   "small": {
+    "System": "aidotnet",
+    "Evaluations": 2000,
+    "Workers": 16,
+    "Islands": 1,
+    "Seconds": 0.4167576,
+    "PeakWorkingSetBytes": 45707264,
+    "AllocatedBytes": 183509128
+   },
+   "large": {
+    "System": "aidotnet",
+    "Evaluations": 4000,
+    "Workers": 16,
+    "Islands": 1,
+    "Seconds": 0.7540308,
+    "PeakWorkingSetBytes": 48730112,
+    "AllocatedBytes": 366453576
+   },
+   "per_eval_seconds": 0.0001686366
+  },
+  {
+   "system": "openevolve",
+   "workers": 16,
+   "repeat": 6,
+   "n": 100,
+   "small": {
+    "System": "openevolve",
+    "Evaluations": 100,
+    "Workers": 16,
+    "Islands": 1,
+    "Seconds": 4.096211399999447,
+    "PeakWorkingSetBytes": 1171853312
+   },
+   "large": {
+    "System": "openevolve",
+    "Evaluations": 200,
+    "Workers": 16,
+    "Islands": 1,
+    "Seconds": 5.315844999990077,
+    "PeakWorkingSetBytes": 1239351296
+   },
+   "per_eval_seconds": 0.012196335999906296
+  },
+  {
+   "system": "aidotnet",
+   "workers": 16,
+   "repeat": 7,
+   "n": 2000,
+   "small": {
+    "System": "aidotnet",
+    "Evaluations": 2000,
+    "Workers": 16,
+    "Islands": 1,
+    "Seconds": 0.3769645,
+    "PeakWorkingSetBytes": 44511232,
+    "AllocatedBytes": 183509128
+   },
+   "large": {
+    "System": "aidotnet",
+    "Evaluations": 4000,
+    "Workers": 16,
+    "Islands": 1,
+    "Seconds": 0.7322863,
+    "PeakWorkingSetBytes": 50274304,
+    "AllocatedBytes": 366453576
+   },
+   "per_eval_seconds": 0.00017766089999999998
+  },
+  {
+   "system": "openevolve",
+   "workers": 16,
+   "repeat": 7,
+   "n": 100,
+   "small": {
+    "System": "openevolve",
+    "Evaluations": 100,
+    "Workers": 16,
+    "Islands": 1,
+    "Seconds": 4.341694100003224,
+    "PeakWorkingSetBytes": 1162358784
+   },
+   "large": {
+    "System": "openevolve",
+    "Evaluations": 200,
+    "Workers": 16,
+    "Islands": 1,
+    "Seconds": 4.623427899990929,
+    "PeakWorkingSetBytes": 1232744448
+   },
+   "per_eval_seconds": 0.002817337999877054
+  },
+  {
+   "system": "aidotnet",
+   "workers": 16,
+   "repeat": 8,
+   "n": 2000,
+   "small": {
+    "System": "aidotnet",
+    "Evaluations": 2000,
+    "Workers": 16,
+    "Islands": 1,
+    "Seconds": 0.3709155,
+    "PeakWorkingSetBytes": 44449792,
+    "AllocatedBytes": 183507984
+   },
+   "large": {
+    "System": "aidotnet",
+    "Evaluations": 4000,
+    "Workers": 16,
+    "Islands": 1,
+    "Seconds": 0.698997,
+    "PeakWorkingSetBytes": 50094080,
+    "AllocatedBytes": 366455864
+   },
+   "per_eval_seconds": 0.00016404075
+  },
+  {
+   "system": "openevolve",
+   "workers": 16,
+   "repeat": 8,
+   "n": 100,
+   "small": {
+    "System": "openevolve",
+    "Evaluations": 100,
+    "Workers": 16,
+    "Islands": 1,
+    "Seconds": 4.43548469999223,
+    "PeakWorkingSetBytes": 1165197312
+   },
+   "large": {
+    "System": "openevolve",
+    "Evaluations": 200,
+    "Workers": 16,
+    "Islands": 1,
+    "Seconds": 4.623489599995082,
+    "PeakWorkingSetBytes": 1233694720
+   },
+   "per_eval_seconds": 0.0018800490000285208
+  }
+ ]
+}
