@@ -330,16 +330,31 @@ public sealed class EvolutionResourceLedger
     private void ValidateAmounts(EvolutionResources amounts)
     {
         Guard.NotNull(amounts);
-        if (amounts.Amounts.Keys.Any(key => !Limits.Amounts.ContainsKey(key)))
-            throw new ArgumentException("Every charged resource must have an explicit limit.", nameof(amounts));
+        // Plain loops here and below: these run on every reservation and settlement, and the LINQ forms allocated a
+        // closure and an enumerator per call (measured on the pipeline's ZeroLatency profile).
+        foreach (string key in amounts.Amounts.Keys)
+            if (!Limits.Amounts.ContainsKey(key))
+                throw new ArgumentException("Every charged resource must have an explicit limit.", nameof(amounts));
     }
 
-    private bool EqualAmounts(EvolutionResources first, EvolutionResources second) => Limits.Amounts.Keys.All(key => first[key] == second[key]);
+    private bool EqualAmounts(EvolutionResources first, EvolutionResources second)
+    {
+        foreach (string key in Limits.Amounts.Keys)
+            if (first[key] != second[key]) return false;
+        return true;
+    }
     private static Dictionary<string, decimal> Copy(IReadOnlyDictionary<string, decimal> source) => source.ToDictionary(pair => pair.Key, pair => pair.Value, StringComparer.Ordinal);
     private static void ValidateId(string id, string argument)
     {
-        if (string.IsNullOrWhiteSpace(id) || id.Length > 256 || id.Any(char.IsControl))
+        if (string.IsNullOrWhiteSpace(id) || id.Length > 256 || ContainsControl(id))
             throw new ArgumentException("Identity must be nonblank, printable and at most 256 characters.", argument);
+    }
+
+    private static bool ContainsControl(string id)
+    {
+        foreach (char c in id)
+            if (char.IsControl(c)) return true;
+        return false;
     }
 
     private sealed class Operation(string id, EvolutionResourceStage stage, int attempt, EvolutionResources estimated, EvolutionResources maximum)

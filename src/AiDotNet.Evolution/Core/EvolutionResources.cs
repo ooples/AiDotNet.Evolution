@@ -20,7 +20,7 @@ public sealed class EvolutionResources
         foreach (KeyValuePair<string, decimal> pair in amounts)
         {
             if (copy.Count >= 32) throw new ArgumentException("At most 32 resources are supported.", nameof(amounts));
-            if (string.IsNullOrWhiteSpace(pair.Key) || pair.Key.Length > 64 || pair.Key.Any(char.IsControl))
+            if (string.IsNullOrWhiteSpace(pair.Key) || pair.Key.Length > 64 || ContainsControl(pair.Key))
                 throw new ArgumentException("Resource names must be nonblank, printable and at most 64 characters.", nameof(amounts));
             if (pair.Value < 0 || pair.Value > MaximumAmount)
                 throw new ArgumentOutOfRangeException(nameof(amounts));
@@ -28,6 +28,14 @@ public sealed class EvolutionResources
             copy.Add(pair.Key, pair.Value);
         }
         Amounts = new ReadOnlyDictionary<string, decimal>(copy);
+    }
+
+    // A loop, not Any(char.IsControl): every resource vector is built through here on the reservation hot path.
+    private static bool ContainsControl(string name)
+    {
+        foreach (char c in name)
+            if (char.IsControl(c)) return true;
+        return false;
     }
 
     /// <summary>Gets the detached amounts in ordinal name order.</summary>

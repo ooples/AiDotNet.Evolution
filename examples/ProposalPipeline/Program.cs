@@ -37,12 +37,15 @@ if (args.Length == 3 && args[0] == "--profile")
     for (int warm = 0; warm < 20; warm++) await Run("Sphere", "ZeroLatency", method, (ulong)warm, 0, null);
     using var allocations = Environment.GetEnvironmentVariable("EVOLUTION_ALLOCATION_TYPES") == "1" ? new AllocationListener() : null;
     long allocated = GC.GetTotalAllocatedBytes(precise: true);
+    // Thread-pool work items per run count the thread hops the dispatcher makes; unlike time, this is immune to host load.
+    long workItems = ThreadPool.CompletedWorkItemCount;
     var clock = Stopwatch.StartNew();
     for (int run = 0; run < count; run++)
         if (!(await Run("Sphere", "ZeroLatency", method, (ulong)(run % 16), 0, null)).Valid) throw new InvalidOperationException("Profile run failed.");
     clock.Stop();
     Console.WriteLine(JsonSerializer.Serialize(new { Method = method, Runs = count, MeanMilliseconds = clock.Elapsed.TotalMilliseconds / count,
-        MeanAllocatedBytes = (GC.GetTotalAllocatedBytes(precise: true) - allocated) / count }));
+        MeanAllocatedBytes = (GC.GetTotalAllocatedBytes(precise: true) - allocated) / count,
+        MeanThreadPoolWorkItems = (ThreadPool.CompletedWorkItemCount - workItems) / (double)count }));
     allocations?.Print(count);
     return 0;
 }

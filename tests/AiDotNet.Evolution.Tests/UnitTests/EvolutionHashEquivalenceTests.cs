@@ -58,6 +58,22 @@ public sealed class EvolutionHashEquivalenceTests
     }
 
     [Fact]
+    public void CombineEncoded_equals_Combine_over_the_same_components_and_has_no_component_cap()
+    {
+        var random = new Random(23);
+        for (int trial = 0; trial < 300; trial++)
+        {
+            string[] parts = RandomStrings(random.Next(0, 60), 1000 + trial).ToArray();
+            Assert.Equal(EvolutionHash.Combine(parts), EvolutionHash.CombineEncoded(parts.Select(EvolutionHash.EncodeComponent)));
+        }
+        string[] atCap = Enumerable.Range(0, EvolutionCollectionLimits.MaximumHashComponents).Select(i => "c" + i).ToArray();
+        Assert.Equal(EvolutionHash.Combine(atCap), EvolutionHash.CombineEncoded(atCap.Select(EvolutionHash.EncodeComponent)));
+        string[] beyond = atCap.Append("one-more").ToArray();
+        Assert.Throws<ArgumentException>(() => EvolutionHash.Combine(beyond));
+        Assert.Equal(ReferenceCombine(beyond), EvolutionHash.CombineEncoded(beyond.Select(EvolutionHash.EncodeComponent)));
+    }
+
+    [Fact]
     public void Combine_enumerates_a_lazy_sequence_once_and_keeps_its_argument_checks()
     {
         int pulls = 0;

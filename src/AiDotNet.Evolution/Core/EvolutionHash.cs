@@ -142,6 +142,38 @@ public static class EvolutionHash
 #endif
     }
 
+    /// <summary>Encodes one component exactly as <see cref="Combine"/> hashes it: the UTF-8 of <c>len:value;</c>.</summary>
+    internal static byte[] EncodeComponent(string value)
+    {
+        if (value is null) throw new ArgumentNullException(nameof(value));
+        return Encoding.UTF8.GetBytes(value.Length.ToString(System.Globalization.CultureInfo.InvariantCulture) + ":" + value + ";");
+    }
+
+    /// <summary>
+    /// Hashes pre-encoded components (from <see cref="EncodeComponent"/>) in order. For any sequence that
+    /// <see cref="Combine"/> accepts, the digest equals Combine's over the same components; unlike Combine it has no
+    /// component-count cap, so callers can fingerprint collections as large as their own bounds allow.
+    /// </summary>
+    internal static string CombineEncoded(IEnumerable<byte[]> encodedComponents)
+    {
+        if (encodedComponents is null) throw new ArgumentNullException(nameof(encodedComponents));
+        using var hash = IncrementalHash.CreateHash(HashAlgorithmName.SHA256);
+        foreach (byte[] component in encodedComponents)
+        {
+            if (component is null) throw new ArgumentException("Hash components cannot be null.", nameof(encodedComponents));
+            hash.AppendData(component);
+        }
+        byte[] digest = hash.GetHashAndReset();
+        const string digits = "0123456789abcdef";
+        var chars = new char[digest.Length * 2];
+        for (int i = 0; i < digest.Length; i++)
+        {
+            chars[2 * i] = digits[digest[i] >> 4];
+            chars[(2 * i) + 1] = digits[digest[i] & 0xF];
+        }
+        return new string(chars);
+    }
+
     private static void ValidateComponent(string? value, int count, long characters)
     {
         if (count == EvolutionCollectionLimits.MaximumHashComponents)
