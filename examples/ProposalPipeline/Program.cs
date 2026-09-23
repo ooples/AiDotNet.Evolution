@@ -144,7 +144,7 @@ static async Task<Execution> Run(string family, string profile, string method, u
         MaxDegreeOfParallelism = 4,
         CheckpointInterval = 0,
         MigrationInterval = 0,
-        Dispatch = method == "Batch" ? EvolutionDispatchMode.Batch : method == "Continuous" ? EvolutionDispatchMode.Continuous : EvolutionDispatchMode.Pipeline,
+        Dispatch = method == "Batch" ? EvolutionDispatchMode.Batch : method == "Continuous" ? EvolutionDispatchMode.Continuous : method == "Auto" ? EvolutionDispatchMode.Auto : EvolutionDispatchMode.Pipeline,
         MaxInFlight = method == "Continuous" ? 8 : 0,
         Pipeline = new EvolutionPipelineOptions
         {

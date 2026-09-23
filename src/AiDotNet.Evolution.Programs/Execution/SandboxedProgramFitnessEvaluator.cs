@@ -40,8 +40,12 @@ namespace AiDotNet.Evolution.Programs;
 /// distinction is what lets you tell "the model is writing slow code" apart from "the model is writing broken
 /// code".</para>
 /// </remarks>
-public sealed class SandboxedProgramFitnessEvaluator : IProgramFitnessEvaluator
+public sealed class SandboxedProgramFitnessEvaluator : IProgramFitnessEvaluator, IEvolutionLatencyProfile
 {
+    /// <inheritdoc/>
+    /// <remarks>Every evaluation executes the candidate in a sandbox, which waits on a process.</remarks>
+    public bool IsLatencyBound => true;
+
     private const int MaxRetainedExampleDiagnostics = 8;
     private const int MaxErrorMessageLength = 200;
 

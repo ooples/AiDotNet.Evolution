@@ -8,8 +8,12 @@ using Newtonsoft.Json.Linq;
 namespace AiDotNet.Evolution.Programs;
 
 /// <summary>Runs a caller-supplied evaluator script and validates bounded JSON scores and metrics.</summary>
-public sealed class ScriptProgramFitnessEvaluator : IProgramFitnessEvaluator
+public sealed class ScriptProgramFitnessEvaluator : IProgramFitnessEvaluator, IEvolutionLatencyProfile
 {
+    /// <inheritdoc/>
+    /// <remarks>Every evaluation runs the evaluator script through an execution engine, which waits on a process.</remarks>
+    public bool IsLatencyBound => true;
+
     private const string QualityProperty = "quality";
     private const string DescriptorsProperty = "descriptors";
     private const string ObjectivesProperty = "objectives";
