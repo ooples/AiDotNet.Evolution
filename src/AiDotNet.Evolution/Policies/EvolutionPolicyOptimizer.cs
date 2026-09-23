@@ -218,6 +218,9 @@ public sealed class EvolutionPolicyOptimizer
             // the campaign deadline still stop a queued trial through the wait below.
             work = Task.Run(() =>
             {
+                // A trial still queued when the campaign is canceled must not reach the provider, which may ignore an
+                // already-canceled token (review on #151).
+                token.ThrowIfCancellationRequested();
                 timeout.CancelAfter(_options.TrialBudget.Timeout);
                 return task.RunAsync(policy, _options.TrialBudget, seed, timeout.Token);
             }, CancellationToken.None);
