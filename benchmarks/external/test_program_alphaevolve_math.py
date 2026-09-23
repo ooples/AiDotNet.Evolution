@@ -55,7 +55,7 @@ class AnalyticTests(unittest.TestCase):
         self.problems = {p["id"]: p for p in am.b_problems(published())}
 
     def test_every_published_b_construction_reproduces_its_published_value(self):
-        self.assertEqual(16, len(self.problems))
+        self.assertEqual(18, len(self.problems))  # 16 + the two hexagon packings
         self.assertEqual([], [r for r in am.self_test(self.problems.values()) if not r["matches"]])
 
     def test_constraint_violations_are_rejected_not_scored(self):
@@ -91,6 +91,36 @@ class AnalyticTests(unittest.TestCase):
         close = centers.copy(); close[1] = close[0] // 2 + close[1] // 2
         self.assertIsNone(am.verify(p["kissing-11"], close), "a too-close pair breaks the kissing lemma")
         self.assertIsNone(am.verify(p["kissing-11"], centers[:, :10]), "dimension is part of the problem")
+
+class FamilyTests(unittest.TestCase):
+    def setUp(self):
+        root = os.environ.get("EVOLUTION_ALPHAEVOLVE_RESULTS")
+        if not root:
+            raise RuntimeError("Set EVOLUTION_ALPHAEVOLVE_RESULTS to the pinned alphaevolve_results checkout")
+        self.problems = am.family(Path(root) / "mathematical_results.ipynb", NOTEBOOK_SHA256)
+
+    def test_every_published_construction_verifies_and_pending_ones_are_declared(self):
+        self.assertEqual(34, len(self.problems))
+        self.assertEqual([], [r["id"] for r in am.self_test(self.problems) if not r["matches"]])
+        rows = am.manifest(self.problems)
+        self.assertEqual(36, len(rows))
+        self.assertEqual({"independent", "pending"}, {r["verifier"] for r in rows})
+        self.assertTrue(all(r["citation"].startswith("https://github.com/google-deepmind/alphaevolve_results/blob/")
+                            and r["direction"] in ("minimize", "maximize") for r in rows))
+        self.assertTrue(all("construction" not in r for r in rows), "the manifest never carries a construction")
+
+    def test_contamination_screens(self):
+        by_id = {p["id"]: p for p in self.problems}
+        heights = by_id["c1-autocorrelation"]["construction"]
+        self.assertEqual(["c1-autocorrelation"],
+                         am.prompt_contamination(self.problems, "heights: " + " ".join(map(str, heights[100:120]))))
+        self.assertEqual([], am.prompt_contamination(self.problems, "Minimise max(f*f)/(int f)^2 with 600 steps."))
+        circles = np.array(by_id["circles-square-26"]["construction"])
+        self.assertTrue(am.output_contamination(by_id["circles-square-26"], circles[::-1]))
+        self.assertFalse(am.output_contamination(by_id["circles-square-26"], circles + 1e-3))
+        a, b, c = by_id["tensor-333-Z"]["construction"]
+        order = np.arange(a.shape[1])[::-1]
+        self.assertTrue(am.output_contamination(by_id["tensor-333-Z"], (a[:, order], b[:, order], c[:, order])))
 
 if __name__ == "__main__":
     unittest.main()

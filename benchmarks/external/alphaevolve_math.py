@@ -288,6 +288,44 @@ def circles(value, count, box=None, perimeter=None):
     return None if gaps.min() < -TOL else float(r.sum())
 
 
+def _hexagon(center, side, angle_degrees):
+    theta = np.radians(angle_degrees) + np.arange(6) * np.pi / 3
+    return np.asarray(center, dtype=np.float64) + side * np.stack([np.cos(theta), np.sin(theta)], 1)
+
+
+def _separated(a, b):
+    """Separating-axis test for two convex polygons: True when their interiors are disjoint."""
+    for polygon in (a, b):
+        edges = np.roll(polygon, -1, 0) - polygon
+        for nx, ny in np.stack([edges[:, 1], -edges[:, 0]], 1):
+            pa, pb = a @ (nx, ny), b @ (nx, ny)
+            if pa.max() <= pb.min() + TOL or pb.max() <= pa.min() + TOL:
+                return True
+    return False
+
+
+def hexagons(namespace, count):
+    """Outer side length of `count` disjoint unit hexagons packed inside the outer hexagon."""
+    inner = np.asarray(namespace["inner_hex_data"], dtype=np.float64)
+    side = float(namespace["outer_hex_side_length"])
+    if inner.shape != (count, 3) or side <= 0:
+        return None
+    outer = _hexagon(namespace["outer_hex_center"], side, namespace["outer_hex_angle_degrees"])
+    shapes = [_hexagon(row[:2], 1.0, row[2]) for row in inner]
+    edges = np.roll(outer, -1, 0) - outer
+    normals = np.stack([edges[:, 1], -edges[:, 0]], 1)
+    orientation = np.sign(((outer.mean(0) - outer) * normals).sum(1))  # inward sign per edge
+    for shape in shapes:
+        inside = ((shape[:, None, :] - outer[None, :, :]) * normals[None]).sum(-1) * orientation
+        if np.any(inside < -TOL * np.linalg.norm(normals, axis=1)):
+            return None
+    for i in range(count):
+        for j in range(i + 1, count):
+            if not _separated(shapes[i], shapes[j]):
+                return None
+    return side
+
+
 # (section, variable, id, direction, published, printed decimals, verifier(value, namespace))
 B_PROBLEMS = [
     ("B.1", "step_function_heights_1", "c1-autocorrelation", "minimize", 1.5053, 4, lambda v, ns: c1(v)),
@@ -297,6 +335,8 @@ B_PROBLEMS = [
     ("B.5", "best_sequence", "c5-erdos-overlap", "minimize", 0.380924, 6, lambda v, ns: c5(v)),
     ("B.6", "solution_1", "c6-sums-differences-2003", "maximize", 1.1479, 4, lambda v, ns: c6(v)),
     ("B.6", "solution_2", "c6-sums-differences-54265", "maximize", 1.1584, 4, lambda v, ns: c6(v)),
+    ("B.7", "inner_hex_data#0", "hexagons-11", "minimize", 3.931, 3, lambda v, ns: hexagons(ns, 11)),
+    ("B.7", "inner_hex_data#1", "hexagons-12", "minimize", 3.942, 3, lambda v, ns: hexagons(ns, 12)),
     ("B.8", "construction_1", "maxmin-ratio-2d-16", "minimize", 12.889266112, 9, lambda v, ns: distance_ratio_squared(v, 2, 16)),
     ("B.8", "construction_2", "maxmin-ratio-3d-14", "minimize", 4.165849767, 9, lambda v, ns: distance_ratio_squared(v, 3, 14)),
     ("B.9", "found_points", "heilbronn-triangle-11", "maximize", 0.0365, 4,
@@ -312,10 +352,13 @@ B_PROBLEMS = [
 
 def b_problems(cells):
     problems = []
-    for section, variable, ident, direction, value, decimals, check in B_PROBLEMS:
+    for section, spec, ident, direction, value, decimals, check in B_PROBLEMS:
+        variable, _, occurrence = spec.partition("#")
         found = [ns for heading, ns in cells if heading and heading.startswith(section + ".") or
                  heading and heading.startswith(section + " ")]
         found = [ns for ns in found if variable in ns]
+        if occurrence:
+            found = found[int(occurrence):int(occurrence) + 1]
         if len(found) != 1:
             raise ValueError(f"{ident}: expected one data cell holding {variable} under {section}, found {len(found)}")
         namespace = found[0]
@@ -324,6 +367,30 @@ def b_problems(cells):
                              construction_variable=variable, construction=namespace[variable],
                              _check=check, _namespace=namespace))
     return problems
+
+
+def double_columns(decomposition, n, m, p):
+    """<n,m,2p> from <n,m,p>: C = [A B1 | A B2], so each rank-1 term appears once per column block.
+    The notebook gives <4,4,8> rank 96 only as 'double the rank-48 <4,4,4>'; this builds it."""
+    a, b, c = (np.asarray(f) for f in decomposition)
+    rank = a.shape[1]
+    new_b = np.zeros((m * 2 * p, 2 * rank), dtype=b.dtype)
+    new_c = np.zeros((2 * p * n, 2 * rank), dtype=c.dtype)
+    for block in range(2):
+        for j in range(m):
+            for k in range(p):
+                new_b[j * 2 * p + block * p + k, block * rank:(block + 1) * rank] = b[j * p + k]
+        for k in range(p):
+            for i in range(n):
+                new_c[(block * p + k) * n + i, block * rank:(block + 1) * rank] = c[k * n + i]
+    return np.concatenate([a, a], 1), new_b, new_c
+
+
+def derived_problems(tensors):
+    base = next(t for t in tensors if t["id"] == "tensor-444-0.5*C")
+    return [dict(base, id="tensor-448-0.5*C", section="Rank-96 decomposition of <4,4,8> over 0.5*C (derived by doubling)",
+                 published_value=96, parameters=dict(n=4, m=4, p=8, ring="0.5*C"),
+                 construction=double_columns(base["construction"], 4, 4, 4), derived_from=base["id"])]
 
 
 def verify(problem, construction):
@@ -347,7 +414,7 @@ def matches_published(problem, value):
         return value == problem["published_value"]
     half = 0.5 * 10 ** -problem["published_decimals"]
     target = problem["published_value"]
-    return value <= target + half if problem["direction"] == "minimize" else value >= target - half
+    return bool(value <= target + half if problem["direction"] == "minimize" else value >= target - half)
 
 
 def self_test(problems):
@@ -357,3 +424,74 @@ def self_test(problems):
         value = verify(pr, pr["construction"])
         rows.append(dict(id=pr["id"], published=pr["published_value"], verified=value, matches=matches_published(pr, value)))
     return rows
+
+# ------------------------------------------------------------- manifest and contamination
+PENDING = [
+    dict(id="c4-uncertainty-hermite", section="B.4", direction="minimize", published_value=0.3521, published_decimals=4,
+         reason="Hermite formulation needs exact real-root isolation of P/x^2; verifier not yet built"),
+    dict(id="c4-uncertainty-laguerre", section="B.4", direction="minimize", published_value=0.3216, published_decimals=4,
+         reason="Cohn-Goncalves Laguerre formulation needs an exact linear solve with double-root conditions"),
+]
+WINDOW = 8
+
+
+def _numbers(value):
+    flat = np.asarray(value, dtype=np.complex128).reshape(-1)
+    return [f"{x.real:.6g}" if x.imag == 0 else f"{x.real:.6g}{x.imag:+.6g}j" for x in flat]
+
+
+def prompt_contamination(problems, prompt):
+    """Problems whose published construction appears in `prompt` as a run of WINDOW numbers.
+    Prompts must never carry a known construction; any hit refuses the prompt."""
+    found = [f"{float(m):.6g}" for m in re.findall(r"[-+]?\d*\.?\d+(?:[eE][-+]?\d+)?", prompt)]
+    text = " ".join(found)
+    hits = []
+    for problem in problems:
+        numbers = _numbers(problem["construction"] if problem["kind"] != "tensor" else problem["construction"][0])
+        if len(numbers) < WINDOW:
+            continue
+        windows = {" ".join(numbers[i:i + WINDOW]) for i in range(0, len(numbers) - WINDOW + 1, max(1, WINDOW // 2))}
+        if any(window in text for window in windows):
+            hits.append(problem["id"])
+    return hits
+
+
+def output_contamination(problem, candidate, tolerance=1e-6):
+    """True when a candidate reproduces the published construction (row order ignored for
+    point sets): a memorised answer, flagged and never counted as a search result."""
+    try:
+        if problem["kind"] == "tensor":
+            ours = [np.asarray(f, dtype=np.complex128) for f in candidate]
+            theirs = [np.asarray(f, dtype=np.complex128) for f in problem["construction"]]
+            if any(a.shape != b.shape for a, b in zip(ours, theirs)):
+                return False
+            key = lambda fs: sorted(tuple(np.round(np.concatenate([f[:, r] for f in fs]), 6)) for r in range(fs[0].shape[1]))
+            return key(ours) == key(theirs)
+        ours = np.asarray(candidate, dtype=np.float64)
+        theirs = np.asarray(problem["construction"], dtype=np.float64)
+        if ours.shape != theirs.shape:
+            return False
+        if ours.ndim == 2:
+            ours, theirs = ours[np.lexsort(ours.T[::-1])], theirs[np.lexsort(theirs.T[::-1])]
+        return bool(np.allclose(ours, theirs, rtol=0, atol=tolerance))
+    except (ValueError, TypeError):
+        return False
+
+
+def manifest(problems):
+    """The registrable family: everything but the constructions themselves (never in prompts)."""
+    rows = [dict(id=p["id"], section=p["section"], kind=p["kind"], direction=p["direction"],
+                 published_value=p["published_value"], published_decimals=p.get("published_decimals"),
+                 proven_optimal=p["proven_optimal"], citation=p["citation"], verifier="independent",
+                 derived_from=p.get("derived_from")) for p in problems]
+    rows += [dict(id=p["id"], section=p["section"], kind="analytic", direction=p["direction"],
+                  published_value=p["published_value"], published_decimals=p["published_decimals"],
+                  proven_optimal=False, citation=CITATION, verifier="pending", pending_reason=p["reason"])
+             for p in PENDING]
+    return rows
+
+
+def family(notebook_path, expected_sha256):
+    cells, _ = data_cells(notebook_path, expected_sha256)
+    tensors = tensor_problems(cells)
+    return tensors + derived_problems(tensors) + b_problems(cells)
