@@ -93,7 +93,12 @@ def verify_tensor(decomposition, n, m, p, ring):
     scale = RINGS[ring]
     scaled = []
     for factor in factors:
-        values = factor.astype(np.complex128) * scale
+        try:
+            values = factor.astype(np.complex128) * scale
+        except (TypeError, ValueError):
+            return None  # non-numeric coefficients are an invalid candidate, not an error
+        if not np.all(np.isfinite(values)):
+            return None
         rounded = np.round(values.real) + 1j * np.round(values.imag)
         if not np.all(np.abs(values - rounded) == 0):
             return None  # a coefficient outside the declared ring
@@ -168,11 +173,18 @@ def c5(value):  # Erdos minimum overlap: 0 <= f <= 1 with sum exactly n/2
     return 2 * np.correlate(h, 1 - h, mode="full").max() / h.size
 
 
+# The exact sums/differences check needs a 2*max(U)+1 byte bitmap. The published 54265-integer set
+# needs 1.6e9; the bound is declared so a hostile candidate cannot request unbounded memory.
+MAXIMUM_SET_EXTENT = 2_000_000_000
+
+
 def c6(value):  # 1 + log(|U-U|/|U+U|) / log(2 max U + 1), U of integers with min 0
     u = np.asarray(value)
     if u.ndim != 1 or u.size < 2 or u.dtype.kind not in "iu" or u.min() != 0 or np.unique(u).size != u.size:
         return None
     top = int(u.max())
+    if 2 * top + 1 > MAXIMUM_SET_EXTENT:
+        return None  # beyond the declared memory bound for the exact support bitmap
     if 2 * top + 1 <= 1 << 26:
         indicator = np.zeros(top + 1)
         indicator[u] = 1
@@ -236,7 +248,7 @@ def _hull_area(points):
 def heilbronn_triangle(points, a, b, c, count):
     x = np.asarray(points, dtype=np.float64)
     tri = np.asarray([a, b, c], dtype=np.float64)
-    if x.shape != (count, 2) or tri.shape != (3, 2):
+    if x.shape != (count, 2) or tri.shape != (3, 2) or not np.all(np.isfinite(x)) or not np.all(np.isfinite(tri)):
         return None
     area = _areas(tri)[0]
     matrix = np.array([[tri[0][0] - tri[2][0], tri[1][0] - tri[2][0]], [tri[0][1] - tri[2][1], tri[1][1] - tri[2][1]]])
@@ -276,7 +288,7 @@ def kissing(centers, dimension):
 
 def circles(value, count, box=None, perimeter=None):
     c = np.asarray(value, dtype=np.float64)
-    if c.shape != (count, 3) or np.any(c[:, 2] <= 0):
+    if c.shape != (count, 3) or not np.all(np.isfinite(c)) or np.any(c[:, 2] <= 0):
         return None
     x, y, r = c.T
     if box is not None:
@@ -306,13 +318,25 @@ def _separated(a, b):
     return False
 
 
-def hexagons(namespace, count):
-    """Outer side length of `count` disjoint unit hexagons packed inside the outer hexagon."""
-    inner = np.asarray(namespace["inner_hex_data"], dtype=np.float64)
-    side = float(namespace["outer_hex_side_length"])
-    if inner.shape != (count, 3) or side <= 0:
+HEXAGON_FIELDS = ("inner_hex_data", "outer_hex_center", "outer_hex_side_length", "outer_hex_angle_degrees")
+
+
+def hexagons(candidate, count):
+    """Outer side length of `count` disjoint unit hexagons packed inside the outer hexagon.
+    The candidate is the whole construction (inner hexagons AND the outer hexagon), never a stored value."""
+    if not isinstance(candidate, dict) or set(candidate) != set(HEXAGON_FIELDS):
         return None
-    outer = _hexagon(namespace["outer_hex_center"], side, namespace["outer_hex_angle_degrees"])
+    try:
+        inner = np.asarray(candidate["inner_hex_data"], dtype=np.float64)
+        center = np.asarray(candidate["outer_hex_center"], dtype=np.float64)
+        side = float(candidate["outer_hex_side_length"])
+        angle = float(candidate["outer_hex_angle_degrees"])
+    except (TypeError, ValueError):
+        return None
+    if (inner.shape != (count, 3) or center.shape != (2,) or not np.all(np.isfinite(inner)) or
+            not np.all(np.isfinite(center)) or not np.isfinite(side) or not np.isfinite(angle) or side <= 0):
+        return None
+    outer = _hexagon(center, side, angle)
     shapes = [_hexagon(row[:2], 1.0, row[2]) for row in inner]
     edges = np.roll(outer, -1, 0) - outer
     normals = np.stack([edges[:, 1], -edges[:, 0]], 1)
@@ -337,8 +361,8 @@ B_PROBLEMS = [
     ("B.5", "best_sequence", "c5-erdos-overlap", "minimize", 0.380924, 6, lambda v, ns: c5(v)),
     ("B.6", "solution_1", "c6-sums-differences-2003", "maximize", 1.1479, 4, lambda v, ns: c6(v)),
     ("B.6", "solution_2", "c6-sums-differences-54265", "maximize", 1.1584, 4, lambda v, ns: c6(v)),
-    ("B.7", "inner_hex_data#0", "hexagons-11", "minimize", 3.931, 3, lambda v, ns: hexagons(ns, 11)),
-    ("B.7", "inner_hex_data#1", "hexagons-12", "minimize", 3.942, 3, lambda v, ns: hexagons(ns, 12)),
+    ("B.7", "inner_hex_data#0", "hexagons-11", "minimize", 3.931, 3, lambda v, ns: hexagons(v, 11)),
+    ("B.7", "inner_hex_data#1", "hexagons-12", "minimize", 3.942, 3, lambda v, ns: hexagons(v, 12)),
     ("B.8", "construction_1", "maxmin-ratio-2d-16", "minimize", 12.889266112, 9, lambda v, ns: distance_ratio_squared(v, 2, 16)),
     ("B.8", "construction_2", "maxmin-ratio-3d-14", "minimize", 4.165849767, 9, lambda v, ns: distance_ratio_squared(v, 3, 14)),
     ("B.9", "found_points", "heilbronn-triangle-11", "maximize", 0.0365, 4,
@@ -364,9 +388,12 @@ def b_problems(cells):
         if len(found) != 1:
             raise ValueError(f"{ident}: expected one data cell holding {variable} under {section}, found {len(found)}")
         namespace = found[0]
+        # B.7's construction is the whole packing, so a candidate must supply the outer hexagon too.
+        construction = ({key: namespace[key] for key in HEXAGON_FIELDS} if variable == "inner_hex_data"
+                        else namespace[variable])
         problems.append(dict(id=ident, section=section, kind="analytic", direction=direction, published_value=value,
                              published_decimals=decimals, proven_optimal=False, citation=CITATION,
-                             construction_variable=variable, construction=namespace[variable],
+                             construction_variable=variable, construction=construction,
                              _check=check, _namespace=namespace))
     return problems
 
@@ -638,10 +665,14 @@ def prompt_contamination(problems, prompt):
     text = " ".join(found)
     hits = []
     for problem in problems:
-        numbers = _numbers(problem["construction"] if problem["kind"] != "tensor" else problem["construction"][0])
-        if len(numbers) < WINDOW:
+        construction = problem["construction"]
+        sequences = ([_numbers(factor) for factor in construction] if problem["kind"] == "tensor" else
+                     [_numbers(np.asarray(construction[key], dtype=np.float64)) for key in HEXAGON_FIELDS]
+                     if isinstance(construction, dict) else [_numbers(construction)])
+        windows = {" ".join(numbers[i:i + WINDOW]) for numbers in sequences
+                   for i in range(0, len(numbers) - WINDOW + 1, max(1, WINDOW // 2))}
+        if not windows:
             continue
-        windows = {" ".join(numbers[i:i + WINDOW]) for i in range(0, len(numbers) - WINDOW + 1, max(1, WINDOW // 2))}
         if any(window in text for window in windows):
             hits.append(problem["id"])
     return hits
@@ -656,8 +687,12 @@ def output_contamination(problem, candidate, tolerance=1e-6):
             theirs = [np.asarray(f, dtype=np.complex128) for f in problem["construction"]]
             if any(a.shape != b.shape for a, b in zip(ours, theirs)):
                 return False
-            key = lambda fs: sorted(tuple(np.round(np.concatenate([f[:, r] for f in fs]), 6)) for r in range(fs[0].shape[1]))
-            return key(ours) == key(theirs)
+            # A rank-one term is its outer product: (a, b, c), (-a, -b, c) and (2a, b/2, c) are one term.
+            # Comparing the multiset of term tensors ignores term order, sign flips and rescaling.
+            def terms(fs):
+                return sorted(tuple(np.round(np.einsum("i,j,k->ijk", fs[0][:, r], fs[1][:, r], fs[2][:, r]).ravel(), 6))
+                              for r in range(fs[0].shape[1]))
+            return terms(ours) == terms(theirs)
         ours = np.asarray(candidate, dtype=np.float64)
         theirs = np.asarray(problem["construction"], dtype=np.float64)
         if ours.shape != theirs.shape:

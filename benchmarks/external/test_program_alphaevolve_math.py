@@ -127,5 +127,49 @@ class FamilyTests(unittest.TestCase):
         order = np.arange(a.shape[1])[::-1]
         self.assertTrue(am.output_contamination(by_id["tensor-333-Z"], (a[:, order], b[:, order], c[:, order])))
 
+class ReviewRegressionTests(unittest.TestCase):
+    """Each case is a CodeRabbit finding on #133 that must stay fixed."""
+
+    def setUp(self):
+        root = os.environ.get("EVOLUTION_ALPHAEVOLVE_RESULTS")
+        if not root:
+            raise RuntimeError("Set EVOLUTION_ALPHAEVOLVE_RESULTS to the pinned alphaevolve_results checkout")
+        self.problems = {p["id"]: p for p in am.family(Path(root) / "mathematical_results.ipynb", NOTEBOOK_SHA256)}
+
+    def test_the_hexagon_verifier_judges_the_candidate_not_the_published_packing(self):
+        problem = self.problems["hexagons-11"]
+        published = problem["construction"]
+        self.assertTrue(am.matches_published(problem, am.verify(problem, published)))
+        shrunk = dict(published, outer_hex_side_length=float(published["outer_hex_side_length"]) * 0.97)
+        self.assertIsNone(am.verify(problem, shrunk), "a smaller outer hexagon cannot contain the packing")
+        moved = dict(published, inner_hex_data=np.array(published["inner_hex_data"], dtype=float) + [0.5, 0.5, 0.0])
+        self.assertIsNone(am.verify(problem, moved))
+        self.assertIsNone(am.verify(problem, {"inner_hex_data": published["inner_hex_data"]}), "the outer hexagon is part of the candidate")
+
+    def test_invalid_candidates_are_rejected_not_raised(self):
+        tensor = self.problems["tensor-333-Z"]
+        a, b, c = tensor["construction"]
+        self.assertIsNone(am.verify(tensor, (np.full(np.shape(a), "x"), b, c)), "non-numeric coefficients")
+        self.assertIsNone(am.verify(tensor, (np.where(np.array(a) == 0, np.nan, a), b, c)))
+        self.assertIsNone(am.c6(np.array([0, 3, am.MAXIMUM_SET_EXTENT])), "an extent past the declared bound is refused before allocating")
+        points = np.array(self.problems["heilbronn-triangle-11"]["construction"], dtype=float)
+        points[0, 0] = np.nan
+        self.assertIsNone(am.verify(self.problems["heilbronn-triangle-11"], points))
+        circles = np.array(self.problems["circles-square-26"]["construction"], dtype=float)
+        circles[0, 2] = np.inf
+        self.assertIsNone(am.verify(self.problems["circles-square-26"], circles))
+
+    def test_contamination_covers_every_factor_and_equivalent_decompositions(self):
+        tensor = self.problems["tensor-333-Z"]
+        a, b, c = (np.array(f) for f in tensor["construction"])
+        third = " ".join(f"{v:.6g}" for v in c.reshape(-1)[:40])
+        self.assertIn("tensor-333-Z", am.prompt_contamination(self.problems.values(), "use " + third))
+        flipped = (-a, -b, c)
+        rescaled = (2 * a, b / 2, c)
+        self.assertTrue(am.output_contamination(tensor, flipped))
+        self.assertTrue(am.output_contamination(tensor, rescaled))
+        different = (a, b, np.where(c == 0, 1.0, c))
+        self.assertFalse(am.output_contamination(tensor, different))
+
 if __name__ == "__main__":
     unittest.main()
