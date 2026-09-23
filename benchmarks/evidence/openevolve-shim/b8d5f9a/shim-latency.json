@@ -1,0 +1,18 @@
+{
+  "story": "V1-03 #110",
+  "commit": "b8d5f9a",
+  "samples": 600,
+  "request_bytes": 16140,
+  "shim_ms_p50": 0.4836999978579115,
+  "shim_ms_p95": 0.818000000435859,
+  "shim_ms_max": 21.805199998198077,
+  "connection": "persistent (HTTP/1.1 keep-alive), connect included once per broker",
+  "chat_received": 600,
+  "recorded": 600,
+  "unrecorded_prompts": 0,
+  "targets": {
+    "shim_ms_p95": "< 5",
+    "unrecorded_prompts": 0
+  },
+  "passed": true
+}
