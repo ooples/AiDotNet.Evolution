@@ -255,7 +255,9 @@ class ClaudeTransport:
             text = self._generate(system_message, messages)
             usage = self._last_usage
             return {"text": text, "cost_units": sum(usage[name] for name in USAGE_FIELDS),
-                    "cost_metric": "reported_input_plus_cache_plus_output_tokens"}
+                    "cost_metric": "reported_input_plus_cache_plus_output_tokens",
+                    "throttle_seconds": self._last_notes["retry_delay_seconds"],
+                    "rate_limit_events": len(self._last_notes["rate_limit_events"])}
 
     def canary_input_tokens(self):
         """Input tokens for a fixed prompt; a change means context was injected."""
@@ -346,6 +348,7 @@ class ClaudeTransport:
                                **{key: value for key, value in notes.items() if key != "rate_limit_events"},
                                rate_limit_events=len(notes["rate_limit_events"]))
                 self._last_usage = dict(usage)
+                self._last_notes = notes
                 return text
         except Exception:
             self.failed = True
