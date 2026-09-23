@@ -178,6 +178,7 @@ class ProgramBroker:
         # Every authenticated chat request, counted before it is parsed, so a refused prompt
         # is still visible: received minus recorded model rows is the unrecorded-prompt count.
         self.chat_received = 0
+        self.refusals = []
         broker = self
 
         class Handler(BaseHTTPRequestHandler):
@@ -230,7 +231,10 @@ class ProgramBroker:
                     self.send_header("Content-Length", str(len(payload)))
                     self.end_headers()
                     self.wfile.write(payload)
-                except Exception:
+                except Exception as error:
+                    # Kept, bounded, so a refused request is diagnosable rather than silent.
+                    if len(broker.refusals) < 100:
+                        broker.refusals.append(f"{self.path}: {type(error).__name__}: {str(error)[:200]}")
                     self.send_error(400, "Benchmark request failed")
 
         # Threaded so an idle keep-alive connection cannot block another client's request;

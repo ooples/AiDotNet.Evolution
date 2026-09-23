@@ -336,6 +336,7 @@ jobs:
           .local/program-env/bin/python -m unittest discover -s benchmarks/external -p test_claude_transport.py -v
           .local/program-env/bin/python -m unittest discover -s benchmarks/external -p test_openevolve_adapter.py -v
           .local/program-env/bin/python -m unittest discover -s benchmarks/external -p test_openevolve_configs.py -v
+          .local/program-env/bin/python -m unittest discover -s benchmarks/external -p test_campaign_runner.py -v
           .local/program-env/bin/python benchmarks/external/run_program_comparison.py --aidotnet benchmarks/EvolutionComparison/bin/Release/net10.0/EvolutionComparison.dll --upstream .local/openevolve-upstream --output TestResults/program-comparison
       - name: Validate actual container isolation and independent oracles
         run: |
