@@ -277,7 +277,7 @@ internal static class RunCommand
         throw new InvalidDataException(outputDirectory + " already holds 1000 trace sessions.");
     }
 
-    private static string Extension(ProgramLanguage language) => language switch
+    internal static string Extension(ProgramLanguage language) => language switch
     {
         ProgramLanguage.Python => ".py",
         ProgramLanguage.JavaScript => ".js",

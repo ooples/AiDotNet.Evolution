@@ -3,6 +3,7 @@ using System.Runtime.InteropServices;
 using System.Text;
 using System.Text.Json;
 using AiDotNet.Evolution;
+using AiDotNet.Evolution.Programs;
 
 namespace AiDotNet.Evolution.Cli;
 
@@ -16,7 +17,7 @@ public static class Program
           aidotnet-evolve preflight <run.json>
           aidotnet-evolve inspect <trace>
           aidotnet-evolve compare <traceA> <traceB>
-          aidotnet-evolve export  <trace> <output-directory>
+          aidotnet-evolve export  <trace> <output-directory> [--include-source <program-file>]
           aidotnet-evolve report  <trace> <output.html>
         """;
 
@@ -31,7 +32,8 @@ public static class Program
                 ["preflight", string runFile] => RunCommand.Preflight(runFile, Console.Out, CancellationToken.None),
                 ["inspect", string trace] => Print(JsonSerializer.Serialize(TraceAnalysis.Load(trace).Summary(), Json)),
                 ["compare", string a, string b] => Print(JsonSerializer.Serialize(TraceAnalysis.Compare(TraceAnalysis.Load(a), TraceAnalysis.Load(b)), Json)),
-                ["export", string trace, string output] => Export(trace, output),
+                ["export", string trace, string output] => Export(trace, output, null),
+                ["export", string trace, string output, "--include-source", string source] => Export(trace, output, source),
                 ["report", string trace, string output] => Report(trace, output),
                 _ => Fail(Usage)
             };
@@ -58,13 +60,46 @@ public static class Program
     private static int Print(string text) { Console.WriteLine(text); return 0; }
     private static int Fail(string text) { Console.Error.WriteLine(text); return 2; }
 
-    private static int Export(string trace, string output)
+    /// <summary>Writes winner.json, and with <paramref name="sourcePath"/> the winner's exact program beside it.</summary>
+    /// <remarks>
+    /// Traces never carry source, so the program is supplied by the caller -- usually the run's best file -- and is
+    /// accepted only if its content identity IS the winning genome's id. A file that merely resembles the winner,
+    /// or the best of a different session, is refused rather than exported under the winner's evidence.
+    /// </remarks>
+    private static int Export(string trace, string output, string? sourcePath)
     {
         TraceAnalysis analysis = TraceAnalysis.Load(trace);
-        Directory.CreateDirectory(output);
+        string winnerId = (analysis.Best ?? throw new InvalidDataException("The trace has no valid evaluation to export.")).GenomeId;
         string path = Path.Combine(output, "winner.json");
         if (File.Exists(path)) return Fail("error: " + path + " already exists; exports never overwrite.");
-        File.WriteAllText(path, JsonSerializer.Serialize(analysis.Winner(), Json));
+
+        object? source = null;
+        string? sourceOut = null;
+        string? sourceText = null;
+        if (sourcePath is not null)
+        {
+            sourceText = File.ReadAllText(sourcePath);
+            ProgramLanguage? language = null;
+            foreach (ProgramLanguage candidate in Enum.GetValues<ProgramLanguage>())
+            {
+                if (string.Equals(new ProgramGenome(sourceText, candidate).Id, winnerId, StringComparison.Ordinal)) { language = candidate; break; }
+            }
+            if (language is not { } matched)
+                return Fail("error: " + sourcePath + " is not the winner's program: its identity does not match genome " + winnerId + ".");
+            sourceOut = Path.Combine(output, "winner" + RunCommand.Extension(matched));
+            if (File.Exists(sourceOut)) return Fail("error: " + sourceOut + " already exists; exports never overwrite.");
+            source = new
+            {
+                File = Path.GetFileName(sourceOut),
+                Language = matched.ToString(),
+                Sha256 = Convert.ToHexString(System.Security.Cryptography.SHA256.HashData(Encoding.UTF8.GetBytes(sourceText))).ToLowerInvariant(),
+                BoundTo = winnerId
+            };
+        }
+
+        Directory.CreateDirectory(output);
+        if (sourceOut is not null && sourceText is not null) File.WriteAllText(sourceOut, sourceText, new UTF8Encoding(false));
+        File.WriteAllText(path, JsonSerializer.Serialize(analysis.Winner(source), Json));
         return Print(path);
     }
 
@@ -139,7 +174,7 @@ internal sealed class TraceAnalysis
         };
     }
 
-    public object Winner()
+    public object Winner(object? source = null)
     {
         EvolutionTraceRecord best = Best ?? throw new InvalidDataException("The trace has no valid evaluation to export.");
         var byGenome = Records.GroupBy(r => r.GenomeId).ToDictionary(g => g.Key, g => g.Last());
@@ -167,7 +202,10 @@ internal sealed class TraceAnalysis
                 Runtime = RuntimeInformation.FrameworkDescription,
                 Architecture = RuntimeInformation.ProcessArchitecture.ToString()
             },
-            Limitations = "Identity, evidence and lineage only: traces carry no program source and no credentials."
+            Source = source,
+            Limitations = source is null
+                ? "Identity, evidence and lineage only: traces carry no program source and no credentials."
+                : "The program source is included by request and is bound to the winning genome id. No credentials are exported."
         };
     }
 
