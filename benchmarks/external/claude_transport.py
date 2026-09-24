@@ -178,6 +178,37 @@ class ExclusiveWorkspace:
         finally:
             handle.close()
 
+class ClaudeModelSet:
+    """One transport per declared model, so a native ensemble routes by name through one contract.
+
+    Both systems receive the same instance's `generate`; an undeclared name is refused rather
+    than mapped, so a config cannot silently reach a model the other arm never had. Calls are
+    sequential across the whole set, as each transport's admission is per model.
+    """
+    def __init__(self, executable, models, evidence, max_calls, *, timeout=300, canary_baselines=None):
+        if not isinstance(models, (list, tuple)) or not models or len(set(models)) != len(models):
+            raise ValueError("Declare a non-empty set of distinct models")
+        baselines = canary_baselines or {}
+        root = Path(evidence).resolve()
+        root.mkdir(parents=True, exist_ok=False)
+        self.transports = {model: ClaudeTransport(executable, model, root / model, max_calls, timeout=timeout,
+                                                  canary_baseline=baselines.get(model)) for model in models}
+        self._lock = threading.Lock()
+
+    def generate(self, system_message, messages, model=None):
+        if model not in self.transports:
+            raise ValueError(f"Model {model!r} is not in the declared set {sorted(self.transports)}")
+        if not self._lock.acquire(blocking=False):
+            raise ValueError("Concurrent model calls are outside the sequential benchmark contract")
+        try:
+            return self.transports[model].generate_metered(system_message, messages)
+        finally:
+            self._lock.release()
+
+    def verify_canaries(self):
+        """Every model's canary against its baseline; the first failure refuses the campaign."""
+        return {model: transport.canary_input_tokens() for model, transport in self.transports.items()}
+
 def reconcile_receipts(evidence):
     """Every admitted call directory must hold a receipt; returns the coverage record."""
     root = Path(evidence)

@@ -9,7 +9,7 @@ import tempfile
 import unittest
 from unittest.mock import patch
 
-from claude_transport import (CANARY_PROMPT, MAX_OUTPUT, PINNED_CLI, ClaudeTransport, ExclusiveWorkspace, parse_events,
+from claude_transport import (CANARY_PROMPT, MAX_OUTPUT, PINNED_CLI, ClaudeModelSet, ClaudeTransport, ExclusiveWorkspace, parse_events,
                               reconcile_receipts,
                               scrubbed_environment, verified_executable)
 
@@ -182,6 +182,22 @@ class ReceiptTests(unittest.TestCase):
             with self.assertRaisesRegex(ValueError, "gap-free"):
                 reconcile_receipts(root)
 
+
+class ModelSetTests(unittest.TestCase):
+    def test_routes_by_declared_name_and_refuses_the_rest(self):
+        with tempfile.TemporaryDirectory() as directory:
+            models = ClaudeModelSet(sys.executable, ["haiku", "opus"], Path(directory) / "e", 3,
+                                    canary_baselines={"haiku": 448})
+            self.assertEqual((448, None), (models.transports["haiku"].canary_baseline, models.transports["opus"].canary_baseline))
+            with patch.object(ClaudeTransport, "generate_metered", autospec=True, return_value={"text": "t"}) as call:
+                models.generate("s", [], model="opus")
+                self.assertIs(models.transports["opus"], call.call_args.args[0])
+                for name in ("sonnet", None):
+                    with self.assertRaisesRegex(ValueError, "declared set"):
+                        models.generate("s", [], model=name)
+            for bad in ([], ["haiku", "haiku"], "haiku"):
+                with self.assertRaises(ValueError):
+                    ClaudeModelSet(sys.executable, bad, Path(directory) / f"x{len(bad)}{type(bad).__name__}", 1)
 
 class WorkspaceTests(unittest.TestCase):
     def test_path_is_fixed_and_emptied_between_calls(self):

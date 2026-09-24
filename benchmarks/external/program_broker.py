@@ -5,10 +5,11 @@ must be isolated by the supplied evaluator; never give that capability to candid
 """
 from __future__ import annotations
 
-from http.server import BaseHTTPRequestHandler, HTTPServer
+from http.server import BaseHTTPRequestHandler, ThreadingHTTPServer
 import json
 import math
 import secrets
+import socket
 import threading
 import time
 import urllib.request
@@ -17,6 +18,39 @@ from urllib.parse import urlsplit
 from program_controls import candidate_hash
 
 MAX_MESSAGE = 256 * 1024
+# Both transports' token metrics; one campaign uses one transport, so arms never mix them.
+COST_METRICS = ("reported_input_plus_output_tokens", "reported_input_plus_cache_plus_output_tokens")
+CHAT_PATH = "/v1/chat/completions"
+# Accepted and recorded, never honoured: the subscription CLI exposes no sampling controls,
+# so they are identical (the CLI default) for every arm and are declared as such.
+IGNORED_SAMPLING = ("temperature", "top_p", "max_tokens", "max_completion_tokens", "seed", "reasoning_effort")
+
+
+def chat_request(body):
+    """An OpenAI chat-completions body as a broker model payload; anything unhonourable is refused."""
+    if not isinstance(body, dict) or set(body) - {"model", "messages", "stream", "n", *IGNORED_SAMPLING}:
+        raise ValueError("Unsupported chat-completions fields")
+    model, messages = body.get("model"), body.get("messages")
+    if not isinstance(model, str) or not 0 < len(model) <= 100 or any(char.isspace() for char in model):
+        raise ValueError("Invalid model name")
+    if body.get("stream", False) is not False or body.get("n", 1) != 1:
+        raise ValueError("Streaming and multiple choices are outside the one-request contract")
+    if (not isinstance(messages, list) or not messages or
+            any(not isinstance(m, dict) or set(m) != {"role", "content"} or not isinstance(m["content"], str) or
+                m["role"] not in ("system", "user", "assistant") for m in messages)):
+        raise ValueError("Messages must be role/content text")
+    system = ""
+    if messages[0]["role"] == "system":
+        system, messages = messages[0]["content"], messages[1:]
+    if not messages or any(m["role"] == "system" for m in messages):
+        raise ValueError("Only one leading system message is supported")
+    return {"system": system, "messages": messages, "model": model,
+            "ignored_sampling": {name: body[name] for name in IGNORED_SAMPLING if name in body}}
+
+
+def chat_response(model, text, sequence):
+    return {"id": f"evolution-{sequence}", "object": "chat.completion", "created": 0, "model": model,
+            "choices": [{"index": 0, "finish_reason": "stop", "message": {"role": "assistant", "content": text}}]}
 
 
 def request(endpoint, capability, operation, payload):
@@ -66,20 +100,40 @@ class ProgramBroker:
         self.evaluation_seconds = 0.0
         self.has_valid_evaluation = False
         self.capability = secrets.token_hex(32)
+        # Every authenticated chat request, counted before it is parsed, so a refused prompt
+        # is still visible: received minus recorded model rows is the unrecorded-prompt count.
+        self.chat_received = 0
         broker = self
 
         class Handler(BaseHTTPRequestHandler):
+            # Keep-alive: a new loopback connect() costs ~15 ms p95 on Windows (measured; the
+            # handler itself is ~0.02 ms), and OpenEvolve's pooled client reuses connections.
+            protocol_version = "HTTP/1.1"
+
             def setup(self):
                 super().setup()
                 self.connection.settimeout(5)
+                # Headers and body go out as separate small writes; with Nagle on, loopback
+                # delayed-ACK stalls put a multi-millisecond tail on every call.
+                self.connection.setsockopt(socket.IPPROTO_TCP, socket.TCP_NODELAY, 1)
 
             def log_message(self, *args):
                 pass
+
+            def handle(self):
+                # A keep-alive peer that exits resets its idle connection; that is the end of
+                # the connection, not a failure (any request it made is already a row).
+                try:
+                    super().handle()
+                except (ConnectionResetError, ConnectionAbortedError, BrokenPipeError):
+                    self.close_connection = True
 
             def do_POST(self):
                 if not secrets.compare_digest(self.headers.get("Authorization", ""), "Bearer " + broker.capability):
                     self.send_error(403)
                     return
+                if self.path == CHAT_PATH:
+                    broker.chat_received += 1
                 try:
                     length = int(self.headers.get("Content-Length", "-1"))
                     if not 0 <= length <= MAX_MESSAGE or self.headers.get("Transfer-Encoding"):
@@ -87,8 +141,13 @@ class ProgramBroker:
                     raw = self.rfile.read(length)
                     if len(raw) != length:
                         raise ValueError("Truncated request")
-                    result = broker.dispatch(self.path.removeprefix("/"), json.loads(raw))
-                    payload = json.dumps({"status": "ok", "result": result}, allow_nan=False).encode()
+                    if self.path == CHAT_PATH:
+                        with broker._admission:  # the row read must belong to this dispatch
+                            text = broker.dispatch("model", chat_request(json.loads(raw)))
+                            body = chat_response(broker.rows[-1]["request"]["model"], text, broker.rows[-1]["sequence"])
+                    else:
+                        body = {"status": "ok", "result": broker.dispatch(self.path.removeprefix("/"), json.loads(raw))}
+                    payload = json.dumps(body, allow_nan=False).encode()
                     if len(payload) > MAX_MESSAGE:
                         raise ValueError("Oversized response")
                     self.send_response(200)
@@ -99,7 +158,11 @@ class ProgramBroker:
                 except Exception:
                     self.send_error(400, "Benchmark request failed")
 
-        self.server = HTTPServer(("127.0.0.1", 0), Handler)
+        # Threaded so an idle keep-alive connection cannot block another client's request;
+        # admission stays strictly sequential under _admission.
+        self._admission = threading.RLock()
+        self.server = ThreadingHTTPServer(("127.0.0.1", 0), Handler)
+        self.server.daemon_threads = True
         self.thread = threading.Thread(target=self.server.serve_forever, daemon=True)
         self.endpoint = "http://127.0.0.1:" + str(self.server.server_port)
 
@@ -113,6 +176,10 @@ class ProgramBroker:
         self.server.server_close()
 
     def dispatch(self, operation, payload):
+        with self._admission:
+            return self._dispatch(operation, payload)
+
+    def _dispatch(self, operation, payload):
         if (operation not in self.limits or self.closed or time.monotonic() - self.started >= self.seconds
                 or self.attempted[operation] >= self.limits[operation]):
             raise ValueError("Independent broker admission closed")
@@ -133,11 +200,14 @@ class ProgramBroker:
         known_work = False
         try:
             if operation == "model":
-                measured = self.generate(payload["system"], payload["messages"])
+                if "model" in payload:
+                    measured = self.generate(payload["system"], payload["messages"], model=payload["model"])
+                else:
+                    measured = self.generate(payload["system"], payload["messages"])
                 if (not isinstance(measured, dict) or not isinstance(measured.get("text"), str)
                         or len(measured["text"].encode()) > 64 * 1024
                         or type(measured.get("cost_units")) is not int or measured["cost_units"] < 0
-                        or measured.get("cost_metric") != "reported_input_plus_output_tokens"):
+                        or measured.get("cost_metric") not in COST_METRICS):
                     raise ValueError("Missing bounded model response or independently reported token cost")
                 self.model_tokens += measured["cost_units"]
                 known_work = True

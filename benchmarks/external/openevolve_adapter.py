@@ -39,14 +39,31 @@ def evaluate(program_path):
     return {"combined_score": result["quality"] if result["status"] == "valid" else -1e300}
 
 
-async def run(upstream, initial, output, model, iterations, seed, task, mode, selection_profile="default"):
+NATIVE_MODES = ("recommended", "matched")
+
+
+def native_config(record, endpoint, capability):
+    """A built config record as an upstream Config whose native OpenAI client calls the broker shim."""
+    from openevolve import Config
+    if record.get("kind") not in NATIVE_MODES or not isinstance(record.get("config"), dict):
+        raise ValueError("Not a built OpenEvolve comparison config")
+    data = json.loads(json.dumps(record["config"]))
+    data["llm"] = dict(data.get("llm") or {}, api_base=endpoint + "/v1", api_key=capability)
+    config = Config.from_dict(data)
+    models = config.llm.models + config.llm.evaluator_models
+    if any(m.init_client is not None or m.api_base != endpoint + "/v1" or m.retries != 0 for m in models):
+        raise ValueError("A model escaped the broker shim")
+    return config
+
+
+async def run(upstream, initial, output, model, iterations, seed, task, mode, selection_profile="default", config_record=None):
     upstream = Path(upstream).resolve(strict=True)
     actual = subprocess.check_output(["git", "rev-parse", "HEAD"], cwd=upstream, text=True).strip()
     changes = subprocess.check_output(["git", "status", "--porcelain", "--untracked-files=no"], cwd=upstream, text=True)
     if actual != REVISION or changes.strip():
         raise ValueError("OpenEvolve checkout is not the exact clean pinned source")
-    if (not 1 <= iterations <= 64 or not 0 <= seed < 2**32 or mode not in ("controlled", "native-bounded") or
-            selection_profile not in ("default", "best")):
+    if (not 1 <= iterations <= 64 or not 0 <= seed < 2**32 or mode not in ("controlled", "native-bounded", *NATIVE_MODES) or
+            selection_profile not in ("default", "best") or (mode in NATIVE_MODES) != (config_record is not None)):
         raise ValueError("Invalid bounded OpenEvolve run")
     import openevolve
     from openevolve import Config, OpenEvolve
@@ -55,6 +72,19 @@ async def run(upstream, initial, output, model, iterations, seed, task, mode, se
         raise ValueError("Installed OpenEvolve is not the declared source checkout")
     destination = Path(output)
     destination.mkdir(parents=True, exist_ok=False)
+    if mode in NATIVE_MODES:
+        record = json.loads(Path(config_record).read_text(encoding="utf-8"))
+        config = native_config(record, os.environ["EVOLUTION_BROKER_ENDPOINT"], os.environ["EVOLUTION_BROKER_CAPABILITY"])
+        if config.max_iterations != iterations or config.random_seed != seed:
+            raise ValueError("Config budget differs from the declared run")
+        engine = OpenEvolve(str(initial), str(Path(__file__).resolve()), config, str(destination))
+        best = await engine.run(iterations=iterations)
+        result = dict(schema="openevolve-broker-run-v1", revision=actual, mode=mode, iterations=iterations, seed=seed,
+                      models=record["models"], changes=record["changes"], differences=record.get("differences", []),
+                      transport_limits=record["transport_limits"],
+                      best=None if best is None else {"code": best.code, "metrics": best.metrics})
+        (destination / "adapter-result.json").write_text(json.dumps(result, indent=2, allow_nan=False), encoding="utf-8")
+        return result
     config = Config()
     if selection_profile == "best":
         config.database.exploration_ratio = 0.0
@@ -111,10 +141,12 @@ def main():
     parser.add_argument("--iterations", type=int, required=True)
     parser.add_argument("--seed", type=int, required=True)
     parser.add_argument("--task", type=Path, required=True)
-    parser.add_argument("--mode", choices=("controlled", "native-bounded"), required=True)
+    parser.add_argument("--mode", choices=("controlled", "native-bounded", *NATIVE_MODES), required=True)
     parser.add_argument("--selection-profile", choices=("default", "best"), default="default")
+    parser.add_argument("--config-record", type=Path, help="A built recommended/matched record (native modes only)")
     args = parser.parse_args()
-    asyncio.run(run(args.upstream, args.initial, args.output, args.model, args.iterations, args.seed, args.task, args.mode, args.selection_profile))
+    asyncio.run(run(args.upstream, args.initial, args.output, args.model, args.iterations, args.seed, args.task, args.mode,
+                    args.selection_profile, args.config_record))
 
 
 if __name__ == "__main__":

@@ -119,15 +119,19 @@ class Solver:
 
     def test_memory_limit_is_enforced(self):
         # Docker's container-level OOMKilled flag is not the kernel counter.
-        # Keep a small fixture parent alive so it can read cgroup-v2 evidence
-        # after its allocation child is killed; exit 137 alone is not proof.
+        # Keep a small fixture parent alive so it can read the kernel's own OOM
+        # evidence after its allocation child is killed; exit 137 alone is not
+        # proof. Both cgroup versions carry an oom_kill counter and the limit.
         result = self.run_source('''import subprocess
 class Solver:
  def solve(self, problem):
+  import os
+  v2 = os.path.exists('/sys/fs/cgroup/memory.events')
+  base = '/sys/fs/cgroup/' if v2 else '/sys/fs/cgroup/memory/'
   def events():
-   return dict(line.split() for line in open('/sys/fs/cgroup/memory.events'))
+   return dict(line.split() for line in open(base + ('memory.events' if v2 else 'memory.oom_control')))
   before = int(events()['oom_kill'])
-  maximum = int(open('/sys/fs/cgroup/memory.max').read())
+  maximum = int(open(base + ('memory.max' if v2 else 'memory.limit_in_bytes')).read())
   child = subprocess.run(['python', '-c', 'x = [bytearray(8*1024*1024) for _ in range(128)]'],
                          capture_output=True, timeout=3)
   return {'maximum':maximum, 'exit':child.returncode, 'oom_kills':int(events()['oom_kill'])-before}
