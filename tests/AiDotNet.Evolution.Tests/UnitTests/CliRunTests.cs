@@ -205,6 +205,40 @@ public sealed class CliRunTests
         }
         finally { Environment.SetEnvironmentVariable(variable, null); }
     }
+    [Fact]
+    public async Task Inspect_reads_a_run_that_is_still_in_progress()
+    {
+        using var directory = new TemporaryDirectory();
+        using var model = new FakeChatModel();
+        using var reached = new ManualResetEventSlim(false);
+        using var release = new ManualResetEventSlim(false);
+        // Hold the second model call: by then the seed and the first proposal are scored and checkpointed.
+        model.OnCall = call => { if (call == 2) { reached.Set(); release.Wait(TimeSpan.FromSeconds(60)); } };
+        File.WriteAllText(Path.Combine(directory.Path, "initial.py"), "X = 0\n");
+        File.WriteAllText(Path.Combine(directory.Path, "evaluator.py"), Evaluator);
+        string runFile = WriteRun(directory.Path, model.Endpoint, maxEvaluations: 3);
+
+        using var interrupt = new AiDotNet.Evolution.Cli.RunInterrupt();
+        var running = Task.Run(() => AiDotNet.Evolution.Cli.RunCommand.Execute(runFile, false, new StringWriter(), new StringWriter(), interrupt));
+        try
+        {
+            Assert.True(reached.Wait(TimeSpan.FromSeconds(60)), "the run never reached its second model call");
+            var (code, output, error) = Run("inspect", Path.Combine(directory.Path, "out", "trace-000.jsonl"));
+            Assert.True(code == 0, error); // the writer shares the file, so a live trace is readable
+            using JsonDocument summary = JsonDocument.Parse(output);
+            Assert.True(summary.RootElement.GetProperty("Running").GetBoolean()); // reported as in progress
+            Assert.NotEqual(JsonValueKind.Null, summary.RootElement.GetProperty("Best").ValueKind);
+        }
+        finally
+        {
+            release.Set();
+            // Awaited before the directory is disposed, so a failed assertion above is not masked by a locked trace.
+            Assert.Equal(0, await running);
+        }
+        var (_, after, _) = Run("inspect", Path.Combine(directory.Path, "out", "trace-000.jsonl"));
+        using (JsonDocument finished = JsonDocument.Parse(after))
+            Assert.False(finished.RootElement.GetProperty("Running").GetBoolean()); // the marker goes with the run
+    }
     [Theory]
     [InlineData(1, 0)]                                      // one press: stop at the batch boundary and report
     [InlineData(2, AiDotNet.Evolution.Cli.RunCommand.AbortedExitCode)] // two presses: abort, checkpoint still written

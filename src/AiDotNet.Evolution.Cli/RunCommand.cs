@@ -89,6 +89,7 @@ internal static class RunCommand
         string initial = ReadBounded(Path.Combine(baseDirectory, run.InitialProgram), run.Budget.MaxProgramChars);
         string evaluator = ReadBounded(Path.Combine(baseDirectory, run.Evaluator), MaxRunFileBytes);
         string tracePath = NextTracePath(outputDirectory);
+        using var marker = RunMarker.Create(outputDirectory, run.RunId, tracePath);
 
         using var execution = CreateExecution(run);
         using var model = new OpenAiCompatibleChatClient(run.Model);
@@ -371,4 +372,51 @@ internal sealed class OpenAiCompatibleChatClient : IProgramChatClient, IDisposab
     }
 
     public void Dispose() => _http.Dispose();
+}
+
+/// <summary>Marks an output directory as holding a run in progress, for as long as the run process lives.</summary>
+/// <remarks>
+/// A trace flushed at every checkpoint is readable while it is written, but nothing in it says whether its writer is
+/// still going: a finished run and a running one look alike. The marker names the trace and the process, and a
+/// reader believes it only while that process is alive, so a run killed without cleanup never reads as running.
+/// </remarks>
+internal sealed class RunMarker : IDisposable
+{
+    internal const string FileName = "running.json";
+    private readonly string _path;
+
+    private RunMarker(string path) => _path = path;
+
+    public static RunMarker Create(string outputDirectory, string runId, string tracePath)
+    {
+        Directory.CreateDirectory(outputDirectory);
+        string path = Path.Combine(outputDirectory, FileName);
+        File.WriteAllText(path, JsonSerializer.Serialize(new Entry(runId, Environment.ProcessId, Path.GetFileName(tracePath), DateTimeOffset.UtcNow)));
+        return new RunMarker(path);
+    }
+
+    /// <summary>Whether a live process is still writing <paramref name="tracePath"/>.</summary>
+    public static bool IsRunning(string tracePath)
+    {
+        string path = Path.Combine(Path.GetDirectoryName(Path.GetFullPath(tracePath)) ?? ".", FileName);
+        if (!File.Exists(path)) return false;
+        Entry? entry;
+        try { entry = JsonSerializer.Deserialize<Entry>(File.ReadAllText(path)); }
+        catch (Exception exception) when (exception is IOException or JsonException) { return false; }
+        if (entry is null || !string.Equals(entry.Trace, Path.GetFileName(tracePath), StringComparison.Ordinal)) return false;
+        try
+        {
+            using var process = System.Diagnostics.Process.GetProcessById(entry.ProcessId);
+            return !process.HasExited;
+        }
+        catch (ArgumentException) { return false; } // no such process: the run ended without removing its marker
+    }
+
+    public void Dispose()
+    {
+        try { File.Delete(_path); }
+        catch (IOException) { /* a stale marker is harmless: readers check that its process is alive */ }
+    }
+
+    private sealed record Entry(string RunId, int ProcessId, string Trace, DateTimeOffset StartedUtc);
 }

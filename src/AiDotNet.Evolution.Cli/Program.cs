@@ -188,6 +188,7 @@ internal sealed class TraceAnalysis
             Trace = Path,
             RunId = Read.Summary?.RunId,
             Complete = Read.IsComplete,
+            Running = RunMarker.IsRunning(Path),
             Direction = Direction.ToString(),
             Records = Records.Count,
             Statuses = Records.GroupBy(r => r.Status.ToString()).OrderBy(g => g.Key).ToDictionary(g => g.Key, g => g.Count()),
