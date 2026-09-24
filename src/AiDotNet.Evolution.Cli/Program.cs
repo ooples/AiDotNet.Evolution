@@ -18,6 +18,7 @@ public static class Program
           aidotnet-evolve inspect <trace>
           aidotnet-evolve compare <traceA> <traceB>
           aidotnet-evolve export  <trace> <output-directory> [--include-source <program-file>]
+          aidotnet-evolve inspect-export <export-directory>
           aidotnet-evolve report  <trace> <output.html>
         """;
 
@@ -35,6 +36,7 @@ public static class Program
                 ["export", string trace, string output] => Export(trace, output, null),
                 ["export", string trace, string output, "--include-source", string source] => Export(trace, output, source),
                 ["report", string trace, string output] => Report(trace, output),
+                ["inspect-export", string exportDirectory] => InspectExport(exportDirectory),
                 _ => Fail(Usage)
             };
         }
@@ -130,6 +132,35 @@ public static class Program
         }
         return null;
     }
+    /// <summary>Re-checks an export: the winner record parses, and an included source still is the winner.</summary>
+    /// <remarks>
+    /// An export is made to be passed around, so whoever receives one needs to know it was not edited on the way:
+    /// the source must hash to the recorded SHA-256 and its content identity must still be the winning genome id.
+    /// </remarks>
+    private static int InspectExport(string exportDirectory)
+    {
+        string winnerPath = Path.Combine(exportDirectory, "winner.json");
+        if (!File.Exists(winnerPath)) return Fail("error: " + winnerPath + " not found.");
+        using JsonDocument winner = JsonDocument.Parse(File.ReadAllText(winnerPath));
+        JsonElement root = winner.RootElement;
+        string genomeId = root.GetProperty("GenomeId").GetString() ?? string.Empty;
+        if (!root.TryGetProperty("Source", out JsonElement source) || source.ValueKind == JsonValueKind.Null)
+            return Print(JsonSerializer.Serialize(new { Valid = true, GenomeId = genomeId, Quality = root.GetProperty("Quality").GetDouble(), Source = (object?)null }, Json));
+
+        string file = Path.GetFileName(source.GetProperty("File").GetString() ?? string.Empty);
+        string sourcePath = Path.Combine(exportDirectory, file);
+        if (file.Length == 0 || !File.Exists(sourcePath)) return Fail("error: the export names source '" + file + "', which is missing.");
+        string text = File.ReadAllText(sourcePath);
+        string sha = Convert.ToHexString(System.Security.Cryptography.SHA256.HashData(Encoding.UTF8.GetBytes(text))).ToLowerInvariant();
+        if (!string.Equals(sha, source.GetProperty("Sha256").GetString(), StringComparison.Ordinal))
+            return Fail("error: " + file + " does not match its recorded SHA-256; the source was changed after export.");
+        if (!Enum.TryParse(source.GetProperty("Language").GetString(), out ProgramLanguage language)
+            || !string.Equals(new ProgramGenome(text, language).Id, genomeId, StringComparison.Ordinal)
+            || !string.Equals(source.GetProperty("BoundTo").GetString(), genomeId, StringComparison.Ordinal))
+            return Fail("error: " + file + " is not bound to winning genome " + genomeId + ".");
+        return Print(JsonSerializer.Serialize(new { Valid = true, GenomeId = genomeId, Quality = root.GetProperty("Quality").GetDouble(), Source = new { File = file, Sha256 = sha, Language = language.ToString() } }, Json));
+    }
+
     private static int Report(string trace, string output)
     {
         if (File.Exists(output)) return Fail("error: " + output + " already exists; reports never overwrite.");

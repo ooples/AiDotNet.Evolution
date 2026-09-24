@@ -175,6 +175,14 @@ public sealed class CliRunTests
             Assert.Equal(64, source.GetProperty("Sha256").GetString()?.Length);
         }
         Assert.Equal(2, Run("export", trace, exportDir, "--include-source", best).Code); // exports never overwrite
+        var (verifyCode, verified, verifyError) = Run("inspect-export", exportDir);
+        Assert.True(verifyCode == 0, verifyError);
+        using (JsonDocument check = JsonDocument.Parse(verified))
+            Assert.True(check.RootElement.GetProperty("Valid").GetBoolean());
+        File.AppendAllText(Path.Combine(exportDir, "winner.py"), "# changed in transit\n");
+        var (tamperedCode, _, tamperedError) = Run("inspect-export", exportDir);
+        Assert.Equal(2, tamperedCode);
+        Assert.Contains("SHA-256", tamperedError);
     }
     [Fact]
     public void Export_refuses_a_winner_source_that_contains_a_configured_credential()
