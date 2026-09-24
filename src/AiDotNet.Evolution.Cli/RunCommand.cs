@@ -89,11 +89,9 @@ internal static class RunCommand
         string initial = ReadBounded(Path.Combine(baseDirectory, run.InitialProgram), run.Budget.MaxProgramChars);
         string evaluator = ReadBounded(Path.Combine(baseDirectory, run.Evaluator), MaxRunFileBytes);
         string tracePath = NextTracePath(outputDirectory);
+        using var marker = RunMarker.Create(outputDirectory, run.RunId, tracePath);
 
-        var sandbox = new ProgramSandboxOptions { RuntimeVersion = run.RuntimeVersion };
-        sandbox.Limits.TimeLimitSeconds = run.Budget.EvaluationTimeLimitSeconds;
-        sandbox.Limits.MaxConcurrentExecutions = run.Budget.Parallelism;
-        using var execution = new ProcessProgramExecutionEngine(sandbox);
+        using var execution = CreateExecution(run);
         using var model = new OpenAiCompatibleChatClient(run.Model);
 
         var programOptions = new ProgramProposalOptions
@@ -102,8 +100,7 @@ internal static class RunCommand
             TaskDescription = run.TaskDescription,
             MaxProgramChars = run.Budget.MaxProgramChars
         };
-        var fitness = new ScriptProgramFitnessEvaluator(execution, evaluator,
-            new ScriptProgramEvaluationOptions { EvaluatorScriptLanguage = run.EvaluatorLanguage, Direction = run.Direction });
+        var fitness = CreateFitness(run, execution, evaluator);
         var task = new ProgramEvolutionTask(fitness, new ProgramDescriptorSet(new[] { new ProgramLengthDescriptor() }), programOptions);
         var variation = new LlmProgramVariationOperator(model, programOptions, new LlmProgramVariationOptions
         {
@@ -171,6 +168,76 @@ internal static class RunCommand
         return 0;
     }
 
+    /// <summary>
+    /// Checks everything a run needs before it spends a model call: the run file, the checkpoint state, a writable
+    /// output directory, the seed and evaluator files, and that the seed actually passes the evaluator.
+    /// </summary>
+    /// <remarks>
+    /// A seed the evaluator rejects would make every later proposal compete against nothing, and a run that finds
+    /// that out after its first model call has already paid for it. Preflight scores the seed exactly as run
+    /// would -- the same sandbox, limits and evaluator -- and never contacts the model.
+    /// </remarks>
+    public static int Preflight(string runFilePath, TextWriter output, CancellationToken cancellationToken)
+    {
+        string fullPath = Path.GetFullPath(runFilePath);
+        RunFile run = Load(fullPath);
+        string baseDirectory = Path.GetDirectoryName(fullPath) ?? ".";
+        string outputDirectory = Path.GetFullPath(Path.Combine(baseDirectory, run.Output));
+        // Looked up only when the directory exists: opening the store creates it, and preflight starts nothing.
+        string checkpointDirectory = Path.Combine(outputDirectory, "checkpoints");
+        bool hasCheckpoint = Directory.Exists(checkpointDirectory) && new DirectoryEvolutionCheckpointStore(checkpointDirectory).LoadLatestAsync(run.RunId, cancellationToken).GetAwaiter().GetResult() is not null;
+
+        string initial = ReadBounded(Path.Combine(baseDirectory, run.InitialProgram), run.Budget.MaxProgramChars);
+        string evaluator = ReadBounded(Path.Combine(baseDirectory, run.Evaluator), MaxRunFileBytes);
+        ProbeWritable(outputDirectory);
+
+        EvolutionTaskResult seed;
+        using (var execution = CreateExecution(run))
+        {
+            var fitness = CreateFitness(run, execution, evaluator);
+            seed = fitness.EvaluateAsync(new ProgramGenome(initial, run.Language),
+                new EvolutionEvaluationContext(0, run.Budget.Seed, 0, 1), cancellationToken).AsTask().GetAwaiter().GetResult();
+        }
+
+        bool passed = seed.Status == EvolutionEvaluationStatus.Completed && seed.Quality is not null;
+        output.WriteLine(JsonSerializer.Serialize(new
+        {
+            RunId = run.RunId,
+            Passed = passed,
+            // What the next command must be: a fresh run refuses an existing checkpoint and resume refuses a missing one.
+            Next = hasCheckpoint ? "resume" : "run",
+            Output = outputDirectory,
+            SeedStatus = seed.Status.ToString(),
+            SeedQuality = seed.Quality,
+            SeedDiagnostics = seed.Diagnostics,
+            ModelCalls = 0
+        }, Program.Json));
+        return passed ? 0 : PreflightFailedExitCode;
+    }
+
+    /// <summary>Returned when preflight finds the seed does not pass the evaluator.</summary>
+    public const int PreflightFailedExitCode = 4;
+
+    private static ProcessProgramExecutionEngine CreateExecution(RunFile run)
+    {
+        var sandbox = new ProgramSandboxOptions { RuntimeVersion = run.RuntimeVersion };
+        sandbox.Limits.TimeLimitSeconds = run.Budget.EvaluationTimeLimitSeconds;
+        sandbox.Limits.MaxConcurrentExecutions = run.Budget.Parallelism;
+        return new ProcessProgramExecutionEngine(sandbox);
+    }
+
+    private static ScriptProgramFitnessEvaluator CreateFitness(RunFile run, ProcessProgramExecutionEngine execution, string evaluator)
+        => new(execution, evaluator,
+            new ScriptProgramEvaluationOptions { EvaluatorScriptLanguage = run.EvaluatorLanguage, Direction = run.Direction });
+
+    /// <summary>Proves the output directory accepts a write, so a run cannot fail at its first checkpoint.</summary>
+    private static void ProbeWritable(string outputDirectory)
+    {
+        Directory.CreateDirectory(outputDirectory);
+        string probe = Path.Combine(outputDirectory, ".preflight-" + Guid.NewGuid().ToString("N"));
+        File.WriteAllText(probe, string.Empty);
+        File.Delete(probe);
+    }
     internal static RunFile Load(string path)
     {
         var info = new FileInfo(path);
@@ -211,7 +278,7 @@ internal static class RunCommand
         throw new InvalidDataException(outputDirectory + " already holds 1000 trace sessions.");
     }
 
-    private static string Extension(ProgramLanguage language) => language switch
+    internal static string Extension(ProgramLanguage language) => language switch
     {
         ProgramLanguage.Python => ".py",
         ProgramLanguage.JavaScript => ".js",
@@ -305,4 +372,51 @@ internal sealed class OpenAiCompatibleChatClient : IProgramChatClient, IDisposab
     }
 
     public void Dispose() => _http.Dispose();
+}
+
+/// <summary>Marks an output directory as holding a run in progress, for as long as the run process lives.</summary>
+/// <remarks>
+/// A trace flushed at every checkpoint is readable while it is written, but nothing in it says whether its writer is
+/// still going: a finished run and a running one look alike. The marker names the trace and the process, and a
+/// reader believes it only while that process is alive, so a run killed without cleanup never reads as running.
+/// </remarks>
+internal sealed class RunMarker : IDisposable
+{
+    internal const string FileName = "running.json";
+    private readonly string _path;
+
+    private RunMarker(string path) => _path = path;
+
+    public static RunMarker Create(string outputDirectory, string runId, string tracePath)
+    {
+        Directory.CreateDirectory(outputDirectory);
+        string path = Path.Combine(outputDirectory, FileName);
+        File.WriteAllText(path, JsonSerializer.Serialize(new Entry(runId, Environment.ProcessId, Path.GetFileName(tracePath), DateTimeOffset.UtcNow)));
+        return new RunMarker(path);
+    }
+
+    /// <summary>Whether a live process is still writing <paramref name="tracePath"/>.</summary>
+    public static bool IsRunning(string tracePath)
+    {
+        string path = Path.Combine(Path.GetDirectoryName(Path.GetFullPath(tracePath)) ?? ".", FileName);
+        if (!File.Exists(path)) return false;
+        Entry? entry;
+        try { entry = JsonSerializer.Deserialize<Entry>(File.ReadAllText(path)); }
+        catch (Exception exception) when (exception is IOException or JsonException) { return false; }
+        if (entry is null || !string.Equals(entry.Trace, Path.GetFileName(tracePath), StringComparison.Ordinal)) return false;
+        try
+        {
+            using var process = System.Diagnostics.Process.GetProcessById(entry.ProcessId);
+            return !process.HasExited;
+        }
+        catch (ArgumentException) { return false; } // no such process: the run ended without removing its marker
+    }
+
+    public void Dispose()
+    {
+        try { File.Delete(_path); }
+        catch (IOException) { /* a stale marker is harmless: readers check that its process is alive */ }
+    }
+
+    private sealed record Entry(string RunId, int ProcessId, string Trace, DateTimeOffset StartedUtc);
 }
