@@ -97,12 +97,39 @@ public static class Program
             };
         }
 
+        string winnerJson = JsonSerializer.Serialize(analysis.Winner(source), Json);
+        if (FindCredential(winnerJson + "\n" + sourceText) is { } variable)
+            return Fail("error: the export contains the value of " + variable + ", a configured credential; nothing was written. " +
+                "Remove it from the program and export again.");
+
         Directory.CreateDirectory(output);
         if (sourceOut is not null && sourceText is not null) File.WriteAllText(sourceOut, sourceText, new UTF8Encoding(false));
-        File.WriteAllText(path, JsonSerializer.Serialize(analysis.Winner(source), Json));
+        File.WriteAllText(path, winnerJson);
         return Print(path);
     }
 
+    private static readonly string[] CredentialNameParts = { "KEY", "TOKEN", "SECRET", "PASSWORD" };
+
+    /// <summary>
+    /// The name of the first credential-like environment variable whose value appears in <paramref name="text"/>.
+    /// </summary>
+    /// <remarks>
+    /// A model can echo what it was sent, so an evolved program can carry the very key the run authenticated with.
+    /// Exports are made to be shared, so a known configured credential blocks one outright. Only the variable's
+    /// NAME is reported. Values shorter than 8 characters are skipped: they match ordinary text too readily to mean
+    /// anything. An unknown or encoded secret cannot be detected this way and still needs human review.
+    /// </remarks>
+    internal static string? FindCredential(string text)
+    {
+        foreach (System.Collections.DictionaryEntry entry in Environment.GetEnvironmentVariables())
+        {
+            if (entry.Key is not string name || entry.Value is not string value || value.Length < 8) continue;
+            string upper = name.ToUpperInvariant();
+            if (!CredentialNameParts.Any(upper.Contains)) continue;
+            if (text.Contains(value, StringComparison.Ordinal)) return name;
+        }
+        return null;
+    }
     private static int Report(string trace, string output)
     {
         if (File.Exists(output)) return Fail("error: " + output + " already exists; reports never overwrite.");

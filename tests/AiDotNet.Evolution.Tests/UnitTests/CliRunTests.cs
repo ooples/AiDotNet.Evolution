@@ -176,6 +176,35 @@ public sealed class CliRunTests
         }
         Assert.Equal(2, Run("export", trace, exportDir, "--include-source", best).Code); // exports never overwrite
     }
+    [Fact]
+    public void Export_refuses_a_winner_source_that_contains_a_configured_credential()
+    {
+        using var directory = new TemporaryDirectory();
+        using var model = new FakeChatModel();
+        const string variable = "AIDOTNET_EVOLVE_TEST_API_KEY";
+        const string secret = "sk-test-0123456789abcdef";
+        // The seed is the only evaluation, so the winner carries the key -- as a program an echoing model wrote would.
+        File.WriteAllText(Path.Combine(directory.Path, "initial.py"), "X = 0\n# " + secret + "\n");
+        File.WriteAllText(Path.Combine(directory.Path, "evaluator.py"), Evaluator);
+        Assert.Equal(0, Run("run", WriteRun(directory.Path, model.Endpoint, maxEvaluations: 1)).Code);
+        string outDir = Path.Combine(directory.Path, "out");
+        string trace = Path.Combine(outDir, "trace-000.jsonl");
+
+        Environment.SetEnvironmentVariable(variable, secret);
+        try
+        {
+            string exportDir = Path.Combine(directory.Path, "export");
+            var (code, output, error) = Run("export", trace, exportDir, "--include-source", Path.Combine(outDir, "best.py"));
+            Assert.Equal(2, code);
+            Assert.Contains(variable, error);                       // the variable is named...
+            Assert.DoesNotContain(secret, error + output);          // ...its value never is
+            Assert.False(Directory.Exists(exportDir));              // and nothing is written
+
+            Assert.Equal(0, Run("export", trace, exportDir).Code);  // without the source the evidence carries no key
+            Assert.Null(AiDotNet.Evolution.Cli.Program.FindCredential("X = 0"));
+        }
+        finally { Environment.SetEnvironmentVariable(variable, null); }
+    }
     [Theory]
     [InlineData(1, 0)]                                      // one press: stop at the batch boundary and report
     [InlineData(2, AiDotNet.Evolution.Cli.RunCommand.AbortedExitCode)] // two presses: abort, checkpoint still written
