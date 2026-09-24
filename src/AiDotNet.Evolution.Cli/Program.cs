@@ -13,6 +13,7 @@ public static class Program
         Usage:
           aidotnet-evolve run     <run.json>
           aidotnet-evolve resume  <run.json>
+          aidotnet-evolve preflight <run.json>
           aidotnet-evolve inspect <trace>
           aidotnet-evolve compare <traceA> <traceB>
           aidotnet-evolve export  <trace> <output-directory>
@@ -27,6 +28,7 @@ public static class Program
             {
                 ["run", string runFile] => Evolve(runFile, resume: false),
                 ["resume", string runFile] => Evolve(runFile, resume: true),
+                ["preflight", string runFile] => RunCommand.Preflight(runFile, Console.Out, CancellationToken.None),
                 ["inspect", string trace] => Print(JsonSerializer.Serialize(TraceAnalysis.Load(trace).Summary(), Json)),
                 ["compare", string a, string b] => Print(JsonSerializer.Serialize(TraceAnalysis.Compare(TraceAnalysis.Load(a), TraceAnalysis.Load(b)), Json)),
                 ["export", string trace, string output] => Export(trace, output),

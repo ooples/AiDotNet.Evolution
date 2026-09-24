@@ -95,6 +95,53 @@ public sealed class CliRunTests
             Assert.NotEqual(JsonValueKind.Null, summary.RootElement.GetProperty("Best").ValueKind);
     }
 
+    [Fact]
+    public void Preflight_scores_the_seed_exactly_as_run_would_and_never_calls_the_model()
+    {
+        using var directory = new TemporaryDirectory();
+        using var model = new FakeChatModel();
+        File.WriteAllText(Path.Combine(directory.Path, "initial.py"), "X = 4\n");
+        File.WriteAllText(Path.Combine(directory.Path, "evaluator.py"), Evaluator);
+        string runFile = WriteRun(directory.Path, model.Endpoint, maxEvaluations: 2);
+
+        var (code, output, error) = Run("preflight", runFile);
+        Assert.True(code == 0, error);
+        using (JsonDocument report = JsonDocument.Parse(output))
+        {
+            Assert.True(report.RootElement.GetProperty("Passed").GetBoolean());
+            Assert.Equal("Completed", report.RootElement.GetProperty("SeedStatus").GetString());
+            Assert.Equal(4d, report.RootElement.GetProperty("SeedQuality").GetDouble()); // the evaluator really ran
+            Assert.Equal("run", report.RootElement.GetProperty("Next").GetString());
+        }
+        Assert.Equal(0, model.Calls);
+        string outDir = Path.Combine(directory.Path, "out");
+        Assert.Empty(Directory.GetFileSystemEntries(outDir).Select(Path.GetFileName)); // the write probe is removed; nothing is started
+
+        Assert.Equal(0, Run("run", runFile).Code);
+        (code, output, error) = Run("preflight", runFile);
+        Assert.True(code == 0, error);
+        using (JsonDocument report = JsonDocument.Parse(output))
+            Assert.Equal("resume", report.RootElement.GetProperty("Next").GetString()); // a fresh run would now refuse
+    }
+
+    [Fact]
+    public void Preflight_fails_a_seed_the_evaluator_rejects_before_any_model_call()
+    {
+        using var directory = new TemporaryDirectory();
+        using var model = new FakeChatModel();
+        File.WriteAllText(Path.Combine(directory.Path, "initial.py"), "X = 0\n");
+        File.WriteAllText(Path.Combine(directory.Path, "evaluator.py"), "import sys\n\ndef evaluate(source):\n    raise ValueError(\"seed rejected\")\n\nevaluate(sys.stdin.read())\n");
+        string runFile = WriteRun(directory.Path, model.Endpoint, maxEvaluations: 2);
+
+        var (code, output, error) = Run("preflight", runFile);
+        Assert.True(code == AiDotNet.Evolution.Cli.RunCommand.PreflightFailedExitCode, code + ": " + error);
+        using (JsonDocument report = JsonDocument.Parse(output))
+        {
+            Assert.False(report.RootElement.GetProperty("Passed").GetBoolean());
+            Assert.NotEqual("Completed", report.RootElement.GetProperty("SeedStatus").GetString());
+        }
+        Assert.Equal(0, model.Calls);
+    }
     [Theory]
     [InlineData(1, 0)]                                      // one press: stop at the batch boundary and report
     [InlineData(2, AiDotNet.Evolution.Cli.RunCommand.AbortedExitCode)] // two presses: abort, checkpoint still written
