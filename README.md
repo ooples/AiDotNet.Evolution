@@ -33,7 +33,7 @@ library: no service, no account, no telemetry.
 ## Quick start
 
 ```bash
-dotnet add package AiDotNet.Evolution --prerelease
+dotnet add package AiDotNet.Evolution
 ```
 
 ```csharp
