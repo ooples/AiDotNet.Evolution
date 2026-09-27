@@ -1,0 +1,15 @@
+<Project>
+  <!--
+    AiDotNet 0.233.0 started packing its own build-time source generators (analyzers/dotnet/cs/AiDotNet.Generators.dll).
+    They run inside every consuming project and emit AiDotNet's internal registries into it. Those files name AiDotNet
+    types unqualified, which cannot bind through the AiDotNetConsumer extern alias, and they break the build with
+    hundreds of CS0246/CS0234/CS0104 errors. ExcludeAssets="analyzers" is recorded by restore but not honoured for
+    analyzers, so the generator is removed from the compiler inputs here instead. When the package stops shipping it,
+    this matches nothing.
+  -->
+  <Target Name="RemoveAiDotNetGenerators" BeforeTargets="CoreCompile">
+    <ItemGroup>
+      <Analyzer Remove="@(Analyzer)" Condition="'%(Filename)' == 'AiDotNet.Generators'" />
+    </ItemGroup>
+  </Target>
+</Project>
