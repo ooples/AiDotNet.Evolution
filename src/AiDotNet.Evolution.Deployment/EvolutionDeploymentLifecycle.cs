@@ -147,7 +147,9 @@ public sealed class EvolutionDeploymentLifecycle
                     if (_epoch != result.Epoch || _observed.Key != candidate.Envelope.Key || _storageFaulted)
                         return new("Stale", false, candidate.Id, result.EvidenceId);
                     deadline.Token.ThrowIfCancellationRequested();
-                    if (!_registry.TryPromote(result.Revision, candidate, result.Incumbent!, result.EvidenceId!))
+                    var incumbent = result.Incumbent ?? throw new InvalidOperationException("An approved preparation carries no incumbent.");
+                    var evidenceId = result.EvidenceId ?? throw new InvalidOperationException("An approved preparation carries no evidence id.");
+                    if (!_registry.TryPromote(result.Revision, candidate, incumbent, evidenceId))
                         return new("Stale", false, candidate.Id, result.EvidenceId);
                     _cached = candidate; _pending = null; _windows.Clear(); _monitoredRevision = null;
                     return new("Promoted", true, candidate.Id, result.EvidenceId);
@@ -246,7 +248,7 @@ public sealed class EvolutionDeploymentLifecycle
                     _observed.Key != observed.Artifact.Envelope.Key || _storageFaulted) return new("Stale", false);
                 epoch = _epoch;
             }
-            var validation = DeploymentEncoding.Parse<DeploymentValidationEvidence>(_registry.ReadEvidence(slot.ValidationEvidenceId!));
+            var validation = DeploymentEncoding.Parse<DeploymentValidationEvidence>(_registry.ReadEvidence(slot.ValidationEvidenceId ?? throw new InvalidDataException("The active slot has no validation evidence.")));
             validation.Validate();
             if (!validation.AllPassed || validation.EnvelopeKey != observed.Artifact.Envelope.Key || validation.Direction != _policy.Direction ||
                 (slot.CandidateEvidenceSide ? validation.CandidateId : validation.IncumbentId) != observed.Artifact.Id)
