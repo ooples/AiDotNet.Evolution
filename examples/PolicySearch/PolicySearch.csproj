@@ -1,5 +1,7 @@
 <Project Sdk="Microsoft.NET.Sdk">
   <PropertyGroup>
+    <!-- Demonstrates an experimental research surface; consumers opt in the same way. -->
+    <NoWarn>$(NoWarn);AIDEVO001;AIDEVO002;AIDEVO003</NoWarn>
     <OutputType>Exe</OutputType>
     <TargetFramework>net10.0</TargetFramework>
     <ImplicitUsings>enable</ImplicitUsings>

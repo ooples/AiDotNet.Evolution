@@ -85,18 +85,27 @@ public sealed partial class EvolutionEngine<TGenome>
             view = snapshot.Archive;
             snapshotHash = snapshot.Fingerprint;
         }
-        var artifactFingerprint = snapshots is null ? null : new StringBuilder();
-        if (artifactFingerprint is not null) AppendArtifacts(artifactFingerprint, parentArtifacts);
-        string? identity = snapshots is null ? null : EvolutionHash.Combine(new[] { "pipeline-proposal-v2-content", _options.RunId, _compatibilityHash,
+        // Most proposals have no parent artifacts; their fingerprint is a constant computed once.
+        string? artifactHash = snapshots is null ? null : parentArtifacts.Count == 0 ? EmptyArtifactsHash : HashArtifacts(parentArtifacts);
+        string? identity = snapshots is null ? null : EvolutionHash.Combine(new[] { "pipeline-proposal-v3-content", _options.RunId, _compatibilityHash,
             evaluationId.ToString(CultureInfo.InvariantCulture), generation.ToString(CultureInfo.InvariantCulture),
             island.ToString(CultureInfo.InvariantCulture), view.DefinitionHash, view.Version.ToString(CultureInfo.InvariantCulture),
-            snapshotHash!, FingerprintPipelineEvaluation(selection.Parent.Evaluation), EvolutionHash.Compute(artifactFingerprint!.ToString()) }
+            snapshotHash!, FingerprintPipelineEvaluation(selection.Parent.Evaluation), artifactHash! }
             .Concat(selection.Inspirations.Select(entry => FingerprintPipelineEvaluation(entry.Evaluation))));
         var context = snapshots is null
             ? new EvolutionVariationContext<TGenome>(selection.Parent, selection.Inspirations, proposalRandom, generation, island, parentArtifacts, view)
             : new EvolutionVariationContext<TGenome>(selection.Parent, selection.Inspirations, proposalRandom, generation, island, parentArtifacts, view, identity!, evaluationId);
         return new VariationRequest(evaluationId, island, lineage, context);
     }
+
+    private static string HashArtifacts(IReadOnlyList<EvolutionArtifact> artifacts)
+    {
+        var builder = new StringBuilder();
+        AppendArtifacts(builder, artifacts);
+        return EvolutionHash.Compute(builder.ToString());
+    }
+
+    private static readonly string EmptyArtifactsHash = HashArtifacts(Array.Empty<EvolutionArtifact>());
 
     /// <summary>Runs only the external proposal call; no engine archive/counter/artifact mutation occurs here.</summary>
     private async Task<VariationResponse> InvokeVariationAsync(VariationRequest request, CancellationToken cancellationToken)
@@ -143,23 +152,86 @@ public sealed partial class EvolutionEngine<TGenome>
         public bool Failed { get; } = failed;
     }
 
-    private static string FingerprintPipelineEvaluation(EvolutionEvaluation evaluation)
-    {
-        var builder = new StringBuilder();
-        // Reuse checkpoint/state-hash semantics: include measurements, costs, origins, lineage and artifacts,
-        // but not callback elapsed time. A version counter plus genome ID does not identify observed evidence.
-        AppendEvaluation(builder, evaluation);
-        return EvolutionHash.Compute(builder.ToString());
-    }
+    // An evaluation is immutable, so its fingerprint is a pure function of the instance. Pipeline
+    // snapshots re-fingerprint every archive entry each wave, and every proposal re-fingerprints its
+    // parent and inspirations; without this memo the same evidence was serialized and SHA-256 hashed
+    // repeatedly (the ZeroLatency pipeline regression). Weak keys never extend an evaluation's lifetime.
+    private static readonly System.Runtime.CompilerServices.ConditionalWeakTable<EvolutionEvaluation, string> PipelineFingerprints = new();
+    private static readonly System.Runtime.CompilerServices.ConditionalWeakTable<EvolutionEvaluation, string>.CreateValueCallback ComputePipelineFingerprint =
+        static evaluation =>
+        {
+            var builder = new StringBuilder();
+            // Reuse checkpoint/state-hash semantics: include measurements, costs, origins, lineage and artifacts,
+            // but not callback elapsed time. A version counter plus genome ID does not identify observed evidence.
+            AppendEvaluation(builder, evaluation);
+            return EvolutionHash.Compute(builder.ToString());
+        };
 
-    private sealed class PipelineArchiveContext
+    internal static string FingerprintPipelineEvaluationForTests(EvolutionEvaluation evaluation) => FingerprintPipelineEvaluation(evaluation);
+
+    private static string FingerprintPipelineEvaluation(EvolutionEvaluation evaluation) =>
+        PipelineFingerprints.GetValue(evaluation, ComputePipelineFingerprint);
+
+    internal sealed class PipelineArchiveContext
     {
         public PipelineArchiveContext(EvolutionArchiveSnapshot<TGenome> archive)
         {
             Archive = archive;
-            Fingerprint = EvolutionHash.Combine(new[] { archive.DefinitionHash, archive.Version.ToString(CultureInfo.InvariantCulture) }
-                .Concat(archive.Entries.SelectMany(entry => new[] { entry.Cell.StableKey, FingerprintPipelineEvaluation(entry.Evaluation) })));
+            // Protocol v3: the archive commitment is the sum mod 2^256 of one SHA-256 digest per elite over (cell, evaluation
+            // fingerprint), bound with definition, version and count. Each digest is computed once per immutable entry, so a
+            // wave costs one table lookup and a 256-bit add per elite instead of hashing the whole archive again (v2), and
+            // there is no component cap. It is order-independent, which is sound because a cell holds exactly one entry, and
+            // it is a function of the entries alone, so a resumed run recomputes the same value. It commits the proposal
+            // context for deterministic replay and is not designed to resist adversarially chosen colliding archives.
+            Fingerprint = ArchiveFingerprint(archive);
         }
+
+        /// <summary>The v3 archive commitment for pipeline proposal identities; internal for direct testing.</summary>
+        internal static string ArchiveFingerprint(IEvolutionArchiveView<TGenome> archive)
+        {
+            ulong s0 = 0, s1 = 0, s2 = 0, s3 = 0;
+            foreach (EvolutionArchiveEntry<TGenome> entry in archive.Entries)
+            {
+                byte[] digest = PipelineEntryDigests.GetValue(entry, DigestEntryCallback);
+                ulong carry = Add(ref s0, Limb(digest, 0), 0);
+                carry = Add(ref s1, Limb(digest, 8), carry);
+                carry = Add(ref s2, Limb(digest, 16), carry);
+                Add(ref s3, Limb(digest, 24), carry);
+            }
+            return EvolutionHash.Combine(new[]
+            {
+                "pipeline-archive-v3", archive.DefinitionHash, archive.Version.ToString(CultureInfo.InvariantCulture),
+                archive.Count.ToString(CultureInfo.InvariantCulture),
+                string.Concat(s3.ToString("x16", CultureInfo.InvariantCulture), s2.ToString("x16", CultureInfo.InvariantCulture),
+                    s1.ToString("x16", CultureInfo.InvariantCulture), s0.ToString("x16", CultureInfo.InvariantCulture))
+            });
+        }
+
+        // Explicit little-endian, so the identity does not depend on the host's byte order.
+        private static ulong Limb(byte[] bytes, int offset)
+        {
+            ulong value = 0;
+            for (int i = 7; i >= 0; i--) value = (value << 8) | bytes[offset + i];
+            return value;
+        }
+
+        private static ulong Add(ref ulong limb, ulong value, ulong carry)
+        {
+            ulong sum = unchecked(limb + value);
+            ulong carried = sum < limb ? 1UL : 0UL;
+            ulong total = unchecked(sum + carry);
+            if (total < sum) carried = 1UL;
+            limb = total;
+            return carried;
+        }
+
+        private static byte[] DigestEntry(EvolutionArchiveEntry<TGenome> entry)
+        {
+            return EvolutionHash.CombineBytes(new[] { entry.Cell.StableKey, FingerprintPipelineEvaluation(entry.Evaluation) });
+        }
+
+        private static readonly System.Runtime.CompilerServices.ConditionalWeakTable<EvolutionArchiveEntry<TGenome>, byte[]> PipelineEntryDigests = new();
+        private static readonly System.Runtime.CompilerServices.ConditionalWeakTable<EvolutionArchiveEntry<TGenome>, byte[]>.CreateValueCallback DigestEntryCallback = DigestEntry;
         public EvolutionArchiveSnapshot<TGenome> Archive { get; }
         public string Fingerprint { get; }
     }
@@ -378,9 +450,23 @@ public sealed partial class EvolutionEngine<TGenome>
             if (_pipelineEvaluationRate is not null) await _pipelineEvaluationRate.WaitAsync(cancellationToken).ConfigureAwait(false);
             if (_pipelineStatistics is not null) { _pipelineStatistics.Started(1); pipelineTimer = Stopwatch.StartNew(); }
             Stopwatch timer = Stopwatch.StartNew();
-            EvolutionTaskResult result = _pipelineStatistics is null
-                ? await EvaluateAttemptAsync(item, cancellationToken).ConfigureAwait(false)
-                : await Task.Run(() => EvaluateAttemptAsync(item, cancellationToken), CancellationToken.None).ConfigureAwait(false);
+            EvolutionTaskResult result;
+            if (_pipelineStatistics is null || Volatile.Read(ref _pipelineInlineEvaluations))
+            {
+                // As for proposals: an evaluator that returns promptly needs no thread-pool hop, which measured as the
+                // ZeroLatency pipeline's remaining per-evaluation cost (worker wake/park). The first call that blocks past
+                // the budget before returning switches this run to offloading, so a synchronously blocking evaluator can
+                // hold the loop at most once. Commit order is independent of where the work ran.
+                long started = Stopwatch.GetTimestamp();
+                Task<EvolutionTaskResult> inline = EvaluateAttemptAsync(item, cancellationToken);
+                if (_pipelineStatistics is not null && Stopwatch.GetTimestamp() - started > InlineProposalBudgetTicks)
+                    Volatile.Write(ref _pipelineInlineEvaluations, false);
+                result = await inline.ConfigureAwait(false);
+            }
+            else
+            {
+                result = await Task.Run(() => EvaluateAttemptAsync(item, cancellationToken), CancellationToken.None).ConfigureAwait(false);
+            }
             timer.Stop();
             item.Elapsed += timer.Elapsed;
             AccumulateAttemptMetadata(item, result);

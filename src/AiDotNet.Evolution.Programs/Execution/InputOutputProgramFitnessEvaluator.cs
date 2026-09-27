@@ -30,8 +30,12 @@ namespace AiDotNet.Evolution.Programs;
 /// model wrote is a security decision only you can make — a container or an isolated process is the usual choice.
 /// Pick a <see cref="ProgramOutputComparison"/> that matches how precise the expected output has to be.</para>
 /// </remarks>
-public sealed class InputOutputProgramFitnessEvaluator : IProgramFitnessEvaluator
+public sealed class InputOutputProgramFitnessEvaluator : IProgramFitnessEvaluator, IEvolutionLatencyProfile
 {
+    /// <inheritdoc/>
+    /// <remarks>Every evaluation executes the candidate against its cases, which waits on a process.</remarks>
+    public bool IsLatencyBound => true;
+
     private const int MaxRetainedExampleDiagnostics = 8;
     private const int MaxErrorMessageLength = 200;
 

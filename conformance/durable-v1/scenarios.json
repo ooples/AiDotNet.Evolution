@@ -1,0 +1,73 @@
+{
+  "protocol": "durable-worker-v1",
+  "description": "Language-neutral conformance scenarios for docs/DURABLE_WORKER_PROTOCOL.md. Every client (C# host, Python, TypeScript) runs each step and must observe exactly the expected reply fields. '$lease' is the lease from the most recent successful claim; '$dir' is a fresh owned directory per scenario.",
+  "job": {"evaluationId": "9223372036854775807", "attempt": 1, "canonicalGenomeId": "integer:7", "payload": "7", "estimated": {"cost": "1"}, "maximum": {"cost": "5"}},
+  "config": {"directory": "$dir", "runId": "run", "compatibilityHash": "compat", "limits": {"cost": "100"}},
+  "scenarios": [
+    {
+      "name": "lifecycle",
+      "steps": [
+        {"op": "open", "args": {"config": "$config"}, "expect": {"runId": "run", "wasRecovered": false}},
+        {"op": "enqueue", "args": {"job": "$job"}, "expect": {"enqueued": true}},
+        {"op": "enqueue", "args": {"job": "$job"}, "expect": {"enqueued": false}},
+        {"op": "claim", "args": {"worker": {"workerId": "one", "compatibilityHash": "compat"}}, "expect": {"available": true, "lease.identity.evaluationId": "9223372036854775807", "lease.workerId": "one"}},
+        {"op": "claim", "args": {"worker": {"workerId": "two", "compatibilityHash": "compat"}}, "expect": {"lease": null}},
+        {"op": "heartbeat", "args": {"identity": "$lease.identity", "workerId": "one"}, "expect": {"status": "renewed"}},
+        {"op": "commit", "args": {"identity": "$lease.identity", "workerId": "one", "payload": "49", "provenance": "local-square-v1", "actual": {"cost": "0.5"}, "outcome": "completed"}, "expect": {"disposition": "accepted"}},
+        {"op": "commit", "args": {"identity": "$lease.identity", "workerId": "one", "payload": "49", "provenance": "local-square-v1", "actual": {"cost": "0.5"}, "outcome": "completed"}, "expect": {"disposition": "duplicate"}},
+        {"op": "result", "args": {"evaluationId": "9223372036854775807", "attempt": 1}, "expect": {"result.payload": "49"}},
+        {"op": "delivery", "args": {"identity": "$lease.identity", "workerId": "one"}, "expect": {"result.actual.cost": "0.5", "result.outcome": "completed"}},
+        {"op": "close", "args": {}, "expect": {"closed": true}}
+      ]
+    },
+    {
+      "name": "conflicting-work-is-rejected",
+      "steps": [
+        {"op": "open", "args": {"config": "$config"}, "expect": {}},
+        {"op": "enqueue", "args": {"job": "$job"}, "expect": {"enqueued": true}},
+        {"op": "enqueue", "args": {"job": {"evaluationId": "9223372036854775807", "attempt": 1, "canonicalGenomeId": "integer:7", "payload": "8", "estimated": {"cost": "1"}, "maximum": {"cost": "5"}}}, "expect": {"$error": true}},
+        {"op": "close", "args": {}, "expect": {"closed": true}}
+      ]
+    },
+    {
+      "name": "canceled-work-is-not-claimable",
+      "steps": [
+        {"op": "open", "args": {"config": "$config"}, "expect": {}},
+        {"op": "enqueue", "args": {"job": "$job"}, "expect": {"enqueued": true}},
+        {"op": "cancel", "args": {"evaluationId": "9223372036854775807", "attempt": 1}, "expect": {"canceled": true}},
+        {"op": "claim", "args": {"worker": {"workerId": "one", "compatibilityHash": "compat"}}, "expect": {"lease": null}},
+        {"op": "close", "args": {}, "expect": {"closed": true}}
+      ]
+    },
+    {
+      "name": "a-foreign-worker-cannot-commit",
+      "steps": [
+        {"op": "open", "args": {"config": "$config"}, "expect": {}},
+        {"op": "enqueue", "args": {"job": "$job"}, "expect": {"enqueued": true}},
+        {"op": "claim", "args": {"worker": {"workerId": "one", "compatibilityHash": "compat"}}, "expect": {"available": true}},
+        {"op": "commit", "args": {"identity": "$lease.identity", "workerId": "intruder", "payload": "49", "provenance": "local-square-v1", "actual": {"cost": "0.5"}, "outcome": "completed"}, "expect": {"disposition": "unknown-lease"}},
+        {"op": "close", "args": {}, "expect": {"closed": true}}
+      ]
+    },
+    {
+      "name": "unavailable-is-never-completion",
+      "steps": [
+        {"op": "open", "args": {"config": "$config"}, "expect": {}},
+        {"op": "claim", "args": {"worker": {"workerId": "one", "compatibilityHash": "compat"}}, "expect": {"available": false, "lease": null}},
+        {"op": "close", "args": {}, "expect": {"closed": true}}
+      ]
+    },
+    {
+      "name": "reopen-recovers-and-a-mismatch-is-refused",
+      "steps": [
+        {"op": "open", "args": {"config": "$config"}, "expect": {"wasRecovered": false}},
+        {"op": "enqueue", "args": {"job": "$job"}, "expect": {"enqueued": true}},
+        {"op": "close", "args": {}, "expect": {"closed": true}},
+        {"op": "open", "args": {"config": "$config"}, "expect": {"wasRecovered": true}},
+        {"op": "enqueue", "args": {"job": "$job"}, "expect": {"enqueued": false}},
+        {"op": "close", "args": {}, "expect": {"closed": true}},
+        {"op": "open", "args": {"config": {"directory": "$dir", "runId": "run", "compatibilityHash": "different", "limits": {"cost": "100"}}}, "expect": {"$error": true}}
+      ]
+    }
+  ]
+}

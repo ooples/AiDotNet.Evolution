@@ -158,6 +158,13 @@ jobs:
         run: dotnet run --project benchmarks/AiDotNet.Evolution.Performance -c Release --no-build -- --profile TestResults/performance '${{ github.sha }}' --smoke
       - name: Verify paired analysis contracts
         run: python3 -m unittest discover -s benchmarks/analysis -v
+      - name: Verify the pre-registered campaign report reproduces byte-for-byte
+        working-directory: benchmarks/analysis
+        run: >-
+          python3 campaign_registration.py check
+          --registration ../evidence/campaign-registration/contract-example/frozen/registration.json
+          --raw ../evidence/campaign-registration/contract-example/raw.json
+          --report ../evidence/campaign-registration/contract-example/report.json
       - name: Verify frozen feature-ablation campaign
         run: |
           python3 benchmarks/analysis/ablation.py register benchmarks/AiDotNet.Evolution.Quality/bin/Release/net10.0/AiDotNet.Evolution.Quality.dll TestResults/ablation-plan.json --seeds 2 --budget 16
@@ -294,6 +301,7 @@ jobs:
       EVOLUTION_OPENEVOLVE_CHECKOUT: ${{ github.workspace }}/.local/openevolve-upstream
       EVOLUTION_PROFILE_UPSTREAM: ${{ github.workspace }}/.local/openevolve-upstream
       EVOLUTION_CORRECTNESS_UPSTREAM: ${{ github.workspace }}/.local/correctness-algotune
+      EVOLUTION_ALPHAEVOLVE_RESULTS: ${{ github.workspace }}/.local/alphaevolve-results
       EVOLUTION_PROFILE_DLL: ${{ github.workspace }}/benchmarks/EvolutionComparison/bin/Release/net10.0/EvolutionComparison.dll
     steps:
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1
@@ -311,6 +319,12 @@ jobs:
           ref: dff9914c10800c7a031c9e8c3d4d1c8cd1b38906
           path: .local/correctness-algotune
           persist-credentials: false
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1
+        with:
+          repository: google-deepmind/alphaevolve_results
+          ref: 4226acbf237ff9ad10ba7673a2af127a2d8a5971
+          path: .local/alphaevolve-results
+          persist-credentials: false
       - uses: actions/setup-dotnet@a98b56852c35b8e3190ac28c8c2271da59106c68
         with:
           dotnet-version: '10.0.x'
@@ -326,7 +340,10 @@ jobs:
           [ -d "$EVOLUTION_PROFILE_UPSTREAM" ] || { echo "::error::EVOLUTION_PROFILE_UPSTREAM missing: $EVOLUTION_PROFILE_UPSTREAM"; exit 1; }
           .local/program-env/bin/python eng/run_required_tests.py benchmarks/external 'test_program*.py'
           .local/program-env/bin/python -m unittest discover -s benchmarks/external -p test_codex_transport.py -v
+          .local/program-env/bin/python -m unittest discover -s benchmarks/external -p test_claude_transport.py -v
           .local/program-env/bin/python -m unittest discover -s benchmarks/external -p test_openevolve_adapter.py -v
+          .local/program-env/bin/python -m unittest discover -s benchmarks/external -p test_openevolve_configs.py -v
+          .local/program-env/bin/python -m unittest discover -s benchmarks/external -p test_campaign_runner.py -v
           .local/program-env/bin/python benchmarks/external/run_program_comparison.py --aidotnet benchmarks/EvolutionComparison/bin/Release/net10.0/EvolutionComparison.dll --upstream .local/openevolve-upstream --output TestResults/program-comparison
       - name: Validate actual container isolation and independent oracles
         run: |

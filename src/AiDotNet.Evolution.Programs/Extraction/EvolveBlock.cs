@@ -52,7 +52,10 @@ public static class EvolveBlock
     /// <param name="markers">The marker pair to look for; the default instance uses the hash-comment markers.</param>
     /// <returns>The recovered regions plus a status and diagnostics describing any malformed markers.</returns>
     /// <exception cref="ArgumentNullException"><paramref name="source"/> is <c>null</c>.</exception>
-    public static EvolveBlockExtractionResult Extract(string source, EvolveBlockMarkers markers = default)
+    public static EvolveBlockExtractionResult Extract(string source) => Extract(source, default(EvolveBlockMarkers));
+
+    /// <summary>Extracts evolve blocks using an explicit marker pair.</summary>
+    public static EvolveBlockExtractionResult Extract(string source, EvolveBlockMarkers markers)
     {
         if (source is null) throw new ArgumentNullException(nameof(source));
 

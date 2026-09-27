@@ -1,0 +1,75 @@
+{
+  "dispositions": [
+    "accepted",
+    "accepted"
+  ],
+  "example": "function_minimization",
+  "host_status": {
+    "admitted": "2",
+    "compatibilityHash": "openevolve-411fb59c886c-function_minimization",
+    "denied": "0",
+    "id": 11,
+    "maximumViolated": false,
+    "ok": true,
+    "protocol": 1,
+    "reserved": {
+      "evaluations": "0"
+    },
+    "runId": "upstream-function_minimization",
+    "searchContinuationGuarantee": "delivery-only; partial-batch search continuation requires an explicit fork",
+    "searchState": "not-owned",
+    "settled": "2",
+    "sourceSessionId": null,
+    "spent": {
+      "evaluations": "2"
+    },
+    "supportsExactSearchContinuation": false,
+    "wasRecovered": false
+  },
+  "limitations": "One unmodified initial program and one broken program; the example's stochastic metrics vary run to run. The upstream evaluator scores a broken program 0 with an error artifact instead of raising, so that receipt is completed, as in OpenEvolve. Only evaluate(program_path) is served; cascade stages are not invoked. The home directory is redacted to ~ in tracebacks.",
+  "openevolve_commit": "411fb59c886c18704caaffb611e17cf9e7d824d2",
+  "platform": "Windows-11-10.0.26200-SP0",
+  "python": "3.13.3",
+  "receipts": {
+    "1": {
+      "outcome": "completed",
+      "payload": {
+        "artifacts": {
+          "average_distance_to_global": "0.1691",
+          "best_position": "Final position: x=-1.6170, y=0.6432",
+          "convergence_info": "Converged in 10 trials with 10 successes",
+          "search_efficiency": "Success rate: 100.00%"
+        },
+        "metrics": {
+          "combined_score": 1.4080399266238843,
+          "distance_score": 0.8553742251773145,
+          "reliability_score": 1.0,
+          "value_score": 0.9641620337254572
+        }
+      }
+    },
+    "2": {
+      "outcome": "completed",
+      "payload": {
+        "artifacts": {
+          "error_message": "invalid syntax (program.py, line 1)",
+          "error_type": "SyntaxError",
+          "full_traceback": "Traceback (most recent call last):\n  File \"~\\source\\repos\\AiDotNet.Evolution\\.local\\openevolve-upstream\\examples\\function_minimization\\evaluator.py\", line 65, in evaluate\n    spec.loader.exec_module(program)\n    ~~~~~~~~~~~~~~~~~~~~~~~^^^^^^^^^\n  File \"<frozen importlib._bootstrap_external>\", line 1022, in exec_module\n  File \"<frozen importlib._bootstrap_external>\", line 1160, in get_code\n  File \"<frozen importlib._bootstrap_external>\", line 1090, in source_to_code\n  File \"<frozen importlib._bootstrap>\", line 488, in _call_with_frames_removed\n  File \"~\\AppData\\Local\\Temp\\aidotnet-candidate-gogy8o_i\\program.py\", line 1\n    def search_algorithm(:\n                         ^\nSyntaxError: invalid syntax\n",
+          "suggestion": "Check for syntax errors or missing imports in the generated code"
+        },
+        "metrics": {
+          "combined_score": 0.0,
+          "distance_score": 0.0,
+          "error": "invalid syntax (program.py, line 1)",
+          "reliability_score": 0.0,
+          "value_score": 0.0
+        }
+      }
+    }
+  },
+  "schema": "aidotnet-upstream-evaluator-through-worker-v1",
+  "unmodified_blobs": {
+    "examples/function_minimization/evaluator.py": "f16318125b56073905d10e24143c17286c0963b9",
+    "examples/function_minimization/initial_program.py": "670c02cc459be42f66a2a92fd0e6a33037220671"
+  }
+}

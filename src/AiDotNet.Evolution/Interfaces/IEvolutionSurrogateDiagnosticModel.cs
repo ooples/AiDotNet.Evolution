@@ -1,8 +1,10 @@
+using System.Diagnostics.CodeAnalysis;
 using System.Collections.ObjectModel;
 
 namespace AiDotNet.Evolution;
 
 /// <summary>Optional fitted-model reliability evidence; the generic selector does not invent calibration claims.</summary>
+[Experimental("AIDEVO001")]
 public interface IEvolutionSurrogateDiagnosticModel
 {
     /// <summary>Gets immutable backend-specific evidence retained with acquisition and unreliable-model fallback decisions.</summary>
@@ -10,6 +12,7 @@ public interface IEvolutionSurrogateDiagnosticModel
 }
 
 /// <summary>A bounded, detached reliability report whose meaning is defined by its versioned backend policy.</summary>
+[Experimental("AIDEVO001")]
 public sealed class EvolutionSurrogateValidationReport
 {
     /// <summary>Creates auditable validation metadata without admitting predictions to an archive.</summary>

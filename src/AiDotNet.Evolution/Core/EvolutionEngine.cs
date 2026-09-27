@@ -142,6 +142,14 @@ public sealed partial class EvolutionEngine<TGenome>
         ValidateComponent(variation.Id, variation.VersionHash, nameof(variation));
 
         _options = options.SnapshotAndValidate();
+        if (_options.Dispatch == EvolutionDispatchMode.Auto)
+        {
+            // Resolved once from declared metadata, never from timing, so the run stays deterministic; the resolved
+            // snapshot is re-validated and is what the canonical options and checkpoint compatibility record.
+            EvolutionEngineOptions resolved = _options.SnapshotAndValidate();
+            resolved.Dispatch = IsLatencyBound(variation) || IsLatencyBound(task) ? EvolutionDispatchMode.Pipeline : EvolutionDispatchMode.Batch;
+            _options = resolved.SnapshotAndValidate();
+        }
         if (variation is IEvolutionIslandProposalScheduler islandScheduler &&
             (islandScheduler.IslandCount != _options.IslandCount ||
              _options.IslandAssignment != EvolutionIslandAssignmentStrategy.RoundRobin ||
@@ -283,6 +291,8 @@ public sealed partial class EvolutionEngine<TGenome>
     /// </para>
     /// </remarks>
     public void RequestStop() => Interlocked.Exchange(ref _stopRequested, 1);
+
+    private static bool IsLatencyBound(object component) => component is IEvolutionLatencyProfile { IsLatencyBound: true };
 
     /// <summary>Runs evolution once using a finite initial seed set.</summary>
     /// <param name="initialGenomes">Finite task-specific seed genomes.</param>

@@ -1,3 +1,4 @@
+using System.Diagnostics.CodeAnalysis;
 namespace AiDotNet.Evolution;
 
 /// <summary>Optional model-library adapter; fitting receives only explicitly supplied measured search outcomes.</summary>
@@ -5,6 +6,7 @@ namespace AiDotNet.Evolution;
 /// <remarks>Implementations must fit a fresh, deterministic model from the supplied observations, with no hidden
 /// cross-call learning or confirmation data. Return actual same-unit costs, including failed work, and enforce
 /// externally declared time/resource bounds. Do not meter these same costs twice.</remarks>
+[Experimental("AIDEVO001")]
 public interface IEvolutionSurrogateTrainer<TGenome>
 {
     /// <summary>Gets the immutable backend, feature and fitting-policy identity.</summary>
@@ -16,6 +18,7 @@ public interface IEvolutionSurrogateTrainer<TGenome>
 
 /// <summary>A detached fitted predictor; its predictions never constitute evaluated fitness.</summary>
 /// <typeparam name="TGenome">The immutable genome representation.</typeparam>
+[Experimental("AIDEVO001")]
 public interface IEvolutionSurrogateModel<TGenome>
 {
     /// <summary>Gets the fitted model identity, including training-data and fitting semantics.</summary>

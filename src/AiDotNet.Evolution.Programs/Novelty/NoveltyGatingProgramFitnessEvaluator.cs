@@ -24,8 +24,11 @@ public sealed class NoveltyGatingProgramFitnessEvaluator : IProgramFitnessEvalua
     public NoveltyGatingProgramFitnessEvaluator(
         IProgramFitnessEvaluator inner,
         ProgramNoveltyPolicy? policy = null,
-        string id = "novelty-gating-program-evaluator")
+        string id = "novelty-gating-program-evaluator",
+        ProgramNoveltyEnforcement enforcement = ProgramNoveltyEnforcement.Reject)
     {
+        if (!Enum.IsDefined(typeof(ProgramNoveltyEnforcement), enforcement)) throw new ArgumentOutOfRangeException(nameof(enforcement));
+        Enforcement = enforcement;
         ProgramGuard.NotNull(inner);
         ProgramGuard.NotNullOrWhiteSpace(id);
 
@@ -39,8 +42,19 @@ public sealed class NoveltyGatingProgramFitnessEvaluator : IProgramFitnessEvalua
             inner.Id,
             inner.VersionHash,
             _policy.VersionHash
-        });
+        }.Concat(enforcement == ProgramNoveltyEnforcement.Advise ? new[] { "enforcement-advise" } : Array.Empty<string>()));
     }
+
+    /// <summary>Gets whether a not-novel candidate is rejected or only annotated.</summary>
+    public ProgramNoveltyEnforcement Enforcement { get; }
+
+    /// <summary>The diagnostic attached, in <see cref="ProgramNoveltyEnforcement.Advise"/> mode, to a candidate the policy judged not novel.</summary>
+    public const string SimilarityCode = "program_similar";
+
+    /// <summary>Gets candidates judged not novel but still evaluated because enforcement is advisory.</summary>
+    public long AdvisedCount => Interlocked.Read(ref _advisedCount);
+
+    private long _advisedCount;
 
     public string Id { get; }
 
@@ -112,7 +126,9 @@ public sealed class NoveltyGatingProgramFitnessEvaluator : IProgramFitnessEvalua
 
         lock (_gate) _lastDecision = decision;
 
-        if (!decision.IsNovel)
+        bool advisory = !decision.IsNovel && Enforcement == ProgramNoveltyEnforcement.Advise;
+        if (advisory) Interlocked.Increment(ref _advisedCount);
+        if (!decision.IsNovel && !advisory)
         {
             Interlocked.Increment(ref _rejectedCount);
             return new EvolutionTaskResult(
@@ -127,9 +143,14 @@ public sealed class NoveltyGatingProgramFitnessEvaluator : IProgramFitnessEvalua
         cancellationToken.ThrowIfCancellationRequested(); EnsureIdentity();
         if (measured is null) throw new InvalidOperationException("The inner evaluator returned no work receipt.");
         if (measured.Status == EvolutionEvaluationStatus.Completed) { lock (_gate) Track(candidate); }
+        // Similarity is a heuristic: an equivalent-looking program can still perform differently, so in advisory
+        // mode it is measured and only annotated. Proven identity is the engine's canonical dedup, not this gate.
+        IReadOnlyList<EvolutionDiagnostic> diagnostics = advisory
+            ? measured.Diagnostics.Concat(new[] { new EvolutionDiagnostic(SimilarityCode, BuildRejectionMessage(decision)) }).ToArray()
+            : measured.Diagnostics;
         var result = new EvolutionTaskResult(measured.Status, measured.Quality, measured.Direction,
             measured.Descriptors, measured.Objectives, measured.ConstraintViolations, measured.CostUnits + decision.CostUnits,
-            measured.Diagnostics, measured.Metrics, measured.Artifacts);
+            diagnostics, measured.Metrics, measured.Artifacts);
         return measured.MeasurementOrigin is { } origin ? result.WithMeasurementOrigin(origin) : result;
     }
 

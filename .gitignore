@@ -98,3 +98,7 @@ __pycache__/
 
 # Local tooling cache; never part of the package or the build.
 .token-optimizer/
+
+# Python binding build outputs (pip wheel)
+bindings/python/build/
+bindings/python/*.egg-info/

@@ -1,9 +1,11 @@
+using System.Diagnostics.CodeAnalysis;
 using System.Globalization;
 using System.Text.Json;
 
 namespace AiDotNet.Evolution;
 
 /// <summary>Executes declarative recipes through the real engine with fresh, metered task and operator instances.</summary>
+[Experimental("AIDEVO002")]
 public static class EvolutionPolicyEngineTrial
 {
     /// <summary>Creates an independently versioned task trial with fixed normalization and bounded MAP-Elites archives.</summary>

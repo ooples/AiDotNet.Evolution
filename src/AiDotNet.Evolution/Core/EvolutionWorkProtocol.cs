@@ -21,7 +21,10 @@ public sealed partial class EvolutionWorkProtocol : IDisposable
     private bool _closed;
 
     /// <summary>Creates a protocol endpoint that owns the coordinator opened by its first open command.</summary>
-    public EvolutionWorkProtocol(Func<DateTimeOffset>? utcNow = null) { _utcNow = utcNow; _ownsCoordinator = true; }
+    public EvolutionWorkProtocol() : this((Func<DateTimeOffset>?)null) { }
+
+    /// <summary>Creates a self-owning endpoint with an injected clock (null uses the system clock).</summary>
+    public EvolutionWorkProtocol(Func<DateTimeOffset>? utcNow) { _utcNow = utcNow; _ownsCoordinator = true; }
 
     /// <summary>Creates an endpoint for an already attached live-session coordinator, without taking ownership.</summary>
     /// <remarks>The caller must keep the coordinator alive and handle bridge delivery/reconciliation. Open is then refused.</remarks>
@@ -55,7 +58,10 @@ public sealed partial class EvolutionWorkProtocol : IDisposable
                     ?? throw new ArgumentException("Unknown durable worker operation: " + op);
                 return Reply(id, writer => Dispatch(request, operation, writer));
             }
-            catch (Exception ex) when (ex is ArgumentException or JsonException or IOException or InvalidOperationException or OverflowException)
+            // InvalidDataException is not an IOException: without it an incompatible reopen escaped ProcessJson and
+            // terminated the host instead of returning the protocol error (found by conformance/durable-v1).
+            catch (Exception ex) when (ex is ArgumentException or JsonException or IOException or InvalidDataException or
+                InvalidOperationException or OverflowException)
             {
                 return Reply(id, writer =>
                 {

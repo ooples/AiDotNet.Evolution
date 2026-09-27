@@ -1,3 +1,4 @@
+using System.Diagnostics.CodeAnalysis;
 using System.Diagnostics;
 using System.Globalization;
 using System.Text.Json;
@@ -11,6 +12,7 @@ namespace AiDotNet.Evolution;
 /// An uncooperative provider may still run and owns its own process/device containment. Never launch replacement
 /// campaigns over such work without a separately coordinated global resource/admission policy.
 /// </remarks>
+[Experimental("AIDEVO002")]
 public sealed class EvolutionPolicyOptimizer
 {
     private readonly EvolutionPolicySpace _space;
@@ -204,7 +206,6 @@ public sealed class EvolutionPolicyOptimizer
         }
         var clock = Stopwatch.StartNew();
         var timeout = CancellationTokenSource.CreateLinkedTokenSource(token);
-        timeout.CancelAfter(_options.TrialBudget.Timeout);
         Task<EvolutionPolicyObservation>? work = null;
         EvolutionPolicyObservation? observation = null;
         EvolutionResources charged = maximum;
@@ -212,7 +213,19 @@ public sealed class EvolutionPolicyOptimizer
         string? failure = null;
         try
         {
-            work = Task.Run(() => task.RunAsync(policy, _options.TrialBudget, seed, timeout.Token), timeout.Token);
+            // The trial's deadline measures the trial, not thread-pool queue latency: it starts when the work item runs,
+            // and Task.Run gets no token. Passing the deadline token to Task.Run let a busy pool cancel the item before
+            // it started, so the provider was never called yet the trial was charged as InnerTimedOut (seen on CI).
+            // The provider still receives the deadline token; the campaign token is linked, so caller cancellation and
+            // the campaign deadline still stop a queued trial through the wait below.
+            work = Task.Run(() =>
+            {
+                // A trial still queued when the campaign is canceled must not reach the provider, which may ignore an
+                // already-canceled token (review on #151).
+                token.ThrowIfCancellationRequested();
+                timeout.CancelAfter(_options.TrialBudget.Timeout);
+                return task.RunAsync(policy, _options.TrialBudget, seed, timeout.Token);
+            }, CancellationToken.None);
             if (await Task.WhenAny(work, Task.Delay(System.Threading.Timeout.Infinite, timeout.Token)).ConfigureAwait(false) != work)
             {
                 _abandonedWork = work;

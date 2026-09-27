@@ -66,8 +66,12 @@ namespace AiDotNet.Evolution.Programs;
 /// and asks again instead of wasting the round. You supply the chat client, so no model is contacted unless you
 /// configure one.</para>
 /// </remarks>
-public sealed class LlmProgramVariationOperator : ICheckpointableVariationOperator<ProgramGenome>, IProgramVariationOperator
+public sealed class LlmProgramVariationOperator : ICheckpointableVariationOperator<ProgramGenome>, IProgramVariationOperator, IEvolutionLatencyProfile
 {
+    /// <inheritdoc/>
+    /// <remarks>Every proposal is a model call, so proposals wait on external latency.</remarks>
+    public bool IsLatencyBound => true;
+
     // Bumped whenever the checkpointed attempt shape changes, so an older checkpoint is refused rather than
     // silently misread into a different prompt.
     private const int AttemptStateSchemaVersion = 1;

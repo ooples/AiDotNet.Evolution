@@ -1,5 +1,7 @@
 <Project Sdk="Microsoft.NET.Sdk">
   <PropertyGroup>
+    <!-- Deliberately exercises experimental research surfaces (AIDEVO001-003). -->
+    <NoWarn>$(NoWarn);AIDEVO001;AIDEVO002;AIDEVO003</NoWarn>
     <TargetFrameworks>net10.0;net8.0;net471</TargetFrameworks>
     <ImplicitUsings>enable</ImplicitUsings>
     <Nullable>enable</Nullable>

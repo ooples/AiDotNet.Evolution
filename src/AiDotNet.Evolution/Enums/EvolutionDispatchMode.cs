@@ -31,5 +31,13 @@ public enum EvolutionDispatchMode
     Continuous = 1,
 
     /// <summary>Overlap bounded proposal and evaluator queues inside fixed, snapshot-based feedback waves.</summary>
-    Pipeline = 2
+    Pipeline = 2,
+    /// <summary>
+    /// Resolve to <see cref="Pipeline"/> when the variation operator or the task declares latency-bound work through
+    /// <see cref="IEvolutionLatencyProfile"/>, and to <see cref="Batch"/> otherwise. The choice is made once, when the
+    /// engine is constructed, from declared metadata alone (never from timing), so it is deterministic, and the resolved
+    /// mode is what the options' canonical form and checkpoint compatibility record. Pipeline overlaps latency; with
+    /// zero-latency work it only adds its wave bookkeeping (measured at 0.73x of Batch on the ZeroLatency suite).
+    /// </summary>
+    Auto = 3
 }

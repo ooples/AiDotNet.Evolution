@@ -1,0 +1,7 @@
+{
+  "story": "V1-04b #112",
+  "what": "The pinned reference timed against itself on the dev partition in the real warm Docker sandbox (cgroup v1 host), 5 interleaved samples",
+  "count_connected_components": {"speedup": 0.956, "ratios": [1.03, 1.1, 0.791, 0.824, 0.956]},
+  "matrix_multiplication": {"speedup": 1.061, "ratios": [1.104, 1.068, 1.025, 0.885, 1.061]},
+  "reading": "A true speedup of 1.0 measures 0.96-1.06 as a 5-sample median, with single ratios 0.79-1.10 (about +/-20%). The >= 1.10x geomean gate therefore needs its sample count from V1-07's power analysis; 5 samples cannot resolve it."
+}
