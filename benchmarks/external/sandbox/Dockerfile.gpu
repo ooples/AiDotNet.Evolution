@@ -1,0 +1,13 @@
+# GPU variant of the candidate sandbox for the V1-04c kernel family. Same hardening as
+# Dockerfile (unprivileged user, isolated interpreter, single-threaded BLAS); the launcher
+# adds --gpus for this image only. CUDA 12.6 runtime base and CuPy are pinned.
+FROM nvidia/cuda@sha256:92906d87596d638d35015c6353053121bd299d25943b875763321653884ba924
+RUN apt-get update && apt-get install -y --no-install-recommends python3 python3-venv && apt-get clean \
+ && python3 -m venv /opt/venv
+ENV PATH=/opt/venv/bin:$PATH
+COPY benchmarks/suite/requirements.txt /requirements.txt
+RUN pip install --no-cache-dir --requirement /requirements.txt cupy-cuda12x[ctk]==14.2.0
+ENV PYTHONDONTWRITEBYTECODE=1 PYTHONHASHSEED=0 OMP_NUM_THREADS=1 OPENBLAS_NUM_THREADS=1 MKL_NUM_THREADS=1 CUPY_CACHE_DIR=/tmp/cupy
+USER 65534:65534
+WORKDIR /work
+ENTRYPOINT ["python", "-I", "-B", "/work/worker.py"]
