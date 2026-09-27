@@ -18,7 +18,7 @@ import tempfile
 
 ROOT = Path(__file__).resolve().parents[2]
 sys.path.insert(0, str(ROOT / "bindings/python"))
-from aidotnet_evolution import DurableWorkClient, load_openevolve_evaluator, serve  # noqa: E402
+from aidotnet_evolution import DurableWorkClient, load_openevolve_evaluator, raw_program_source, serve  # noqa: E402
 
 PINNED = "411fb59c886c18704caaffb611e17cf9e7d824d2"
 BROKEN = "def search_algorithm(:\n"  # a syntax error: the evaluator must report it, the worker must commit it
@@ -59,7 +59,8 @@ def main(argv: list[str]) -> int:
             for index, source in enumerate([initial, BROKEN], 1):
                 work.enqueue({"evaluationId": str(index), "attempt": 1, "canonicalGenomeId": f"program:{index}",
                               "payload": source, "estimated": {"evaluations": "1"}, "maximum": {"evaluations": "1"}})
-            dispositions = serve(work, worker, evaluate, provenance=f"openevolve-{example}-evaluator", actual={"evaluations": "1"})
+            dispositions = serve(work, worker, evaluate, provenance=f"openevolve-{example}-evaluator", actual={"evaluations": "1"},
+                                 source_from=raw_program_source)
             receipts = {index: work.result(str(index), 1) for index in (1, 2)}
             status = work.status()
     evidence = {

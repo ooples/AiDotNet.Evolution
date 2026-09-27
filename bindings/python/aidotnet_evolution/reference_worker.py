@@ -15,7 +15,7 @@ import tempfile
 from pathlib import Path
 from typing import Any, Callable, Mapping
 
-from .durable import DurableWorkClient
+from .durable import DurableWorkClient, parse_evaluation_payload
 
 Evaluate = Callable[[str], dict[str, Any]]
 
@@ -29,8 +29,11 @@ def _json_value(value: Any) -> Any:
             return str(value)
         return value
     item = getattr(value, "item", None)  # numpy scalar -> Python scalar
-    if callable(item):
-        return _json_value(item())
+    if callable(item) and getattr(value, "size", 1) == 1:
+        try:
+            return _json_value(item())
+        except (TypeError, ValueError):
+            pass
     return str(value)
 
 
@@ -77,12 +80,24 @@ def load_openevolve_evaluator(path: str | Path, suffix: str = ".py") -> Evaluate
     return run
 
 
+def engine_program_source(payload: str) -> str:
+    """The program source in a lease the engine bridge enqueued: its envelope's encoded genome."""
+    return parse_evaluation_payload(payload)["genomePayload"]
+
+
+def raw_program_source(payload: str) -> str:
+    """For work enqueued directly with the program source as the lease payload."""
+    return payload
+
+
 def serve(client: DurableWorkClient, worker: Mapping[str, Any], evaluate: Evaluate, *, provenance: str,
-          actual: Mapping[str, str], max_leases: int | None = None) -> list[str]:
+          actual: Mapping[str, str], max_leases: int | None = None,
+          source_from: Callable[[str], str] = engine_program_source) -> list[str]:
     """Claims and evaluates leases until none is available (or ``max_leases``), returning each commit disposition.
 
     A null claim means no work is available now, not that the search is complete; the caller decides whether to
-    poll again. An evaluator exception commits a ``failed`` receipt carrying only the exception type. A commit that
+    poll again. ``source_from`` turns a lease payload into program source; the default reads the engine bridge's
+    envelope, and :func:`raw_program_source` serves work enqueued as bare source. An evaluator exception commits a ``failed`` receipt carrying only the exception type. A commit that
     raises is propagated, never retried by re-running the evaluator: the durable host settles lost replies.
     """
     if max_leases is not None and max_leases < 1:
@@ -93,7 +108,7 @@ def serve(client: DurableWorkClient, worker: Mapping[str, Any], evaluate: Evalua
         if lease is None:
             break
         try:
-            payload, outcome = json.dumps(evaluate(lease["payload"]), sort_keys=True, allow_nan=False), "completed"
+            payload, outcome = json.dumps(evaluate(source_from(lease["payload"])), sort_keys=True, allow_nan=False), "completed"
         except Exception as error:  # the evaluator is caller code; any failure is that lease's outcome
             payload, outcome = json.dumps({"error": type(error).__name__}), "failed"
         dispositions.append(client.commit({
