@@ -2100,3 +2100,31 @@ static AiDotNet.Evolution.TopologyMigrationPolicy<TGenome>.ResolveMigrantCount(i
 [AIDEVO003]const AiDotNet.Evolution.CentroidArchiveDefinition.MaximumCoordinates = 1000000 -> int
 [AIDEVO003]static AiDotNet.Evolution.CentroidArchive<TGenome>.Project(AiDotNet.Evolution.IEvolutionArchiveView<TGenome>! source, AiDotNet.Evolution.CentroidArchiveDefinition! definition) -> AiDotNet.Evolution.CentroidArchive<TGenome>!
 [AIDEVO003]static AiDotNet.Evolution.CentroidArchive<TGenome>.ProjectWithReport(AiDotNet.Evolution.IEvolutionArchiveView<TGenome>! source, AiDotNet.Evolution.CentroidArchiveDefinition! definition) -> AiDotNet.Evolution.CentroidArchiveProjection<TGenome>!
+AiDotNet.Evolution.EscalatingVariationOperator<TGenome>
+AiDotNet.Evolution.EscalatingVariationOperator<TGenome>.CaptureState() -> string!
+AiDotNet.Evolution.EscalatingVariationOperator<TGenome>.CurrentTier.get -> int
+AiDotNet.Evolution.EscalatingVariationOperator<TGenome>.EscalatingVariationOperator(System.Collections.Generic.IReadOnlyList<AiDotNet.Evolution.IVariationOperator<TGenome>!>! tiers, int failuresBeforeEscalation) -> void
+AiDotNet.Evolution.EscalatingVariationOperator<TGenome>.Escalations.get -> System.Collections.Generic.IReadOnlyList<AiDotNet.Evolution.EvolutionEscalation!>!
+AiDotNet.Evolution.EscalatingVariationOperator<TGenome>.Id.get -> string!
+AiDotNet.Evolution.EscalatingVariationOperator<TGenome>.Observe(AiDotNet.Evolution.EvolutionEvaluation! evaluation, AiDotNet.Evolution.EvolutionArchiveInsertionResult? insertionResult) -> void
+AiDotNet.Evolution.EscalatingVariationOperator<TGenome>.ProposeAsync(AiDotNet.Evolution.EvolutionVariationContext<TGenome>! context, System.Threading.CancellationToken cancellationToken = default(System.Threading.CancellationToken)) -> System.Threading.Tasks.ValueTask<TGenome>
+AiDotNet.Evolution.EscalatingVariationOperator<TGenome>.RestoreState(string! state) -> void
+AiDotNet.Evolution.EscalatingVariationOperator<TGenome>.TierProposals.get -> System.Collections.Generic.IReadOnlyList<long>!
+AiDotNet.Evolution.EscalatingVariationOperator<TGenome>.TierSuccesses.get -> System.Collections.Generic.IReadOnlyList<long>!
+AiDotNet.Evolution.EscalatingVariationOperator<TGenome>.VersionHash.get -> string!
+AiDotNet.Evolution.EvolutionDispatchMode.Auto = 3 -> AiDotNet.Evolution.EvolutionDispatchMode
+AiDotNet.Evolution.EvolutionEscalation
+AiDotNet.Evolution.EvolutionEscalation.ConsecutiveFailures.get -> int
+AiDotNet.Evolution.EvolutionEscalation.FromOperatorId.get -> string!
+AiDotNet.Evolution.EvolutionEscalation.FromTier.get -> int
+AiDotNet.Evolution.EvolutionEscalation.Generation.get -> long
+AiDotNet.Evolution.EvolutionEscalation.IncrementalCost.get -> AiDotNet.Evolution.EvolutionResources?
+AiDotNet.Evolution.EvolutionEscalation.ToOperatorId.get -> string!
+AiDotNet.Evolution.EvolutionEscalation.ToTier.get -> int
+AiDotNet.Evolution.EvolutionOperatorRewardPolicy.HalfLifeOutcomes.get -> int?
+AiDotNet.Evolution.EvolutionOperatorRewardPolicy.MaximumEstimateAge.get -> int?
+AiDotNet.Evolution.EvolutionOperatorRewardPolicy.WithEstimateAging(int maximumEstimateAge, int? halfLifeOutcomes = null) -> AiDotNet.Evolution.EvolutionOperatorRewardPolicy!
+AiDotNet.Evolution.IEvolutionLatencyProfile
+AiDotNet.Evolution.IEvolutionLatencyProfile.IsLatencyBound.get -> bool
+AiDotNet.Evolution.ResourceMeteredEvolutionTask<TGenome>.IsLatencyBound.get -> bool
+AiDotNet.Evolution.ResourceMeteredVariationOperator<TGenome>.IsLatencyBound.get -> bool
