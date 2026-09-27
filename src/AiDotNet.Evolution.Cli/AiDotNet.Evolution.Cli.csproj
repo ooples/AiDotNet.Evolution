@@ -22,7 +22,7 @@
   <ItemGroup>
     <InternalsVisibleTo Include="AiDotNet.Evolution.Tests" />
     <None Include="README.md" Pack="true" PackagePath="README.md" />
-    <None Include="../AiDotNet.Evolution.Programs/Legacy/AIDOTNET-LICENSE.txt" Pack="true" PackagePath="AIDOTNET-LICENSE.txt" />
+    <None Include="../AiDotNet.Evolution.Programs/AIDOTNET-LICENSE.txt" Pack="true" PackagePath="AIDOTNET-LICENSE.txt" />
     <ProjectReference Include="../AiDotNet.Evolution/AiDotNet.Evolution.csproj" />
     <ProjectReference Include="../AiDotNet.Evolution.Programs/AiDotNet.Evolution.Programs.csproj" />
   </ItemGroup>
