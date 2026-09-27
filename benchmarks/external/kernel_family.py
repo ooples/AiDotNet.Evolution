@@ -1,0 +1,265 @@
+"""V1-04c kernel family: GPU (CuPy) and CPU (NumPy) row kernels with an FP64 host oracle.
+
+A candidate supplies only `kernel(x, *params)`. TRUSTED code appended after it (so it wins
+any name clash) builds every input inside the sandbox from a seed with a closed form the
+host reproduces exactly, runs the kernel, and returns:
+- VERIFY problems: the full output of a small shape, compared elementwise with the host's
+  FP64 reference;
+- TIMED problems: `repeats` fresh-seed runs of a large shape, each reduced to seeded random
+  projections the host recomputes from its own reference. Only digests cross the wire, so
+  the sandbox's request-to-response time measures the kernels, not serialization.
+A fast wrong kernel fails either check, and then has no speedup (US-03).
+
+Residual risk, declared: a candidate that monkeypatches the array library could forge the
+digests. LLM candidates are screened by the full-output check on the verify shape, which
+the same forgery would also have to pass.
+"""
+from __future__ import annotations
+
+import hashlib
+import json
+import math
+from pathlib import Path
+import secrets
+import statistics
+
+import numpy as np
+
+FAMILY = "kernels"
+DEV_SEEDS = tuple(range(3000, 3004))
+VALIDATION_SEEDS = tuple(range(4000, 4004))
+TEST_SIZE = 4
+PROJECTIONS = 4
+RTOL, ATOL = 2e-3, 2e-4  # float32 kernels against an FP64 reference
+
+# task -> (parameter builders, fp64 reference, initial program body)
+TASKS = {
+    "softmax": dict(params=(), description="Row-wise softmax of x (rows x cols, float32).",
+                    initial="def kernel(x):\n    m = xp.max(x, axis=1, keepdims=True)\n    e = xp.exp(x - m)\n"
+                            "    return e / xp.sum(e, axis=1, keepdims=True)\n"),
+    "layernorm": dict(params=("gamma", "beta"), description="Row-wise layer norm, eps=1e-5, with gamma and beta (cols).",
+                      initial="def kernel(x, gamma, beta):\n    mu = xp.mean(x, axis=1, keepdims=True)\n"
+                              "    var = xp.mean((x - mu) ** 2, axis=1, keepdims=True)\n"
+                              "    return (x - mu) / xp.sqrt(var + 1e-5) * gamma + beta\n"),
+    "rmsnorm": dict(params=("gamma",), description="Row-wise RMS norm, eps=1e-6, times gamma (cols).",
+                    initial="def kernel(x, gamma):\n    return x / xp.sqrt(xp.mean(x * x, axis=1, keepdims=True) + 1e-6) * gamma\n"),
+    "bias_gelu": dict(params=("bias",), description="Exact GELU (erf form) of x + bias (bias per column).",
+                      initial="def kernel(x, bias):\n    z = x + bias\n"
+                              "    return 0.5 * z * (1 + erf(z / math.sqrt(2.0)))\n"),
+}
+SHAPES = {"verify": (64, 96), "timed": (4096, 1024)}
+
+
+def inputs(xp, task, seed, rows, cols):
+    """Closed-form inputs; identical on host (numpy) and sandbox (cupy/numpy) up to float32 rounding."""
+    i = xp.arange(rows, dtype=xp.float64)[:, None]
+    j = xp.arange(cols, dtype=xp.float64)[None, :]
+    x = (3.0 * xp.sin(0.37 * i + 0.11 * j + 0.001 * seed) + 0.5 * xp.cos(0.013 * i * j + seed % 7)).astype(xp.float32)
+    col = xp.arange(cols, dtype=xp.float64)
+    params = {"gamma": (1.0 + 0.1 * xp.sin(0.05 * col + seed)).astype(xp.float32),
+              "beta": (0.1 * xp.cos(0.03 * col + seed)).astype(xp.float32),
+              "bias": (0.2 * xp.sin(0.07 * col - seed)).astype(xp.float32)}
+    return x, [params[name] for name in TASKS[task]["params"]]
+
+
+def weights(xp, seed, size):
+    """Seeded Rademacher (+/-1) projections from a SplitMix64 hash of (seed, k, index); identical in
+    numpy and cupy. Unlike a smooth basis they do not cancel a uniform offset: a constant error e
+    moves each projection by about e*sqrt(size)."""
+    mask = (1 << 64) - 1
+    n = xp.arange(size, dtype=xp.uint64)
+    rows = []
+    for k in range(PROJECTIONS):
+        offset = ((seed * 0xBF58476D1CE4E5B9) + ((k + 1) * 0x94D049BB133111EB)) & mask
+        z = n * xp.uint64(0x9E3779B97F4A7C15) + xp.uint64(offset)
+        z = (z ^ (z >> xp.uint64(30))) * xp.uint64(0xBF58476D1CE4E5B9)
+        z = (z ^ (z >> xp.uint64(27))) * xp.uint64(0x94D049BB133111EB)
+        z = z ^ (z >> xp.uint64(31))
+        rows.append((z & xp.uint64(1)).astype(xp.float64) * 2.0 - 1.0)
+    return xp.stack(rows)
+
+
+def reference(task, x, params):
+    """FP64 host oracle, independent of any candidate or of the initial program's code."""
+    from scipy.special import erf
+    x = x.astype(np.float64)
+    params = [p.astype(np.float64) for p in params]
+    if task == "softmax":
+        e = np.exp(x - x.max(1, keepdims=True))
+        return e / e.sum(1, keepdims=True)
+    if task == "layernorm":
+        mu = x.mean(1, keepdims=True)
+        return (x - mu) / np.sqrt(((x - mu) ** 2).mean(1, keepdims=True) + 1e-5) * params[0] + params[1]
+    if task == "rmsnorm":
+        return x / np.sqrt((x * x).mean(1, keepdims=True) + 1e-6) * params[0]
+    if task == "bias_gelu":
+        z = x + params[0]
+        return 0.5 * z * (1 + erf(z / math.sqrt(2.0)))
+    raise ValueError(task)
+
+
+def trusted_suffix(task, backend):
+    xp = "cupy" if backend == "gpu" else "numpy"
+    return f'''
+
+# ---- trusted harness (appended after the candidate; defines Solver last) ----
+import math as _math
+import time as _time
+import numpy as _np
+import {xp} as _xp
+_TASK, _PROJECTIONS = {task!r}, {PROJECTIONS}
+{_source(inputs).replace("def inputs(", "def _inputs(")}
+{_source(weights).replace("def weights(", "def _weights(")}
+TASKS = {json.dumps({t: dict(params=list(v["params"])) for t, v in TASKS.items()})}
+
+class Solver:
+    def solve(self, problem):
+        rows, cols = problem["shape"]
+        outputs = []
+        kernel_seconds = 0.0
+        for offset in range(problem["repeats"]):
+            seed = problem["seed"] + offset
+            x, params = _inputs(_xp, _TASK, seed, rows, cols)
+            if _xp.__name__ == "cupy":
+                _start, _stop = _xp.cuda.Event(), _xp.cuda.Event()
+                _start.record()
+                y = _xp.asarray(kernel(x, *params))
+                _stop.record(); _stop.synchronize()
+                kernel_seconds += _xp.cuda.get_elapsed_time(_start, _stop) / 1000.0
+            else:
+                _t0 = _time.perf_counter()
+                y = _xp.asarray(kernel(x, *params))
+                kernel_seconds += _time.perf_counter() - _t0
+            if y.shape != (rows, cols) or y.dtype.kind not in "fiu":
+                return {{"error": "shape or dtype"}}
+            if problem["mode"] == "verify":
+                outputs.append(_xp.asnumpy(y).tolist() if _xp.__name__ == "cupy" else y.tolist())
+            else:
+                digest = _weights(_xp, seed, rows * cols) @ y.astype(_xp.float64).reshape(-1)
+                outputs.append([float(v) for v in (digest.get() if _xp.__name__ == "cupy" else digest)])
+        if _xp.__name__ == "cupy":
+            _xp.cuda.Device().synchronize()
+        return {{"outputs": outputs, "kernel_seconds": kernel_seconds}}
+'''
+
+
+def _source(function):
+    import inspect
+    return inspect.getsource(function).replace("PROJECTIONS", "_PROJECTIONS").replace("TASKS[", "TASKS[")
+
+
+def program(task, backend, candidate):
+    """What the sandbox runs: the candidate's `kernel`, then the trusted Solver."""
+    header = "import math\nimport numpy as np\n" + ("import cupy as xp\nfrom cupyx.scipy.special import erf\n"
+                                                    if backend == "gpu" else "import numpy as xp\nfrom scipy.special import erf\n")
+    return header + candidate + trusted_suffix(task, backend)
+
+
+def initial(task):
+    return TASKS[task]["initial"]
+
+
+def problems(task, seeds, *, mode, repeats=1):
+    shape = SHAPES["verify" if mode == "verify" else "timed"]
+    return [dict(mode=mode, seed=int(seed), shape=list(shape), repeats=repeats) for seed in seeds]
+
+
+def validate_outputs(task, problem_list, outputs):
+    """True only if every output matches the FP64 reference (full values, or digests)."""
+    if not isinstance(outputs, list) or len(outputs) != len(problem_list):
+        return False
+    for problem, output in zip(problem_list, outputs):
+        if (not isinstance(output, dict) or not isinstance(output.get("outputs"), list) or
+                len(output["outputs"]) != problem["repeats"] or type(output.get("kernel_seconds")) not in (int, float) or
+                not math.isfinite(output["kernel_seconds"]) or output["kernel_seconds"] < 0):
+            return False
+        rows, cols = problem["shape"]
+        for offset, value in enumerate(output["outputs"]):
+            seed = problem["seed"] + offset
+            x, params = inputs(np, task, seed, rows, cols)
+            expected = reference(task, x, params)
+            try:
+                got = np.asarray(value, dtype=np.float64)
+            except (TypeError, ValueError):
+                return False  # malformed output is a failed candidate, never an exception
+            if problem["mode"] == "verify":
+                if got.shape != expected.shape or not np.all(np.isfinite(got)) or \
+                        not np.allclose(got, expected, rtol=RTOL, atol=ATOL):
+                    return False
+            else:
+                want = weights(np, seed, rows * cols) @ expected.reshape(-1)
+                tolerance = 1e-4 * (np.linalg.norm(expected) + 1.0)
+                if got.shape != want.shape or not np.all(np.isfinite(got)) or np.any(np.abs(got - want) > tolerance):
+                    return False
+    return True
+
+
+def seal(directory):
+    reserved = set(DEV_SEEDS) | set(VALIDATION_SEEDS)
+    test = {}
+    for task in sorted(TASKS):
+        seeds = []
+        while len(seeds) < TEST_SIZE:
+            candidate = secrets.randbits(31)
+            if candidate not in reserved and candidate not in seeds:
+                seeds.append(candidate)
+        test[task] = seeds
+    body = json.dumps(dict(Family=FAMILY, Schema="evolution-sealed-test-partition-v1", TestSeeds=test,
+                           DevSeeds=list(DEV_SEEDS), ValidationSeeds=list(VALIDATION_SEEDS)),
+                      sort_keys=True, separators=(",", ":")).encode()
+    path = Path(directory) / f"{FAMILY}-test-partition.json"
+    Path(directory).mkdir(parents=True, exist_ok=True)
+    with path.open("xb") as stream:
+        stream.write(body)
+    return dict(path=str(path), sha256=hashlib.sha256(body).hexdigest())
+
+
+def open_seal(path, expected_sha256):
+    body = Path(path).read_bytes()
+    if hashlib.sha256(body).hexdigest() != expected_sha256:
+        raise ValueError("Sealed test partition does not match its registered hash")
+    return json.loads(body)
+
+
+def kernel_evaluator(sandbox, task, backend, problems, identity, samples=1):
+    """Evaluate a candidate `kernel` in the sandbox; duration_seconds is the harness's kernel-only time.
+
+    Kernel time comes from CUDA events (GPU) or perf_counter (CPU) around the kernel call alone, so input
+    generation and digests are excluded. The host refuses a reported kernel time above its own
+    request-to-response wall time, which it measures independently."""
+    from warm_evaluator import WarmEvaluator
+    captured = []
+
+    def validate(outputs):
+        ok = validate_outputs(task, problems, outputs)
+        captured.append(sum(o["kernel_seconds"] for o in outputs) if ok else None)
+        return ok
+
+    evaluator = WarmEvaluator(sandbox, "Solver", problems, validate, identity=identity, samples=samples)
+
+    def run(source):
+        captured.clear()
+        result = evaluator(program(task, backend, source))
+        kernel = [value for value in captured if value is not None]
+        if result["status"] != "valid" or len(kernel) != len(result["samples"]) or not kernel:
+            return dict(result, status="invalid", duration_seconds=None)
+        if any(k > host for k, host in zip(kernel, result["samples"])):
+            return dict(result, status="invalid", duration_seconds=None, reason="kernel time exceeds host wall time")
+        return dict(result, duration_seconds=statistics.median(kernel), host_seconds=result["duration_seconds"])
+    return run
+
+
+def speedup(reference_timer, candidate_timer, samples=5):
+    ratios = []
+    for _ in range(samples):
+        base, cand = reference_timer(), candidate_timer()
+        if base["status"] != "valid":
+            raise RuntimeError("The initial program failed its own oracle")
+        if cand["status"] != "valid":
+            return dict(speedup=None, ratios=ratios)
+        ratios.append(base["duration_seconds"] / cand["duration_seconds"])
+    return dict(speedup=statistics.median(ratios), ratios=ratios)
+
+
+# Kept for callers that validate a whole output list directly.
+validate = validate_outputs
