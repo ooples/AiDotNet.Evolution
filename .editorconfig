@@ -1,0 +1,9 @@
+# Line endings only, matching .gitattributes, so dotnet format agrees on every OS (#126).
+# Without this, Windows formats C# with CRLF while the repository stores LF.
+root = true
+
+[*]
+end_of_line = lf
+
+[*.{cmd,bat,ps1}]
+end_of_line = crlf

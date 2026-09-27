@@ -48,7 +48,7 @@ def docker(*args, timeout=30, check=True):
 
 
 class DockerSandbox:
-    def __init__(self, image, evidence, *, seconds=15, memory_mib=512):
+    def __init__(self, image, evidence, *, seconds=15, memory_mib=512, gpus=False):
         if not IMAGE.fullmatch(image) or not 1 <= seconds <= 60 or not 128 <= memory_mib <= 1024:
             raise ValueError("Pin an immutable image and bounded resources")
         context = unique_json(docker("context", "inspect").stdout)[0]
@@ -72,6 +72,12 @@ class DockerSandbox:
             "includes": "Python startup, imports, all solve calls and serialization; NOT isolated solve-only latency",
             "worker_sha256": hashlib.sha256(Path(__file__).with_name("sandbox").joinpath("worker.py").read_bytes()).hexdigest()
         }
+        self.gpus = bool(gpus)
+        if self.gpus:
+            # Opt-in, and marked only when on, so every CPU identity stays byte-identical.
+            query = subprocess.run(["nvidia-smi", "--query-gpu=name,driver_version", "--format=csv,noheader", "-i", "0"],
+                                   capture_output=True, timeout=30, check=True).stdout.decode().strip()
+            self.identity.update(gpus="device=0", gpu=query)
         (self.root / "environment.json").write_bytes(encode(self.identity))
         self.rows = []
         self.failed = False
@@ -85,7 +91,8 @@ class DockerSandbox:
                 "--memory", f"{self.memory_mib}m", "--memory-swap", f"{self.memory_mib}m",
                 "--cpus", "1", "--cpuset-cpus", "0", "--user", "65534:65534", "--ipc", "none",
                 "--tmpfs", "/tmp:rw,noexec,nosuid,nodev,size=16777216", "--log-driver", "none",
-                "--mount", f"type=bind,source={bundle},target=/work,readonly", self.image]
+                "--mount", f"type=bind,source={bundle},target=/work,readonly",
+                *(["--gpus", "device=0"] if self.gpus else []), self.image]
 
     def run(self, source, request, *, phase):
         if not self._lock.acquire(blocking=False):
