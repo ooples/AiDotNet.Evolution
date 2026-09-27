@@ -1,0 +1,232 @@
+{
+  "story": "V1-03 #110",
+  "commit": "b8d5f9a",
+  "evaluator": "contract fixture (not a family oracle)",
+  "runs": {
+    "recommended": {
+      "exit_code": 0,
+      "stderr_tail": "40,257 - INFO -    Island 3: 0 programs, best=0.0000, avg=0.0000, diversity=0.00, gen=0\r\n2026-09-22 21:13:40,257 - INFO - Starting process-based evolution from iteration 1 for 2 iterations (total: 3)\r\n2026-09-22 21:13:40,352 - INFO - Early stopping disabled\r\n2026-09-22 21:14:21,981 - INFO - New MAP-Elites cell occupied in island 0: {'complexity': 9, 'diversity': 5}\r\n2026-09-22 21:14:21,982 - INFO - Iteration 1: Program 89c474a2-0c10-4765-95f0-dd0cb1bef819 (parent: 9c1dc98c-c3f4-4eac-83f8-58937db00dfa) completed in 39.60s\r\n2026-09-22 21:14:21,982 - INFO - Metrics: combined_score=1.0000\r\n2026-09-22 21:14:45,716 - INFO - New MAP-Elites cell occupied in island 1: {'complexity': 9, 'diversity': 0}\r\n2026-09-22 21:14:45,716 - INFO - Iteration 2: Program e2c82979-a7ef-407d-9fb7-ce303e09dd0e (parent: 9c1dc98c-c3f4-4eac-83f8-58937db00dfa) completed in 23.73s\r\n2026-09-22 21:14:45,716 - INFO - Metrics: combined_score=1.0000\r\n2026-09-22 21:14:45,716 - INFO - \u2705 Evolution completed - Maximum iterations reached\r\n2026-09-22 21:14:45,728 - INFO - Stopped process pool\r\n2026-09-22 21:14:45,728 - INFO - Using tracked best program: 9c1dc98c-c3f4-4eac-83f8-58937db00dfa\r\n2026-09-22 21:14:45,728 - INFO - Evolution complete. Best program has metrics: combined_score=1.0000\r\n2026-09-22 21:14:45,731 - INFO - Saved best program to C:\\Users\\yolan\\AppData\\Local\\Temp\\tmp3ig0uza5\\result\\best\\best_program.py with program info to C:\\Users\\yolan\\AppData\\Local\\Temp\\tmp3ig0uza5\\result\\best\\best_program_info.json\r\n",
+      "broker_closed": false,
+      "model_rows": 2,
+      "chat_received": 2,
+      "unrecorded_prompts": 0,
+      "models_called": [
+        "haiku",
+        "haiku"
+      ],
+      "statuses": [
+        "completed",
+        "completed",
+        "completed",
+        "completed",
+        "completed"
+      ],
+      "canaries": {
+        "haiku": 448,
+        "opus": 516
+      },
+      "receipt_coverage": {
+        "haiku": 1.0,
+        "opus": 1.0
+      },
+      "tokens": 11374,
+      "changes": [
+        {
+          "path": "llm.models[0].name",
+          "source": "model-swap",
+          "before": "google/gemini-2.5-flash",
+          "after": "haiku",
+          "reason": "The only permitted change to a recommended config"
+        },
+        {
+          "path": "llm.models[1].name",
+          "source": "model-swap",
+          "before": "google/gemini-2.5-pro",
+          "after": "opus",
+          "reason": "The only permitted change to a recommended config"
+        },
+        {
+          "path": "max_iterations",
+          "source": "budget",
+          "before": 100,
+          "after": 2,
+          "reason": "Campaign budget, identical for every arm"
+        },
+        {
+          "path": "random_seed",
+          "source": "budget",
+          "before": 42,
+          "after": 37,
+          "reason": "Paired seed, identical for every arm"
+        },
+        {
+          "path": "llm.retries",
+          "source": "forced",
+          "before": 3,
+          "after": 0,
+          "reason": "A failed call closes broker admission; a retry would be work the budget did not admit"
+        },
+        {
+          "path": "llm.timeout",
+          "source": "forced",
+          "before": 150,
+          "after": 300,
+          "reason": "Matches the transport timeout, so OpenEvolve never abandons a call the broker still meters"
+        },
+        {
+          "path": "evaluator.parallel_evaluations",
+          "source": "forced",
+          "before": 4,
+          "after": 1,
+          "reason": "The broker admits one evaluation at a time for every arm"
+        },
+        {
+          "path": "evaluator.max_retries",
+          "source": "forced",
+          "before": 3,
+          "after": 0,
+          "reason": "A retried evaluation would be unmetered work"
+        },
+        {
+          "path": "evaluator.cascade_evaluation",
+          "source": "forced",
+          "before": true,
+          "after": false,
+          "reason": "The broker exposes one-stage evaluation to every arm"
+        },
+        {
+          "path": "evaluator.use_llm_feedback",
+          "source": "forced",
+          "before": "<absent>",
+          "after": false,
+          "reason": "LLM feedback is extra model work our arm does not receive"
+        },
+        {
+          "path": "language",
+          "source": "forced",
+          "before": "<absent>",
+          "after": "python",
+          "reason": "The reference worker language for every arm"
+        },
+        {
+          "path": "llm.api_base/api_key",
+          "source": "forced",
+          "before": "<provider>",
+          "after": "<loopback shim>",
+          "reason": "Every call goes through the shared metered transport"
+        }
+      ],
+      "differences": [],
+      "passed": true
+    },
+    "matched": {
+      "exit_code": 0,
+      "stderr_tail": " -  * Island 0: 1 programs, best=1.0000, avg=1.0000, diversity=0.00, gen=0 (best: aff61bf2-f1af-4184-a0c0-96089eb2df8e)\r\n2026-09-22 21:15:08,048 - INFO - Starting process-based evolution from iteration 1 for 2 iterations (total: 3)\r\n2026-09-22 21:15:08,145 - INFO - Early stopping disabled\r\n2026-09-22 21:15:19,358 - INFO - New MAP-Elites cell occupied in island 0: {'complexity': 99}\r\n2026-09-22 21:15:19,358 - INFO - Iteration 1: Program fd5d7b85-3e2c-4dd6-89bb-d52829516fdd (parent: aff61bf2-f1af-4184-a0c0-96089eb2df8e) completed in 9.21s\r\n2026-09-22 21:15:19,358 - INFO - Metrics: combined_score=1.0000\r\n2026-09-22 21:15:35,653 - INFO - New MAP-Elites cell occupied in island 0: {'complexity': 0}\r\n2026-09-22 21:15:35,654 - INFO - Iteration 2: Program d1255f16-9831-499f-b2c6-efa4e1058a3c (parent: aff61bf2-f1af-4184-a0c0-96089eb2df8e) completed in 16.29s\r\n2026-09-22 21:15:35,654 - INFO - Metrics: combined_score=1.0000\r\n2026-09-22 21:15:35,654 - INFO - \u2705 Evolution completed - Maximum iterations reached\r\n2026-09-22 21:15:35,667 - INFO - Stopped process pool\r\n2026-09-22 21:15:35,667 - INFO - Using tracked best program: aff61bf2-f1af-4184-a0c0-96089eb2df8e\r\n2026-09-22 21:15:35,667 - INFO - Evolution complete. Best program has metrics: combined_score=1.0000\r\n2026-09-22 21:15:35,669 - INFO - Saved best program to C:\\Users\\yolan\\AppData\\Local\\Temp\\tmpq5c0u5i4\\result\\best\\best_program.py with program info to C:\\Users\\yolan\\AppData\\Local\\Temp\\tmpq5c0u5i4\\result\\best\\best_program_info.json\r\n",
+      "broker_closed": false,
+      "model_rows": 2,
+      "chat_received": 2,
+      "unrecorded_prompts": 0,
+      "models_called": [
+        "opus",
+        "haiku"
+      ],
+      "statuses": [
+        "completed",
+        "completed",
+        "completed",
+        "completed",
+        "completed"
+      ],
+      "canaries": {
+        "haiku": 448,
+        "opus": 516,
+        "sonnet": 579
+      },
+      "receipt_coverage": {
+        "haiku": 1.0,
+        "opus": 1.0,
+        "sonnet": 1.0
+      },
+      "tokens": 3788,
+      "changes": [
+        {
+          "path": "max_iterations",
+          "source": "budget",
+          "before": "<absent>",
+          "after": 2,
+          "reason": "Campaign budget, identical for every arm"
+        },
+        {
+          "path": "random_seed",
+          "source": "budget",
+          "before": "<absent>",
+          "after": 37,
+          "reason": "Paired seed, identical for every arm"
+        },
+        {
+          "path": "llm.retries",
+          "source": "forced",
+          "before": "<absent>",
+          "after": 0,
+          "reason": "A failed call closes broker admission; a retry would be work the budget did not admit"
+        },
+        {
+          "path": "llm.timeout",
+          "source": "forced",
+          "before": "<absent>",
+          "after": 300,
+          "reason": "Matches the transport timeout, so OpenEvolve never abandons a call the broker still meters"
+        },
+        {
+          "path": "evaluator.parallel_evaluations",
+          "source": "forced",
+          "before": "<absent>",
+          "after": 1,
+          "reason": "The broker admits one evaluation at a time for every arm"
+        },
+        {
+          "path": "evaluator.max_retries",
+          "source": "forced",
+          "before": "<absent>",
+          "after": 0,
+          "reason": "A retried evaluation would be unmetered work"
+        },
+        {
+          "path": "evaluator.cascade_evaluation",
+          "source": "forced",
+          "before": "<absent>",
+          "after": false,
+          "reason": "The broker exposes one-stage evaluation to every arm"
+        },
+        {
+          "path": "evaluator.use_llm_feedback",
+          "source": "forced",
+          "before": "<absent>",
+          "after": false,
+          "reason": "LLM feedback is extra model work our arm does not receive"
+        },
+        {
+          "path": "language",
+          "source": "forced",
+          "before": "<absent>",
+          "after": "python",
+          "reason": "The reference worker language for every arm"
+        },
+        {
+          "path": "llm.api_base/api_key",
+          "source": "forced",
+          "before": "<provider>",
+          "after": "<loopback shim>",
+          "reason": "Every call goes through the shared metered transport"
+        }
+      ],
+      "differences": [
+        "Archive: ours bins length over fixed (0, 65536) into 64; OpenEvolve bins 'complexity' (code length) over the observed range",
+        "Inspirations: ours samples from the archive; OpenEvolve's diverse programs come from its island",
+        "Prompt wording: each system renders its own template around the same task and parent"
+      ],
+      "passed": true
+    }
+  },
+  "passed": true
+}
