@@ -90,4 +90,23 @@ public sealed class ExperienceAndAdvisoryNoveltyTests
         Assert.Equal(new[] { "s2", "s3", "s4" }, restored.Retrieve(new("r", "t", "v1", 10_000, false)).Selected.Select(r => r.SourceHash).OrderBy(s => s));
         Assert.Throws<InvalidDataException>(() => new ProgramExperienceStore(capacity: 2).RestoreState(store.CaptureState()));
     }
+    [Fact]
+    public void Truncation_never_splits_a_surrogate_pair_so_state_round_trips_exactly()
+    {
+        // The emoji straddles each bound; cutting inside it leaves a lone surrogate that JSON rewrites as U+FFFD.
+        string emoji = char.ConvertFromUtf32(0x1F600);
+        string hypothesis = new string('h', ProgramExperienceRecord.MaximumHypothesisCharacters - 1) + emoji;
+        string diagnostic = new string('d', 255) + emoji;
+        var record = new ProgramExperienceRecord("r", "t", "v1", hypothesis, "s", ProgramExperienceOutcome.Failed,
+            ProgramEvidencePartition.Search, null, new[] { diagnostic }, 1);
+        Assert.False(char.IsHighSurrogate(record.Hypothesis[^1]));
+        Assert.False(char.IsHighSurrogate(record.Diagnostics[0][^1]));
+        var store = new ProgramExperienceStore();
+        store.Add(record);
+        var restored = new ProgramExperienceStore();
+        restored.RestoreState(store.CaptureState());
+        ProgramExperienceRecord back = Assert.Single(restored.Retrieve(new("r", "t", "v1", 10_000, false)).Selected);
+        Assert.Equal(record.Hypothesis, back.Hypothesis);
+        Assert.Equal(record.Diagnostics, back.Diagnostics);
+    }
 }

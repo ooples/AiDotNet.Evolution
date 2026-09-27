@@ -49,10 +49,10 @@ public sealed class ProgramExperienceRecord
         if (quality is { } q && !double.IsFinite(q)) throw new ArgumentOutOfRangeException(nameof(quality), "Quality must be finite.");
         if (sequence < 0) throw new ArgumentOutOfRangeException(nameof(sequence));
         RunId = runId; TaskIdentity = taskIdentity; TaskVersion = taskVersion;
-        Hypothesis = hypothesis.Length > MaximumHypothesisCharacters ? hypothesis[..MaximumHypothesisCharacters] : hypothesis;
+        Hypothesis = Truncate(hypothesis, MaximumHypothesisCharacters);
         SourceHash = sourceHash; Outcome = outcome; Partition = partition; Quality = quality; Sequence = sequence;
         Diagnostics = (diagnostics ?? Array.Empty<string>()).Where(d => !string.IsNullOrWhiteSpace(d))
-            .Select(d => d.Length > 256 ? d[..256] : d).Take(MaximumDiagnostics).ToArray();
+            .Select(d => Truncate(d, 256)).Take(MaximumDiagnostics).ToArray();
     }
 
     /// <summary>Gets the run that produced the evidence.</summary>
@@ -75,6 +75,10 @@ public sealed class ProgramExperienceRecord
     public IReadOnlyList<string> Diagnostics { get; }
     /// <summary>Gets the producing run's monotonic sequence, used for recency.</summary>
     public long Sequence { get; }
+
+    // Never ends on a high surrogate: a lone one is invalid UTF-16, and JSON rewrites it as U+FFFD on checkpoint.
+    private static string Truncate(string text, int limit) =>
+        text.Length <= limit ? text : text[..(char.IsHighSurrogate(text[limit - 1]) ? limit - 1 : limit)];
 
     internal string Render()
     {
