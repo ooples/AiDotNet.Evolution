@@ -17,6 +17,7 @@ from __future__ import annotations
 
 import argparse
 import json
+import math
 from pathlib import Path
 import random
 import secrets
@@ -29,6 +30,10 @@ SCHEMA = "evolution-campaign-registration-v1"
 REPORT_SCHEMA = "evolution-campaign-report-v1"
 CONFIGS = ("recommended", "matched")
 OURS = "aidotnet"
+
+
+def _finite(value):
+    return type(value) in (int, float) and math.isfinite(value)
 
 
 def _hex64(value):
@@ -53,7 +58,7 @@ def validate(spec):
         endpoint = family["Endpoint"]
         require(isinstance(endpoint, dict) and set(endpoint) == {"Metric", "Direction", "FailureValue"}
                 and isinstance(endpoint["Metric"], str) and endpoint["Direction"] in ("maximize", "minimize")
-                and type(endpoint["FailureValue"]) in (int, float), "Endpoint needs Metric, Direction and FailureValue.")
+                and _finite(endpoint["FailureValue"]), "Endpoint needs Metric, Direction and a finite FailureValue.")
     budget = spec["Budget"]
     require(isinstance(budget, dict) and set(budget) == {"ModelTokens", "ModelCalls", "WallSeconds"} and
             all(type(v) is int and v > 0 for v in budget.values()), "Budget must fix tokens, calls and wall seconds.")
@@ -67,9 +72,9 @@ def validate(spec):
             all(_hex64(v) for v in spec["TestPartitionHashes"].values()), "Seal every family's test partition by SHA-256.")
     published = spec["Published"]
     require(published is None or (isinstance(published, dict) and set(published) == {"Family", "Problems"} and
-            published["Family"] in seen and isinstance(published["Problems"], list) and published["Problems"] and
-            len(set(published["Problems"])) == len(published["Problems"])),
-            "Published must be null or name a registered family and its pre-declared problems.")
+            published["Family"] in seen and isinstance(published["Problems"], dict) and published["Problems"] and
+            all(isinstance(p, str) and d in ("maximize", "minimize") for p, d in published["Problems"].items())),
+            "Published must be null or name a registered family and map each pre-declared problem to its direction.")
 
 
 def register(spec, directory):
@@ -129,7 +134,8 @@ def analyze(registration, runs):
         key = (run.get("Family"), run.get("Arm"), run.get("Seed"))
         require(key in expected and key not in cells, f"Unregistered or duplicate run {key}.")
         require(run.get("Status") in ("completed", "failed"), f"Run {key} has no terminal status.")
-        require(run["Status"] == "failed" or type(run.get("Value")) in (int, float), f"Completed run {key} lacks a value.")
+        # A NaN difference makes every resampled mean compare false with zero, which would read as certain superiority.
+        require(run["Status"] == "failed" or _finite(run.get("Value")), f"Completed run {key} lacks a finite value.")
         cells[key] = run
     missing = sorted(expected - set(cells))
     require(not missing, f"Registered runs are missing: {missing[:5]}")
@@ -159,12 +165,21 @@ def analyze(registration, runs):
 
 
 def published_gate(registration, results):
-    """AlphaEvolve rule: {problem: {"Ours": v, "Published": v, "Direction": d}} for every declared problem."""
+    """AlphaEvolve rule: {problem: {"Ours": v, "Published": v}} for every declared problem.
+
+    Each problem's direction is the one frozen in the registration; a result may restate it but cannot change it.
+    """
     published = registration["Spec"]["Published"]
     require(published is not None, "This campaign registered no published comparison.")
-    require(set(results) == set(published["Problems"]), "Results must cover exactly the declared problems.")
+    directions = published["Problems"]
+    require(set(results) == set(directions), "Results must cover exactly the declared problems.")
+    for problem, result in results.items():
+        require(isinstance(result, dict) and _finite(result.get("Ours")) and _finite(result.get("Published")),
+                f"Problem {problem} needs finite Ours and Published values.")
+        require(result.get("Direction", directions[problem]) == directions[problem],
+                f"Problem {problem} is registered as {directions[problem]}.")
     met = sorted(p for p, r in results.items()
-                 if (r["Ours"] >= r["Published"]) == (r["Direction"] == "maximize") or r["Ours"] == r["Published"])
+                 if (r["Ours"] >= r["Published"] if directions[p] == "maximize" else r["Ours"] <= r["Published"]))
     return dict(Problems=len(results), MatchedOrBeaten=len(met), Met=met, Gate=len(met) * 2 > len(results))
 
 

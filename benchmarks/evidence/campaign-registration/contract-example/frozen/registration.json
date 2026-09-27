@@ -46,20 +46,20 @@
     },
     "Published": {
       "Family": "algotune",
-      "Problems": [
-        "p1",
-        "p2",
-        "p3"
-      ]
+      "Problems": {
+        "p1": "maximize",
+        "p2": "maximize",
+        "p3": "maximize"
+      }
     }
   },
   "Seeds": [
-    1021334267,
-    4144568897,
-    3747846770,
-    642934908,
-    2456304472,
-    3661313923
+    3616613519,
+    746858614,
+    2141266236,
+    4077325196,
+    3436619168,
+    3720102543
   ],
   "Arms": [
     "aidotnet",
@@ -69,5 +69,5 @@
   "StoppingRule": "Fixed N = SeedCount per arm; no interim analysis, no extension, no re-run",
   "DecisionRule": "Holm step-down over every family x config one-sided bootstrap p; all must reject; ties fail",
   "PublishedRule": "Strict majority of pre-declared problems matched or beaten (assumption A1)",
-  "RegistrationSha256": "13c6477632ba25cccab1df13b00c627eb54a374283134d8c09a67eb569954768"
+  "RegistrationSha256": "0540225e37a864cf8421b050b7bdded6294a891008e9c3d1cf9587313d717a31"
 }
