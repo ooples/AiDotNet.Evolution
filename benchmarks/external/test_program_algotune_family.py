@@ -51,7 +51,38 @@ class ScoringTests(unittest.TestCase):
         with self.assertRaisesRegex(ValueError, "dev-partition"):
             family.eligible([{"input_partition": "test", "speedup": 3.0}])
 
+    def test_speedup_alternates_which_side_is_timed_first(self):
+        order = []
+        def timer(name):
+            def run():
+                order.append(name)
+                return {"status": "valid", "duration_seconds": 1.0}
+            return run
+        family.speedup(timer("reference"), timer("candidate"), samples=4)
+        self.assertEqual(["reference", "candidate", "candidate", "reference"] * 2, order)
 
+    def test_a_non_positive_candidate_duration_is_a_timer_fault_not_a_speedup(self):
+        with self.assertRaisesRegex(ValueError, "duration"):
+            family.speedup(lambda: {"status": "valid", "duration_seconds": 1.0},
+                           lambda: {"status": "valid", "duration_seconds": 0.0})
+
+
+class MutantShapeTests(unittest.TestCase):
+    def test_mutants_of_tuple_outputs_keep_their_shape_and_differ(self):
+        correct = {"pair": (1, 2.5), "items": [3, 4]}
+        mutants = family._mutants(correct, 7)
+        self.assertTrue(mutants)
+        for _, _, mutated in mutants:
+            self.assertIsInstance(mutated["pair"], tuple)
+            self.assertNotEqual(correct, mutated)
+
+    def test_the_tolerance_edge_perturbs_a_non_contiguous_array(self):
+        import numpy
+        array = numpy.arange(6, dtype=float).reshape(2, 3).T  # a transposed view is not C-contiguous
+        before = array.copy()
+        container, key, value = family._first_float(array)
+        container[key] = value + 1.0
+        self.assertFalse(numpy.array_equal(before, array), "the perturbation must land in the output itself")
 class MutantTests(unittest.TestCase):
     def test_the_oracle_rejects_every_seeded_mutant_on_every_task(self):
         upstream = os.environ.get("EVOLUTION_CORRECTNESS_UPSTREAM")

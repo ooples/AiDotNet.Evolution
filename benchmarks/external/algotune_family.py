@@ -90,15 +90,24 @@ def panel(upstream, task, partition, *, sealed=None, contract="strict-upstream-v
 
 
 def speedup(reference_timer, candidate_timer, samples=5):
-    """Median of interleaved per-sample ratios; None if the candidate is ever invalid."""
+    """Median of interleaved per-sample ratios; None if the candidate is ever invalid.
+
+    The side timed first alternates (ABBA), so an order effect such as cache or clock warm-up does not
+    favour either program."""
     ratios = []
-    for _ in range(samples):
-        reference = reference_timer()
-        candidate = candidate_timer()
+    for sample in range(samples):
+        if sample % 2 == 0:
+            reference = reference_timer()
+            candidate = candidate_timer()
+        else:
+            candidate = candidate_timer()
+            reference = reference_timer()
         if reference["status"] != "valid":
             raise RuntimeError("The pinned reference failed its own oracle; the panel is unusable")
         if candidate["status"] != "valid":
             return dict(speedup=None, ratios=ratios, reason="invalid candidate cannot score")
+        if not candidate["duration_seconds"] > 0 or not reference["duration_seconds"] > 0:
+            raise ValueError("A timer reported a non-positive duration; the measurement is unusable")
         ratios.append(reference["duration_seconds"] / candidate["duration_seconds"])
     return dict(speedup=statistics.median(ratios), ratios=ratios, reason=None)
 
@@ -140,12 +149,23 @@ def _mutants(value, rng_seed):
             except ImportError:
                 pass
 
+    def replace(node, path, replacement):
+        # Rebuilt rather than assigned in place, because a tuple (or namedtuple) cannot take item assignment.
+        if not path:
+            return replacement
+        head, rest = path[0], path[1:]
+        if isinstance(node, tuple):
+            items = list(node)
+            items[head] = replace(node[head], rest, replacement)
+            return type(node)(*items) if hasattr(node, "_fields") else type(node)(items)
+        node[head] = replace(node[head], rest, replacement)
+        return node
+
     for path, kind in list(walk(value, []))[:12]:
         mutated = copy.deepcopy(value)
-        parent, key = None, None
         node = mutated
         for step in path:
-            parent, key, node = node, step, node[step]
+            node = node[step]
         if kind == "flip":
             replacement = not node
         elif kind == "number":
@@ -155,14 +175,11 @@ def _mutants(value, rng_seed):
             data[rng.randrange(len(data))] ^= 0xFF
             replacement = bytes(data)
         elif kind == "drop":
-            replacement = list(node)[:-1]
+            replacement = type(node)(list(node)[:-1]) if type(node) in (list, tuple) else list(node)[:-1]
         else:
             replacement = node.copy()
             replacement.flat[rng.randrange(replacement.size)] += 1.0
-        if parent is None:
-            mutated = replacement
-        else:
-            parent[key] = replacement
+        mutated = replace(mutated, path, replacement)
         out.append((".".join(map(str, path)) or "<root>", kind, mutated))
     return out
 
@@ -235,6 +252,6 @@ def _first_float(node):
             if found:
                 return found
     elif isinstance(node, numpy.ndarray) and node.dtype.kind == "f" and node.size:
-        flat = node.reshape(-1)
-        return flat, 0, float(flat[0])
+        # node.flat writes through for any memory layout; reshape(-1) copies a non-contiguous array.
+        return node.flat, 0, float(node.flat[0])
     return None
