@@ -11,8 +11,12 @@ namespace AiDotNet.Evolution;
 /// serialized; a declared concurrent backend may overlap only in an engine-coordinated pre-reserved pipeline phase.
 /// Mid-phase checkpoints and feedback are rejected. No diagnostic
 /// observer supplies learning or costs. A restored backend must be discarded if its own RestoreState fails.</remarks>
-public sealed class ResourceMeteredVariationOperator<TGenome> : IOutcomeAwareVariationOperator<TGenome>, IEvolutionProposalCostProvider
+public sealed class ResourceMeteredVariationOperator<TGenome> : IOutcomeAwareVariationOperator<TGenome>, IEvolutionProposalCostProvider, IEvolutionLatencyProfile
 {
+    /// <inheritdoc/>
+    /// <remarks>Forwards the metered proposal source's declaration.</remarks>
+    public bool IsLatencyBound => _source is IEvolutionLatencyProfile { IsLatencyBound: true };
+
     private const int MaximumPending = 65_536, MaximumStateCharacters = 16 * 1024 * 1024;
     private readonly ICostedEvolutionProposalSource<TGenome> _source;
     private readonly EvolutionResourceLedger _ledger;
