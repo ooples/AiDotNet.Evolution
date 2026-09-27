@@ -9,6 +9,6 @@
   </PropertyGroup>
   <ItemGroup>
     <PackageReference Include="AiDotNet.Evolution.Deployment" Version="$(DeploymentTestVersion)" />
-    <PackageReference Include="AiDotNet" Version="0.231.0" Aliases="AiDotNetConsumer" />
+    <PackageReference Include="AiDotNet" Version="0.233.0" Aliases="AiDotNetConsumer" />
   </ItemGroup>
 </Project>
