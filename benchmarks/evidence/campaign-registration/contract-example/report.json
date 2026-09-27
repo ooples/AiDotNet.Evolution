@@ -62,7 +62,7 @@
   "FamilywiseAlpha": 0.05,
   "IntervalNote": "Interval95 is descriptive and unadjusted; the decision is Holm on one-sided bootstrap p",
   "OpenEvolveGate": true,
-  "RawSha256": "b233f633e2c841865fa1238566ef22622a2e1a4dec82ea2d713b3e688aaa9f46",
-  "RegistrationSha256": "13c6477632ba25cccab1df13b00c627eb54a374283134d8c09a67eb569954768",
+  "RawSha256": "ef3998b8729e428fbab946dfa7c9f920d828fbe25f7d78768327f2c31fb4e222",
+  "RegistrationSha256": "0540225e37a864cf8421b050b7bdded6294a891008e9c3d1cf9587313d717a31",
   "Schema": "evolution-campaign-report-v1"
 }

@@ -14,7 +14,7 @@ def spec(**overrides):
                            dict(Family="sr", Configs=["recommended"],
                                 Endpoint=dict(Metric="nmse", Direction="minimize", FailureValue=1e6))],
                  TestPartitionHashes={"algotune": "a" * 64, "sr": "b" * 64},
-                 Published=dict(Family="algotune", Problems=["p1", "p2", "p3"]))
+                 Published=dict(Family="algotune", Problems={"p1": "maximize", "p2": "maximize", "p3": "minimize"}))
     value.update(overrides)
     return value
 
@@ -114,15 +114,36 @@ class RegistrationTests(unittest.TestCase):
         self.assertEqual([True, False, False, True], [r for _, r in adjusted])
 
     def test_published_rule_is_a_strict_majority_of_declared_problems(self):
-        results = {"p1": dict(Ours=2, Published=1, Direction="maximize"),
-                   "p2": dict(Ours=1, Published=1, Direction="maximize"),
-                   "p3": dict(Ours=5, Published=3, Direction="minimize")}
+        results = {"p1": dict(Ours=2, Published=1), "p2": dict(Ours=1, Published=1), "p3": dict(Ours=5, Published=3)}
         gate = cr.published_gate(self.registration, results)
         self.assertEqual((2, ["p1", "p2"], True), (gate["MatchedOrBeaten"], gate["Met"], gate["Gate"]))
         results["p1"]["Ours"] = 0
         self.assertFalse(cr.published_gate(self.registration, results)["Gate"])
         with self.assertRaises(ValueError):
             cr.published_gate(self.registration, {"p1": results["p1"]})
+
+    def test_published_directions_come_from_the_registration(self):
+        # p3 is registered minimize: 5 against 3 loses, and restating it as maximize cannot turn it into a win.
+        results = {"p1": dict(Ours=0, Published=1), "p2": dict(Ours=0, Published=1), "p3": dict(Ours=5, Published=3)}
+        self.assertEqual([], cr.published_gate(self.registration, results)["Met"])
+        with self.assertRaises(ValueError):
+            cr.published_gate(self.registration, dict(results, p3=dict(Ours=5, Published=3, Direction="maximize")))
+        with self.assertRaises(ValueError):
+            cr.register(spec(Published=dict(Family="algotune", Problems=["p1", "p2"])), self.directory / "list")
+
+    def test_non_finite_values_are_refused_with_a_named_reason(self):
+        nan = float("nan")
+        rows = runs(self.registration)
+        rows[0]["Value"] = nan
+        with self.assertRaises(ValueError):
+            cr.analyze(self.registration, rows)
+        with self.assertRaises(ValueError):
+            cr.published_gate(self.registration, {"p1": dict(Ours=nan, Published=1), "p2": dict(Ours=1, Published=1),
+                                                  "p3": dict(Ours=1, Published=3)})
+        families = spec()["Families"]
+        families[0]["Endpoint"]["FailureValue"] = float("inf")
+        with self.assertRaises(ValueError):
+            cr.register(spec(Families=families), self.directory / "inf")
 
 
 if __name__ == "__main__":
