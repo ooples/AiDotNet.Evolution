@@ -60,6 +60,17 @@ def schedule(registration):
     return cells
 
 
+def position_balance(registration):
+    """Per family: positions balance only over whole cycles of the Williams design, so SeedCount must be a
+    multiple of the design's length (k rows for k arms when k is even, 2k when k is odd)."""
+    seeds = len(registration["Seeds"])
+    balance = {}
+    for family in registration["Spec"]["Families"]:
+        rows = len(williams(len(arms_for(family))))
+        balance[family["Family"]] = dict(Arms=len(arms_for(family)), DesignRows=rows, Seeds=seeds, Balanced=seeds % rows == 0)
+    return balance
+
+
 def project(registration, mean_tokens_per_call=None):
     """Upper bounds from the registered budget; an expected token figure when a pilot supplies one."""
     budget, cells = registration["Spec"]["Budget"], schedule(registration)
@@ -67,7 +78,8 @@ def project(registration, mean_tokens_per_call=None):
                       MaxModelCalls=len(cells) * budget["ModelCalls"], MaxModelTokens=len(cells) * budget["ModelTokens"],
                       MaxWallSeconds=len(cells) * budget["WallSeconds"],
                       ExpectedModelTokens=None if mean_tokens_per_call is None else
-                      round(len(cells) * budget["ModelCalls"] * mean_tokens_per_call))
+                      round(len(cells) * budget["ModelCalls"] * mean_tokens_per_call),
+                      PositionBalance=position_balance(registration))
     projection["ProjectionSha256"] = digest(projection)
     return projection
 
@@ -112,6 +124,10 @@ def run(registration_path, state, execute_cell, *, confirm, mean_tokens_per_call
     log(json.dumps(projection, indent=2))
     if confirm != projection["ProjectionSha256"]:
         raise ValueError("Launch refused: pass the printed ProjectionSha256 as confirmation")
+    unbalanced = sorted(name for name, entry in projection["PositionBalance"].items() if not entry["Balanced"])
+    if unbalanced:
+        # A partial design cycle puts some arms first more often than others, the carryover this runner exists to cancel.
+        raise ValueError(f"Launch refused: SeedCount does not complete the position design for {unbalanced}")
     root = Path(state)
     root.mkdir(parents=True, exist_ok=True)
     journal = CellJournal(root / "cells.jsonl")

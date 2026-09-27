@@ -13,7 +13,7 @@ sys.path.insert(0, str(Path(__file__).parents[1] / "analysis"))
 import campaign_registration  # noqa: E402
 
 SPEC = dict(Campaign="runner-unit", Budget=dict(ModelTokens=1000, ModelCalls=4, WallSeconds=60), Models=["haiku"],
-            SeedCount=4, BootstrapSamples=1000, BootstrapSeed=3, FamilywiseAlpha=0.05,
+            SeedCount=6, BootstrapSamples=1000, BootstrapSeed=3, FamilywiseAlpha=0.05,
             Families=[dict(Family="algotune", Configs=["recommended", "matched"],
                            Endpoint=dict(Metric="speedup", Direction="maximize", FailureValue=0.0))],
             TestPartitionHashes={"algotune": "c" * 64}, Published=None)
@@ -58,17 +58,26 @@ class RunnerTests(unittest.TestCase):
 
     def test_every_registered_cell_is_scheduled_once_with_its_position(self):
         cells = cr.schedule(self.registration)
-        self.assertEqual(3 * 4, len({c["Cell"] for c in cells}))
+        self.assertEqual(3 * 6, len({c["Cell"] for c in cells}))
         by_position = collections.Counter((c["Arm"], c["Position"]) for c in cells)
         self.assertEqual(3 * 3, len(by_position), "every arm appears in every position")
+        self.assertEqual({2}, set(by_position.values()), "and equally often: 6 seeds complete the 6-row design")
+
+    def test_a_seed_count_that_leaves_the_position_design_incomplete_is_refused(self):
+        registration = campaign_registration.register(dict(SPEC, SeedCount=4), self.root / "unbalanced")
+        projection = cr.project(registration)
+        self.assertEqual(dict(Arms=3, DesignRows=6, Seeds=4, Balanced=False), projection["PositionBalance"]["algotune"])
+        with self.assertRaisesRegex(ValueError, "position design"):
+            cr.run(self.root / "unbalanced" / "registration.json", self.root / "state", lambda *a: {},
+                   confirm=projection["ProjectionSha256"], log=lambda _: None)
 
     def test_launch_is_refused_without_the_printed_projection_digest(self):
         with self.assertRaisesRegex(ValueError, "Launch refused"):
             cr.run(self.path, self.root / "state", lambda *a: {}, confirm="yes", log=lambda _: None)
         projection = cr.project(self.registration, mean_tokens_per_call=150)
-        self.assertEqual((12, 48, 12000, 7200), (projection["Cells"], projection["MaxModelCalls"],
-                                                 projection["MaxModelTokens"], projection["ExpectedModelTokens"]))
-        self.assertAlmostEqual(0.2, cr.projection_error(projection, 6000))
+        self.assertEqual((18, 72, 18000, 10800), (projection["Cells"], projection["MaxModelCalls"],
+                                                  projection["MaxModelTokens"], projection["ExpectedModelTokens"]))
+        self.assertAlmostEqual(0.2, cr.projection_error(projection, 9000))
 
     def test_a_killed_campaign_resumes_the_in_flight_cell_and_finishes_each_cell_once(self):
         state = self.root / "state"
@@ -81,9 +90,9 @@ class RunnerTests(unittest.TestCase):
         self.assertEqual(0, subprocess.run(argv, timeout=60).returncode)
         calls = [json.loads(line) for line in (state / "calls.jsonl").read_text().splitlines()]
         self.assertEqual([[kill_on, False], [kill_on, True]], [c for c in calls if c[0] == kill_on])
-        self.assertEqual(12 + 1, len(calls), "only the in-flight cell ran twice")
+        self.assertEqual(18 + 1, len(calls), "only the in-flight cell ran twice")
         rows = json.loads((state / "raw.json").read_text())
-        self.assertEqual(12, len(rows))
+        self.assertEqual(18, len(rows))
         self.assertEqual([True], [r["Resumed"] for r in rows if r["Resumed"]])
         self.assertTrue(all(r["ThrottleSeconds"] == 0.5 for r in rows))
         report = campaign_registration.analyze(campaign_registration.load_registration(self.path), rows)
