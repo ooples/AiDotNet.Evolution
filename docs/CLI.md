@@ -6,14 +6,17 @@ and inspects, compares, exports and reports them from their trace files.
 ```text
 aidotnet-evolve run     <run.json>
 aidotnet-evolve resume  <run.json>
+aidotnet-evolve preflight <run.json>
 aidotnet-evolve inspect <trace>
 aidotnet-evolve compare <traceA> <traceB>
-aidotnet-evolve export  <trace> <output-directory>
+aidotnet-evolve export  <trace> <output-directory> [--include-source <program-file>]
+aidotnet-evolve inspect-export <export-directory>
 aidotnet-evolve report  <trace> <output.html>
 ```
 
 Exit codes: `0` success; `2` a usage or input error (the message is on standard error); `3` a run in which every
-model call failed, so only the seed was scored (the summary is still printed); `130` a run aborted by a second Ctrl+C.
+model call failed, so only the seed was scored (the summary is still printed); `4` `preflight` found that the seed
+fails the evaluator; `130` a run aborted by a second Ctrl+C, or by a Ctrl+C before the run started.
 
 ## Run file
 
@@ -60,7 +63,7 @@ run file's directory. Unknown fields are refused, and enums are written as names
 | `model.name` | yes | The model name sent in each request. |
 | `model.apiKeyEnvironmentVariable` | no | The environment variable holding a bearer key. Omit it for a local endpoint that needs none. The key never appears in the run file. |
 | `budget.maxEvaluations` | yes | The total number of evaluations, seed included. `resume` continues toward the same total, so raise it in the run file to extend a finished run. |
-| `budget.parallelism` | no (1) | Concurrent evaluations. It is also the proposal batch size, so a graceful stop takes effect within one round. |
+| `budget.parallelism` | no (1) | Concurrent evaluations. It is also the proposal batch size, so a graceful stop takes effect within one round. Keep it unchanged between `run` and `resume`: the batch size is part of the checkpoint's compatibility, so a different value is refused on resume. |
 | `output` | yes | Holds `checkpoints/`, one `trace-NNN.jsonl` per run or resume session, and `best.<ext>`. |
 | `direction` | no (`Maximize`) | `Maximize` or `Minimize` the evaluator's `quality`. |
 | `warmStart` | no | A `repertoire-NNN.json` written by an earlier run. Its programs join the seeds and are evaluated afresh; see [Warm start](#warm-start). `run` uses it and `resume` ignores it. |

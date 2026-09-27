@@ -75,6 +75,17 @@ internal static class RunCommand
 
     public static int Execute(string runFilePath, bool resume, TextWriter output, TextWriter error, RunInterrupt interrupt)
     {
+        try { return ExecuteCore(runFilePath, resume, output, error, interrupt); }
+        catch (OperationCanceledException) when (interrupt.Token.IsCancellationRequested)
+        {
+            // Interrupted during setup (checkpoint lookup, warm-start import), before the engine could take a graceful stop.
+            error.WriteLine("aborted before the run started; nothing was evaluated.");
+            return AbortedExitCode;
+        }
+    }
+
+    private static int ExecuteCore(string runFilePath, bool resume, TextWriter output, TextWriter error, RunInterrupt interrupt)
+    {
         CancellationToken cancellationToken = interrupt.Token;
         string fullPath = Path.GetFullPath(runFilePath);
         RunFile run = Load(fullPath);
@@ -258,6 +269,9 @@ internal static class RunCommand
         string checkpointDirectory = Path.Combine(outputDirectory, "checkpoints");
         bool hasCheckpoint = Directory.Exists(checkpointDirectory) && new DirectoryEvolutionCheckpointStore(checkpointDirectory).LoadLatestAsync(run.RunId, cancellationToken).GetAwaiter().GetResult() is not null;
 
+        // run would fail on this before its first model call; preflight promises to find it first.
+        if (run.Model.ApiKeyEnvironmentVariable is { } variable && string.IsNullOrEmpty(Environment.GetEnvironmentVariable(variable)))
+            throw new InvalidDataException(OpenAiCompatibleChatClient.MissingKeyMessage(variable));
         string initial = ReadBounded(Path.Combine(baseDirectory, run.InitialProgram), run.Budget.MaxProgramChars);
         string evaluator = ReadBounded(Path.Combine(baseDirectory, run.Evaluator), MaxRunFileBytes);
         ProbeWritable(outputDirectory);
@@ -319,6 +333,9 @@ internal static class RunCommand
         if (run.Schema != RunFile.CurrentSchema)
             throw new InvalidDataException("Run file schema must be '" + RunFile.CurrentSchema + "', not '" + run.Schema + "'.");
         if (string.IsNullOrWhiteSpace(run.RunId)) throw new InvalidDataException("runId is required.");
+        // System.Text.Json does not enforce non-nullable required members, so an explicit null arrives here.
+        if (run.Model is null) throw new InvalidDataException("model is required.");
+        if (run.Budget is null) throw new InvalidDataException("budget is required.");
         if (run.Budget.MaxEvaluations < 1) throw new InvalidDataException("budget.maxEvaluations must be at least 1.");
         if (run.Budget.Parallelism < 1) throw new InvalidDataException("budget.parallelism must be at least 1.");
         if (run.Budget.EvaluationTimeLimitSeconds < 1) throw new InvalidDataException("budget.evaluationTimeLimitSeconds must be at least 1.");
@@ -400,10 +417,13 @@ internal sealed class OpenAiCompatibleChatClient : IProgramChatClient, IDisposab
         if (model.ApiKeyEnvironmentVariable is { } variable)
         {
             string key = Environment.GetEnvironmentVariable(variable) ?? "";
-            if (key.Length == 0) throw new InvalidDataException("Environment variable " + variable + " (model.apiKeyEnvironmentVariable) is not set.");
+            if (key.Length == 0) throw new InvalidDataException(MissingKeyMessage(variable));
             _http.DefaultRequestHeaders.Authorization = new AuthenticationHeaderValue("Bearer", key);
         }
     }
+
+    internal static string MissingKeyMessage(string variable) =>
+        "Environment variable " + variable + " (model.apiKeyEnvironmentVariable) is not set.";
 
     public string ModelId { get; }
 
@@ -466,42 +486,71 @@ internal sealed class OpenAiCompatibleChatClient : IProgramChatClient, IDisposab
 internal sealed class RunMarker : IDisposable
 {
     internal const string FileName = "running.json";
+    internal const string LockFileName = "running.lock";
     private readonly string _path;
+    private readonly FileStream _lock;
 
-    private RunMarker(string path) => _path = path;
+    private RunMarker(string path, FileStream held) { _path = path; _lock = held; }
 
     /// <summary>Claims the output directory for this process, refusing one a live run or resume already holds.</summary>
+    /// <remarks>
+    /// The claim is an exclusive OS lock on <c>running.lock</c>, held for the whole run: the kernel releases it if the
+    /// process dies, so a crash leaves nothing stale and a reused process id cannot block the directory. The JSON marker
+    /// only tells readers which trace is live.
+    /// </remarks>
     public static RunMarker Create(string outputDirectory, string runId, string tracePath)
     {
         Directory.CreateDirectory(outputDirectory);
-        string path = Path.Combine(outputDirectory, FileName);
-        if (Read(path) is { } held && IsAlive(held.ProcessId))
-            throw InUse(outputDirectory, held.ProcessId);
-        if (File.Exists(path)) File.Delete(path); // stale: its process ended without removing it
-        byte[] entry = JsonSerializer.SerializeToUtf8Bytes(new Entry(runId, Environment.ProcessId, Path.GetFileName(tracePath), DateTimeOffset.UtcNow));
+        FileStream held;
         try
         {
-            // CreateNew, so two processes claiming the directory at the same moment cannot both succeed.
-            using var stream = new FileStream(path, FileMode.CreateNew, FileAccess.Write);
-            stream.Write(entry);
+            held = new FileStream(Path.Combine(outputDirectory, LockFileName), FileMode.OpenOrCreate, FileAccess.ReadWrite, FileShare.None);
         }
-        catch (IOException) when (File.Exists(path))
+        catch (IOException)
         {
-            throw InUse(outputDirectory, Read(path)?.ProcessId);
+            throw InUse(outputDirectory);
         }
-        return new RunMarker(path);
+        try
+        {
+            string path = Path.Combine(outputDirectory, FileName);
+            File.WriteAllText(path, JsonSerializer.Serialize(new Entry(runId, Environment.ProcessId, Path.GetFileName(tracePath), DateTimeOffset.UtcNow)));
+            return new RunMarker(path, held);
+        }
+        catch
+        {
+            held.Dispose();
+            throw;
+        }
     }
 
     /// <summary>Refuses to start when a live run or resume holds the directory; checkpoints and traces must have one writer.</summary>
     public static void EnsureAvailable(string outputDirectory)
     {
-        if (Read(Path.Combine(outputDirectory, FileName)) is { } held && IsAlive(held.ProcessId))
-            throw InUse(outputDirectory, held.ProcessId);
+        string lockPath = Path.Combine(outputDirectory, LockFileName);
+        if (!File.Exists(lockPath)) return;
+        try { using var probe = new FileStream(lockPath, FileMode.Open, FileAccess.ReadWrite, FileShare.None); }
+        catch (IOException) { throw InUse(outputDirectory); }
     }
 
-    private static InvalidDataException InUse(string outputDirectory, int? processId) => new(
-        outputDirectory + " is in use by process " + (processId?.ToString(CultureInfo.InvariantCulture) ?? "unknown") +
-        "; wait for it to finish, or delete " + FileName + " there if that process is not an aidotnet-evolve run.");
+    private static InvalidDataException InUse(string outputDirectory)
+    {
+        int? processId = Read(Path.Combine(outputDirectory, FileName))?.ProcessId;
+        return new InvalidDataException(outputDirectory + " is in use by process " +
+            (processId?.ToString(CultureInfo.InvariantCulture) ?? "unknown") + "; wait for that run or resume to finish.");
+    }
+
+    public static bool IsRunning(string tracePath)
+    {
+        string path = Path.Combine(Path.GetDirectoryName(Path.GetFullPath(tracePath)) ?? ".", FileName);
+        Entry? entry = Read(path);
+        if (entry is null || !string.Equals(entry.Trace, Path.GetFileName(tracePath), StringComparison.Ordinal)) return false;
+        try
+        {
+            using var process = System.Diagnostics.Process.GetProcessById(entry.ProcessId);
+            return !process.HasExited;
+        }
+        catch (ArgumentException) { return false; } // no such process: the run ended without removing its marker
+    }
 
     private static Entry? Read(string path)
     {
@@ -510,29 +559,11 @@ internal sealed class RunMarker : IDisposable
         catch (Exception exception) when (exception is IOException or JsonException) { return null; }
     }
 
-    private static bool IsAlive(int processId)
-    {
-        try
-        {
-            using var process = System.Diagnostics.Process.GetProcessById(processId);
-            return !process.HasExited;
-        }
-        catch (ArgumentException) { return false; } // no such process
-    }
-
-    /// <summary>Whether a live process is still writing <paramref name="tracePath"/>.</summary>
-    public static bool IsRunning(string tracePath)
-    {
-        string path = Path.Combine(Path.GetDirectoryName(Path.GetFullPath(tracePath)) ?? ".", FileName);
-        Entry? entry = Read(path);
-        if (entry is null || !string.Equals(entry.Trace, Path.GetFileName(tracePath), StringComparison.Ordinal)) return false;
-        return IsAlive(entry.ProcessId);
-    }
-
     public void Dispose()
     {
         try { File.Delete(_path); }
-        catch (IOException) { /* a stale marker is harmless: readers check that its process is alive */ }
+        catch (IOException) { /* a stale marker is harmless: the lock, not the marker, decides who holds the directory */ }
+        _lock.Dispose();
     }
 
     private sealed record Entry(string RunId, int ProcessId, string Trace, DateTimeOffset StartedUtc);

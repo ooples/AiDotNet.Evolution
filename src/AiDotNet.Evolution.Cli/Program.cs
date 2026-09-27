@@ -139,26 +139,40 @@ public static class Program
     /// </remarks>
     private static int InspectExport(string exportDirectory)
     {
+        // Exports travel between people, so winner.json is untrusted: every field is checked, and a missing or mistyped
+        // one is a malformed export (exit 2), never an unhandled exception.
         string winnerPath = Path.Combine(exportDirectory, "winner.json");
         if (!File.Exists(winnerPath)) return Fail("error: " + winnerPath + " not found.");
         using JsonDocument winner = JsonDocument.Parse(File.ReadAllText(winnerPath));
         JsonElement root = winner.RootElement;
-        string genomeId = root.GetProperty("GenomeId").GetString() ?? string.Empty;
+        if (root.ValueKind != JsonValueKind.Object || Text(root, "GenomeId") is not { } genomeId || Number(root, "Quality") is not { } quality)
+            return Fail("error: " + winnerPath + " is malformed: GenomeId and a numeric Quality are required.");
         if (!root.TryGetProperty("Source", out JsonElement source) || source.ValueKind == JsonValueKind.Null)
-            return Print(JsonSerializer.Serialize(new { Valid = true, GenomeId = genomeId, Quality = root.GetProperty("Quality").GetDouble(), Source = (object?)null }, Json));
+            return Print(JsonSerializer.Serialize(new { Valid = true, GenomeId = genomeId, Quality = quality, Source = (object?)null }, Json));
+        if (source.ValueKind != JsonValueKind.Object || Text(source, "File") is not { } named || Text(source, "Sha256") is not { } recorded ||
+            Text(source, "Language") is not { } languageName || Text(source, "BoundTo") is not { } boundTo)
+            return Fail("error: " + winnerPath + " is malformed: Source needs File, Sha256, Language and BoundTo.");
 
-        string file = Path.GetFileName(source.GetProperty("File").GetString() ?? string.Empty);
+        string file = Path.GetFileName(named);
         string sourcePath = Path.Combine(exportDirectory, file);
         if (file.Length == 0 || !File.Exists(sourcePath)) return Fail("error: the export names source '" + file + "', which is missing.");
         string text = File.ReadAllText(sourcePath);
         string sha = Convert.ToHexString(System.Security.Cryptography.SHA256.HashData(Encoding.UTF8.GetBytes(text))).ToLowerInvariant();
-        if (!string.Equals(sha, source.GetProperty("Sha256").GetString(), StringComparison.Ordinal))
+        if (!string.Equals(sha, recorded, StringComparison.Ordinal))
             return Fail("error: " + file + " does not match its recorded SHA-256; the source was changed after export.");
-        if (!Enum.TryParse(source.GetProperty("Language").GetString(), out ProgramLanguage language)
-            || !string.Equals(new ProgramGenome(text, language).Id, genomeId, StringComparison.Ordinal)
-            || !string.Equals(source.GetProperty("BoundTo").GetString(), genomeId, StringComparison.Ordinal))
+        // A declared name only: Enum.TryParse would also accept "999" as an undefined value.
+        if (!Enum.GetNames(typeof(ProgramLanguage)).Contains(languageName, StringComparer.Ordinal))
+            return Fail("error: " + winnerPath + " is malformed: unknown language '" + languageName + "'.");
+        var language = (ProgramLanguage)Enum.Parse(typeof(ProgramLanguage), languageName);
+        if (!string.Equals(new ProgramGenome(text, language).Id, genomeId, StringComparison.Ordinal) ||
+            !string.Equals(boundTo, genomeId, StringComparison.Ordinal))
             return Fail("error: " + file + " is not bound to winning genome " + genomeId + ".");
-        return Print(JsonSerializer.Serialize(new { Valid = true, GenomeId = genomeId, Quality = root.GetProperty("Quality").GetDouble(), Source = new { File = file, Sha256 = sha, Language = language.ToString() } }, Json));
+        return Print(JsonSerializer.Serialize(new { Valid = true, GenomeId = genomeId, Quality = quality, Source = new { File = file, Sha256 = sha, Language = language.ToString() } }, Json));
+
+        static string? Text(JsonElement element, string name) =>
+            element.TryGetProperty(name, out JsonElement value) && value.ValueKind == JsonValueKind.String ? value.GetString() : null;
+        static double? Number(JsonElement element, string name) =>
+            element.TryGetProperty(name, out JsonElement value) && value.ValueKind == JsonValueKind.Number ? value.GetDouble() : null;
     }
 
     private static int Report(string trace, string output)

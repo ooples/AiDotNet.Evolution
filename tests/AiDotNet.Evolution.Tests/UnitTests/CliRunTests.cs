@@ -389,13 +389,89 @@ public sealed class CliRunTests
         File.WriteAllText(Path.Combine(directory.Path, "evaluator.py"), Evaluator);
         string output = Path.Combine(directory.Path, "out");
         Directory.CreateDirectory(output);
-        // A live process holds the marker (this one); a second run or resume would write the same checkpoints.
-        File.WriteAllText(Path.Combine(output, "running.json"),
-            $$"""{"RunId":"cli-run","ProcessId":{{Environment.ProcessId}},"Trace":"trace-000.jsonl","StartedUtc":"2026-01-01T00:00:00+00:00"}""");
-        var (code, _, error) = Run("run", WriteRun(directory.Path, "http://127.0.0.1:9/v1", 2));
+        // Another run holds the directory's lock; a second run or resume would write the same checkpoints.
+        var (code, _, error) = (0, "", "");
+        using (new FileStream(Path.Combine(output, "running.lock"), FileMode.CreateNew, FileAccess.ReadWrite, FileShare.None))
+            (code, _, error) = Run("run", WriteRun(directory.Path, "http://127.0.0.1:9/v1", 2));
         Assert.Equal(2, code);
         Assert.Contains("in use by process", error);
         Assert.False(File.Exists(Path.Combine(output, "trace-000.jsonl")), "nothing may be written into a directory in use");
+    }
+    [Fact]
+    public void A_stale_marker_without_a_held_lock_does_not_block_a_run()
+    {
+        using var directory = new TemporaryDirectory();
+        File.WriteAllText(Path.Combine(directory.Path, "initial.py"), "X = 0\n");
+        File.WriteAllText(Path.Combine(directory.Path, "evaluator.py"), Evaluator);
+        string output = Path.Combine(directory.Path, "out");
+        Directory.CreateDirectory(output);
+        // Left by a run that crashed: its lock died with it, and even a reused process id must not block the directory.
+        File.WriteAllText(Path.Combine(output, "running.json"),
+            $$"""{"RunId":"cli-run","ProcessId":{{Environment.ProcessId}},"Trace":"trace-000.jsonl","StartedUtc":"2026-01-01T00:00:00+00:00"}""");
+        File.WriteAllText(Path.Combine(output, "running.lock"), string.Empty);
+        var (code, _, error) = Run("run", WriteRun(directory.Path, "http://127.0.0.1:9/v1", 1));
+        Assert.DoesNotContain("in use", error);
+        Assert.Equal(0, code);
+    }
+
+    [Fact]
+    public void An_interrupt_before_the_engine_starts_is_an_abort_not_a_crash()
+    {
+        using var directory = new TemporaryDirectory();
+        File.WriteAllText(Path.Combine(directory.Path, "initial.py"), "X = 0\n");
+        File.WriteAllText(Path.Combine(directory.Path, "evaluator.py"), Evaluator);
+        string runFile = WriteRun(directory.Path, "http://127.0.0.1:9/v1", 2);
+        using var interrupt = new AiDotNet.Evolution.Cli.RunInterrupt();
+        interrupt.Press(); // nothing is attached yet, so this cancels the token the setup calls observe
+        var error = new StringWriter();
+        int code = AiDotNet.Evolution.Cli.RunCommand.Execute(runFile, false, new StringWriter(), error, interrupt);
+        Assert.Equal(AiDotNet.Evolution.Cli.RunCommand.AbortedExitCode, code);
+        Assert.Contains("aborted", error.ToString());
+    }
+
+    [Theory]
+    [InlineData("\"model\": null")]
+    [InlineData("\"budget\": null")]
+    public void A_null_model_or_budget_is_an_input_error_not_a_crash(string replacement)
+    {
+        using var directory = new TemporaryDirectory();
+        string runFile = WriteRun(directory.Path, "http://127.0.0.1:9/v1", 2);
+        string text = File.ReadAllText(runFile);
+        string key = replacement.Split(':')[0];
+        int start = text.IndexOf(key, StringComparison.Ordinal), end = text.IndexOf('}', start) + 1;
+        File.WriteAllText(runFile, text[..start] + replacement + text[end..]);
+        var (code, _, error) = Run("run", runFile);
+        Assert.Equal(2, code);
+        Assert.Contains("required", error);
+    }
+
+    [Fact]
+    public void Preflight_fails_when_the_api_key_variable_is_unset()
+    {
+        using var directory = new TemporaryDirectory();
+        File.WriteAllText(Path.Combine(directory.Path, "initial.py"), "X = 0\n");
+        File.WriteAllText(Path.Combine(directory.Path, "evaluator.py"), Evaluator);
+        string runFile = WriteRun(directory.Path, "http://127.0.0.1:9/v1", 2);
+        string variable = "AIDOTNET_EVOLVE_TEST_UNSET_" + Guid.NewGuid().ToString("N");
+        File.WriteAllText(runFile, File.ReadAllText(runFile).Replace("\"name\": \"fake-model\",", $"\"name\": \"fake-model\", \"apiKeyEnvironmentVariable\": \"{variable}\","));
+        var (code, _, error) = Run("preflight", runFile);
+        Assert.Equal(2, code);
+        Assert.Contains(variable, error);
+    }
+
+    [Theory]
+    [InlineData("""{"Quality": 1.0}""")]
+    [InlineData("""{"GenomeId": "g", "Quality": "high"}""")]
+    [InlineData("""{"GenomeId": "g", "Quality": 1.0, "Source": {"File": "best.py", "Sha256": "x", "Language": "999", "BoundTo": "g"}}""")]
+    [InlineData("""{"GenomeId": "g", "Quality": 1.0, "Source": {"File": "best.py"}}""")]
+    public void Inspect_export_refuses_a_malformed_winner_with_exit_code_2(string winner)
+    {
+        using var directory = new TemporaryDirectory();
+        File.WriteAllText(Path.Combine(directory.Path, "winner.json"), winner);
+        File.WriteAllText(Path.Combine(directory.Path, "best.py"), "X = 1\n");
+        var (code, _, error) = Run("inspect-export", directory.Path);
+        Assert.Equal(2, code);
+        Assert.StartsWith("error:", error.Trim());
     }
     [Fact]
     public void Resume_without_a_checkpoint_and_malformed_run_files_fail_with_exit_code_2()

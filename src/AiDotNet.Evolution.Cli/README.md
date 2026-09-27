@@ -7,9 +7,11 @@ dotnet tool install --global AiDotNet.Evolution.Cli --prerelease
 
 aidotnet-evolve run     <run.json>
 aidotnet-evolve resume  <run.json>
+aidotnet-evolve preflight <run.json>
 aidotnet-evolve inspect <trace>
 aidotnet-evolve compare <traceA> <traceB>
-aidotnet-evolve export  <trace> <output-directory>
+aidotnet-evolve export  <trace> <output-directory> [--include-source <program-file>]
+aidotnet-evolve inspect-export <export-directory>
 aidotnet-evolve report  <trace> <output.html>
 ```
 
