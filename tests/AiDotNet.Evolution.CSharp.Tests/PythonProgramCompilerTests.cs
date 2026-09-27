@@ -34,7 +34,9 @@ public sealed class PythonProgramCompilerTests
         ProgramBuild build = compiler.Build(child);
         Assert.NotNull(build.Artifact);
         Assert.Equal(string.Empty, build.Feedback);
-        Assert.NotEqual(compiler.Build(parent).Artifact!.ImageFingerprint, build.Artifact!.ImageFingerprint);
+        ProgramArtifact? parentArtifact = compiler.Build(parent).Artifact;
+        Assert.NotNull(parentArtifact);
+        Assert.NotEqual(parentArtifact.ImageFingerprint, build.Artifact.ImageFingerprint);
     }
 
     [Fact]
@@ -65,6 +67,31 @@ public sealed class PythonProgramCompilerTests
         Assert.Throws<ArgumentException>(() => compiler.Apply(parent, Plan(new SourceEdit(statement, "y = 2"), new SourceEdit(outer, "x + 2"))));
     }
 
+    [Theory]
+    [InlineData(0x0C)]
+    [InlineData(0x2028)]
+    [InlineData(0x1C)]
+    public void Characters_python_does_not_treat_as_line_breaks_do_not_shift_spans(int separator)
+    {
+        // str.splitlines breaks on these, the Python tokenizer does not; every later span must still be exact.
+        string source = "s = \"a" + (char)separator + "b\"\ndef solve(x):\n    y = x + 1\n    return y * 2\n";
+        var compiler = new PythonProgramCompiler(Python);
+        IReadOnlyList<EditTarget> targets = compiler.Catalog(new ProgramSnapshot(new Dictionary<string, string> { ["solver.py"] = source }));
+        Assert.Contains(targets, t => t.Kind == "statement" && source.Substring(t.Start, t.Length) == "y = x + 1");
+        Assert.Contains(targets, t => t.Kind == "expression" && source.Substring(t.Start, t.Length) == "y * 2");
+    }
+
+    [Theory]
+    [InlineData("recursion")]
+    [InlineData("memory")]
+    public void A_candidate_that_exhausts_the_compiler_is_a_failed_build_not_a_crash(string exhaustion)
+    {
+        // Candidate code is untrusted: one the compiler cannot handle must score as a failed build.
+        string body = exhaustion == "recursion" ? "x = 1" + string.Concat(Enumerable.Repeat("+1", 50_000)) : "x = " + new string('-', 200_000) + "1";
+        ProgramBuild build = new PythonProgramCompiler(Python).Build(new ProgramSnapshot(new Dictionary<string, string> { ["deep.py"] = body + "\n" }));
+        Assert.Null(build.Artifact);
+        Assert.StartsWith("deep.py:", build.Feedback);
+    }
     [Fact]
     public void An_invalid_parent_is_rejected_by_the_catalog()
     {

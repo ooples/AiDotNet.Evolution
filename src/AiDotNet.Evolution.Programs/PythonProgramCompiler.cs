@@ -40,11 +40,11 @@ public sealed class PythonProgramCompiler : IProgramCompiler
         foreach (JsonElement item in reply.RootElement.GetProperty("targets").EnumerateArray())
         {
             if (targets.Count == MaximumTargets) throw new ArgumentException("The syntax catalog exceeds 1024 nodes.");
-            string file = item.GetProperty("file").GetString()!;
+            string file = Text(item, "file");
             int start = item.GetProperty("start").GetInt32(), length = item.GetProperty("length").GetInt32();
-            string text = source.Files[file];
+            if (!source.Files.TryGetValue(file, out string? text)) throw new InvalidDataException("The helper returned an unknown file.");
             if (start < 0 || length < 1 || start + length > text.Length) throw new InvalidDataException("The helper returned an invalid span.");
-            targets.Add(new EditTarget(file, start, length, item.GetProperty("kind").GetString()!,
+            targets.Add(new EditTarget(file, start, length, Text(item, "kind"),
                 ProgramSnapshot.Digest(text.Substring(start, length))));
         }
         return targets;
@@ -97,11 +97,14 @@ public sealed class PythonProgramCompiler : IProgramCompiler
         using JsonDocument reply = Invoke("build", new { files = source.Files }, cancellationToken);
         JsonElement root = reply.RootElement;
         if (!root.GetProperty("ok").GetBoolean()) return new ProgramBuild(null, root.GetProperty("feedback").GetString() ?? "build failed");
-        byte[] image = Convert.FromBase64String(root.GetProperty("image").GetString()!);
-        string compiler = _fingerprint ??= ProgramSnapshot.Digest("python-compiler-v1|" + root.GetProperty("version").GetString() + "|" +
+        byte[] image = Convert.FromBase64String(Text(root, "image"));
+        string compiler = _fingerprint ??= ProgramSnapshot.Digest("python-compiler-v1|" + Text(root, "version") + "|" +
             ProgramSnapshot.Digest(Helper));
         return new ProgramBuild(new ProgramArtifact(source, compiler, "python-bytecode-v1", image), string.Empty);
     }
+
+    private static string Text(JsonElement element, string name) =>
+        element.GetProperty(name).GetString() ?? throw new InvalidDataException("The helper returned no " + name + ".");
 
     private JsonDocument Invoke(string mode, object payload, CancellationToken cancellationToken)
     {
@@ -123,8 +126,14 @@ public sealed class PythonProgramCompiler : IProgramCompiler
                 input.Write(JsonSerializer.Serialize(payload));
             Task<string> output = process.StandardOutput.ReadToEndAsync(cancellationToken);
             Task<string> errors = process.StandardError.ReadToEndAsync(cancellationToken);
-            if (!process.WaitForExit((int)_timeout.TotalMilliseconds))
-                throw new TimeoutException("The Python compiler helper exceeded its time limit.");
+            // Polled so a canceled run stops the helper promptly instead of waiting out the whole time limit.
+            var clock = Stopwatch.StartNew();
+            while (!process.WaitForExit(50))
+            {
+                cancellationToken.ThrowIfCancellationRequested();
+                if (clock.Elapsed > _timeout) throw new TimeoutException("The Python compiler helper exceeded its time limit.");
+            }
+            process.WaitForExit();
             cancellationToken.ThrowIfCancellationRequested();
             string text = output.GetAwaiter().GetResult();
             if (process.ExitCode != 0 || text.Length > 16 * 1024 * 1024)
@@ -139,16 +148,17 @@ public sealed class PythonProgramCompiler : IProgramCompiler
 
     // Trusted helper: parses and compiles only. Offsets are UTF-16 code units to match .NET strings.
     private const string Helper = """
-import ast, base64, json, marshal, sys, textwrap
+import ast, base64, bisect, json, marshal, re, sys, textwrap
 mode = sys.argv[1]
 req = json.loads(sys.stdin.buffer.read().decode("utf-8"))
-def u16(text, index):
-    return len(text[:index].encode("utf-16-le")) // 2
+# Compile-time exhaustion is a property of untrusted candidate code, not a helper failure.
+EXHAUSTED = (RecursionError, MemoryError)
+def utf16(text):
+    astral = [i for i, ch in enumerate(text) if ord(ch) > 0xFFFF]
+    return lambda index: index + bisect.bisect_left(astral, index)
 def offsets(text):
-    starts, total = [0], 0
-    for line in text.splitlines(keepends=True):
-        total += len(line); starts.append(total)
-    return starts
+    # Only the breaks the tokenizer counts: str.splitlines also splits on \f, \x1c-\x1e, \x85, U+2028 and U+2029.
+    return [0] + [match.end() for match in re.finditer(r"\r\n|\r|\n", text)]
 def char_at(text, starts, line, col_bytes):
     raw = text[starts[line - 1]:starts[line] if line < len(starts) else len(text)].encode("utf-8")
     return starts[line - 1] + len(raw[:col_bytes].decode("utf-8", "replace"))
@@ -162,7 +172,9 @@ if mode == "catalog":
             tree = ast.parse(text, filename=name)
         except SyntaxError as error:
             out({"error": f"{name}:{error.lineno}:{error.offset}: {error.msg}"}); sys.exit(0)
-        starts = offsets(text)
+        except (ValueError,) + EXHAUSTED as error:
+            out({"error": f"{name}: {type(error).__name__}"}); sys.exit(0)
+        starts, u16 = offsets(text), utf16(text)
         for function in ast.walk(tree):
             if not isinstance(function, (ast.FunctionDef, ast.AsyncFunctionDef)):
                 continue
@@ -174,7 +186,7 @@ if mode == "catalog":
                 s = char_at(text, starts, node.lineno, node.col_offset)
                 e = char_at(text, starts, node.end_lineno, node.end_col_offset)
                 if e > s:
-                    targets.append({"file": name, "start": u16(text, s), "length": u16(text, e) - u16(text, s),
+                    targets.append({"file": name, "start": u16(s), "length": u16(e) - u16(s),
                                     "kind": "statement" if isinstance(node, ast.stmt) else "expression"})
     seen, unique = set(), []
     for t in targets:
@@ -190,7 +202,7 @@ elif mode == "check":
             ok = len(body) == 1
         else:
             ast.parse(rep.strip(), mode="eval"); ok = rep.strip() == rep
-    except SyntaxError:
+    except (SyntaxError, ValueError) + EXHAUSTED:
         ok = False
     out({"ok": ok})
 elif mode == "build":
@@ -202,6 +214,8 @@ elif mode == "build":
             feedback.append(f"{name}:{error.lineno}:{error.offset}: {type(error).__name__}: {error.msg}")
         except ValueError as error:
             feedback.append(f"{name}: ValueError: {error}")
+        except EXHAUSTED as error:
+            feedback.append(f"{name}: {type(error).__name__}: the compiler ran out of resources")
     if feedback:
         out({"ok": False, "feedback": "; ".join(feedback)})
     else:
