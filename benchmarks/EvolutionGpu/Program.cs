@@ -3,6 +3,7 @@ using System.Security.Cryptography;
 using System.Text.Json;
 using AiDotNet.Evolution;
 using AiDotNet.Tensors.Engines.DirectGpu.CUDA;
+using AiDotNet.Tensors.Helpers;
 
 // Trusted, fixed existing kernels only. No generated code, provider calls or production mutation.
 if (args is ["--self-test"])
@@ -19,6 +20,9 @@ using var backend = new CudaBackend();
 if (!backend.IsAvailable) throw new InvalidOperationException("A real CUDA device is required; no CPU fallback.");
 var campaignClock = Stopwatch.StartNew();
 var rows = new List<object>();
+// Counted as the work happens, so the report cannot drift from what was actually measured.
+int screeningEvaluations = 0, confirmationMeasurements = 0;
+long totalOperations = 0;
 foreach (var shape in new[] { (M: 1, K: 64, N: 64), (M: 16, K: 256, N: 256), (M: 64, K: 256, N: 256) })
 {
     var observations = new List<object>();
@@ -28,6 +32,7 @@ foreach (var shape in new[] { (M: 1, K: 64, N: 64), (M: 16, K: 256, N: 256), (M:
     {
         cancellation.ThrowIfCancellationRequested();
         var measurement = Measure(genome.Category("tactic"), 7123, 15);
+        screeningEvaluations++;
         observations.Add(new { Tactic = genome.Category("tactic"), measurement });
         return new ValueTask<EvolutionTaskResult>(EvolutionTaskResult.Completed(-measurement.MedianUs,
             new Dictionary<string, double> { ["cell"] = 0 }, costUnits: 1));
@@ -62,6 +67,7 @@ foreach (var shape in new[] { (M: 1, K: 64, N: 64), (M: 16, K: 256, N: 256), (M:
         int seed = 9811 + replicate;
         var first = Measure(replicate % 2 == 0 ? "fused" : selected, seed, 31);
         var second = Measure(replicate % 2 == 0 ? selected : "fused", seed, 31);
+        confirmationMeasurements += 2;
         var baseline = replicate % 2 == 0 ? first : second;
         var candidate = replicate % 2 == 0 ? second : first;
         double ratio = baseline.MedianUs / candidate.MedianUs;
@@ -87,7 +93,7 @@ foreach (var shape in new[] { (M: 1, K: 64, N: 64), (M: 16, K: 256, N: 256), (M:
 
     Measurement Measure(string tactic, int seed, int samples)
     {
-        var random = new Random(seed);
+        var random = RandomHelper.CreateSeededRandom(seed);
         float[] Values(int count) => Enumerable.Range(0, count).Select(_ => (float)(random.NextDouble() * 0.25 - 0.125)).ToArray();
         float[] a = Values(shape.M * shape.K), b = Values(shape.K * shape.N), bias = Values(shape.N);
         using var input = backend.AllocateBuffer(a);
@@ -122,7 +128,9 @@ foreach (var shape in new[] { (M: 1, K: 64, N: 64), (M: 16, K: 256, N: 256), (M:
         }
         maxError = Math.Max(maxError, Check(backend.DownloadBuffer(output)));
         double median = raw.OrderBy(value => value).ElementAt(raw.Length / 2);
-        return new Measurement(median, raw, maxError, launches, 1 + 10 + samples * launches);
+        int operations = 1 + 10 + samples * launches;
+        totalOperations += operations;
+        return new Measurement(median, raw, maxError, launches, operations);
 
         double Check(float[] actual)
         {
@@ -152,9 +160,9 @@ JsonSerializer.Serialize(report, new
     Runtime = System.Runtime.InteropServices.RuntimeInformation.FrameworkDescription,
     OperatingSystem = System.Runtime.InteropServices.RuntimeInformation.OSDescription,
     ElapsedSeconds = campaignClock.Elapsed.TotalSeconds,
-    ScreeningEvaluations = 6,
-    ConfirmationMeasurements = 30,
-    TotalTimedAndWarmupOperations = 16716,
+    ScreeningEvaluations = screeningEvaluations,
+    ConfirmationMeasurements = confirmationMeasurements,
+    TotalTimedAndWarmupOperations = totalOperations,
     TensorsAssembly = assembly.FullName,
     TensorsModuleId = assembly.ManifestModule.ModuleVersionId,
     TensorsAssemblySha256 = Convert.ToHexString(SHA256.HashData(File.ReadAllBytes(assembly.Location))),
