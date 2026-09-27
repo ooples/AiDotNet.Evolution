@@ -71,7 +71,8 @@ public sealed class EscalatingVariationOperator<TGenome> : IOutcomeAwareVariatio
             Outcomes = new long[_tiers.Length],
             Successes = new long[_tiers.Length],
             Charged = new Dictionary<string, decimal>[_tiers.Length],
-            Receipts = new long[_tiers.Length]
+            Receipts = new long[_tiers.Length],
+            Canceled = new long[_tiers.Length]
         };
         for (int i = 0; i < _tiers.Length; i++) _state.Charged[i] = new Dictionary<string, decimal>(StringComparer.Ordinal);
         Id = "escalating(" + string.Join(",", _tiers.Select(tier => tier.Id)) + ")";
@@ -113,7 +114,9 @@ public sealed class EscalatingVariationOperator<TGenome> : IOutcomeAwareVariatio
             // The engine rethrows a cancellation instead of committing an outcome, so Observe would never clear this
             // generation: a stopped run would leave it pending, the next proposal with that generation would be refused as
             // a repeat, and repeated cancellations could exhaust MaximumPending. The dispatched proposal still counts.
+            // Counted separately so a checkpoint still balances: proposals = outcomes + canceled + pending.
             _state.Pending.Remove(context.Generation);
+            _state.Canceled[tier] = checked(_state.Canceled[tier] + 1);
             throw;
         }
     }
@@ -200,11 +203,12 @@ public sealed class EscalatingVariationOperator<TGenome> : IOutcomeAwareVariatio
         if (restored is null || restored.VersionHash != VersionHash || restored.Tier < 0 || restored.Tier >= n ||
             restored.ConsecutiveFailures < 0 || restored.ConsecutiveFailures >= _failuresBeforeEscalation ||
             restored.Proposals?.Length != n || restored.Outcomes?.Length != n || restored.Successes?.Length != n ||
-            restored.Charged?.Length != n || restored.Receipts?.Length != n || restored.Children?.Length != n ||
+            restored.Charged?.Length != n || restored.Receipts?.Length != n || restored.Canceled?.Length != n || restored.Children?.Length != n ||
             restored.Pending is null || restored.Log is null || restored.Log.Length > MaximumEscalations ||
             restored.Pending.Values.Any(tier => tier < 0 || tier >= n) || restored.Pending.Keys.Any(key => key <= 0) ||
             Enumerable.Range(0, n).Any(i => restored.Outcomes[i] < 0 || restored.Successes[i] > restored.Outcomes[i] ||
-                restored.Proposals[i] - restored.Outcomes[i] != restored.Pending.Values.Count(tier => tier == i) ||
+                restored.Canceled[i] < 0 ||
+                restored.Proposals[i] - restored.Outcomes[i] - restored.Canceled[i] != restored.Pending.Values.Count(tier => tier == i) ||
                 restored.Receipts[i] < 0 || restored.Receipts[i] > restored.Outcomes[i] || restored.Charged[i] is null ||
                 (_tiers[i] is ICheckpointableVariationOperator<TGenome>) != (restored.Children[i] is not null)) ||
             restored.Log.Any(e => e is null || e.FromTier < 0 || e.ToTier != e.FromTier + 1 || e.ToTier >= n) ||
@@ -231,6 +235,7 @@ public sealed class EscalatingVariationOperator<TGenome> : IOutcomeAwareVariatio
         public long[] Outcomes { get; set; } = Array.Empty<long>();
         public long[] Successes { get; set; } = Array.Empty<long>();
         public long[] Receipts { get; set; } = Array.Empty<long>();
+        public long[] Canceled { get; set; } = Array.Empty<long>();
         public Dictionary<string, decimal>[] Charged { get; set; } = Array.Empty<Dictionary<string, decimal>>();
         public int? AwaitingCost { get; set; }
         [JsonIgnore(Condition = JsonIgnoreCondition.WhenWritingNull)]

@@ -122,6 +122,13 @@ public sealed class EvolutionRoutingTests
             // The second attempt reuses generation 7; it must be canceled again, not refused as a repeated proposal.
             await Assert.ThrowsAnyAsync<OperationCanceledException>(() => ladder.ProposeAsync(Context(), run.Token).AsTask());
         }
+
+        // The dispatched proposals still count, and a checkpoint taken after them must restore.
+        Assert.Equal(2, ladder.TierProposals[0]);
+        string state = ladder.CaptureState();
+        var resumed = new EscalatingVariationOperator<TestGenome>(new IVariationOperator<TestGenome>[] { new CancelingDuringCall("cheap"), new Unique("strong") }, 3);
+        resumed.RestoreState(state);
+        Assert.Equal(state, resumed.CaptureState());
     }
 
     // Cancels the caller's token during the delegated call, as a run being stopped mid-proposal does.
