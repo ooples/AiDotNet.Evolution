@@ -82,6 +82,7 @@ internal static class RunCommand
         string outputDirectory = Path.GetFullPath(Path.Combine(baseDirectory, run.Output));
         var checkpoints = new DirectoryEvolutionCheckpointStore(Path.Combine(outputDirectory, "checkpoints"));
 
+        RunMarker.EnsureAvailable(outputDirectory); // before NextTracePath creates anything there
         bool exists = checkpoints.LoadLatestAsync(run.RunId, cancellationToken).GetAwaiter().GetResult() is not null;
         if (resume && !exists)
             throw new InvalidDataException("Nothing to resume: " + outputDirectory + " holds no checkpoint for run '" + run.RunId + "'.");
@@ -422,8 +423,20 @@ internal sealed class OpenAiCompatibleChatClient : IProgramChatClient, IDisposab
 
         using var content = new ByteArrayContent(JsonSerializer.SerializeToUtf8Bytes(body));
         content.Headers.ContentType = new MediaTypeHeaderValue("application/json");
-        using HttpResponseMessage response = await _http.PostAsync(_completions, content, cancellationToken).ConfigureAwait(false);
-        byte[] bytes = await response.Content.ReadAsByteArrayAsync(cancellationToken).ConfigureAwait(false);
+        HttpResponseMessage response;
+        byte[] bytes;
+        try
+        {
+            response = await _http.PostAsync(_completions, content, cancellationToken).ConfigureAwait(false);
+            bytes = await response.Content.ReadAsByteArrayAsync(cancellationToken).ConfigureAwait(false);
+        }
+        catch (OperationCanceledException exception) when (!cancellationToken.IsCancellationRequested)
+        {
+            // HttpClient reports its own timeout as a cancellation. The run was not canceled, so this is a failed model
+            // call; rethrown as a cancellation it would be neither counted nor reported as the endpoint being unavailable.
+            throw new TimeoutException("Model endpoint did not respond within " + _http.Timeout.TotalSeconds + " seconds.", exception);
+        }
+        using HttpResponseMessage owned = response;
         if (!response.IsSuccessStatusCode)
             throw new HttpRequestException("Model endpoint returned " + (int)response.StatusCode + ".", null, response.StatusCode);
 
@@ -457,29 +470,63 @@ internal sealed class RunMarker : IDisposable
 
     private RunMarker(string path) => _path = path;
 
+    /// <summary>Claims the output directory for this process, refusing one a live run or resume already holds.</summary>
     public static RunMarker Create(string outputDirectory, string runId, string tracePath)
     {
         Directory.CreateDirectory(outputDirectory);
         string path = Path.Combine(outputDirectory, FileName);
-        File.WriteAllText(path, JsonSerializer.Serialize(new Entry(runId, Environment.ProcessId, Path.GetFileName(tracePath), DateTimeOffset.UtcNow)));
+        if (Read(path) is { } held && IsAlive(held.ProcessId))
+            throw InUse(outputDirectory, held.ProcessId);
+        if (File.Exists(path)) File.Delete(path); // stale: its process ended without removing it
+        byte[] entry = JsonSerializer.SerializeToUtf8Bytes(new Entry(runId, Environment.ProcessId, Path.GetFileName(tracePath), DateTimeOffset.UtcNow));
+        try
+        {
+            // CreateNew, so two processes claiming the directory at the same moment cannot both succeed.
+            using var stream = new FileStream(path, FileMode.CreateNew, FileAccess.Write);
+            stream.Write(entry);
+        }
+        catch (IOException) when (File.Exists(path))
+        {
+            throw InUse(outputDirectory, Read(path)?.ProcessId);
+        }
         return new RunMarker(path);
+    }
+
+    /// <summary>Refuses to start when a live run or resume holds the directory; checkpoints and traces must have one writer.</summary>
+    public static void EnsureAvailable(string outputDirectory)
+    {
+        if (Read(Path.Combine(outputDirectory, FileName)) is { } held && IsAlive(held.ProcessId))
+            throw InUse(outputDirectory, held.ProcessId);
+    }
+
+    private static InvalidDataException InUse(string outputDirectory, int? processId) => new(
+        outputDirectory + " is in use by process " + (processId?.ToString(CultureInfo.InvariantCulture) ?? "unknown") +
+        "; wait for it to finish, or delete " + FileName + " there if that process is not an aidotnet-evolve run.");
+
+    private static Entry? Read(string path)
+    {
+        if (!File.Exists(path)) return null;
+        try { return JsonSerializer.Deserialize<Entry>(File.ReadAllText(path)); }
+        catch (Exception exception) when (exception is IOException or JsonException) { return null; }
+    }
+
+    private static bool IsAlive(int processId)
+    {
+        try
+        {
+            using var process = System.Diagnostics.Process.GetProcessById(processId);
+            return !process.HasExited;
+        }
+        catch (ArgumentException) { return false; } // no such process
     }
 
     /// <summary>Whether a live process is still writing <paramref name="tracePath"/>.</summary>
     public static bool IsRunning(string tracePath)
     {
         string path = Path.Combine(Path.GetDirectoryName(Path.GetFullPath(tracePath)) ?? ".", FileName);
-        if (!File.Exists(path)) return false;
-        Entry? entry;
-        try { entry = JsonSerializer.Deserialize<Entry>(File.ReadAllText(path)); }
-        catch (Exception exception) when (exception is IOException or JsonException) { return false; }
+        Entry? entry = Read(path);
         if (entry is null || !string.Equals(entry.Trace, Path.GetFileName(tracePath), StringComparison.Ordinal)) return false;
-        try
-        {
-            using var process = System.Diagnostics.Process.GetProcessById(entry.ProcessId);
-            return !process.HasExited;
-        }
-        catch (ArgumentException) { return false; } // no such process: the run ended without removing its marker
+        return IsAlive(entry.ProcessId);
     }
 
     public void Dispose()

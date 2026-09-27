@@ -33,7 +33,8 @@ public sealed class CliRunTests
         finally { Console.SetOut(originalOut); Console.SetError(originalError); }
     }
 
-    private static string WriteRun(string directory, string endpoint, int maxEvaluations, string output = "out", string extra = "")
+    private static string WriteRun(string directory, string endpoint, int maxEvaluations, string output = "out", string extra = "",
+        int timeoutSeconds = 20)
     {
         string path = Path.Combine(directory, "run.json");
         File.WriteAllText(path, $$"""
@@ -42,7 +43,7 @@ public sealed class CliRunTests
               "runId": "cli-run",
               "initialProgram": "initial.py",
               "evaluator": "evaluator.py",
-              "model": { "endpoint": "{{endpoint}}", "name": "fake-model", "timeoutSeconds": 20 },
+              "model": { "endpoint": "{{endpoint}}", "name": "fake-model", "timeoutSeconds": {{timeoutSeconds}} },
               "budget": { "maxEvaluations": {{maxEvaluations}}, "seed": 7, "evaluationTimeLimitSeconds": 30 },
               "output": "{{output}}"{{extra}}
             }
@@ -361,6 +362,41 @@ public sealed class CliRunTests
             summary.RootElement.GetProperty("ModelUsage").GetProperty("ProviderErrors").GetInt64());
     }
 
+    [Fact]
+    public void A_model_endpoint_that_accepts_but_never_replies_is_an_error_not_a_result()
+    {
+        // HttpClient reports its own timeout as a cancellation; the run was not canceled, so it must count as a failed call.
+        using var directory = new TemporaryDirectory();
+        File.WriteAllText(Path.Combine(directory.Path, "initial.py"), "X = 0\n");
+        File.WriteAllText(Path.Combine(directory.Path, "evaluator.py"), Evaluator);
+        var silent = new TcpListener(IPAddress.Loopback, 0);
+        silent.Start();
+        try
+        {
+            int port = ((IPEndPoint)silent.LocalEndpoint).Port;
+            var (code, _, error) = Run("run", WriteRun(directory.Path, $"http://127.0.0.1:{port}/v1", 2, timeoutSeconds: 1));
+            Assert.Equal(AiDotNet.Evolution.Cli.RunCommand.ModelUnavailableExitCode, code);
+            Assert.Contains("model calls failed", error);
+        }
+        finally { silent.Stop(); }
+    }
+
+    [Fact]
+    public void A_run_refuses_an_output_directory_another_live_process_is_using()
+    {
+        using var directory = new TemporaryDirectory();
+        File.WriteAllText(Path.Combine(directory.Path, "initial.py"), "X = 0\n");
+        File.WriteAllText(Path.Combine(directory.Path, "evaluator.py"), Evaluator);
+        string output = Path.Combine(directory.Path, "out");
+        Directory.CreateDirectory(output);
+        // A live process holds the marker (this one); a second run or resume would write the same checkpoints.
+        File.WriteAllText(Path.Combine(output, "running.json"),
+            $$"""{"RunId":"cli-run","ProcessId":{{Environment.ProcessId}},"Trace":"trace-000.jsonl","StartedUtc":"2026-01-01T00:00:00+00:00"}""");
+        var (code, _, error) = Run("run", WriteRun(directory.Path, "http://127.0.0.1:9/v1", 2));
+        Assert.Equal(2, code);
+        Assert.Contains("in use by process", error);
+        Assert.False(File.Exists(Path.Combine(output, "trace-000.jsonl")), "nothing may be written into a directory in use");
+    }
     [Fact]
     public void Resume_without_a_checkpoint_and_malformed_run_files_fail_with_exit_code_2()
     {
