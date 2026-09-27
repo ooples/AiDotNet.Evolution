@@ -1,3 +1,4 @@
+using System.Diagnostics.CodeAnalysis;
 using System.Globalization;
 
 namespace AiDotNet.Evolution;
@@ -8,6 +9,7 @@ namespace AiDotNet.Evolution;
 /// callers must checkpoint the input observation set and proposal generator state. This is not an engine observer
 /// or a hidden learning side channel. Only true evaluations may become training records or archive fitness.
 /// Serialize calls sharing a trainer unless its backend explicitly supports concurrent fitting.</remarks>
+[Experimental("AIDEVO001")]
 public sealed class EvolutionSurrogateSelector<TGenome>
 {
     private readonly IEvolutionSurrogateTrainer<TGenome> _trainer;

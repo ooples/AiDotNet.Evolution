@@ -1,5 +1,7 @@
 <Project Sdk="Microsoft.NET.Sdk">
   <PropertyGroup>
+    <!-- The surrogate package is experimental (AIDEVO001); this smoke test is a deliberate consumer. -->
+    <NoWarn>$(NoWarn);AIDEVO001</NoWarn>
     <OutputType>Exe</OutputType>
     <TargetFramework>net10.0</TargetFramework>
     <ImplicitUsings>enable</ImplicitUsings>

@@ -1,7 +1,9 @@
+using System.Diagnostics.CodeAnalysis;
 namespace AiDotNet.Evolution;
 
 /// <summary>A pinned, cost-receipting operator factory; policy search varies its weight, never its executable implementation.</summary>
 /// <typeparam name="TGenome">The immutable genome type.</typeparam>
+[Experimental("AIDEVO002")]
 public sealed class EvolutionPolicyEngineOperator<TGenome>
 {
     private readonly Func<ICostedEvolutionProposalSource<TGenome>> _factory;

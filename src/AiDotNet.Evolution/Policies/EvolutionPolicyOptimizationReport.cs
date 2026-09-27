@@ -1,9 +1,11 @@
+using System.Diagnostics.CodeAnalysis;
 using System.Collections.ObjectModel;
 using System.Text.Json;
 
 namespace AiDotNet.Evolution;
 
 /// <summary>One auditable policy/task/seed execution, including failed, denied and abandoned work.</summary>
+[Experimental("AIDEVO002")]
 public sealed class EvolutionPolicyTrialRecord
 {
     internal EvolutionPolicyTrialRecord(int sequence, EvolutionPolicyTrialPhase phase, EvolutionPolicyTrial task, EvolutionSearchPolicy policy,
@@ -43,6 +45,7 @@ public sealed class EvolutionPolicyTrialRecord
 }
 
 /// <summary>One equal-weight held-out family comparison, not one pseudo-independent seed replicate.</summary>
+[Experimental("AIDEVO002")]
 public sealed class EvolutionPolicyFamilyGain
 {
     internal EvolutionPolicyFamilyGain(string family, double candidate, double baseline)
@@ -58,6 +61,7 @@ public sealed class EvolutionPolicyFamilyGain
 }
 
 /// <summary>Predeclared held-out comparison against one baseline, corrected for the registered baseline family.</summary>
+[Experimental("AIDEVO002")]
 public sealed class EvolutionPolicyBaselineComparison
 {
     internal EvolutionPolicyBaselineComparison(EvolutionPolicyBaseline baseline, EvolutionPolicyFamilyGain[] families,
@@ -93,6 +97,7 @@ public sealed class EvolutionPolicyBaselineComparison
 }
 
 /// <summary>A detached campaign result; a suggested policy is never automatically activated in production.</summary>
+[Experimental("AIDEVO002")]
 public sealed class EvolutionPolicyOptimizationReport
 {
     internal EvolutionPolicyOptimizationReport(string planHash, EvolutionPolicyCampaignOutcome outcome, EvolutionPolicyOptimizationOptions options,

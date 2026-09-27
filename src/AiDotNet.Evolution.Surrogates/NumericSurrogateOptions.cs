@@ -1,6 +1,8 @@
+using System.Diagnostics.CodeAnalysis;
 namespace AiDotNet.Evolution.Surrogates;
 
 /// <summary>Immutable support, reliability and explicit work-unit tariff for the optional numeric backend.</summary>
+[Experimental("AIDEVO001")]
 public sealed class NumericSurrogateOptions
 {
     /// <summary>Declares quality support and backend checks. Prices are supplied work-unit tariffs, not measured CPU or dollars.</summary>
@@ -57,6 +59,7 @@ public sealed class NumericSurrogateOptions
 }
 
 /// <summary>Detached fitting diagnostics; empirical validation is not independent deployment confirmation.</summary>
+[Experimental("AIDEVO001")]
 public sealed class NumericSurrogateValidation
 {
     internal NumericSurrogateValidation(int training, int calibration, int validation, double radius, double error,

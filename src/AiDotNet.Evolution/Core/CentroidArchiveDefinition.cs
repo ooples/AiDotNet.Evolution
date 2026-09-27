@@ -1,3 +1,4 @@
+using System.Diagnostics.CodeAnalysis;
 using System.Globalization;
 
 namespace AiDotNet.Evolution;
@@ -9,6 +10,7 @@ namespace AiDotNet.Evolution;
 /// here: supply a frozen, independently prepared partition. Arbitrary sites are a Voronoi archive, not a claim
 /// of a fitted centroidal Voronoi tessellation. Site order defines cell identity and resolves distance ties.
 /// </remarks>
+[Experimental("AIDEVO003")]
 public sealed class CentroidArchiveDefinition
 {
     /// <summary>Maximum number of sites supported by the bounded linear nearest-neighbor implementation.</summary>

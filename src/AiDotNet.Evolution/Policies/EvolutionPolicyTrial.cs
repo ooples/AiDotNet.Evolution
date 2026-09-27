@@ -1,6 +1,8 @@
+using System.Diagnostics.CodeAnalysis;
 namespace AiDotNet.Evolution;
 
 /// <summary>Fixed inner-run limits shared by every policy and baseline in a campaign.</summary>
+[Experimental("AIDEVO002")]
 public sealed class EvolutionPolicyTrialBudget
 {
     /// <summary>Creates finite work, restart, elapsed-time and same-unit resource caps.</summary>
@@ -35,6 +37,7 @@ public sealed class EvolutionPolicyTrialBudget
 }
 
 /// <summary>A fresh inner trial result; absent quality and unknown consumption are never fabricated as measured zero.</summary>
+[Experimental("AIDEVO002")]
 public sealed class EvolutionPolicyObservation
 {
     /// <summary>Creates a normalized higher-is-better utility and complete same-unit receipt for one inner trial.</summary>
@@ -80,6 +83,7 @@ public sealed class EvolutionPolicyObservation
 
 /// <summary>A versioned task protocol assigned to one semantic family before policy search begins.</summary>
 /// <remarks>Use the engine-backed adapter for actual declarative execution. Custom runners must enforce the supplied limits and report all nested costs.</remarks>
+[Experimental("AIDEVO002")]
 public sealed class EvolutionPolicyTrial
 {
     private readonly Func<EvolutionSearchPolicy, EvolutionPolicyTrialBudget, ulong, CancellationToken, Task<EvolutionPolicyObservation>> _run;
@@ -106,6 +110,7 @@ public sealed class EvolutionPolicyTrial
 
 /// <summary>A predeclared manually chosen baseline with explicit rationale, provenance and prior tuning charges.</summary>
 /// <remarks>Metadata does not prove a baseline is strong. Researchers must retain the referenced tuning evidence and justify its task-specific competitiveness.</remarks>
+[Experimental("AIDEVO002")]
 public sealed class EvolutionPolicyBaseline
 {
     /// <summary>Creates a baseline without hiding its earlier tuning cost from the campaign report.</summary>

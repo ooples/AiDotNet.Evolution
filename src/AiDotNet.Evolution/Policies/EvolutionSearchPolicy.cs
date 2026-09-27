@@ -1,9 +1,11 @@
+using System.Diagnostics.CodeAnalysis;
 using System.Collections.ObjectModel;
 using System.Globalization;
 
 namespace AiDotNet.Evolution;
 
 /// <summary>Fixed parent-selection schedules available to offline policy search.</summary>
+[Experimental("AIDEVO002")]
 public enum EvolutionPolicySelectionSchedule
 {
     /// <summary>Sample occupied archive cells uniformly throughout the run.</summary>
@@ -15,6 +17,7 @@ public enum EvolutionPolicySelectionSchedule
 }
 
 /// <summary>Bounded context contracts; policies never introduce executable code or arbitrary prompt templates.</summary>
+[Experimental("AIDEVO002")]
 public enum EvolutionPolicyContext
 {
     /// <summary>Expose only the selected parent and deterministic proposal stream.</summary>
@@ -26,6 +29,7 @@ public enum EvolutionPolicyContext
 }
 
 /// <summary>An immutable, versioned declarative recipe for a trusted engine adapter.</summary>
+[Experimental("AIDEVO002")]
 public sealed class EvolutionSearchPolicy
 {
     /// <summary>Creates a policy with up to sixteen named operators, integer weights, a schedule, restart interval and context contract.</summary>
@@ -83,6 +87,7 @@ public sealed class EvolutionSearchPolicy
 
 /// <summary>A finite, predeclared catalogue that bounds the entire policy search, including mutation.</summary>
 /// <remarks>Populate a Cartesian product when each dimension should vary independently. Sparse catalogues intentionally forbid missing combinations.</remarks>
+[Experimental("AIDEVO002")]
 public sealed class EvolutionPolicySpace
 {
     private readonly EvolutionSearchPolicy[] _policies;

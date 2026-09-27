@@ -1,3 +1,4 @@
+using System.Diagnostics.CodeAnalysis;
 // Migrated from ooples/AiDotNet 66d7602c92101e5ab2bd9db8cfa7f7526fa2c75d:src/Evolution/Programs/DelegateProgramFitnessEvaluator.cs
 // Original license retained in AIDOTNET-LICENSE.txt.
 
@@ -32,6 +33,7 @@ public sealed class DelegateProgramFitnessEvaluator : IProgramFitnessEvaluator
     /// <param name="versionHash">A version hash that changes whenever the scoring rule changes.</param>
     /// <exception cref="ArgumentNullException"><paramref name="evaluate"/> is <c>null</c>.</exception>
     /// <exception cref="ArgumentException"><paramref name="id"/> or <paramref name="versionHash"/> is empty or white space.</exception>
+    [SuppressMessage("ApiDesign", "RS0026:Do not add multiple public overloads with optional parameters", Justification = "The two constructors take delegates of different arity, so no call can be ambiguous; named-argument callers depend on the optional parameters, and future additions are tracked by PublicAPI.*.txt.")]
     public DelegateProgramFitnessEvaluator(
         Func<ProgramGenome, EvolutionEvaluationContext, CancellationToken, ValueTask<EvolutionTaskResult>> evaluate,
         string id = "delegate-program-evaluator",
@@ -52,6 +54,7 @@ public sealed class DelegateProgramFitnessEvaluator : IProgramFitnessEvaluator
     /// <param name="direction">Whether larger or smaller scores are better.</param>
     /// <exception cref="ArgumentNullException"><paramref name="score"/> is <c>null</c>.</exception>
     /// <exception cref="ArgumentException"><paramref name="id"/> or <paramref name="versionHash"/> is empty or white space.</exception>
+    [SuppressMessage("ApiDesign", "RS0026:Do not add multiple public overloads with optional parameters", Justification = "The two constructors take delegates of different arity, so no call can be ambiguous; named-argument callers depend on the optional parameters, and future additions are tracked by PublicAPI.*.txt.")]
     public DelegateProgramFitnessEvaluator(
         Func<ProgramGenome, double> score,
         string id = "delegate-program-evaluator",

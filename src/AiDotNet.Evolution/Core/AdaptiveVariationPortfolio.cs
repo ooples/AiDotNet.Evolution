@@ -31,11 +31,19 @@ public sealed class AdaptiveVariationPortfolio<TGenome> : IOutcomeAwareVariation
     private bool _notifying;
 
     /// <summary>Creates the archive-success/evaluator-cost portfolio with measurement-origin-aware learning.</summary>
-    public AdaptiveVariationPortfolio(IEnumerable<IVariationOperator<TGenome>> operators, double explorationProbability = 0.1)
+    public AdaptiveVariationPortfolio(IEnumerable<IVariationOperator<TGenome>> operators)
+        : this(operators, 0.1, null) { }
+
+    /// <summary>Creates the archive-success/evaluator-cost portfolio with an explicit exploration probability.</summary>
+    public AdaptiveVariationPortfolio(IEnumerable<IVariationOperator<TGenome>> operators, double explorationProbability)
         : this(operators, explorationProbability, null) { }
 
     /// <summary>Creates an opt-in portfolio with explicit gain/cost semantics and nonzero exploration.</summary>
-    public AdaptiveVariationPortfolio(IEnumerable<IVariationOperator<TGenome>> operators, EvolutionOperatorRewardPolicy rewardPolicy, double explorationProbability = 0.1)
+    public AdaptiveVariationPortfolio(IEnumerable<IVariationOperator<TGenome>> operators, EvolutionOperatorRewardPolicy rewardPolicy)
+        : this(operators, 0.1, rewardPolicy) => Guard.NotNull(rewardPolicy);
+
+    /// <summary>Creates an opt-in gain/cost portfolio with an explicit exploration probability.</summary>
+    public AdaptiveVariationPortfolio(IEnumerable<IVariationOperator<TGenome>> operators, EvolutionOperatorRewardPolicy rewardPolicy, double explorationProbability)
         : this(operators, explorationProbability, rewardPolicy) => Guard.NotNull(rewardPolicy);
 
     /// <summary>Creates an ordered portfolio with a nonzero exploration probability in (0, 1].</summary>

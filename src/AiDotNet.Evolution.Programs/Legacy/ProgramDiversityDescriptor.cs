@@ -43,7 +43,13 @@ public sealed class ProgramDiversityDescriptor : IRebasableProgramDescriptor
     /// <param name="name">The archive dimension name this descriptor fills.</param>
     /// <exception cref="ArgumentNullException"><paramref name="referenceSources"/> is <c>null</c>, or an entry is <c>null</c>.</exception>
     /// <exception cref="ArgumentException"><paramref name="name"/> is empty or white space.</exception>
-    public ProgramDiversityDescriptor(IEnumerable<string> referenceSources, string name = DefaultName)
+    public ProgramDiversityDescriptor(IEnumerable<string> referenceSources)
+        : this(referenceSources, DefaultName)
+    {
+    }
+
+    /// <summary>Initializes a diversity descriptor against fixed reference sources with an explicit dimension name.</summary>
+    public ProgramDiversityDescriptor(IEnumerable<string> referenceSources, string name)
     {
         ProgramGuard.NotNull(referenceSources);
         ProgramGuard.NotNullOrWhiteSpace(name);
@@ -71,7 +77,13 @@ public sealed class ProgramDiversityDescriptor : IRebasableProgramDescriptor
     /// <param name="name">The archive dimension name this descriptor fills.</param>
     /// <exception cref="ArgumentNullException"><paramref name="referenceGenomes"/> is <c>null</c>, or an entry is <c>null</c>.</exception>
     /// <exception cref="ArgumentException"><paramref name="name"/> is empty or white space.</exception>
-    public ProgramDiversityDescriptor(IEnumerable<ProgramGenome> referenceGenomes, string name = DefaultName)
+    public ProgramDiversityDescriptor(IEnumerable<ProgramGenome> referenceGenomes)
+        : this(referenceGenomes, DefaultName)
+    {
+    }
+
+    /// <summary>Initializes a diversity descriptor against fixed reference genomes with an explicit dimension name.</summary>
+    public ProgramDiversityDescriptor(IEnumerable<ProgramGenome> referenceGenomes, string name)
         : this(ToSources(referenceGenomes), name)
     {
     }
