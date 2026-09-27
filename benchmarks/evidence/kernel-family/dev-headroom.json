@@ -1,0 +1,20 @@
+{
+  "story": "V1-04c #29",
+  "partition": "dev",
+  "task": "softmax",
+  "comparison": "hand-written fused CUDA RawKernel (one block per row) vs the initial multi-pass CuPy program",
+  "timing": "kernel-only: CUDA events around the kernel call inside the trusted harness, each checked against the host's independently measured wall time",
+  "speedup_median": 6.461,
+  "ratios": [6.695, 6.494, 5.481, 6.556, 6.292, 6.461, 6.17],
+  "samples": 7,
+  "seeds": [3000],
+  "repeats_per_request": 40,
+  "shape": [4096, 1024],
+  "candidate_sha256": "1fa7cf849a7e7f8faabbdc1024f43a251bdf800e9cf44aa2e6b2d0a117a0535c",
+  "initial_sha256": "da627ada0318c6d31beb03dc8cde76d74fae8bc4eb09acbbc3aa14036fba34cd",
+  "harness_commit": "509ee0b64e3e5a4b4c939a9d3e0fe42e4e3d669e",
+  "image_digest": "sha256:7f096bcdbc3b769ca8b788d623c2d219dec46e636ebb171ef2cc251b0969a321",
+  "hardware": "NVIDIA GeForce GTX 1660 Ti, driver 616.56",
+  "superseded": "An earlier end-to-end figure (1.219x) mostly timed input generation and digests; it is replaced by this kernel-only measurement.",
+  "reading": "Headroom exists on dev data (R7). No claim beyond this card (R11)."
+}
