@@ -60,6 +60,8 @@ jobs:
         run: ./eng/Test-ReleaseWorkflow.ps1 -NoRestore
       - name: Build all package target frameworks
         run: dotnet build src/AiDotNet.Evolution/AiDotNet.Evolution.csproj --configuration Release --no-restore
+      # Programs reaches this output only through the CLI's project reference; its tests are in CSharp.Tests, so here it
+      # would be measured as mostly uncovered. The ratchet baseline never included it.
       - name: Test net10.0 with coverage
         run: >
           dotnet test tests/AiDotNet.Evolution.Tests/AiDotNet.Evolution.Tests.csproj
@@ -68,6 +70,7 @@ jobs:
           --collect:"XPlat Code Coverage" --results-directory ./coverage
           --
           DataCollectionRunSettings.DataCollectors.DataCollector.Configuration.Format=cobertura
+          DataCollectionRunSettings.DataCollectors.DataCollector.Configuration.Exclude="[AiDotNet.Evolution.Programs]*"
       - name: Test net8.0
         run: >
           dotnet test tests/AiDotNet.Evolution.Tests/AiDotNet.Evolution.Tests.csproj
