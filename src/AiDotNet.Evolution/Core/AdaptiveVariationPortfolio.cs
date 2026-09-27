@@ -117,11 +117,13 @@ public sealed class AdaptiveVariationPortfolio<TGenome> : IOutcomeAwareVariation
         if (_pending.Count >= MaximumPending)
             throw new InvalidOperationException("The portfolio pending-outcome limit was reached.");
         int index = Array.FindIndex(_arms, arm => arm.Proposals == 0);
+        if (index < 0 && _rewardPolicy?.MaximumEstimateAge is int age)
+            index = StaleArm(age);
         if (index < 0)
         {
             index = context.Random.NextDouble() < _explorationProbability
                 ? context.Random.NextInt(_arms.Length)
-                : Enumerable.Range(0, _arms.Length).OrderByDescending(i => MeanReward(_arms[i])).First();
+                : Enumerable.Range(0, _arms.Length).OrderByDescending(i => Estimate(_arms[i])).First();
         }
         _arms[index].Proposals = checked(_arms[index].Proposals + 1);
         _pending.Add(context.Generation, index);
@@ -164,6 +166,17 @@ public sealed class AdaptiveVariationPortfolio<TGenome> : IOutcomeAwareVariation
         _credit?.Remove(evaluation.Lineage.Generation);
         _arms[index].Outcomes = checked(_arms[index].Outcomes + 1);
         _arms[index].RewardSum += reward;
+        if (_rewardPolicy?.MaximumEstimateAge is not null)
+        {
+            _outcomeTick = checked(_outcomeTick + 1);
+            _arms[index].LastOutcomeTick = _outcomeTick;
+            if (_rewardPolicy.HalfLifeOutcomes is int halfLife)
+            {
+                double keep = Math.Pow(0.5, 1.0 / halfLife);
+                _arms[index].DecayedReward = (_arms[index].DecayedReward * keep) + reward;
+                _arms[index].DecayedWeight = (_arms[index].DecayedWeight * keep) + 1;
+            }
+        }
         LastCredit = new(evaluation.Lineage.Generation, _operators[index].Id, _operators[index].VersionHash,
             _rewardPolicy?.VersionHash ?? "archive-success-evaluator-cost-v3-valid-measurement", baseline?.Quality, evaluation, insertionResult, cost, reward);
         if (CreditCommitted is { } notification)
@@ -195,6 +208,7 @@ public sealed class AdaptiveVariationPortfolio<TGenome> : IOutcomeAwareVariation
             Arms = _arms,
             Pending = _pending,
             Credit = _credit,
+            OutcomeTick = _outcomeTick,
             Children = _operators.Select(op =>
                 (op as ICheckpointableVariationOperator<TGenome>)?.CaptureState()).ToArray()
         }, EvolutionJson.Compact);
@@ -239,20 +253,45 @@ public sealed class AdaptiveVariationPortfolio<TGenome> : IOutcomeAwareVariation
             if (arm is null || arm.Outcomes < 0 || arm.Proposals < arm.Outcomes ||
                 arm.Proposals - arm.Outcomes != pendingCounts[i] ||
                 !EvolutionDescriptorDefinition.IsFinite(arm.RewardSum) || arm.RewardSum < 0 || arm.RewardSum > arm.Outcomes ||
-                (_operators[i] is ICheckpointableVariationOperator<TGenome>) != (restored.Children[i] is not null))
+                (_operators[i] is ICheckpointableVariationOperator<TGenome>) != (restored.Children[i] is not null) ||
+                arm.LastOutcomeTick < 0 || arm.LastOutcomeTick > restored.OutcomeTick ||
+                !EvolutionDescriptorDefinition.IsFinite(arm.DecayedReward) || !EvolutionDescriptorDefinition.IsFinite(arm.DecayedWeight) ||
+                arm.DecayedReward < 0 || arm.DecayedWeight < 0 || arm.DecayedReward > arm.DecayedWeight)
                 throw new InvalidDataException("The portfolio statistics or child state are invalid.");
         }
+        if (restored.OutcomeTick < 0 || (_rewardPolicy?.MaximumEstimateAge is null && restored.OutcomeTick != 0) ||
+            restored.OutcomeTick > restored.Arms.Sum(arm => arm.Outcomes))
+            throw new InvalidDataException("The portfolio outcome clock is invalid.");
         for (int i = 0; i < _arms.Length; i++)
             if (_operators[i] is ICheckpointableVariationOperator<TGenome> child)
                 child.RestoreState(restored.Children[i]!);
         _arms = restored.Arms;
         _pending = restored.Pending;
         _credit = restored.Credit;
+        _outcomeTick = restored.OutcomeTick;
         LastCredit = null;
         CreditNotificationFailures = 0;
     }
 
     private static double MeanReward(ArmState arm) => arm.Outcomes == 0 ? 0 : arm.RewardSum / arm.Outcomes;
+
+    // With a half-life the estimate follows recent behavior; without one it is the plain mean, unchanged.
+    private double Estimate(ArmState arm) => _rewardPolicy?.HalfLifeOutcomes is not null && arm.DecayedWeight > 0
+        ? arm.DecayedReward / arm.DecayedWeight
+        : MeanReward(arm);
+
+    // The first arm whose newest outcome is older than the age and that has no probe already outstanding;
+    // re-probing it is the explicit handling of a stale estimate. Deterministic: constructor order.
+    private int StaleArm(int age)
+    {
+        var outstanding = new bool[_arms.Length];
+        foreach (int pendingIndex in _pending.Values) outstanding[pendingIndex] = true;
+        for (int i = 0; i < _arms.Length; i++)
+            if (!outstanding[i] && _arms[i].Outcomes > 0 && _outcomeTick - _arms[i].LastOutcomeTick > age) return i;
+        return -1;
+    }
+
+    private long _outcomeTick;
 
     private void RejectNotificationReentry()
     {
@@ -265,6 +304,13 @@ public sealed class AdaptiveVariationPortfolio<TGenome> : IOutcomeAwareVariation
         public long Proposals { get; set; }
         public long Outcomes { get; set; }
         public double RewardSum { get; set; }
+        // Written only when estimate aging is configured, so every existing state string is unchanged.
+        [JsonIgnore(Condition = JsonIgnoreCondition.WhenWritingDefault)]
+        public long LastOutcomeTick { get; set; }
+        [JsonIgnore(Condition = JsonIgnoreCondition.WhenWritingDefault)]
+        public double DecayedReward { get; set; }
+        [JsonIgnore(Condition = JsonIgnoreCondition.WhenWritingDefault)]
+        public double DecayedWeight { get; set; }
     }
 
     private sealed class PortfolioState
@@ -276,6 +322,8 @@ public sealed class AdaptiveVariationPortfolio<TGenome> : IOutcomeAwareVariation
         [JsonIgnore(Condition = JsonIgnoreCondition.WhenWritingNull)]
         public SortedDictionary<long, ParentCredit>? Credit { get; set; }
         public string?[]? Children { get; set; }
+        [JsonIgnore(Condition = JsonIgnoreCondition.WhenWritingDefault)]
+        public long OutcomeTick { get; set; }
     }
 
     private sealed class ParentCredit
