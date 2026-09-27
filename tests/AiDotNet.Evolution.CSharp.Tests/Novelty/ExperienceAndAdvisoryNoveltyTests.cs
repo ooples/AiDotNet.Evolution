@@ -20,7 +20,7 @@ public sealed class ExperienceAndAdvisoryNoveltyTests
     {
         var reject = new NoveltyGatingProgramFitnessEvaluator(new RecordingProgramFitnessEvaluator(), NotNovel());
         var advise = new NoveltyGatingProgramFitnessEvaluator(new RecordingProgramFitnessEvaluator(), NotNovel(),
-            enforcement: ProgramNoveltyEnforcement.Advise);
+            "novelty-gating-program-evaluator", ProgramNoveltyEnforcement.Advise);
         reject.Remember(A()); advise.Remember(A());
         EvolutionTaskResult rejected = await reject.EvaluateAsync(B(), Context());
         EvolutionTaskResult advised = await advise.EvaluateAsync(B(), Context());

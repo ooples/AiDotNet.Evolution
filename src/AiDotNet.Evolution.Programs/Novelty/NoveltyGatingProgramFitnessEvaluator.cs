@@ -21,11 +21,33 @@ public sealed class NoveltyGatingProgramFitnessEvaluator : IProgramFitnessEvalua
     private long _rejectedCount;
     private ProgramNoveltyDecision? _lastDecision;
 
+    private const string DefaultId = "novelty-gating-program-evaluator";
+
+    /// <summary>Creates a rejecting gate with the default policy and id.</summary>
+    public NoveltyGatingProgramFitnessEvaluator(IProgramFitnessEvaluator inner)
+        : this(inner, null, DefaultId, ProgramNoveltyEnforcement.Reject)
+    {
+    }
+
+    /// <summary>Creates a rejecting gate with an explicit policy and the default id.</summary>
+    public NoveltyGatingProgramFitnessEvaluator(IProgramFitnessEvaluator inner, ProgramNoveltyPolicy? policy)
+        : this(inner, policy, DefaultId, ProgramNoveltyEnforcement.Reject)
+    {
+    }
+
+    /// <summary>Creates a rejecting gate with an explicit policy and id.</summary>
+    public NoveltyGatingProgramFitnessEvaluator(IProgramFitnessEvaluator inner, ProgramNoveltyPolicy? policy, string id)
+        : this(inner, policy, id, ProgramNoveltyEnforcement.Reject)
+    {
+    }
+
+    /// <summary>Creates a gate with an explicit enforcement; <see cref="ProgramNoveltyEnforcement.Advise"/> measures and annotates instead of rejecting.</summary>
+    /// <remarks>A separate overload rather than a new optional parameter, so the published constructor keeps its signature.</remarks>
     public NoveltyGatingProgramFitnessEvaluator(
         IProgramFitnessEvaluator inner,
-        ProgramNoveltyPolicy? policy = null,
-        string id = "novelty-gating-program-evaluator",
-        ProgramNoveltyEnforcement enforcement = ProgramNoveltyEnforcement.Reject)
+        ProgramNoveltyPolicy? policy,
+        string id,
+        ProgramNoveltyEnforcement enforcement)
     {
         if (!Enum.IsDefined(typeof(ProgramNoveltyEnforcement), enforcement)) throw new ArgumentOutOfRangeException(nameof(enforcement));
         Enforcement = enforcement;

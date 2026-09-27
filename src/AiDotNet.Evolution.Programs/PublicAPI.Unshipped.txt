@@ -394,7 +394,10 @@ AiDotNet.Evolution.Programs.Novelty.NoveltyGatingProgramFitnessEvaluator.GetLast
 AiDotNet.Evolution.Programs.Novelty.NoveltyGatingProgramFitnessEvaluator.GetRememberedGenomes() -> System.Collections.Generic.IReadOnlyList<AiDotNet.Evolution.Programs.ProgramGenome!>!
 AiDotNet.Evolution.Programs.Novelty.NoveltyGatingProgramFitnessEvaluator.Id.get -> string!
 AiDotNet.Evolution.Programs.Novelty.NoveltyGatingProgramFitnessEvaluator.Inner.get -> AiDotNet.Evolution.Programs.IProgramFitnessEvaluator!
-AiDotNet.Evolution.Programs.Novelty.NoveltyGatingProgramFitnessEvaluator.NoveltyGatingProgramFitnessEvaluator(AiDotNet.Evolution.Programs.IProgramFitnessEvaluator! inner, AiDotNet.Evolution.Programs.Novelty.ProgramNoveltyPolicy? policy = null, string! id = "novelty-gating-program-evaluator") -> void
+AiDotNet.Evolution.Programs.Novelty.NoveltyGatingProgramFitnessEvaluator.NoveltyGatingProgramFitnessEvaluator(AiDotNet.Evolution.Programs.IProgramFitnessEvaluator! inner) -> void
+AiDotNet.Evolution.Programs.Novelty.NoveltyGatingProgramFitnessEvaluator.NoveltyGatingProgramFitnessEvaluator(AiDotNet.Evolution.Programs.IProgramFitnessEvaluator! inner, AiDotNet.Evolution.Programs.Novelty.ProgramNoveltyPolicy? policy) -> void
+AiDotNet.Evolution.Programs.Novelty.NoveltyGatingProgramFitnessEvaluator.NoveltyGatingProgramFitnessEvaluator(AiDotNet.Evolution.Programs.IProgramFitnessEvaluator! inner, AiDotNet.Evolution.Programs.Novelty.ProgramNoveltyPolicy? policy, string! id) -> void
+AiDotNet.Evolution.Programs.Novelty.NoveltyGatingProgramFitnessEvaluator.NoveltyGatingProgramFitnessEvaluator(AiDotNet.Evolution.Programs.IProgramFitnessEvaluator! inner, AiDotNet.Evolution.Programs.Novelty.ProgramNoveltyPolicy? policy, string! id, AiDotNet.Evolution.Programs.Novelty.ProgramNoveltyEnforcement enforcement) -> void
 AiDotNet.Evolution.Programs.Novelty.NoveltyGatingProgramFitnessEvaluator.Policy.get -> AiDotNet.Evolution.Programs.Novelty.ProgramNoveltyPolicy!
 AiDotNet.Evolution.Programs.Novelty.NoveltyGatingProgramFitnessEvaluator.RejectedCount.get -> long
 AiDotNet.Evolution.Programs.Novelty.NoveltyGatingProgramFitnessEvaluator.Remember(AiDotNet.Evolution.Programs.ProgramGenome! genome) -> void
@@ -1597,3 +1600,86 @@ virtual AiDotNet.Evolution.Programs.ProgramPlanner.Invoke(AiDotNet.Evolution.Pro
 virtual AiDotNet.Evolution.Programs.ProgramTaskOptions.Clone() -> AiDotNet.Evolution.Programs.ProgramTaskOptions!
 virtual AiDotNet.Evolution.Programs.ProgramTaskOptions.Validate() -> void
 virtual AiDotNet.Evolution.Programs.ProgramVerifier.Invoke(AiDotNet.Evolution.Programs.VerificationRequest! request, System.Threading.CancellationToken cancellationToken) -> System.Threading.Tasks.ValueTask<AiDotNet.Evolution.EvolutionResourceResult<AiDotNet.Evolution.Programs.VerificationReceipt!>!>
+AiDotNet.Evolution.Programs.Experience.ProgramEvidencePartition
+AiDotNet.Evolution.Programs.Experience.ProgramEvidencePartition.FinalTest = 2 -> AiDotNet.Evolution.Programs.Experience.ProgramEvidencePartition
+AiDotNet.Evolution.Programs.Experience.ProgramEvidencePartition.Search = 0 -> AiDotNet.Evolution.Programs.Experience.ProgramEvidencePartition
+AiDotNet.Evolution.Programs.Experience.ProgramEvidencePartition.Validation = 1 -> AiDotNet.Evolution.Programs.Experience.ProgramEvidencePartition
+AiDotNet.Evolution.Programs.Experience.ProgramExperienceOutcome
+AiDotNet.Evolution.Programs.Experience.ProgramExperienceOutcome.Failed = 3 -> AiDotNet.Evolution.Programs.Experience.ProgramExperienceOutcome
+AiDotNet.Evolution.Programs.Experience.ProgramExperienceOutcome.Improved = 0 -> AiDotNet.Evolution.Programs.Experience.ProgramExperienceOutcome
+AiDotNet.Evolution.Programs.Experience.ProgramExperienceOutcome.Invalid = 2 -> AiDotNet.Evolution.Programs.Experience.ProgramExperienceOutcome
+AiDotNet.Evolution.Programs.Experience.ProgramExperienceOutcome.NotImproved = 1 -> AiDotNet.Evolution.Programs.Experience.ProgramExperienceOutcome
+AiDotNet.Evolution.Programs.Experience.ProgramExperienceQuery
+AiDotNet.Evolution.Programs.Experience.ProgramExperienceQuery.<Clone>$() -> AiDotNet.Evolution.Programs.Experience.ProgramExperienceQuery!
+AiDotNet.Evolution.Programs.Experience.ProgramExperienceQuery.ContextBudgetCharacters.get -> int
+AiDotNet.Evolution.Programs.Experience.ProgramExperienceQuery.ContextBudgetCharacters.init -> void
+AiDotNet.Evolution.Programs.Experience.ProgramExperienceQuery.Deconstruct(out string! RunId, out string! TaskIdentity, out string! TaskVersion, out int ContextBudgetCharacters, out bool IncludeOtherRuns) -> void
+AiDotNet.Evolution.Programs.Experience.ProgramExperienceQuery.Equals(AiDotNet.Evolution.Programs.Experience.ProgramExperienceQuery? other) -> bool
+AiDotNet.Evolution.Programs.Experience.ProgramExperienceQuery.IncludeOtherRuns.get -> bool
+AiDotNet.Evolution.Programs.Experience.ProgramExperienceQuery.IncludeOtherRuns.init -> void
+AiDotNet.Evolution.Programs.Experience.ProgramExperienceQuery.ProgramExperienceQuery(string! RunId, string! TaskIdentity, string! TaskVersion, int ContextBudgetCharacters, bool IncludeOtherRuns) -> void
+AiDotNet.Evolution.Programs.Experience.ProgramExperienceQuery.RunId.get -> string!
+AiDotNet.Evolution.Programs.Experience.ProgramExperienceQuery.RunId.init -> void
+AiDotNet.Evolution.Programs.Experience.ProgramExperienceQuery.TaskIdentity.get -> string!
+AiDotNet.Evolution.Programs.Experience.ProgramExperienceQuery.TaskIdentity.init -> void
+AiDotNet.Evolution.Programs.Experience.ProgramExperienceQuery.TaskVersion.get -> string!
+AiDotNet.Evolution.Programs.Experience.ProgramExperienceQuery.TaskVersion.init -> void
+AiDotNet.Evolution.Programs.Experience.ProgramExperienceRecord
+AiDotNet.Evolution.Programs.Experience.ProgramExperienceRecord.Diagnostics.get -> System.Collections.Generic.IReadOnlyList<string!>!
+AiDotNet.Evolution.Programs.Experience.ProgramExperienceRecord.Hypothesis.get -> string!
+AiDotNet.Evolution.Programs.Experience.ProgramExperienceRecord.Outcome.get -> AiDotNet.Evolution.Programs.Experience.ProgramExperienceOutcome
+AiDotNet.Evolution.Programs.Experience.ProgramExperienceRecord.Partition.get -> AiDotNet.Evolution.Programs.Experience.ProgramEvidencePartition
+AiDotNet.Evolution.Programs.Experience.ProgramExperienceRecord.ProgramExperienceRecord(string! runId, string! taskIdentity, string! taskVersion, string! hypothesis, string! sourceHash, AiDotNet.Evolution.Programs.Experience.ProgramExperienceOutcome outcome, AiDotNet.Evolution.Programs.Experience.ProgramEvidencePartition partition, double? quality, System.Collections.Generic.IEnumerable<string!>? diagnostics, long sequence) -> void
+AiDotNet.Evolution.Programs.Experience.ProgramExperienceRecord.Quality.get -> double?
+AiDotNet.Evolution.Programs.Experience.ProgramExperienceRecord.RunId.get -> string!
+AiDotNet.Evolution.Programs.Experience.ProgramExperienceRecord.Sequence.get -> long
+AiDotNet.Evolution.Programs.Experience.ProgramExperienceRecord.SourceHash.get -> string!
+AiDotNet.Evolution.Programs.Experience.ProgramExperienceRecord.TaskIdentity.get -> string!
+AiDotNet.Evolution.Programs.Experience.ProgramExperienceRecord.TaskVersion.get -> string!
+AiDotNet.Evolution.Programs.Experience.ProgramExperienceRetrieval
+AiDotNet.Evolution.Programs.Experience.ProgramExperienceRetrieval.<Clone>$() -> AiDotNet.Evolution.Programs.Experience.ProgramExperienceRetrieval!
+AiDotNet.Evolution.Programs.Experience.ProgramExperienceRetrieval.Context.get -> string!
+AiDotNet.Evolution.Programs.Experience.ProgramExperienceRetrieval.Context.init -> void
+AiDotNet.Evolution.Programs.Experience.ProgramExperienceRetrieval.Deconstruct(out System.Collections.Generic.IReadOnlyList<AiDotNet.Evolution.Programs.Experience.ProgramExperienceRecord!>! Selected, out string! Context, out int ExcludedIncompatible) -> void
+AiDotNet.Evolution.Programs.Experience.ProgramExperienceRetrieval.Equals(AiDotNet.Evolution.Programs.Experience.ProgramExperienceRetrieval? other) -> bool
+AiDotNet.Evolution.Programs.Experience.ProgramExperienceRetrieval.ExcludedIncompatible.get -> int
+AiDotNet.Evolution.Programs.Experience.ProgramExperienceRetrieval.ExcludedIncompatible.init -> void
+AiDotNet.Evolution.Programs.Experience.ProgramExperienceRetrieval.ProgramExperienceRetrieval(System.Collections.Generic.IReadOnlyList<AiDotNet.Evolution.Programs.Experience.ProgramExperienceRecord!>! Selected, string! Context, int ExcludedIncompatible) -> void
+AiDotNet.Evolution.Programs.Experience.ProgramExperienceRetrieval.Selected.get -> System.Collections.Generic.IReadOnlyList<AiDotNet.Evolution.Programs.Experience.ProgramExperienceRecord!>!
+AiDotNet.Evolution.Programs.Experience.ProgramExperienceRetrieval.Selected.init -> void
+AiDotNet.Evolution.Programs.Experience.ProgramExperienceStore
+AiDotNet.Evolution.Programs.Experience.ProgramExperienceStore.Add(AiDotNet.Evolution.Programs.Experience.ProgramExperienceRecord! record) -> void
+AiDotNet.Evolution.Programs.Experience.ProgramExperienceStore.CaptureState() -> string!
+AiDotNet.Evolution.Programs.Experience.ProgramExperienceStore.Count.get -> int
+AiDotNet.Evolution.Programs.Experience.ProgramExperienceStore.ProgramExperienceStore(int capacity = 4096) -> void
+AiDotNet.Evolution.Programs.Experience.ProgramExperienceStore.RestoreState(string! state) -> void
+AiDotNet.Evolution.Programs.Experience.ProgramExperienceStore.Retrieve(AiDotNet.Evolution.Programs.Experience.ProgramExperienceQuery! query) -> AiDotNet.Evolution.Programs.Experience.ProgramExperienceRetrieval!
+AiDotNet.Evolution.Programs.InputOutputProgramFitnessEvaluator.IsLatencyBound.get -> bool
+AiDotNet.Evolution.Programs.LlmProgramVariationOperator.IsLatencyBound.get -> bool
+AiDotNet.Evolution.Programs.MeteredProgramVariationOperator.IsLatencyBound.get -> bool
+AiDotNet.Evolution.Programs.Novelty.NoveltyGatingProgramFitnessEvaluator.AdvisedCount.get -> long
+AiDotNet.Evolution.Programs.Novelty.NoveltyGatingProgramFitnessEvaluator.Enforcement.get -> AiDotNet.Evolution.Programs.Novelty.ProgramNoveltyEnforcement
+AiDotNet.Evolution.Programs.Novelty.ProgramNoveltyEnforcement
+AiDotNet.Evolution.Programs.Novelty.ProgramNoveltyEnforcement.Advise = 1 -> AiDotNet.Evolution.Programs.Novelty.ProgramNoveltyEnforcement
+AiDotNet.Evolution.Programs.Novelty.ProgramNoveltyEnforcement.Reject = 0 -> AiDotNet.Evolution.Programs.Novelty.ProgramNoveltyEnforcement
+AiDotNet.Evolution.Programs.ProgramEvolutionTask.IsLatencyBound.get -> bool
+AiDotNet.Evolution.Programs.PythonProgramCompiler
+AiDotNet.Evolution.Programs.PythonProgramCompiler.Apply(AiDotNet.Evolution.Programs.ProgramSnapshot! parent, AiDotNet.Evolution.Programs.PatchPlan! plan, System.Threading.CancellationToken cancellationToken = default(System.Threading.CancellationToken)) -> AiDotNet.Evolution.Programs.ProgramSnapshot!
+AiDotNet.Evolution.Programs.PythonProgramCompiler.Build(AiDotNet.Evolution.Programs.ProgramSnapshot! source, System.Threading.CancellationToken cancellationToken = default(System.Threading.CancellationToken)) -> AiDotNet.Evolution.Programs.ProgramBuild!
+AiDotNet.Evolution.Programs.PythonProgramCompiler.Catalog(AiDotNet.Evolution.Programs.ProgramSnapshot! source, System.Threading.CancellationToken cancellationToken = default(System.Threading.CancellationToken)) -> System.Collections.Generic.IReadOnlyList<AiDotNet.Evolution.Programs.EditTarget!>!
+AiDotNet.Evolution.Programs.PythonProgramCompiler.PythonProgramCompiler(string! pythonExecutable, System.TimeSpan? timeout = null) -> void
+AiDotNet.Evolution.Programs.SandboxedProgramFitnessEvaluator.IsLatencyBound.get -> bool
+AiDotNet.Evolution.Programs.ScriptProgramFitnessEvaluator.IsLatencyBound.get -> bool
+const AiDotNet.Evolution.Programs.Experience.ProgramExperienceRecord.MaximumDiagnostics = 8 -> int
+const AiDotNet.Evolution.Programs.Experience.ProgramExperienceRecord.MaximumHypothesisCharacters = 1024 -> int
+const AiDotNet.Evolution.Programs.Novelty.NoveltyGatingProgramFitnessEvaluator.SimilarityCode = "program_similar" -> string!
+override AiDotNet.Evolution.Programs.Experience.ProgramExperienceQuery.Equals(object? obj) -> bool
+override AiDotNet.Evolution.Programs.Experience.ProgramExperienceQuery.GetHashCode() -> int
+override AiDotNet.Evolution.Programs.Experience.ProgramExperienceQuery.ToString() -> string!
+override AiDotNet.Evolution.Programs.Experience.ProgramExperienceRetrieval.Equals(object? obj) -> bool
+override AiDotNet.Evolution.Programs.Experience.ProgramExperienceRetrieval.GetHashCode() -> int
+override AiDotNet.Evolution.Programs.Experience.ProgramExperienceRetrieval.ToString() -> string!
+static AiDotNet.Evolution.Programs.Experience.ProgramExperienceQuery.operator !=(AiDotNet.Evolution.Programs.Experience.ProgramExperienceQuery? left, AiDotNet.Evolution.Programs.Experience.ProgramExperienceQuery? right) -> bool
+static AiDotNet.Evolution.Programs.Experience.ProgramExperienceQuery.operator ==(AiDotNet.Evolution.Programs.Experience.ProgramExperienceQuery? left, AiDotNet.Evolution.Programs.Experience.ProgramExperienceQuery? right) -> bool
+static AiDotNet.Evolution.Programs.Experience.ProgramExperienceRetrieval.operator !=(AiDotNet.Evolution.Programs.Experience.ProgramExperienceRetrieval? left, AiDotNet.Evolution.Programs.Experience.ProgramExperienceRetrieval? right) -> bool
+static AiDotNet.Evolution.Programs.Experience.ProgramExperienceRetrieval.operator ==(AiDotNet.Evolution.Programs.Experience.ProgramExperienceRetrieval? left, AiDotNet.Evolution.Programs.Experience.ProgramExperienceRetrieval? right) -> bool

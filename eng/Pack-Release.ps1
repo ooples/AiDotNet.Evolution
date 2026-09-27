@@ -14,7 +14,7 @@ if ((Test-Path -LiteralPath $output) -and @(Get-ChildItem -LiteralPath $output -
     throw 'Release output directory must be empty; stale packages must never be published.'
 }
 $projects = @('AiDotNet.Evolution', 'AiDotNet.Evolution.Programs', 'AiDotNet.Evolution.CSharp',
-    'AiDotNet.Evolution.Deployment', 'AiDotNet.Evolution.Surrogates')
+    'AiDotNet.Evolution.Deployment', 'AiDotNet.Evolution.Surrogates', 'AiDotNet.Evolution.Cli')
 # Fail closed if a new package was added without updating the release set.
 $packable = @(Get-ChildItem -Path "$root/src/*/*.csproj" | Where-Object {
     [xml] $projectXml = Get-Content -LiteralPath $_.FullName -Raw
