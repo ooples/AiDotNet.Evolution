@@ -3,6 +3,7 @@ using System.Runtime.InteropServices;
 using System.Text;
 using System.Text.Json;
 using AiDotNet.Evolution;
+using AiDotNet.Evolution.Programs;
 
 namespace AiDotNet.Evolution.Cli;
 
@@ -13,9 +14,11 @@ public static class Program
         Usage:
           aidotnet-evolve run     <run.json>
           aidotnet-evolve resume  <run.json>
+          aidotnet-evolve preflight <run.json>
           aidotnet-evolve inspect <trace>
           aidotnet-evolve compare <traceA> <traceB>
-          aidotnet-evolve export  <trace> <output-directory>
+          aidotnet-evolve export  <trace> <output-directory> [--include-source <program-file>]
+          aidotnet-evolve inspect-export <export-directory>
           aidotnet-evolve report  <trace> <output.html>
         """;
 
@@ -27,10 +30,13 @@ public static class Program
             {
                 ["run", string runFile] => Evolve(runFile, resume: false),
                 ["resume", string runFile] => Evolve(runFile, resume: true),
+                ["preflight", string runFile] => RunCommand.Preflight(runFile, Console.Out, CancellationToken.None),
                 ["inspect", string trace] => Print(JsonSerializer.Serialize(TraceAnalysis.Load(trace).Summary(), Json)),
                 ["compare", string a, string b] => Print(JsonSerializer.Serialize(TraceAnalysis.Compare(TraceAnalysis.Load(a), TraceAnalysis.Load(b)), Json)),
-                ["export", string trace, string output] => Export(trace, output),
+                ["export", string trace, string output] => Export(trace, output, null),
+                ["export", string trace, string output, "--include-source", string source] => Export(trace, output, source),
                 ["report", string trace, string output] => Report(trace, output),
+                ["inspect-export", string exportDirectory] => InspectExport(exportDirectory),
                 _ => Fail(Usage)
             };
         }
@@ -56,14 +62,103 @@ public static class Program
     private static int Print(string text) { Console.WriteLine(text); return 0; }
     private static int Fail(string text) { Console.Error.WriteLine(text); return 2; }
 
-    private static int Export(string trace, string output)
+    /// <summary>Writes winner.json, and with <paramref name="sourcePath"/> the winner's exact program beside it.</summary>
+    /// <remarks>
+    /// Traces never carry source, so the program is supplied by the caller -- usually the run's best file -- and is
+    /// accepted only if its content identity IS the winning genome's id. A file that merely resembles the winner,
+    /// or the best of a different session, is refused rather than exported under the winner's evidence.
+    /// </remarks>
+    private static int Export(string trace, string output, string? sourcePath)
     {
         TraceAnalysis analysis = TraceAnalysis.Load(trace);
-        Directory.CreateDirectory(output);
+        string winnerId = (analysis.Best ?? throw new InvalidDataException("The trace has no valid evaluation to export.")).GenomeId;
         string path = Path.Combine(output, "winner.json");
         if (File.Exists(path)) return Fail("error: " + path + " already exists; exports never overwrite.");
-        File.WriteAllText(path, JsonSerializer.Serialize(analysis.Winner(), Json));
+
+        object? source = null;
+        string? sourceOut = null;
+        string? sourceText = null;
+        if (sourcePath is not null)
+        {
+            sourceText = File.ReadAllText(sourcePath);
+            ProgramLanguage? language = null;
+            foreach (ProgramLanguage candidate in Enum.GetValues<ProgramLanguage>())
+            {
+                if (string.Equals(new ProgramGenome(sourceText, candidate).Id, winnerId, StringComparison.Ordinal)) { language = candidate; break; }
+            }
+            if (language is not { } matched)
+                return Fail("error: " + sourcePath + " is not the winner's program: its identity does not match genome " + winnerId + ".");
+            sourceOut = Path.Combine(output, "winner" + RunCommand.Extension(matched));
+            if (File.Exists(sourceOut)) return Fail("error: " + sourceOut + " already exists; exports never overwrite.");
+            source = new
+            {
+                File = Path.GetFileName(sourceOut),
+                Language = matched.ToString(),
+                Sha256 = Convert.ToHexString(System.Security.Cryptography.SHA256.HashData(Encoding.UTF8.GetBytes(sourceText))).ToLowerInvariant(),
+                BoundTo = winnerId
+            };
+        }
+
+        string winnerJson = JsonSerializer.Serialize(analysis.Winner(source), Json);
+        if (FindCredential(winnerJson + "\n" + sourceText) is { } variable)
+            return Fail("error: the export contains the value of " + variable + ", a configured credential; nothing was written. " +
+                "Remove it from the program and export again.");
+
+        Directory.CreateDirectory(output);
+        if (sourceOut is not null && sourceText is not null) File.WriteAllText(sourceOut, sourceText, new UTF8Encoding(false));
+        File.WriteAllText(path, winnerJson);
         return Print(path);
+    }
+
+    private static readonly string[] CredentialNameParts = { "KEY", "TOKEN", "SECRET", "PASSWORD" };
+
+    /// <summary>
+    /// The name of the first credential-like environment variable whose value appears in <paramref name="text"/>.
+    /// </summary>
+    /// <remarks>
+    /// A model can echo what it was sent, so an evolved program can carry the very key the run authenticated with.
+    /// Exports are made to be shared, so a known configured credential blocks one outright. Only the variable's
+    /// NAME is reported. Values shorter than 8 characters are skipped: they match ordinary text too readily to mean
+    /// anything. An unknown or encoded secret cannot be detected this way and still needs human review.
+    /// </remarks>
+    internal static string? FindCredential(string text)
+    {
+        foreach (System.Collections.DictionaryEntry entry in Environment.GetEnvironmentVariables())
+        {
+            if (entry.Key is not string name || entry.Value is not string value || value.Length < 8) continue;
+            string upper = name.ToUpperInvariant();
+            if (!CredentialNameParts.Any(upper.Contains)) continue;
+            if (text.Contains(value, StringComparison.Ordinal)) return name;
+        }
+        return null;
+    }
+    /// <summary>Re-checks an export: the winner record parses, and an included source still is the winner.</summary>
+    /// <remarks>
+    /// An export is made to be passed around, so whoever receives one needs to know it was not edited on the way:
+    /// the source must hash to the recorded SHA-256 and its content identity must still be the winning genome id.
+    /// </remarks>
+    private static int InspectExport(string exportDirectory)
+    {
+        string winnerPath = Path.Combine(exportDirectory, "winner.json");
+        if (!File.Exists(winnerPath)) return Fail("error: " + winnerPath + " not found.");
+        using JsonDocument winner = JsonDocument.Parse(File.ReadAllText(winnerPath));
+        JsonElement root = winner.RootElement;
+        string genomeId = root.GetProperty("GenomeId").GetString() ?? string.Empty;
+        if (!root.TryGetProperty("Source", out JsonElement source) || source.ValueKind == JsonValueKind.Null)
+            return Print(JsonSerializer.Serialize(new { Valid = true, GenomeId = genomeId, Quality = root.GetProperty("Quality").GetDouble(), Source = (object?)null }, Json));
+
+        string file = Path.GetFileName(source.GetProperty("File").GetString() ?? string.Empty);
+        string sourcePath = Path.Combine(exportDirectory, file);
+        if (file.Length == 0 || !File.Exists(sourcePath)) return Fail("error: the export names source '" + file + "', which is missing.");
+        string text = File.ReadAllText(sourcePath);
+        string sha = Convert.ToHexString(System.Security.Cryptography.SHA256.HashData(Encoding.UTF8.GetBytes(text))).ToLowerInvariant();
+        if (!string.Equals(sha, source.GetProperty("Sha256").GetString(), StringComparison.Ordinal))
+            return Fail("error: " + file + " does not match its recorded SHA-256; the source was changed after export.");
+        if (!Enum.TryParse(source.GetProperty("Language").GetString(), out ProgramLanguage language)
+            || !string.Equals(new ProgramGenome(text, language).Id, genomeId, StringComparison.Ordinal)
+            || !string.Equals(source.GetProperty("BoundTo").GetString(), genomeId, StringComparison.Ordinal))
+            return Fail("error: " + file + " is not bound to winning genome " + genomeId + ".");
+        return Print(JsonSerializer.Serialize(new { Valid = true, GenomeId = genomeId, Quality = root.GetProperty("Quality").GetDouble(), Source = new { File = file, Sha256 = sha, Language = language.ToString() } }, Json));
     }
 
     private static int Report(string trace, string output)
@@ -124,6 +219,7 @@ internal sealed class TraceAnalysis
             Trace = Path,
             RunId = Read.Summary?.RunId,
             Complete = Read.IsComplete,
+            Running = RunMarker.IsRunning(Path),
             Direction = Direction.ToString(),
             Records = Records.Count,
             Statuses = Records.GroupBy(r => r.Status.ToString()).OrderBy(g => g.Key).ToDictionary(g => g.Key, g => g.Count()),
@@ -137,7 +233,7 @@ internal sealed class TraceAnalysis
         };
     }
 
-    public object Winner()
+    public object Winner(object? source = null)
     {
         EvolutionTraceRecord best = Best ?? throw new InvalidDataException("The trace has no valid evaluation to export.");
         var byGenome = Records.GroupBy(r => r.GenomeId).ToDictionary(g => g.Key, g => g.Last());
@@ -165,7 +261,10 @@ internal sealed class TraceAnalysis
                 Runtime = RuntimeInformation.FrameworkDescription,
                 Architecture = RuntimeInformation.ProcessArchitecture.ToString()
             },
-            Limitations = "Identity, evidence and lineage only: traces carry no program source and no credentials."
+            Source = source,
+            Limitations = source is null
+                ? "Identity, evidence and lineage only: traces carry no program source and no credentials."
+                : "The program source is included by request and is bound to the winning genome id. No credentials are exported."
         };
     }
 
