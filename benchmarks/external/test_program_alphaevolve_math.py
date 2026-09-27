@@ -127,6 +127,18 @@ class FamilyTests(unittest.TestCase):
         order = np.arange(a.shape[1])[::-1]
         self.assertTrue(am.output_contamination(by_id["tensor-333-Z"], (a[:, order], b[:, order], c[:, order])))
 
+class StandaloneVerifierTests(unittest.TestCase):
+    """Verifier contracts that need no upstream notebook."""
+
+    def test_a_non_finite_convex_heilbronn_point_is_rejected_not_scored(self):
+        angles = np.linspace(0, 2 * np.pi, 13, endpoint=False)
+        points = np.stack([np.cos(angles), np.sin(angles)], axis=1)
+        self.assertIsNotNone(am.heilbronn_convex(points, 13))
+        for bad in (np.nan, np.inf):
+            broken = points.copy()
+            broken[0, 0] = bad
+            self.assertIsNone(am.heilbronn_convex(broken, 13))
+
 class ReviewRegressionTests(unittest.TestCase):
     """Each case is a CodeRabbit finding on #133 that must stay fixed."""
 

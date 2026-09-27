@@ -261,7 +261,7 @@ def heilbronn_triangle(points, a, b, c, count):
 
 def heilbronn_convex(points, count):
     x = np.asarray(points, dtype=np.float64)
-    if x.shape != (count, 2):
+    if x.shape != (count, 2) or not np.all(np.isfinite(x)):
         return None
     hull = _hull_area(x)
     return None if hull <= 0 else min(_areas(x)) / hull
