@@ -22,7 +22,7 @@ The original three PR2203 blobs at `9343d45907342eabd1f24cffa4724e7817855bf4`
 are preserved in `aidotnet-pr-2203-original.zip`. Thirty-eight supporting original
 source/test/configuration blobs at `9cd7d5d6c366a483874024650d02901f69a1829c`
 are in `aidotnet-model-runtime-original.zip`. Every entry was verified against its
-original Git blob hash. Original BSL licensing is retained in Programs/Legacy.
+original Git blob hash. Original BSL licensing is retained in `src/AiDotNet.Evolution.Programs/AIDOTNET-LICENSE.txt`.
 
 Text-only chat is intentional: this variation path consumes text proposals, never model
 tool requests. General-purpose AiDotNet chat/agent APIs are not duplicated or removed.

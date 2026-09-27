@@ -5,9 +5,9 @@ relocated, not merged, and does not close their user stories or delete source br
 
 | Original change | Standalone replacement |
 |---|---|
-| #2210 noise options, session, and tests | `src/AiDotNet.Evolution.Programs/Legacy/ProgramNoiseEvaluation*`, matching tests under `tests/AiDotNet.Evolution.CSharp.Tests/Legacy` |
+| #2210 noise options, session, and tests | `src/AiDotNet.Evolution.Programs/Fitness/ProgramNoiseEvaluation*`, matching tests under `tests/AiDotNet.Evolution.CSharp.Tests/ProgramTypes` |
 | #2210 consumer study and statistical verifier | `benchmarks/EvolutionNoise`: fresh RidgeRegression fits and sorting, no model-provider calls |
-| #2212 metered adapter, portfolio, cost/provider contracts | Programs/Legacy `ICostedProgramProposalSource`, `IProgramResourceLedgerProvider`, `MeteredProgramVariationOperator`, `ProgramVariationPortfolio`; existing portfolio adversarial tests |
+| #2212 metered adapter, portfolio, cost/provider contracts | Programs (`Variation/`, `Fitness/`) `ICostedProgramProposalSource`, `IProgramResourceLedgerProvider`, `MeteredProgramVariationOperator`, `ProgramVariationPortfolio`; existing portfolio adversarial tests |
 | #2212 compiler-arm factory and proposal source | `CSharpProgramVariation.Create`, `CSharpProposalSource`, `ICSharpProposalClient`, `CSharpProgramSourceOptions`; compiler/options/proposal tests and `StandaloneCompilerPortfolioTests` |
 | #2212 usage aggregation and builder wiring | `ProgramEvolution.CreateEngine` accepts the portfolio directly; integration test checks outcome commits, evaluation charges, and consumed proposal credits |
 | #2212 output-verifier fixes | `benchmarks/EvolutionNoise/Verify-Output.Tests.ps1`, including explicit success exit after expected native failures |

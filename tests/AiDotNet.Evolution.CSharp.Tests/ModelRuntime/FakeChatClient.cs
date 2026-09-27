@@ -1,5 +1,5 @@
 using AiDotNet.Evolution.Programs;
-// Migrated text-chat fixture from AiDotNet9cd7d5d:ProgramEvolutionTestDoubles.cs; original BSL license retained in Programs/Legacy.
+// Migrated text-chat fixture from AiDotNet9cd7d5d:ProgramEvolutionTestDoubles.cs; original BSL license retained in src/AiDotNet.Evolution.Programs/AIDOTNET-LICENSE.txt.
 using System.Collections.ObjectModel;
 
 namespace AiDotNet.Evolution.CSharp.Tests.ModelRuntime;

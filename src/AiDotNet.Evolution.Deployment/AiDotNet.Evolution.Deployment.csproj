@@ -20,7 +20,7 @@
     <PackageReference Include="intelopenmp.redist.win" Version="2026.0.0.944" Condition="$([MSBuild]::IsOSPlatform('Windows'))" />
     <PackageReference Include="inteltbb.redist.win" Version="2023.0.0.716" Condition="$([MSBuild]::IsOSPlatform('Windows'))" />
     <InternalsVisibleTo Include="AiDotNetTests" />
-    <None Include="../AiDotNet.Evolution.Programs/Legacy/AIDOTNET-LICENSE.txt" Pack="true" PackagePath="AIDOTNET-LICENSE.txt" />
+    <None Include="../AiDotNet.Evolution.Programs/AIDOTNET-LICENSE.txt" Pack="true" PackagePath="AIDOTNET-LICENSE.txt" />
   </ItemGroup>
   <!-- V1-11: the public API is declared (PublicAPI.*.txt) and every change to it must be too. -->
   <ItemGroup>

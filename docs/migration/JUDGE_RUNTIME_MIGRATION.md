@@ -4,7 +4,7 @@ The LLM fitness wrapper from AiDotNet PR2148/2168 now lives in
 `AiDotNet.Evolution.Programs`, with no reference to the AiDotNet assembly.
 Source: `9cd7d5d6c366a483874024650d02901f69a1829c`; four original implementation,
 options, and test blobs are retained byte-for-byte in `aidotnet-judge-original.zip`.
-The original license remains in `src/AiDotNet.Evolution.Programs/Legacy/AIDOTNET-LICENSE.txt`.
+The original license remains in `src/AiDotNet.Evolution.Programs/AIDOTNET-LICENSE.txt`.
 
 ## API transition
 

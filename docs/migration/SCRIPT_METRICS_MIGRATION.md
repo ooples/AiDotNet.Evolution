@@ -16,7 +16,7 @@ blobs from `9cd7d5d6c366a483874024650d02901f69a1829c`, verified byte-for-byte:
 Implementations live under `src/AiDotNet.Evolution.Programs/Execution` and `Metrics`;
 tests live under `tests/AiDotNet.Evolution.CSharp.Tests/ScriptMetrics`. The existing
 execution fixture and caller-owned execution contract from PR92 are reused.
-Original licensing remains in `Legacy/AIDOTNET-LICENSE.txt`.
+Original licensing remains in `src/AiDotNet.Evolution.Programs/AIDOTNET-LICENSE.txt`.
 
 ## Behavior preserved and hardened
 

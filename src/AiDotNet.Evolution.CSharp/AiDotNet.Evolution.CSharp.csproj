@@ -12,7 +12,7 @@
     <EnablePackageValidation>true</EnablePackageValidation>
   </PropertyGroup>
   <ItemGroup>
-    <None Include="../AiDotNet.Evolution.Programs/Legacy/AIDOTNET-LICENSE.txt" Pack="true" PackagePath="AIDOTNET-LICENSE.txt" />
+    <None Include="../AiDotNet.Evolution.Programs/AIDOTNET-LICENSE.txt" Pack="true" PackagePath="AIDOTNET-LICENSE.txt" />
     <None Include="../../LICENSE" Pack="true" PackagePath="APACHE-LICENSE.txt" />
     <InternalsVisibleTo Include="AiDotNet.Evolution.CSharp.Tests" />
     <None Include="../../docs/COMPILER_GUIDED_PROGRAMS.md" Pack="true" PackagePath="README.md" />
