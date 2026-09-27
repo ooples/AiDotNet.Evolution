@@ -9,6 +9,6 @@
   <ItemGroup>
     <ProjectReference Include="../../src/AiDotNet.Evolution.Programs/AiDotNet.Evolution.Programs.csproj" />
     <!-- Model primitives only. All Evolution types resolve to the projects in this repository. -->
-    <PackageReference Include="AiDotNet" Version="0.231.0" Aliases="AiDotNetConsumer" />
+    <PackageReference Include="AiDotNet" Version="0.233.0" Aliases="AiDotNetConsumer" />
   </ItemGroup>
 </Project>
