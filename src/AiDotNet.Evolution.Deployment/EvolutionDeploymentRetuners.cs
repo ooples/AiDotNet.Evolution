@@ -65,7 +65,7 @@ public static class EvolutionDeploymentRetuners
     /// <remarks>Factories supply training/search-validation data only; keep deployment holdout data in the lifecycle evaluator.</remarks>
     public static Func<EvolutionDeploymentRetuneRequest, CancellationToken, Task<EvolutionDeployableArtifact>> AutoML<T, TInput, TOutput>(
         Func<EvolutionDeploymentEnvelope, (TInput TrainingInputs, TOutput TrainingTargets, TInput ValidationInputs, TOutput ValidationTargets)> dataFactory,
-        Action<MapElitesAutoML<T, TInput, TOutput>, EvolutionDeploymentEnvelope> configure,
+        Action<AiDotNet.Evolution.AutoML.MapElitesAutoML<T, TInput, TOutput>, EvolutionDeploymentEnvelope> configure,
         string serializationVersion, MapElitesAutoMLOptions? options = null)
     {
         if (dataFactory is null) throw new ArgumentNullException(nameof(dataFactory));
@@ -78,7 +78,7 @@ public static class EvolutionDeploymentRetuners
             MapElitesAutoMLOptions effective = frozen.SnapshotAndValidate();
             effective.InitialPopulationSize = Math.Min(effective.InitialPopulationSize, request.MaximumEvaluations);
             effective.MaxProposalMultiplier = Math.Min(effective.MaxProposalMultiplier, request.MaximumProposals / request.MaximumEvaluations);
-            using var search = new MapElitesAutoML<T, TInput, TOutput>(effective);
+            using var search = new AiDotNet.Evolution.AutoML.MapElitesAutoML<T, TInput, TOutput>(effective);
             configure(search, request.Envelope);
             // Apply admitted limits after caller configuration; the sealed engine snapshots its own options.
             search.TrialLimit = request.MaximumEvaluations;
