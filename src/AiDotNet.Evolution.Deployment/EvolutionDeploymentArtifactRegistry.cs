@@ -135,7 +135,7 @@ public sealed class EvolutionDeploymentArtifactRegistry
             { /* An invalid prior never prevents quarantine of a measured regression. */ }
         }
         // Failure here leaves the tombstone visible, so a reader cannot reload the regressing active pointer.
-        WriteSlot(rollback?.Id, null, envelope.Key, evidenceId, current.ValidationEvidenceId!, false);
+        WriteSlot(rollback?.Id, null, envelope.Key, evidenceId, current.ValidationEvidenceId ?? throw new InvalidDataException("The active slot has no validation evidence to carry into the quarantine record."), false);
         return true;
     }
 
