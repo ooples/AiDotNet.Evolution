@@ -90,13 +90,20 @@ async def main(upstream, iterations, workers, islands):
     config.evaluator.timeout = 60
     config.llm = LLMConfig(models=[LLMModelConfig(name="null", init_client=init_null_llm)], retries=0, timeout=60,
                            api_base="http://127.0.0.1:9/unused", api_key="unused")
+    # Counting relies on every program staying in the database, so the run must fit its population.
+    if iterations >= config.database.population_size:
+        raise SystemExit(f"iterations must be below population_size ({config.database.population_size})")
     engine = OpenEvolve(str(work / "initial.py"), str(work / "evaluator.py"), config, str(work / "out"))
     with TreeMemory() as memory:
         started = time.perf_counter()
         await engine.run(iterations=iterations)
         seconds = time.perf_counter() - started
-    print(json.dumps(dict(System="openevolve", Evaluations=iterations, Workers=workers, Islands=islands, Seconds=seconds,
-                          PeakWorkingSetBytes=memory.peak)))
+    # Measured, not requested: an iteration that failed or was dropped must not count as orchestrated work.
+    added = sum(1 for program in engine.database.programs.values() if program.iteration_found > 0)
+    print(json.dumps(dict(System="openevolve", Requested=iterations, Evaluations=added, Workers=workers, Islands=islands,
+                          Seconds=seconds, PeakWorkingSetBytes=memory.peak)))
+    if added < iterations:
+        raise SystemExit(f"only {added} of {iterations} iterations produced a program")
 
 
 if __name__ == "__main__":

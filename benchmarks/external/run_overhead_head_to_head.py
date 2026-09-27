@@ -41,6 +41,8 @@ def main():
         for repeat in range(args.repeats):
             for system, n in sizes.items():  # alternate systems within a repeat, fresh processes each time
                 small, large = once(system, n, workers, args.upstream), once(system, 2 * n, workers, args.upstream)
+                if small["Evaluations"] < n or large["Evaluations"] < 2 * n:
+                    raise RuntimeError(f"{system} w={workers} completed fewer evaluations than requested")
                 per_eval = (large["Seconds"] - small["Seconds"]) / n
                 rows.append(dict(system=system, workers=workers, repeat=repeat, n=n, small=small, large=large,
                                  per_eval_seconds=per_eval))
@@ -62,7 +64,6 @@ def main():
                             ratio_ci95=[ratios[int(0.025 * len(ratios))], ratios[int(0.975 * len(ratios)) - 1]],
                             aidotnet_peak_mb=statistics.median(c["memory"] for c in cells[("aidotnet", workers)]) / 2**20,
                             openevolve_peak_mb=statistics.median(c["memory"] for c in cells[("openevolve", workers)]) / 2**20))
-    base = {s: next(x for x in summary if x["workers"] == min(c["workers"] for c in summary)) for s in ("aidotnet",)}
     result = dict(story="V1-30 #120", repeats=args.repeats, sizes=sizes, method="(T(2N)-T(N))/N, fresh processes, null LLM and evaluator",
                   headline=False, note="A C# controller vs a Python one is expected to favour us (R12); not a headline claim.",
                   summary=summary, rows=rows)

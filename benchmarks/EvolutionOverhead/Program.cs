@@ -53,8 +53,9 @@ internal sealed class AllocationListener : System.Diagnostics.Tracing.EventListe
 
     protected override void OnEventWritten(System.Diagnostics.Tracing.EventWrittenEventArgs data)
     {
-        if (data.EventName is null || !data.EventName.StartsWith("GCAllocationTick", StringComparison.Ordinal) || data.Payload is null) return;
-        int type = data.PayloadNames!.IndexOf("TypeName"), amount = data.PayloadNames.IndexOf("AllocationAmount64");
+        if (data.EventName is null || !data.EventName.StartsWith("GCAllocationTick", StringComparison.Ordinal) ||
+            data.Payload is null || data.PayloadNames is not { } names) return;
+        int type = names.IndexOf("TypeName"), amount = names.IndexOf("AllocationAmount64");
         if (type < 0 || amount < 0) return;
         lock (_bytes) _bytes[data.Payload[type] as string ?? "?"] = _bytes.GetValueOrDefault(data.Payload[type] as string ?? "?") +
             Convert.ToInt64(data.Payload[amount], System.Globalization.CultureInfo.InvariantCulture);
