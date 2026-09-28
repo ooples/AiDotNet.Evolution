@@ -402,7 +402,7 @@ public sealed class ProgramPromptBuilder
             {
                 ["attempt_number"] = attempt.AttemptNumber.ToString(CultureInfo.InvariantCulture),
                 ["changes"] = attempt.ChangesDescription is { } changes && changes.Trim().Length > 0
-                    ? PromptTextRedactor.Redact(changes.Trim())
+                    ? BoundChanges(PromptTextRedactor.Redact(changes.Trim()))
                     : _templates.RenderFragment(ProgramPromptFragmentKey.AttemptUnknownChanges),
                 ["performance"] = DescribeMetricsInline(attempt.Metrics),
                 ["outcome"] = DescribeOutcome(context.Direction, attempt)
@@ -414,6 +414,25 @@ public sealed class ProgramPromptBuilder
         }
 
         return builder.ToString();
+    }
+
+    // OpenEvolve's diff-summary bounds: long lines are cut and only the first lines are kept, with a note of what was left out.
+    private string BoundChanges(string changes)
+    {
+        if (_promptOptions.DiffSummaryMaxLines is null && _promptOptions.DiffSummaryMaxLineLength is null) return changes;
+        string[] lines = changes.Replace("\r\n", "\n").Split('\n');
+        int keep = Math.Min(lines.Length, _promptOptions.DiffSummaryMaxLines ?? lines.Length);
+        var bounded = new StringBuilder();
+        for (int i = 0; i < keep; i++)
+        {
+            string line = lines[i];
+            if (_promptOptions.DiffSummaryMaxLineLength is { } length && line.Length > length) line = line.Substring(0, length - 3) + "...";
+            if (i > 0) bounded.Append('\n');
+            bounded.Append(line);
+        }
+        if (keep < lines.Length)
+            bounded.Append('\n').Append("... (").Append((lines.Length - keep).ToString(CultureInfo.InvariantCulture)).Append(" more lines)");
+        return bounded.ToString();
     }
 
     private string DescribeOutcome(EvolutionOptimizationDirection direction, ProgramPromptAttempt attempt)
@@ -1043,6 +1062,13 @@ public sealed class ProgramPromptBuilder
         yield return _promptOptions.NumTopPrograms.ToString(CultureInfo.InvariantCulture);
         yield return _promptOptions.NumDiversePrograms.ToString(CultureInfo.InvariantCulture);
         yield return _promptOptions.NumPreviousAttempts.ToString(CultureInfo.InvariantCulture);
+        // Only when set, so existing prompt identities are unchanged.
+        if (_promptOptions.DiffSummaryMaxLines is not null || _promptOptions.DiffSummaryMaxLineLength is not null)
+        {
+            yield return "diff-summary-v1";
+            yield return _promptOptions.DiffSummaryMaxLines?.ToString(CultureInfo.InvariantCulture) ?? "all-lines";
+            yield return _promptOptions.DiffSummaryMaxLineLength?.ToString(CultureInfo.InvariantCulture) ?? "full-lines";
+        }
         yield return _promptOptions.MaxArtifactBytes.ToString(CultureInfo.InvariantCulture);
         yield return _promptOptions.MaxPromptChars.ToString(CultureInfo.InvariantCulture);
         yield return _promptOptions.MaxProgramSnippetChars.ToString(CultureInfo.InvariantCulture);
