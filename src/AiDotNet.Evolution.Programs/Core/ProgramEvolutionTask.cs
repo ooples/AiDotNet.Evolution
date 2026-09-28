@@ -153,10 +153,19 @@ public sealed class ProgramEvolutionTask : IEvolutionTask<ProgramGenome>, IEvolu
             throw new InvalidOperationException("The fitness evaluator returned no result or resource receipt.");
         }
 
-        if (_descriptors.Count == 0 || result.Status != EvolutionEvaluationStatus.Completed) return result;
+        bool promotes = _options.MetricDescriptors.Count > 0 || _options.QualityDescriptorName is not null;
+        if ((_descriptors.Count == 0 && !promotes) || result.Status != EvolutionEvaluationStatus.Completed) return result;
 
         var merged = new Dictionary<string, double>(StringComparer.Ordinal);
         foreach (KeyValuePair<string, double> pair in _descriptors.Compute(genome)) merged[pair.Key] = pair.Value;
+        foreach (string name in _options.MetricDescriptors)
+        {
+            // Refused rather than defaulted: a missing coordinate would silently file the program in cell zero.
+            if (!result.Metrics.TryGetValue(name, out double value) || !double.IsFinite(value))
+                throw new InvalidDataException("Descriptor metric '" + name + "' is missing or not finite; the evaluator must report it for every completed evaluation.");
+            merged[name] = value;
+        }
+        if (_options.QualityDescriptorName is { } qualityName && result.Quality is { } quality) merged[qualityName] = quality;
         foreach (KeyValuePair<string, double> pair in result.Descriptors) merged[pair.Key] = pair.Value;
 
         var mergedResult = new EvolutionTaskResult(
@@ -194,6 +203,14 @@ public sealed class ProgramEvolutionTask : IEvolutionTask<ProgramGenome>, IEvolu
             // checkpoint-compatibility check.
             evaluator.Id
         };
+
+        // Only when used, so existing task identities (and checkpoints) are unchanged.
+        if (options.MetricDescriptors.Count > 0 || options.QualityDescriptorName is not null)
+        {
+            components.Add("program-descriptor-promotion-v1");
+            components.Add(options.QualityDescriptorName ?? string.Empty);
+            components.AddRange(options.MetricDescriptors);
+        }
 
         if (options.ResourceAccounting is { } resources)
         {
