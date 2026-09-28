@@ -689,7 +689,7 @@ public sealed partial class EvolutionEngine<TGenome>
     private void RestoreBatchTransaction(BatchTransaction transaction, IEnumerable<WorkItem> batch)
     {
         foreach (WorkItem item in batch)
-            if (item.AddedToSeen && item.Candidate is not null) _seen.Remove(item.Candidate.CanonicalGenome.Id);
+            if (item.AddedToSeen && item.Candidate is not null) RemoveSeen(item.Candidate.CanonicalGenome.Id);
         _nextEvaluationId = transaction.NextEvaluationId;
         _proposals = transaction.Proposals;
         _evaluationAttempts = transaction.EvaluationAttempts;

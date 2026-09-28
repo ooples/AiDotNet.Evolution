@@ -15,6 +15,11 @@ public sealed partial class EvolutionEngine<TGenome>
     private const int EngineParetoConstraintSchemaVersion = 9;
     private string? _safePayload;
     private long _safeSequence;
+    // The last safe boundary's document, minus the seen set and the cache. Those two grow with every evaluation, so
+    // serialising them at each boundary made a checkpointed run quadratic: 84 s for 20,000 evaluations, almost all of it
+    // here (V1-73). They are recovered when a save needs them, by undoing the changes logged since the boundary.
+    private EngineStateDocument? _safeDocument;
+    private readonly List<SafeChange> _safeChanges = new();
 
     private void CaptureSafeState(TGenome[] seeds, int seedIndex)
     {
@@ -51,12 +56,7 @@ public sealed partial class EvolutionEngine<TGenome>
                 Status = pair.Key,
                 Count = pair.Value
             }).ToList(),
-            SeenGenomeIds = _seen.OrderBy(value => value, StringComparer.Ordinal).ToList(),
-            Cache = _cache.OrderBy(pair => pair.Key, StringComparer.Ordinal).Select(pair => new CacheDocument
-            {
-                GenomeId = pair.Key,
-                Result = TaskResultDocument.From(pair.Value)
-            }).ToList(),
+
             Failures = _failures.Select(DiagnosticDocument.From).ToList(),
             EarlyStoppingBest = _earlyStoppingBest,
             EarlyStoppingArchiveMetric = UsesIncrementalEarlyStoppingArchiveMetric() &&
@@ -75,9 +75,67 @@ public sealed partial class EvolutionEngine<TGenome>
                 }).ToList(),
             Islands = _islands.Select(archive => ArchiveDocument.From(archive, SerializeGenome)).ToList()
         };
+        _safeDocument = document;
+        _safePayload = null;
+        _safeChanges.Clear();
+        _safeSequence++;
+    }
+
+    // Every change to the seen set or the cache goes through these, so a deferred safe state can be recovered.
+    private bool AddSeen(string id)
+    {
+        if (!_seen.Add(id)) return false;
+        RecordSafeChange(SafeChangeKind.SeenAdded, id);
+        return true;
+    }
+
+    private void RemoveSeen(string id)
+    {
+        if (_seen.Remove(id)) RecordSafeChange(SafeChangeKind.SeenRemoved, id);
+    }
+
+    private void SetCached(string id, EvolutionTaskResult result)
+    {
+        RecordSafeChange(SafeChangeKind.CacheSet, id, _cache.TryGetValue(id, out EvolutionTaskResult? previous) ? previous : null);
+        _cache[id] = result;
+    }
+
+    /// <summary>Records a change to the seen set or the cache so the last safe boundary can be recovered.</summary>
+    private void RecordSafeChange(SafeChangeKind kind, string key, EvolutionTaskResult? previous = null)
+    {
+        if (_safeDocument is not null) _safeChanges.Add(new SafeChange(kind, key, previous));
+    }
+
+    /// <summary>Returns the last safe boundary's payload, serialising it on first use.</summary>
+    private string? SafePayload()
+    {
+        if (_safePayload is not null || _safeDocument is not { } document) return _safePayload;
+        var seen = new HashSet<string>(_seen, StringComparer.Ordinal);
+        var cache = new Dictionary<string, EvolutionTaskResult>(_cache, StringComparer.Ordinal);
+        for (int i = _safeChanges.Count - 1; i >= 0; i--)
+        {
+            SafeChange change = _safeChanges[i];
+            switch (change.Kind)
+            {
+                case SafeChangeKind.SeenAdded: seen.Remove(change.Key); break;
+                case SafeChangeKind.SeenRemoved: seen.Add(change.Key); break;
+                case SafeChangeKind.CacheSet:
+                    if (change.Previous is null) cache.Remove(change.Key);
+                    else cache[change.Key] = change.Previous;
+                    break;
+                default: throw new InvalidOperationException("Unknown safe-state change.");
+            }
+        }
+        document.SeenGenomeIds = seen.OrderBy(value => value, StringComparer.Ordinal).ToList();
+        document.Cache = cache.OrderBy(pair => pair.Key, StringComparer.Ordinal).Select(pair => new CacheDocument
+        {
+            GenomeId = pair.Key,
+            Result = TaskResultDocument.From(pair.Value)
+        }).ToList();
         if (HasMeasurementOrigins(document)) document.SchemaVersion = EngineMeasurementOriginSchemaVersion;
-        if (document.Islands.Any(island => island.Pareto is not null)) document.SchemaVersion = EngineParetoSchemaVersion;
-        if (document.Islands.Any(island => island.Pareto?.ConstraintCount is not null)) document.SchemaVersion = EngineParetoConstraintSchemaVersion;
+        IReadOnlyList<ArchiveDocument> islands = document.Islands ?? new List<ArchiveDocument>();
+        if (islands.Any(island => island.Pareto is not null)) document.SchemaVersion = EngineParetoSchemaVersion;
+        if (islands.Any(island => island.Pareto?.ConstraintCount is not null)) document.SchemaVersion = EngineParetoConstraintSchemaVersion;
         string payload = JsonSerializer.Serialize(document, EvolutionStateJsonContext.Default.EngineStateDocument);
         if (payload.Length > EvolutionCollectionLimits.MaximumCheckpointBytes ||
             Encoding.UTF8.GetByteCount(payload) > EvolutionCollectionLimits.MaximumCheckpointBytes)
@@ -87,14 +145,26 @@ public sealed partial class EvolutionEngine<TGenome>
                 $"{EvolutionCollectionLimits.MaximumCheckpointBytes}-byte package limit.");
         }
         _safePayload = payload;
-        _safeSequence++;
+        _safeDocument = null;
+        _safeChanges.Clear();
+        return payload;
     }
+
+    private enum SafeChangeKind
+    {
+        SeenAdded,
+        SeenRemoved,
+        CacheSet
+    }
+
+    private readonly record struct SafeChange(SafeChangeKind Kind, string Key, EvolutionTaskResult? Previous);
 
     private async Task SaveCheckpointAsync(bool force, CancellationToken cancellationToken)
     {
-        if (_checkpointStore is null || _safePayload is null) return;
+        if (_checkpointStore is null) return;
         if (!force && (_options.CheckpointInterval == 0 || _commitsSinceCheckpoint < _options.CheckpointInterval)) return;
-        var checkpoint = new EvolutionCheckpoint(_options.RunId, _safeSequence, _compatibilityHash, _safePayload,
+        if (SafePayload() is not { } payload) return;
+        var checkpoint = new EvolutionCheckpoint(_options.RunId, _safeSequence, _compatibilityHash, payload,
             EvolutionCheckpoint.CurrentSchemaVersion, BestQualityAcrossIslands(), _islands[0].Direction);
         await _checkpointStore.SaveAsync(checkpoint, cancellationToken).ConfigureAwait(false);
         _commitsSinceCheckpoint = 0;
@@ -266,6 +336,8 @@ public sealed partial class EvolutionEngine<TGenome>
         RestoreIslandHistories(state);
         _safeSequence = checkpoint.Sequence;
         _safePayload = checkpoint.Payload;
+        _safeDocument = null;
+        _safeChanges.Clear();
         return new RestoredSeeds(seeds, state.SeedIndex);
     }
 
