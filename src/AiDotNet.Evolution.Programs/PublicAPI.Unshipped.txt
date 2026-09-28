@@ -1764,3 +1764,8 @@ override AiDotNet.Evolution.Programs.WeightedChatModel.ToString() -> string!
 static AiDotNet.Evolution.Programs.WeightedChatModel.operator !=(AiDotNet.Evolution.Programs.WeightedChatModel? left, AiDotNet.Evolution.Programs.WeightedChatModel? right) -> bool
 static AiDotNet.Evolution.Programs.WeightedChatModel.operator ==(AiDotNet.Evolution.Programs.WeightedChatModel? left, AiDotNet.Evolution.Programs.WeightedChatModel? right) -> bool
 const AiDotNet.Evolution.Programs.WeightedEnsembleChatClient.MaximumMembers = 256 -> int
+AiDotNet.Evolution.Programs.ProgramExecuteErrorCode.CpuTimeLimitExceeded = 11 -> AiDotNet.Evolution.Programs.ProgramExecuteErrorCode
+AiDotNet.Evolution.Programs.ProgramExecuteErrorCode.MemoryLimitExceeded = 10 -> AiDotNet.Evolution.Programs.ProgramExecuteErrorCode
+AiDotNet.Evolution.Programs.ProgramSandboxLimitOptions.CpuTimeLimitSeconds.get -> int?
+AiDotNet.Evolution.Programs.ProgramSandboxLimitOptions.CpuTimeLimitSeconds.set -> void
+AiDotNet.Evolution.Programs.ProgramSandboxLimitOptions.GetCpuTimeLimit() -> System.TimeSpan

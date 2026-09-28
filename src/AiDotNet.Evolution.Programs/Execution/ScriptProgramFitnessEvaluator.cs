@@ -167,9 +167,13 @@ public sealed class ScriptProgramFitnessEvaluator : IProgramFitnessEvaluator, IE
 
         if (!response.Success)
         {
-            string code = response.ErrorCode == ProgramExecuteErrorCode.TimeoutOrCanceled
-                ? "timeout"
-                : "script_failed";
+            string code = response.ErrorCode switch
+            {
+                ProgramExecuteErrorCode.TimeoutOrCanceled => "timeout",
+                ProgramExecuteErrorCode.MemoryLimitExceeded => "memory_limit_exceeded",
+                ProgramExecuteErrorCode.CpuTimeLimitExceeded => "cpu_time_limit_exceeded",
+                _ => "script_failed"
+            };
             if (!_options.RetainArtifactText)
                 return Failed(code, "The evaluator script did not complete; untrusted failure text was withheld.");
             // Opted in: keep what the script printed before it failed or timed out (OpenEvolve's timeout artifacts), bounded
