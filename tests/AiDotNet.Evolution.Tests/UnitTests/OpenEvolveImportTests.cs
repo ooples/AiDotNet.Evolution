@@ -150,6 +150,10 @@ public sealed class OpenEvolveImportTests
         File.WriteAllText(Path.Combine(directory.Path, "initial_program.py"), "X = 0\n");
         // Stage 1 scores X / 10; a candidate reaching 0.25 (X >= 3) goes on to stage 2, which scores X / 5 and leaves a
         // marker. OpenEvolve merges stage metrics, the later stage winning, and takes combined_score as the fitness.
+        // Real evaluators print progress, directly and from processes they start, and it often contains braces (a
+        // dict, a format string); stage 1 below does both. None of it may reach the result the shim prints. (No line
+        // of this raw string may start with '#': on net471 the file is compiled out, and such a line then reads as a
+        // preprocessor directive.)
         File.WriteAllText(Path.Combine(directory.Path, "evaluator.py"), """
             import os, re, subprocess, sys
 
@@ -158,8 +162,6 @@ public sealed class OpenEvolveImportTests
                     return int(re.search(r"X = (\d+)", f.read()).group(1))
 
             def evaluate_stage1(path):
-                # Real evaluators print progress, directly and from processes they start, and it often contains
-                # braces (a dict, a format string). None of it may reach the result the shim prints.
                 print({"scoring": path})
                 subprocess.run([sys.executable, "-c", "print('{child output}')"], check=True)
                 return {"combined_score": _x(path) / 10.0}
