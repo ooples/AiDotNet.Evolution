@@ -3,7 +3,7 @@
 `aidotnet-evolve` is a `dotnet tool` for AiDotNet.Evolution runs.
 
 ```text
-dotnet tool install --global AiDotNet.Evolution.Cli --prerelease
+dotnet tool install --global AiDotNet.Evolution.Cli
 
 aidotnet-evolve run     <run.json>
 aidotnet-evolve resume  <run.json>
