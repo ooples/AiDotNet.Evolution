@@ -333,8 +333,12 @@ public sealed partial class EvolutionEngine<TGenome>
         CaptureSafeState(seeds, seedIndex);
 
         var runTimer = Stopwatch.StartNew();
-        using var runCancellation = CancellationTokenSource.CreateLinkedTokenSource(cancellationToken);
-        if (_options.TimeLimit.HasValue) runCancellation.CancelAfter(_options.TimeLimit.Value);
+        _runStartedTimestamp = _options.TimeProvider.GetTimestamp();
+        using CancellationTokenSource? timeLimit = _options.TimeLimit is { } limit
+            ? EvolutionClock.CreateCancellationTokenSource(_options.TimeProvider, limit) : null;
+        using var runCancellation = timeLimit is null
+            ? CancellationTokenSource.CreateLinkedTokenSource(cancellationToken)
+            : CancellationTokenSource.CreateLinkedTokenSource(cancellationToken, timeLimit.Token);
         CancellationToken runToken = runCancellation.Token;
         EvolutionStopReason stopReason;
         try
@@ -485,11 +489,15 @@ public sealed partial class EvolutionEngine<TGenome>
         }
     }
 
+    private long _runStartedTimestamp;
+
     private EvolutionStopReason? GetLimitStopReason(Stopwatch timer)
     {
         if (_evaluationAttempts >= _options.MaxEvaluationAttempts) return EvolutionStopReason.EvaluationBudgetReached;
         if (_proposals >= _options.MaxProposals) return EvolutionStopReason.ProposalBudgetReached;
-        if (_options.TimeLimit.HasValue && timer.Elapsed >= _options.TimeLimit.Value) return EvolutionStopReason.TimeLimitReached;
+        // Measured with the configured clock, the same one that cancels the run at the limit.
+        if (_options.TimeLimit.HasValue && _options.TimeProvider.GetElapsedTime(_runStartedTimestamp) >= _options.TimeLimit.Value)
+            return EvolutionStopReason.TimeLimitReached;
         return null;
     }
 

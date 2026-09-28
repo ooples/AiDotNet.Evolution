@@ -497,6 +497,14 @@ public sealed class EvolutionEngineOptions
         Artifacts = new EvolutionArtifactOptions { Enabled = true }
     };
 
+    /// <summary>Gets or sets the clock the engine measures deadlines, delays and the run time limit with.</summary>
+    /// <remarks>
+    /// <see cref="TimeProvider.System"/> by default. A test can pass a fake provider to fire evaluation timeouts, retry
+    /// delays and the run time limit deterministically. It is not part of the run's identity: it changes when time is
+    /// read, never what a run means, so it is excluded from compatibility hashes.
+    /// </remarks>
+    public TimeProvider TimeProvider { get; set; } = TimeProvider.System;
+
     /// <summary>Validates every option and returns an independent, normalized copy.</summary>
     /// <returns>
     /// A defensive snapshot whose nested option objects are also copied, so later mutation of this instance cannot
@@ -582,6 +590,7 @@ public sealed class EvolutionEngineOptions
         Guard.NotNull(Artifacts);
         Guard.NotNull(EarlyStopping);
         Guard.NotNull(Pipeline);
+        Guard.NotNull(TimeProvider);
         EvolutionPipelineOptions pipeline = Pipeline.SnapshotAndValidate();
         if (Dispatch == EvolutionDispatchMode.Pipeline && (MaxInFlight != 0 || MaxInFlightPerIsland != 0))
             throw new ArgumentException("Pipeline uses its own WaveSize and bounded queues; continuous-window/island quotas are not supported.", nameof(Pipeline));
@@ -650,6 +659,7 @@ public sealed class EvolutionEngineOptions
             QualityDescriptorName = QualityDescriptorName,
             OutputDirectory = OutputDirectory,
             RunId = RunId,
+            TimeProvider = TimeProvider,
             EvaluationGracePeriod = EvaluationGracePeriod,
             RetryOn = RetryOn,
             RetryBaseDelay = RetryBaseDelay,
@@ -770,7 +780,11 @@ public sealed class EvolutionEngineOptions
         Field("output-directory", OutputDirectory ?? "none")
     }.Concat(Dispatch == EvolutionDispatchMode.Pipeline
         ? new[] { Field("pipeline-schedule-records", Pipeline.MaximumScheduleRecords.ToString(CultureInfo.InvariantCulture)) }
-        : Array.Empty<KeyValuePair<string, string>>()).ToArray();
+        : Array.Empty<KeyValuePair<string, string>>())
+        // A substituted clock is provenance, like the worker count; the system clock adds nothing, so existing strings are unchanged.
+        .Concat(ReferenceEquals(TimeProvider, TimeProvider.System)
+            ? Array.Empty<KeyValuePair<string, string>>()
+            : new[] { Field("clock", TimeProvider.GetType().FullName ?? "custom") }).ToArray();
 
     /// <summary>Encodes the semantic options into the string the configuration hash is computed from.</summary>
     internal string ToSemanticCanonicalString() => Encode(SemanticFields());
