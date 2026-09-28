@@ -19,4 +19,7 @@ internal interface IEvolutionIndexedArchive<TGenome>
 
     /// <summary>Returns the position of this exact entry, or -1 when it is not currently in the archive.</summary>
     int IndexOf(EvolutionArchiveEntry<TGenome> entry);
+
+    /// <summary>Returns whether exactly one entry holds this genome; selection excludes all of a parent's copies.</summary>
+    bool HoldsGenomeOnce(string genomeId);
 }

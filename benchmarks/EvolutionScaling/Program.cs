@@ -13,7 +13,13 @@ if (args.Length is < 2 or > 3 || !int.TryParse(args[0], out int elites) || !int.
     Console.Error.WriteLine("Usage: EvolutionScaling <elites 16..1000000> <measured evaluations 64..1000000> [workers 1..64]");
     return 2;
 }
-int workers = args.Length == 3 && int.TryParse(args[2], out int parsed) && parsed is >= 1 and <= 64 ? parsed : 1;
+int workers = 1;
+if (args.Length == 3 && (!int.TryParse(args[2], out workers) || workers is < 1 or > 64))
+{
+    // An invalid worker count must not quietly produce one-worker results that look valid.
+    Console.Error.WriteLine("Usage: EvolutionScaling <elites 16..1000000> <measured evaluations 64..1000000> [workers 1..64]");
+    return 2;
+}
 var builder = new EvolutionSearchSpaceBuilder();
 builder.Add(EvolutionParameter.Real("x", 0, 1));
 builder.Add(EvolutionParameter.Real("y", 0, 1));

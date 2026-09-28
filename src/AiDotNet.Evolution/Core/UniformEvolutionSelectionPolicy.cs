@@ -76,12 +76,13 @@ public sealed class UniformEvolutionSelectionPolicy<TGenome> : ISelectionPolicy<
     }
     // The same draws as the materialised path, in O(k): candidates are the entries without the parent, in entry order,
     // and a partial Fisher-Yates over that virtual list records only the slots it has swapped. Returns null to fall back
-    // when the parent is not the only entry with its genome, which the virtual list could not express.
+    // when the parent is not the only entry with its genome, which the virtual list cannot express.
     private static List<EvolutionArchiveEntry<TGenome>>? SelectIndexed(IEvolutionIndexedArchive<TGenome> archive,
         EvolutionArchiveEntry<TGenome> parent, StableRandom random, int inspirationCount)
     {
         int parentIndex = archive.IndexOf(parent);
-        if (parentIndex < 0) return null;
+        // The virtual list skips one slot, so it matches the filtered list only when no other entry shares the genome.
+        if (parentIndex < 0 || !archive.HoldsGenomeOnce(parent.Evaluation.GenomeId)) return null;
         int length = archive.Count - 1;
         int take = Math.Min(inspirationCount, length);
         var swapped = new Dictionary<int, int>(take * 2);
@@ -93,10 +94,7 @@ public sealed class UniformEvolutionSelectionPolicy<TGenome> : ISelectionPolicy<
             int atI = swapped.TryGetValue(i, out int v) ? v : i;
             swapped[selected] = atI;
             swapped[i] = atSelected;
-            EvolutionArchiveEntry<TGenome> entry = archive.EntryAt(atSelected < parentIndex ? atSelected : atSelected + 1);
-            // A second entry carrying the parent's genome would have been filtered out of the materialised list.
-            if (entry.Evaluation.GenomeId == parent.Evaluation.GenomeId) return null;
-            chosen.Add(entry);
+            chosen.Add(archive.EntryAt(atSelected < parentIndex ? atSelected : atSelected + 1));
         }
         return chosen;
     }

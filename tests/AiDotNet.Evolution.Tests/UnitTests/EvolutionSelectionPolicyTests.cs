@@ -58,9 +58,11 @@ public sealed class EvolutionSelectionPolicyTests
         Assert.Equal(state, restored.CaptureState());
     }
     [Theory]
-    [InlineData(0)]
-    [InlineData(120)]
-    public void UniformSelectionOnTheIndexedArchiveMatchesTheMaterialisedAlgorithmExactly(int capacity)
+    [InlineData(0, false)]
+    [InlineData(120, false)]
+    [InlineData(0, true)]
+    [InlineData(120, true)]
+    public void UniformSelectionOnTheIndexedArchiveMatchesTheMaterialisedAlgorithmExactly(int capacity, bool sharedGenomes)
     {
         // The archive keeps an ordered view in step with inserts, replacements and evictions, and uniform selection draws
         // from it in O(k). Both must reproduce the original algorithm draw for draw, so every run's state is unchanged.
@@ -71,12 +73,17 @@ public sealed class EvolutionSelectionPolicyTests
         var added = new List<EvolutionArchiveEntry<TestGenome>>();
         for (int i = 0; i < 3000; i++)
         {
-            MapElitesArchiveTests.Add(archive, i, "g" + i, feed.NextDouble(), feed.NextDouble() * 200);
+            // With shared genomes, some genome ids land in several cells, which selection must exclude together with
+            // the parent; the indexed path has to fall back to the materialised one for those parents.
+            string genome = sharedGenomes && i % 3 != 0 ? "shared" + (i % 5) : "g" + i;
+            MapElitesArchiveTests.Add(archive, i, genome, feed.NextDouble(), feed.NextDouble() * 200);
             added.AddRange(archive.Entries.Where(entry => entry.Evaluation.EvaluationId == i));
             if (i % 7 != 0) continue;
             // Independent of the archive's ordered view: every entry it still holds, found through Get, in key order.
             EvolutionArchiveEntry<TestGenome>[] expectedEntries = added.Where(entry => ReferenceEquals(archive.Get(entry.Cell), entry))
                 .OrderBy(entry => entry.Cell.StableKey, StringComparer.Ordinal).ToArray();
+            // The count comes from the archive's cell dictionary, not the view, so a cell the view dropped is caught.
+            Assert.Equal(archive.Count, expectedEntries.Length);
             Assert.Equal(expectedEntries, archive.Entries);
             foreach (int k in new[] { 0, 1, 3, 12 })
             {

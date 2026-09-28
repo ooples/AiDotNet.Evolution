@@ -2,9 +2,10 @@
 
 Ours: one process per (size, repeat). The benchmark fills an archive of exactly `size` elites and times the
 evaluations after the fill from inside the run, so no startup cost is included.
-OpenEvolve: its population cannot be pre-filled, so each (size, repeat) runs twice in fresh processes, for `size`
-and `size + M` iterations with population_size = size, and reports (T(size + M) - T(size)) / M. Every program the
-second run adds past `size` meets a full population, which is the steady state being measured.
+OpenEvolve: its population cannot be pre-filled, so each (size, repeat) runs twice in fresh processes, for a baseline
+that fills the population (at least `size` iterations, extended until it reports `size` programs) and for the baseline
+plus M, with population_size = size, and reports (T(baseline + M) - T(baseline)) / (evaluations added). Every program the
+second run adds past the baseline meets a full population, which is the steady state being measured.
 Usage: python run_scaling.py --upstream <openevolve checkout> --output <json>
 """
 import argparse
@@ -70,6 +71,21 @@ def theirs(upstream, size, iterations):
     return run([sys.executable, str(HERE / "openevolve_scaling_run.py"), str(upstream), str(iterations), str(size)])
 
 
+def full_population(upstream, size):
+    """Runs just enough iterations to fill the population, so the measured iterations meet a full one.
+
+    `size` iterations are not enough: some proposals are rejected, leaving e.g. 98 of 100 programs. The baseline is
+    extended by the shortfall (with headroom) until the run reports a full population.
+    """
+    iterations = size
+    for _ in range(6):
+        result = theirs(upstream, size, iterations)
+        if result["Programs"] >= size:
+            return result, iterations
+        iterations += max(10, 2 * (size - result["Programs"]))
+    raise RuntimeError(f"openevolve size={size} never filled its population (last: {result['Programs']} programs)")
+
+
 def main():
     parser = argparse.ArgumentParser()
     parser.add_argument("--upstream", required=True)
@@ -88,8 +104,8 @@ def main():
         for size in [int(s) for s in args.openevolve_sizes.split(",")]:
             for attempt in range(3):
                 try:
-                    small = theirs(args.upstream, size, size)
-                    large = theirs(args.upstream, size, size + args.openevolve_measured)
+                    small, baseline = full_population(args.upstream, size)
+                    large = theirs(args.upstream, size, baseline + args.openevolve_measured)
                 except Hung as hung:
                     hangs.append(dict(size=size, repeat=repeat, detail=str(hung)))
                     continue
