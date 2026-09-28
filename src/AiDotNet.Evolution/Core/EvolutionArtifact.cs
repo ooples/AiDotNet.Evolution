@@ -10,8 +10,8 @@ namespace AiDotNet.Evolution;
 /// failing assertion trace. Artifacts ride inline on <see cref="EvolutionTaskResult"/> and
 /// <see cref="EvolutionEvaluation"/>, are bounded by
 /// <see cref="EvolutionArtifactOptions"/> before the engine stores them, are written into
-/// checkpoints, and are folded into the run's deterministic state hash. Only text is supported: binary payloads have no
-/// stable textual form, so they cannot participate in a reproducible hash.
+/// checkpoints, and are folded into the run's deterministic state hash. Only text is retained inline: binary payloads have
+/// no stable textual form, so <see cref="FromBytes"/> content goes to an <see cref="IEvolutionArtifactStore"/> instead.
 /// </para>
 /// <para>
 /// <b>Artifact text is untrusted content.</b> It originates from an evaluated candidate, which in a program-synthesis
@@ -74,4 +74,44 @@ public sealed class EvolutionArtifact
 
     /// <summary>Gets whether credential-shaped content was removed from the body.</summary>
     public bool IsRedacted { get; }
+
+    /// <summary>The largest binary payload one artifact may carry.</summary>
+    public const int MaximumContentBytes = 64 * 1024 * 1024;
+
+    private readonly byte[]? _content;
+
+    private EvolutionArtifact(string key, byte[] content, string mediaType) : this(key, string.Empty)
+    {
+        _content = content;
+        MediaType = mediaType;
+    }
+
+    /// <summary>Creates a binary artifact, such as an image or a profile, from an evaluator.</summary>
+    /// <remarks>
+    /// Binary content never enters an evaluation, a checkpoint or the state hash. The engine writes it to
+    /// <see cref="EvolutionArtifactOptions.Store"/> and keeps a text artifact naming its content address, size and
+    /// media type; with no store configured it keeps only a note that the content was not retained.
+    /// </remarks>
+    /// <param name="key">A stable, non-empty name of at most <see cref="MaximumKeyLength"/> characters.</param>
+    /// <param name="content">The bytes, at most <see cref="MaximumContentBytes"/>; copied.</param>
+    /// <param name="mediaType">A media type such as <c>image/png</c>.</param>
+    public static EvolutionArtifact FromBytes(string key, byte[] content, string mediaType)
+    {
+        Guard.NotNull(content);
+        Guard.NotNullOrWhiteSpace(mediaType);
+        if (content.Length > MaximumContentBytes)
+            throw new ArgumentException($"Binary artifacts cannot exceed {MaximumContentBytes} bytes.", nameof(content));
+        if (mediaType.Length > 128 || mediaType.Any(char.IsControl))
+            throw new ArgumentException("The media type must be printable and at most 128 characters.", nameof(mediaType));
+        return new EvolutionArtifact(key, (byte[])content.Clone(), mediaType.Trim());
+    }
+
+    /// <summary>Gets whether this artifact carries binary content rather than text.</summary>
+    public bool IsBinary => _content is not null;
+
+    /// <summary>Gets the media type of a binary artifact, or <c>null</c> for text.</summary>
+    public string? MediaType { get; }
+
+    /// <summary>Returns a copy of the binary content, or an empty array for a text artifact.</summary>
+    public byte[] GetContent() => _content is null ? Array.Empty<byte>() : (byte[])_content.Clone();
 }

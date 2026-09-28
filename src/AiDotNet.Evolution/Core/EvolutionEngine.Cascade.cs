@@ -1,3 +1,4 @@
+using System.Text;
 using System.Globalization;
 
 namespace AiDotNet.Evolution;
@@ -160,24 +161,64 @@ public sealed partial class EvolutionEngine<TGenome>
         if (!_options.Artifacts.Enabled || artifacts.Count == 0) return Array.Empty<EvolutionArtifact>();
         var retained = new List<EvolutionArtifact>(Math.Min(artifacts.Count, _options.Artifacts.MaxArtifactsPerEvaluation));
         long totalBytes = 0;
+        long storedBytes = 0;
+        IEvolutionArtifactStore? store = _options.Artifacts.Store;
         foreach (EvolutionArtifact artifact in artifacts)
         {
             if (retained.Count >= _options.Artifacts.MaxArtifactsPerEvaluation) break;
             string text = artifact.Text;
             bool redacted = artifact.IsRedacted;
-            if (_options.Artifacts.SanitizeSecrets)
+            bool truncated;
+            if (artifact.IsBinary)
             {
-                string sanitized = EvolutionArtifactSanitizer.Sanitize(text);
-                redacted |= !string.Equals(sanitized, text, StringComparison.Ordinal);
-                text = sanitized;
+                // Binary content never enters the evaluation: it is stored, or noted as not retained.
+                byte[] content = artifact.GetContent();
+                string? reference = TryStore(store, content, ref storedBytes);
+                text = reference is null
+                    ? $"[binary artifact not retained: {content.Length} bytes, {artifact.MediaType}; " +
+                      (store is null ? "no artifact store is configured]" : "the per-evaluation storage limit was reached]")
+                    : $"[stored: {reference}, {content.Length} bytes, {artifact.MediaType}]";
+                text = TruncateToBytes(text, _options.Artifacts.MaxArtifactBytes, out truncated);
+                truncated |= reference is null;
             }
-            text = TruncateToBytes(text, _options.Artifacts.MaxArtifactBytes, out bool truncated);
+            else
+            {
+                if (_options.Artifacts.SanitizeSecrets)
+                {
+                    string sanitized = EvolutionArtifactSanitizer.Sanitize(text);
+                    redacted |= !string.Equals(sanitized, text, StringComparison.Ordinal);
+                    text = sanitized;
+                }
+                string? reference = null;
+                if (store is not null && Encoding.UTF8.GetByteCount(text) > _options.Artifacts.MaxArtifactBytes)
+                    reference = TryStore(store, Encoding.UTF8.GetBytes(text), ref storedBytes);
+                if (reference is null)
+                {
+                    text = TruncateToBytes(text, _options.Artifacts.MaxArtifactBytes, out truncated);
+                }
+                else
+                {
+                    // Spilled, not lost: a preview that still fits the inline budget, then the full content's address.
+                    string suffix = $"\n[full content: {reference}, {Encoding.UTF8.GetByteCount(text)} bytes, text/plain]";
+                    int budget = Math.Max(0, _options.Artifacts.MaxArtifactBytes - Encoding.UTF8.GetByteCount(suffix));
+                    text = TruncateToBytes(text, budget, out _) + suffix;
+                    text = TruncateToBytes(text, _options.Artifacts.MaxArtifactBytes, out _);
+                    truncated = true;
+                }
+            }
             var bounded = new EvolutionArtifact(artifact.Key, text, artifact.IsTruncated || truncated, redacted);
             if (totalBytes + bounded.SizeBytes > _options.Artifacts.MaxBytesPerEvaluation) break;
             totalBytes += bounded.SizeBytes;
             retained.Add(bounded);
         }
         return retained.Count == 0 ? Array.Empty<EvolutionArtifact>() : Array.AsReadOnly(retained.ToArray());
+    }
+
+    private string? TryStore(IEvolutionArtifactStore? store, byte[] content, ref long storedBytes)
+    {
+        if (store is null || storedBytes + content.Length > _options.Artifacts.MaxStoredBytesPerEvaluation) return null;
+        storedBytes += content.Length;
+        return store.Put(content);
     }
 
     /// <summary>Cuts text at a code-point boundary so its UTF-8 encoding fits the supplied byte budget.</summary>

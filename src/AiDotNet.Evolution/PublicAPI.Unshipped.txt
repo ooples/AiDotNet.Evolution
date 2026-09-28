@@ -2128,3 +2128,21 @@ AiDotNet.Evolution.IEvolutionLatencyProfile
 AiDotNet.Evolution.IEvolutionLatencyProfile.IsLatencyBound.get -> bool
 AiDotNet.Evolution.ResourceMeteredEvolutionTask<TGenome>.IsLatencyBound.get -> bool
 AiDotNet.Evolution.ResourceMeteredVariationOperator<TGenome>.IsLatencyBound.get -> bool
+AiDotNet.Evolution.DirectoryEvolutionArtifactStore
+AiDotNet.Evolution.DirectoryEvolutionArtifactStore.DirectoryEvolutionArtifactStore(string! directory, System.TimeSpan? retention = null) -> void
+AiDotNet.Evolution.DirectoryEvolutionArtifactStore.DirectoryPath.get -> string!
+AiDotNet.Evolution.DirectoryEvolutionArtifactStore.Prune(System.DateTimeOffset now) -> int
+AiDotNet.Evolution.DirectoryEvolutionArtifactStore.Put(byte[]! content) -> string!
+AiDotNet.Evolution.DirectoryEvolutionArtifactStore.TryRead(string! reference, out byte[]! content) -> bool
+AiDotNet.Evolution.EvolutionArtifact.GetContent() -> byte[]!
+AiDotNet.Evolution.EvolutionArtifact.IsBinary.get -> bool
+AiDotNet.Evolution.EvolutionArtifact.MediaType.get -> string?
+AiDotNet.Evolution.EvolutionArtifactOptions.MaxStoredBytesPerEvaluation.get -> long
+AiDotNet.Evolution.EvolutionArtifactOptions.MaxStoredBytesPerEvaluation.set -> void
+AiDotNet.Evolution.EvolutionArtifactOptions.Store.get -> AiDotNet.Evolution.IEvolutionArtifactStore?
+AiDotNet.Evolution.EvolutionArtifactOptions.Store.set -> void
+AiDotNet.Evolution.IEvolutionArtifactStore
+AiDotNet.Evolution.IEvolutionArtifactStore.Put(byte[]! content) -> string!
+AiDotNet.Evolution.IEvolutionArtifactStore.TryRead(string! reference, out byte[]! content) -> bool
+const AiDotNet.Evolution.EvolutionArtifact.MaximumContentBytes = 67108864 -> int
+static AiDotNet.Evolution.EvolutionArtifact.FromBytes(string! key, byte[]! content, string! mediaType) -> AiDotNet.Evolution.EvolutionArtifact!
