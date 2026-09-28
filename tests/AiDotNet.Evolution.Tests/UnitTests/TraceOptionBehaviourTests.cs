@@ -56,30 +56,56 @@ public sealed class TraceOptionBehaviourTests
     }
 
     [Fact]
-    public async Task IncludeDescriptors_IncludeLineage_and_IncludeDiagnostics_each_remove_their_fields_when_cleared()
+    public async Task IncludeDescriptors_IncludeLineage_and_IncludeDiagnostics_each_remove_only_their_own_fields()
     {
+        // Each flag is cleared on its own, so an observer that wired one flag to another's fields fails here.
         var (full, _) = await Trace(_ => { });
-        var (bare, _) = await Trace(options =>
-        {
-            options.IncludeDescriptors = false;
-            options.IncludeLineage = false;
-            options.IncludeDiagnostics = false;
-        });
-        Assert.Contains(full, record => record.Descriptors.Count > 0 && record.Cell is not null);
-        Assert.Contains(full, record => record.ParentIds.Count > 0);
-        Assert.Contains(full, record => record.Diagnostics.Count > 0);
-        Assert.All(bare, record => Assert.True(record.Descriptors.Count == 0 && record.Cell is null));
-        Assert.All(bare, record => Assert.Empty(record.ParentIds));
-        Assert.All(bare, record => Assert.Empty(record.Diagnostics));
-        Assert.Equal(full.Count, bare.Count);
+        var (noDescriptors, _) = await Trace(options => options.IncludeDescriptors = false);
+        var (noLineage, _) = await Trace(options => options.IncludeLineage = false);
+        var (noDiagnostics, _) = await Trace(options => options.IncludeDiagnostics = false);
+
+        Assert.Contains(full, HasDescriptors);
+        Assert.Contains(full, HasLineage);
+        Assert.Contains(full, HasDiagnostics);
+
+        Assert.DoesNotContain(noDescriptors, HasDescriptors);
+        Assert.Contains(noDescriptors, HasLineage);
+        Assert.Contains(noDescriptors, HasDiagnostics);
+
+        Assert.Contains(noLineage, HasDescriptors);
+        Assert.DoesNotContain(noLineage, HasLineage);
+        Assert.Contains(noLineage, HasDiagnostics);
+
+        Assert.Contains(noDiagnostics, HasDescriptors);
+        Assert.Contains(noDiagnostics, HasLineage);
+        Assert.DoesNotContain(noDiagnostics, HasDiagnostics);
+
+        Assert.Equal(full.Count, noDescriptors.Count);
+        Assert.Equal(full.Count, noLineage.Count);
+        Assert.Equal(full.Count, noDiagnostics.Count);
     }
 
     [Fact]
-    public async Task MaxTrackedMetrics_marks_the_summary_truncated_once_more_metrics_arrive_than_it_tracks()
+    public async Task MaxTrackedMetrics_limits_the_summary_without_dropping_records()
     {
-        var (_, one) = await Trace(options => options.MaxTrackedMetrics = 1);
-        var (_, plenty) = await Trace(_ => { });
-        Assert.True(one.IsTruncated);
+        var (oneRecords, one) = await Trace(options => options.MaxTrackedMetrics = 1);
+        var (plentyRecords, plenty) = await Trace(_ => { });
+
+        Assert.True(one.IsMetricSummaryTruncated);
+        Assert.False(one.IsTruncated);
+        Assert.Equal(0, one.RecordsDropped);
+        Assert.Single(one.TotalMetricDeltas);
+        Assert.Equal(plentyRecords.Count, oneRecords.Count);
+        Assert.Equal(plenty.RecordsWritten, one.RecordsWritten);
+
+        Assert.False(plenty.IsMetricSummaryTruncated);
         Assert.False(plenty.IsTruncated);
+        Assert.Equal(2, plenty.TotalMetricDeltas.Count);
     }
+
+    private static bool HasDescriptors(EvolutionTraceRecord record) => record.Descriptors.Count > 0 || record.Cell is not null;
+
+    private static bool HasLineage(EvolutionTraceRecord record) => record.ParentIds.Count > 0;
+
+    private static bool HasDiagnostics(EvolutionTraceRecord record) => record.Diagnostics.Count > 0;
 }
