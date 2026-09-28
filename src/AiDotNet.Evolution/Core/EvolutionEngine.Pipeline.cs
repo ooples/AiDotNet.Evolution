@@ -290,7 +290,7 @@ public sealed partial class EvolutionEngine<TGenome>
             WorkItem[] round = pending.Take(count).ToArray(); pending.RemoveRange(0, count);
             foreach (WorkItem item in round) { item.AttemptCount++; item.ChargedAttempts++; _evaluationAttempts++; }
             TimeSpan delay = RetryDelayForAttempt(round.Max(item => item.AttemptCount));
-            if (delay > TimeSpan.Zero) await Task.Delay(delay, cancellationToken).ConfigureAwait(false);
+            if (delay > TimeSpan.Zero) await EvolutionClock.Delay(_options.TimeProvider, delay, cancellationToken).ConfigureAwait(false);
             var tasks = new List<Task>(count);
             var active = new List<Task>();
             var meteredTask = _task as ResourceMeteredEvolutionTask<TGenome>;

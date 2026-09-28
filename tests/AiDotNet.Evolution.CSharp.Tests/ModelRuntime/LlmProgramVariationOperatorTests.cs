@@ -747,4 +747,42 @@ public sealed class LlmProgramVariationOperatorTests
         Assert.NotEqual(new LlmProgramVariationOperator(client, first, promptBuilder: builder).VersionHash,
             new LlmProgramVariationOperator(client, changed, promptBuilder: builder).VersionHash);
     }
+    [Fact]
+    public async Task Lessons_from_the_experience_store_reach_the_prompt_only_when_bound()
+    {
+        var parent = new ProgramGenome(ParentSource, ProgramLanguage.Python);
+        var store = new AiDotNet.Evolution.Programs.Experience.ProgramExperienceStore();
+        store.Add(new AiDotNet.Evolution.Programs.Experience.ProgramExperienceRecord("run", "task", "v1", "memoise the inner loop", "h1",
+            AiDotNet.Evolution.Programs.Experience.ProgramExperienceOutcome.Improved,
+            AiDotNet.Evolution.Programs.Experience.ProgramEvidencePartition.Search, 0.9, null, 1));
+        string Response() => "```python\ndef solve(x):\n    return x + 1\n```";
+
+        var bound = new FakeChatClient(Response());
+        await new LlmProgramVariationOperator(bound, new ProgramProposalOptions { Language = ProgramLanguage.Python },
+            new LlmProgramVariationOptions
+            {
+                Mode = ProgramEvolutionMode.FullRewrite,
+                MaxProposalRetries = 0,
+                Experience = new AiDotNet.Evolution.Programs.Experience.ProgramExperienceBinding(store, "run", "task", "v1")
+            }).ProposeAsync(Context(parent));
+        string prompt = bound.Conversations.Single().Last(message => message.Role == ProgramChatRole.User).Text;
+        Assert.Contains("Lessons from earlier attempts", prompt);
+        Assert.Contains("memoise the inner loop", prompt);
+
+        var unbound = new FakeChatClient(Response());
+        await new LlmProgramVariationOperator(unbound, new ProgramProposalOptions { Language = ProgramLanguage.Python },
+            new LlmProgramVariationOptions { Mode = ProgramEvolutionMode.FullRewrite, MaxProposalRetries = 0 }).ProposeAsync(Context(parent));
+        Assert.DoesNotContain("Lessons from earlier attempts", unbound.Conversations.Single().Last().Text);
+
+        // Another task's lessons never leak into this one.
+        var otherTask = new FakeChatClient(Response());
+        await new LlmProgramVariationOperator(otherTask, new ProgramProposalOptions { Language = ProgramLanguage.Python },
+            new LlmProgramVariationOptions
+            {
+                Mode = ProgramEvolutionMode.FullRewrite,
+                MaxProposalRetries = 0,
+                Experience = new AiDotNet.Evolution.Programs.Experience.ProgramExperienceBinding(store, "run", "other-task", "v1")
+            }).ProposeAsync(Context(parent));
+        Assert.DoesNotContain("memoise the inner loop", otherTask.Conversations.Single().Last().Text);
+    }
 }
