@@ -120,8 +120,8 @@ internal static class OpenEvolveConfigCatalog
         new("diff_based_evolution", OpenEvolveKeyDisposition.Mapped, "mode = Diff when true, FullRewrite when false"),
         new("max_code_length", OpenEvolveKeyDisposition.Mapped, "budget.maxProgramChars"),
         new("diff_pattern", OpenEvolveKeyDisposition.RefusedUnlessDefault, "ours reads OpenEvolve's default SEARCH/REPLACE block format only"),
-        new("early_stopping_patience", OpenEvolveKeyDisposition.Mapped, "search.earlyStoppingPatience, in evaluations"),
-        new("convergence_threshold", OpenEvolveKeyDisposition.Mapped, "search.earlyStoppingMinimumImprovement"),
+        new("early_stopping_patience", OpenEvolveKeyDisposition.Mapped, "search.earlyStoppingPatience in evaluations when positive; negative stops at convergence_threshold (search.targetQuality); zero never stops early"),
+        new("convergence_threshold", OpenEvolveKeyDisposition.Mapped, "search.earlyStoppingMinimumImprovement, or the target fitness when early_stopping_patience is negative"),
         new("early_stopping_metric", OpenEvolveKeyDisposition.RefusedUnlessDefault, "early stopping watches the fitness (combined_score); other metrics are not supported"),
         new("max_tasks_per_child", OpenEvolveKeyDisposition.NoEffect, "every evaluation already runs in a fresh process"),
     };

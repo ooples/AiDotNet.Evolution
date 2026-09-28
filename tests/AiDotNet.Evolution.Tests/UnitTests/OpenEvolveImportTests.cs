@@ -228,6 +228,19 @@ public sealed class OpenEvolveImportTests
         Assert.Contains(cascade.Notes, note => note.StartsWith("evaluator.timeout = 180000 s", StringComparison.Ordinal));
     }
 
+    [Theory]
+    [InlineData(5, 5L, null)]
+    [InlineData(0, null, null)]
+    [InlineData(-1, null, 0.95)]
+    public void Early_stopping_patience_follows_openevolve(int patience, long? expectedPatience, double? expectedTarget)
+    {
+        using var directory = new TemporaryDirectory();
+        OpenEvolveImport imported = Import(directory,
+            "llm:\n  name: m\nearly_stopping_patience: " + patience + "\nconvergence_threshold: 0.95\n");
+        Assert.Equal(expectedPatience, imported.Run.Search.EarlyStoppingPatience);
+        Assert.Equal(expectedTarget, imported.Run.Search.TargetQuality);
+    }
+
     [Fact]
     public void A_language_without_dedicated_support_is_evolved_as_generic_text()
     {

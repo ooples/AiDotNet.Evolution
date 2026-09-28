@@ -162,7 +162,7 @@ is refused rather than mixed into an ongoing run.
 | `diff_based_evolution` | Mapped | mode = Diff when true, FullRewrite when false |
 | `max_code_length` | Mapped | budget.maxProgramChars |
 | `diff_pattern` | RefusedUnlessDefault | ours reads OpenEvolve's default SEARCH/REPLACE block format only |
-| `early_stopping_patience` | Mapped | search.earlyStoppingPatience, in evaluations |
-| `convergence_threshold` | Mapped | search.earlyStoppingMinimumImprovement |
+| `early_stopping_patience` | Mapped | search.earlyStoppingPatience in evaluations when positive; negative stops at convergence_threshold (search.targetQuality); zero never stops early |
+| `convergence_threshold` | Mapped | search.earlyStoppingMinimumImprovement, or the target fitness when early_stopping_patience is negative |
 | `early_stopping_metric` | RefusedUnlessDefault | early stopping watches the fitness (combined_score); other metrics are not supported |
 | `max_tasks_per_child` | NoEffect | every evaluation already runs in a fresh process |

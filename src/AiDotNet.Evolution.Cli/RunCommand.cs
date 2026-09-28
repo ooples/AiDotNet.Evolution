@@ -102,6 +102,8 @@ internal sealed class RunSearch
     /// <summary>Evaluations without improvement before stopping; null never stops early.</summary>
     public long? EarlyStoppingPatience { get; init; }
     public double EarlyStoppingMinimumImprovement { get; init; }
+    /// <summary>A fitness at which the run stops as soon as any program reaches it; null for none.</summary>
+    public double? TargetQuality { get; init; }
     /// <summary>Retries for an evaluation that failed or timed out (OpenEvolve's <c>evaluator.max_retries</c>).</summary>
     public int EvaluationRetries { get; init; }
     /// <summary>A memory cap per evaluation in MiB, enforced by the sandbox; null for none.</summary>
@@ -343,6 +345,7 @@ internal static class RunCommand
             options.EarlyStopping.PatienceEvaluations = patience;
             options.EarlyStopping.MinimumImprovement = run.Search.EarlyStoppingMinimumImprovement;
         }
+        if (run.Search.TargetQuality is double target) options.TargetQuality = target;
         options.Artifacts.Enabled = run.Search.CollectArtifacts;
         options.Artifacts.DeliverToNextProposal = run.Search.IncludeArtifacts;
         options.GlobalEliteCount = run.Search.EliteArchiveSize;

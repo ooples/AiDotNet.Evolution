@@ -138,7 +138,10 @@ internal static class OpenEvolveConfigImporter
                 TopInspirations = topInspirations,
                 DiversePrograms = Math.Max(0, inspirationCount - 1 - topInspirations),
                 MetricDescriptors = descriptors,
-                EarlyStoppingPatience = Integer(merged["early_stopping_patience"]),
+                // OpenEvolve: a positive patience counts iterations without improvement; a negative one instead stops
+                // when the fitness reaches convergence_threshold; zero never stops early.
+                EarlyStoppingPatience = Integer(merged["early_stopping_patience"]) is > 0 and var patience ? patience : null,
+                TargetQuality = Integer(merged["early_stopping_patience"]) is < 0 ? Number(merged["convergence_threshold"]) ?? 0 : null,
                 EarlyStoppingMinimumImprovement = Number(merged["convergence_threshold"]) ?? 0,
                 EvaluationRetries = (int)(Integer(merged["evaluator.max_retries"]) ?? 0),
                 EvaluationMemoryLimitMb = memory ?? ImportedMemoryLimitMb,

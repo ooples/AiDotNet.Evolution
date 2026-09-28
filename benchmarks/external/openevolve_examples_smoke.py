@@ -68,6 +68,21 @@ def find_files(example):
     return None, None, None
 
 
+def working_directory(config_text, example, upstream):
+    """The directory the example's own command runs from.
+
+    OpenEvolve resolves a relative template_dir against the working directory, and examples disagree on which one
+    they expect: lm_eval runs from the repository root ("examples/lm_eval/prompts"), llm_prompt_optimization from its
+    own folder ("templates"). The directory in which the configured template_dir exists is the one its command uses.
+    """
+    match = re.search(r"(?m)^\s*template_dir:\s*[\"']?([^\"'\n#]+?)[\"']?\s*(?:#.*)?$", config_text)
+    if match and not Path(match.group(1)).is_absolute():
+        for candidate in (upstream, example):
+            if (candidate / match.group(1)).is_dir():
+                return candidate
+    return upstream
+
+
 def first_diagnostic(output):
     for trace in sorted(output.glob("trace-*.jsonl")):
         for line in trace.read_text(encoding="utf-8", errors="replace").splitlines():
@@ -128,7 +143,7 @@ def main():
              "--iterations", str(args.iterations), "--output", str(work / "out"), "--python", args.python],
             # OpenEvolve's examples are run from the repository root (openevolve-run.py examples/<name>/...), and some
             # configs name paths relative to it, such as lm_eval's template_dir.
-            capture_output=True, text=True, timeout=1800, env=env, cwd=str(Path(args.upstream)))
+            capture_output=True, text=True, timeout=1800, env=env, cwd=str(working_directory(text, example, Path(args.upstream))))
         if run.returncode == 0:
             result = json.loads(run.stdout)
             completed = result.get("CompletedEvaluations") or 0
