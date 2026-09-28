@@ -60,8 +60,8 @@ jobs:
         run: ./eng/Test-ReleaseWorkflow.ps1 -NoRestore
       - name: Build all package target frameworks
         run: dotnet build src/AiDotNet.Evolution/AiDotNet.Evolution.csproj --configuration Release --no-restore
-      # Programs reaches this output only through the CLI's project reference; its tests are in CSharp.Tests, so here it
-      # would be measured as mostly uncovered. The ratchet baseline never included it.
+      # Coverage is collected from every test project and merged before the ratchet grades it (V1-81), so an assembly
+      # is measured by all of its tests, not only the ones that happen to run in this project.
       - name: Test net10.0 with coverage
         run: >
           dotnet test tests/AiDotNet.Evolution.Tests/AiDotNet.Evolution.Tests.csproj
@@ -70,7 +70,6 @@ jobs:
           --collect:"XPlat Code Coverage" --results-directory ./coverage
           --
           DataCollectionRunSettings.DataCollectors.DataCollector.Configuration.Format=cobertura
-          DataCollectionRunSettings.DataCollectors.DataCollector.Configuration.Exclude="[AiDotNet.Evolution.Programs]*"
       - name: Test net8.0
         run: >
           dotnet test tests/AiDotNet.Evolution.Tests/AiDotNet.Evolution.Tests.csproj
@@ -79,7 +78,9 @@ jobs:
       - name: Verify standalone program and compiler contracts
         shell: pwsh
         run: |
-          dotnet test tests/AiDotNet.Evolution.CSharp.Tests/AiDotNet.Evolution.CSharp.Tests.csproj -c Release --no-restore
+          dotnet test tests/AiDotNet.Evolution.CSharp.Tests/AiDotNet.Evolution.CSharp.Tests.csproj -c Release --no-restore `
+            --collect:"XPlat Code Coverage" --results-directory ./coverage `
+            -- DataCollectionRunSettings.DataCollectors.DataCollector.Configuration.Format=cobertura
           if ($LASTEXITCODE -ne 0) { throw 'Standalone program migration tests failed.' }
       - name: Verify numeric quality harness contracts
         shell: pwsh
@@ -203,9 +204,15 @@ jobs:
       - name: Enforce coverage ratchet
         shell: pwsh
         run: |
-          $report = Get-ChildItem -Path coverage -Recurse -Filter coverage.cobertura.xml | Select-Object -First 1
-          if ($null -eq $report) { throw 'No Cobertura report was produced.' }
-          ./eng/Test-Coverage.ps1 -CoverageFile $report.FullName -BaselineFile coverage-baseline.json
+          $reports = @(Get-ChildItem -Path coverage -Recurse -Filter coverage.cobertura.xml)
+          # One report per test project (and target framework); grading only the first one measured whichever project
+          # happened to sort first. Every report is merged and the merged result is graded.
+          if ($reports.Count -lt 2) { throw "Expected coverage from every test project, found $($reports.Count) report(s)." }
+          dotnet tool install dotnet-reportgenerator-globaltool --version 5.5.11 --tool-path ./.tools
+          if ($LASTEXITCODE -ne 0) { throw 'Installing ReportGenerator failed.' }
+          ./.tools/reportgenerator "-reports:coverage/**/coverage.cobertura.xml" "-targetdir:coverage/merged" "-reporttypes:Cobertura"
+          if ($LASTEXITCODE -ne 0) { throw 'Merging coverage reports failed.' }
+          ./eng/Test-Coverage.ps1 -CoverageFile coverage/merged/Cobertura.xml -BaselineFile coverage-baseline.json
       - name: Upload coverage and crash diagnostics
         if: always()
         uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a # v7.0.1
