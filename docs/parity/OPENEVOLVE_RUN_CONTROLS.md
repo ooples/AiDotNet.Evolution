@@ -14,8 +14,8 @@ All of these already existed; this page is the verified mapping the v1 plan aske
 | `max_code_length` | `ProgramTaskOptions.MaxProgramChars`: rejected before evaluation, never truncated | `ProgramFoundationAdversarialTests`, `LlmProgramVariationOperatorTests` |
 | `diff_based_evolution` | `ProgramEvolutionMode` (diff or full rewrite) | `LlmProgramVariationOperatorTests` |
 | `diff_pattern` | `ProgramDiffOptions.SearchMarker` / `DividerMarker` / `ReplaceMarker` | `ProgramDiffTests` |
-| `language` / `file_suffix` | `ProgramLanguage`; the CLI derives the file extension from it | `ProgramDiffTests`, `CliTests` |
-| `random_seed` | `EvolutionEngineOptions.Seed` (deterministic replay, including with several workers) | `EvolutionEngineTests` |
+| `language` / `file_suffix` | `ProgramLanguage`; file extensions map both ways through `ProgramLanguageDetector` | `ProgramLanguageDetectorTests` |
+| `random_seed` | `EvolutionEngineOptions.Seed`: the seed alone decides the run at 1, 4 or 8 workers, although evaluations complete out of order (OpenEvolve replays only with one worker) | `ParallelReplayDeterminismTests` |
 | `database.num_islands` | `EvolutionEngineOptions.IslandCount` | `EvolutionCoreParityTests` |
 | `database.migration_interval` / `migration_rate` | `MigrationInterval` / `MigrationRate` (+ `MigrationTopology`, `MigrationTrigger`) | `EvolutionMigrationTopologyTests`, `EvolutionCoreParityTests` |
 | `database.population_size` | archive capacity and `MaxRetainedFailures` | `MapElitesArchiveTests`, `EvolutionCoreParityTests` |
