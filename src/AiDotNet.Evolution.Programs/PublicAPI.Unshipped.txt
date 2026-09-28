@@ -1685,3 +1685,20 @@ static AiDotNet.Evolution.Programs.Experience.ProgramExperienceRetrieval.operato
 static AiDotNet.Evolution.Programs.Experience.ProgramExperienceRetrieval.operator ==(AiDotNet.Evolution.Programs.Experience.ProgramExperienceRetrieval? left, AiDotNet.Evolution.Programs.Experience.ProgramExperienceRetrieval? right) -> bool
 AiDotNet.Evolution.Programs.ProgramTaskOptions.MetricDescriptors.get -> System.Collections.Generic.IList<string!>!
 AiDotNet.Evolution.Programs.ProgramTaskOptions.MetricDescriptors.set -> void
+AiDotNet.Evolution.Programs.Experience.ProgramExperienceBinding
+AiDotNet.Evolution.Programs.Experience.ProgramExperienceBinding.ContextBudgetCharacters.get -> int
+AiDotNet.Evolution.Programs.Experience.ProgramExperienceBinding.IncludeOtherRuns.get -> bool
+AiDotNet.Evolution.Programs.Experience.ProgramExperienceBinding.ProgramExperienceBinding(AiDotNet.Evolution.Programs.Experience.ProgramExperienceStore! store, string! runId, string! taskIdentity, string! taskVersion, int contextBudgetCharacters = 4000, bool includeOtherRuns = false) -> void
+AiDotNet.Evolution.Programs.Experience.ProgramExperienceBinding.RunId.get -> string!
+AiDotNet.Evolution.Programs.Experience.ProgramExperienceBinding.Store.get -> AiDotNet.Evolution.Programs.Experience.ProgramExperienceStore!
+AiDotNet.Evolution.Programs.Experience.ProgramExperienceBinding.TaskIdentity.get -> string!
+AiDotNet.Evolution.Programs.Experience.ProgramExperienceBinding.TaskVersion.get -> string!
+AiDotNet.Evolution.Programs.Experience.ProgramExperienceRecorder
+AiDotNet.Evolution.Programs.Experience.ProgramExperienceRecorder.OnEventAsync(AiDotNet.Evolution.EvolutionEvent<AiDotNet.Evolution.Programs.ProgramGenome!>! evolutionEvent, System.Threading.CancellationToken cancellationToken = default(System.Threading.CancellationToken)) -> System.Threading.Tasks.ValueTask
+AiDotNet.Evolution.Programs.Experience.ProgramExperienceRecorder.ProgramExperienceRecorder(AiDotNet.Evolution.Programs.Experience.ProgramExperienceBinding! binding) -> void
+AiDotNet.Evolution.Programs.LlmProgramVariationOptions.Experience.get -> AiDotNet.Evolution.Programs.Experience.ProgramExperienceBinding?
+AiDotNet.Evolution.Programs.LlmProgramVariationOptions.Experience.set -> void
+AiDotNet.Evolution.Programs.ProgramEvolutionPromptOptions.DiffSummaryMaxLineLength.get -> int?
+AiDotNet.Evolution.Programs.ProgramEvolutionPromptOptions.DiffSummaryMaxLineLength.set -> void
+AiDotNet.Evolution.Programs.ProgramEvolutionPromptOptions.DiffSummaryMaxLines.get -> int?
+AiDotNet.Evolution.Programs.ProgramEvolutionPromptOptions.DiffSummaryMaxLines.set -> void

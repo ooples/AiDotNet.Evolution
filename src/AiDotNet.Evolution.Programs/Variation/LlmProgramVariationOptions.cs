@@ -64,6 +64,12 @@ public sealed class LlmProgramVariationOptions
     /// <summary>Gets or sets the sampling temperature passed to the chat client, or <c>null</c> for its default.</summary>
     public double? Temperature { get; set; }
 
+    /// <summary>
+    /// Gets or sets a store whose lessons for this task are added to every proposal prompt, or <c>null</c> for none.
+    /// </summary>
+    /// <remarks>Not part of the operator's identity: the store's contents change as a run proceeds.</remarks>
+    public AiDotNet.Evolution.Programs.Experience.ProgramExperienceBinding? Experience { get; set; }
+
     /// <summary>Gets or sets the output token cap passed to the chat client, or <c>null</c> for its default.</summary>
     public int? MaxOutputTokens { get; set; }
 
@@ -160,6 +166,7 @@ public sealed class LlmProgramVariationOptions
         MaxPromptProgramChars = MaxPromptProgramChars,
         SystemMessage = SystemMessage,
         Temperature = Temperature,
+        Experience = Experience,
         MaxOutputTokens = MaxOutputTokens,
         Seed = Seed,
         IncludeParentMetrics = IncludeParentMetrics,
