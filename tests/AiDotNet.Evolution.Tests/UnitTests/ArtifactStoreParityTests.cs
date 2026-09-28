@@ -120,6 +120,108 @@ public sealed class ArtifactStoreParityTests : IDisposable
     }
 
     [Fact]
+    public void Aggregate_binary_content_per_result_is_capped()
+    {
+        EvolutionArtifact[] tooMuch = Enumerable.Range(0, 5)
+            .Select(i => EvolutionArtifact.FromBytes("blob" + i, new byte[EvolutionArtifact.MaximumContentBytes], "application/octet-stream"))
+            .ToArray();
+        Assert.Throws<ArgumentException>(() => new EvolutionTaskResult(EvolutionEvaluationStatus.Completed, 1,
+            descriptors: new Dictionary<string, double> { ["x"] = 1 }, artifacts: tooMuch));
+    }
+
+    [Fact]
+    public async Task Nothing_is_stored_when_its_reference_cannot_fit_inline()
+    {
+        var store = new DirectoryEvolutionArtifactStore(_root);
+        EvolutionEvaluation evaluation = await FirstEvaluation(() => new[]
+        {
+            EvolutionArtifact.FromBytes("plot", new byte[100], "image/png"),
+            new EvolutionArtifact("stderr", string.Concat(Enumerable.Repeat("ok ", 200)))
+        }, a => { a.Store = store; a.MaxArtifactBytes = 40; });
+        Assert.Empty(Directory.GetFiles(_root, "*.bin"));
+        Assert.DoesNotContain("sha256:", string.Concat(evaluation.Artifacts.Select(artifact => artifact.Text)));
+        Assert.All(evaluation.Artifacts, artifact => Assert.True(artifact.IsTruncated));
+    }
+
+    private sealed class BinaryResumeTask(CancellationTokenSource? cancelAt = null) : IEvolutionTask<TestGenome>
+    {
+        public string Id => "binary-resume";
+        public string VersionHash => "binary-resume-v1";
+        public string EvaluatorVersionHash => "binary-resume-evaluator-v1";
+
+        public static byte[] Payload(int value) => Enumerable.Range(0, 300).Select(i => (byte)(i * value)).ToArray();
+
+        public ValueTask<EvolutionCanonicalGenome<TestGenome>> CanonicalizeAsync(TestGenome genome,
+            CancellationToken cancellationToken = default) => new(new EvolutionCanonicalGenome<TestGenome>(
+            new TestGenome(genome.Value), genome.Value.ToString(CultureInfo.InvariantCulture)));
+
+        public ValueTask<EvolutionTaskResult> EvaluateAsync(EvolutionCandidate<TestGenome> candidate,
+            EvolutionEvaluationContext context, CancellationToken cancellationToken = default)
+        {
+            if (cancelAt is not null && candidate.EvaluationId >= 4)
+            {
+                cancelAt.Cancel();
+                cancellationToken.ThrowIfCancellationRequested();
+            }
+            int value = candidate.CanonicalGenome.Genome.Value;
+            return new(new EvolutionTaskResult(EvolutionEvaluationStatus.Completed, value,
+                descriptors: new Dictionary<string, double> { ["x"] = Math.Max(0, Math.Min(100, value)) },
+                artifacts: new[] { EvolutionArtifact.FromBytes("plot", Payload(value), "image/png") }));
+        }
+    }
+
+    [Fact]
+    public async Task Binary_artifact_references_survive_checkpoint_and_resume()
+    {
+        EvolutionEngineOptions Options(bool resume)
+        {
+            var options = new EvolutionEngineOptions
+            {
+                RunId = "binary-resume",
+                Seed = 91,
+                MaxEvaluationAttempts = 8,
+                MaxProposals = 100,
+                MaxGenerations = 100,
+                ProposalBatchSize = 2,
+                MaxDegreeOfParallelism = 1,
+                IslandCount = 1,
+                MigrationInterval = 0,
+                CheckpointInterval = 2,
+                Resume = resume
+            };
+            options.Artifacts.Enabled = true;
+            options.Artifacts.Store = new DirectoryEvolutionArtifactStore(_root);
+            return options;
+        }
+        MapElitesArchive<TestGenome> Archive() => new(new[] { new EvolutionDescriptorDefinition("x", 0, 100, 10, EvolutionOutOfRangePolicy.Clamp) });
+        TestGenome[] seeds = Enumerable.Range(1, 8).Select(value => new TestGenome(value)).ToArray();
+
+        EvolutionRunResult<TestGenome> uninterrupted = await new EvolutionEngine<TestGenome>(new BinaryResumeTask(),
+            new IncrementVariation(), _ => Archive(), Options(false), checkpointStore: new InMemoryEvolutionCheckpointStore(),
+            genomeCodec: new TestGenomeCodec()).RunAsync(seeds);
+
+        var shared = new InMemoryEvolutionCheckpointStore();
+        using var cancellation = new CancellationTokenSource();
+        await Assert.ThrowsAnyAsync<OperationCanceledException>(() => new EvolutionEngine<TestGenome>(new BinaryResumeTask(cancellation),
+            new IncrementVariation(), _ => Archive(), Options(false), checkpointStore: shared, genomeCodec: new TestGenomeCodec())
+            .RunAsync(seeds, cancellation.Token));
+        EvolutionRunResult<TestGenome> resumed = await new EvolutionEngine<TestGenome>(new BinaryResumeTask(),
+            new IncrementVariation(), _ => Archive(), Options(true), checkpointStore: shared, genomeCodec: new TestGenomeCodec())
+            .RunAsync(seeds);
+
+        Assert.Equal(uninterrupted.StateHash, resumed.StateHash);
+        var reader = new DirectoryEvolutionArtifactStore(_root);
+        EvolutionArchiveEntry<TestGenome>[] entries = resumed.Islands.SelectMany(island => island.Entries).ToArray();
+        Assert.NotEmpty(entries);
+        foreach (EvolutionArchiveEntry<TestGenome> entry in entries)
+        {
+            EvolutionArtifact kept = Assert.Single(entry.Evaluation.Artifacts);
+            Assert.True(reader.TryRead(Reference(kept.Text), out byte[] back));
+            Assert.Equal(BinaryResumeTask.Payload(entry.Candidate.CanonicalGenome.Genome.Value), back);
+        }
+    }
+
+    [Fact]
     public void The_store_is_content_addressed_verified_and_pruned_by_retention()
     {
         var store = new DirectoryEvolutionArtifactStore(_root, TimeSpan.FromDays(30));

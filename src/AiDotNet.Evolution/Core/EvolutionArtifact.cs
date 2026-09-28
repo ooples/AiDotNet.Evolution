@@ -112,6 +112,12 @@ public sealed class EvolutionArtifact
     /// <summary>Gets the media type of a binary artifact, or <c>null</c> for text.</summary>
     public string? MediaType { get; }
 
+    /// <summary>The binary payload length without copying it; zero for text.</summary>
+    internal int ContentLength => _content?.Length ?? 0;
+
+    /// <summary>The binary payload itself, for the engine to store without a second copy; never mutated.</summary>
+    internal byte[]? ContentReference => _content;
+
     /// <summary>Returns a copy of the binary content, or an empty array for a text artifact.</summary>
     public byte[] GetContent() => _content is null ? Array.Empty<byte>() : (byte[])_content.Clone();
 }

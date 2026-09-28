@@ -41,11 +41,16 @@ public sealed class DirectoryEvolutionArtifactStore : IEvolutionArtifactStore
         string path = PathFor(hex);
         if (File.Exists(path))
         {
-            // Re-storing refreshes the blob, so retention counts from its latest use.
-            File.SetLastWriteTimeUtc(path, DateTime.UtcNow);
-            return Prefix + hex;
+            // Re-storing refreshes the blob, so retention counts from its latest use. Another store's prune may delete
+            // it between the check and the refresh; the content is still in hand, so fall through and write it again.
+            try
+            {
+                File.SetLastWriteTimeUtc(path, DateTime.UtcNow);
+                return Prefix + hex;
+            }
+            catch (FileNotFoundException) { }
         }
-        string temporary = Path.Combine(_directory, "." + hex + "." + Guid.NewGuid().ToString("N", CultureInfo.InvariantCulture) + ".tmp");
+        string temporary = Child("." + hex + "." + Guid.NewGuid().ToString("N", CultureInfo.InvariantCulture) + ".tmp");
         File.WriteAllBytes(temporary, content);
         try
         {
@@ -92,7 +97,10 @@ public sealed class DirectoryEvolutionArtifactStore : IEvolutionArtifactStore
         return removed;
     }
 
-    private string PathFor(string hex) => Path.Combine(_directory, hex + Extension);
+    private string PathFor(string hex) => Child(hex + Extension);
+
+    // Names here are generated (validated hex plus a fixed suffix), never rooted; joining explicitly keeps the directory.
+    private string Child(string name) => _directory.TrimEnd(Path.DirectorySeparatorChar, Path.AltDirectorySeparatorChar) + Path.DirectorySeparatorChar + name;
 
     private static string Hash(byte[] content)
     {

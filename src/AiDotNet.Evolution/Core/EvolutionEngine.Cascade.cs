@@ -172,12 +172,16 @@ public sealed partial class EvolutionEngine<TGenome>
             if (artifact.IsBinary)
             {
                 // Binary content never enters the evaluation: it is stored, or noted as not retained.
-                byte[] content = artifact.GetContent();
-                string? reference = TryStore(store, content, ref storedBytes);
-                text = reference is null
-                    ? $"[binary artifact not retained: {content.Length} bytes, {artifact.MediaType}; " +
-                      (store is null ? "no artifact store is configured]" : "the per-evaluation storage limit was reached]")
-                    : $"[stored: {reference}, {content.Length} bytes, {artifact.MediaType}]";
+                byte[] content = artifact.ContentReference ?? Array.Empty<byte>();
+                string Marker(string address) => $"[stored: {address}, {content.Length} bytes, {artifact.MediaType}]";
+                // Store only when the whole marker fits inline; a cut-off address would point at nothing.
+                bool fits = Encoding.UTF8.GetByteCount(Marker(PlaceholderAddress)) <= _options.Artifacts.MaxArtifactBytes;
+                string? reference = fits ? TryStore(store, content, ref storedBytes) : null;
+                text = reference is not null ? Marker(reference)
+                    : $"[binary artifact not retained: {content.Length} bytes, {artifact.MediaType}; " +
+                      (store is null ? "no artifact store is configured]"
+                        : !fits ? "its reference does not fit the inline artifact budget]"
+                        : "the per-evaluation storage limit was reached]");
                 text = TruncateToBytes(text, _options.Artifacts.MaxArtifactBytes, out truncated);
                 truncated |= reference is null;
             }
@@ -190,7 +194,10 @@ public sealed partial class EvolutionEngine<TGenome>
                     text = sanitized;
                 }
                 string? reference = null;
-                if (store is not null && Encoding.UTF8.GetByteCount(text) > _options.Artifacts.MaxArtifactBytes)
+                int fullBytes = Encoding.UTF8.GetByteCount(text);
+                string Suffix(string address) => $"\n[full content: {address}, {fullBytes} bytes, text/plain]";
+                if (store is not null && fullBytes > _options.Artifacts.MaxArtifactBytes &&
+                    Encoding.UTF8.GetByteCount(Suffix(PlaceholderAddress)) <= _options.Artifacts.MaxArtifactBytes)
                     reference = TryStore(store, Encoding.UTF8.GetBytes(text), ref storedBytes);
                 if (reference is null)
                 {
@@ -199,7 +206,7 @@ public sealed partial class EvolutionEngine<TGenome>
                 else
                 {
                     // Spilled, not lost: a preview that still fits the inline budget, then the full content's address.
-                    string suffix = $"\n[full content: {reference}, {Encoding.UTF8.GetByteCount(text)} bytes, text/plain]";
+                    string suffix = Suffix(reference);
                     int budget = Math.Max(0, _options.Artifacts.MaxArtifactBytes - Encoding.UTF8.GetByteCount(suffix));
                     text = TruncateToBytes(text, budget, out _) + suffix;
                     text = TruncateToBytes(text, _options.Artifacts.MaxArtifactBytes, out _);
@@ -213,6 +220,9 @@ public sealed partial class EvolutionEngine<TGenome>
         }
         return retained.Count == 0 ? Array.Empty<EvolutionArtifact>() : Array.AsReadOnly(retained.ToArray());
     }
+
+    // Same length as a real content address, so a marker measured with it measures the one that will be emitted.
+    private static readonly string PlaceholderAddress = "sha256:" + new string('0', 64);
 
     private string? TryStore(IEvolutionArtifactStore? store, byte[] content, ref long storedBytes)
     {

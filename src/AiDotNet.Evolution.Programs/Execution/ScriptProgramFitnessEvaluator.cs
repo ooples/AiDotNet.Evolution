@@ -178,7 +178,7 @@ public sealed class ScriptProgramFitnessEvaluator : IProgramFitnessEvaluator, IE
             var output = new List<EvolutionArtifact>(2);
             foreach ((string key, string? text) in new[] { ("stdout", response.StdOut), ("stderr", response.StdErr) })
                 if (!string.IsNullOrEmpty(text))
-                    output.Add(new EvolutionArtifact(key, ProgramText.Bound(ProgramText.Sanitize(text), _options.MaxArtifactLength)));
+                    output.Add(new EvolutionArtifact(key, ProgramText.Sanitize(ProgramText.Bound(text, _options.MaxArtifactLength))));
             return new EvolutionTaskResult(EvolutionEvaluationStatus.Failed, costUnits: failed.CostUnits,
                 diagnostics: failed.Diagnostics, artifacts: output);
         }
