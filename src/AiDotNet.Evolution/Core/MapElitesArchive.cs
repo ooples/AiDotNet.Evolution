@@ -49,7 +49,7 @@ public sealed class MapElitesArchive<TGenome> :
     // The occupied cells in the same ordinal key order as _cells, kept in step by the common mutations (a replacement
     // is one slot write, a new cell one binary insert) and rebuilt only after bulk changes. Sample and selection read
     // it by index, so steady-state proposals no longer copy the whole archive whenever its version changes (V1-72).
-    private List<EvolutionArchiveEntry<TGenome>>? _order;
+    private OrderedArchiveEntries<TGenome>? _order;
     // How many cells hold each genome, kept with the ordered view. Selection must exclude every entry with the parent's
     // genome, and it can do that from the view in O(k) only when the parent's genome occupies exactly one cell.
     private Dictionary<string, int>? _genomeCells;
@@ -172,7 +172,7 @@ public sealed class MapElitesArchive<TGenome> :
         {
             if (_entries is null || _entriesVersion != Version)
             {
-                _entries = Array.AsReadOnly(Order.ToArray());
+                _entries = Array.AsReadOnly(Order.Items().ToArray());
                 _entriesVersion = Version;
             }
             return _entries;
@@ -222,7 +222,7 @@ public sealed class MapElitesArchive<TGenome> :
             if (Comparer.Compare(candidateEntry, incumbent) >= 0)
                 return Mutation(EvolutionArchiveInsertionResult.NotImproved, removed: removed);
             _cells[key.StableKey] = candidateEntry;
-            if (_order is not null) _order[OrderIndex(key.StableKey)] = candidateEntry;
+            if (_order is not null) _order.Replace(key.StableKey, candidateEntry);
             CountGenome(incumbent, -1);
             CountGenome(candidateEntry, 1);
             AddRemoved(ref removed, incumbent);
@@ -234,7 +234,7 @@ public sealed class MapElitesArchive<TGenome> :
         if (_cells.Count < Capacity)
         {
             _cells.Add(key.StableKey, candidateEntry);
-            if (_order is not null) _order.Insert(~OrderIndex(key.StableKey), candidateEntry);
+            if (_order is not null) _order.Insert(candidateEntry);
             CountGenome(candidateEntry, 1);
             PromoteIfBest(candidateEntry);
             Version++;
@@ -250,8 +250,8 @@ public sealed class MapElitesArchive<TGenome> :
         _cells.Add(key.StableKey, candidateEntry);
         if (_order is not null)
         {
-            _order.RemoveAt(OrderIndex(worst.Cell.StableKey));
-            _order.Insert(~OrderIndex(key.StableKey), candidateEntry);
+            _order.Remove(worst.Cell.StableKey);
+            _order.Insert(candidateEntry);
         }
         CountGenome(worst, -1);
         CountGenome(candidateEntry, 1);
@@ -288,7 +288,7 @@ public sealed class MapElitesArchive<TGenome> :
     {
         Guard.NotNull(random);
         if (_cells.Count == 0) return null;
-        List<EvolutionArchiveEntry<TGenome>> order = Order;
+        OrderedArchiveEntries<TGenome> order = Order;
         return order[random.NextInt(order.Count)];
     }
 
@@ -308,7 +308,7 @@ public sealed class MapElitesArchive<TGenome> :
         if (_order is null || _genomeCells is null)
         {
             _genomeCells = new Dictionary<string, int>(StringComparer.Ordinal);
-            foreach (EvolutionArchiveEntry<TGenome> entry in Order) CountGenome(entry, 1);
+            foreach (EvolutionArchiveEntry<TGenome> entry in Order.Items()) CountGenome(entry, 1);
         }
         return _genomeCells.TryGetValue(genomeId, out int cells) && cells == 1;
     }
@@ -322,22 +322,12 @@ public sealed class MapElitesArchive<TGenome> :
         else _genomeCells[id] = cells;
     }
 
-    private List<EvolutionArchiveEntry<TGenome>> Order => _order ??= new List<EvolutionArchiveEntry<TGenome>>(_cells.Values);
+    private OrderedArchiveEntries<TGenome> Order => _order ??= new OrderedArchiveEntries<TGenome>(_cells.Values);
 
-    // Binary search of the ordered cells by ordinal key: the index when present, else the complement of the insert point.
+    // The index of a cell's key when present, else the complement of its insert point.
     private int OrderIndex(string stableKey)
     {
-        List<EvolutionArchiveEntry<TGenome>> order = Order;
-        int low = 0, high = order.Count - 1;
-        while (low <= high)
-        {
-            int middle = low + ((high - low) >> 1);
-            int comparison = string.CompareOrdinal(order[middle].Cell.StableKey, stableKey);
-            if (comparison == 0) return middle;
-            if (comparison < 0) low = middle + 1;
-            else high = middle - 1;
-        }
-        return ~low;
+        return Order.IndexOf(stableKey);
     }
 
     /// <summary>Widens any Grow axis that cannot bin the supplied values, then rebins existing entries.</summary>
