@@ -176,6 +176,20 @@ public static class EvolutionHash
 #endif
     }
 
+    /// <summary>Whether <see cref="Combine"/> accepts these components, by the same bounds it enforces.</summary>
+    internal static bool FitsCombine(IReadOnlyList<string> values)
+    {
+        long characters = 0;
+        for (int count = 0; count < values.Count; count++)
+        {
+            string value = values[count];
+            if (count == EvolutionCollectionLimits.MaximumHashComponents || value is null) return false;
+            if (characters + value.Length + 32 > EvolutionCollectionLimits.MaximumHashCharacters) return false;
+            characters += value.Length.ToString(System.Globalization.CultureInfo.InvariantCulture).Length + value.Length + 2;
+        }
+        return true;
+    }
+
     private static void ValidateComponent(string? value, int count, long characters)
     {
         if (count == EvolutionCollectionLimits.MaximumHashComponents)
