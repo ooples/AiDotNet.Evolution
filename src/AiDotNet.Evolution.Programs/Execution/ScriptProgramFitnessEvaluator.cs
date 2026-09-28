@@ -170,7 +170,17 @@ public sealed class ScriptProgramFitnessEvaluator : IProgramFitnessEvaluator, IE
             string code = response.ErrorCode == ProgramExecuteErrorCode.TimeoutOrCanceled
                 ? "timeout"
                 : "script_failed";
-            return Failed(code, "The evaluator script did not complete; untrusted failure text was withheld.");
+            if (!_options.RetainArtifactText)
+                return Failed(code, "The evaluator script did not complete; untrusted failure text was withheld.");
+            // Opted in: keep what the script printed before it failed or timed out (OpenEvolve's timeout artifacts), bounded
+            // and sanitized here, then bounded again by the engine's artifact options.
+            EvolutionTaskResult failed = Failed(code, "The evaluator script did not complete; its captured output is attached as artifacts.");
+            var output = new List<EvolutionArtifact>(2);
+            foreach ((string key, string? text) in new[] { ("stdout", response.StdOut), ("stderr", response.StdErr) })
+                if (!string.IsNullOrEmpty(text) && output.Count < _options.MaxArtifactCount)
+                    output.Add(new EvolutionArtifact(key, ProgramText.Sanitize(ProgramText.Bound(text, _options.MaxArtifactLength))));
+            return new EvolutionTaskResult(EvolutionEvaluationStatus.Failed, costUnits: failed.CostUnits,
+                diagnostics: failed.Diagnostics, artifacts: output);
         }
 
         if (response.ExitCode != 0 || response.ErrorCode is not null and not ProgramExecuteErrorCode.None ||
