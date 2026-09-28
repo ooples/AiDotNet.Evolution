@@ -4,6 +4,7 @@
     <ImplicitUsings>enable</ImplicitUsings>
     <Nullable>enable</Nullable>
     <TreatWarningsAsErrors>true</TreatWarningsAsErrors>
+    <GenerateDocumentationFile>true</GenerateDocumentationFile>
     <Version>0.2.0</Version>
     <Description>Compiler-neutral bounded program improvement and artifact-bound promotion.</Description>
     <RepositoryUrl>https://github.com/ooples/AiDotNet.Evolution</RepositoryUrl>

@@ -13,10 +13,7 @@ using Newtonsoft.Json;
 namespace AiDotNet.Evolution.Programs;
 
 /// <summary>Proposes the next candidate program by asking a chat model to edit or rewrite the parent.</summary>
-/// <typeparam name="T">
-/// The numeric type the AiDotNet chat abstraction is parameterized on, matching the chat client supplied to the
-/// constructor. It is a marker for ecosystem consistency and does not affect prompting.
-/// </typeparam>
+
 /// <remarks>
 /// <para>
 /// The operator turns one archive parent into one new <see cref="ProgramGenome"/>. It renders the prompt through a

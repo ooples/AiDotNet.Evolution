@@ -153,8 +153,8 @@ public sealed class ProgramPromptBuilder
     /// <param name="criteria">The criteria to score, one per line in the prompt.</param>
     /// <param name="responseSchema">
     /// The JSON shape the answer must take, or <c>null</c> for a schema derived from
-    /// <paramref name="criteria"/>. Pair it with <see cref="ProgramChatOptions.ResponseJsonSchema"/> so providers that
-    /// support constrained decoding cannot return unparseable text at all.
+    /// <paramref name="criteria"/>. Pair it with <see cref="ProgramChatOptions.ResponseFormat"/> set to
+    /// <see cref="ProgramChatResponseFormat.Json"/> so providers that support JSON mode return an object.
     /// </param>
     /// <returns>A system message followed by the scoring request.</returns>
     /// <exception cref="ArgumentNullException"><paramref name="program"/> or <paramref name="criteria"/> is <c>null</c>.</exception>

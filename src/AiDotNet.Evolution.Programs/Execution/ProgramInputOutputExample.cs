@@ -17,7 +17,9 @@ namespace AiDotNet.Evolution.Programs;
 /// </remarks>
 public sealed class ProgramInputOutputExample
 {
+    /// <summary>Gets or sets the text given to the program on standard input.</summary>
     public string Input { get; set; } = string.Empty;
 
+    /// <summary>Gets or sets the output the program should print.</summary>
     public string ExpectedOutput { get; set; } = string.Empty;
 }
