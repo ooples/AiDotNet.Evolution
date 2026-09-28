@@ -1685,3 +1685,6 @@ static AiDotNet.Evolution.Programs.Experience.ProgramExperienceRetrieval.operato
 static AiDotNet.Evolution.Programs.Experience.ProgramExperienceRetrieval.operator ==(AiDotNet.Evolution.Programs.Experience.ProgramExperienceRetrieval? left, AiDotNet.Evolution.Programs.Experience.ProgramExperienceRetrieval? right) -> bool
 AiDotNet.Evolution.Programs.ProgramTaskOptions.MetricDescriptors.get -> System.Collections.Generic.IList<string!>!
 AiDotNet.Evolution.Programs.ProgramTaskOptions.MetricDescriptors.set -> void
+AiDotNet.Evolution.Programs.LlmProgramVariationOperator.SupportsDeterministicConcurrency.get -> bool
+AiDotNet.Evolution.Programs.LlmProgramVariationOptions.ConcurrentProposals.get -> bool
+AiDotNet.Evolution.Programs.LlmProgramVariationOptions.ConcurrentProposals.set -> void

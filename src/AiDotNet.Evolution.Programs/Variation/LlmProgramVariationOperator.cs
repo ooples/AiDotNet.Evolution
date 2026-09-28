@@ -66,7 +66,8 @@ namespace AiDotNet.Evolution.Programs;
 /// and asks again instead of wasting the round. You supply the chat client, so no model is contacted unless you
 /// configure one.</para>
 /// </remarks>
-public sealed class LlmProgramVariationOperator : ICheckpointableVariationOperator<ProgramGenome>, IProgramVariationOperator, IEvolutionLatencyProfile
+public sealed class LlmProgramVariationOperator : ICheckpointableVariationOperator<ProgramGenome>, IProgramVariationOperator, IEvolutionLatencyProfile,
+    IDeterministicConcurrentVariationOperator<ProgramGenome>
 {
     /// <inheritdoc/>
     /// <remarks>Every proposal is a model call, so proposals wait on external latency.</remarks>
@@ -88,6 +89,19 @@ public sealed class LlmProgramVariationOperator : ICheckpointableVariationOperat
     private readonly ProposalProvenanceOptions _provenanceOptions;
     private readonly object _attemptLock = new();
     private readonly Queue<ProgramProposalAttempt> _attempts = new();
+
+    // Concurrent mode (LlmProgramVariationOptions.ConcurrentProposals). Records are ordered by (generation, sequence),
+    // not by arrival, and a prompt reads history frozen per (island, archive snapshot version): the first proposal of a
+    // wave to start freezes it before any proposal of that wave can finish, so every prompt of the wave, and every
+    // checkpoint taken after the wave drains, is the same whichever model call returns first.
+    private readonly SortedList<(long Generation, int Sequence), (ProgramProposalAttempt Attempt, int Island, long Version)> _ordered = new();
+    private readonly Dictionary<(int Island, long Version), ProgramProposalAttempt[]> _frozen = new();
+    private long _restoredGeneration = long.MinValue;
+
+    /// <inheritdoc/>
+    /// <remarks>True when <see cref="LlmProgramVariationOptions.ConcurrentProposals"/> is set; the chat client must then
+    /// accept overlapping calls (every client in this package does).</remarks>
+    public bool SupportsDeterministicConcurrency => _variationOptions.ConcurrentProposals;
     private long _provenanceFailures;
     private long _proposals;
     private long _chatCalls;
@@ -195,7 +209,7 @@ public sealed class LlmProgramVariationOperator : ICheckpointableVariationOperat
     {
         lock (_attemptLock)
         {
-            return _attempts.ToArray();
+            return _variationOptions.ConcurrentProposals ? _ordered.Values.Select(entry => entry.Attempt).ToArray() : _attempts.ToArray();
         }
     }
 
@@ -223,6 +237,7 @@ public sealed class LlmProgramVariationOperator : ICheckpointableVariationOperat
 
         ProgramPromptResult prompt = _promptBuilder.Build(BuildPromptContext(context, parent), context.Random);
         var messages = new List<ProgramChatMessage>(prompt.Messages);
+        int recordSequence = 0;
 
         bool recordProvenance = _provenanceSink is not null && _provenanceOptions.Enabled;
         string proposalId = recordProvenance ? BuildProposalId(context) : string.Empty;
@@ -287,7 +302,7 @@ public sealed class LlmProgramVariationOperator : ICheckpointableVariationOperat
             {
                 Interlocked.Increment(ref _providerErrors);
                 string typeName = exception.GetType().Name;
-                Record(parent.Id, attemptNumber, ProgramProposalOutcome.ProviderError, typeName);
+                Record(context, recordSequence++, parent.Id, attemptNumber, ProgramProposalOutcome.ProviderError, typeName);
                 if (recordProvenance)
                 {
                     await RecordProvenanceAsync(
@@ -307,7 +322,7 @@ public sealed class LlmProgramVariationOperator : ICheckpointableVariationOperat
             CheckModelIdentity();
             ProgramProposalOutcome outcome = TryBuildChild(
                 parent, responseText, prompt.Mode, out ProgramGenome child, out string feedback);
-            Record(parent.Id, attemptNumber, outcome, feedback, inputTokens, outputTokens);
+            Record(context, recordSequence++, parent.Id, attemptNumber, outcome, feedback, inputTokens, outputTokens);
             if (recordProvenance)
             {
                 await RecordProvenanceAsync(
@@ -325,7 +340,7 @@ public sealed class LlmProgramVariationOperator : ICheckpointableVariationOperat
         }
 
         Interlocked.Increment(ref _abandoned);
-        Record(parent.Id, Math.Max(attemptNumber, 1), ProgramProposalOutcome.Exhausted,
+        Record(context, recordSequence++, parent.Id, Math.Max(attemptNumber, 1), ProgramProposalOutcome.Exhausted,
             "Every permitted attempt failed; the parent was returned unchanged.");
         return parent;
     }
@@ -386,7 +401,7 @@ public sealed class LlmProgramVariationOperator : ICheckpointableVariationOperat
             promptContext.Artifacts = artifacts;
         }
 
-        ApplyPreviousAttempts(promptContext, context.Parent.Evaluation.GenomeId);
+        ApplyPreviousAttempts(promptContext, context.Parent.Evaluation.GenomeId, context);
         ApplyArchiveContext(promptContext, context);
         SplitDiagnostics(evaluation.Diagnostics, promptContext);
         return promptContext;
@@ -401,7 +416,7 @@ public sealed class LlmProgramVariationOperator : ICheckpointableVariationOperat
     /// and is free to repeat an edit that failed to parse or applied to nothing. This surfaces the recorded
     /// attempts for that parent so the same dead end is not paid for twice.
     /// </remarks>
-    private void ApplyPreviousAttempts(ProgramPromptContext promptContext, string parentGenomeId)
+    private void ApplyPreviousAttempts(ProgramPromptContext promptContext, string parentGenomeId, EvolutionVariationContext<ProgramGenome> context)
     {
         int limit = _variationOptions.MaxPreviousAttempts;
         if (limit <= 0) return;
@@ -409,7 +424,7 @@ public sealed class LlmProgramVariationOperator : ICheckpointableVariationOperat
         ProgramProposalAttempt[] recorded;
         lock (_attemptLock)
         {
-            recorded = _attempts.ToArray();
+            recorded = _variationOptions.ConcurrentProposals ? Frozen(context) : _attempts.ToArray();
         }
 
         var recent = new List<ProgramPromptAttempt>();
@@ -733,7 +748,24 @@ public sealed class LlmProgramVariationOperator : ICheckpointableVariationOperat
         return ProgramProposalOutcome.Accepted;
     }
 
+    // Called under _attemptLock. History as of this proposal's snapshot: only records from earlier snapshot versions of
+    // the same island, which all completed before the current wave started.
+    private ProgramProposalAttempt[] Frozen(EvolutionVariationContext<ProgramGenome> context)
+    {
+        long version = context.Archive?.Version ?? long.MaxValue;
+        var key = (context.Island, version);
+        if (_frozen.TryGetValue(key, out ProgramProposalAttempt[]? frozen)) return frozen;
+        frozen = _ordered.Values.Where(entry => entry.Island == context.Island && entry.Version < version || entry.Version == -1)
+            .Select(entry => entry.Attempt).ToArray();
+        foreach ((int Island, long Version) stale in _frozen.Keys.Where(existing => existing.Island == context.Island).ToArray())
+            _frozen.Remove(stale);
+        _frozen[key] = frozen;
+        return frozen;
+    }
+
     private void Record(
+        EvolutionVariationContext<ProgramGenome> context,
+        int sequence,
         string parentId,
         int attemptNumber,
         ProgramProposalOutcome outcome,
@@ -745,6 +777,15 @@ public sealed class LlmProgramVariationOperator : ICheckpointableVariationOperat
         if (capacity == 0) return;
 
         var attempt = new ProgramProposalAttempt(parentId, attemptNumber, outcome, detail, inputTokens, outputTokens);
+        if (_variationOptions.ConcurrentProposals)
+        {
+            lock (_attemptLock)
+            {
+                _ordered[(context.Generation, sequence)] = (attempt, context.Island, context.Archive?.Version ?? long.MaxValue);
+                while (_ordered.Count > capacity) _ordered.RemoveAt(0); // the oldest by generation, never by arrival
+            }
+            return;
+        }
         lock (_attemptLock)
         {
             while (_attempts.Count >= capacity) _attempts.Dequeue();
@@ -762,7 +803,10 @@ public sealed class LlmProgramVariationOperator : ICheckpointableVariationOperat
     public string CaptureState()
     {
         ProgramProposalAttempt[] recorded;
-        lock (_attemptLock) { recorded = _attempts.ToArray(); }
+        lock (_attemptLock)
+        {
+            recorded = _variationOptions.ConcurrentProposals ? _ordered.Values.Select(entry => entry.Attempt).ToArray() : _attempts.ToArray();
+        }
 
         var document = new AttemptStateDocument
         {
@@ -827,7 +871,15 @@ public sealed class LlmProgramVariationOperator : ICheckpointableVariationOperat
         lock (_attemptLock)
         {
             _attempts.Clear();
-            foreach (ProgramProposalAttempt attempt in restored) _attempts.Enqueue(attempt);
+            _ordered.Clear();
+            _frozen.Clear();
+            foreach (ProgramProposalAttempt attempt in restored)
+            {
+                if (!_variationOptions.ConcurrentProposals) { _attempts.Enqueue(attempt); continue; }
+                // Restored history predates every snapshot of the resumed run: version -1, generations below any real one.
+                _ordered[(_restoredGeneration++, 0)] = (attempt, -1, -1);
+            }
+            _restoredGeneration = long.MinValue;
         }
     }
 
@@ -1102,6 +1154,8 @@ public sealed class LlmProgramVariationOperator : ICheckpointableVariationOperat
                 : "stream",
             promptBuilder.VersionHash
         };
+        // Only when set, so existing operator identities are unchanged: concurrent history changes what prompts contain.
+        if (variationOptions.ConcurrentProposals) components.Add("concurrent-proposals-v1");
         components.Add(variationOptions.FeatureDimensions.Count.ToString(CultureInfo.InvariantCulture));
         components.AddRange(variationOptions.FeatureDimensions);
         components.Add(variationOptions.FeatureBinCounts.Count.ToString(CultureInfo.InvariantCulture));

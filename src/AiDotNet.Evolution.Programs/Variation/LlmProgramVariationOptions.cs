@@ -64,6 +64,14 @@ public sealed class LlmProgramVariationOptions
     /// <summary>Gets or sets the sampling temperature passed to the chat client, or <c>null</c> for its default.</summary>
     public double? Temperature { get; set; }
 
+    /// <summary>
+    /// Gets or sets whether several proposals may call the model at once under pipeline dispatch, with
+    /// <see cref="EvolutionEngineOptions.Pipeline"/>'s <c>MaxProposalConcurrency</c>. Off by default, when proposals run one
+    /// at a time. On, replay stays exact: a prompt's previous-attempt history is the history as of its archive snapshot,
+    /// so no prompt depends on which concurrent call returns first.
+    /// </summary>
+    public bool ConcurrentProposals { get; set; }
+
     /// <summary>Gets or sets the output token cap passed to the chat client, or <c>null</c> for its default.</summary>
     public int? MaxOutputTokens { get; set; }
 
@@ -160,6 +168,7 @@ public sealed class LlmProgramVariationOptions
         MaxPromptProgramChars = MaxPromptProgramChars,
         SystemMessage = SystemMessage,
         Temperature = Temperature,
+        ConcurrentProposals = ConcurrentProposals,
         MaxOutputTokens = MaxOutputTokens,
         Seed = Seed,
         IncludeParentMetrics = IncludeParentMetrics,
