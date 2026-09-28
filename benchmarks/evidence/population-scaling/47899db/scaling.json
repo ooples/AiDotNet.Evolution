@@ -1,25 +1,26 @@
 {
  "story": "V1-72 #177",
  "repeats": 5,
+ "completed_repeats": 5,
  "ours_measured": 20000,
  "openevolve_measured": 200,
  "summary": {
   "aidotnet": {
    "us_per_eval_median": {
-    "100": 49.721644999999995,
-    "1000": 51.452439999999996,
-    "10000": 41.517125,
-    "50000": 27.40942
+    "100": 33.9637,
+    "1000": 35.90977,
+    "10000": 53.473994999999995,
+    "50000": 33.914385
    },
-   "growth_largest_over_smallest": 0.5512573045401052
+   "growth_largest_over_smallest": 0.9985480086091916
   },
   "openevolve": {
    "us_per_eval_median": {
-    "100": 13519.502999915858,
-    "1000": 32402.60599995963,
-    "5000": 99761.58400000713
+    "100": 15846.524000007776,
+    "1000": 31302.96449991874,
+    "5000": 211485.8694999566
    },
-   "growth_largest_over_smallest": 7.379086642506609
+   "growth_largest_over_smallest": 13.34588389856683
   }
  },
  "hangs": [],
@@ -28,610 +29,610 @@
    "system": "aidotnet",
    "size": 100,
    "repeat": 0,
-   "us_per_eval": 49.721644999999995,
+   "us_per_eval": 32.523590000000006,
    "raw": {
     "System": "aidotnet",
     "Elites": 100,
     "Measured": 20000,
     "Workers": 1,
-    "MicrosecondsPerEvaluation": 49.721644999999995,
-    "FillSeconds": 0.0165708
+    "MicrosecondsPerEvaluation": 32.523590000000006,
+    "FillSeconds": 0.0155092
    }
   },
   {
    "system": "aidotnet",
    "size": 1000,
    "repeat": 0,
-   "us_per_eval": 52.72462999999999,
+   "us_per_eval": 35.90977,
    "raw": {
     "System": "aidotnet",
     "Elites": 1000,
     "Measured": 20000,
     "Workers": 1,
-    "MicrosecondsPerEvaluation": 52.72462999999999,
-    "FillSeconds": 0.0709742
+    "MicrosecondsPerEvaluation": 35.90977,
+    "FillSeconds": 0.0485539
    }
   },
   {
    "system": "aidotnet",
    "size": 10000,
    "repeat": 0,
-   "us_per_eval": 43.097955,
+   "us_per_eval": 38.538025,
    "raw": {
     "System": "aidotnet",
     "Elites": 10000,
     "Measured": 20000,
     "Workers": 1,
-    "MicrosecondsPerEvaluation": 43.097955,
-    "FillSeconds": 0.6721545
+    "MicrosecondsPerEvaluation": 38.538025,
+    "FillSeconds": 0.5297376
    }
   },
   {
    "system": "aidotnet",
    "size": 50000,
    "repeat": 0,
-   "us_per_eval": 27.428955,
+   "us_per_eval": 27.920495000000003,
    "raw": {
     "System": "aidotnet",
     "Elites": 50000,
     "Measured": 20000,
     "Workers": 1,
-    "MicrosecondsPerEvaluation": 27.428955,
-    "FillSeconds": 2.1387766
+    "MicrosecondsPerEvaluation": 27.920495000000003,
+    "FillSeconds": 2.1948059
    }
   },
   {
    "system": "openevolve",
    "size": 100,
    "repeat": 0,
-   "us_per_eval": 13519.502999915858,
+   "us_per_eval": 15846.524000007776,
    "small": {
     "System": "openevolve",
-    "Iterations": 100,
+    "Iterations": 110,
     "Population": 100,
-    "Evaluations": 100,
-    "Programs": 98,
-    "Seconds": 2.0830549000093015
+    "Evaluations": 110,
+    "Programs": 100,
+    "Seconds": 2.5812974000000395
    },
    "large": {
     "System": "openevolve",
-    "Iterations": 300,
+    "Iterations": 310,
     "Population": 100,
-    "Evaluations": 300,
+    "Evaluations": 310,
     "Programs": 100,
-    "Seconds": 4.786955499992473
+    "Seconds": 5.750602200001595
    }
   },
   {
    "system": "openevolve",
    "size": 1000,
    "repeat": 0,
-   "us_per_eval": 31815.77400006063,
+   "us_per_eval": 46893.76800008176,
    "small": {
     "System": "openevolve",
-    "Iterations": 1000,
+    "Iterations": 1010,
     "Population": 1000,
-    "Evaluations": 1000,
-    "Programs": 996,
-    "Seconds": 21.561355899990303
+    "Evaluations": 1010,
+    "Programs": 1000,
+    "Seconds": 25.7262170999893
    },
    "large": {
     "System": "openevolve",
-    "Iterations": 1200,
+    "Iterations": 1210,
     "Population": 1000,
-    "Evaluations": 1200,
+    "Evaluations": 1210,
     "Programs": 1000,
-    "Seconds": 27.92451070000243
+    "Seconds": 35.10497070000565
    }
   },
   {
    "system": "openevolve",
    "size": 5000,
    "repeat": 0,
-   "us_per_eval": 99761.58400000713,
+   "us_per_eval": 211485.8694999566,
    "small": {
     "System": "openevolve",
-    "Iterations": 5000,
+    "Iterations": 5018,
     "Population": 5000,
-    "Evaluations": 5000,
-    "Programs": 4993,
-    "Seconds": 274.2427335999964
+    "Evaluations": 5018,
+    "Programs": 5000,
+    "Seconds": 404.69904950000637
    },
    "large": {
     "System": "openevolve",
-    "Iterations": 5200,
+    "Iterations": 5218,
     "Population": 5000,
-    "Evaluations": 5200,
+    "Evaluations": 5218,
     "Programs": 5000,
-    "Seconds": 294.19505039999785
+    "Seconds": 446.9962233999977
    }
   },
   {
    "system": "aidotnet",
    "size": 100,
    "repeat": 1,
-   "us_per_eval": 49.305715,
+   "us_per_eval": 33.9637,
    "raw": {
     "System": "aidotnet",
     "Elites": 100,
     "Measured": 20000,
     "Workers": 1,
-    "MicrosecondsPerEvaluation": 49.305715,
-    "FillSeconds": 0.0166157
+    "MicrosecondsPerEvaluation": 33.9637,
+    "FillSeconds": 0.015369
    }
   },
   {
    "system": "aidotnet",
    "size": 1000,
    "repeat": 1,
-   "us_per_eval": 51.361760000000004,
+   "us_per_eval": 34.030235,
    "raw": {
     "System": "aidotnet",
     "Elites": 1000,
     "Measured": 20000,
     "Workers": 1,
-    "MicrosecondsPerEvaluation": 51.361760000000004,
-    "FillSeconds": 0.0704031
+    "MicrosecondsPerEvaluation": 34.030235,
+    "FillSeconds": 0.0484839
    }
   },
   {
    "system": "aidotnet",
    "size": 10000,
    "repeat": 1,
-   "us_per_eval": 41.109735,
+   "us_per_eval": 39.855760000000004,
    "raw": {
     "System": "aidotnet",
     "Elites": 10000,
     "Measured": 20000,
     "Workers": 1,
-    "MicrosecondsPerEvaluation": 41.109735,
-    "FillSeconds": 0.7062107
+    "MicrosecondsPerEvaluation": 39.855760000000004,
+    "FillSeconds": 0.5067351
    }
   },
   {
    "system": "aidotnet",
    "size": 50000,
    "repeat": 1,
-   "us_per_eval": 27.40942,
+   "us_per_eval": 26.284855,
    "raw": {
     "System": "aidotnet",
     "Elites": 50000,
     "Measured": 20000,
     "Workers": 1,
-    "MicrosecondsPerEvaluation": 27.40942,
-    "FillSeconds": 2.0629811
+    "MicrosecondsPerEvaluation": 26.284855,
+    "FillSeconds": 2.1346771
    }
   },
   {
    "system": "openevolve",
    "size": 100,
    "repeat": 1,
-   "us_per_eval": 13215.079500005231,
+   "us_per_eval": 16460.819999992964,
    "small": {
     "System": "openevolve",
-    "Iterations": 100,
+    "Iterations": 110,
     "Population": 100,
-    "Evaluations": 100,
-    "Programs": 98,
-    "Seconds": 2.0385991999937687
+    "Evaluations": 110,
+    "Programs": 100,
+    "Seconds": 2.60064710000006
    },
    "large": {
     "System": "openevolve",
-    "Iterations": 300,
+    "Iterations": 310,
     "Population": 100,
-    "Evaluations": 300,
+    "Evaluations": 310,
     "Programs": 100,
-    "Seconds": 4.681615099994815
+    "Seconds": 5.892811099998653
    }
   },
   {
    "system": "openevolve",
    "size": 1000,
    "repeat": 1,
-   "us_per_eval": 34410.1595000393,
+   "us_per_eval": 31302.96449991874,
    "small": {
     "System": "openevolve",
-    "Iterations": 1000,
+    "Iterations": 1010,
     "Population": 1000,
-    "Evaluations": 1000,
-    "Programs": 995,
-    "Seconds": 21.081118299989612
+    "Evaluations": 1010,
+    "Programs": 1000,
+    "Seconds": 30.703880600005505
    },
    "large": {
     "System": "openevolve",
-    "Iterations": 1200,
+    "Iterations": 1210,
     "Population": 1000,
-    "Evaluations": 1200,
+    "Evaluations": 1210,
     "Programs": 1000,
-    "Seconds": 27.96315019999747
+    "Seconds": 36.96447349998925
    }
   },
   {
    "system": "openevolve",
    "size": 5000,
    "repeat": 1,
-   "us_per_eval": 209690.80499991833,
+   "us_per_eval": 175865.8429999923,
    "small": {
     "System": "openevolve",
-    "Iterations": 5000,
+    "Iterations": 5012,
     "Population": 5000,
-    "Evaluations": 5000,
-    "Programs": 4993,
-    "Seconds": 277.1455736000062
+    "Evaluations": 5012,
+    "Programs": 5000,
+    "Seconds": 398.01946090000274
    },
    "large": {
     "System": "openevolve",
-    "Iterations": 5200,
+    "Iterations": 5212,
     "Population": 5000,
-    "Evaluations": 5200,
+    "Evaluations": 5212,
     "Programs": 5000,
-    "Seconds": 319.08373459998984
+    "Seconds": 433.1926295000012
    }
   },
   {
    "system": "aidotnet",
    "size": 100,
    "repeat": 2,
-   "us_per_eval": 49.98888,
+   "us_per_eval": 32.4392,
    "raw": {
     "System": "aidotnet",
     "Elites": 100,
     "Measured": 20000,
     "Workers": 1,
-    "MicrosecondsPerEvaluation": 49.98888,
-    "FillSeconds": 0.0182405
+    "MicrosecondsPerEvaluation": 32.4392,
+    "FillSeconds": 0.0154616
    }
   },
   {
    "system": "aidotnet",
    "size": 1000,
    "repeat": 2,
-   "us_per_eval": 52.217800000000004,
+   "us_per_eval": 34.35232,
    "raw": {
     "System": "aidotnet",
     "Elites": 1000,
     "Measured": 20000,
     "Workers": 1,
-    "MicrosecondsPerEvaluation": 52.217800000000004,
-    "FillSeconds": 0.0724004
+    "MicrosecondsPerEvaluation": 34.35232,
+    "FillSeconds": 0.0472469
    }
   },
   {
    "system": "aidotnet",
    "size": 10000,
    "repeat": 2,
-   "us_per_eval": 41.517125,
+   "us_per_eval": 53.473994999999995,
    "raw": {
     "System": "aidotnet",
     "Elites": 10000,
     "Measured": 20000,
     "Workers": 1,
-    "MicrosecondsPerEvaluation": 41.517125,
-    "FillSeconds": 0.6919166
+    "MicrosecondsPerEvaluation": 53.473994999999995,
+    "FillSeconds": 0.5089368
    }
   },
   {
    "system": "aidotnet",
    "size": 50000,
    "repeat": 2,
-   "us_per_eval": 55.490165000000005,
+   "us_per_eval": 33.914385,
    "raw": {
     "System": "aidotnet",
     "Elites": 50000,
     "Measured": 20000,
     "Workers": 1,
-    "MicrosecondsPerEvaluation": 55.490165000000005,
-    "FillSeconds": 2.1350013
+    "MicrosecondsPerEvaluation": 33.914385,
+    "FillSeconds": 3.0437769
    }
   },
   {
    "system": "openevolve",
    "size": 100,
    "repeat": 2,
-   "us_per_eval": 14132.970499995281,
+   "us_per_eval": 15203.32000000053,
    "small": {
     "System": "openevolve",
-    "Iterations": 100,
+    "Iterations": 110,
     "Population": 100,
-    "Evaluations": 100,
-    "Programs": 99,
-    "Seconds": 2.569349500001408
+    "Evaluations": 110,
+    "Programs": 100,
+    "Seconds": 2.848139199995785
    },
    "large": {
     "System": "openevolve",
-    "Iterations": 300,
+    "Iterations": 310,
     "Population": 100,
-    "Evaluations": 300,
+    "Evaluations": 310,
     "Programs": 100,
-    "Seconds": 5.395943600000464
+    "Seconds": 5.888803199995891
    }
   },
   {
    "system": "openevolve",
    "size": 1000,
    "repeat": 2,
-   "us_per_eval": 40283.697999984724,
+   "us_per_eval": 9170.974000007845,
    "small": {
     "System": "openevolve",
-    "Iterations": 1000,
+    "Iterations": 1010,
     "Population": 1000,
-    "Evaluations": 1000,
-    "Programs": 995,
-    "Seconds": 21.883830000006128
+    "Evaluations": 1010,
+    "Programs": 1000,
+    "Seconds": 32.66224039999361
    },
    "large": {
     "System": "openevolve",
-    "Iterations": 1200,
+    "Iterations": 1210,
     "Population": 1000,
-    "Evaluations": 1200,
+    "Evaluations": 1210,
     "Programs": 1000,
-    "Seconds": 29.940569600003073
+    "Seconds": 34.496435199995176
    }
   },
   {
    "system": "openevolve",
    "size": 5000,
    "repeat": 2,
-   "us_per_eval": 92605.29099999985,
+   "us_per_eval": 802206.3994999917,
    "small": {
     "System": "openevolve",
-    "Iterations": 5000,
+    "Iterations": 5012,
     "Population": 5000,
-    "Evaluations": 5000,
-    "Programs": 4992,
-    "Seconds": 274.64059019999695
+    "Evaluations": 5012,
+    "Programs": 5000,
+    "Seconds": 412.397278199991
    },
    "large": {
     "System": "openevolve",
-    "Iterations": 5200,
+    "Iterations": 5212,
     "Population": 5000,
-    "Evaluations": 5200,
+    "Evaluations": 5212,
     "Programs": 5000,
-    "Seconds": 293.1616483999969
+    "Seconds": 572.8385580999893
    }
   },
   {
    "system": "aidotnet",
    "size": 100,
    "repeat": 3,
-   "us_per_eval": 49.221255000000006,
+   "us_per_eval": 49.214485,
    "raw": {
     "System": "aidotnet",
     "Elites": 100,
     "Measured": 20000,
     "Workers": 1,
-    "MicrosecondsPerEvaluation": 49.221255000000006,
-    "FillSeconds": 0.0163876
+    "MicrosecondsPerEvaluation": 49.214485,
+    "FillSeconds": 0.0362375
    }
   },
   {
    "system": "aidotnet",
    "size": 1000,
    "repeat": 3,
-   "us_per_eval": 51.17618,
+   "us_per_eval": 56.47531,
    "raw": {
     "System": "aidotnet",
     "Elites": 1000,
     "Measured": 20000,
     "Workers": 1,
-    "MicrosecondsPerEvaluation": 51.17618,
-    "FillSeconds": 0.0710494
+    "MicrosecondsPerEvaluation": 56.47531,
+    "FillSeconds": 0.0520496
    }
   },
   {
    "system": "aidotnet",
    "size": 10000,
    "repeat": 3,
-   "us_per_eval": 41.51331,
+   "us_per_eval": 53.53485500000001,
    "raw": {
     "System": "aidotnet",
     "Elites": 10000,
     "Measured": 20000,
     "Workers": 1,
-    "MicrosecondsPerEvaluation": 41.51331,
-    "FillSeconds": 0.6708889
+    "MicrosecondsPerEvaluation": 53.53485500000001,
+    "FillSeconds": 0.8572044
    }
   },
   {
    "system": "aidotnet",
    "size": 50000,
    "repeat": 3,
-   "us_per_eval": 27.081919999999997,
+   "us_per_eval": 36.175255,
    "raw": {
     "System": "aidotnet",
     "Elites": 50000,
     "Measured": 20000,
     "Workers": 1,
-    "MicrosecondsPerEvaluation": 27.081919999999997,
-    "FillSeconds": 2.1028156
+    "MicrosecondsPerEvaluation": 36.175255,
+    "FillSeconds": 2.6225697
    }
   },
   {
    "system": "openevolve",
    "size": 100,
    "repeat": 3,
-   "us_per_eval": 13369.358999916585,
+   "us_per_eval": 15071.469500035164,
    "small": {
     "System": "openevolve",
-    "Iterations": 100,
+    "Iterations": 110,
     "Population": 100,
-    "Evaluations": 100,
-    "Programs": 98,
-    "Seconds": 2.1367219000094337
+    "Evaluations": 110,
+    "Programs": 100,
+    "Seconds": 2.605959599997732
    },
    "large": {
     "System": "openevolve",
-    "Iterations": 300,
+    "Iterations": 310,
     "Population": 100,
-    "Evaluations": 300,
+    "Evaluations": 310,
     "Programs": 100,
-    "Seconds": 4.810593699992751
+    "Seconds": 5.620253500004765
    }
   },
   {
    "system": "openevolve",
    "size": 1000,
    "repeat": 3,
-   "us_per_eval": 32402.60599995963,
+   "us_per_eval": 17406.121000021813,
    "small": {
     "System": "openevolve",
-    "Iterations": 1000,
+    "Iterations": 1010,
     "Population": 1000,
-    "Evaluations": 1000,
-    "Programs": 997,
-    "Seconds": 21.137155000003986
+    "Evaluations": 1010,
+    "Programs": 1000,
+    "Seconds": 44.352794099992025
    },
    "large": {
     "System": "openevolve",
-    "Iterations": 1200,
+    "Iterations": 1210,
     "Population": 1000,
-    "Evaluations": 1200,
+    "Evaluations": 1210,
     "Programs": 1000,
-    "Seconds": 27.617676199995913
+    "Seconds": 47.83401829999639
    }
   },
   {
    "system": "openevolve",
    "size": 5000,
    "repeat": 3,
-   "us_per_eval": 62703.37699999801,
+   "us_per_eval": 849542.305500072,
    "small": {
     "System": "openevolve",
-    "Iterations": 5000,
+    "Iterations": 5016,
     "Population": 5000,
-    "Evaluations": 5000,
-    "Programs": 4992,
-    "Seconds": 278.9158893999993
+    "Evaluations": 5016,
+    "Programs": 5000,
+    "Seconds": 433.2686498999974
    },
    "large": {
     "System": "openevolve",
-    "Iterations": 5200,
+    "Iterations": 5216,
     "Population": 5000,
-    "Evaluations": 5200,
+    "Evaluations": 5216,
     "Programs": 5000,
-    "Seconds": 291.4565647999989
+    "Seconds": 603.1771110000118
    }
   },
   {
    "system": "aidotnet",
    "size": 100,
    "repeat": 4,
-   "us_per_eval": 49.7434,
+   "us_per_eval": 58.243475,
    "raw": {
     "System": "aidotnet",
     "Elites": 100,
     "Measured": 20000,
     "Workers": 1,
-    "MicrosecondsPerEvaluation": 49.7434,
-    "FillSeconds": 0.0165791
+    "MicrosecondsPerEvaluation": 58.243475,
+    "FillSeconds": 0.030518
    }
   },
   {
    "system": "aidotnet",
    "size": 1000,
    "repeat": 4,
-   "us_per_eval": 51.452439999999996,
+   "us_per_eval": 54.139075,
    "raw": {
     "System": "aidotnet",
     "Elites": 1000,
     "Measured": 20000,
     "Workers": 1,
-    "MicrosecondsPerEvaluation": 51.452439999999996,
-    "FillSeconds": 0.0696716
+    "MicrosecondsPerEvaluation": 54.139075,
+    "FillSeconds": 0.0654952
    }
   },
   {
    "system": "aidotnet",
    "size": 10000,
    "repeat": 4,
-   "us_per_eval": 42.59151,
+   "us_per_eval": 59.64389,
    "raw": {
     "System": "aidotnet",
     "Elites": 10000,
     "Measured": 20000,
     "Workers": 1,
-    "MicrosecondsPerEvaluation": 42.59151,
-    "FillSeconds": 0.6741289
+    "MicrosecondsPerEvaluation": 59.64389,
+    "FillSeconds": 0.753946
    }
   },
   {
    "system": "aidotnet",
    "size": 50000,
    "repeat": 4,
-   "us_per_eval": 26.831429999999997,
+   "us_per_eval": 60.466390000000004,
    "raw": {
     "System": "aidotnet",
     "Elites": 50000,
     "Measured": 20000,
     "Workers": 1,
-    "MicrosecondsPerEvaluation": 26.831429999999997,
-    "FillSeconds": 2.0712446
+    "MicrosecondsPerEvaluation": 60.466390000000004,
+    "FillSeconds": 3.1868803
    }
   },
   {
    "system": "openevolve",
    "size": 100,
    "repeat": 4,
-   "us_per_eval": 13953.232999920147,
+   "us_per_eval": 25015.604000000167,
    "small": {
     "System": "openevolve",
-    "Iterations": 100,
+    "Iterations": 110,
     "Population": 100,
-    "Evaluations": 100,
-    "Programs": 99,
-    "Seconds": 2.033983300003456
+    "Evaluations": 110,
+    "Programs": 100,
+    "Seconds": 3.991148000000976
    },
    "large": {
     "System": "openevolve",
-    "Iterations": 300,
+    "Iterations": 310,
     "Population": 100,
-    "Evaluations": 300,
+    "Evaluations": 310,
     "Programs": 100,
-    "Seconds": 4.824629899987485
+    "Seconds": 8.99426880000101
    }
   },
   {
    "system": "openevolve",
    "size": 1000,
    "repeat": 4,
-   "us_per_eval": 29324.29750006122,
+   "us_per_eval": 62565.102500011555,
    "small": {
     "System": "openevolve",
-    "Iterations": 1000,
+    "Iterations": 1010,
     "Population": 1000,
-    "Evaluations": 1000,
-    "Programs": 996,
-    "Seconds": 21.1967147999967
+    "Evaluations": 1010,
+    "Programs": 1000,
+    "Seconds": 37.646229799996945
    },
    "large": {
     "System": "openevolve",
-    "Iterations": 1200,
+    "Iterations": 1210,
     "Population": 1000,
-    "Evaluations": 1200,
+    "Evaluations": 1210,
     "Programs": 1000,
-    "Seconds": 27.061574300008942
+    "Seconds": 50.15925029999926
    }
   },
   {
    "system": "openevolve",
    "size": 5000,
    "repeat": 4,
-   "us_per_eval": 145980.99249997176,
+   "us_per_eval": 31304.906999866947,
    "small": {
     "System": "openevolve",
-    "Iterations": 5000,
+    "Iterations": 5014,
     "Population": 5000,
-    "Evaluations": 5000,
-    "Programs": 4993,
-    "Seconds": 269.11536930000875
+    "Evaluations": 5014,
+    "Programs": 5000,
+    "Seconds": 587.847592200007
    },
    "large": {
     "System": "openevolve",
-    "Iterations": 5200,
+    "Iterations": 5214,
     "Population": 5000,
-    "Evaluations": 5200,
+    "Evaluations": 5214,
     "Programs": 5000,
-    "Seconds": 298.3115678000031
+    "Seconds": 594.1085735999804
    }
   }
  ]
