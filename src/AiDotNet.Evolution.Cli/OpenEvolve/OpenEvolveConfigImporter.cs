@@ -34,12 +34,15 @@ internal static class OpenEvolveConfigImporter
         Dictionary<string, object?> defaults = Defaults();
         var merged = new Dictionary<string, object?>(defaults, StringComparer.Ordinal);
         var errors = new List<string>();
+        var unknown = new List<string>();
         foreach ((string key, object? value) in config)
         {
             OpenEvolveKey? known = OpenEvolveConfigCatalog.Find(key);
             if (known is null)
             {
-                errors.Add(key + ": not an OpenEvolve 0.3.2 config key");
+                // OpenEvolve builds its config with dacite, which drops keys it does not define, so these change nothing
+                // there either. They are named rather than dropped silently, since one may be a misspelt real key.
+                unknown.Add(key);
                 continue;
             }
             if (known.Disposition == OpenEvolveKeyDisposition.RefusedUnlessDefault && !Same(value, defaults[key]))
@@ -47,6 +50,15 @@ internal static class OpenEvolveConfigImporter
             merged[key] = value;
         }
         var notes = new List<string>();
+        foreach (string key in unknown)
+            notes.Add(key + " is not an OpenEvolve 0.3.2 config key; OpenEvolve ignores it, and so does this import.");
+        if (!config.ContainsKey("llm.api_base") && Environment.GetEnvironmentVariable("OPENAI_API_BASE") is { Length: > 0 } apiBase)
+        {
+            merged["llm.api_base"] = apiBase; // OpenEvolve's own fallback when the config leaves api_base unset
+            notes.Add("llm.api_base comes from OPENAI_API_BASE: " + apiBase);
+        }
+        if (config.TryGetValue("llm.api_key", out object? configuredKey) && configuredKey is not null)
+            notes.Add("llm.api_key in the config is not used; the key is read from OPENAI_API_KEY.");
         List<RunModel> models = Models(merged, defaults, errors);
         if (errors.Count > 0)
             throw new InvalidDataException("The OpenEvolve config cannot be imported:" + Environment.NewLine + "  " +
@@ -65,6 +77,8 @@ internal static class OpenEvolveConfigImporter
         double exploitation = Number(merged["database.exploitation_ratio"]) ?? 0.7;
         if (exploration < 0 || exploitation < 0 || exploration + exploitation > 1 + 1e-9)
             throw new InvalidDataException("database.exploration_ratio + exploitation_ratio must be between 0 and 1.");
+        int inspirationCount = (int)(Integer(merged["prompt.num_diverse_programs"]) ?? 2);
+        int topInspirations = Math.Max(1, (int)(inspirationCount * (Number(merged["database.elite_selection_ratio"]) ?? 0.1)));
         string? language = merged["language"] as string;
         string? systemMessage = merged["prompt.system_message"] as string;
 
@@ -100,7 +114,10 @@ internal static class OpenEvolveConfigImporter
                 ExploitationRatio = exploitation,
                 EliteRatio = 1 - exploration - exploitation,
                 TopPrograms = (int?)Integer(merged["prompt.num_top_programs"]),
-                DiversePrograms = (int?)Integer(merged["prompt.num_diverse_programs"]),
+                // OpenEvolve's n inspirations: the island best, then max(1, int(n x elite_selection_ratio)) top programs,
+                // then diverse ones filling the rest of n.
+                TopInspirations = topInspirations,
+                DiversePrograms = Math.Max(0, inspirationCount - 1 - topInspirations),
                 MetricDescriptors = descriptors,
                 EarlyStoppingPatience = Integer(merged["early_stopping_patience"]),
                 EarlyStoppingMinimumImprovement = Number(merged["convergence_threshold"]) ?? 0,
@@ -176,10 +193,10 @@ internal static class OpenEvolveConfigImporter
         bool manual = Boolean(model["manual_mode"]);
         return new RunModel
         {
-            Provider = manual ? ModelProvider.Manual : ModelProvider.OpenAiCompatible,
+            Provider = manual ? ModelProvider.Manual : Provider(model["provider"] as string),
             Endpoint = model["api_base"] as string,
             Name = model["name"] as string ?? throw new InvalidDataException("llm.models: every model needs a name."),
-            ApiKeyEnvironmentVariable = manual ? null : "OPENAI_API_KEY",
+            ApiKeyEnvironmentVariable = manual || Provider(model["provider"] as string) == ModelProvider.ClaudeCode ? null : "OPENAI_API_KEY",
             Temperature = Number(model["temperature"]),
             TopP = Number(model["top_p"]),
             MaxOutputTokens = (int?)Integer(model["max_tokens"]),
@@ -216,6 +233,13 @@ internal static class OpenEvolveConfigImporter
         }
         return descriptors;
     }
+
+    private static ModelProvider Provider(string? provider) => provider?.ToLowerInvariant() switch
+    {
+        null or "openai" => ModelProvider.OpenAiCompatible,
+        "claude_code" or "claude-code" => ModelProvider.ClaudeCode,
+        _ => throw new InvalidDataException("llm.provider = " + provider + ": not supported (openai or claude_code).")
+    };
 
     private static ProgramLanguage ParseLanguage(string language) => language.ToLowerInvariant() switch
     {

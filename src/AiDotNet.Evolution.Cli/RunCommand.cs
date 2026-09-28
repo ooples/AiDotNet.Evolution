@@ -56,6 +56,8 @@ internal sealed class RunSearch
     public double? EliteRatio { get; init; }
     /// <summary>Top programs shown in each prompt (OpenEvolve's <c>prompt.num_top_programs</c>).</summary>
     public int? TopPrograms { get; init; }
+    /// <summary>Top-quality elites offered as inspirations after the island best; null keeps the engine default.</summary>
+    public int? TopInspirations { get; init; }
     /// <summary>Diverse programs shown in each prompt (OpenEvolve's <c>prompt.num_diverse_programs</c>).</summary>
     public int? DiversePrograms { get; init; }
     /// <summary>Evaluator metrics used as archive axes, with their bin counts; empty keeps program length alone.</summary>
@@ -294,6 +296,7 @@ internal static class RunCommand
             if (run.Search.EliteRatio is double elite) options.Selection.EliteRatio = elite;
         }
         if (run.Search.DiversePrograms is int diverse) options.Selection.DiverseInspirationCount = diverse;
+        if (run.Search.TopInspirations is int top) options.Selection.TopInspirationCount = top;
         if (run.Search.EarlyStoppingPatience is long patience)
         {
             options.EarlyStopping.PatienceEvaluations = patience;
@@ -304,10 +307,13 @@ internal static class RunCommand
         options.GlobalEliteCount = run.Search.EliteArchiveSize;
         if (run.Search.MaxArtifactBytes is int artifactBytes) options.Artifacts.MaxArtifactBytes = artifactBytes;
 
+        // OpenEvolve's population_size bounds the whole database; a bound at or above the grid is just the grid.
+        long grid = descriptors.Aggregate(1L, (cells, descriptor) => cells * descriptor.BinCount);
+        int capacity = run.Search.ArchiveCapacity > 0 && run.Search.ArchiveCapacity < grid ? run.Search.ArchiveCapacity : 0;
         EvolutionRunResult<ProgramGenome> result;
         using (var tracer = new EvolutionTraceObserver<ProgramGenome>(new EvolutionTraceOptions { Enabled = true, Path = tracePath }, run.RunId, descriptors))
         {
-            var engine = new EvolutionEngine<ProgramGenome>(task, variation, _ => new MapElitesArchive<ProgramGenome>(descriptors, capacity: run.Search.ArchiveCapacity), options,
+            var engine = new EvolutionEngine<ProgramGenome>(task, variation, _ => new MapElitesArchive<ProgramGenome>(descriptors, capacity: capacity), options,
                 observer: tracer, checkpointStore: checkpoints, genomeCodec: codec);
             interrupt.Attach(engine.RequestStop);
             try
