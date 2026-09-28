@@ -333,6 +333,32 @@ public sealed class LlmProgramVariationOperatorTests
     }
 
     [Fact]
+    public async Task ArtifactDiagnosticPrefixDecidesWhichDiagnosticsBecomeArtifacts()
+    {
+        EvolutionDiagnostic[] diagnostics =
+        {
+            new EvolutionDiagnostic("program_script_artifact_stdout", "captured stdout line", isRedacted: true),
+            new EvolutionDiagnostic("custom_log", "custom log line")
+        };
+
+        var standardClient = new FakeChatClient(DiffResponse("    return x", "    return 4"));
+        await new LlmProgramVariationOperator(standardClient).ProposeAsync(Context(diagnostics: diagnostics));
+        string standard = standardClient.Conversations[0][1].Text;
+        Assert.Contains("### program_script_artifact_stdout", standard, StringComparison.Ordinal);
+        Assert.DoesNotContain("### custom_log", standard, StringComparison.Ordinal);
+
+        var customClient = new FakeChatClient(DiffResponse("    return x", "    return 4"));
+        await new LlmProgramVariationOperator(customClient, null, new LlmProgramVariationOptions
+        {
+            ArtifactDiagnosticPrefix = "custom_"
+        }).ProposeAsync(Context(diagnostics: diagnostics));
+        string custom = customClient.Conversations[0][1].Text;
+        Assert.Contains("### custom_log", custom, StringComparison.Ordinal);
+        Assert.DoesNotContain("### program_script_artifact_stdout", custom, StringComparison.Ordinal);
+        Assert.Contains("- program_script_artifact_stdout", custom, StringComparison.Ordinal);
+    }
+
+    [Fact]
     public async Task FeatureDimensionNamesLabelTheArchiveCell()
     {
         var client = new FakeChatClient(DiffResponse("    return x", "    return 4"));

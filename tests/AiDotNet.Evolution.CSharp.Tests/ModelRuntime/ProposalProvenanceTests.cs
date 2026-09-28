@@ -125,6 +125,27 @@ public sealed class ProposalProvenanceTests : IDisposable
     }
 
     [Fact]
+    public async Task MaxSegmentBytesFlushesBeforeTheRecordCountIsReached()
+    {
+        var bounded = new ProposalProvenanceOptions { FlushEveryRecords = 1000, MaxSegmentBytes = 1 };
+        using (var sink = new JsonLinesProposalProvenanceSink(_directory, bounded))
+        {
+            await sink.RecordAsync(Record("p1", 1, "a", "b"));
+            await sink.RecordAsync(Record("p2", 2, "b", "c"));
+            Assert.Equal(2, sink.SegmentsWritten);
+        }
+
+        string unboundedDirectory = Path.Combine(_directory, "unbounded");
+        using (var sink = new JsonLinesProposalProvenanceSink(
+                   unboundedDirectory, new ProposalProvenanceOptions { FlushEveryRecords = 1000 }))
+        {
+            await sink.RecordAsync(Record("p1", 1, "a", "b"));
+            await sink.RecordAsync(Record("p2", 2, "b", "c"));
+            Assert.Equal(0, sink.SegmentsWritten);
+        }
+    }
+
+    [Fact]
     public async Task SegmentsAreWrittenAtomicallyAndLeaveNoTemporaryFiles()
     {
         var sink = new JsonLinesProposalProvenanceSink(
