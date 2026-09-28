@@ -1,0 +1,41 @@
+name: Main red alert
+
+# V1-81 (#183): a post-merge failure on main must not go unnoticed. When a required workflow fails on a push to main,
+# open one issue per workflow (or comment on the one already open) and link it to the v1 epic.
+on:
+  workflow_run:
+    workflows: ["Build and Test", "CodeQL", "SonarCloud"]
+    types: [completed]
+    branches: [main]
+
+permissions:
+  contents: read
+
+jobs:
+  report:
+    if: github.event.workflow_run.event == 'push' && github.event.workflow_run.conclusion == 'failure'
+    runs-on: ubuntu-latest
+    permissions:
+      issues: write
+    steps:
+      - name: Open or update the issue
+        env:
+          GH_TOKEN: ${{ github.token }}
+          REPO: ${{ github.repository }}
+          WORKFLOW: ${{ github.event.workflow_run.name }}
+          RUN_URL: ${{ github.event.workflow_run.html_url }}
+          SHA: ${{ github.event.workflow_run.head_sha }}
+        run: |
+          title="main is red: ${WORKFLOW}"
+          body="The \`${WORKFLOW}\` workflow failed on main at ${SHA}.
+
+          Run: ${RUN_URL}
+
+          Opened automatically by the main-red-alert workflow (V1-81, #183). Epic: #125."
+          existing=$(gh issue list --repo "$REPO" --state open --search "\"${title}\" in:title" --json number,title \
+            --jq ".[] | select(.title == \"${title}\") | .number" | head -n 1)
+          if [ -n "$existing" ]; then
+            gh issue comment "$existing" --repo "$REPO" --body "Failed again at ${SHA}: ${RUN_URL}"
+          else
+            gh issue create --repo "$REPO" --title "$title" --body "$body"
+          fi
