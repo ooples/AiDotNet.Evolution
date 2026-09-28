@@ -1,5 +1,49 @@
 # Changelog
 
+## [0.2.0](https://github.com/ooples/AiDotNet.Evolution/compare/v0.1.0...v0.2.0) (2026-09-28)
+
+
+### ⚠ BREAKING CHANGES
+
+* **engine:** zero-latency pipeline, proposal identity v3 and Dispatch=Auto (V1-20) ([#138](https://github.com/ooples/AiDotNet.Evolution/issues/138))
+
+### Features
+
+* **analysis:** hash-frozen campaign pre-registration and reproducible report (V1-05) ([#130](https://github.com/ooples/AiDotNet.Evolution/issues/130)) ([726446b](https://github.com/ooples/AiDotNet.Evolution/commit/726446b5ce3030fb52aab1cc222d9ce9d712ad6f))
+* **api:** classify, declare and enforce the public API (V1-11) ([#137](https://github.com/ooples/AiDotNet.Evolution/issues/137)) ([602360f](https://github.com/ooples/AiDotNet.Evolution/commit/602360f4389572ae59f15e8c10e11c8c26a84d4c))
+* **benchmarks:** add oracle-checked GPU consumer proof for US-11 ([#106](https://github.com/ooples/AiDotNet.Evolution/issues/106)) ([6d26bda](https://github.com/ooples/AiDotNet.Evolution/commit/6d26bda5e690a2e9a9c068357ed44d1301204b0d))
+* **benchmarks:** AlgoTune family with sealed test inputs and oracle mutants (V1-04b) ([#132](https://github.com/ooples/AiDotNet.Evolution/issues/132)) ([9837360](https://github.com/ooples/AiDotNet.Evolution/commit/9837360b1bf0514ce05d68874490f687b76dee72))
+* **benchmarks:** AlphaEvolve math family with independent verifiers (V1-04a) ([#133](https://github.com/ooples/AiDotNet.Evolution/issues/133)) ([40523be](https://github.com/ooples/AiDotNet.Evolution/commit/40523be8f76058cf2b6318140ce72b0e58b754d4))
+* **benchmarks:** Claude transport, OpenEvolve shim and campaign runner (V1-02, V1-03, V1-06) ([#128](https://github.com/ooples/AiDotNet.Evolution/issues/128)) ([7662afc](https://github.com/ooples/AiDotNet.Evolution/commit/7662afca614696298d92bb2f9927cac42f7a70b8))
+* **benchmarks:** engine overhead head-to-head vs OpenEvolve (V1-30) ([#143](https://github.com/ooples/AiDotNet.Evolution/issues/143)) ([3eb1dd1](https://github.com/ooples/AiDotNet.Evolution/commit/3eb1dd10573233910eb5ad2364c4c7f83171a190))
+* **benchmarks:** GPU/CPU kernel family with an FP64 host oracle (V1-04c) ([#134](https://github.com/ooples/AiDotNet.Evolution/issues/134)) ([46e1141](https://github.com/ooples/AiDotNet.Evolution/commit/46e1141859bf8c8d8709343ec142114e9790d34e))
+* **cli:** aidotnet-evolve with reports, run/resume, lifecycle and warm start (V1-24, V1-26) ([#142](https://github.com/ooples/AiDotNet.Evolution/issues/142)) ([4fc12bd](https://github.com/ooples/AiDotNet.Evolution/commit/4fc12bddab4356a31eaad2124831f391ac0d40cb))
+* **conformance:** durable-worker scenarios, tested wheel and reference Python worker (V1-25) ([#144](https://github.com/ooples/AiDotNet.Evolution/issues/144)) ([0c71e2d](https://github.com/ooples/AiDotNet.Evolution/commit/0c71e2d9d0ad8bb0add4685b1de32ffdb8ee2ab2))
+* **engine:** zero-latency pipeline, proposal identity v3 and Dispatch=Auto (V1-20) ([#138](https://github.com/ooples/AiDotNet.Evolution/issues/138)) ([78fca33](https://github.com/ooples/AiDotNet.Evolution/commit/78fca331a0ddffc2eed9b571fe23277352929221))
+* **programs:** bounded experience memory and advisory novelty (V1-23) ([#141](https://github.com/ooples/AiDotNet.Evolution/issues/141)) ([30471be](https://github.com/ooples/AiDotNet.Evolution/commit/30471be05e820872033fe52721b4eacb274c9886))
+* **programs:** compiler-guided repair for Python tasks (V1-22) ([#140](https://github.com/ooples/AiDotNet.Evolution/issues/140)) ([c0c7cd1](https://github.com/ooples/AiDotNet.Evolution/commit/c0c7cd158c66a252a648d80368af514c6ca6b538))
+* **routing:** escalation ladder and explicit stale-estimate handling (V1-21) ([#139](https://github.com/ooples/AiDotNet.Evolution/issues/139)) ([fe6ee63](https://github.com/ooples/AiDotNet.Evolution/commit/fe6ee63837757f87bffa6c14cd1301e31184d8be))
+
+
+### Bug Fixes
+
+* **api:** declare the public api merged alongside the api freeze ([#161](https://github.com/ooples/AiDotNet.Evolution/issues/161)) ([e82469c](https://github.com/ooples/AiDotNet.Evolution/commit/e82469cac845591a236063a348fde42fb84e7685))
+* **build:** keep aidotnet 0.233 generators out of consuming projects ([#160](https://github.com/ooples/AiDotNet.Evolution/issues/160)) ([9235c5b](https://github.com/ooples/AiDotNet.Evolution/commit/9235c5b847658e6b22a0e821f452ab74d24a1586))
+* **build:** Windows solution restore and format gate (V1-00, [#126](https://github.com/ooples/AiDotNet.Evolution/issues/126)) ([#136](https://github.com/ooples/AiDotNet.Evolution/issues/136)) ([91b0b3c](https://github.com/ooples/AiDotNet.Evolution/commit/91b0b3c61d74edaddc5a859a28f3b56eadc0c883))
+* **policies:** start a trial's deadline when the trial starts, not when it is queued ([#151](https://github.com/ooples/AiDotNet.Evolution/issues/151)) ([c07d67b](https://github.com/ooples/AiDotNet.Evolution/commit/c07d67b43bc205165dc82fee9b8d7c87e8f8d6e6))
+* **release:** publish all Evolution packages and validate before tagging ([#104](https://github.com/ooples/AiDotNet.Evolution/issues/104)) ([7de3011](https://github.com/ooples/AiDotNet.Evolution/commit/7de30119328557b8e04b937620fd1b06eefda56d))
+* **sandbox:** measure warm resources on cgroup-v1 hosts, and audit v1 story issues ([#127](https://github.com/ooples/AiDotNet.Evolution/issues/127)) ([5e131ce](https://github.com/ooples/AiDotNet.Evolution/commit/5e131cee21159b92e7e2356473e7ee94535bb4fd))
+
+
+### Refactoring
+
+* **programs:** retire Programs/Legacy into responsibility folders (V1-10) ([#135](https://github.com/ooples/AiDotNet.Evolution/issues/135)) ([7458a9f](https://github.com/ooples/AiDotNet.Evolution/commit/7458a9fac853d4e48a8c1b70e534241ea5567e46))
+
+
+### Documentation
+
+* install the stable packages without --prerelease ([#162](https://github.com/ooples/AiDotNet.Evolution/issues/162)) ([9e5f116](https://github.com/ooples/AiDotNet.Evolution/commit/9e5f1169bbea6221ddbd6dabe557f7062b89812d))
+
 ## [0.1.0](https://github.com/ooples/AiDotNet.Evolution/compare/v0.1.0-preview.2...v0.1.0) (2026-09-16)
 
 
