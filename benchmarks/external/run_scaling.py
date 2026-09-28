@@ -62,9 +62,11 @@ def run(command, timeout=HANG_SECONDS):
     return json.loads(output.strip().splitlines()[-1])
 
 
+OURS_DLL = ROOT / "benchmarks/EvolutionScaling/bin/Release/net10.0/EvolutionScaling.dll"
+
+
 def ours(size, measured):
-    dll = ROOT / "benchmarks/EvolutionScaling/bin/Release/net10.0/EvolutionScaling.dll"
-    return run(["dotnet", str(dll), str(size), str(measured)])
+    return run(["dotnet", str(OURS_DLL), str(size), str(measured)])
 
 
 def theirs(upstream, size, iterations):
@@ -95,7 +97,14 @@ def main():
     parser.add_argument("--ours-measured", type=int, default=20000)
     parser.add_argument("--openevolve-measured", type=int, default=200)
     parser.add_argument("--repeats", type=int, default=5)
+    # A published copy outside the source tree, so rebuilding or cleaning the tree cannot pull it from under a long run.
+    parser.add_argument("--ours-dll", default=None)
     args = parser.parse_args()
+    global OURS_DLL
+    if args.ours_dll:
+        OURS_DLL = Path(args.ours_dll)
+    if not OURS_DLL.is_file():
+        raise SystemExit(f"benchmark binary not found: {OURS_DLL}")
     rows, hangs = [], []
     for repeat in range(args.repeats):
         for size in [int(s) for s in args.ours_sizes.split(",")]:
@@ -118,15 +127,21 @@ def main():
             else:
                 raise RuntimeError(f"openevolve size={size} could not be measured in three attempts (hung or non-positive difference)")
             rows.append(dict(system="openevolve", size=size, repeat=repeat, us_per_eval=per_eval * 1e6, small=small, large=large))
+        # Written after every repeat, so a failure late in a long run loses at most the repeat in progress.
+        summary = write(args, rows, hangs, completed_repeats=repeat + 1)
+    print(json.dumps(summary, indent=1))
+
+
+def write(args, rows, hangs, completed_repeats):
     summary = {}
     for system in ("aidotnet", "openevolve"):
         sizes = sorted({r["size"] for r in rows if r["system"] == system})
         medians = {s: statistics.median(r["us_per_eval"] for r in rows if r["system"] == system and r["size"] == s) for s in sizes}
         summary[system] = dict(us_per_eval_median=medians, growth_largest_over_smallest=medians[sizes[-1]] / medians[sizes[0]])
-    result = dict(story="V1-72 #177", repeats=args.repeats, ours_measured=args.ours_measured,
+    result = dict(story="V1-72 #177", repeats=args.repeats, completed_repeats=completed_repeats, ours_measured=args.ours_measured,
                   openevolve_measured=args.openevolve_measured, summary=summary, hangs=hangs, rows=rows)
     Path(args.output).write_text(json.dumps(result, indent=1) + "\n", encoding="utf-8")
-    print(json.dumps(summary, indent=1))
+    return summary
 
 
 if __name__ == "__main__":
