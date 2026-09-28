@@ -108,14 +108,22 @@ public sealed class EvolutionTaskResult
         Status = status;
         Quality = quality;
         Direction = direction;
-        _descriptors = new ReadOnlyDictionary<string, double>(descriptorCopy);
-        _metrics = new ReadOnlyDictionary<string, double>(metricCopy);
-        _objectives = Array.AsReadOnly(objectiveCopy);
-        _constraintViolations = Array.AsReadOnly(violationCopy);
+        // Empty parts share one immutable instance: the engine keeps a result per evaluated genome, and most have no
+        // metrics, objectives, violations, diagnostics or artifacts, so separate empty wrappers were half of each one.
+        _descriptors = descriptorCopy.Count == 0 ? EmptyNamedValues : new ReadOnlyDictionary<string, double>(descriptorCopy);
+        _metrics = metricCopy.Count == 0 ? EmptyNamedValues : new ReadOnlyDictionary<string, double>(metricCopy);
+        _objectives = objectiveCopy.Length == 0 ? EmptyValues : Array.AsReadOnly(objectiveCopy);
+        _constraintViolations = violationCopy.Length == 0 ? EmptyValues : Array.AsReadOnly(violationCopy);
         CostUnits = costUnits;
-        _diagnostics = Array.AsReadOnly(diagnosticCopy);
-        _artifacts = Array.AsReadOnly(artifactCopy);
+        _diagnostics = diagnosticCopy.Length == 0 ? EmptyDiagnostics : Array.AsReadOnly(diagnosticCopy);
+        _artifacts = artifactCopy.Length == 0 ? EmptyArtifacts : Array.AsReadOnly(artifactCopy);
     }
+
+    private static readonly ReadOnlyDictionary<string, double> EmptyNamedValues =
+        new(new Dictionary<string, double>(StringComparer.Ordinal));
+    private static readonly ReadOnlyCollection<double> EmptyValues = Array.AsReadOnly(Array.Empty<double>());
+    private static readonly ReadOnlyCollection<EvolutionDiagnostic> EmptyDiagnostics = Array.AsReadOnly(Array.Empty<EvolutionDiagnostic>());
+    private static readonly ReadOnlyCollection<EvolutionArtifact> EmptyArtifacts = Array.AsReadOnly(Array.Empty<EvolutionArtifact>());
 
     /// <summary>Gets the terminal status.</summary>
     public EvolutionEvaluationStatus Status { get; }
