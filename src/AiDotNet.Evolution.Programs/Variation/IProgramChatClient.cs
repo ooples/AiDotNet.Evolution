@@ -45,6 +45,12 @@ public sealed class ProgramChatOptions
     /// <summary>Maximum generated tokens.</summary>
     public int? MaxOutputTokens { get; set; }
     /// <summary>Proposal-local sampling seed.</summary>
+    /// <summary>Gets or sets nucleus sampling (OpenEvolve's <c>top_p</c>), or <c>null</c> for the provider default.</summary>
+    public double? TopP { get; set; }
+
+    /// <summary>Gets or sets the reasoning effort for models that support it, or <c>null</c> for the provider default.</summary>
+    public ProgramReasoningEffort? ReasoningEffort { get; set; }
+
     public int? Seed { get; set; }
 }
 
