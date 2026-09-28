@@ -169,6 +169,53 @@ public sealed class ScriptEvidenceAdversarialTests
     }
 
     [Fact]
+    public async Task A_timed_out_script_keeps_its_captured_output_only_when_artifact_text_is_opted_in()
+    {
+        // OpenEvolve records timeout artifacts; here that is the explicit RetainArtifactText opt-in, and the default still withholds.
+        var timedOut = new ProgramExecuteResponse
+        {
+            Success = false,
+            Language = ProgramLanguage.Python,
+            ExitCode = -1,
+            ErrorCode = ProgramExecuteErrorCode.TimeoutOrCanceled,
+            StdOut = "partial progress 40%",
+            StdErr = "still running"
+        };
+        var runner = new ScriptedProgramExecutionEngine(_ => timedOut);
+
+        var withheld = await new ScriptProgramFitnessEvaluator(runner, "# evaluate").EvaluateAsync(Candidate, Context);
+        Assert.Equal(EvolutionEvaluationStatus.Failed, withheld.Status);
+        Assert.Empty(withheld.Artifacts);
+
+        var kept = await new ScriptProgramFitnessEvaluator(runner, "# evaluate", new() { RetainArtifactText = true })
+            .EvaluateAsync(Candidate, Context);
+        Assert.Equal(EvolutionEvaluationStatus.Failed, kept.Status);
+        Assert.Equal("program_script_timeout", Assert.Single(kept.Diagnostics).Code);
+        Assert.Equal(new[] { "stdout", "stderr" }, kept.Artifacts.Select(artifact => artifact.Key));
+        Assert.Contains("partial progress", kept.Artifacts[0].Text);
+        Assert.Equal(1, kept.CostUnits);
+    }
+
+    [Theory]
+    [InlineData(0)]
+    [InlineData(1)]
+    public async Task A_failed_script_keeps_no_more_captured_output_than_the_artifact_count_allows(int limit)
+    {
+        var runner = new ScriptedProgramExecutionEngine(_ => new ProgramExecuteResponse
+        {
+            Success = false,
+            Language = ProgramLanguage.Python,
+            ExitCode = -1,
+            ErrorCode = ProgramExecuteErrorCode.TimeoutOrCanceled,
+            StdOut = "partial progress 40%",
+            StdErr = "still running"
+        });
+        var result = await new ScriptProgramFitnessEvaluator(runner, "# evaluate",
+            new() { RetainArtifactText = true, MaxArtifactCount = limit }).EvaluateAsync(Candidate, Context);
+        Assert.Equal(new[] { "stdout", "stderr" }.Take(limit), result.Artifacts.Select(artifact => artifact.Key));
+    }
+
+    [Fact]
     public async Task ExplicitAndDerivedScoresShareOneRegisteredDirection()
     {
         var aggregate = new ProgramMetricAggregator(new()

@@ -1,3 +1,4 @@
+using System.Security.Cryptography;
 using System.Globalization;
 using System.Text;
 using System.Text.Json;
@@ -107,7 +108,7 @@ public sealed class DirectoryEvolutionCheckpointStore : IEvolutionCheckpointStor
             cancellationToken.ThrowIfCancellationRequested();
             using FileStream writeLock = AcquireWriteLock(cancellationToken);
             var preloaded = new Dictionary<string, EvolutionCheckpoint>(StringComparer.Ordinal);
-            EvolutionCheckpoint? existing = LoadNewestValid(checkpoint.RunId, preloaded);
+            EvolutionCheckpoint? existing = LoadNewestValidForSave(checkpoint.RunId, preloaded);
             if (existing is not null)
             {
                 ValidateSuccessor(existing, checkpoint);
@@ -120,8 +121,9 @@ public sealed class DirectoryEvolutionCheckpointStore : IEvolutionCheckpointStor
                     throw new InvalidDataException(
                         "The checkpoint directory is at its package file limit and retention could not free a slot.");
             }
-            Persist(checkpoint, cancellationToken);
+            byte[] written = Persist(checkpoint, cancellationToken);
             preloaded[FileNameFor(checkpoint.Sequence)] = checkpoint;
+            _lastWritten = (FileNameFor(checkpoint.Sequence), Sha256(written), checkpoint);
             ApplyRetention(checkpoint.RunId, preloaded);
         }
         return Task.CompletedTask;
@@ -328,7 +330,54 @@ public sealed class DirectoryEvolutionCheckpointStore : IEvolutionCheckpointStor
             : -checkpoint.Quality.Value;
     }
 
-    private void Persist(EvolutionCheckpoint checkpoint, CancellationToken cancellationToken)
+    // The snapshot this instance wrote last, with the SHA-256 of its exact bytes. Saving must compare against the newest
+    // valid snapshot on disk; when that is still byte-for-byte the file written here, the checkpoint object already in
+    // hand was validated before it was written, so it is reused instead of re-reading and re-validating megabytes of
+    // JSON on every save (V1-74). Anything else on disk, and every LoadLatestAsync, takes the full validating path.
+    private (string FileName, string Sha256, EvolutionCheckpoint Checkpoint)? _lastWritten;
+
+    private EvolutionCheckpoint? LoadNewestValidForSave(string runId, Dictionary<string, EvolutionCheckpoint> loaded)
+    {
+        if (_lastWritten is { } last && string.Equals(last.Checkpoint.RunId, runId, StringComparison.Ordinal))
+        {
+            IReadOnlyList<SnapshotFile> snapshots = EnumerateSnapshots(EvolutionCollectionLimits.MaximumCheckpointFiles);
+            if (snapshots.Count > 0 && string.Equals(snapshots[0].FileName, last.FileName, StringComparison.Ordinal) &&
+                TryHashFile(snapshots[0].Path) is { } current && string.Equals(current, last.Sha256, StringComparison.Ordinal))
+            {
+                loaded.Add(last.FileName, last.Checkpoint);
+                return last.Checkpoint;
+            }
+            _lastWritten = null;
+        }
+        return LoadNewestValid(runId, loaded);
+    }
+
+    private string? TryHashFile(string path)
+    {
+        try
+        {
+            using var stream = new FileStream(path, FileMode.Open, FileAccess.Read, FileShare.Read);
+            if (stream.Length > _maxCheckpointBytes) return null;
+            using SHA256 sha = SHA256.Create();
+            return Convert.ToBase64String(sha.ComputeHash(stream));
+        }
+        catch (IOException)
+        {
+            return null;
+        }
+        catch (UnauthorizedAccessException)
+        {
+            return null;
+        }
+    }
+
+    private static string Sha256(byte[] content)
+    {
+        using SHA256 sha = SHA256.Create();
+        return Convert.ToBase64String(sha.ComputeHash(content));
+    }
+
+    private byte[] Persist(EvolutionCheckpoint checkpoint, CancellationToken cancellationToken)
     {
         string targetPath = EvolutionPath.Join(_directory, FileNameFor(checkpoint.Sequence));
         string tempPath = EvolutionPath.Join(_directory,
@@ -371,6 +420,7 @@ public sealed class DirectoryEvolutionCheckpointStore : IEvolutionCheckpointStor
                 }
             }
         }
+        return payload;
     }
 
     /// <summary>Builds the fixed-width file name one sequence is stored under.</summary>
@@ -525,16 +575,28 @@ public sealed class DirectoryEvolutionCheckpointStore : IEvolutionCheckpointStor
         public EvolutionCheckpoint ToCheckpoint() => new(RunId, Sequence, CompatibilityHash, Payload, Checksum,
             SchemaVersion, Quality, QualityDirection);
 
-        private string ComputeDocumentChecksum() => EvolutionHash.Combine(new[]
+        // The payload is hashed inline while the whole input fits EvolutionHash.Combine's character bound, exactly as
+        // before, so every existing snapshot still verifies. A larger payload (a checkpoint may be up to 256 MB; about
+        // 10,000 elites of 4 KB programs pass the 16 MiB bound) could not be saved at all; it is now represented by its
+        // own SHA-256 digest. Writer and reader apply the same size rule, so the form is never ambiguous (V1-74).
+        private string ComputeDocumentChecksum()
         {
-            SchemaVersion.ToString(CultureInfo.InvariantCulture),
-            RunId,
-            Sequence.ToString(CultureInfo.InvariantCulture),
-            CompatibilityHash,
-            Payload,
-            Checksum,
-            EvolutionHash.EncodeNullableDouble(Quality),
-            ((int)QualityDirection).ToString(CultureInfo.InvariantCulture)
-        });
+            string[] Components(string payload) => new[]
+            {
+                SchemaVersion.ToString(CultureInfo.InvariantCulture),
+                RunId,
+                Sequence.ToString(CultureInfo.InvariantCulture),
+                CompatibilityHash,
+                payload,
+                Checksum,
+                EvolutionHash.EncodeNullableDouble(Quality),
+                ((int)QualityDirection).ToString(CultureInfo.InvariantCulture)
+            };
+            string[] inline = Components(Payload);
+            // Exactly the inputs Combine accepted before keep the inline form; only ones it refused take the digest form.
+            return EvolutionHash.Combine(EvolutionHash.FitsCombine(inline)
+                ? inline
+                : Components("payload-sha256:" + EvolutionHash.Compute(Payload)));
+        }
     }
 }

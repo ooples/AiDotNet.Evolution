@@ -992,6 +992,8 @@ public sealed class LlmProgramVariationOperator : ICheckpointableVariationOperat
         return new ProgramChatOptions
         {
             Temperature = _variationOptions.Temperature,
+            TopP = _variationOptions.TopP,
+            ReasoningEffort = _variationOptions.ReasoningEffort,
             MaxOutputTokens = _variationOptions.MaxOutputTokens,
             Seed = seed
         };
@@ -1102,6 +1104,13 @@ public sealed class LlmProgramVariationOperator : ICheckpointableVariationOperat
                 : "stream",
             promptBuilder.VersionHash
         };
+        // Only when set, so existing operator identities are unchanged.
+        if (variationOptions.TopP is not null || variationOptions.ReasoningEffort is not null)
+        {
+            components.Add("sampling-v2");
+            components.Add(variationOptions.TopP?.ToString("R", CultureInfo.InvariantCulture) ?? "provider-top-p");
+            components.Add(variationOptions.ReasoningEffort?.ToString() ?? "provider-reasoning");
+        }
         components.Add(variationOptions.FeatureDimensions.Count.ToString(CultureInfo.InvariantCulture));
         components.AddRange(variationOptions.FeatureDimensions);
         components.Add(variationOptions.FeatureBinCounts.Count.ToString(CultureInfo.InvariantCulture));
