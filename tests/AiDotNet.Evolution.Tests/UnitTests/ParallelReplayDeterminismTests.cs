@@ -25,9 +25,17 @@ public sealed class ParallelReplayDeterminismTests
         });
         var options = new EvolutionEngineOptions
         {
-            RunId = "replay", Seed = seed, MaxEvaluationAttempts = 96, MaxProposals = 192, MaxGenerations = 96,
-            ProposalBatchSize = 8, MaxDegreeOfParallelism = workers, IslandCount = 2, MigrationInterval = 0,
-            CheckpointInterval = 0, Dispatch = dispatch
+            RunId = "replay",
+            Seed = seed,
+            MaxEvaluationAttempts = 96,
+            MaxProposals = 192,
+            MaxGenerations = 96,
+            ProposalBatchSize = 8,
+            MaxDegreeOfParallelism = workers,
+            IslandCount = 2,
+            MigrationInterval = 0,
+            CheckpointInterval = 0,
+            Dispatch = dispatch
         };
         var engine = new EvolutionEngine<EvolutionSearchGenome>(task, new SearchSpaceRestart(space),
             _ => new MapElitesArchive<EvolutionSearchGenome>(new[] { new EvolutionDescriptorDefinition("x", -5, 5, 16) }), options);
