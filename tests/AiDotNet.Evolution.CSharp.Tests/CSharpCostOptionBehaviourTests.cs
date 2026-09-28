@@ -21,6 +21,8 @@ public sealed class CSharpCostOptionBehaviourTests
         foreach (string counter in Counters) Assert.True(work[counter] > 0, counter + " was never exercised");
 
         const decimal Raise = 0.5m;
+        Assert.Equal(baseline + Raise * work["model_calls"],
+            (await Spend(options => options.ModelCallCostUnits += Raise)).Cost);
         Assert.Equal(baseline + Raise * work["parse_calls"],
             (await Spend(options => options.ParseCostUnits += Raise)).Cost);
         Assert.Equal(baseline + Raise * work["build_calls"],
@@ -37,7 +39,7 @@ public sealed class CSharpCostOptionBehaviourTests
     [Fact]
     public void CompilationTimeoutSeconds_bounds_a_slow_compile()
     {
-        CSharpPatchAttempt Attempt(int seconds, int depth = Depth)
+        CSharpPatchAttempt Attempt(int seconds, int depth)
         {
             CSharpProgramEvolutionOptions options = Options();
             options.CompilationTimeoutSeconds = seconds;
@@ -49,20 +51,32 @@ public sealed class CSharpCostOptionBehaviourTests
         // Load and JIT the compiler first so the timed arms measure binding, not start-up.
         Assert.Equal(string.Empty, Attempt(30, depth: 1).Feedback);
 
-        var timer = Stopwatch.StartNew();
-        CSharpPatchAttempt patient = Attempt(30);
-        TimeSpan full = timer.Elapsed;
-        Assert.DoesNotContain("timed out", patient.Feedback, StringComparison.Ordinal);
-        Assert.True(full > TimeSpan.FromSeconds(2), "The slow source compiled in " + full + "; it no longer discriminates.");
+        // Calibrate to this host: deepen until an unbounded compile takes long enough to discriminate a one-second
+        // bound. Each level roughly doubles binding time, so the level that first passes the target stays well inside
+        // the thirty-second patient bound on a slow host, and a fast host simply goes deeper.
+        TimeSpan target = TimeSpan.FromSeconds(3);
+        int depth = FirstDepth;
+        CSharpPatchAttempt patient;
+        TimeSpan full;
+        while (true)
+        {
+            var timer = Stopwatch.StartNew();
+            patient = Attempt(30, depth);
+            full = timer.Elapsed;
+            Assert.DoesNotContain("timed out", patient.Feedback, StringComparison.Ordinal);
+            if (full > target) break;
+            Assert.True(depth < LastDepth, "Even depth " + depth + " compiled in " + full + "; the slow source no longer discriminates.");
+            depth++;
+        }
 
-        timer.Restart();
-        CSharpPatchAttempt bounded = Attempt(1);
-        Assert.Contains("timed out", bounded.Feedback, StringComparison.Ordinal);
-        Assert.True(timer.Elapsed < full, "Timed out after " + timer.Elapsed + " but the full compile took " + full);
+        var bounded = Stopwatch.StartNew();
+        CSharpPatchAttempt limited = Attempt(1, depth);
+        Assert.Contains("timed out", limited.Feedback, StringComparison.Ordinal);
+        Assert.True(bounded.Elapsed < full, "Timed out after " + bounded.Elapsed + " but the full compile took " + full);
     }
 
-    private const int Depth = 11;
-
+    private const int FirstDepth = 8;
+    private const int LastDepth = 20;
     // Two overloads that differ only in the lambda's parameter type force the binder to try both at every
     // level; only the int reading of every parameter type-checks the innermost body, so the call is not
     // ambiguous, yet binding cost grows exponentially with depth while the source stays a few hundred characters.
