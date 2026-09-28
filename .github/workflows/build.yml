@@ -1,6 +1,9 @@
 name: Build and Test
 
 on:
+  # The merge queue tests each PR combined with everything ahead of it; required checks must report there too.
+  merge_group:
+    types: [checks_requested]
   push:
     branches: [main]
   pull_request:
