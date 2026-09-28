@@ -1126,6 +1126,8 @@ public sealed partial class EvolutionEngine<TGenome>
 
     private string ComputeStateHash()
     {
+        // Streamed: the text covers every seen identity and cached result, so it grows with the run.
+        using var stream = new EvolutionHashStream();
         var builder = new StringBuilder();
         Append(builder, _compatibilityHash);
         Append(builder, _nextEvaluationId);
@@ -1141,20 +1143,21 @@ public sealed partial class EvolutionEngine<TGenome>
         }
         Append(builder, "seen");
         Append(builder, _seen.Count);
-        foreach (string id in _seen.OrderBy(value => value, StringComparer.Ordinal)) Append(builder, id);
+        foreach (string id in _seen.OrderBy(value => value, StringComparer.Ordinal)) { Append(builder, id); stream.Flush(builder); }
         Append(builder, "cache");
         Append(builder, _cache.Count);
         foreach (KeyValuePair<string, EvolutionTaskResult> cached in _cache.OrderBy(pair => pair.Key, StringComparer.Ordinal))
         {
             Append(builder, "cache:" + cached.Key);
             AppendTaskResult(builder, cached.Value);
+            stream.Flush(builder);
         }
         if (_options.DeduplicationCapacity > 0)
         {
             // Which genome is forgotten next is state: two runs that differ only here diverge at the next eviction.
             Append(builder, "deduplication-order");
             Append(builder, _deduplicationOrder.Count);
-            foreach (string id in _deduplicationOrder) Append(builder, id);
+            foreach (string id in _deduplicationOrder) { Append(builder, id); stream.Flush(builder); }
         }
         Append(builder, "selection");
         Append(builder, _selection is IOutcomeAwareEvolutionSelectionPolicy<TGenome> adaptiveSelection
@@ -1242,7 +1245,7 @@ public sealed partial class EvolutionEngine<TGenome>
             if (!_pendingArtifacts.TryGetValue(genomeId, out EvolutionArtifact[]? artifacts)) continue;
             AppendArtifacts(builder, artifacts);
         }
-        return EvolutionHash.Compute(builder.ToString());
+        return stream.Finish(builder);
     }
 
     private static void AppendTaskResult(StringBuilder builder, EvolutionTaskResult result)

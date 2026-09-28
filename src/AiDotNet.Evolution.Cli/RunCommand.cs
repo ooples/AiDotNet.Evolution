@@ -33,16 +33,41 @@ internal sealed class RunFile
     public string? WarmStart { get; init; }
 }
 
+/// <summary>How the CLI reaches the model (OpenEvolve's <c>provider</c> plus its manual mode).</summary>
+internal enum ModelProvider
+{
+    /// <summary>Any OpenAI-compatible <c>chat/completions</c> endpoint.</summary>
+    OpenAiCompatible,
+    /// <summary>The Claude Code CLI and its login session; no API key.</summary>
+    ClaudeCode,
+    /// <summary>A person answers each prompt through a queue directory.</summary>
+    Manual
+}
+
 internal sealed class RunModel
 {
-    /// <summary>An OpenAI-compatible base URL, for example <c>http://127.0.0.1:8000/v1</c>.</summary>
-    public required string Endpoint { get; init; }
+    public ModelProvider Provider { get; init; } = ModelProvider.OpenAiCompatible;
+    /// <summary>An OpenAI-compatible base URL, for example <c>http://127.0.0.1:8000/v1</c>; required for that provider.</summary>
+    public string? Endpoint { get; init; }
     public required string Name { get; init; }
     /// <summary>The environment variable holding the API key; null for an endpoint that needs none.</summary>
     public string? ApiKeyEnvironmentVariable { get; init; }
     public double? Temperature { get; init; }
+    public double? TopP { get; init; }
+    public ProgramReasoningEffort? ReasoningEffort { get; init; }
     public int? MaxOutputTokens { get; init; }
     public int TimeoutSeconds { get; init; } = 300;
+    /// <summary>Retries for throttled, failed or timed-out calls (OpenEvolve's <c>retries</c>).</summary>
+    public int MaxRetries { get; init; } = 3;
+    /// <summary>Seconds before the first retry; each further retry doubles it (OpenEvolve's <c>retry_delay</c>).</summary>
+    public int RetryDelaySeconds { get; init; } = 5;
+    /// <summary>Per-call spending cap for the Claude Code provider (OpenEvolve's <c>max_budget_usd</c>).</summary>
+    public decimal? MaxBudgetUsd { get; init; }
+    /// <summary>The Claude Code executable; <c>claude</c> on PATH when null.</summary>
+    public string? ClaudeExecutable { get; init; }
+    /// <summary>The manual provider's queue directory, relative to the run file.</summary>
+    public string? ManualQueue { get; init; }
+    public int ManualTimeoutSeconds { get; init; } = 3600;
 }
 
 internal sealed class RunBudget
@@ -106,7 +131,8 @@ internal static class RunCommand
         using var marker = RunMarker.Create(outputDirectory, run.RunId, tracePath);
 
         using var execution = CreateExecution(run);
-        using var model = new OpenAiCompatibleChatClient(run.Model);
+        IProgramChatClient model = CreateModel(run.Model, baseDirectory);
+        using var ownedModel = model as IDisposable;
 
         var programOptions = new ProgramProposalOptions
         {
@@ -120,6 +146,8 @@ internal static class RunCommand
         {
             Mode = ProgramEvolutionMode.FullRewrite,
             Temperature = run.Model.Temperature,
+            TopP = run.Model.TopP,
+            ReasoningEffort = run.Model.ReasoningEffort,
             MaxOutputTokens = run.Model.MaxOutputTokens
         });
         var descriptors = new[] { new EvolutionDescriptorDefinition("length", 0, run.Budget.MaxProgramChars, 64) };
@@ -271,7 +299,7 @@ internal static class RunCommand
 
         // run would fail on this before its first model call; preflight promises to find it first.
         if (run.Model.ApiKeyEnvironmentVariable is { } variable && string.IsNullOrEmpty(Environment.GetEnvironmentVariable(variable)))
-            throw new InvalidDataException(OpenAiCompatibleChatClient.MissingKeyMessage(variable));
+            throw new InvalidDataException(MissingKeyMessage(variable));
         string initial = ReadBounded(Path.Combine(baseDirectory, run.InitialProgram), run.Budget.MaxProgramChars);
         string evaluator = ReadBounded(Path.Combine(baseDirectory, run.Evaluator), MaxRunFileBytes);
         ProbeWritable(outputDirectory);
@@ -341,12 +369,69 @@ internal static class RunCommand
         if (run.Budget.EvaluationTimeLimitSeconds < 1) throw new InvalidDataException("budget.evaluationTimeLimitSeconds must be at least 1.");
         if (run.Budget.MaxProgramChars < 1) throw new InvalidDataException("budget.maxProgramChars must be at least 1.");
         if (run.Model.TimeoutSeconds < 1) throw new InvalidDataException("model.timeoutSeconds must be at least 1.");
-        if (!Uri.TryCreate(run.Model.Endpoint, UriKind.Absolute, out Uri? endpoint) || endpoint.Scheme is not ("http" or "https"))
-            throw new InvalidDataException("model.endpoint must be an absolute http(s) URL.");
-        if (endpoint.Scheme == "http" && !endpoint.IsLoopback)
-            throw new InvalidDataException("model.endpoint must use https unless it is a loopback address; an API key is never sent in clear text.");
+        if (run.Model.MaxRetries is < 0 or > 20) throw new InvalidDataException("model.maxRetries must be between 0 and 20.");
+        if (run.Model.RetryDelaySeconds < 0) throw new InvalidDataException("model.retryDelaySeconds cannot be negative.");
+        if (run.Model.TopP is { } topP && (double.IsNaN(topP) || topP <= 0 || topP > 1)) throw new InvalidDataException("model.topP must be in (0, 1].");
+        switch (run.Model.Provider)
+        {
+            case ModelProvider.OpenAiCompatible:
+                if (!Uri.TryCreate(run.Model.Endpoint, UriKind.Absolute, out Uri? endpoint) || endpoint.Scheme is not ("http" or "https"))
+                    throw new InvalidDataException("model.endpoint must be an absolute http(s) URL.");
+                if (endpoint.Scheme == "http" && !endpoint.IsLoopback)
+                    throw new InvalidDataException("model.endpoint must use https unless it is a loopback address; an API key is never sent in clear text.");
+                break;
+            case ModelProvider.ClaudeCode:
+                if (run.Model.MaxBudgetUsd is <= 0) throw new InvalidDataException("model.maxBudgetUsd must be positive.");
+                break;
+            case ModelProvider.Manual:
+                if (string.IsNullOrWhiteSpace(run.Model.ManualQueue)) throw new InvalidDataException("model.manualQueue is required for the manual provider.");
+                if (run.Model.ManualTimeoutSeconds < 1) throw new InvalidDataException("model.manualTimeoutSeconds must be at least 1.");
+                break;
+            default:
+                throw new InvalidDataException("model.provider is not supported.");
+        }
         return run;
     }
+
+    /// <summary>Builds the configured provider's client; the caller disposes it when it is disposable.</summary>
+    internal static IProgramChatClient CreateModel(RunModel model, string baseDirectory)
+    {
+        switch (model.Provider)
+        {
+            case ModelProvider.ClaudeCode:
+                return new ClaudeCodeChatClient(new ClaudeCodeChatClientOptions
+                {
+                    Executable = model.ClaudeExecutable ?? "claude",
+                    Model = model.Name,
+                    MaxBudgetUsd = model.MaxBudgetUsd,
+                    Timeout = TimeSpan.FromSeconds(model.TimeoutSeconds),
+                    MaxRetries = model.MaxRetries,
+                    RetryDelay = TimeSpan.FromSeconds(model.RetryDelaySeconds)
+                });
+            case ModelProvider.Manual:
+                return new ManualProgramChatClient(Path.Combine(baseDirectory, model.ManualQueue ?? "manual-queue"),
+                    TimeSpan.FromSeconds(model.ManualTimeoutSeconds), modelId: model.Name);
+            default:
+                string? key = null;
+                if (model.ApiKeyEnvironmentVariable is { } variable)
+                {
+                    key = Environment.GetEnvironmentVariable(variable);
+                    if (string.IsNullOrEmpty(key)) throw new InvalidDataException(MissingKeyMessage(variable));
+                }
+                return new OpenAiCompatibleChatClient(new OpenAiCompatibleChatClientOptions
+                {
+                    Endpoint = new Uri(model.Endpoint ?? string.Empty, UriKind.Absolute),
+                    Model = model.Name,
+                    ApiKey = key,
+                    Timeout = TimeSpan.FromSeconds(model.TimeoutSeconds),
+                    MaxRetries = model.MaxRetries,
+                    RetryDelay = TimeSpan.FromSeconds(model.RetryDelaySeconds)
+                });
+        }
+    }
+
+    internal static string MissingKeyMessage(string variable) =>
+        "Environment variable " + variable + " (model.apiKeyEnvironmentVariable) is not set.";
 
     private static string ReadBounded(string path, int maximumChars)
     {
@@ -398,84 +483,6 @@ internal sealed class RunInterrupt : IDisposable
 }
 
 /// <summary>A minimal OpenAI-compatible <c>/chat/completions</c> client for the CLI.</summary>
-internal sealed class OpenAiCompatibleChatClient : IProgramChatClient, IDisposable
-{
-    private const int MaxResponseBytes = 4 * 1024 * 1024;
-    private readonly HttpClient _http;
-    private readonly Uri _completions;
-
-    public OpenAiCompatibleChatClient(RunModel model)
-    {
-        ModelId = model.Name;
-        string root = model.Endpoint.EndsWith('/') ? model.Endpoint : model.Endpoint + "/";
-        _completions = new Uri(new Uri(root, UriKind.Absolute), "chat/completions");
-        _http = new HttpClient(new HttpClientHandler { AllowAutoRedirect = false })
-        {
-            Timeout = TimeSpan.FromSeconds(model.TimeoutSeconds),
-            MaxResponseContentBufferSize = MaxResponseBytes
-        };
-        if (model.ApiKeyEnvironmentVariable is { } variable)
-        {
-            string key = Environment.GetEnvironmentVariable(variable) ?? "";
-            if (key.Length == 0) throw new InvalidDataException(MissingKeyMessage(variable));
-            _http.DefaultRequestHeaders.Authorization = new AuthenticationHeaderValue("Bearer", key);
-        }
-    }
-
-    internal static string MissingKeyMessage(string variable) =>
-        "Environment variable " + variable + " (model.apiKeyEnvironmentVariable) is not set.";
-
-    public string ModelId { get; }
-
-    public async Task<ProgramChatResponse> GetResponseAsync(IReadOnlyList<ProgramChatMessage> messages, ProgramChatOptions? options = null,
-        CancellationToken cancellationToken = default)
-    {
-        if (options?.ResponseFormat is ProgramChatResponseFormat.Json)
-            throw new NotSupportedException("The CLI model client requests text completions only.");
-        var body = new Dictionary<string, object>
-        {
-            ["model"] = ModelId,
-            ["messages"] = messages.Select(message => new { role = message.Role.ToString().ToLowerInvariant(), content = message.Text }).ToArray()
-        };
-        if (options?.Temperature is { } temperature) body["temperature"] = temperature;
-        if (options?.MaxOutputTokens is { } maxTokens) body["max_tokens"] = maxTokens;
-        if (options?.Seed is { } seed) body["seed"] = seed;
-
-        using var content = new ByteArrayContent(JsonSerializer.SerializeToUtf8Bytes(body));
-        content.Headers.ContentType = new MediaTypeHeaderValue("application/json");
-        HttpResponseMessage response;
-        byte[] bytes;
-        try
-        {
-            response = await _http.PostAsync(_completions, content, cancellationToken).ConfigureAwait(false);
-            bytes = await response.Content.ReadAsByteArrayAsync(cancellationToken).ConfigureAwait(false);
-        }
-        catch (OperationCanceledException exception) when (!cancellationToken.IsCancellationRequested)
-        {
-            // HttpClient reports its own timeout as a cancellation. The run was not canceled, so this is a failed model
-            // call; rethrown as a cancellation it would be neither counted nor reported as the endpoint being unavailable.
-            throw new TimeoutException("Model endpoint did not respond within " + _http.Timeout.TotalSeconds + " seconds.", exception);
-        }
-        using HttpResponseMessage owned = response;
-        if (!response.IsSuccessStatusCode)
-            throw new HttpRequestException("Model endpoint returned " + (int)response.StatusCode + ".", null, response.StatusCode);
-
-        using JsonDocument document = JsonDocument.Parse(bytes);
-        JsonElement root = document.RootElement;
-        string text = root.GetProperty("choices")[0].GetProperty("message").GetProperty("content").GetString()
-            ?? throw new InvalidDataException("Model response has no message content.");
-        ProgramChatUsage? usage = null;
-        if (root.TryGetProperty("usage", out JsonElement reported) && reported.ValueKind == JsonValueKind.Object &&
-            reported.TryGetProperty("prompt_tokens", out JsonElement input) && reported.TryGetProperty("completion_tokens", out JsonElement generated))
-        {
-            usage = new ProgramChatUsage(input.GetInt32(), generated.GetInt32());
-        }
-        string? reportedModel = root.TryGetProperty("model", out JsonElement name) && name.ValueKind == JsonValueKind.String ? name.GetString() : null;
-        return new ProgramChatResponse(ProgramChatMessage.Assistant(text), usage, reportedModel);
-    }
-
-    public void Dispose() => _http.Dispose();
-}
 
 /// <summary>Marks an output directory as holding a run in progress, for as long as the run process lives.</summary>
 /// <remarks>

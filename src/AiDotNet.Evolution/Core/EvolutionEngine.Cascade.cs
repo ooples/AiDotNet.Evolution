@@ -1,3 +1,4 @@
+using System.Text;
 using System.Globalization;
 
 namespace AiDotNet.Evolution;
@@ -160,24 +161,74 @@ public sealed partial class EvolutionEngine<TGenome>
         if (!_options.Artifacts.Enabled || artifacts.Count == 0) return Array.Empty<EvolutionArtifact>();
         var retained = new List<EvolutionArtifact>(Math.Min(artifacts.Count, _options.Artifacts.MaxArtifactsPerEvaluation));
         long totalBytes = 0;
+        long storedBytes = 0;
+        IEvolutionArtifactStore? store = _options.Artifacts.Store;
         foreach (EvolutionArtifact artifact in artifacts)
         {
             if (retained.Count >= _options.Artifacts.MaxArtifactsPerEvaluation) break;
             string text = artifact.Text;
             bool redacted = artifact.IsRedacted;
-            if (_options.Artifacts.SanitizeSecrets)
+            bool truncated;
+            if (artifact.IsBinary)
             {
-                string sanitized = EvolutionArtifactSanitizer.Sanitize(text);
-                redacted |= !string.Equals(sanitized, text, StringComparison.Ordinal);
-                text = sanitized;
+                // Binary content never enters the evaluation: it is stored, or noted as not retained.
+                byte[] content = artifact.ContentReference ?? Array.Empty<byte>();
+                string Marker(string address) => $"[stored: {address}, {content.Length} bytes, {artifact.MediaType}]";
+                // Store only when the whole marker fits inline; a cut-off address would point at nothing.
+                bool fits = Encoding.UTF8.GetByteCount(Marker(PlaceholderAddress)) <= _options.Artifacts.MaxArtifactBytes;
+                string? reference = fits ? TryStore(store, content, ref storedBytes) : null;
+                text = reference is not null ? Marker(reference)
+                    : $"[binary artifact not retained: {content.Length} bytes, {artifact.MediaType}; " +
+                      (store is null ? "no artifact store is configured]"
+                        : !fits ? "its reference does not fit the inline artifact budget]"
+                        : "the per-evaluation storage limit was reached]");
+                text = TruncateToBytes(text, _options.Artifacts.MaxArtifactBytes, out truncated);
+                truncated |= reference is null;
             }
-            text = TruncateToBytes(text, _options.Artifacts.MaxArtifactBytes, out bool truncated);
+            else
+            {
+                if (_options.Artifacts.SanitizeSecrets)
+                {
+                    string sanitized = EvolutionArtifactSanitizer.Sanitize(text);
+                    redacted |= !string.Equals(sanitized, text, StringComparison.Ordinal);
+                    text = sanitized;
+                }
+                string? reference = null;
+                int fullBytes = Encoding.UTF8.GetByteCount(text);
+                string Suffix(string address) => $"\n[full content: {address}, {fullBytes} bytes, text/plain]";
+                if (store is not null && fullBytes > _options.Artifacts.MaxArtifactBytes &&
+                    Encoding.UTF8.GetByteCount(Suffix(PlaceholderAddress)) <= _options.Artifacts.MaxArtifactBytes)
+                    reference = TryStore(store, Encoding.UTF8.GetBytes(text), ref storedBytes);
+                if (reference is null)
+                {
+                    text = TruncateToBytes(text, _options.Artifacts.MaxArtifactBytes, out truncated);
+                }
+                else
+                {
+                    // Spilled, not lost: a preview that still fits the inline budget, then the full content's address.
+                    string suffix = Suffix(reference);
+                    int budget = Math.Max(0, _options.Artifacts.MaxArtifactBytes - Encoding.UTF8.GetByteCount(suffix));
+                    text = TruncateToBytes(text, budget, out _) + suffix;
+                    text = TruncateToBytes(text, _options.Artifacts.MaxArtifactBytes, out _);
+                    truncated = true;
+                }
+            }
             var bounded = new EvolutionArtifact(artifact.Key, text, artifact.IsTruncated || truncated, redacted);
             if (totalBytes + bounded.SizeBytes > _options.Artifacts.MaxBytesPerEvaluation) break;
             totalBytes += bounded.SizeBytes;
             retained.Add(bounded);
         }
         return retained.Count == 0 ? Array.Empty<EvolutionArtifact>() : Array.AsReadOnly(retained.ToArray());
+    }
+
+    // Same length as a real content address, so a marker measured with it measures the one that will be emitted.
+    private static readonly string PlaceholderAddress = "sha256:" + new string('0', 64);
+
+    private string? TryStore(IEvolutionArtifactStore? store, byte[] content, ref long storedBytes)
+    {
+        if (store is null || storedBytes + content.Length > _options.Artifacts.MaxStoredBytesPerEvaluation) return null;
+        storedBytes += content.Length;
+        return store.Put(content);
     }
 
     /// <summary>Cuts text at a code-point boundary so its UTF-8 encoding fits the supplied byte budget.</summary>

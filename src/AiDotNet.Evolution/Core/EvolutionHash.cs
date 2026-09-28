@@ -17,6 +17,10 @@ public static class EvolutionHash
 #if NET8_0_OR_GREATER
     // Inputs up to this many UTF-8 bytes are encoded on the stack; larger ones rent from the shared pool.
     private const int StackBytes = 512;
+    // Beyond this, input is encoded through one fixed buffer instead of all at once. A whole-run state hash encodes
+    // every cached result, and renting three bytes per character for it left a 32 MB array in the shared pool at
+    // 16,000 evaluations, 40% of the process's peak working set (V1-70).
+    private const int StreamBytes = 64 * 1024;
 #endif
 
     /// <summary>Encodes a double by its exact IEEE 754 bit pattern for cross-framework identity.</summary>
@@ -50,9 +54,14 @@ public static class EvolutionHash
             Span<byte> bytes = stackalloc byte[StackBytes];
             return Digest(bytes[..Encoding.UTF8.GetBytes(value, bytes)]);
         }
-        byte[] rented = ArrayPool<byte>.Shared.Rent(maximum);
-        try { return Digest(rented.AsSpan(0, Encoding.UTF8.GetBytes(value, rented))); }
-        finally { ArrayPool<byte>.Shared.Return(rented); }
+        if (maximum <= StreamBytes)
+        {
+            byte[] rented = ArrayPool<byte>.Shared.Rent(maximum);
+            try { return Digest(rented.AsSpan(0, Encoding.UTF8.GetBytes(value, rented))); }
+            finally { ArrayPool<byte>.Shared.Return(rented); }
+        }
+        using var stream = new EvolutionHashStream();
+        return stream.Finish(new StringBuilder(value));
 #else
         byte[] bytes = Encoding.UTF8.GetBytes(value);
         byte[] hash;
@@ -61,8 +70,15 @@ public static class EvolutionHash
 #endif
     }
 
-#if NET8_0_OR_GREATER
-    // SHA-256 of the bytes as 64 lowercase hex digits, the same digits as ToString("x2") per byte.
+    /// <summary>Computes the same digest as <see cref="Compute(string)"/> of <c>builder.ToString()</c>, without the copy.</summary>
+    internal static string Compute(StringBuilder builder)
+    {
+        if (builder is null) throw new ArgumentNullException(nameof(builder));
+        using var stream = new EvolutionHashStream();
+        return stream.Finish(builder);
+    }
+
+#if NET8_0_OR_GREATER    // SHA-256 of the bytes as 64 lowercase hex digits, the same digits as ToString("x2") per byte.
     private static string Digest(ReadOnlySpan<byte> data)
     {
         const string digits = "0123456789abcdef";
@@ -174,6 +190,20 @@ public static class EvolutionHash
         for (int i = 0; i < 32; i++) digest[i] = Convert.ToByte(hex.Substring(2 * i, 2), 16);
         return digest;
 #endif
+    }
+
+    /// <summary>Whether <see cref="Combine"/> accepts these components, by the same bounds it enforces.</summary>
+    internal static bool FitsCombine(IReadOnlyList<string> values)
+    {
+        long characters = 0;
+        for (int count = 0; count < values.Count; count++)
+        {
+            string value = values[count];
+            if (count == EvolutionCollectionLimits.MaximumHashComponents || value is null) return false;
+            if (characters + value.Length + 32 > EvolutionCollectionLimits.MaximumHashCharacters) return false;
+            characters += value.Length.ToString(System.Globalization.CultureInfo.InvariantCulture).Length + value.Length + 2;
+        }
+        return true;
     }
 
     private static void ValidateComponent(string? value, int count, long characters)

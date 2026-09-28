@@ -20,6 +20,7 @@ public static class Program
           aidotnet-evolve export  <trace> <output-directory> [--include-source <program-file>]
           aidotnet-evolve inspect-export <export-directory>
           aidotnet-evolve report  <trace> <output.html>
+          aidotnet-evolve watch   <trace> <output.html> [--interval <seconds>]
         """;
 
     public static int Main(string[] args)
@@ -36,6 +37,11 @@ public static class Program
                 ["export", string trace, string output] => Export(trace, output, null),
                 ["export", string trace, string output, "--include-source", string source] => Export(trace, output, source),
                 ["report", string trace, string output] => Report(trace, output),
+                ["watch", string trace, string output] => Watch(trace, output, 2, CancellationToken.None),
+                ["watch", string trace, string output, "--interval", string seconds] =>
+                    int.TryParse(seconds, NumberStyles.None, CultureInfo.InvariantCulture, out int interval) && interval is >= 1 and <= 3600
+                        ? Watch(trace, output, interval, CancellationToken.None)
+                        : Fail("error: --interval must be a whole number of seconds from 1 to 3600."),
                 ["inspect-export", string exportDirectory] => InspectExport(exportDirectory),
                 _ => Fail(Usage)
             };
@@ -175,6 +181,32 @@ public static class Program
             element.TryGetProperty(name, out JsonElement value) && value.ValueKind == JsonValueKind.Number ? value.GetDouble() : null;
     }
 
+    /// <summary>Keeps <paramref name="output"/> current while the run writing <paramref name="trace"/> is live.</summary>
+    /// <remarks>
+    /// The page is re-rendered whenever the trace grows and refreshes itself in the browser until the run ends, all
+    /// from the local file: no server, no script, no external request. The final render drops the refresh.
+    /// </remarks>
+    internal static int Watch(string trace, string output, int intervalSeconds, CancellationToken cancellationToken)
+    {
+        long lastLength = -1;
+        while (true)
+        {
+            cancellationToken.ThrowIfCancellationRequested();
+            bool running = RunMarker.IsRunning(trace);
+            long length = File.Exists(trace) ? new FileInfo(trace).Length : 0;
+            if (length != lastLength || !running)
+            {
+                string html = HtmlReport.Render(TraceAnalysis.Load(trace), running ? intervalSeconds : null);
+                string temporary = output + ".tmp";
+                File.WriteAllText(temporary, html, new UTF8Encoding(false));
+                File.Move(temporary, output, overwrite: true);
+                lastLength = length;
+            }
+            if (!running) return Print(output);
+            cancellationToken.WaitHandle.WaitOne(TimeSpan.FromSeconds(intervalSeconds));
+        }
+    }
+
     private static int Report(string trace, string output)
     {
         if (File.Exists(output)) return Fail("error: " + output + " already exists; reports never overwrite.");
@@ -308,18 +340,22 @@ internal sealed class TraceAnalysis
 /// <summary>One self-contained HTML page: inline SVG, inline CSS, no network or script dependencies.</summary>
 internal static class HtmlReport
 {
-    public static string Render(TraceAnalysis t)
+    public static string Render(TraceAnalysis t, int? refreshSeconds = null)
     {
         var html = new StringBuilder();
         EvolutionTraceRecord? best = t.Best;
-        html.Append("<!doctype html><html lang=\"en\"><head><meta charset=\"utf-8\"><title>Evolution run report</title><style>")
+        html.Append("<!doctype html><html lang=\"en\"><head><meta charset=\"utf-8\">");
+        // A live view reloads itself; a finished report never does.
+        if (refreshSeconds is { } seconds) html.Append("<meta http-equiv=\"refresh\" content=\"").Append(seconds).Append("\">");
+        html.Append("<title>Evolution run report</title><style>")
             .Append("body{font:14px/1.5 system-ui,sans-serif;margin:24px;color:#1b1b1b;background:#fff}h1{font-size:20px}h2{font-size:16px;margin-top:28px}")
             .Append("table{border-collapse:collapse}td,th{border:1px solid #ccc;padding:3px 8px;text-align:left}svg{background:#fafafa;border:1px solid #ddd}")
             .Append(".note{color:#555}@media(prefers-color-scheme:dark){body{background:#141414;color:#e6e6e6}svg{background:#1d1d1d;border-color:#333}td,th{border-color:#444}.note{color:#aaa}}")
             .Append("</style></head><body>");
         html.Append("<h1>Evolution run report</h1><p class=\"note\">Trace ").Append(E(System.IO.Path.GetFileName(t.Path)))
             .Append(" &middot; ").Append(t.Records.Count).Append(" evaluations &middot; direction ").Append(E(t.Direction.ToString()))
-            .Append(t.Read.IsComplete ? "" : " &middot; <strong>trace incomplete</strong>").Append("</p>");
+            .Append(t.Read.IsComplete ? "" : " &middot; <strong>trace incomplete</strong>")
+            .Append(refreshSeconds is null ? "" : " &middot; <strong>live</strong>, refreshing while the run is running").Append("</p>");
         html.Append("<table><tr><th>Best genome</th><td>").Append(E(best?.GenomeId ?? "none")).Append("</td></tr><tr><th>Best quality</th><td>")
             .Append(best?.Quality is { } q ? q.ToString("G6", CultureInfo.InvariantCulture) : "none").Append("</td></tr><tr><th>Improvements</th><td>")
             .Append(t.Records.Count(r => r.IsImprovement)).Append("</td></tr><tr><th>Total cost units</th><td>")
