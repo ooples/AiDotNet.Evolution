@@ -4,7 +4,7 @@
     <ImplicitUsings>enable</ImplicitUsings>
     <Nullable>enable</Nullable>
     <TreatWarningsAsErrors>true</TreatWarningsAsErrors>
-    <Version>0.1.0-preview.1</Version>
+    <Version>0.2.0</Version>
     <Description>Compiler-neutral bounded program improvement and artifact-bound promotion.</Description>
     <RepositoryUrl>https://github.com/ooples/AiDotNet.Evolution</RepositoryUrl>
     <PackageLicenseFile>AIDOTNET-LICENSE.txt</PackageLicenseFile>
@@ -12,19 +12,19 @@
     <EnablePackageValidation>true</EnablePackageValidation>
   </PropertyGroup>
   <ItemGroup>
-    <None Include="AIDOTNET-LICENSE.txt" Pack="true" PackagePath="AIDOTNET-LICENSE.txt" />
-    <None Include="../../LICENSE" Pack="true" PackagePath="APACHE-LICENSE.txt" />
-    <InternalsVisibleTo Include="AiDotNet.Evolution.CSharp.Tests" />
-    <InternalsVisibleTo Include="AiDotNet.Evolution.CSharp" />
-    <InternalsVisibleTo Include="AiDotNet.Evolution.Deployment" />
-    <None Include="../../docs/COMPILER_GUIDED_PROGRAMS.md" Pack="true" PackagePath="README.md" />
-    <ProjectReference Include="../AiDotNet.Evolution/AiDotNet.Evolution.csproj" />
-    <PackageReference Include="Newtonsoft.Json" Version="13.0.4" />
+    <None Include="AIDOTNET-LICENSE.txt" Pack="true" PackagePath="AIDOTNET-LICENSE.txt"/>
+    <None Include="../../LICENSE" Pack="true" PackagePath="APACHE-LICENSE.txt"/>
+    <InternalsVisibleTo Include="AiDotNet.Evolution.CSharp.Tests"/>
+    <InternalsVisibleTo Include="AiDotNet.Evolution.CSharp"/>
+    <InternalsVisibleTo Include="AiDotNet.Evolution.Deployment"/>
+    <None Include="../../docs/COMPILER_GUIDED_PROGRAMS.md" Pack="true" PackagePath="README.md"/>
+    <ProjectReference Include="../AiDotNet.Evolution/AiDotNet.Evolution.csproj"/>
+    <PackageReference Include="Newtonsoft.Json" Version="13.0.4"/>
   </ItemGroup>
   <!-- V1-11: the public API is declared (PublicAPI.*.txt) and every change to it must be too. -->
   <ItemGroup>
-    <PackageReference Include="Microsoft.CodeAnalysis.PublicApiAnalyzers" Version="5.6.0" PrivateAssets="all" />
-    <AdditionalFiles Include="PublicAPI.Shipped.txt" />
-    <AdditionalFiles Include="PublicAPI.Unshipped.txt" />
+    <PackageReference Include="Microsoft.CodeAnalysis.PublicApiAnalyzers" Version="5.6.0" PrivateAssets="all"/>
+    <AdditionalFiles Include="PublicAPI.Shipped.txt"/>
+    <AdditionalFiles Include="PublicAPI.Unshipped.txt"/>
   </ItemGroup>
 </Project>

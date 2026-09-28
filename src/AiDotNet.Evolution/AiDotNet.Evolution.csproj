@@ -11,7 +11,7 @@
     <ContinuousIntegrationBuild Condition="'$(CI)' == 'true'">true</ContinuousIntegrationBuild>
     <GenerateDocumentationFile>true</GenerateDocumentationFile>
     <GeneratePackageOnBuild>true</GeneratePackageOnBuild>
-    <Version>0.1.0</Version>
+    <Version>0.2.0</Version>
     <PackageId>AiDotNet.Evolution</PackageId>
     <Title>AiDotNet.Evolution</Title>
     <Description>Deterministic, task-agnostic quality-diversity evolution for .NET with typed genomes, MAP-Elites archives, checkpointing, migration, and reproducible parallel evaluation.</Description>
@@ -47,8 +47,8 @@
   </ItemGroup>
   <!-- V1-11: the public API is declared (PublicAPI.*.txt) and every change to it must be too. -->
   <ItemGroup>
-    <PackageReference Include="Microsoft.CodeAnalysis.PublicApiAnalyzers" Version="5.6.0" PrivateAssets="all" />
-    <AdditionalFiles Include="PublicAPI.Shipped.txt" />
-    <AdditionalFiles Include="PublicAPI.Unshipped.txt" />
+    <PackageReference Include="Microsoft.CodeAnalysis.PublicApiAnalyzers" Version="5.6.0" PrivateAssets="all"/>
+    <AdditionalFiles Include="PublicAPI.Shipped.txt"/>
+    <AdditionalFiles Include="PublicAPI.Unshipped.txt"/>
   </ItemGroup>
 </Project>
