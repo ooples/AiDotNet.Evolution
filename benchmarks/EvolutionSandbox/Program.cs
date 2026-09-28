@@ -4,17 +4,20 @@ using System.Text.Json;
 using AiDotNet.Evolution.Programs;
 
 // V1-76 (#181): what process isolation adds to one evaluation of a trivial Python candidate.
-// Usage: EvolutionSandbox <python> <evaluations> [warmup]
+// Usage: EvolutionSandbox <python> <evaluations> [warmup] [docker-image]
 //   baseline  one long-lived interpreter that execs each candidate in-process and replies on a pipe, the way
 //             OpenEvolve's process pool evaluates; its round trip is the cost of evaluation without isolation.
 //   process   ProcessProgramExecutionEngine: a fresh, limit-bearing process per candidate, killed as a tree.
 //   warm      WarmPythonExecutionEngine: a forked child per candidate on Linux and macOS, a reused interpreter on Windows.
+//   docker    with an image: a fresh `docker run --rm --network none` container per candidate, the container
+//             boundary a hostile candidate needs; fewer evaluations, since each one starts a container.
 // Added latency is sandbox minus baseline at each percentile.
-if (args.Length is < 2 or > 3 || !int.TryParse(args[1], out int evaluations) || evaluations is < 10 or > 100_000)
+if (args.Length is < 2 or > 4 || !int.TryParse(args[1], out int evaluations) || evaluations is < 10 or > 100_000)
 {
-    Console.Error.WriteLine("Usage: EvolutionSandbox <python> <evaluations 10..100000> [warmup]");
+    Console.Error.WriteLine("Usage: EvolutionSandbox <python> <evaluations 10..100000> [warmup] [docker-image]");
     return 2;
 }
+string? dockerImage = args.Length == 4 ? args[3] : null;
 string python = args[0];
 int warmup = args.Length == 3 && int.TryParse(args[2], out int w) && w >= 0 ? w : 20;
 const string Candidate = "def solve(x):\n    return x * 2\n\nprint(solve(21))\n";
@@ -24,6 +27,7 @@ double[] process = await Sandbox(python, Candidate, evaluations, warmup, Program
 // The fork worker needs fork(); on Windows only the reused worker is measured.
 ProgramSandboxMode warmMode = OperatingSystem.IsWindows() ? ProgramSandboxMode.WarmReusedWorker : ProgramSandboxMode.WarmForkWorker;
 double[] warm = await Sandbox(python, Candidate, evaluations, warmup, warmMode);
+double[]? docker = dockerImage is null ? null : await Docker(dockerImage, Candidate, Math.Min(evaluations, 50), Math.Min(warmup, 3));
 Console.WriteLine(JsonSerializer.Serialize(new
 {
     Os = System.Runtime.InteropServices.RuntimeInformation.OSDescription,
@@ -33,7 +37,11 @@ Console.WriteLine(JsonSerializer.Serialize(new
     AddedP95Ms = Percentile(process, 0.95) - Percentile(baseline, 0.95),
     WarmMode = warmMode.ToString(), WarmMs = Summary(warm),
     WarmAddedP50Ms = Percentile(warm, 0.50) - Percentile(baseline, 0.50),
-    WarmAddedP95Ms = Percentile(warm, 0.95) - Percentile(baseline, 0.95)
+    WarmAddedP95Ms = Percentile(warm, 0.95) - Percentile(baseline, 0.95),
+    DockerImage = dockerImage,
+    DockerMs = docker is null ? null : Summary(docker),
+    DockerAddedP50Ms = docker is null ? (double?)null : Percentile(docker, 0.50) - Percentile(baseline, 0.50),
+    DockerAddedP95Ms = docker is null ? (double?)null : Percentile(docker, 0.95) - Percentile(baseline, 0.95)
 }));
 return 0;
 
@@ -122,6 +130,30 @@ static async Task<double[]> Sandbox(string python, string candidate, int evaluat
         });
         double ms = Stopwatch.GetElapsedTime(begin).TotalMilliseconds;
         if (!response.Success || response.StdOut?.Trim() != "42") throw new InvalidOperationException("Sandbox run failed: " + response.Error);
+        if (i >= warmup) times.Add(ms);
+    }
+    return times.ToArray();
+}
+
+static async Task<double[]> Docker(string image, string candidate, int evaluations, int warmup)
+{
+    var times = new List<double>(evaluations);
+    for (int i = 0; i < warmup + evaluations; i++)
+    {
+        var start = new ProcessStartInfo("docker")
+        {
+            RedirectStandardOutput = true,
+            RedirectStandardError = true,
+            UseShellExecute = false
+        };
+        foreach (string argument in new[] { "run", "--rm", "--network", "none", "--memory", "256m", image, "python", "-c", candidate })
+            start.ArgumentList.Add(argument);
+        long begin = Stopwatch.GetTimestamp();
+        using Process process = Process.Start(start) ?? throw new InvalidOperationException("docker did not start.");
+        string output = await process.StandardOutput.ReadToEndAsync();
+        await process.WaitForExitAsync();
+        double ms = Stopwatch.GetElapsedTime(begin).TotalMilliseconds;
+        if (process.ExitCode != 0 || output.Trim() != "42") throw new InvalidOperationException("Docker run failed: " + await process.StandardError.ReadToEndAsync());
         if (i >= warmup) times.Add(ms);
     }
     return times.ToArray();

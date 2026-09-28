@@ -46,7 +46,14 @@ jobs:
           $python = if ($IsWindows) { (Get-Command python).Source } else { (Get-Command python3).Source }
           $python = & $python -c "import sys, os; print(os.path.realpath(sys.executable))"
           New-Item -ItemType Directory -Force TestResults/sandbox-overhead | Out-Null
-          dotnet benchmarks/EvolutionSandbox/bin/Release/net10.0/EvolutionSandbox.dll $python 500 50 |
+          # Linux runners have Docker; measure a fresh container per candidate there (a slim CPython image, pulled first so the pull is not timed).
+          $docker = @()
+          if ($IsLinux) {
+            $image = 'python:3.12-slim'
+            docker pull $image | Out-Null
+            $docker = @($image)
+          }
+          dotnet benchmarks/EvolutionSandbox/bin/Release/net10.0/EvolutionSandbox.dll $python 500 50 @docker |
             Tee-Object -FilePath "TestResults/sandbox-overhead/${{ matrix.os }}.json"
           if ($LASTEXITCODE -ne 0) { throw 'Measurement failed.' }
       - name: Upload
