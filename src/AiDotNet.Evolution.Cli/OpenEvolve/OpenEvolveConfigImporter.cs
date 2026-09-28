@@ -1,0 +1,361 @@
+using System.Globalization;
+using System.Reflection;
+using System.Text.Json;
+using AiDotNet.Evolution.Programs;
+using YamlDotNet.RepresentationModel;
+
+namespace AiDotNet.Evolution.Cli;
+
+internal sealed record OpenEvolveImportEntry(string Key, string Value, OpenEvolveKeyDisposition Disposition, string Ours, bool FromConfig);
+
+internal sealed record OpenEvolveImport(RunFile Run, IReadOnlyList<OpenEvolveImportEntry> Entries, IReadOnlyList<string> Notes);
+
+/// <summary>
+/// Translates an OpenEvolve 0.3.2 <c>config.yaml</c> into a run file. The config is laid over OpenEvolve's own defaults,
+/// so the run behaves as OpenEvolve would with the same file. Every key is reported. A key OpenEvolve does not define
+/// is refused, and so is a value we cannot reproduce: unless it equals OpenEvolve's default, it is refused by name.
+/// </summary>
+internal static class OpenEvolveConfigImporter
+{
+    private const string DefaultsResource = "AiDotNet.Evolution.Cli.OpenEvolve.defaults.json";
+    // OpenEvolve sets no memory limit, but the sandbox always sets one. This is generous enough for numpy/scipy evaluators.
+    private const int ImportedMemoryLimitMb = 4096;
+    // The fields one entry of llm.models may carry: OpenEvolve's LLMModelConfig, which the top-level llm keys default.
+    private static readonly HashSet<string> ModelFields = new(StringComparer.Ordinal)
+    {
+        "api_base", "api_key", "name", "provider", "init_client", "weight", "system_message", "temperature", "top_p",
+        "max_tokens", "timeout", "retries", "retry_delay", "random_seed", "reasoning_effort", "max_budget_usd", "manual_mode",
+        "_manual_queue_dir"
+    };
+
+    public static OpenEvolveImport Import(string configPath, string initialProgram, string evaluator, int? iterations, string? python)
+    {
+        Dictionary<string, object?> config = Flatten(Load(configPath));
+        Dictionary<string, object?> defaults = Defaults();
+        var merged = new Dictionary<string, object?>(defaults, StringComparer.Ordinal);
+        var errors = new List<string>();
+        foreach ((string key, object? value) in config)
+        {
+            OpenEvolveKey? known = OpenEvolveConfigCatalog.Find(key);
+            if (known is null)
+            {
+                errors.Add(key + ": not an OpenEvolve 0.3.2 config key");
+                continue;
+            }
+            if (known.Disposition == OpenEvolveKeyDisposition.RefusedUnlessDefault && !Same(value, defaults[key]))
+                errors.Add(key + " = " + Show(value) + ": not supported (" + known.Ours + ")");
+            merged[key] = value;
+        }
+        var notes = new List<string>();
+        List<RunModel> models = Models(merged, defaults, errors);
+        if (errors.Count > 0)
+            throw new InvalidDataException("The OpenEvolve config cannot be imported:" + Environment.NewLine + "  " +
+                                           string.Join(Environment.NewLine + "  ", errors));
+
+        long seed = Integer(merged["random_seed"]) ?? 42;
+        if (merged["random_seed"] is null) notes.Add("random_seed is null (an unseeded OpenEvolve run); this run uses seed 42.");
+        int maxIterations = iterations ?? (int)(Integer(merged["max_iterations"]) ?? 10000);
+        if (maxIterations < 1) throw new InvalidDataException("max_iterations must be at least 1.");
+        List<RunMetricDescriptor> descriptors = Descriptors(merged, notes);
+        int timeout = (int)(Integer(merged["evaluator.timeout"]) ?? 300);
+        int? memory = (int?)Integer(merged["evaluator.memory_limit_mb"]);
+        if (memory is null) notes.Add("evaluator.memory_limit_mb is null: OpenEvolve sets no limit, the sandbox caps each evaluation at " +
+                                      ImportedMemoryLimitMb + " MiB.");
+        double exploration = Number(merged["database.exploration_ratio"]) ?? 0.2;
+        double exploitation = Number(merged["database.exploitation_ratio"]) ?? 0.7;
+        if (exploration < 0 || exploitation < 0 || exploration + exploitation > 1 + 1e-9)
+            throw new InvalidDataException("database.exploration_ratio + exploitation_ratio must be between 0 and 1.");
+        string? language = merged["language"] as string;
+        string? systemMessage = merged["prompt.system_message"] as string;
+
+        var run = new RunFile
+        {
+            Schema = RunFile.CurrentSchema,
+            RunId = "openevolve-" + Path.GetFileNameWithoutExtension(configPath),
+            InitialProgram = Path.GetFullPath(initialProgram),
+            Evaluator = Path.GetFullPath(evaluator),
+            Output = ".",
+            Model = models[0],
+            AdditionalModels = models.Skip(1).ToList(),
+            Language = language is null ? ProgramLanguage.Python : ParseLanguage(language),
+            Mode = Boolean(merged["diff_based_evolution"]) ? ProgramEvolutionMode.Diff : ProgramEvolutionMode.FullRewrite,
+            // "system_message" is OpenEvolve's name for its built-in template, which ours stands in for.
+            SystemMessage = systemMessage is null or "system_message" ? null : systemMessage,
+            Budget = new RunBudget
+            {
+                MaxEvaluations = checked(maxIterations + 1),
+                Seed = (ulong)seed,
+                Parallelism = Math.Max(1, (int)(Integer(merged["evaluator.parallel_evaluations"]) ?? 1)),
+                EvaluationTimeLimitSeconds = Math.Max(1, timeout),
+                MaxProgramChars = (int)(Integer(merged["max_code_length"]) ?? 10000)
+            },
+            Search = new RunSearch
+            {
+                Islands = Math.Max(1, (int)(Integer(merged["database.num_islands"]) ?? 1)),
+                MigrationInterval = (int)(Integer(merged["database.migration_interval"]) ?? 0),
+                MigrationRate = Number(merged["database.migration_rate"]) ?? 0.1,
+                // OpenEvolve draws the parent by exploration, then exploitation, then a remainder branch; ours has the same
+                // three branches with the remainder as the third, and its defaults (0.2/0.7/0.1) are OpenEvolve's.
+                ExplorationRatio = exploration,
+                ExploitationRatio = exploitation,
+                EliteRatio = 1 - exploration - exploitation,
+                TopPrograms = (int?)Integer(merged["prompt.num_top_programs"]),
+                DiversePrograms = (int?)Integer(merged["prompt.num_diverse_programs"]),
+                MetricDescriptors = descriptors,
+                EarlyStoppingPatience = Integer(merged["early_stopping_patience"]),
+                EarlyStoppingMinimumImprovement = Number(merged["convergence_threshold"]) ?? 0,
+                EvaluationRetries = (int)(Integer(merged["evaluator.max_retries"]) ?? 0),
+                EvaluationMemoryLimitMb = memory ?? ImportedMemoryLimitMb,
+                IncludeArtifacts = Boolean(merged["prompt.include_artifacts"]),
+                MaxArtifactBytes = (int?)Integer(merged["prompt.max_artifact_bytes"]),
+                CollectArtifacts = Boolean(merged["evaluator.enable_artifacts"]),
+                ArchiveCapacity = (int)(Integer(merged["database.population_size"]) ?? 0),
+                EliteArchiveSize = (int)(Integer(merged["database.archive_size"]) ?? 0)
+            },
+            OpenEvolveEvaluator = new RunOpenEvolveEvaluator
+            {
+                Python = python,
+                Cascade = Boolean(merged["evaluator.cascade_evaluation"]),
+                CascadeThresholds = List(merged["evaluator.cascade_thresholds"]).Select(value => Number(value) ?? 0).ToList(),
+                FileSuffix = merged["file_suffix"] as string ?? ".py",
+                TimeoutSeconds = Math.Max(1, timeout),
+                FeatureDimensions = List(merged["database.feature_dimensions"]).OfType<string>().ToList()
+            }
+        };
+
+        var entries = OpenEvolveConfigCatalog.Keys
+            .Select(key => new OpenEvolveImportEntry(key.Name, Show(merged[key.Name]), key.Disposition, key.Ours, config.ContainsKey(key.Name)))
+            .ToList();
+        return new OpenEvolveImport(run, entries, notes);
+    }
+
+    private static List<RunModel> Models(Dictionary<string, object?> merged, Dictionary<string, object?> defaults, List<string> errors)
+    {
+        var shared = new Dictionary<string, object?>(StringComparer.Ordinal);
+        foreach (string field in ModelFields) shared[field] = merged["llm." + field];
+        var entries = new List<Dictionary<string, object?>>();
+        foreach (object? item in List(merged["llm.models"]))
+        {
+            if (item is not Dictionary<string, object?> model)
+            {
+                errors.Add("llm.models: every entry must be a mapping");
+                continue;
+            }
+            foreach (string field in model.Keys.Where(field => !ModelFields.Contains(field)))
+                errors.Add("llm.models[].'" + field + "': not an OpenEvolve 0.3.2 model field");
+            var resolved = new Dictionary<string, object?>(shared, StringComparer.Ordinal);
+            foreach ((string field, object? value) in model)
+            {
+                resolved[field] = value;
+                OpenEvolveKey? key = OpenEvolveConfigCatalog.Find("llm." + field);
+                if (key?.Disposition == OpenEvolveKeyDisposition.RefusedUnlessDefault && !Same(value, defaults["llm." + field]))
+                    errors.Add("llm.models[]." + field + " = " + Show(value) + ": not supported (" + key.Ours + ")");
+            }
+            entries.Add(resolved);
+        }
+        // OpenEvolve's older form, used when llm.models is empty.
+        if (entries.Count == 0 && merged["llm.primary_model"] is string primary)
+        {
+            entries.Add(new(shared, StringComparer.Ordinal) { ["name"] = primary, ["weight"] = merged["llm.primary_model_weight"] ?? 1.0 });
+            if (merged["llm.secondary_model"] is string secondary)
+                entries.Add(new(shared, StringComparer.Ordinal) { ["name"] = secondary, ["weight"] = merged["llm.secondary_model_weight"] ?? 0.0 });
+        }
+        if (entries.Count == 0 && merged["llm.name"] is string name) entries.Add(new(shared, StringComparer.Ordinal) { ["name"] = name });
+        if (entries.Count == 0)
+        {
+            errors.Add("llm: no model is configured (set llm.models, llm.primary_model or llm.name)");
+            return new List<RunModel>();
+        }
+        return entries.Where(model => (Number(model["weight"]) ?? 1) > 0).Select(ToModel).ToList() is { Count: > 0 } weighted
+            ? weighted
+            : throw new InvalidDataException("llm: every configured model has weight 0.");
+    }
+
+    private static RunModel ToModel(Dictionary<string, object?> model)
+    {
+        bool manual = Boolean(model["manual_mode"]);
+        return new RunModel
+        {
+            Provider = manual ? ModelProvider.Manual : ModelProvider.OpenAiCompatible,
+            Endpoint = model["api_base"] as string,
+            Name = model["name"] as string ?? throw new InvalidDataException("llm.models: every model needs a name."),
+            ApiKeyEnvironmentVariable = manual ? null : "OPENAI_API_KEY",
+            Temperature = Number(model["temperature"]),
+            TopP = Number(model["top_p"]),
+            MaxOutputTokens = (int?)Integer(model["max_tokens"]),
+            ReasoningEffort = model["reasoning_effort"] is string effort ? ParseEffort(effort) : null,
+            TimeoutSeconds = Math.Max(1, (int)(Integer(model["timeout"]) ?? 60)),
+            MaxRetries = (int)(Integer(model["retries"]) ?? 3),
+            RetryDelaySeconds = (int)(Integer(model["retry_delay"]) ?? 5),
+            MaxBudgetUsd = Number(model["max_budget_usd"]) is double budget ? (decimal)budget : null,
+            ManualQueue = model["_manual_queue_dir"] as string,
+            Weight = Number(model["weight"]) ?? 1
+        };
+    }
+
+    private static List<RunMetricDescriptor> Descriptors(Dictionary<string, object?> merged, List<string> notes)
+    {
+        var descriptors = new List<RunMetricDescriptor>();
+        object? bins = merged["database.feature_bins"];
+        foreach (string dimension in List(merged["database.feature_dimensions"]).OfType<string>())
+        {
+            int count = (int)((bins is Dictionary<string, object?> perDimension && perDimension.TryGetValue(dimension, out object? own)
+                ? Integer(own) : Integer(bins)) ?? 10);
+            if (dimension == "diversity")
+            {
+                notes.Add("database.feature_dimensions: OpenEvolve's population-relative 'diversity' axis has no deterministic " +
+                          "equivalent and is dropped.");
+                continue;
+            }
+            descriptors.Add(new RunMetricDescriptor
+            {
+                // OpenEvolve's "complexity" is program length; "score" is the fitness itself; others are evaluator metrics.
+                Name = dimension switch { "complexity" => "length", _ => dimension },
+                Bins = Math.Max(1, count)
+            });
+        }
+        return descriptors;
+    }
+
+    private static ProgramLanguage ParseLanguage(string language) => language.ToLowerInvariant() switch
+    {
+        "python" => ProgramLanguage.Python,
+        _ => Enum.TryParse(language, ignoreCase: true, out ProgramLanguage parsed)
+            ? parsed
+            : throw new InvalidDataException("language = " + language + ": not a language this CLI runs.")
+    };
+
+    private static ProgramReasoningEffort ParseEffort(string effort) =>
+        Enum.TryParse(effort, ignoreCase: true, out ProgramReasoningEffort parsed)
+            ? parsed
+            : throw new InvalidDataException("reasoning_effort = " + effort + ": not a known effort.");
+
+    private static YamlMappingNode Load(string path)
+    {
+        var info = new FileInfo(path);
+        if (!info.Exists) throw new FileNotFoundException("OpenEvolve config not found: " + path, path);
+        if (info.Length > 1024 * 1024) throw new InvalidDataException("The OpenEvolve config exceeds 1 MiB.");
+        var stream = new YamlStream();
+        using (var reader = new StreamReader(path)) stream.Load(reader);
+        if (stream.Documents.Count == 0) return new YamlMappingNode();
+        return stream.Documents[0].RootNode as YamlMappingNode
+               ?? throw new InvalidDataException("The OpenEvolve config must be a mapping at the top level.");
+    }
+
+    // Nested sections become dotted keys, as OpenEvolve's dataclasses nest. Lists and the free-form mappings some keys
+    // take (llm.models entries, per-dimension feature_bins) stay whole values.
+    private static Dictionary<string, object?> Flatten(YamlMappingNode root)
+    {
+        var flat = new Dictionary<string, object?>(StringComparer.Ordinal);
+        foreach ((YamlNode keyNode, YamlNode value) in root.Children)
+        {
+            string key = ((YamlScalarNode)keyNode).Value ?? string.Empty;
+            if (value is YamlMappingNode section && key is "llm" or "prompt" or "database" or "evaluator" or "evolution_trace")
+            {
+                foreach ((YamlNode childKey, YamlNode child) in section.Children)
+                    flat[key + "." + (((YamlScalarNode)childKey).Value ?? string.Empty)] = Convert(child);
+            }
+            else
+            {
+                flat[key] = Convert(value);
+            }
+        }
+        return flat;
+    }
+
+    private static object? Convert(YamlNode node) => node switch
+    {
+        YamlScalarNode scalar => Scalar(scalar),
+        YamlSequenceNode sequence => sequence.Children.Select(Convert).ToList(),
+        YamlMappingNode mapping => mapping.Children.ToDictionary(pair => ((YamlScalarNode)pair.Key).Value ?? string.Empty,
+            pair => Convert(pair.Value), StringComparer.Ordinal),
+        _ => null
+    };
+
+    // YAML scalars are text; this applies YAML 1.2's core schema, the types PyYAML gives OpenEvolve for these values.
+    private static object? Scalar(YamlScalarNode scalar)
+    {
+        string text = scalar.Value ?? string.Empty;
+        if (scalar.Style is YamlDotNet.Core.ScalarStyle.SingleQuoted or YamlDotNet.Core.ScalarStyle.DoubleQuoted) return text;
+        if (text is "" or "~" or "null" or "Null" or "NULL") return null;
+        if (text is "true" or "True" or "TRUE") return true;
+        if (text is "false" or "False" or "FALSE") return false;
+        if (long.TryParse(text, NumberStyles.AllowLeadingSign, CultureInfo.InvariantCulture, out long integer)) return integer;
+        if (double.TryParse(text, NumberStyles.Float, CultureInfo.InvariantCulture, out double number)) return number;
+        return text;
+    }
+
+    private static Dictionary<string, object?> Defaults()
+    {
+        using Stream stream = Assembly.GetExecutingAssembly().GetManifestResourceStream(DefaultsResource)
+            ?? throw new InvalidOperationException("The OpenEvolve defaults are missing from the tool.");
+        using JsonDocument document = JsonDocument.Parse(stream);
+        return document.RootElement.EnumerateObject().ToDictionary(property => property.Name, property => FromJson(property.Value),
+            StringComparer.Ordinal);
+    }
+
+    private static object? FromJson(JsonElement element) => element.ValueKind switch
+    {
+        JsonValueKind.Null => null,
+        JsonValueKind.True => true,
+        JsonValueKind.False => false,
+        JsonValueKind.Number => element.TryGetInt64(out long integer) ? integer : element.GetDouble(),
+        JsonValueKind.String => element.GetString(),
+        JsonValueKind.Array => element.EnumerateArray().Select(FromJson).ToList(),
+        JsonValueKind.Object => element.EnumerateObject().ToDictionary(p => p.Name, p => FromJson(p.Value), StringComparer.Ordinal),
+        _ => null
+    };
+
+    private static bool Same(object? a, object? b) => (a, b) switch
+    {
+        (null, null) => true,
+        (null, _) or (_, null) => false,
+        (long x, long y) => x == y,
+        (long or double, long or double) => Math.Abs(System.Convert.ToDouble(a, CultureInfo.InvariantCulture) -
+                                                     System.Convert.ToDouble(b, CultureInfo.InvariantCulture)) < 1e-12,
+        (List<object?> x, List<object?> y) => x.Count == y.Count && x.Zip(y, Same).All(equal => equal),
+        (Dictionary<string, object?> x, Dictionary<string, object?> y) => x.Count == y.Count &&
+            x.All(pair => y.TryGetValue(pair.Key, out object? other) && Same(pair.Value, other)),
+        _ => Equals(a, b)
+    };
+
+    private static long? Integer(object? value) => value switch
+    {
+        long integer => integer,
+        double number when Math.Abs(number - Math.Round(number)) < 1e-12 => (long)Math.Round(number),
+        null => null,
+        _ => throw new InvalidDataException("expected a whole number, found " + Show(value) + ".")
+    };
+
+    private static double? Number(object? value) => value switch
+    {
+        long integer => integer,
+        double number => number,
+        null => null,
+        _ => throw new InvalidDataException("expected a number, found " + Show(value) + ".")
+    };
+
+    private static bool Boolean(object? value) => value switch
+    {
+        bool flag => flag,
+        _ => throw new InvalidDataException("expected true or false, found " + Show(value) + ".")
+    };
+
+    private static List<object?> List(object? value) => value switch
+    {
+        List<object?> list => list,
+        null => new List<object?>(),
+        _ => new List<object?> { value }
+    };
+
+    internal static string Show(object? value) => value switch
+    {
+        null => "null",
+        bool flag => flag ? "true" : "false",
+        double number => number.ToString("R", CultureInfo.InvariantCulture),
+        long integer => integer.ToString(CultureInfo.InvariantCulture),
+        List<object?> list => "[" + string.Join(", ", list.Select(Show)) + "]",
+        Dictionary<string, object?> map => "{" + string.Join(", ", map.Select(pair => pair.Key + ": " + Show(pair.Value))) + "}",
+        _ => value.ToString() ?? string.Empty
+    };
+}

@@ -70,6 +70,12 @@ internal sealed class RunSearch
     /// <summary>Whether evaluator artifacts are fed into later prompts (OpenEvolve's <c>prompt.include_artifacts</c>).</summary>
     public bool IncludeArtifacts { get; init; } = true;
     public int? MaxArtifactBytes { get; init; }
+    /// <summary>Whether evaluator artifacts are collected at all (OpenEvolve's <c>evaluator.enable_artifacts</c>).</summary>
+    public bool CollectArtifacts { get; init; } = true;
+    /// <summary>The most elites the archive holds (OpenEvolve's <c>database.population_size</c>); zero means the whole grid.</summary>
+    public int ArchiveCapacity { get; init; }
+    /// <summary>The global elite index size programs are drawn from (OpenEvolve's <c>database.archive_size</c>); zero for none.</summary>
+    public int EliteArchiveSize { get; init; }
 }
 
 internal sealed class RunMetricDescriptor
@@ -153,6 +159,9 @@ internal static class RunCommand
         UnmappedMemberHandling = JsonUnmappedMemberHandling.Disallow,
         Converters = { new JsonStringEnumConverter(allowIntegerValues: false) }
     };
+
+    /// <summary>Writes run files in the form <see cref="Load"/> reads, for the OpenEvolve importer.</summary>
+    internal static readonly JsonSerializerOptions RunFileJson = new(RunJson) { WriteIndented = true };
 
     /// <summary>Exit code for a run aborted by a second interrupt; its final checkpoint was still written.</summary>
     public const int AbortedExitCode = 130;
@@ -290,13 +299,15 @@ internal static class RunCommand
             options.EarlyStopping.PatienceEvaluations = patience;
             options.EarlyStopping.MinimumImprovement = run.Search.EarlyStoppingMinimumImprovement;
         }
+        options.Artifacts.Enabled = run.Search.CollectArtifacts;
         options.Artifacts.DeliverToNextProposal = run.Search.IncludeArtifacts;
+        options.GlobalEliteCount = run.Search.EliteArchiveSize;
         if (run.Search.MaxArtifactBytes is int artifactBytes) options.Artifacts.MaxArtifactBytes = artifactBytes;
 
         EvolutionRunResult<ProgramGenome> result;
         using (var tracer = new EvolutionTraceObserver<ProgramGenome>(new EvolutionTraceOptions { Enabled = true, Path = tracePath }, run.RunId, descriptors))
         {
-            var engine = new EvolutionEngine<ProgramGenome>(task, variation, _ => new MapElitesArchive<ProgramGenome>(descriptors), options,
+            var engine = new EvolutionEngine<ProgramGenome>(task, variation, _ => new MapElitesArchive<ProgramGenome>(descriptors, capacity: run.Search.ArchiveCapacity), options,
                 observer: tracer, checkpointStore: checkpoints, genomeCodec: codec);
             interrupt.Attach(engine.RequestStop);
             try

@@ -28,5 +28,6 @@
     <!-- Reads OpenEvolve config.yaml files (V1-56); the libraries themselves stay free of it. -->
     <PackageReference Include="YamlDotNet" Version="18.1.0"/>
     <EmbeddedResource Include="OpenEvolve/openevolve_evaluator_shim.py" LogicalName="AiDotNet.Evolution.Cli.OpenEvolve.openevolve_evaluator_shim.py"/>
+    <EmbeddedResource Include="OpenEvolve/openevolve-0.3.2-defaults.json" LogicalName="AiDotNet.Evolution.Cli.OpenEvolve.defaults.json"/>
   </ItemGroup>
 </Project>
