@@ -10,12 +10,15 @@ using AiDotNet.Evolution;
 //                                                        the kill/resume driver
 //   resume <evaluations> <checkpointEvery> <workDir> <killPoints>
 //                                                        uninterrupted run, then one killed-and-resumed run per kill point
+//   sandbox <executions> <python> <concurrency>          out-of-process sandbox executions whose programs start a detached
+//                                                        grandchild and time out 1% of the time; counts survivors after
 if (args.Length < 1) return Usage();
 return args[0] switch
 {
     "memory" when args.Length == 4 => await Memory(int.Parse(args[1]), int.Parse(args[2]), args[3]),
     "run" when args.Length == 5 => await Run(int.Parse(args[1]), int.Parse(args[2]), args[3], args[4] == "1", progress: true),
     "resume" when args.Length == 5 => await Resume(int.Parse(args[1]), int.Parse(args[2]), args[3], int.Parse(args[4])),
+    "sandbox" when args.Length == 4 => await Sandbox(int.Parse(args[1]), args[2], int.Parse(args[3])),
     _ => Usage()
 };
 
@@ -141,6 +144,109 @@ static (string Hash, int Seen) Child(string host, string dll, int evaluations, i
     process.WaitForExit();
     if (process.ExitCode != 0 || hash.Length == 0) throw new InvalidOperationException($"Child failed with exit code {process.ExitCode}.");
     return (hash, seen);
+}
+
+static async Task<int> Sandbox(int executions, string python, int concurrency)
+{
+    // Every grandchild carries this marker in its command line, so survivors can be found whatever their parent now is.
+    string marker = "soak-orphan-" + Guid.NewGuid().ToString("N");
+    var options = new AiDotNet.Evolution.Programs.ProgramSandboxOptions();
+    options.SetInterpreter(AiDotNet.Evolution.Programs.ProgramLanguage.Python,
+        new AiDotNet.Evolution.Programs.ProgramInterpreterSpecification(python, "{source}"));
+    options.Limits.TimeLimitSeconds = 2;
+    options.Limits.MaxConcurrentExecutions = concurrency;
+    // DETACHED_PROCESS | CREATE_NEW_PROCESS_GROUP on Windows: the grandchild outlives its parent unless the job kills it.
+    string spawn = "import subprocess, sys, time\n" +
+        "flags = 0x00000008 | 0x00000200 if sys.platform == 'win32' else 0\n" +
+        "subprocess.Popen([sys.executable, '-c', 'import time; time.sleep(120)', '" + marker + "'], creationflags=flags)\n";
+    string normal = spawn + "print('ok')\n";
+    string slow = spawn + "time.sleep(30)\nprint('late')\n";
+    // Positive control: a marked sleeper started outside the sandbox must be counted, or a zero below proves nothing.
+    var control = new ProcessStartInfo(python) { UseShellExecute = false };
+    foreach (string a in new[] { "-c", "import time; time.sleep(120)", marker }) control.ArgumentList.Add(a);
+    using (Process sleeper = Process.Start(control) ?? throw new InvalidOperationException("Control sleeper did not start."))
+    {
+        int seen = 0;
+        for (int attempt = 0; attempt < 20 && seen == 0; attempt++) { await Task.Delay(250); seen = Marked(marker); }
+        sleeper.Kill(entireProcessTree: true);
+        sleeper.WaitForExit();
+        if (seen != 1) throw new InvalidOperationException($"The orphan counter saw {seen} marked processes where exactly one was running.");
+    }
+    // Second control: the same program run outside the sandbox must leave its grandchild behind, so zero orphans below
+    // is the sandbox's doing rather than a spawn that never happened.
+    string script = Path.Combine(Path.GetTempPath(), marker + ".py");
+    File.WriteAllText(script, normal);
+    var bare = new ProcessStartInfo(python) { UseShellExecute = false, RedirectStandardOutput = true };
+    bare.ArgumentList.Add(script);
+    using (Process parent = Process.Start(bare) ?? throw new InvalidOperationException("Bare run did not start."))
+    {
+        parent.StandardOutput.ReadToEnd();
+        parent.WaitForExit();
+    }
+    int leftBehind = 0;
+    for (int attempt = 0; attempt < 20 && leftBehind == 0; attempt++) { await Task.Delay(250); leftBehind = Marked(marker); }
+    KillMarked(marker);
+    File.Delete(script);
+    if (leftBehind != 1) throw new InvalidOperationException($"Outside the sandbox the program left {leftBehind} grandchildren, not one.");
+    int completed = 0, timedOut = 0, other = 0, peakMarked = 0;
+    var clock = Stopwatch.StartNew();
+    using (var engine = new AiDotNet.Evolution.Programs.ProcessProgramExecutionEngine(options))
+    {
+        var running = new List<Task<AiDotNet.Evolution.Programs.ProgramExecuteResponse>>();
+        for (int i = 0; i < executions; i++)
+        {
+            running.Add(engine.ExecuteAsync(new AiDotNet.Evolution.Programs.ProgramExecuteRequest
+            {
+                Language = AiDotNet.Evolution.Programs.ProgramLanguage.Python,
+                SourceCode = i % 100 == 99 ? slow : normal
+            }));
+            if (running.Count < concurrency * 2 && i < executions - 1) continue;
+            foreach (var response in await Task.WhenAll(running))
+            {
+                if (response.Success) completed++;
+                else if (response.ErrorCode == AiDotNet.Evolution.Programs.ProgramExecuteErrorCode.TimeoutOrCanceled) timedOut++;
+                else other++;
+            }
+            running.Clear();
+            if (i % 1000 == 999) peakMarked = Math.Max(peakMarked, Marked(marker));
+        }
+    }
+    // A killed tree takes a moment to disappear. A true orphan sleeps for 120 s, so anything still marked after 30 s of
+    // polling is one; a tree that was merely slow to tear down reaches zero well before.
+    int survivors = Marked(marker);
+    var settle = Stopwatch.StartNew();
+    while (survivors > 0 && settle.Elapsed < TimeSpan.FromSeconds(30))
+    {
+        await Task.Delay(TimeSpan.FromSeconds(1));
+        survivors = Marked(marker);
+    }
+    Console.WriteLine(JsonSerializer.Serialize(new
+    {
+        Mode = "sandbox", Executions = executions, Completed = completed, TimedOut = timedOut, Other = other,
+        PeakMarkedDuringRun = peakMarked, OrphansAfter = survivors, SettleSeconds = settle.Elapsed.TotalSeconds,
+        Seconds = clock.Elapsed.TotalSeconds
+    }));
+    return survivors == 0 ? 0 : 1;
+}
+
+// Stops every process a control run left behind.
+static void KillMarked(string marker)
+{
+    var start = new ProcessStartInfo("powershell", "-NoProfile -Command \"Get-CimInstance Win32_Process | Where-Object { $_.ProcessId -ne $PID -and $_.CommandLine -like '*time.sleep(120)*" + marker + "*' } | ForEach-Object { Stop-Process -Id $_.ProcessId -Force }\"")
+    { UseShellExecute = false };
+    using Process process = Process.Start(start) ?? throw new InvalidOperationException("Process cleanup did not start.");
+    process.WaitForExit();
+}
+
+// Counts live processes whose command line carries the marker (WMI, so it sees processes of any parent).
+static int Marked(string marker)
+{
+    var start = new ProcessStartInfo("powershell", "-NoProfile -Command \"@(Get-CimInstance Win32_Process | Where-Object { $_.ProcessId -ne $PID -and $_.CommandLine -like '*time.sleep(120)*" + marker + "*' }).Count\"")
+    { RedirectStandardOutput = true, UseShellExecute = false };
+    using Process process = Process.Start(start) ?? throw new InvalidOperationException("Process query did not start.");
+    string output = process.StandardOutput.ReadToEnd();
+    process.WaitForExit();
+    return int.Parse(output.Trim());
 }
 
 static int ChildCount(int pid)
