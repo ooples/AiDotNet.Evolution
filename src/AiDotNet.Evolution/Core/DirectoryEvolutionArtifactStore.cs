@@ -39,17 +39,8 @@ public sealed class DirectoryEvolutionArtifactStore : IEvolutionArtifactStore
         Guard.NotNull(content);
         string hex = Hash(content);
         string path = PathFor(hex);
-        if (File.Exists(path))
-        {
-            // Re-storing refreshes the blob, so retention counts from its latest use. Another store's prune may delete
-            // it between the check and the refresh; the content is still in hand, so fall through and write it again.
-            try
-            {
-                File.SetLastWriteTimeUtc(path, DateTime.UtcNow);
-                return Prefix + hex;
-            }
-            catch (FileNotFoundException) { }
-        }
+        // Re-storing refreshes the blob, so retention counts from its latest use.
+        if (File.Exists(path) && TryRefresh(path)) return Prefix + hex;
         string temporary = Child("." + hex + "." + Guid.NewGuid().ToString("N", CultureInfo.InvariantCulture) + ".tmp");
         File.WriteAllBytes(temporary, content);
         try
@@ -95,6 +86,21 @@ public sealed class DirectoryEvolutionArtifactStore : IEvolutionArtifactStore
             catch (IOException) { /* in use by a concurrent reader; the next prune retries */ }
         }
         return removed;
+    }
+
+    // Another store's prune may delete the blob between the existence check and the refresh. The content is still in
+    // hand, so the caller then writes it again rather than failing the evaluation.
+    private static bool TryRefresh(string path)
+    {
+        try
+        {
+            File.SetLastWriteTimeUtc(path, DateTime.UtcNow);
+            return true;
+        }
+        catch (FileNotFoundException)
+        {
+            return false;
+        }
     }
 
     private string PathFor(string hex) => Child(hex + Extension);
