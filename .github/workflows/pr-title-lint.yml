@@ -8,9 +8,12 @@ name: Lint PR Title (Conventional Commits)
 on:
   pull_request:
     types: [opened, edited, reopened, synchronize]
+  # Required checks must report on merge-queue entries too; see the early return in the script.
+  merge_group:
+    types: [checks_requested]
 
 concurrency:
-  group: pr-title-lint-${{ github.event.pull_request.number }}
+  group: pr-title-lint-${{ github.event.pull_request.number || github.event.merge_group.head_sha }}
   cancel-in-progress: true
 
 # contents: read is used for exactly one thing — reading release-please-config.json from the base
@@ -31,6 +34,12 @@ jobs:
         uses: actions/github-script@3a2844b7e9c422d3c10d287c895573f7108da1b3 # v7
         with:
           script: |
+            // A merge-queue entry has no pull request. The squash subject is this PR's title, which was already
+            // validated on the PR itself, so the queue's run reports success rather than failing for want of a title.
+            if (context.eventName === 'merge_group') {
+              core.info('Merge-queue entry: the PR title was validated on the pull request.');
+              return;
+            }
             // Derived from release-please-config.json rather than duplicated here. A second
             // hand-maintained list drifts silently, and both directions are damaging: a type
             // release-please handles gets rejected, or a type it ignores is accepted and quietly

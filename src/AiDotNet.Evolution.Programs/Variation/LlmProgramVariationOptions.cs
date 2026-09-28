@@ -65,12 +65,18 @@ public sealed class LlmProgramVariationOptions
     public double? Temperature { get; set; }
 
     /// <summary>
-    /// Gets or sets whether several proposals may call the model at once under pipeline dispatch, with
-    /// <see cref="EvolutionEngineOptions.Pipeline"/>'s <c>MaxProposalConcurrency</c>. Off by default, when proposals run one
-    /// at a time. On, replay stays exact: a prompt's previous-attempt history is the history as of its archive snapshot,
-    /// so no prompt depends on which concurrent call returns first.
+    /// Gets or sets whether several proposals may call the model at once, up to
+    /// <see cref="EvolutionEngineOptions.Pipeline"/>'s <c>MaxProposalConcurrency</c>, under
+    /// <see cref="EvolutionDispatchMode.Pipeline"/> or <see cref="EvolutionDispatchMode.Continuous"/> dispatch. Off by
+    /// default, when proposals run one at a time. On, replay stays exact: a prompt reads only the attempt history of
+    /// evaluations that had committed when it was planned, so no prompt depends on which concurrent call returns first.
     /// </summary>
     public bool ConcurrentProposals { get; set; }
+    /// <summary>Gets or sets nucleus sampling passed to the chat client (OpenEvolve's <c>top_p</c>), or <c>null</c> for its default.</summary>
+    public double? TopP { get; set; }
+
+    /// <summary>Gets or sets the reasoning effort passed to the chat client (OpenEvolve's <c>reasoning_effort</c>), or <c>null</c>.</summary>
+    public ProgramReasoningEffort? ReasoningEffort { get; set; }
 
     /// <summary>Gets or sets the output token cap passed to the chat client, or <c>null</c> for its default.</summary>
     public int? MaxOutputTokens { get; set; }
@@ -169,6 +175,8 @@ public sealed class LlmProgramVariationOptions
         SystemMessage = SystemMessage,
         Temperature = Temperature,
         ConcurrentProposals = ConcurrentProposals,
+        TopP = TopP,
+        ReasoningEffort = ReasoningEffort,
         MaxOutputTokens = MaxOutputTokens,
         Seed = Seed,
         IncludeParentMetrics = IncludeParentMetrics,
@@ -202,6 +210,10 @@ public sealed class LlmProgramVariationOptions
         if (MaxOutputTokens.HasValue && MaxOutputTokens.Value <= 0)
             throw new ArgumentOutOfRangeException(nameof(MaxOutputTokens), MaxOutputTokens.Value,
                 "Value must be positive.");
+        if (TopP is { } topP && (double.IsNaN(topP) || topP <= 0 || topP > 1))
+            throw new ArgumentOutOfRangeException(nameof(TopP), topP, "TopP must be in (0, 1].");
+        if (ReasoningEffort is { } effort && !Enum.IsDefined(typeof(ProgramReasoningEffort), effort))
+            throw new ArgumentOutOfRangeException(nameof(ReasoningEffort));
         if (Temperature.HasValue
             && (double.IsNaN(Temperature.Value) || double.IsInfinity(Temperature.Value)
                 || Temperature.Value < 0 || Temperature.Value > 2))

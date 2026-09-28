@@ -56,6 +56,16 @@ public sealed class EvolutionArtifactOptions
     /// <summary>Gets or sets the maximum number of candidates whose artifacts may await delivery.</summary>
     public int MaxPendingCandidates { get; set; } = 256;
 
+    /// <summary>
+    /// Gets or sets where full artifact content is kept when it is binary or larger than <see cref="MaxArtifactBytes"/>;
+    /// <c>null</c> keeps only the bounded inline text (the default). With a store, the inline artifact is a preview plus
+    /// the content address, so nothing is lost to truncation.
+    /// </summary>
+    public IEvolutionArtifactStore? Store { get; set; }
+
+    /// <summary>Gets or sets the most bytes one evaluation may write to <see cref="Store"/> (OpenEvolve's <c>max_artifact_storage</c>).</summary>
+    public long MaxStoredBytesPerEvaluation { get; set; } = 100L * 1024 * 1024;
+
     /// <summary>Validates every value and returns an independent copy.</summary>
     /// <returns>A defensive copy that later mutation of this instance cannot affect.</returns>
     /// <exception cref="ArgumentOutOfRangeException">
@@ -78,6 +88,7 @@ public sealed class EvolutionArtifactOptions
             throw new ArgumentOutOfRangeException(nameof(MaxBytesPerEvaluation),
                 $"One evaluation may retain at most " +
                 $"{EvolutionCollectionLimits.MaximumArtifactBytesPerEvaluation} artifact bytes.");
+        if (MaxStoredBytesPerEvaluation <= 0) throw new ArgumentOutOfRangeException(nameof(MaxStoredBytesPerEvaluation));
         if (MaxPendingCandidates > EvolutionCollectionLimits.MaximumResultEntries)
             throw new ArgumentOutOfRangeException(nameof(MaxPendingCandidates));
         long pendingBytes = (long)MaxPendingCandidates * MaxBytesPerEvaluation;
@@ -94,7 +105,9 @@ public sealed class EvolutionArtifactOptions
             MaxBytesPerEvaluation = MaxBytesPerEvaluation,
             SanitizeSecrets = SanitizeSecrets,
             DeliverToNextProposal = DeliverToNextProposal,
-            MaxPendingCandidates = MaxPendingCandidates
+            MaxPendingCandidates = MaxPendingCandidates,
+            Store = Store,
+            MaxStoredBytesPerEvaluation = MaxStoredBytesPerEvaluation
         };
     }
 
@@ -109,5 +122,7 @@ public sealed class EvolutionArtifactOptions
         SanitizeSecrets ? "sanitize" : "raw",
         DeliverToNextProposal ? "deliver" : "no-deliver",
         MaxPendingCandidates.ToString(CultureInfo.InvariantCulture)
-    });
+    }.Concat(Store is null ? Array.Empty<string>()
+        // Only when a store is set, so existing compatibility hashes are unchanged; the location itself is not semantics.
+        : new[] { "spill-v1", MaxStoredBytesPerEvaluation.ToString(CultureInfo.InvariantCulture) }));
 }
