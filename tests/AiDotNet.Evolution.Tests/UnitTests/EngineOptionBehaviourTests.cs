@@ -10,8 +10,15 @@ public sealed class EngineOptionBehaviourTests
 {
     private static EvolutionEngineOptions Options(int budget = 12) => new()
     {
-        RunId = "option-behaviour", Seed = 3, MaxEvaluationAttempts = budget, MaxProposals = budget * 2, MaxGenerations = budget * 2,
-        ProposalBatchSize = 2, MaxDegreeOfParallelism = 1, MigrationInterval = 0, CheckpointInterval = 0
+        RunId = "option-behaviour",
+        Seed = 3,
+        MaxEvaluationAttempts = budget,
+        MaxProposals = budget * 2,
+        MaxGenerations = budget * 2,
+        ProposalBatchSize = 2,
+        MaxDegreeOfParallelism = 1,
+        MigrationInterval = 0,
+        CheckpointInterval = 0
     };
 
     private static MapElitesArchive<TestGenome> Archive() =>

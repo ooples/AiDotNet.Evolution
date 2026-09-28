@@ -39,8 +39,15 @@ public sealed class TraceOptionBehaviourTests
             var engine = new EvolutionEngine<TestGenome>(new MetricTask(), new IncrementVariation(), _ => new MapElitesArchive<TestGenome>(descriptors),
                 new EvolutionEngineOptions
                 {
-                    RunId = "trace-options", Seed = 1, MaxEvaluationAttempts = 6, MaxProposals = 12, MaxGenerations = 12, ProposalBatchSize = 1,
-                    MaxDegreeOfParallelism = 1, MigrationInterval = 0, CheckpointInterval = 0
+                    RunId = "trace-options",
+                    Seed = 1,
+                    MaxEvaluationAttempts = 6,
+                    MaxProposals = 12,
+                    MaxGenerations = 12,
+                    ProposalBatchSize = 1,
+                    MaxDegreeOfParallelism = 1,
+                    MigrationInterval = 0,
+                    CheckpointInterval = 0
                 }, observer: tracer);
             await engine.RunAsync(new[] { new TestGenome(1) });
             summary = tracer.Summary;

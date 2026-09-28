@@ -17,9 +17,18 @@ public sealed class EngineDefectClassTests
         // threshold of seed 1, so they are rejected before evaluation and must leave no trace anywhere a program can live.
         var options = new EvolutionEngineOptions
         {
-            RunId = "d2", Seed = 5, MaxEvaluationAttempts = 10, MaxProposals = 3, MaxGenerations = 10, ProposalBatchSize = 1,
-            MaxDegreeOfParallelism = 1, MigrationInterval = 0, CheckpointInterval = 1, NoveltyDistanceThreshold = 3,
-            GlobalEliteCount = 10, HistorySize = 10
+            RunId = "d2",
+            Seed = 5,
+            MaxEvaluationAttempts = 10,
+            MaxProposals = 3,
+            MaxGenerations = 10,
+            ProposalBatchSize = 1,
+            MaxDegreeOfParallelism = 1,
+            MigrationInterval = 0,
+            CheckpointInterval = 1,
+            NoveltyDistanceThreshold = 3,
+            GlobalEliteCount = 10,
+            HistorySize = 10
         };
         var task = new SyntheticEvolutionTask();
         var store = new InMemoryEvolutionCheckpointStore();
@@ -56,11 +65,20 @@ public sealed class EngineDefectClassTests
         {
             var options = new EvolutionEngineOptions
             {
-                RunId = "d5", Seed = 13, MaxEvaluationAttempts = 40, MaxProposals = 80, MaxGenerations = 80, ProposalBatchSize = 8,
-                MaxDegreeOfParallelism = 4, MigrationInterval = 0, CheckpointInterval = 0, ExecutionMode = mode,
+                RunId = "d5",
+                Seed = 13,
+                MaxEvaluationAttempts = 40,
+                MaxProposals = 80,
+                MaxGenerations = 80,
+                ProposalBatchSize = 8,
+                MaxDegreeOfParallelism = 4,
+                MigrationInterval = 0,
+                CheckpointInterval = 0,
+                ExecutionMode = mode,
                 // Continuous dispatch plans each proposal from the archive as it stands, so completion order could reach
                 // what later proposals see; batch dispatch would hide order by committing whole batches.
-                Dispatch = EvolutionDispatchMode.Continuous, MaxInFlight = 4
+                Dispatch = EvolutionDispatchMode.Continuous,
+                MaxInFlight = 4
             };
             var engine = new EvolutionEngine<TestGenome>(new OrderedDelayTask(delayMs), new IncrementVariation(),
                 _ => new MapElitesArchive<TestGenome>(new[] { new EvolutionDescriptorDefinition("x", 0, 100, 10, EvolutionOutOfRangePolicy.Clamp) }),
