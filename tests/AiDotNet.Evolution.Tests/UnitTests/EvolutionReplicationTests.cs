@@ -118,7 +118,7 @@ public sealed class EvolutionReplicationTests
                 .RunAsync(Candidate, Context(), "batch");
             Assert.False(report.IsComplete); Assert.Equal(0.75m, report.ChargedCostUnits);
             EvolutionResourceReceipt receipt = ledger.Snapshot().Receipts.Single();
-        Assert.Equal(EvolutionResourceOutcome.Failed, receipt.Outcome);
+            Assert.Equal(EvolutionResourceOutcome.Failed, receipt.Outcome);
         }
     }
 
