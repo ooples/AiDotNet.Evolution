@@ -170,6 +170,38 @@ public sealed class DirectoryEvolutionCheckpointStoreTests
     }
 
     [Fact]
+    public async Task A_payload_beyond_the_hash_bound_saves_and_loads_while_smaller_ones_keep_their_format()
+    {
+        // About 10,000 elites of 4 KB programs pass the 16 MiB bound that the document checksum used to hit, so such a
+        // run could not be checkpointed at all (V1-74).
+        using var directory = new TemporaryDirectory();
+        var store = new DirectoryEvolutionCheckpointStore(directory.Path);
+        string large = new string('p', EvolutionCollectionLimits.MaximumHashCharacters + 1024);
+        await store.SaveAsync(new EvolutionCheckpoint("run", 1, "compat", large));
+        EvolutionCheckpoint? loaded = await new DirectoryEvolutionCheckpointStore(directory.Path).LoadLatestAsync("run");
+        Assert.Equal(large, loaded?.Payload);
+
+        // Small payloads keep the inline checksum, so snapshots written before this change still verify.
+        using var small = new TemporaryDirectory();
+        var smallStore = new DirectoryEvolutionCheckpointStore(small.Path);
+        await smallStore.SaveAsync(new EvolutionCheckpoint("run", 1, "compat", "small payload"));
+        Assert.DoesNotContain("payload-sha256", File.ReadAllText(Directory.GetFiles(small.Path, "checkpoint-*.json").Single()));
+    }
+
+    [Fact]
+    public async Task A_snapshot_changed_on_disk_after_the_store_wrote_it_is_revalidated_on_the_next_save()
+    {
+        // The store reuses the checkpoint it last wrote only while the file is byte-for-byte what it wrote.
+        using var directory = new TemporaryDirectory();
+        var store = new DirectoryEvolutionCheckpointStore(directory.Path);
+        await store.SaveAsync(Checkpoint(1, "one", 1));
+        string written = Directory.GetFiles(directory.Path, "checkpoint-*.json").Single();
+        File.WriteAllText(written, "{ damaged");
+        // The damaged newest snapshot no longer counts, so a sequence-1 fork is accepted rather than compared with it.
+        await store.SaveAsync(Checkpoint(1, "fork", 1));
+        Assert.Equal("fork", (await store.LoadLatestAsync("run"))?.Payload);
+    }
+    [Fact]
     public async Task TheStoreRefusesRollbackForksAndCompatibilityDrift()
     {
         using var directory = new TemporaryDirectory();
