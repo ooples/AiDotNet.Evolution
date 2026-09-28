@@ -100,6 +100,12 @@ public sealed class ProgramEvolutionPromptOptions
     /// <summary>Gets or sets how many earlier attempts are summarized.</summary>
     public int NumPreviousAttempts { get; set; } = 3;
 
+    /// <summary>Gets or sets the most lines of a previous attempt's changes shown, or <c>null</c> for all (OpenEvolve's <c>diff_summary_max_lines</c>).</summary>
+    public int? DiffSummaryMaxLines { get; set; }
+
+    /// <summary>Gets or sets the longest line of a previous attempt's changes shown, or <c>null</c> for no limit (OpenEvolve's <c>diff_summary_max_line_len</c>).</summary>
+    public int? DiffSummaryMaxLineLength { get; set; }
+
     /// <summary>Gets or sets whether the inspirations section is rendered.</summary>
     public bool IncludeInspirations { get; set; } = true;
 
@@ -237,6 +243,8 @@ public sealed class ProgramEvolutionPromptOptions
             NumTopPrograms = NumTopPrograms,
             NumDiversePrograms = NumDiversePrograms,
             NumPreviousAttempts = NumPreviousAttempts,
+            DiffSummaryMaxLines = DiffSummaryMaxLines,
+            DiffSummaryMaxLineLength = DiffSummaryMaxLineLength,
             IncludeInspirations = IncludeInspirations,
             IncludePreviousAttempts = IncludePreviousAttempts,
             IncludeArtifacts = IncludeArtifacts,
@@ -277,6 +285,8 @@ public sealed class ProgramEvolutionPromptOptions
         RequireRange(NumTopPrograms, 0, 64, nameof(NumTopPrograms));
         RequireRange(NumDiversePrograms, 0, 64, nameof(NumDiversePrograms));
         RequireRange(NumPreviousAttempts, 0, 64, nameof(NumPreviousAttempts));
+        if (DiffSummaryMaxLines is { } lines) RequireRange(lines, 1, 10_000, nameof(DiffSummaryMaxLines));
+        if (DiffSummaryMaxLineLength is { } length) RequireRange(length, 8, 100_000, nameof(DiffSummaryMaxLineLength));
         RequireRange(MaxArtifactBytes, 0, 8 * 1024 * 1024, nameof(MaxArtifactBytes));
         RequireRange(MaxArtifactCount, 0, 256, nameof(MaxArtifactCount));
         RequireRange(MaxDiagnostics, 0, 64, nameof(MaxDiagnostics));

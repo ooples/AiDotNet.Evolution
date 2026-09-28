@@ -124,10 +124,18 @@ public sealed class ProcessProgramExecutionEngineTests
 
             ProgramSandboxOptions options = ProgramSandboxTestEnvironment.Options(template);
             options.Limits.TimeLimitSeconds = 1;
+            // The limit fires on a fake clock, the moment the grandchild is running, so how fast a loaded runner schedules
+            // the kill no longer races the grandchild's own sleep (the old flake).
+            var clock = new Microsoft.Extensions.Time.Testing.FakeTimeProvider();
+            options.TimeProvider = clock;
 
             using var engine = new ProcessProgramExecutionEngine(options);
             var stopwatch = Stopwatch.StartNew();
-            ProgramExecuteResponse response = await engine.ExecuteAsync(Request("ignored"));
+            Task<ProgramExecuteResponse> running = engine.ExecuteAsync(Request("ignored"));
+            while (!(File.Exists(marker) && File.ReadAllText(marker).Contains("start", StringComparison.Ordinal)) && stopwatch.Elapsed < TimeSpan.FromSeconds(15))
+                await Task.Delay(20);
+            clock.Advance(TimeSpan.FromSeconds(1));
+            ProgramExecuteResponse response = await running;
             stopwatch.Stop();
 
             Assert.False(response.Success);
