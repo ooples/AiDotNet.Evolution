@@ -492,7 +492,7 @@ public sealed class MapElitesArchive<TGenome> :
         _order = null;
         foreach (KeyValuePair<string, EvolutionArchiveEntry<TGenome>> cell in staged._cells)
             _cells.Add(cell.Key, cell.Value);
-            _order = null;
+        _order = null;
         _best = staged._best;
         Version++;
         return _cells.Count;
@@ -558,7 +558,7 @@ public sealed class MapElitesArchive<TGenome> :
         TotalGridCells = staged.TotalGridCells;
         foreach (KeyValuePair<string, EvolutionArchiveEntry<TGenome>> cell in staged._cells)
             _cells.Add(cell.Key, cell.Value);
-            _order = null;
+        _order = null;
         _best = staged._best;
         Version = version;
         _entries = null;
