@@ -163,6 +163,7 @@ public sealed class EvolutionEngineOptionsCopyTests
         || type == typeof(double)
         || type == typeof(bool)
         || type == typeof(TimeSpan)
+        || type == typeof(TimeProvider)
         || type.IsEnum
         || (Nullable.GetUnderlyingType(type) is Type inner && CanProbe(inner));
 
@@ -178,6 +179,7 @@ public sealed class EvolutionEngineOptionsCopyTests
         if (type == typeof(double)) return 0.5d;
         if (type == typeof(bool)) return true;
         if (type == typeof(TimeSpan)) return TimeSpan.FromSeconds(7);
+        if (type == typeof(TimeProvider)) return new Microsoft.Extensions.Time.Testing.FakeTimeProvider();
 
         if (type.IsEnum)
         {
