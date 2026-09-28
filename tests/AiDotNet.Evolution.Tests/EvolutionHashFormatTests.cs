@@ -37,4 +37,23 @@ public class EvolutionHashFormatTests
             Assert.Equal(Reference(value), EvolutionHash.Compute(value));
         }
     }
+    [Theory]
+    [InlineData(20_000)]
+    [InlineData(100_000)]
+    [InlineData(1_000_000)]
+    public void Large_inputs_hash_the_same_whether_whole_streamed_or_built(int length)
+    {
+        // Past 64 KiB the input is encoded through a fixed buffer. A surrogate pair every few characters makes some
+        // pair straddle every buffer and StringBuilder chunk boundary; the bytes must still be those of the whole string.
+        var builder = new StringBuilder();
+        while (builder.Length < length)
+        {
+            builder.Append("state;");
+            builder.Append(char.ConvertFromUtf32(0x1F600 + builder.Length % 50));
+            builder.Append((char)('a' + builder.Length % 26));
+        }
+        string value = builder.ToString();
+        Assert.Equal(Reference(value), EvolutionHash.Compute(value));
+        Assert.Equal(Reference(value), EvolutionHash.Compute(builder));
+    }
 }

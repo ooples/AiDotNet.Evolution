@@ -1683,6 +1683,65 @@ static AiDotNet.Evolution.Programs.Experience.ProgramExperienceQuery.operator !=
 static AiDotNet.Evolution.Programs.Experience.ProgramExperienceQuery.operator ==(AiDotNet.Evolution.Programs.Experience.ProgramExperienceQuery? left, AiDotNet.Evolution.Programs.Experience.ProgramExperienceQuery? right) -> bool
 static AiDotNet.Evolution.Programs.Experience.ProgramExperienceRetrieval.operator !=(AiDotNet.Evolution.Programs.Experience.ProgramExperienceRetrieval? left, AiDotNet.Evolution.Programs.Experience.ProgramExperienceRetrieval? right) -> bool
 static AiDotNet.Evolution.Programs.Experience.ProgramExperienceRetrieval.operator ==(AiDotNet.Evolution.Programs.Experience.ProgramExperienceRetrieval? left, AiDotNet.Evolution.Programs.Experience.ProgramExperienceRetrieval? right) -> bool
+AiDotNet.Evolution.Programs.ClaudeCodeChatClient
+AiDotNet.Evolution.Programs.ClaudeCodeChatClient.ClaudeCodeChatClient(AiDotNet.Evolution.Programs.ClaudeCodeChatClientOptions! options) -> void
+AiDotNet.Evolution.Programs.ClaudeCodeChatClient.GetResponseAsync(System.Collections.Generic.IReadOnlyList<AiDotNet.Evolution.Programs.ProgramChatMessage!>! messages, AiDotNet.Evolution.Programs.ProgramChatOptions? options = null, System.Threading.CancellationToken cancellationToken = default(System.Threading.CancellationToken)) -> System.Threading.Tasks.Task<AiDotNet.Evolution.Programs.ProgramChatResponse!>!
+AiDotNet.Evolution.Programs.ClaudeCodeChatClient.ModelId.get -> string!
+AiDotNet.Evolution.Programs.ClaudeCodeChatClientOptions
+AiDotNet.Evolution.Programs.ClaudeCodeChatClientOptions.ClaudeCodeChatClientOptions() -> void
+AiDotNet.Evolution.Programs.ClaudeCodeChatClientOptions.Executable.get -> string!
+AiDotNet.Evolution.Programs.ClaudeCodeChatClientOptions.Executable.set -> void
+AiDotNet.Evolution.Programs.ClaudeCodeChatClientOptions.ExecutablePrefixArguments.get -> System.Collections.Generic.IList<string!>!
+AiDotNet.Evolution.Programs.ClaudeCodeChatClientOptions.ExecutablePrefixArguments.set -> void
+AiDotNet.Evolution.Programs.ClaudeCodeChatClientOptions.Isolate.get -> bool
+AiDotNet.Evolution.Programs.ClaudeCodeChatClientOptions.Isolate.set -> void
+AiDotNet.Evolution.Programs.ClaudeCodeChatClientOptions.MaxBudgetUsd.get -> decimal?
+AiDotNet.Evolution.Programs.ClaudeCodeChatClientOptions.MaxBudgetUsd.set -> void
+AiDotNet.Evolution.Programs.ClaudeCodeChatClientOptions.MaxRetries.get -> int
+AiDotNet.Evolution.Programs.ClaudeCodeChatClientOptions.MaxRetries.set -> void
+AiDotNet.Evolution.Programs.ClaudeCodeChatClientOptions.Model.get -> string!
+AiDotNet.Evolution.Programs.ClaudeCodeChatClientOptions.Model.set -> void
+AiDotNet.Evolution.Programs.ClaudeCodeChatClientOptions.RetryDelay.get -> System.TimeSpan
+AiDotNet.Evolution.Programs.ClaudeCodeChatClientOptions.RetryDelay.set -> void
+AiDotNet.Evolution.Programs.ClaudeCodeChatClientOptions.Timeout.get -> System.TimeSpan
+AiDotNet.Evolution.Programs.ClaudeCodeChatClientOptions.Timeout.set -> void
+AiDotNet.Evolution.Programs.LlmProgramVariationOptions.ReasoningEffort.get -> AiDotNet.Evolution.Programs.ProgramReasoningEffort?
+AiDotNet.Evolution.Programs.LlmProgramVariationOptions.ReasoningEffort.set -> void
+AiDotNet.Evolution.Programs.LlmProgramVariationOptions.TopP.get -> double?
+AiDotNet.Evolution.Programs.LlmProgramVariationOptions.TopP.set -> void
+AiDotNet.Evolution.Programs.ManualProgramChatClient
+AiDotNet.Evolution.Programs.ManualProgramChatClient.GetResponseAsync(System.Collections.Generic.IReadOnlyList<AiDotNet.Evolution.Programs.ProgramChatMessage!>! messages, AiDotNet.Evolution.Programs.ProgramChatOptions? options = null, System.Threading.CancellationToken cancellationToken = default(System.Threading.CancellationToken)) -> System.Threading.Tasks.Task<AiDotNet.Evolution.Programs.ProgramChatResponse!>!
+AiDotNet.Evolution.Programs.ManualProgramChatClient.ManualProgramChatClient(string! queueDirectory, System.TimeSpan timeout, System.TimeSpan? pollInterval = null, string! modelId = "manual") -> void
+AiDotNet.Evolution.Programs.ManualProgramChatClient.ModelId.get -> string!
+AiDotNet.Evolution.Programs.OpenAiCompatibleChatClient
+AiDotNet.Evolution.Programs.OpenAiCompatibleChatClient.Dispose() -> void
+AiDotNet.Evolution.Programs.OpenAiCompatibleChatClient.GetResponseAsync(System.Collections.Generic.IReadOnlyList<AiDotNet.Evolution.Programs.ProgramChatMessage!>! messages, AiDotNet.Evolution.Programs.ProgramChatOptions? options = null, System.Threading.CancellationToken cancellationToken = default(System.Threading.CancellationToken)) -> System.Threading.Tasks.Task<AiDotNet.Evolution.Programs.ProgramChatResponse!>!
+AiDotNet.Evolution.Programs.OpenAiCompatibleChatClient.ModelId.get -> string!
+AiDotNet.Evolution.Programs.OpenAiCompatibleChatClient.OpenAiCompatibleChatClient(AiDotNet.Evolution.Programs.OpenAiCompatibleChatClientOptions! options) -> void
+AiDotNet.Evolution.Programs.OpenAiCompatibleChatClientOptions
+AiDotNet.Evolution.Programs.OpenAiCompatibleChatClientOptions.ApiKey.get -> string?
+AiDotNet.Evolution.Programs.OpenAiCompatibleChatClientOptions.ApiKey.set -> void
+AiDotNet.Evolution.Programs.OpenAiCompatibleChatClientOptions.Endpoint.get -> System.Uri?
+AiDotNet.Evolution.Programs.OpenAiCompatibleChatClientOptions.Endpoint.set -> void
+AiDotNet.Evolution.Programs.OpenAiCompatibleChatClientOptions.MaxResponseBytes.get -> int
+AiDotNet.Evolution.Programs.OpenAiCompatibleChatClientOptions.MaxResponseBytes.set -> void
+AiDotNet.Evolution.Programs.OpenAiCompatibleChatClientOptions.MaxRetries.get -> int
+AiDotNet.Evolution.Programs.OpenAiCompatibleChatClientOptions.MaxRetries.set -> void
+AiDotNet.Evolution.Programs.OpenAiCompatibleChatClientOptions.Model.get -> string!
+AiDotNet.Evolution.Programs.OpenAiCompatibleChatClientOptions.Model.set -> void
+AiDotNet.Evolution.Programs.OpenAiCompatibleChatClientOptions.OpenAiCompatibleChatClientOptions() -> void
+AiDotNet.Evolution.Programs.OpenAiCompatibleChatClientOptions.RetryDelay.get -> System.TimeSpan
+AiDotNet.Evolution.Programs.OpenAiCompatibleChatClientOptions.RetryDelay.set -> void
+AiDotNet.Evolution.Programs.OpenAiCompatibleChatClientOptions.Timeout.get -> System.TimeSpan
+AiDotNet.Evolution.Programs.OpenAiCompatibleChatClientOptions.Timeout.set -> void
+AiDotNet.Evolution.Programs.ProgramChatOptions.ReasoningEffort.get -> AiDotNet.Evolution.Programs.ProgramReasoningEffort?
+AiDotNet.Evolution.Programs.ProgramChatOptions.ReasoningEffort.set -> void
+AiDotNet.Evolution.Programs.ProgramChatOptions.TopP.get -> double?
+AiDotNet.Evolution.Programs.ProgramChatOptions.TopP.set -> void
+AiDotNet.Evolution.Programs.ProgramReasoningEffort
+AiDotNet.Evolution.Programs.ProgramReasoningEffort.High = 2 -> AiDotNet.Evolution.Programs.ProgramReasoningEffort
+AiDotNet.Evolution.Programs.ProgramReasoningEffort.Low = 0 -> AiDotNet.Evolution.Programs.ProgramReasoningEffort
+AiDotNet.Evolution.Programs.ProgramReasoningEffort.Medium = 1 -> AiDotNet.Evolution.Programs.ProgramReasoningEffort
 AiDotNet.Evolution.Programs.ProgramTaskOptions.MetricDescriptors.get -> System.Collections.Generic.IList<string!>!
 AiDotNet.Evolution.Programs.ProgramTaskOptions.MetricDescriptors.set -> void
 AiDotNet.Evolution.Programs.Experience.ProgramExperienceBinding
@@ -1702,3 +1761,23 @@ AiDotNet.Evolution.Programs.ProgramEvolutionPromptOptions.DiffSummaryMaxLineLeng
 AiDotNet.Evolution.Programs.ProgramEvolutionPromptOptions.DiffSummaryMaxLineLength.set -> void
 AiDotNet.Evolution.Programs.ProgramEvolutionPromptOptions.DiffSummaryMaxLines.get -> int?
 AiDotNet.Evolution.Programs.ProgramEvolutionPromptOptions.DiffSummaryMaxLines.set -> void
+AiDotNet.Evolution.Programs.WeightedChatModel
+AiDotNet.Evolution.Programs.WeightedChatModel.<Clone>$() -> AiDotNet.Evolution.Programs.WeightedChatModel!
+AiDotNet.Evolution.Programs.WeightedChatModel.Client.get -> AiDotNet.Evolution.Programs.IProgramChatClient!
+AiDotNet.Evolution.Programs.WeightedChatModel.Client.init -> void
+AiDotNet.Evolution.Programs.WeightedChatModel.Deconstruct(out AiDotNet.Evolution.Programs.IProgramChatClient! Client, out double Weight) -> void
+AiDotNet.Evolution.Programs.WeightedChatModel.Equals(AiDotNet.Evolution.Programs.WeightedChatModel? other) -> bool
+AiDotNet.Evolution.Programs.WeightedChatModel.Weight.get -> double
+AiDotNet.Evolution.Programs.WeightedChatModel.Weight.init -> void
+AiDotNet.Evolution.Programs.WeightedChatModel.WeightedChatModel(AiDotNet.Evolution.Programs.IProgramChatClient! Client, double Weight) -> void
+AiDotNet.Evolution.Programs.WeightedEnsembleChatClient
+AiDotNet.Evolution.Programs.WeightedEnsembleChatClient.GetMemberStatistics() -> System.Collections.Generic.IReadOnlyList<(string! ModelId, long Calls, long Failures)>!
+AiDotNet.Evolution.Programs.WeightedEnsembleChatClient.GetResponseAsync(System.Collections.Generic.IReadOnlyList<AiDotNet.Evolution.Programs.ProgramChatMessage!>! messages, AiDotNet.Evolution.Programs.ProgramChatOptions? options = null, System.Threading.CancellationToken cancellationToken = default(System.Threading.CancellationToken)) -> System.Threading.Tasks.Task<AiDotNet.Evolution.Programs.ProgramChatResponse!>!
+AiDotNet.Evolution.Programs.WeightedEnsembleChatClient.ModelId.get -> string!
+AiDotNet.Evolution.Programs.WeightedEnsembleChatClient.WeightedEnsembleChatClient(System.Collections.Generic.IEnumerable<AiDotNet.Evolution.Programs.WeightedChatModel!>! members) -> void
+override AiDotNet.Evolution.Programs.WeightedChatModel.Equals(object? obj) -> bool
+override AiDotNet.Evolution.Programs.WeightedChatModel.GetHashCode() -> int
+override AiDotNet.Evolution.Programs.WeightedChatModel.ToString() -> string!
+static AiDotNet.Evolution.Programs.WeightedChatModel.operator !=(AiDotNet.Evolution.Programs.WeightedChatModel? left, AiDotNet.Evolution.Programs.WeightedChatModel? right) -> bool
+static AiDotNet.Evolution.Programs.WeightedChatModel.operator ==(AiDotNet.Evolution.Programs.WeightedChatModel? left, AiDotNet.Evolution.Programs.WeightedChatModel? right) -> bool
+const AiDotNet.Evolution.Programs.WeightedEnsembleChatClient.MaximumMembers = 256 -> int
