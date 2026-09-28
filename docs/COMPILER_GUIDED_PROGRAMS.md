@@ -97,3 +97,22 @@ these checks authenticate a hostile same-process provider or replace OS isolatio
 The compiler adapts the earlier `CSharpPatchCompiler` method-body catalog and safe emit approach from AiDotNet commit
 `66d7602c9`, while replacing its facade/single-file coupling with Evolution-owned compiler-neutral contracts. Original
 consumer drafts are preserved; no consumer feature PR is created for US-17.
+
+## The standalone C# proposal loop
+
+`AiDotNet.Evolution.CSharp` runs the same syntax-guided loop inside an evolution run.
+`CSharpProgramEvolutionOptions` declares its bounds and prices up front:
+
+- the reference assemblies, target identity, model identity and audit directory;
+- the source, response, repair, edit and catalogue limits, and the compilation timeout;
+- the cost of setup, of each model call, input token and output token, and of each parse, build and
+  audit.
+
+Nothing is inferred from a provider's bill.
+
+The model is reached through `ICSharpProposalClient`, which you supply: no credentials or network
+access are assumed. A conversation is a list of `CompilerChatMessage` values (`System`, `User` and
+`Assistant` factories), sent with `CompilerChatOptions` (temperature, output-token limit and an
+optional seed). The reply is a `CompilerChatResponse`: the text, the model the provider says answered,
+and a `CompilerChatUsage` of token counts when it reports one. Those token counts are multiplied by
+the declared token prices and charged to the run's ledger.
