@@ -11,6 +11,12 @@ on:
 permissions:
   contents: read
 
+# One report at a time per monitored workflow, so two failures cannot both find no issue and both open one. A newer run
+# may replace one still waiting; the issue is then opened or commented on by the newer run, so no failure goes unreported.
+concurrency:
+  group: main-red-alert-${{ github.event.workflow_run.name }}
+  cancel-in-progress: false
+
 jobs:
   report:
     if: github.event.workflow_run.event == 'push' && github.event.workflow_run.conclusion == 'failure'
@@ -32,7 +38,8 @@ jobs:
           Run: ${RUN_URL}
 
           Opened automatically by the main-red-alert workflow (V1-81, #183). Epic: #125."
-          existing=$(gh issue list --repo "$REPO" --state open --search "\"${title}\" in:title" --json number,title \
+          # A direct listing, not search: the search index can lag behind an issue opened moments ago.
+          existing=$(gh issue list --repo "$REPO" --state open --limit 500 --json number,title \
             --jq ".[] | select(.title == \"${title}\") | .number" | head -n 1)
           if [ -n "$existing" ]; then
             gh issue comment "$existing" --repo "$REPO" --body "Failed again at ${SHA}: ${RUN_URL}"
