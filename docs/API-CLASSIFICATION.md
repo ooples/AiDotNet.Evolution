@@ -283,6 +283,7 @@ against the declared public API, so a type added, removed or reclassified withou
 | `AiDotNet.Evolution.IEvolutionLatencyProfile` | Stable | [RUNNING_AND_RESUMING.md](RUNNING_AND_RESUMING.md), [DispatchAutoTests](../tests/AiDotNet.Evolution.Tests/UnitTests/DispatchAutoTests.cs) |
 | `AiDotNet.Evolution.DirectoryEvolutionArtifactStore` | Stable | [RUNNING_AND_RESUMING.md](RUNNING_AND_RESUMING.md), [ArtifactStoreParityTests](../tests/AiDotNet.Evolution.Tests/UnitTests/ArtifactStoreParityTests.cs) |
 | `AiDotNet.Evolution.IEvolutionArtifactStore` | Stable | [RUNNING_AND_RESUMING.md](RUNNING_AND_RESUMING.md), [ArtifactStoreParityTests](../tests/AiDotNet.Evolution.Tests/UnitTests/ArtifactStoreParityTests.cs) |
+| `AiDotNet.Evolution.EvolutionIncumbentChallengeOutcome` | Stable | [REPLICATED_EVALUATION.md](REPLICATED_EVALUATION.md), [ProgramNoiseEvaluationTests](../tests/AiDotNet.Evolution.CSharp.Tests/ProgramTypes/ProgramNoiseEvaluationTests.cs) |
 
 ## AiDotNet.Evolution.CSharp
 

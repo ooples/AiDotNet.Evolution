@@ -52,7 +52,7 @@ public sealed class EvolutionIncumbentChallenge<TGenome>
         cancellationToken.ThrowIfCancellationRequested();
         string identity = EvolutionHash.Combine(new[] { VersionHash, slot.ToString(CultureInfo.InvariantCulture) });
         EvolutionIncumbentChallengeReport Report(EvolutionReplicationReport first, EvolutionReplicationReport? second,
-            EvolutionReplicationReport? third, EvolutionReplicationReport? fourth, double? lower, string outcome) =>
+            EvolutionReplicationReport? third, EvolutionReplicationReport? fourth, double? lower, EvolutionIncumbentChallengeOutcome outcome) =>
             new(identity, candidate.Id, incumbent.Id, first, second, third, fourth, lower, outcome);
         // A zero-cost durable tombstone accounts for the finite inference slot,
         // not a physical evaluator call. Changing candidate/context cannot reuse it.
@@ -60,26 +60,26 @@ public sealed class EvolutionIncumbentChallenge<TGenome>
             EvolutionResources.Empty, EvolutionResources.Empty) ?? throw new EvolutionResourceBudgetException(identity))
             claim.Complete(EvolutionResources.Empty);
         var candidateSearch = await _search.RunAsync(candidate, context, identity, cancellationToken: cancellationToken).ConfigureAwait(false);
-        if (cancellationToken.IsCancellationRequested) return Report(candidateSearch, null, null, null, null, "canceled");
-        if (!candidateSearch.IsComplete) return Report(candidateSearch, null, null, null, null, "candidate-search-incomplete");
+        if (cancellationToken.IsCancellationRequested) return Report(candidateSearch, null, null, null, null, EvolutionIncumbentChallengeOutcome.Canceled);
+        if (!candidateSearch.IsComplete) return Report(candidateSearch, null, null, null, null, EvolutionIncumbentChallengeOutcome.CandidateSearchIncomplete);
         var incumbentSearch = await _search.RunAsync(incumbent, context, identity, cancellationToken: cancellationToken).ConfigureAwait(false);
-        if (cancellationToken.IsCancellationRequested) return Report(candidateSearch, incumbentSearch, null, null, null, "canceled");
-        if (!incumbentSearch.IsComplete) return Report(candidateSearch, incumbentSearch, null, null, null, "incumbent-search-incomplete");
+        if (cancellationToken.IsCancellationRequested) return Report(candidateSearch, incumbentSearch, null, null, null, EvolutionIncumbentChallengeOutcome.Canceled);
+        if (!incumbentSearch.IsComplete) return Report(candidateSearch, incumbentSearch, null, null, null, EvolutionIncumbentChallengeOutcome.IncumbentSearchIncomplete);
         double searchGain = _direction == EvolutionOptimizationDirection.Maximize
             ? candidateSearch.MeanQuality!.Value - incumbentSearch.MeanQuality!.Value
             : incumbentSearch.MeanQuality!.Value - candidateSearch.MeanQuality!.Value;
-        if (searchGain <= _minimumImprovement) return Report(candidateSearch, incumbentSearch, null, null, null, "not-promising");
+        if (searchGain <= _minimumImprovement) return Report(candidateSearch, incumbentSearch, null, null, null, EvolutionIncumbentChallengeOutcome.NotPromising);
         var candidateConfirmation = await _confirm.RunAsync(candidate, context, identity, EvolutionReplicationPurpose.Confirmation, cancellationToken).ConfigureAwait(false);
-        if (cancellationToken.IsCancellationRequested) return Report(candidateSearch, incumbentSearch, candidateConfirmation, null, null, "canceled");
-        if (!candidateConfirmation.IsComplete) return Report(candidateSearch, incumbentSearch, candidateConfirmation, null, null, "candidate-confirmation-incomplete");
+        if (cancellationToken.IsCancellationRequested) return Report(candidateSearch, incumbentSearch, candidateConfirmation, null, null, EvolutionIncumbentChallengeOutcome.Canceled);
+        if (!candidateConfirmation.IsComplete) return Report(candidateSearch, incumbentSearch, candidateConfirmation, null, null, EvolutionIncumbentChallengeOutcome.CandidateConfirmationIncomplete);
         var incumbentConfirmation = await _confirm.RunAsync(incumbent, context, identity, EvolutionReplicationPurpose.Confirmation, cancellationToken).ConfigureAwait(false);
-        if (cancellationToken.IsCancellationRequested) return Report(candidateSearch, incumbentSearch, candidateConfirmation, incumbentConfirmation, null, "canceled");
-        if (!incumbentConfirmation.IsComplete) return Report(candidateSearch, incumbentSearch, candidateConfirmation, incumbentConfirmation, null, "incumbent-confirmation-incomplete");
+        if (cancellationToken.IsCancellationRequested) return Report(candidateSearch, incumbentSearch, candidateConfirmation, incumbentConfirmation, null, EvolutionIncumbentChallengeOutcome.Canceled);
+        if (!incumbentConfirmation.IsComplete) return Report(candidateSearch, incumbentSearch, candidateConfirmation, incumbentConfirmation, null, EvolutionIncumbentChallengeOutcome.IncumbentConfirmationIncomplete);
         double lowerGain = _direction == EvolutionOptimizationDirection.Maximize
             ? candidateConfirmation.LowerBound!.Value - incumbentConfirmation.UpperBound!.Value
             : incumbentConfirmation.LowerBound!.Value - candidateConfirmation.UpperBound!.Value;
         return Report(candidateSearch, incumbentSearch, candidateConfirmation, incumbentConfirmation, lowerGain,
-            lowerGain > _minimumImprovement ? "confirmed-improvement" : "not-confirmed");
+            lowerGain > _minimumImprovement ? EvolutionIncumbentChallengeOutcome.ConfirmedImprovement : EvolutionIncumbentChallengeOutcome.NotConfirmed);
     }
 }
 
@@ -88,7 +88,7 @@ public sealed class EvolutionIncumbentChallengeReport
 {
     internal EvolutionIncumbentChallengeReport(string identity, string candidateId, string incumbentId, EvolutionReplicationReport candidateSearch,
         EvolutionReplicationReport? incumbentSearch, EvolutionReplicationReport? candidateConfirmation,
-        EvolutionReplicationReport? incumbentConfirmation, double? lowerGain, string outcome)
+        EvolutionReplicationReport? incumbentConfirmation, double? lowerGain, EvolutionIncumbentChallengeOutcome outcome)
     {
         Identity = identity; CandidateId = candidateId; IncumbentId = incumbentId; CandidateSearch = candidateSearch; IncumbentSearch = incumbentSearch;
         CandidateConfirmation = candidateConfirmation; IncumbentConfirmation = incumbentConfirmation;
@@ -110,11 +110,32 @@ public sealed class EvolutionIncumbentChallengeReport
     public EvolutionReplicationReport? IncumbentConfirmation { get; }
     /// <summary>Gets the conservative lower improvement bound in declared quality units.</summary>
     public double? LowerImprovementBound { get; }
-    /// <summary>Gets an explicit incomplete/nonpromising/nonconfirmed/confirmed outcome.</summary>
-    public string Outcome { get; }
+    /// <summary>Gets an explicit incomplete, not-promising, not-confirmed or confirmed outcome.</summary>
+    public EvolutionIncumbentChallengeOutcome Outcome { get; }
     /// <summary>Gets statistical confirmation only; correctness/applicability and archive replacement remain external gates.</summary>
-    public bool IsConfirmed => Outcome == "confirmed-improvement";
+    public bool IsConfirmed => Outcome == EvolutionIncumbentChallengeOutcome.ConfirmedImprovement;
     /// <summary>Gets all reported actual and conservative unknown sample charges.</summary>
     public decimal ChargedCostUnits => CandidateSearch.ChargedCostUnits + (IncumbentSearch?.ChargedCostUnits ?? 0)
         + (CandidateConfirmation?.ChargedCostUnits ?? 0) + (IncumbentConfirmation?.ChargedCostUnits ?? 0);
+}
+
+/// <summary>How an incumbent challenge ended.</summary>
+public enum EvolutionIncumbentChallengeOutcome
+{
+    /// <summary>Fresh confirmation showed the candidate beats the incumbent by more than the minimum improvement.</summary>
+    ConfirmedImprovement = 0,
+    /// <summary>Confirmation ran but did not show the required improvement.</summary>
+    NotConfirmed = 1,
+    /// <summary>The search-phase comparison did not justify spending on confirmation.</summary>
+    NotPromising = 2,
+    /// <summary>The candidate's search measurements did not complete.</summary>
+    CandidateSearchIncomplete = 3,
+    /// <summary>The incumbent's search measurements did not complete.</summary>
+    IncumbentSearchIncomplete = 4,
+    /// <summary>The candidate's confirmation measurements did not complete.</summary>
+    CandidateConfirmationIncomplete = 5,
+    /// <summary>The incumbent's confirmation measurements did not complete.</summary>
+    IncumbentConfirmationIncomplete = 6,
+    /// <summary>The challenge was cancelled before it finished.</summary>
+    Canceled = 7
 }

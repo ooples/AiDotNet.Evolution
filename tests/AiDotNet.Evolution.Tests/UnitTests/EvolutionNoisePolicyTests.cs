@@ -45,7 +45,7 @@ public sealed class EvolutionNoisePolicyTests
         var result = await Challenge(Ledger(), (g, _, _) => new(Value(g)), (g, _, _) => new(Value(1 - g)))
             .RunAsync(0, Candidate(1), Candidate(0), Context);
         Assert.False(result.IsConfirmed);
-        Assert.Equal("not-confirmed", result.Outcome);
+        Assert.Equal(EvolutionIncumbentChallengeOutcome.NotConfirmed, result.Outcome);
         Assert.True(result.LowerImprovementBound < 0);
     }
 
@@ -55,7 +55,7 @@ public sealed class EvolutionNoisePolicyTests
         int confirmationCalls = 0;
         var result = await Challenge(Ledger(), (_, _, _) => new(Value(.5)), (_, _, _) => { confirmationCalls++; return new(Value(1)); })
             .RunAsync(0, Candidate(1), Candidate(0), Context);
-        Assert.Equal("not-promising", result.Outcome);
+        Assert.Equal(EvolutionIncumbentChallengeOutcome.NotPromising, result.Outcome);
         Assert.Equal(0, confirmationCalls);
         Assert.Equal(8, result.ChargedCostUnits);
         Assert.Null(result.CandidateConfirmation);
@@ -83,7 +83,7 @@ public sealed class EvolutionNoisePolicyTests
         var result = await Challenge(ledger, (g, _, _) => new(Value(g)), (g, _, _) => new(Value(g)))
             .RunAsync(0, Candidate(1), Candidate(0), Context);
         Assert.False(result.IsConfirmed);
-        Assert.Equal("candidate-confirmation-incomplete", result.Outcome);
+        Assert.Equal(EvolutionIncumbentChallengeOutcome.CandidateConfirmationIncomplete, result.Outcome);
         Assert.Equal(10, result.ChargedCostUnits);
         Assert.Equal(2, result.CandidateConfirmation!.Samples.Count);
         Assert.Null(result.LowerImprovementBound);
@@ -99,7 +99,7 @@ public sealed class EvolutionNoisePolicyTests
             if (++calls == 4) cancellation.Cancel();
             return new(Value(g));
         }, (g, _, _) => new(Value(g))).RunAsync(0, Candidate(1), Candidate(0), Context, cancellation.Token);
-        Assert.Equal("canceled", result.Outcome);
+        Assert.Equal(EvolutionIncumbentChallengeOutcome.Canceled, result.Outcome);
         Assert.Equal(4, result.CandidateSearch.Samples.Count);
         Assert.Equal(4, result.ChargedCostUnits);
         Assert.Null(result.IncumbentSearch);

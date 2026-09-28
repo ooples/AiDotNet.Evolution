@@ -133,7 +133,9 @@ stopped: `Completed`, `PrecisionReached`, `BudgetExhausted`, `InvalidMeasurement
 
 `EvolutionIncumbentChallenge<TGenome>.RunAsync` returns an `EvolutionIncumbentChallengeReport`. It
 keeps the challenger's and incumbent's search reports apart from their confirmation reports, gives the
-lower bound on the improvement, and says whether the challenge was confirmed.
+lower bound on the improvement, and says whether the challenge was confirmed. Its `Outcome` is an
+`EvolutionIncumbentChallengeOutcome`: `ConfirmedImprovement`, `NotConfirmed`, `NotPromising`, one of
+the four `...Incomplete` values naming which measurement did not finish, or `Canceled`.
 
 `EvolutionRejectionAudit<TGenome>.RunAsync` returns an `EvolutionRejectionAuditReport` for a frozen
 set of screen rejections. Each audited reject is an `EvolutionRejectionAuditEntry` with its full

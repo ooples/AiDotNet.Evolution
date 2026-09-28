@@ -53,7 +53,7 @@ public sealed class ProgramNoiseEvaluationTests
     {
         var report = await Session(Ledger(), hidden: Eval(g => g.Source == "good" ? 0 : 1))
             .ChallengeAsync(0, new("good"), new("bad"), 7);
-        Assert.False(report.IsConfirmed); Assert.Equal("not-confirmed", report.Outcome);
+        Assert.False(report.IsConfirmed); Assert.Equal(EvolutionIncumbentChallengeOutcome.NotConfirmed, report.Outcome);
         Assert.Equal(272, report.ChargedCostUnits);
     }
 

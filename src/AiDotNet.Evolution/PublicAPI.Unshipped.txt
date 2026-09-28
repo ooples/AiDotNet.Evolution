@@ -666,7 +666,6 @@ AiDotNet.Evolution.EvolutionIncumbentChallengeReport.IncumbentId.get -> string!
 AiDotNet.Evolution.EvolutionIncumbentChallengeReport.IncumbentSearch.get -> AiDotNet.Evolution.EvolutionReplicationReport?
 AiDotNet.Evolution.EvolutionIncumbentChallengeReport.IsConfirmed.get -> bool
 AiDotNet.Evolution.EvolutionIncumbentChallengeReport.LowerImprovementBound.get -> double?
-AiDotNet.Evolution.EvolutionIncumbentChallengeReport.Outcome.get -> string!
 AiDotNet.Evolution.EvolutionInfeasibleEntry<TGenome>
 AiDotNet.Evolution.EvolutionInfeasibleEntry<TGenome>.Entry.get -> AiDotNet.Evolution.EvolutionArchiveEntry<TGenome>!
 AiDotNet.Evolution.EvolutionInfeasibleEntry<TGenome>.EvolutionInfeasibleEntry(int island, AiDotNet.Evolution.EvolutionArchiveEntry<TGenome>! entry) -> void
@@ -2147,3 +2146,13 @@ AiDotNet.Evolution.IEvolutionArtifactStore.TryRead(string! reference, out byte[]
 const AiDotNet.Evolution.EvolutionArtifact.MaximumContentBytes = 67108864 -> int
 static AiDotNet.Evolution.EvolutionArtifact.FromBytes(string! key, byte[]! content, string! mediaType) -> AiDotNet.Evolution.EvolutionArtifact!
 const AiDotNet.Evolution.EvolutionTaskResult.MaximumBinaryContentBytes = 268435456 -> long
+AiDotNet.Evolution.EvolutionIncumbentChallengeOutcome
+AiDotNet.Evolution.EvolutionIncumbentChallengeOutcome.Canceled = 7 -> AiDotNet.Evolution.EvolutionIncumbentChallengeOutcome
+AiDotNet.Evolution.EvolutionIncumbentChallengeOutcome.CandidateConfirmationIncomplete = 5 -> AiDotNet.Evolution.EvolutionIncumbentChallengeOutcome
+AiDotNet.Evolution.EvolutionIncumbentChallengeOutcome.CandidateSearchIncomplete = 3 -> AiDotNet.Evolution.EvolutionIncumbentChallengeOutcome
+AiDotNet.Evolution.EvolutionIncumbentChallengeOutcome.ConfirmedImprovement = 0 -> AiDotNet.Evolution.EvolutionIncumbentChallengeOutcome
+AiDotNet.Evolution.EvolutionIncumbentChallengeOutcome.IncumbentConfirmationIncomplete = 6 -> AiDotNet.Evolution.EvolutionIncumbentChallengeOutcome
+AiDotNet.Evolution.EvolutionIncumbentChallengeOutcome.IncumbentSearchIncomplete = 4 -> AiDotNet.Evolution.EvolutionIncumbentChallengeOutcome
+AiDotNet.Evolution.EvolutionIncumbentChallengeOutcome.NotConfirmed = 1 -> AiDotNet.Evolution.EvolutionIncumbentChallengeOutcome
+AiDotNet.Evolution.EvolutionIncumbentChallengeOutcome.NotPromising = 2 -> AiDotNet.Evolution.EvolutionIncumbentChallengeOutcome
+AiDotNet.Evolution.EvolutionIncumbentChallengeReport.Outcome.get -> AiDotNet.Evolution.EvolutionIncumbentChallengeOutcome
