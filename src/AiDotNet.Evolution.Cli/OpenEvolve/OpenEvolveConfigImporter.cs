@@ -60,6 +60,12 @@ internal static class OpenEvolveConfigImporter
         if (config.TryGetValue("llm.api_key", out object? configuredKey) && configuredKey is not null)
             notes.Add("llm.api_key in the config is not used; the key is read from OPENAI_API_KEY.");
         List<RunModel> models = Models(merged, defaults, errors);
+        foreach (object? judge in List(merged["llm.evaluator_models"]))
+        {
+            if (judge is not Dictionary<string, object?> fields) errors.Add("llm.evaluator_models: every entry must be a mapping");
+            else foreach (string field in fields.Keys.Where(field => !ModelFields.Contains(field)))
+                errors.Add("llm.evaluator_models[].'" + field + "': not an OpenEvolve 0.3.2 model field");
+        }
         if (errors.Count > 0)
             throw new InvalidDataException("The OpenEvolve config cannot be imported:" + Environment.NewLine + "  " +
                                            string.Join(Environment.NewLine + "  ", errors));
@@ -80,7 +86,6 @@ internal static class OpenEvolveConfigImporter
         int inspirationCount = (int)(Integer(merged["prompt.num_diverse_programs"]) ?? 2);
         int topInspirations = Math.Max(1, (int)(inspirationCount * (Number(merged["database.elite_selection_ratio"]) ?? 0.1)));
         string? language = merged["language"] as string;
-        string? systemMessage = merged["prompt.system_message"] as string;
 
         var run = new RunFile
         {
@@ -93,8 +98,16 @@ internal static class OpenEvolveConfigImporter
             AdditionalModels = models.Skip(1).ToList(),
             Language = language is null ? ProgramLanguage.Python : ParseLanguage(language),
             Mode = Boolean(merged["diff_based_evolution"]) ? ProgramEvolutionMode.Diff : ProgramEvolutionMode.FullRewrite,
-            // "system_message" is OpenEvolve's name for its built-in template, which ours stands in for.
-            SystemMessage = systemMessage is null or "system_message" ? null : systemMessage,
+            Prompt = Prompt(merged, Path.GetDirectoryName(Path.GetFullPath(configPath)) ?? "."),
+            LlmFeedback = Boolean(merged["evaluator.use_llm_feedback"])
+                ? new RunLlmFeedback
+                {
+                    Weight = Number(merged["evaluator.llm_feedback_weight"]) ?? 0.1,
+                    // OpenEvolve judges with the proposal models when llm.evaluator_models is empty.
+                    Models = List(merged["llm.evaluator_models"]).OfType<Dictionary<string, object?>>()
+                        .Select(judge => ToModel(Resolve(judge, merged))).ToList()
+                }
+                : null,
             Budget = new RunBudget
             {
                 MaxEvaluations = checked(maxIterations + 1),
@@ -144,6 +157,62 @@ internal static class OpenEvolveConfigImporter
             .Select(key => new OpenEvolveImportEntry(key.Name, Show(merged[key.Name]), key.Disposition, key.Ours, config.ContainsKey(key.Name)))
             .ToList();
         return new OpenEvolveImport(run, entries, notes);
+    }
+
+    // OpenEvolve's shipped template names (openevolve/prompts/defaults at 411fb59). OpenEvolve treats a system message as
+    // a template when a template of that name exists and as literal text otherwise; the import records that guess.
+    private static readonly HashSet<string> OpenEvolveTemplates = new(StringComparer.Ordinal)
+    {
+        "diff_user", "evaluation", "evaluator_system_message", "evolution_history", "full_rewrite_user", "inspiration_program",
+        "inspirations_section", "previous_attempt", "system_message", "system_message_changes_description",
+        "system_message_with_changes_description", "top_program", "user_message_with_changes_description"
+    };
+
+    private static RunPrompt Prompt(Dictionary<string, object?> merged, string configDirectory)
+    {
+        string? templates = merged["prompt.template_dir"] as string;
+        string? templateDirectory = templates is null ? null : Path.GetFullPath(Path.Combine(configDirectory, templates));
+        bool IsTemplate(string name) => OpenEvolveTemplates.Contains(name) ||
+            (templateDirectory is not null && File.Exists(Path.Combine(templateDirectory, name + ".txt")));
+        string? system = merged["prompt.system_message"] as string;
+        string? evaluatorSystem = merged["prompt.evaluator_system_message"] as string;
+        string? initial = merged["prompt.initial_changes_description"] as string;
+        return new RunPrompt
+        {
+            TemplateDirectory = templateDirectory,
+            // The default name stands for our built-in system message; any other value follows OpenEvolve's guess.
+            SystemMessage = system is null or "system_message" ? null : system,
+            SystemMessageMode = system is not null && IsTemplate(system)
+                ? AiDotNet.Evolution.Programs.ProgramPromptSystemMessageMode.TemplateKey
+                : AiDotNet.Evolution.Programs.ProgramPromptSystemMessageMode.Literal,
+            EvaluatorSystemMessage = evaluatorSystem is null or "evaluator_system_message" ? null : evaluatorSystem,
+            ProgramsAsChangesDescription = Boolean(merged["prompt.programs_as_changes_description"]),
+            InitialChangesDescription = string.IsNullOrEmpty(initial) ? null : initial,
+            NumTopPrograms = (int?)Integer(merged["prompt.num_top_programs"]),
+            NumDiversePrograms = (int?)Integer(merged["prompt.num_diverse_programs"]),
+            IncludeArtifacts = Boolean(merged["prompt.include_artifacts"]),
+            MaxArtifactBytes = (int?)Integer(merged["prompt.max_artifact_bytes"]),
+            ArtifactSecurityFilter = Boolean(merged["prompt.artifact_security_filter"]),
+            UseTemplateStochasticity = Boolean(merged["prompt.use_template_stochasticity"]),
+            TemplateVariations = merged["prompt.template_variations"] is Dictionary<string, object?> variations && variations.Count > 0
+                ? variations.ToDictionary(pair => pair.Key, pair => List(pair.Value).Select(Show).ToList(), StringComparer.Ordinal)
+                : null,
+            // code_length_threshold is OpenEvolve's older name for the same threshold, used when the newer one is unset.
+            SuggestSimplificationAfterChars = (int?)(Integer(merged["prompt.suggest_simplification_after_chars"]) ??
+                                                     Integer(merged["prompt.code_length_threshold"])),
+            IncludeChangesUnderChars = (int?)Integer(merged["prompt.include_changes_under_chars"]),
+            ConciseImplementationMaxLines = (int?)Integer(merged["prompt.concise_implementation_max_lines"]),
+            ComprehensiveImplementationMinLines = (int?)Integer(merged["prompt.comprehensive_implementation_min_lines"])
+        };
+    }
+
+    // An llm.models or llm.evaluator_models entry over the shared llm defaults, as OpenEvolve resolves each model.
+    private static Dictionary<string, object?> Resolve(Dictionary<string, object?> model, Dictionary<string, object?> merged)
+    {
+        var resolved = new Dictionary<string, object?>(StringComparer.Ordinal);
+        foreach (string field in ModelFields) resolved[field] = merged["llm." + field];
+        foreach ((string field, object? value) in model) resolved[field] = value;
+        return resolved;
     }
 
     private static List<RunModel> Models(Dictionary<string, object?> merged, Dictionary<string, object?> defaults, List<string> errors)

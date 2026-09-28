@@ -35,12 +35,47 @@ internal sealed class RunFile
     public ProgramEvolutionMode Mode { get; init; } = ProgramEvolutionMode.FullRewrite;
     /// <summary>Extra models sampled beside <see cref="Model"/> by weight (OpenEvolve's <c>llm.models</c>); empty for one model.</summary>
     public List<RunModel> AdditionalModels { get; init; } = new();
-    /// <summary>The system prompt for proposals, or <c>null</c> for the built-in one (OpenEvolve's <c>prompt.system_message</c>).</summary>
-    public string? SystemMessage { get; init; }
+    /// <summary>Prompt wording and content (OpenEvolve's <c>prompt</c> section); defaults keep the built-in prompt.</summary>
+    public RunPrompt Prompt { get; init; } = new();
+    /// <summary>A language model's opinion blended into each fitness (OpenEvolve's <c>evaluator.use_llm_feedback</c>).</summary>
+    public RunLlmFeedback? LlmFeedback { get; init; }
     /// <summary>Islands, migration, selection and stopping; defaults reproduce a single-island uniform search.</summary>
     public RunSearch Search { get; init; } = new();
     /// <summary>How an unmodified OpenEvolve evaluator is run; <c>null</c> when <see cref="Evaluator"/> follows this CLI's contract.</summary>
     public RunOpenEvolveEvaluator? OpenEvolveEvaluator { get; init; }
+}
+
+/// <summary>Prompt settings mapped onto <see cref="ProgramEvolutionPromptOptions"/>; null leaves each at its default.</summary>
+internal sealed class RunPrompt
+{
+    /// <summary>A directory of <c>&lt;stem&gt;.txt</c> templates layered over the shipped ones.</summary>
+    public string? TemplateDirectory { get; init; }
+    public string? SystemMessage { get; init; }
+    /// <summary>Whether <see cref="SystemMessage"/> names a template or is the text itself.</summary>
+    public ProgramPromptSystemMessageMode SystemMessageMode { get; init; } = ProgramPromptSystemMessageMode.TemplateKey;
+    public string? EvaluatorSystemMessage { get; init; }
+    public bool ProgramsAsChangesDescription { get; init; }
+    public string? InitialChangesDescription { get; init; }
+    public int? NumTopPrograms { get; init; }
+    public int? NumDiversePrograms { get; init; }
+    public bool? IncludeArtifacts { get; init; }
+    public int? MaxArtifactBytes { get; init; }
+    public bool? ArtifactSecurityFilter { get; init; }
+    public bool? UseTemplateStochasticity { get; init; }
+    public Dictionary<string, List<string>>? TemplateVariations { get; init; }
+    public int? SuggestSimplificationAfterChars { get; init; }
+    public int? IncludeChangesUnderChars { get; init; }
+    public int? ConciseImplementationMaxLines { get; init; }
+    public int? ComprehensiveImplementationMinLines { get; init; }
+}
+
+/// <summary>Scores each program with a language model as well as the evaluator, and blends the two.</summary>
+internal sealed class RunLlmFeedback
+{
+    /// <summary>How much the model's score counts (OpenEvolve's <c>evaluator.llm_feedback_weight</c>).</summary>
+    public double Weight { get; init; } = 0.1;
+    /// <summary>The judging models (OpenEvolve's <c>llm.evaluator_models</c>); empty uses the proposal models.</summary>
+    public List<RunModel> Models { get; init; } = new();
 }
 
 /// <summary>Search settings OpenEvolve exposes under <c>database</c>, <c>prompt</c> and the top level.</summary>
@@ -204,10 +239,7 @@ internal static class RunCommand
         using var marker = RunMarker.Create(outputDirectory, run.RunId, tracePath);
 
         using var execution = CreateExecution(run);
-        IProgramChatClient model = run.AdditionalModels.Count == 0
-            ? CreateModel(run.Model, baseDirectory)
-            : new WeightedEnsembleChatClient(new[] { run.Model }.Concat(run.AdditionalModels)
-                .Select(member => new WeightedChatModel(CreateModel(member, baseDirectory), member.Weight)).ToList());
+        IProgramChatClient model = CreateModels(new[] { run.Model }.Concat(run.AdditionalModels).ToList(), baseDirectory);
         using var ownedModel = model as IDisposable;
 
         var programOptions = new ProgramProposalOptions
@@ -216,14 +248,21 @@ internal static class RunCommand
             TaskDescription = run.TaskDescription,
             MaxProgramChars = run.Budget.MaxProgramChars
         };
+        ApplyPrompt(run.Prompt, programOptions.Prompt, baseDirectory);
         foreach (RunMetricDescriptor metric in run.Search.MetricDescriptors.Where(metric => metric.Name != "length"))
             programOptions.MetricDescriptors.Add(metric.Name);
-        var fitness = CreateFitness(run, execution, evaluator);
+        IProgramFitnessEvaluator fitness = CreateFitness(run, execution, evaluator);
+        if (run.LlmFeedback is { } feedback)
+        {
+            IProgramChatClient judge = feedback.Models.Count == 0
+                ? CreateModels(new[] { run.Model }.Concat(run.AdditionalModels).ToList(), baseDirectory)
+                : CreateModels(feedback.Models, baseDirectory);
+            fitness = new LlmJudgeProgramFitnessEvaluator(judge, fitness, null, new LlmFeedbackOptions { Enabled = true, Weight = feedback.Weight });
+        }
         var task = new ProgramEvolutionTask(fitness, new ProgramDescriptorSet(new[] { new ProgramLengthDescriptor() }), programOptions);
         var variationOptions = new LlmProgramVariationOptions
         {
             Mode = run.Mode,
-            SystemMessage = run.SystemMessage,
             Temperature = run.Model.Temperature,
             TopP = run.Model.TopP,
             ReasoningEffort = run.Model.ReasoningEffort,
@@ -459,6 +498,32 @@ internal static class RunCommand
                 sandbox.SetInterpreter(ProgramLanguage.Python, new ProgramInterpreterSpecification(python, "{source}"));
         }
         return new ProcessProgramExecutionEngine(sandbox);
+    }
+
+    /// <summary>One model, or a weighted ensemble of several (OpenEvolve's <c>llm.models</c>).</summary>
+    private static IProgramChatClient CreateModels(IReadOnlyList<RunModel> models, string baseDirectory) => models.Count == 1
+        ? CreateModel(models[0], baseDirectory)
+        : new WeightedEnsembleChatClient(models.Select(member => new WeightedChatModel(CreateModel(member, baseDirectory), member.Weight)).ToList());
+
+    private static void ApplyPrompt(RunPrompt source, ProgramEvolutionPromptOptions prompt, string baseDirectory)
+    {
+        if (source.TemplateDirectory is { } templates) prompt.TemplateDirectory = Path.GetFullPath(Path.Combine(baseDirectory, templates));
+        if (source.SystemMessage is { } system) { prompt.SystemMessage = system; prompt.SystemMessageMode = source.SystemMessageMode; }
+        if (source.EvaluatorSystemMessage is { } evaluatorSystem) prompt.EvaluatorSystemMessage = evaluatorSystem;
+        prompt.ProgramsAsChangesDescription = source.ProgramsAsChangesDescription;
+        if (source.InitialChangesDescription is { } initial) prompt.InitialChangesDescription = initial;
+        if (source.NumTopPrograms is int top) prompt.NumTopPrograms = top;
+        if (source.NumDiversePrograms is int diverse) prompt.NumDiversePrograms = diverse;
+        if (source.IncludeArtifacts is bool artifacts) prompt.IncludeArtifacts = artifacts;
+        if (source.MaxArtifactBytes is int bytes) prompt.MaxArtifactBytes = bytes;
+        if (source.ArtifactSecurityFilter is bool filter) prompt.ArtifactSecurityFilter = filter;
+        if (source.UseTemplateStochasticity is bool stochastic) prompt.UseTemplateStochasticity = stochastic;
+        if (source.TemplateVariations is { } variations)
+            foreach ((string key, List<string> values) in variations) prompt.TemplateVariations[key] = values;
+        if (source.SuggestSimplificationAfterChars is int simplify) prompt.SuggestSimplificationAfterChars = simplify;
+        if (source.IncludeChangesUnderChars is int changes) prompt.IncludeChangesUnderChars = changes;
+        if (source.ConciseImplementationMaxLines is int concise) prompt.ConciseImplementationMaxLines = concise;
+        if (source.ComprehensiveImplementationMinLines is int comprehensive) prompt.ComprehensiveImplementationMinLines = comprehensive;
     }
 
     /// <summary>The evaluator script to run: the file itself, or the OpenEvolve shim that imports it.</summary>

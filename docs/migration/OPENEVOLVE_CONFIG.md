@@ -47,6 +47,12 @@ is refused rather than mixed into an ongoing run.
 
 ## What differs, and is reported
 
+- **Prompts.** OpenEvolve's prompt keys map onto our prompt options: templates, changes-description mode, template
+  variations and the length-based hints. A ``system_message`` that names one of OpenEvolve's shipped templates (or a file
+  in ``template_dir``) is used as a template; anything else is literal text. That is OpenEvolve's own guess, recorded
+  explicitly.
+- **LLM feedback.** ``evaluator.use_llm_feedback`` scores each program with ``llm.evaluator_models`` (or the proposal
+  models) and blends the result in with ``llm_feedback_weight``.
 - **Diversity axis.** OpenEvolve's built-in `diversity` feature is measured against the current population, so it has
   no deterministic equivalent. It is dropped, and `complexity` becomes program length.
 - **Memory limit.** OpenEvolve declares `evaluator.memory_limit_mb` but does not enforce it. Here it is enforced, and
@@ -83,33 +89,33 @@ is refused rather than mixed into an ongoing run.
 | `llm.manual_mode` | Mapped | model.provider = Manual |
 | `llm._manual_queue_dir` | Mapped | model.manualQueue |
 | `llm.models` | Mapped | model plus additionalModels, sampled by weight |
-| `llm.evaluator_models` | RefusedUnlessDefault | LLM feedback on programs (evaluator.use_llm_feedback) is not implemented |
+| `llm.evaluator_models` | Mapped | llmFeedback.models, the judging models; empty uses the proposal models, as in OpenEvolve |
 | `llm.primary_model` | Mapped | model.name (OpenEvolve's older single-model form) |
 | `llm.primary_model_weight` | Mapped | model.weight |
 | `llm.secondary_model` | Mapped | a second model in additionalModels |
 | `llm.secondary_model_weight` | Mapped | its weight |
-| `prompt.template_dir` | RefusedUnlessDefault | custom prompt templates are not supported |
-| `prompt.system_message` | Mapped | systemMessage |
-| `prompt.evaluator_system_message` | RefusedUnlessDefault | LLM feedback on programs is not implemented |
-| `prompt.programs_as_changes_description` | RefusedUnlessDefault | the changes-description prompt mode is not implemented |
+| `prompt.template_dir` | Mapped | prompt.templateDirectory, templates layered over ours by stem; a missing directory is an error |
+| `prompt.system_message` | Mapped | prompt.systemMessage; a template name when a template of that name exists, literal text otherwise (OpenEvolve's guess, made explicit) |
+| `prompt.evaluator_system_message` | Mapped | prompt.evaluatorSystemMessage, the LLM-feedback judge's system message |
+| `prompt.programs_as_changes_description` | Mapped | prompt.programsAsChangesDescription |
 | `prompt.system_message_changes_description` | RefusedUnlessDefault | the changes-description prompt mode is not implemented |
-| `prompt.initial_changes_description` | RefusedUnlessDefault | the changes-description prompt mode is not implemented |
-| `prompt.num_top_programs` | Mapped | search.topPrograms |
+| `prompt.initial_changes_description` | Mapped | prompt.initialChangesDescription |
+| `prompt.num_top_programs` | Mapped | prompt.numTopPrograms and search.topPrograms |
 | `prompt.num_diverse_programs` | Mapped | the inspiration count n: island best, then top programs, then diverse ones up to n, as OpenEvolve fills it |
-| `prompt.use_template_stochasticity` | RefusedUnlessDefault | prompt template variations are not implemented |
-| `prompt.template_variations` | RefusedUnlessDefault | prompt template variations are not implemented |
+| `prompt.use_template_stochasticity` | Mapped | prompt.useTemplateStochasticity |
+| `prompt.template_variations` | Mapped | prompt.templateVariations |
 | `prompt.use_meta_prompting` | RefusedUnlessDefault | meta-prompting is not implemented in the CLI |
 | `prompt.meta_prompt_weight` | RefusedUnlessDefault | meta-prompting is not implemented in the CLI |
-| `prompt.include_artifacts` | Mapped | search.includeArtifacts |
-| `prompt.max_artifact_bytes` | Mapped | search.maxArtifactBytes |
-| `prompt.artifact_security_filter` | RefusedUnlessDefault | ours always removes secrets from artifacts; it cannot be turned off |
-| `prompt.suggest_simplification_after_chars` | RefusedUnlessDefault | OpenEvolve's length-based prompt hints are not reproduced |
-| `prompt.include_changes_under_chars` | RefusedUnlessDefault | OpenEvolve's length-based prompt hints are not reproduced |
-| `prompt.concise_implementation_max_lines` | RefusedUnlessDefault | OpenEvolve's length-based prompt hints are not reproduced |
-| `prompt.comprehensive_implementation_min_lines` | RefusedUnlessDefault | OpenEvolve's length-based prompt hints are not reproduced |
+| `prompt.include_artifacts` | Mapped | prompt.includeArtifacts and search.includeArtifacts |
+| `prompt.max_artifact_bytes` | Mapped | prompt.maxArtifactBytes and search.maxArtifactBytes |
+| `prompt.artifact_security_filter` | Mapped | prompt.artifactSecurityFilter |
+| `prompt.suggest_simplification_after_chars` | Mapped | prompt.suggestSimplificationAfterChars |
+| `prompt.include_changes_under_chars` | Mapped | prompt.includeChangesUnderChars |
+| `prompt.concise_implementation_max_lines` | Mapped | prompt.conciseImplementationMaxLines |
+| `prompt.comprehensive_implementation_min_lines` | Mapped | prompt.comprehensiveImplementationMinLines |
 | `prompt.diff_summary_max_line_len` | RefusedUnlessDefault | diff summaries in prompts are not configurable in the CLI yet |
 | `prompt.diff_summary_max_lines` | RefusedUnlessDefault | diff summaries in prompts are not configurable in the CLI yet |
-| `prompt.code_length_threshold` | RefusedUnlessDefault | OpenEvolve's length-based prompt hints are not reproduced |
+| `prompt.code_length_threshold` | Mapped | prompt.suggestSimplificationAfterChars when suggest_simplification_after_chars is unset (its older name) |
 | `database.db_path` | NoEffect | run state lives in checkpoints under --output |
 | `database.in_memory` | NoEffect | run state lives in checkpoints under --output |
 | `database.log_prompts` | NoEffect | prompt logging only; prompts are not written to the trace |
@@ -142,8 +148,8 @@ is refused rather than mixed into an ongoing run.
 | `evaluator.cascade_thresholds` | Mapped | openEvolveEvaluator.cascadeThresholds, with OpenEvolve's threshold rule |
 | `evaluator.parallel_evaluations` | Mapped | budget.parallelism |
 | `evaluator.distributed` | RefusedUnlessDefault | distributed evaluation is not configured through this importer |
-| `evaluator.use_llm_feedback` | RefusedUnlessDefault | LLM feedback on programs is not implemented |
-| `evaluator.llm_feedback_weight` | RefusedUnlessDefault | LLM feedback on programs is not implemented |
+| `evaluator.use_llm_feedback` | Mapped | llmFeedback: a judge model's score blended into each fitness |
+| `evaluator.llm_feedback_weight` | Mapped | llmFeedback.weight |
 | `evaluator.enable_artifacts` | Mapped | artifacts are collected when true and ignored when false |
 | `evaluator.max_artifact_storage` | NoEffect | artifact storage housekeeping only |
 | `evolution_trace.enabled` | NoEffect | ours always writes trace-NNN.jsonl under --output |

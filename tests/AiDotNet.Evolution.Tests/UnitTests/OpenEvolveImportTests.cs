@@ -87,9 +87,13 @@ public sealed class OpenEvolveImportTests
               feature_bins: 8
             prompt:
               num_diverse_programs: 4
+              system_message: You are a careful optimiser.
+              suggest_simplification_after_chars: 800
             evaluator:
               cascade_thresholds: [0.4, 0.6]
               parallel_evaluations: 2
+              use_llm_feedback: true
+              llm_feedback_weight: 0.25
             """);
         RunFile run = imported.Run;
         Assert.Equal(6, run.Budget.MaxEvaluations); // five iterations after the seed
@@ -108,6 +112,12 @@ public sealed class OpenEvolveImportTests
         Assert.Equal(new[] { ("length", 8), ("accuracy", 8) }, run.Search.MetricDescriptors.Select(d => (d.Name, d.Bins)));
         Assert.Equal(new[] { 0.4, 0.6 }, run.OpenEvolveEvaluator?.CascadeThresholds);
         Assert.True(run.OpenEvolveEvaluator?.Cascade); // OpenEvolve's default
+        // Not the name of an OpenEvolve template, so it is the text itself, as OpenEvolve would decide.
+        Assert.Equal(("You are a careful optimiser.", ProgramPromptSystemMessageMode.Literal),
+            (run.Prompt.SystemMessage, run.Prompt.SystemMessageMode));
+        Assert.Equal(800, run.Prompt.SuggestSimplificationAfterChars);
+        Assert.Equal(0.25, run.LlmFeedback?.Weight);
+        Assert.Empty(run.LlmFeedback?.Models ?? new List<RunModel> { run.Model }); // judges with the proposal models
     }
 
     [Fact]
@@ -115,13 +125,13 @@ public sealed class OpenEvolveImportTests
     {
         using var directory = new TemporaryDirectory();
         const string Base = "llm:\n  name: m\n";
-        Assert.NotNull(Import(directory, Base + "prompt:\n  template_dir: null\n"));
-        var refused = Assert.Throws<InvalidDataException>(() => Import(directory, Base + "prompt:\n  template_dir: my_templates\n"));
-        Assert.Contains("prompt.template_dir = my_templates", refused.Message);
+        Assert.NotNull(Import(directory, Base + "prompt:\n  use_meta_prompting: false\n"));
+        var refused = Assert.Throws<InvalidDataException>(() => Import(directory, Base + "prompt:\n  use_meta_prompting: true\n"));
+        Assert.Contains("prompt.use_meta_prompting = true", refused.Message);
         var twoAtOnce = Assert.Throws<InvalidDataException>(() => Import(directory,
-            Base + "evaluator:\n  distributed: true\n  use_llm_feedback: true\n"));
+            Base + "evaluator:\n  distributed: true\n  cpu_limit: 2\n"));
         Assert.Contains("evaluator.distributed", twoAtOnce.Message);
-        Assert.Contains("evaluator.use_llm_feedback", twoAtOnce.Message);
+        Assert.Contains("evaluator.cpu_limit", twoAtOnce.Message);
     }
 
     [Fact]
