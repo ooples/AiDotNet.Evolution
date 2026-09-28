@@ -26,7 +26,7 @@ public sealed class TraceOptionBehaviourTests
         }
     }
 
-    private static async Task<(IReadOnlyList<EvolutionTraceRecord> Records, EvolutionTraceSummary Summary)> Trace(Action<EvolutionTraceOptions> configure)
+    private static async Task<(IReadOnlyList<EvolutionTraceRecord> Records, EvolutionTraceSummary Summary, EvolutionTraceFormat Format)> Trace(Action<EvolutionTraceOptions> configure)
     {
         using var directory = new TemporaryDirectory();
         string path = Path.Combine(directory.Path, "trace.jsonl");
@@ -52,17 +52,18 @@ public sealed class TraceOptionBehaviourTests
             await engine.RunAsync(new[] { new TestGenome(1) });
             summary = tracer.Summary;
         }
-        return (EvolutionTraceFile.Read(path).Records, summary);
+        var file = EvolutionTraceFile.Read(path);
+        return (file.Records, summary, file.Format);
     }
 
     [Fact]
     public async Task IncludeDescriptors_IncludeLineage_and_IncludeDiagnostics_each_remove_only_their_own_fields()
     {
         // Each flag is cleared on its own, so an observer that wired one flag to another's fields fails here.
-        var (full, _) = await Trace(_ => { });
-        var (noDescriptors, _) = await Trace(options => options.IncludeDescriptors = false);
-        var (noLineage, _) = await Trace(options => options.IncludeLineage = false);
-        var (noDiagnostics, _) = await Trace(options => options.IncludeDiagnostics = false);
+        var (full, _, _) = await Trace(_ => { });
+        var (noDescriptors, _, _) = await Trace(options => options.IncludeDescriptors = false);
+        var (noLineage, _, _) = await Trace(options => options.IncludeLineage = false);
+        var (noDiagnostics, _, _) = await Trace(options => options.IncludeDiagnostics = false);
 
         Assert.Contains(full, HasDescriptors);
         Assert.Contains(full, HasLineage);
@@ -88,8 +89,8 @@ public sealed class TraceOptionBehaviourTests
     [Fact]
     public async Task MaxTrackedMetrics_limits_the_summary_without_dropping_records()
     {
-        var (oneRecords, one) = await Trace(options => options.MaxTrackedMetrics = 1);
-        var (plentyRecords, plenty) = await Trace(_ => { });
+        var (oneRecords, one, _) = await Trace(options => options.MaxTrackedMetrics = 1);
+        var (plentyRecords, plenty, _) = await Trace(_ => { });
 
         Assert.True(one.IsMetricSummaryTruncated);
         Assert.False(one.IsTruncated);
@@ -103,6 +104,19 @@ public sealed class TraceOptionBehaviourTests
         Assert.Equal(2, plenty.TotalMetricDeltas.Count);
     }
 
+    [Fact]
+    public async Task Format_decides_how_the_trace_file_is_written()
+    {
+        var (lines, linesSummary, linesFormat) = await Trace(_ => { });
+        var (document, documentSummary, documentFormat) = await Trace(options => options.Format = EvolutionTraceFormat.Json);
+
+        Assert.Equal(EvolutionTraceFormat.JsonLines, linesFormat);
+        Assert.Equal(EvolutionTraceFormat.JsonLines, linesSummary.Format);
+        Assert.Equal(EvolutionTraceFormat.Json, documentFormat);
+        Assert.Equal(EvolutionTraceFormat.Json, documentSummary.Format);
+        // The format changes the encoding, not the content.
+        Assert.Equal(lines.Count, document.Count);
+    }
     private static bool HasDescriptors(EvolutionTraceRecord record) => record.Descriptors.Count > 0 || record.Cell is not null;
 
     private static bool HasLineage(EvolutionTraceRecord record) => record.ParentIds.Count > 0;

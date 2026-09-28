@@ -97,6 +97,19 @@ public sealed class JudgeAndMetricOptionBehaviourTests
     }
 
     [Fact]
+    public async Task MaxOutputTokens_bounds_each_judge_request()
+    {
+        var standard = new FakeChatClient(Answer);
+        await Judge(new LlmFeedbackOptions(), standard).EvaluateAsync(Candidate(), Context());
+        var bounded = new FakeChatClient(Answer);
+        await Judge(new LlmFeedbackOptions { MaxOutputTokens = 321 }, bounded).EvaluateAsync(Candidate(), Context());
+
+        Assert.Equal(321, bounded.LastOptions?.MaxOutputTokens);
+        Assert.Equal(new LlmFeedbackOptions().MaxOutputTokens, standard.LastOptions?.MaxOutputTokens);
+        Assert.NotEqual(321, standard.LastOptions?.MaxOutputTokens);
+    }
+
+    [Fact]
     public void ResourceAccounting_on_a_task_changes_its_identity_by_cost_unit_semantics()
     {
         // The caller's evaluator owns ledger charging; the task only records which cost units its results are

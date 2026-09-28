@@ -541,6 +541,22 @@ public sealed class LlmProgramVariationOperatorTests
     }
 
     [Fact]
+    public async Task TopPAndReasoningEffortReachTheModelOnlyWhenSet()
+    {
+        var tuned = new FakeChatClient(DiffResponse("    return x", "    return 4"));
+        await new LlmProgramVariationOperator(tuned, null,
+            new LlmProgramVariationOptions { TopP = 0.8, ReasoningEffort = ProgramReasoningEffort.High }).ProposeAsync(Context());
+        Assert.Equal(0.8, tuned.LastOptions?.TopP);
+        Assert.Equal(ProgramReasoningEffort.High, tuned.LastOptions?.ReasoningEffort);
+
+        // Unset, each is left to the provider rather than sent as a value.
+        var provider = new FakeChatClient(DiffResponse("    return x", "    return 4"));
+        await new LlmProgramVariationOperator(provider, null, new LlmProgramVariationOptions()).ProposeAsync(Context());
+        Assert.Null(provider.LastOptions?.TopP);
+        Assert.Null(provider.LastOptions?.ReasoningEffort);
+    }
+
+    [Fact]
     public async Task RequestedFormatAndEvolveBlockRulesReachTheModel()
     {
         var diffClient = new FakeChatClient(DiffResponse("    return x", "    return 4"));

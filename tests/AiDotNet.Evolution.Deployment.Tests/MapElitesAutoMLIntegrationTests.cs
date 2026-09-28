@@ -181,6 +181,33 @@ public sealed class MapElitesAutoMLIntegrationTests
         Assert.Empty(autoML.Archive);
     }
 
+    [Fact(Timeout = 240000)]
+    public async Task SearchAsync_IslandAndInspirationOptionsReachTheEngine()
+    {
+        // Each option is forwarded to the evolution engine, whose run identity covers it, so changing one alone changes
+        // the archive state hash while repeating the baseline reproduces it exactly.
+        (Matrix<double> trainX, Vector<double> trainY, Matrix<double> validationX, Vector<double> validationY) =
+            CreateRegressionData();
+        async Task<string> Hash(Action<MapElitesAutoMLOptions> configure)
+        {
+            var options = new MapElitesAutoMLOptions { Seed = 17, InitialPopulationSize = 1, ComplexityBinCount = 4, ArchiveCapacity = 8 };
+            configure(options);
+            using var autoML = new MapElitesAutoML<double, Matrix<double>, Vector<double>>(options);
+            autoML.TrialLimit = 4;
+            autoML.EnsembleOptions.Enabled = false;
+            autoML.SetCandidateModels(new List<Type> { typeof(AiDotNetConsumer::AiDotNet.Regression.PolynomialRegression<>) });
+            _ = await autoML.SearchAsync(trainX, trainY, validationX, validationY, TimeSpan.FromSeconds(30));
+            return autoML.ArchiveStateHash;
+        }
+
+        string baseline = await Hash(_ => { });
+        Assert.Equal(baseline, await Hash(_ => { }));
+        Assert.NotEqual(baseline, await Hash(options => options.InspirationCount = 1));
+        Assert.NotEqual(baseline, await Hash(options => options.IslandCount = 2));
+        Assert.NotEqual(baseline, await Hash(options => options.MigrationInterval = 1));
+        Assert.NotEqual(baseline, await Hash(options => options.MigrantsPerIsland = 1));
+    }
+
     [Fact]
     public void Constructor_InvalidQualityDiversityOptionsFailBeforeSearch()
     {
