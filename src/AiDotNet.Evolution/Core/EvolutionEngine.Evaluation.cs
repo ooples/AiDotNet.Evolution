@@ -634,6 +634,7 @@ public sealed partial class EvolutionEngine<TGenome>
                 RemoveSeen(item.Candidate.CanonicalGenome.Id);
             }
 
+            RememberCommitted(item);
             if (item.CacheStatus != EvolutionCacheStatus.Hit) QueueLineageArtifacts(item, evaluation);
 
             if (_selection is IOutcomeAwareEvolutionSelectionPolicy<TGenome> adaptiveSelection)
@@ -665,6 +666,7 @@ public sealed partial class EvolutionEngine<TGenome>
 
             if (_checkpointStore is not null && _options.CheckpointInterval > 0) _commitsSinceCheckpoint++;
         }
+        EnforceDeduplicationCapacity();
         return failedFast;
     }
 

@@ -2128,3 +2128,5 @@ AiDotNet.Evolution.IEvolutionLatencyProfile
 AiDotNet.Evolution.IEvolutionLatencyProfile.IsLatencyBound.get -> bool
 AiDotNet.Evolution.ResourceMeteredEvolutionTask<TGenome>.IsLatencyBound.get -> bool
 AiDotNet.Evolution.ResourceMeteredVariationOperator<TGenome>.IsLatencyBound.get -> bool
+AiDotNet.Evolution.EvolutionEngineOptions.DeduplicationCapacity.get -> int
+AiDotNet.Evolution.EvolutionEngineOptions.DeduplicationCapacity.set -> void

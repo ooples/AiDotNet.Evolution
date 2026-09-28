@@ -67,6 +67,8 @@ public sealed partial class EvolutionEngine<TGenome>
     private readonly long[] _islandGenerations;
     private readonly HashSet<string> _seen = new(StringComparer.Ordinal);
     private readonly Dictionary<string, EvolutionTaskResult> _cache = new(StringComparer.Ordinal);
+    // Committed genomes, oldest first, when DeduplicationCapacity bounds what is remembered.
+    private readonly Queue<string> _deduplicationOrder = new();
     private readonly Dictionary<EvolutionEvaluationStatus, long> _statusCounts = new();
     private readonly Queue<EvolutionDiagnostic> _failures = new();
     private readonly Dictionary<string, EvolutionArtifact[]> _pendingArtifacts = new(StringComparer.Ordinal);
