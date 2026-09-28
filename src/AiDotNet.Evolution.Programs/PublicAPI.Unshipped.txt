@@ -1683,6 +1683,8 @@ static AiDotNet.Evolution.Programs.Experience.ProgramExperienceQuery.operator !=
 static AiDotNet.Evolution.Programs.Experience.ProgramExperienceQuery.operator ==(AiDotNet.Evolution.Programs.Experience.ProgramExperienceQuery? left, AiDotNet.Evolution.Programs.Experience.ProgramExperienceQuery? right) -> bool
 static AiDotNet.Evolution.Programs.Experience.ProgramExperienceRetrieval.operator !=(AiDotNet.Evolution.Programs.Experience.ProgramExperienceRetrieval? left, AiDotNet.Evolution.Programs.Experience.ProgramExperienceRetrieval? right) -> bool
 static AiDotNet.Evolution.Programs.Experience.ProgramExperienceRetrieval.operator ==(AiDotNet.Evolution.Programs.Experience.ProgramExperienceRetrieval? left, AiDotNet.Evolution.Programs.Experience.ProgramExperienceRetrieval? right) -> bool
+AiDotNet.Evolution.Programs.ProgramSandboxOptions.TimeProvider.get -> System.TimeProvider!
+AiDotNet.Evolution.Programs.ProgramSandboxOptions.TimeProvider.set -> void
 AiDotNet.Evolution.Programs.ClaudeCodeChatClient
 AiDotNet.Evolution.Programs.ClaudeCodeChatClient.ClaudeCodeChatClient(AiDotNet.Evolution.Programs.ClaudeCodeChatClientOptions! options) -> void
 AiDotNet.Evolution.Programs.ClaudeCodeChatClient.GetResponseAsync(System.Collections.Generic.IReadOnlyList<AiDotNet.Evolution.Programs.ProgramChatMessage!>! messages, AiDotNet.Evolution.Programs.ProgramChatOptions? options = null, System.Threading.CancellationToken cancellationToken = default(System.Threading.CancellationToken)) -> System.Threading.Tasks.Task<AiDotNet.Evolution.Programs.ProgramChatResponse!>!
@@ -1747,6 +1749,23 @@ AiDotNet.Evolution.Programs.ProgramTaskOptions.MetricDescriptors.set -> void
 AiDotNet.Evolution.Programs.LlmProgramVariationOperator.SupportsDeterministicConcurrency.get -> bool
 AiDotNet.Evolution.Programs.LlmProgramVariationOptions.ConcurrentProposals.get -> bool
 AiDotNet.Evolution.Programs.LlmProgramVariationOptions.ConcurrentProposals.set -> void
+AiDotNet.Evolution.Programs.Experience.ProgramExperienceBinding
+AiDotNet.Evolution.Programs.Experience.ProgramExperienceBinding.ContextBudgetCharacters.get -> int
+AiDotNet.Evolution.Programs.Experience.ProgramExperienceBinding.IncludeOtherRuns.get -> bool
+AiDotNet.Evolution.Programs.Experience.ProgramExperienceBinding.ProgramExperienceBinding(AiDotNet.Evolution.Programs.Experience.ProgramExperienceStore! store, string! runId, string! taskIdentity, string! taskVersion, int contextBudgetCharacters = 4000, bool includeOtherRuns = false) -> void
+AiDotNet.Evolution.Programs.Experience.ProgramExperienceBinding.RunId.get -> string!
+AiDotNet.Evolution.Programs.Experience.ProgramExperienceBinding.Store.get -> AiDotNet.Evolution.Programs.Experience.ProgramExperienceStore!
+AiDotNet.Evolution.Programs.Experience.ProgramExperienceBinding.TaskIdentity.get -> string!
+AiDotNet.Evolution.Programs.Experience.ProgramExperienceBinding.TaskVersion.get -> string!
+AiDotNet.Evolution.Programs.Experience.ProgramExperienceRecorder
+AiDotNet.Evolution.Programs.Experience.ProgramExperienceRecorder.OnEventAsync(AiDotNet.Evolution.EvolutionEvent<AiDotNet.Evolution.Programs.ProgramGenome!>! evolutionEvent, System.Threading.CancellationToken cancellationToken = default(System.Threading.CancellationToken)) -> System.Threading.Tasks.ValueTask
+AiDotNet.Evolution.Programs.Experience.ProgramExperienceRecorder.ProgramExperienceRecorder(AiDotNet.Evolution.Programs.Experience.ProgramExperienceBinding! binding) -> void
+AiDotNet.Evolution.Programs.LlmProgramVariationOptions.Experience.get -> AiDotNet.Evolution.Programs.Experience.ProgramExperienceBinding?
+AiDotNet.Evolution.Programs.LlmProgramVariationOptions.Experience.set -> void
+AiDotNet.Evolution.Programs.ProgramEvolutionPromptOptions.DiffSummaryMaxLineLength.get -> int?
+AiDotNet.Evolution.Programs.ProgramEvolutionPromptOptions.DiffSummaryMaxLineLength.set -> void
+AiDotNet.Evolution.Programs.ProgramEvolutionPromptOptions.DiffSummaryMaxLines.get -> int?
+AiDotNet.Evolution.Programs.ProgramEvolutionPromptOptions.DiffSummaryMaxLines.set -> void
 AiDotNet.Evolution.Programs.WeightedChatModel
 AiDotNet.Evolution.Programs.WeightedChatModel.<Clone>$() -> AiDotNet.Evolution.Programs.WeightedChatModel!
 AiDotNet.Evolution.Programs.WeightedChatModel.Client.get -> AiDotNet.Evolution.Programs.IProgramChatClient!

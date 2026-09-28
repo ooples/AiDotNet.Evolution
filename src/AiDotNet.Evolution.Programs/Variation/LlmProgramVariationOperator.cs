@@ -239,6 +239,7 @@ public sealed class LlmProgramVariationOperator : ICheckpointableVariationOperat
 
         ProgramPromptResult prompt = _promptBuilder.Build(BuildPromptContext(context, parent), context.Random);
         var messages = new List<ProgramChatMessage>(prompt.Messages);
+        AppendExperience(messages);
         int recordSequence = 0;
         long recordId = RecordId(context);
 
@@ -1081,6 +1082,18 @@ public sealed class LlmProgramVariationOperator : ICheckpointableVariationOperat
     /// index keeps the run reproducible while making each draw a different one, which is the whole point of drawing
     /// more than one.
     /// </remarks>
+    // Lessons from earlier programs of this task, appended to the final user message within the binding's budget.
+    private void AppendExperience(List<ProgramChatMessage> messages)
+    {
+        if (_variationOptions.Experience is not { } experience || messages.Count == 0) return;
+        string lessons = experience.Store.Retrieve(experience.Query()).Context;
+        if (lessons.Length == 0) return;
+        int last = messages.FindLastIndex(message => message.Role == ProgramChatRole.User);
+        if (last < 0) return;
+        messages[last] = ProgramChatMessage.User(messages[last].Text + "\n\n## Lessons from earlier attempts on this task\n" +
+            "Each line is a hypothesis that was tried and what it produced. Build on what worked; do not repeat what did not.\n" + lessons);
+    }
+
     private ProgramChatOptions BuildChatOptions(StableRandom random, int sample = 0)
     {
         int baseSeed = _variationOptions.Seed ?? unchecked((int)(random.NextUInt32() & 0x7FFFFFFF));

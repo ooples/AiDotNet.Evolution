@@ -407,7 +407,7 @@ public sealed partial class EvolutionEngine<TGenome>
     private async Task EvaluateAfterDelayAsync(WorkItem item, TimeSpan delay, SemaphoreSlim semaphore,
         CancellationToken cancellationToken)
     {
-        if (delay > TimeSpan.Zero) await Task.Delay(delay, cancellationToken).ConfigureAwait(false);
+        if (delay > TimeSpan.Zero) await EvolutionClock.Delay(_options.TimeProvider, delay, cancellationToken).ConfigureAwait(false);
         await EvaluateWithSlotAsync(item, semaphore, cancellationToken).ConfigureAwait(false);
     }
 

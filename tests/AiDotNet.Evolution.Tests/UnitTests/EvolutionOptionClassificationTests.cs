@@ -20,7 +20,9 @@ public sealed class EvolutionOptionClassificationTests
         nameof(EvolutionEngineOptions.TimeLimit),
         nameof(EvolutionEngineOptions.CheckpointInterval),
         nameof(EvolutionEngineOptions.Resume),
-        nameof(EvolutionEngineOptions.MaxDegreeOfParallelism)
+        nameof(EvolutionEngineOptions.MaxDegreeOfParallelism),
+        // When time is read, never what a run means: a fake clock replays the same run, so it is provenance only.
+        nameof(EvolutionEngineOptions.TimeProvider)
     };
 
     // The third category, and the only one allowed to appear in NEITHER canonical string. A derived option does not
@@ -179,6 +181,8 @@ public sealed class EvolutionOptionClassificationTests
             return new EvolutionEarlyStoppingOptions { PatienceEvaluations = 9 };
         if (type == typeof(EvolutionPipelineOptions))
             return new EvolutionPipelineOptions { WaveSize = 33 };
+        if (type == typeof(TimeProvider))
+            return new Microsoft.Extensions.Time.Testing.FakeTimeProvider();
 
         throw new InvalidOperationException(
             $"'{property.Name}' has type '{type}', which this test cannot vary. Extend AlternativeValue so the new " +

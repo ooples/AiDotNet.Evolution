@@ -72,6 +72,13 @@ public sealed class LlmProgramVariationOptions
     /// evaluations that had committed when it was planned, so no prompt depends on which concurrent call returns first.
     /// </summary>
     public bool ConcurrentProposals { get; set; }
+
+    /// <summary>
+    /// Gets or sets a store whose lessons for this task are added to every proposal prompt, or <c>null</c> for none.
+    /// </summary>
+    /// <remarks>Not part of the operator's identity: the store's contents change as a run proceeds.</remarks>
+    public AiDotNet.Evolution.Programs.Experience.ProgramExperienceBinding? Experience { get; set; }
+
     /// <summary>Gets or sets nucleus sampling passed to the chat client (OpenEvolve's <c>top_p</c>), or <c>null</c> for its default.</summary>
     public double? TopP { get; set; }
 
@@ -175,6 +182,7 @@ public sealed class LlmProgramVariationOptions
         SystemMessage = SystemMessage,
         Temperature = Temperature,
         ConcurrentProposals = ConcurrentProposals,
+        Experience = Experience,
         TopP = TopP,
         ReasoningEffort = ReasoningEffort,
         MaxOutputTokens = MaxOutputTokens,
