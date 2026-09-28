@@ -1,7 +1,7 @@
 {
-  "line": 91.05,
-  "branch": 77.35,
+  "line": 88.82,
+  "branch": 75.45,
   "recorded_at": "2026-09-28",
-  "recorded_sha": "4326d390da5a823a662e155ad2fac09765f8ae95",
-  "scope": "merged: AiDotNet.Evolution.Tests (net10.0) + AiDotNet.Evolution.CSharp.Tests"
+  "recorded_sha": "02f89568903ed456809edf86c041a658350804ab",
+  "scope": "merged in CI (ubuntu): AiDotNet.Evolution.Tests net10.0 + AiDotNet.Evolution.CSharp.Tests net10.0 and net8.0; run 36374467786"
 }
