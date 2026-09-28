@@ -376,8 +376,9 @@ public sealed class ProcessProgramExecutionEngine : IProgramExecutionEngine, IPr
         bool compileOnly,
         CancellationToken cancellationToken)
     {
-        using var timeoutSource = CancellationTokenSource.CreateLinkedTokenSource(cancellationToken);
-        timeoutSource.CancelAfter(_limits.GetTimeLimit());
+        // Measured on the configured clock, so a test can fire the limit at a chosen moment.
+        using var deadline = new CancellationTokenSource(_limits.GetTimeLimit(), _options.TimeProvider);
+        using var timeoutSource = CancellationTokenSource.CreateLinkedTokenSource(cancellationToken, deadline.Token);
 
         using WindowsJobObject? job = WindowsJobObject.TryCreate(_limits.GetMemoryLimitBytes(), _limits.GetCpuTimeLimit());
         using var process = new Process { StartInfo = startInfo };
