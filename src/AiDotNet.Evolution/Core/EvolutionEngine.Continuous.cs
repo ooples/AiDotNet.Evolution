@@ -158,6 +158,12 @@ public sealed partial class EvolutionEngine<TGenome>
         }
     }
 
+    /// <summary>Returns the lowest identifier not yet committed: every admitted or outstanding item is uncommitted.</summary>
+    private long LowestUncommitted(ContinuousState state) =>
+        state.InFlight.Select(entry => entry.EvaluationId)
+            .Concat(state.Proposing.Select(entry => entry.Request.EvaluationId))
+            .DefaultIfEmpty(_nextEvaluationId).Min();
+
     /// <summary>Returns the tasks whose completion can let the loop make progress.</summary>
     private List<Task> WaitableWork(ContinuousState state)
     {
@@ -172,9 +178,11 @@ public sealed partial class EvolutionEngine<TGenome>
 
     /// <summary>Turns finished proposals into window entries and dispatches their evaluations.</summary>
     /// <remarks>
-    /// Admission runs duplicate detection and the refiner, whose outcome depends on what was admitted before, so a
-    /// deterministic run admits in identifier order exactly as a serial proposer would. An opportunistic run admits
-    /// whatever has finished.
+    /// Admission reads the evaluation cache, the duplicate set and the archive (for structural novelty), and commits
+    /// change all three. A deterministic run therefore admits proposal N at exactly one point: in identifier order,
+    /// once the committed prefix reaches N minus <see cref="ContinuousState.AdmissionLag"/>, while
+    /// <see cref="TryTakeCommittable"/> holds the commit of that prefix's next item until N is admitted. What N sees
+    /// is then fixed, whenever its model call happens to return. An opportunistic run admits whatever has finished.
     /// </remarks>
     private async Task AdmitFinishedProposalsAsync(ContinuousState state, SemaphoreSlim semaphore,
         CancellationToken cancellationToken)
@@ -183,7 +191,8 @@ public sealed partial class EvolutionEngine<TGenome>
         while (true)
         {
             int index = _options.ExecutionMode == EvolutionExecutionMode.Deterministic
-                ? (state.Proposing.Count > 0 && state.Proposing[0].Response is { IsCompleted: true } ? 0 : -1)
+                ? (state.Proposing.Count > 0 && state.Proposing[0].Response is { IsCompleted: true } &&
+                   LowestUncommitted(state) >= state.Proposing[0].Request.EvaluationId - state.AdmissionLag ? 0 : -1)
                 : state.Proposing.FindIndex(proposal => proposal.Response is { IsCompleted: true });
             if (index < 0) break;
             ContinuousProposal proposal = state.Proposing[index];
@@ -282,8 +291,12 @@ public sealed partial class EvolutionEngine<TGenome>
 
         // Admitted work that has not been charged yet still consumes the budget, so counting it here keeps admission
         // a function of the window's contents rather than of how far the evaluator happens to have got.
-        int uncharged = state.InFlight.Count(item => item.RequiresEvaluation && item.ChargedAttempts == 0) +
-                        state.Proposing.Count;
+        // With overlapping model calls, whether an outstanding proposal has resolved yet (and turned out to need no
+        // evaluation) depends on timing, so every uncharged outstanding item counts until it commits. Serial proposing
+        // resolves each one before the next check, so it keeps the exact count.
+        int uncharged = state.ConcurrentProposals
+            ? state.InFlight.Count(item => item.ChargedAttempts == 0) + state.Proposing.Count
+            : state.InFlight.Count(item => item.RequiresEvaluation && item.ChargedAttempts == 0);
         if (_evaluationAttempts + uncharged >= _options.MaxEvaluationAttempts)
         {
             state.Stop = EvolutionStopReason.EvaluationBudgetReached;
@@ -311,9 +324,7 @@ public sealed partial class EvolutionEngine<TGenome>
                 // The request is planned here, paired with a commit exactly as a serial proposal would be, and
                 // reads a snapshot of the archive, so the model call can overlap later commits without seeing them.
                 // Every identifier below the oldest outstanding one has committed, so that is the history horizon.
-                long committedBefore = state.InFlight.Select(entry => entry.EvaluationId)
-                    .Concat(state.Proposing.Select(entry => entry.Request.EvaluationId))
-                    .DefaultIfEmpty(_nextEvaluationId).Min();
+                long committedBefore = LowestUncommitted(state);
                 VariationRequest? request = CreateVariationRequest(new Dictionary<int, PipelineArchiveContext>(), committedBefore);
                 if (request is null) return false;
                 state.Proposing.Add(new ContinuousProposal(request));
@@ -422,7 +433,10 @@ public sealed partial class EvolutionEngine<TGenome>
         {
             WorkItem head = state.InFlight.OrderBy(item => item.EvaluationId).First();
             if (head.RequiresEvaluation || head.Result is null) return false;
-            if (state.Proposing.Count > 0 && state.Proposing[0].Request.EvaluationId < head.EvaluationId) return false;
+            // The other half of the admission rule: every proposal within AdmissionLag of this commit must be admitted
+            // first, so none of them can see this commit's effect on the cache, duplicate set or archive.
+            if (state.Proposing.Count > 0 && state.Proposing[0].Request.EvaluationId <= head.EvaluationId + state.AdmissionLag)
+                return false;
             ready = head;
             return true;
         }
@@ -454,6 +468,7 @@ public sealed partial class EvolutionEngine<TGenome>
         public ContinuousState(TGenome[] seeds, int seedIndex, int window, bool concurrentProposals)
         {
             ConcurrentProposals = concurrentProposals;
+            AdmissionLag = window / 2;
             Seeds = seeds;
             SeedIndex = seedIndex;
             CommittedSeeds = seedIndex;
@@ -472,6 +487,12 @@ public sealed partial class EvolutionEngine<TGenome>
         public List<ContinuousProposal> Proposing { get; } = new();
         /// <summary>Whether the operator lets proposals overlap each other and later commits.</summary>
         public bool ConcurrentProposals { get; }
+        /// <summary>
+        /// How many commits a finished proposal may run ahead of: proposal N is admitted when the committed prefix
+        /// reaches N minus this. Half the window, which is part of the run's identity, so up to this many evaluations
+        /// overlap while the rest of the window keeps model calls running.
+        /// </summary>
+        public int AdmissionLag { get; }
         /// <summary>Window slots taken by outstanding proposals and admitted evaluations together.</summary>
         public int Occupied => InFlight.Count + Proposing.Count;
     }

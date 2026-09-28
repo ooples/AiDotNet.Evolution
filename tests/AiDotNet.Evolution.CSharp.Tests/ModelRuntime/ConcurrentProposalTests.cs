@@ -114,6 +114,17 @@ public sealed class ConcurrentProposalTests
     }
 
     [Fact]
+    public async Task Checkpointed_runs_with_overlapping_model_calls_agree_under_contention()
+    {
+        // Admission reads the cache, the duplicate set and the archive, which commits change. Admitting whenever a model
+        // call returned let a duplicate be a cache hit in one run and a duplicate in the next; twelve runs at once make
+        // that timing vary enough to show it. Each checkpoint drains the window, which exercises the refill path too.
+        var runs = await Task.WhenAll(Enumerable.Range(0, 12).Select(index => Task.Run(() =>
+            Run(4, index % 2 == 0, EvolutionDispatchMode.Continuous, 80, new InMemoryEvolutionCheckpointStore(), false))));
+        Assert.Single(runs.Select(run => run.StateHash).Distinct());
+    }
+
+    [Fact]
     public void Concurrency_is_opt_in_and_changes_the_operator_identity_only_when_set()
     {
         var model = new JitteryModel(false);
