@@ -43,7 +43,7 @@ public sealed class CliRunTests
               "runId": "cli-run",
               "initialProgram": "initial.py",
               "evaluator": "evaluator.py",
-              "model": { "endpoint": "{{endpoint}}", "name": "fake-model", "timeoutSeconds": {{timeoutSeconds}} },
+              "model": { "endpoint": "{{endpoint}}", "name": "fake-model", "timeoutSeconds": {{timeoutSeconds}}, "maxRetries": 0 },
               "budget": { "maxEvaluations": {{maxEvaluations}}, "seed": 7, "evaluationTimeLimitSeconds": 30 },
               "output": "{{output}}"{{extra}}
             }
@@ -473,6 +473,52 @@ public sealed class CliRunTests
         Assert.Equal(2, code);
         Assert.StartsWith("error:", error.Trim());
     }
+    [Theory]
+    [InlineData("\"provider\": \"OpenAiCompatible\", \"name\": \"m\"", "model.endpoint")]
+    [InlineData("\"provider\": \"Manual\", \"name\": \"m\"", "model.manualQueue")]
+    [InlineData("\"provider\": \"ClaudeCode\", \"name\": \"m\", \"maxBudgetUsd\": 0", "model.maxBudgetUsd")]
+    [InlineData("\"provider\": \"Ollama\", \"name\": \"m\"", "")]
+    [InlineData("\"endpoint\": \"http://127.0.0.1:9/v1\", \"name\": \"m\", \"topP\": 1.5", "model.topP")]
+    public void Each_provider_refuses_the_settings_it_cannot_run_with(string model, string mentioned)
+    {
+        using var directory = new TemporaryDirectory();
+        string runFile = WriteRun(directory.Path, "http://127.0.0.1:9/v1", 2);
+        string text = File.ReadAllText(runFile);
+        int start = text.IndexOf("\"model\"", StringComparison.Ordinal), end = text.IndexOf('}', start) + 1;
+        File.WriteAllText(runFile, text[..start] + "\"model\": { " + model + " }" + text[end..]);
+        var (code, _, error) = Run("run", runFile);
+        Assert.Equal(2, code);
+        Assert.Contains(mentioned, error);
+    }
+
+    [Fact]
+    public async Task The_manual_provider_runs_a_search_answered_by_a_person()
+    {
+        using var directory = new TemporaryDirectory();
+        File.WriteAllText(Path.Combine(directory.Path, "initial.py"), "X = 0\n");
+        File.WriteAllText(Path.Combine(directory.Path, "evaluator.py"), Evaluator);
+        string runFile = WriteRun(directory.Path, "http://127.0.0.1:9/v1", 2);
+        string text = File.ReadAllText(runFile);
+        int start = text.IndexOf("\"model\"", StringComparison.Ordinal), end = text.IndexOf('}', start) + 1;
+        File.WriteAllText(runFile, text[..start] +
+            "\"model\": { \"provider\": \"Manual\", \"name\": \"person\", \"manualQueue\": \"queue\", \"manualTimeoutSeconds\": 60 }" + text[end..]);
+        string queue = Path.Combine(directory.Path, "queue");
+        Task answering = Task.Run(async () =>
+        {
+            string prompt = Path.Combine(queue, "000001.prompt.json");
+            for (int i = 0; i < 1200 && !File.Exists(prompt); i++) await Task.Delay(50);
+            string staged = Path.Combine(queue, "answer.tmp");
+            await File.WriteAllTextAsync(staged, "```python\nX = 5\n```\n");
+            File.Move(staged, Path.Combine(queue, "000001.response.txt"));
+        });
+        var (code, output, error) = Run("run", runFile);
+        await answering;
+        Assert.True(code == 0, error);
+        using JsonDocument summary = JsonDocument.Parse(output);
+        Assert.Equal(2, summary.RootElement.GetProperty("CompletedEvaluations").GetInt64());
+        Assert.Equal(1, summary.RootElement.GetProperty("ModelUsage").GetProperty("ChatCalls").GetInt64());
+    }
+
     [Fact]
     public void Resume_without_a_checkpoint_and_malformed_run_files_fail_with_exit_code_2()
     {
