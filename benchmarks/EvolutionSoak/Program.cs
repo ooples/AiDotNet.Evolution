@@ -69,6 +69,11 @@ static async Task<int> Memory(int evaluations, int checkpointEvery, string store
     var counter = new Counter(0, n =>
     {
         if (n % step != 0) return;
+        // Measured after a full compacting collection, so a sample shows what the process retains rather than where the
+        // collector happened to be; the instantaneous working set swings by a third with collection timing alone.
+        GC.Collect(2, GCCollectionMode.Forced, blocking: true, compacting: true);
+        GC.WaitForPendingFinalizers();
+        GC.Collect(2, GCCollectionMode.Forced, blocking: true, compacting: true);
         using Process self = Process.GetCurrentProcess();
         self.Refresh();
         samples.Add(new
