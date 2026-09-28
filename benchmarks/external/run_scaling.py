@@ -21,7 +21,16 @@ HERE = Path(__file__).resolve().parent
 ROOT = HERE.parents[1]
 
 
-def run(command, timeout=3600):
+# OpenEvolve occasionally deadlocks with its process pool (V1-70 saw one run in seven hang); a run that exceeds this
+# is killed, counted, and re-measured rather than aborting the campaign.
+HANG_SECONDS = 900
+
+
+class Hung(Exception):
+    pass
+
+
+def run(command, timeout=HANG_SECONDS):
     # Files, not pipes: a pool worker that outlives its parent would hold a pipe open forever. Anything the run left
     # behind is killed before the next measurement starts.
     with tempfile.TemporaryFile("w+", encoding="utf-8") as stdout, tempfile.TemporaryFile("w+", encoding="utf-8") as stderr:
@@ -29,12 +38,14 @@ def run(command, timeout=3600):
         tree = psutil.Process(process.pid)
         try:
             code = process.wait(timeout=timeout)
+        except subprocess.TimeoutExpired:
+            code = None
         finally:
             try:
                 leftovers = tree.children(recursive=True)
             except psutil.NoSuchProcess:
                 leftovers = []
-            for child in leftovers:
+            for child in leftovers + [tree]:
                 try:
                     child.kill()
                 except psutil.NoSuchProcess:
@@ -43,6 +54,8 @@ def run(command, timeout=3600):
         stdout.seek(0)
         stderr.seek(0)
         output, errors = stdout.read(), stderr.read()
+    if code is None:
+        raise Hung(f"{command[1:4]} exceeded {timeout} s")
     if code != 0:
         raise RuntimeError(f"{command[1:4]} failed: {errors[-800:]}")
     return json.loads(output.strip().splitlines()[-1])
@@ -67,15 +80,19 @@ def main():
     parser.add_argument("--openevolve-measured", type=int, default=200)
     parser.add_argument("--repeats", type=int, default=5)
     args = parser.parse_args()
-    rows = []
+    rows, hangs = [], []
     for repeat in range(args.repeats):
         for size in [int(s) for s in args.ours_sizes.split(",")]:
             result = ours(size, args.ours_measured)
             rows.append(dict(system="aidotnet", size=size, repeat=repeat, us_per_eval=result["MicrosecondsPerEvaluation"], raw=result))
         for size in [int(s) for s in args.openevolve_sizes.split(",")]:
             for attempt in range(3):
-                small = theirs(args.upstream, size, size)
-                large = theirs(args.upstream, size, size + args.openevolve_measured)
+                try:
+                    small = theirs(args.upstream, size, size)
+                    large = theirs(args.upstream, size, size + args.openevolve_measured)
+                except Hung as hung:
+                    hangs.append(dict(size=size, repeat=repeat, detail=str(hung)))
+                    continue
                 extra = large["Evaluations"] - small["Evaluations"]
                 if extra < args.openevolve_measured // 2:
                     raise RuntimeError(f"openevolve size={size} completed too few evaluations to measure ({extra})")
@@ -83,7 +100,7 @@ def main():
                 if per_eval > 0:  # a non-positive difference is noise; re-measure, never average it in
                     break
             else:
-                raise RuntimeError(f"openevolve size={size} gave a non-positive difference three times")
+                raise RuntimeError(f"openevolve size={size} could not be measured in three attempts (hung or non-positive difference)")
             rows.append(dict(system="openevolve", size=size, repeat=repeat, us_per_eval=per_eval * 1e6, small=small, large=large))
     summary = {}
     for system in ("aidotnet", "openevolve"):
@@ -91,7 +108,7 @@ def main():
         medians = {s: statistics.median(r["us_per_eval"] for r in rows if r["system"] == system and r["size"] == s) for s in sizes}
         summary[system] = dict(us_per_eval_median=medians, growth_largest_over_smallest=medians[sizes[-1]] / medians[sizes[0]])
     result = dict(story="V1-72 #177", repeats=args.repeats, ours_measured=args.ours_measured,
-                  openevolve_measured=args.openevolve_measured, summary=summary, rows=rows)
+                  openevolve_measured=args.openevolve_measured, summary=summary, hangs=hangs, rows=rows)
     Path(args.output).write_text(json.dumps(result, indent=1) + "\n", encoding="utf-8")
     print(json.dumps(summary, indent=1))
 
