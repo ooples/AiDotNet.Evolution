@@ -4,6 +4,8 @@
     <ImplicitUsings>enable</ImplicitUsings>
     <Nullable>enable</Nullable>
     <TreatWarningsAsErrors>true</TreatWarningsAsErrors>
+    <!-- The experience memory is experimental (AIDEVO004); this assembly uses it deliberately. -->
+    <NoWarn>$(NoWarn);AIDEVO004</NoWarn>
     <GenerateDocumentationFile>true</GenerateDocumentationFile>
     <Version>0.2.0</Version>
     <Description>Compiler-neutral bounded program improvement and artifact-bound promotion.</Description>

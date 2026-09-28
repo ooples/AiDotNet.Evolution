@@ -1,9 +1,11 @@
+using System.Diagnostics.CodeAnalysis;
 using System.Text;
 using System.Text.Json;
 
 namespace AiDotNet.Evolution.Programs.Experience;
 
 /// <summary>What an evaluated proposal achieved, for later retrieval as a lesson.</summary>
+[Experimental("AIDEVO004")]
 public enum ProgramExperienceOutcome
 {
     /// <summary>A valid program that improved on its parent.</summary>
@@ -17,6 +19,7 @@ public enum ProgramExperienceOutcome
 }
 
 /// <summary>Which data an experience's evidence came from. Final-test evidence is never stored.</summary>
+[Experimental("AIDEVO004")]
 public enum ProgramEvidencePartition
 {
     /// <summary>Search-time (development) evidence.</summary>
@@ -28,6 +31,7 @@ public enum ProgramEvidencePartition
 }
 
 /// <summary>One retained lesson: the hypothesis tried, what it produced, and under which task assumptions.</summary>
+[Experimental("AIDEVO004")]
 public sealed class ProgramExperienceRecord
 {
     /// <summary>Maximum characters of a hypothesis.</summary>
@@ -95,10 +99,12 @@ public sealed class ProgramExperienceRecord
 /// <param name="TaskVersion">The task/evaluator version; other versions never match.</param>
 /// <param name="ContextBudgetCharacters">The rendered lessons never exceed this many characters.</param>
 /// <param name="IncludeOtherRuns">Opt in to lessons from other runs of the same task and version.</param>
+[Experimental("AIDEVO004")]
 public sealed record ProgramExperienceQuery(string RunId, string TaskIdentity, string TaskVersion, int ContextBudgetCharacters,
     bool IncludeOtherRuns);
 
 /// <summary>Retrieved lessons and the text that fits the context budget.</summary>
+[Experimental("AIDEVO004")]
 public sealed record ProgramExperienceRetrieval(IReadOnlyList<ProgramExperienceRecord> Selected, string Context, int ExcludedIncompatible);
 
 /// <summary>
@@ -106,6 +112,7 @@ public sealed record ProgramExperienceRetrieval(IReadOnlyList<ProgramExperienceR
 /// be retrieved; retrieval never crosses task identity or version, crosses runs only when opted in, and fits a
 /// fixed character budget with alternating successes and failures from distinct sources.
 /// </summary>
+[Experimental("AIDEVO004")]
 public sealed class ProgramExperienceStore
 {
     private readonly int _capacity;
