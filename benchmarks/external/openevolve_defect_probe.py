@@ -18,6 +18,7 @@ import math
 import os
 import pathlib
 import re
+import subprocess
 import sys
 import tempfile
 import time
@@ -218,10 +219,14 @@ def d6_timeout_keeps_running() -> dict:
 
     metrics, at_return, later, returned, pid, child_alive = asyncio.run(run())
     if pid is not None and child_alive:
-        try:
-            os.kill(pid, 9 if sys.platform != "win32" else 1)
-        except OSError:
-            pass
+        # On Windows a venv's python.exe is a launcher with the interpreter as its child, so end the whole tree.
+        if sys.platform == "win32":
+            subprocess.run(["taskkill", "/F", "/T", "/PID", str(pid)], capture_output=True, check=False)
+        else:
+            try:
+                os.kill(pid, 9)
+            except OSError:
+                pass
     still_running = later > at_return
     return {
         "reproduced": still_running or child_alive,
