@@ -30,7 +30,11 @@ public sealed class ConcurrentProposalTests
         }
     }
 
-    private static async Task<(string StateHash, int MaxInFlight)> Run(int concurrency, bool reverse)
+    private static Task<(string StateHash, int MaxInFlight)> Run(int concurrency, bool reverse) =>
+        Run(concurrency, reverse, EvolutionDispatchMode.Pipeline, maxProposals: 80, store: null, resume: false);
+
+    private static async Task<(string StateHash, int MaxInFlight)> Run(int concurrency, bool reverse, EvolutionDispatchMode dispatch,
+        int maxProposals, IEvolutionCheckpointStore? store, bool resume)
     {
         var model = new JitteryModel(reverse);
         var variation = new LlmProgramVariationOperator(model, new ProgramProposalOptions { Language = ProgramLanguage.Python },
@@ -42,13 +46,23 @@ public sealed class ConcurrentProposalTests
         }, "x-score", "x-score-v1"));
         var options = new EvolutionEngineOptions
         {
-            RunId = "concurrent-proposals", Seed = 5, MaxEvaluationAttempts = 40, MaxProposals = 80, MaxGenerations = 80,
-            MaxDegreeOfParallelism = 4, MigrationInterval = 0, CheckpointInterval = 0, Dispatch = EvolutionDispatchMode.Pipeline
+            RunId = "concurrent-proposals",
+            Seed = 5,
+            MaxEvaluationAttempts = 40,
+            MaxProposals = maxProposals,
+            MaxGenerations = 80,
+            MaxDegreeOfParallelism = 4,
+            MigrationInterval = 0,
+            CheckpointInterval = store is null ? 0 : 4,
+            Dispatch = dispatch,
+            Resume = resume
         };
         options.Pipeline.MaxProposalConcurrency = concurrency;
-        options.Pipeline.WaveSize = 8;
+        if (dispatch == EvolutionDispatchMode.Pipeline) options.Pipeline.WaveSize = 8;
+        else options.MaxInFlight = 8;
         var engine = new EvolutionEngine<ProgramGenome>(task, variation,
-            _ => new MapElitesArchive<ProgramGenome>(new[] { new EvolutionDescriptorDefinition("x", 0, 100, 20) }), options);
+            _ => new MapElitesArchive<ProgramGenome>(new[] { new EvolutionDescriptorDefinition("x", 0, 100, 20) }), options,
+            checkpointStore: store, genomeCodec: store is null ? null : new ProgramGenomeCodec());
         EvolutionRunResult<ProgramGenome> result = await engine.RunAsync(new[] { new ProgramGenome("X = 1\n", ProgramLanguage.Python) });
         return (result.StateHash, model.MaxInFlight);
     }
@@ -67,6 +81,36 @@ public sealed class ConcurrentProposalTests
         Assert.True(reordered.MaxInFlight > 1, "proposals never overlapped");
         Assert.Equal(concurrent.StateHash, reordered.StateHash);
         Assert.Equal(concurrent.StateHash, again.StateHash);
+    }
+
+    [Fact]
+    public async Task Continuous_dispatch_overlaps_model_calls_and_the_proposal_cap_changes_only_the_schedule()
+    {
+        // Continuous dispatch plans each proposal when the commit a window earlier lands, whatever the timing, and
+        // starts model calls in planning order, so the number of overlapping calls is a budget setting: one call at a
+        // time and four give the same run.
+        var serial = await Run(1, false, EvolutionDispatchMode.Continuous, 80, null, false);
+        var concurrent = await Run(4, false, EvolutionDispatchMode.Continuous, 80, null, false);
+        var reordered = await Run(4, true, EvolutionDispatchMode.Continuous, 80, null, false);
+        Assert.Equal(1, serial.MaxInFlight);
+        Assert.True(concurrent.MaxInFlight > 1, "proposals never overlapped");
+        Assert.True(reordered.MaxInFlight > 1, "proposals never overlapped");
+        Assert.Equal(serial.StateHash, concurrent.StateHash);
+        Assert.Equal(serial.StateHash, reordered.StateHash);
+    }
+
+    [Fact]
+    public async Task A_continuous_run_with_overlapping_model_calls_resumes_to_the_uninterrupted_state()
+    {
+        // With one seed, a window of eight and a checkpoint every four commits, the first checkpoint drains the window
+        // after eleven proposals (ids 0-10). A run capped at eleven proposals stops at exactly that checkpoint, so its
+        // resume must reproduce the uninterrupted run. The drain covers outstanding model calls as well as
+        // evaluations; a checkpoint written mid-call would record proposals whose outcome it never saw.
+        var uninterrupted = await Run(4, false, EvolutionDispatchMode.Continuous, 80, new InMemoryEvolutionCheckpointStore(), false);
+        var store = new InMemoryEvolutionCheckpointStore();
+        await Run(4, true, EvolutionDispatchMode.Continuous, 11, store, false);
+        var resumed = await Run(4, false, EvolutionDispatchMode.Continuous, 80, store, true);
+        Assert.Equal(uninterrupted.StateHash, resumed.StateHash);
     }
 
     [Fact]

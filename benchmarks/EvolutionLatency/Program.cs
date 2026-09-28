@@ -25,6 +25,8 @@ var options = new EvolutionEngineOptions
     ExecutionMode = Environment.GetEnvironmentVariable("LATENCY_MODE") == "Opportunistic" ? EvolutionExecutionMode.Opportunistic : EvolutionExecutionMode.Deterministic
 };
 options.Pipeline.MaxProposalConcurrency = concurrency;
+int windowMultiple = int.TryParse(Environment.GetEnvironmentVariable("LATENCY_WINDOW_MULTIPLE"), out int window) ? window : 4;
+if (dispatch == EvolutionDispatchMode.Continuous) options.MaxInFlight = concurrency * windowMultiple;
 int waveMultiple = int.TryParse(Environment.GetEnvironmentVariable("LATENCY_WAVE_MULTIPLE"), out int multiple) ? multiple : 4;
 options.Pipeline.WaveSize = concurrency * waveMultiple;
 options.Pipeline.ProposalQueueCapacity = concurrency * waveMultiple;
@@ -38,7 +40,7 @@ clock.Stop();
 double ideal = model.TotalLatencySeconds / concurrency;
 Console.WriteLine(JsonSerializer.Serialize(new
 {
-    Proposals = model.Calls, Concurrency = concurrency, Dispatch = dispatch.ToString(), WaveSize = options.Pipeline.WaveSize,
+    Proposals = model.Calls, Concurrency = concurrency, Dispatch = dispatch.ToString(), WaveSize = options.Pipeline.WaveSize, options.MaxInFlight,
     MeanInFlight = model.InFlightSeconds / clock.Elapsed.TotalSeconds,
     InFlightUtilisation = model.InFlightSeconds / clock.Elapsed.TotalSeconds / concurrency,
     WallSeconds = clock.Elapsed.TotalSeconds, IdealSeconds = ideal, WallOverIdeal = clock.Elapsed.TotalSeconds / ideal,

@@ -90,13 +90,14 @@ public sealed class LlmProgramVariationOperator : ICheckpointableVariationOperat
     private readonly object _attemptLock = new();
     private readonly Queue<ProgramProposalAttempt> _attempts = new();
 
-    // Concurrent mode (LlmProgramVariationOptions.ConcurrentProposals). Records are ordered by (generation, sequence),
-    // not by arrival, and a prompt reads history frozen per (island, archive snapshot version): the first proposal of a
-    // wave to start freezes it before any proposal of that wave can finish, so every prompt of the wave, and every
-    // checkpoint taken after the wave drains, is the same whichever model call returns first.
-    private readonly SortedList<(long Generation, int Sequence), (ProgramProposalAttempt Attempt, int Island, long Version)> _ordered = new();
-    private readonly Dictionary<(int Island, long Version), ProgramProposalAttempt[]> _frozen = new();
-    private long _restoredGeneration = long.MinValue;
+    // Concurrent mode (LlmProgramVariationOptions.ConcurrentProposals). Records are ordered by (evaluation id, sequence),
+    // not by arrival, and a prompt reads only the records of evaluations below its context's CommittedBefore horizon.
+    // Those had all committed, so had all finished, when the proposal was planned: the view is the same whichever
+    // model call returns first. Horizons only grow in planning order and the engine starts calls in that order, so a
+    // record falls out of history only once no later prompt can still ask for it.
+    private readonly SortedList<(long Id, int Sequence), ProgramProposalAttempt> _ordered = new();
+    private readonly Dictionary<long, ProgramProposalAttempt[]> _frozen = new();
+    private long _frozenHorizon = long.MinValue;
 
     /// <inheritdoc/>
     /// <remarks>True when <see cref="LlmProgramVariationOptions.ConcurrentProposals"/> is set; the chat client must then
@@ -209,7 +210,7 @@ public sealed class LlmProgramVariationOperator : ICheckpointableVariationOperat
     {
         lock (_attemptLock)
         {
-            return _variationOptions.ConcurrentProposals ? _ordered.Values.Select(entry => entry.Attempt).ToArray() : _attempts.ToArray();
+            return _variationOptions.ConcurrentProposals ? _ordered.Values.ToArray() : _attempts.ToArray();
         }
     }
 
@@ -748,19 +749,45 @@ public sealed class LlmProgramVariationOperator : ICheckpointableVariationOperat
         return ProgramProposalOutcome.Accepted;
     }
 
-    // Called under _attemptLock. History as of this proposal's snapshot: only records from earlier snapshot versions of
-    // the same island, which all completed before the current wave started.
+    // Called under _attemptLock. History as of this proposal's planning: the newest records below its horizon, capped at
+    // the history capacity exactly as the serial queue is. A context without a horizon comes from serial dispatch,
+    // where every earlier call has already finished, so it sees everything.
     private ProgramProposalAttempt[] Frozen(EvolutionVariationContext<ProgramGenome> context)
     {
-        long version = context.Archive?.Version ?? long.MaxValue;
-        var key = (context.Island, version);
-        if (_frozen.TryGetValue(key, out ProgramProposalAttempt[]? frozen)) return frozen;
-        frozen = _ordered.Values.Where(entry => entry.Island == context.Island && entry.Version < version || entry.Version == -1)
-            .Select(entry => entry.Attempt).ToArray();
-        foreach ((int Island, long Version) stale in _frozen.Keys.Where(existing => existing.Island == context.Island).ToArray())
-            _frozen.Remove(stale);
-        _frozen[key] = frozen;
+        int capacity = _variationOptions.MaxRecordedAttempts;
+        if (context.CommittedBefore is not long horizon)
+            return _ordered.Values.Skip(Math.Max(0, _ordered.Count - capacity)).ToArray();
+        if (_frozen.TryGetValue(horizon, out ProgramProposalAttempt[]? frozen)) return frozen;
+        int below = CountBelow(horizon);
+        frozen = _ordered.Values.Skip(Math.Max(0, below - capacity)).Take(Math.Min(below, capacity)).ToArray();
+        if (horizon > _frozenHorizon)
+        {
+            _frozenHorizon = horizon;
+            foreach (long stale in _frozen.Keys.Where(existing => existing < horizon).ToArray()) _frozen.Remove(stale);
+            TrimBelowFrozenHorizon(capacity);
+        }
+        _frozen[horizon] = frozen;
         return frozen;
+    }
+
+    // Records at or above the newest horizon may still be read by a prompt planned later; below it only the newest
+    // capacity can be, because every later horizon is at least as high.
+    private void TrimBelowFrozenHorizon(int capacity)
+    {
+        while (CountBelow(_frozenHorizon) > capacity) _ordered.RemoveAt(0);
+    }
+
+    private int CountBelow(long horizon)
+    {
+        IList<(long Id, int Sequence)> keys = _ordered.Keys;
+        int low = 0, high = keys.Count;
+        while (low < high)
+        {
+            int middle = low + (high - low) / 2;
+            if (keys[middle].Id < horizon) low = middle + 1;
+            else high = middle;
+        }
+        return low;
     }
 
     private void Record(
@@ -781,8 +808,10 @@ public sealed class LlmProgramVariationOperator : ICheckpointableVariationOperat
         {
             lock (_attemptLock)
             {
-                _ordered[(context.Generation, sequence)] = (attempt, context.Island, context.Archive?.Version ?? long.MaxValue);
-                while (_ordered.Count > capacity) _ordered.RemoveAt(0); // the oldest by generation, never by arrival
+                _ordered[(context.EvaluationId ?? context.Generation, sequence)] = attempt;
+                // The oldest by evaluation id, never by arrival. Serial dispatch has no horizon and trims like the queue.
+                if (context.CommittedBefore is null) { while (_ordered.Count > capacity) _ordered.RemoveAt(0); }
+                else TrimBelowFrozenHorizon(capacity);
             }
             return;
         }
@@ -805,7 +834,9 @@ public sealed class LlmProgramVariationOperator : ICheckpointableVariationOperat
         ProgramProposalAttempt[] recorded;
         lock (_attemptLock)
         {
-            recorded = _variationOptions.ConcurrentProposals ? _ordered.Values.Select(entry => entry.Attempt).ToArray() : _attempts.ToArray();
+            recorded = _variationOptions.ConcurrentProposals
+                ? _ordered.Values.Skip(Math.Max(0, _ordered.Count - _variationOptions.MaxRecordedAttempts)).ToArray()
+                : _attempts.ToArray();
         }
 
         var document = new AttemptStateDocument
@@ -873,13 +904,14 @@ public sealed class LlmProgramVariationOperator : ICheckpointableVariationOperat
             _attempts.Clear();
             _ordered.Clear();
             _frozen.Clear();
+            _frozenHorizon = long.MinValue;
+            long restoredId = long.MinValue;
             foreach (ProgramProposalAttempt attempt in restored)
             {
                 if (!_variationOptions.ConcurrentProposals) { _attempts.Enqueue(attempt); continue; }
-                // Restored history predates every snapshot of the resumed run: version -1, generations below any real one.
-                _ordered[(_restoredGeneration++, 0)] = (attempt, -1, -1);
+                // Restored history predates every evaluation of the resumed run, so it sits below every horizon.
+                _ordered[(restoredId++, 0)] = attempt;
             }
-            _restoredGeneration = long.MinValue;
         }
     }
 
