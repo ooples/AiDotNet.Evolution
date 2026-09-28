@@ -1,3 +1,5 @@
+// GC.GetTotalAllocatedBytes is .NET Core 3.0+, and the budget is defined for the modern runtimes, not .NET Framework.
+#if NET8_0_OR_GREATER
 using Xunit;
 
 namespace AiDotNet.Evolution.Tests;
@@ -52,3 +54,4 @@ public sealed class AllocationBudgetTests
             $"Allocation per evaluation rose to {perEvaluation:F0} bytes, more than 20% above the committed {CommittedBytesPerEvaluation}.");
     }
 }
+#endif
