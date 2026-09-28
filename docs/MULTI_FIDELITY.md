@@ -160,3 +160,20 @@ powershell -ExecutionPolicy Bypass -File eng/Test-RegressionFidelity.ps1
 powershell -ExecutionPolicy Bypass -File eng/Test-FidelityRecovery.ps1
 dotnet run --project examples/MultiFidelitySearch -c Release -- --regression 32 TestResults/regression-new.json
 ```
+
+## Report types
+
+`EvolutionFidelityReport<TGenome>` keeps two lists:
+
+- `Batches`: one `EvolutionFidelityBatch<TGenome>` per measured batch, giving the candidate, the
+  `EvolutionFidelityLevel`, the purpose (search or confirmation), its replication report, and how many
+  continuation tokens were accepted or rejected when it resumed from a lower level.
+- `Promotions`: one `EvolutionFidelityPromotion` per decision to measure a candidate at the next
+  level. Each records the source batch, the levels, the candidate's rank, whether the promotion was an
+  exploration slot, and the scheduler and evaluator versions that made it, so the decision can be
+  audited later.
+
+A measurement that can continue at a higher fidelity carries an `EvolutionFidelityResumeState`: an
+opaque continuation token bound to one genome, replicate, evaluator version and source level. The
+scheduler hands it only to a matching measurement, so a token from another candidate or another
+evaluator version is refused rather than resumed.

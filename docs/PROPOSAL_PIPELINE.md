@@ -91,3 +91,12 @@ python benchmarks/analysis/analyze_pipeline.py --verify-evidence new-evidence-di
 The evidence directory contains every live/replay response, receipt, schedule and failure in `raw.json.gz`, plus a recomputable `analysis.json` and both raw/compressed hashes. Hashes detect inconsistency, not malicious replacement by a trusted artifact writer. CI runs real C# output through the analyzer, unit-tests failure/corruption handling, and rejects three tampered response tapes. An empty/failed archive is retained with zero best quality rather than causing evidence serialization to drop the failed run.
 
 For cross-build default-mode overhead, the existing `engine-profile-v1` suite exercises variation after eight seed evaluations. On multi-group Windows machines, set `AIDOTNET_PROFILE_PROCESSOR_GROUP` explicitly (a bounded integer 0–63; the OS must support the requested group). Identical masks such as `F` do not identify the same CPUs in different groups. `compare_pipeline_defaults.py` rejects mismatched processor groups, runtime controls, missing/failed cases and changed logical work/state/quality. Three repeated fresh-process measurements per case remain descriptive when source groups run sequentially on a shared host.
+
+## Pipeline report
+
+After a pipelined run, `EvolutionEngine<TGenome>.PipelineReport` returns an `EvolutionPipelineReport`:
+the wave size, queue capacities, worker counts, execution mode and call totals, separate from the
+deterministic search state. Its `Schedule` is a list of `EvolutionPipelineScheduleEntry` records,
+each with a kind (`EvolutionPipelineScheduleKind`: `ProposalSnapshot`, `Commit` or `WaveAborted`), the
+evaluation id and generation. Callback timings are left out on purpose, so two replays of a
+deterministic run produce the same schedule.

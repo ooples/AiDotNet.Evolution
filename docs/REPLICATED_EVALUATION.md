@@ -122,3 +122,21 @@ failed negative-control presets. Its evidence is workload-specific, not universa
 Purpose separation is a logical identity/accounting boundary, **not a security sandbox**: callers
 must keep hidden test data and confirmation feedback outside the proposing process. The runner is not a transparent
 task decorator and does not silently choose aggregation rules for task metrics, artifacts or noisy descriptors.
+
+## Report types
+
+A replication report's `Samples` are `EvolutionReplicateMeasurement` receipts: the replicate context,
+the status, the quality, the charged cost, whether the cost was unknown, and the measurement origin.
+Raw artifacts and diagnostics are not kept. `EvolutionReplicationStopReason` says why a batch
+stopped: `Completed`, `PrecisionReached`, `BudgetExhausted`, `InvalidMeasurement`,
+`MaximumCostExceeded`, `UnknownCost` or `Canceled`.
+
+`EvolutionIncumbentChallenge<TGenome>.RunAsync` returns an `EvolutionIncumbentChallengeReport`. It
+keeps the challenger's and incumbent's search reports apart from their confirmation reports, gives the
+lower bound on the improvement, and says whether the challenge was confirmed.
+
+`EvolutionRejectionAudit<TGenome>.RunAsync` returns an `EvolutionRejectionAuditReport` for a frozen
+set of screen rejections. Each audited reject is an `EvolutionRejectionAuditEntry` with its full
+evaluation and whether it would definitely have been useful. An unresolved audit is never counted as
+a harmless rejection. The report gives confidence bounds on the false-rejection rate and the cost
+charged for the audit.
