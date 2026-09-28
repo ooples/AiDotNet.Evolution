@@ -12,6 +12,7 @@ aidotnet-evolve compare <traceA> <traceB>
 aidotnet-evolve export  <trace> <output-directory> [--include-source <program-file>]
 aidotnet-evolve inspect-export <export-directory>
 aidotnet-evolve report  <trace> <output.html>
+aidotnet-evolve watch   <trace> <output.html> [--interval <seconds>]
 ```
 
 Exit codes: `0` success; `2` a usage or input error (the message is on standard error); `3` a run in which every
