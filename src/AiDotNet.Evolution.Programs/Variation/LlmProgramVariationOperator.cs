@@ -98,6 +98,7 @@ public sealed class LlmProgramVariationOperator : ICheckpointableVariationOperat
     private readonly SortedList<(long Id, int Sequence), ProgramProposalAttempt> _ordered = new();
     private readonly Dictionary<long, ProgramProposalAttempt[]> _frozen = new();
     private long _frozenHorizon = long.MinValue;
+    private long _nextUnidentifiedRecord = long.MinValue / 2;
 
     /// <inheritdoc/>
     /// <remarks>True when <see cref="LlmProgramVariationOptions.ConcurrentProposals"/> is set; the chat client must then
@@ -239,6 +240,7 @@ public sealed class LlmProgramVariationOperator : ICheckpointableVariationOperat
         ProgramPromptResult prompt = _promptBuilder.Build(BuildPromptContext(context, parent), context.Random);
         var messages = new List<ProgramChatMessage>(prompt.Messages);
         int recordSequence = 0;
+        long recordId = RecordId(context);
 
         bool recordProvenance = _provenanceSink is not null && _provenanceOptions.Enabled;
         string proposalId = recordProvenance ? BuildProposalId(context) : string.Empty;
@@ -303,7 +305,7 @@ public sealed class LlmProgramVariationOperator : ICheckpointableVariationOperat
             {
                 Interlocked.Increment(ref _providerErrors);
                 string typeName = exception.GetType().Name;
-                Record(context, recordSequence++, parent.Id, attemptNumber, ProgramProposalOutcome.ProviderError, typeName);
+                Record(context, recordId, recordSequence++, parent.Id, attemptNumber, ProgramProposalOutcome.ProviderError, typeName);
                 if (recordProvenance)
                 {
                     await RecordProvenanceAsync(
@@ -323,7 +325,7 @@ public sealed class LlmProgramVariationOperator : ICheckpointableVariationOperat
             CheckModelIdentity();
             ProgramProposalOutcome outcome = TryBuildChild(
                 parent, responseText, prompt.Mode, out ProgramGenome child, out string feedback);
-            Record(context, recordSequence++, parent.Id, attemptNumber, outcome, feedback, inputTokens, outputTokens);
+            Record(context, recordId, recordSequence++, parent.Id, attemptNumber, outcome, feedback, inputTokens, outputTokens);
             if (recordProvenance)
             {
                 await RecordProvenanceAsync(
@@ -341,7 +343,7 @@ public sealed class LlmProgramVariationOperator : ICheckpointableVariationOperat
         }
 
         Interlocked.Increment(ref _abandoned);
-        Record(context, recordSequence++, parent.Id, Math.Max(attemptNumber, 1), ProgramProposalOutcome.Exhausted,
+        Record(context, recordId, recordSequence++, parent.Id, Math.Max(attemptNumber, 1), ProgramProposalOutcome.Exhausted,
             "Every permitted attempt failed; the parent was returned unchanged.");
         return parent;
     }
@@ -790,8 +792,18 @@ public sealed class LlmProgramVariationOperator : ICheckpointableVariationOperat
         return low;
     }
 
+    // Records are keyed by evaluation identifier, which snapshot dispatch assigns. A context without one (serial
+    // dispatch) takes the next key from a range below every identifier the engine issues and above restored history, so
+    // the two can never collide; those contexts carry no horizon, so where they sort only decides trimming order.
+    internal long RecordId(EvolutionVariationContext<ProgramGenome> context)
+    {
+        if (context.EvaluationId is long id) return id;
+        lock (_attemptLock) return _nextUnidentifiedRecord++;
+    }
+
     private void Record(
         EvolutionVariationContext<ProgramGenome> context,
+        long recordId,
         int sequence,
         string parentId,
         int attemptNumber,
@@ -808,7 +820,7 @@ public sealed class LlmProgramVariationOperator : ICheckpointableVariationOperat
         {
             lock (_attemptLock)
             {
-                _ordered[(context.EvaluationId ?? context.Generation, sequence)] = attempt;
+                _ordered[(recordId, sequence)] = attempt;
                 // The oldest by evaluation id, never by arrival. Serial dispatch has no horizon and trims like the queue.
                 if (context.CommittedBefore is null) { while (_ordered.Count > capacity) _ordered.RemoveAt(0); }
                 else TrimBelowFrozenHorizon(capacity);

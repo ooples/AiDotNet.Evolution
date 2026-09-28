@@ -196,11 +196,14 @@ public sealed partial class EvolutionEngine<TGenome>
                 : state.Proposing.FindIndex(proposal => proposal.Response is { IsCompleted: true });
             if (index < 0) break;
             ContinuousProposal proposal = state.Proposing[index];
-            state.Proposing.RemoveAt(index);
             if (proposal.Response is not Task<VariationResponse> call) break;
+            // The proposal leaves Proposing only once it is an InFlight item. If either await throws (a cancelled model
+            // call, or cancellation during completion), it is still listed, so the rollback undoes its identifier and
+            // counters instead of losing them.
             VariationResponse response = await call.ConfigureAwait(false);
             WorkItem item = await CompleteVariationAsync(proposal.Request, response, cancellationToken).ConfigureAwait(false);
             item.IsSeed = false;
+            state.Proposing.RemoveAt(index);
             state.InFlight.Add(item);
             admitted = true;
         }
@@ -291,12 +294,24 @@ public sealed partial class EvolutionEngine<TGenome>
 
         // Admitted work that has not been charged yet still consumes the budget, so counting it here keeps admission
         // a function of the window's contents rather than of how far the evaluator happens to have got.
-        // With overlapping model calls, whether an outstanding proposal has resolved yet (and turned out to need no
-        // evaluation) depends on timing, so every uncharged outstanding item counts until it commits. Serial proposing
-        // resolves each one before the next check, so it keeps the exact count.
-        int uncharged = state.ConcurrentProposals
-            ? state.InFlight.Count(item => item.ChargedAttempts == 0) + state.Proposing.Count
-            : state.InFlight.Count(item => item.RequiresEvaluation && item.ChargedAttempts == 0);
+        // With overlapping model calls, whether a late proposal has resolved yet (and turned out to be a cache hit or a
+        // duplicate) depends on which call returned first, so only the ones the commit order guarantees are admitted may
+        // be discounted: every identifier up to the last commit plus the admission lag. Later ones stay reserved whether
+        // or not they have resolved, which keeps this check a function of the commit count. The cost is that a run can
+        // stop up to AdmissionLag evaluations short of the budget when those late proposals would not have needed one.
+        // Serial proposing resolves each proposal before the next check, so it keeps the exact count.
+        int uncharged;
+        if (state.ConcurrentProposals)
+        {
+            long admittedThrough = LowestUncommitted(state) - 1 + state.AdmissionLag;
+            uncharged = state.InFlight.Count(item => item.ChargedAttempts == 0 &&
+                                                     (item.RequiresEvaluation || item.EvaluationId > admittedThrough)) +
+                        state.Proposing.Count;
+        }
+        else
+        {
+            uncharged = state.InFlight.Count(item => item.RequiresEvaluation && item.ChargedAttempts == 0);
+        }
         if (_evaluationAttempts + uncharged >= _options.MaxEvaluationAttempts)
         {
             state.Stop = EvolutionStopReason.EvaluationBudgetReached;

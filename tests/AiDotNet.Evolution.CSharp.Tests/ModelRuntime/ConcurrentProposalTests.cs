@@ -13,6 +13,7 @@ public sealed class ConcurrentProposalTests
     {
         private int _inFlight, _calls;
         public int MaxInFlight;
+        public int Calls => Volatile.Read(ref _calls);
         public string ModelId => "jittery";
         public async Task<ProgramChatResponse> GetResponseAsync(IReadOnlyList<ProgramChatMessage> messages, ProgramChatOptions? options = null,
             CancellationToken cancellationToken = default)
@@ -124,6 +125,82 @@ public sealed class ConcurrentProposalTests
         Assert.Single(runs.Select(run => run.StateHash).Distinct());
     }
 
+    [Fact]
+    public void A_context_without_an_evaluation_identifier_gets_a_key_no_identifier_can_take()
+    {
+        // Serial dispatch gives no evaluation identifier. Keyed by generation, its records collided with a snapshot run's
+        // identifiers on the same operator (generation 5 and evaluation 5) and one replaced the other.
+        var variation = new LlmProgramVariationOperator(new JitteryModel(false), new ProgramProposalOptions { Language = ProgramLanguage.Python },
+            new LlmProgramVariationOptions { ConcurrentProposals = true });
+        var parent = new EvolutionArchiveEntry<ProgramGenome>(new EvolutionCellKey(new[] { 0 }),
+            new EvolutionCandidate<ProgramGenome>(0, new EvolutionCanonicalGenome<ProgramGenome>(new ProgramGenome("X = 1\n", ProgramLanguage.Python), "p"),
+                new EvolutionLineage(null, null, "seed", null, 0, 0, 0)),
+            new EvolutionEvaluation(0, "p", EvolutionEvaluationStatus.Completed, 1, EvolutionOptimizationDirection.Maximize,
+                new Dictionary<string, double> { ["x"] = 0 }, Array.Empty<double>(), Array.Empty<double>(),
+                new EvolutionEvaluationCost(TimeSpan.Zero, 1, 0), new EvolutionLineage(null, null, "seed", null, 0, 0, 0),
+                EvolutionCacheStatus.Miss, Array.Empty<EvolutionDiagnostic>(), "task", "eval", "config"));
+        EvolutionVariationContext<ProgramGenome> Context(long generation) =>
+            new(parent, Array.Empty<EvolutionArchiveEntry<ProgramGenome>>(), new StableRandom(1), generation, 0);
+
+        long first = variation.RecordId(Context(5)), second = variation.RecordId(Context(5));
+        Assert.NotEqual(first, second);
+        // Engine identifiers start at zero, so every unidentified key sits below all of them.
+        Assert.True(first < 0 && second < 0, $"unidentified keys {first} and {second} overlap the identifier range");
+    }
+
+    // Answers with one of a few programs, so most proposals are duplicates that need no evaluation.
+    private sealed class RepetitiveModel(int distinct) : IProgramChatClient
+    {
+        public string ModelId => "repetitive";
+        public async Task<ProgramChatResponse> GetResponseAsync(IReadOnlyList<ProgramChatMessage> messages, ProgramChatOptions? options = null,
+            CancellationToken cancellationToken = default)
+        {
+            int seed = options?.Seed ?? 0;
+            await Task.Delay(1 + seed % 7, cancellationToken);
+            return new ProgramChatResponse(ProgramChatMessage.Assistant("```python\nX = " +
+                (10 + Math.Abs(seed) % distinct).ToString(CultureInfo.InvariantCulture) + "\n```"));
+        }
+    }
+
+    [Theory]
+    [InlineData(false)]
+    [InlineData(true)]
+    public async Task Duplicates_resolved_before_the_budget_check_do_not_hold_back_evaluations(bool reverse)
+    {
+        // A duplicate is admitted and needs no evaluation. Counting it as reserved budget stopped the run with most of the
+        // evaluation budget unspent; only proposals whose admission the commit order does not yet guarantee may be held.
+        int calls = 0;
+        var model = new RepetitiveModel(distinct: 26);
+        var variation = new LlmProgramVariationOperator(model, new ProgramProposalOptions { Language = ProgramLanguage.Python },
+            new LlmProgramVariationOptions { Mode = ProgramEvolutionMode.FullRewrite, MaxProposalRetries = 0, ConcurrentProposals = true });
+        // A slow evaluator keeps evaluations in the window while duplicates resolve behind them.
+        var task = new ProgramEvolutionTask(new DelegateProgramFitnessEvaluator(async (genome, _, cancellationToken) =>
+        {
+            Interlocked.Increment(ref calls);
+            await Task.Delay(15, cancellationToken);
+            int x = int.Parse(genome.Source.Split('=')[1].Trim(), CultureInfo.InvariantCulture);
+            return EvolutionTaskResult.Completed(x, new Dictionary<string, double> { ["x"] = x % 100 });
+        }, "x-score", "x-score-v1"));
+        var options = new EvolutionEngineOptions
+        {
+            RunId = "budget",
+            Seed = reverse ? 9UL : 5UL,
+            MaxEvaluationAttempts = 24,
+            MaxProposals = 400,
+            MaxGenerations = 400,
+            MaxDegreeOfParallelism = 4,
+            MigrationInterval = 0,
+            CheckpointInterval = 0,
+            Dispatch = EvolutionDispatchMode.Continuous,
+            MaxInFlight = 8
+        };
+        options.Pipeline.MaxProposalConcurrency = 4;
+        var engine = new EvolutionEngine<ProgramGenome>(task, variation,
+            _ => new MapElitesArchive<ProgramGenome>(new[] { new EvolutionDescriptorDefinition("x", 0, 100, 20) }), options);
+        EvolutionRunResult<ProgramGenome> result = await engine.RunAsync(new[] { new ProgramGenome("X = 1\n", ProgramLanguage.Python) });
+        // Up to AdmissionLag (half the window) late proposals may stay reserved, so the run may end that far short.
+        Assert.True(calls >= 24 - 4, $"only {calls} of 24 evaluations ran before {result.StopReason}");
+    }
     [Fact]
     public void Concurrency_is_opt_in_and_changes_the_operator_identity_only_when_set()
     {
