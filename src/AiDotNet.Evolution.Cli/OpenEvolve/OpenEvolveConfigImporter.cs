@@ -30,7 +30,7 @@ internal static class OpenEvolveConfigImporter
 
     public static OpenEvolveImport Import(string configPath, string initialProgram, string evaluator, int? iterations, string? python)
     {
-        Dictionary<string, object?> config = Flatten(Load(configPath));
+        Dictionary<string, object?> config = Flatten(Load(configPath, python));
         Dictionary<string, object?> defaults = Defaults();
         var merged = new Dictionary<string, object?>(defaults, StringComparer.Ordinal);
         var errors = new List<string>();
@@ -326,16 +326,67 @@ internal static class OpenEvolveConfigImporter
             ? parsed
             : throw new InvalidDataException("reasoning_effort = " + effort + ": not a known effort.");
 
-    private static YamlMappingNode Load(string path)
+    private static YamlMappingNode Load(string path, string? python)
     {
         var info = new FileInfo(path);
         if (!info.Exists) throw new FileNotFoundException("OpenEvolve config not found: " + path, path);
         if (info.Length > 1024 * 1024) throw new InvalidDataException("The OpenEvolve config exceeds 1 MiB.");
         var stream = new YamlStream();
-        using (var reader = new StreamReader(path)) stream.Load(reader);
+        try
+        {
+            using var reader = new StreamReader(path);
+            stream.Load(reader);
+        }
+        catch (YamlDotNet.Core.YamlException exception)
+        {
+            // OpenEvolve reads its config with PyYAML, which accepts some input the YAML spec does not (for example a
+            // quoted multi-line scalar indented less than its key). Parse such a file the way OpenEvolve does.
+            string json = ReadWithPyYaml(path, python)
+                ?? throw new InvalidDataException(
+                    $"The OpenEvolve config is not valid YAML at line {exception.Start.Line}, column {exception.Start.Column}, " +
+                    "and PyYAML was not available to read it the way OpenEvolve does. Pass --python with an interpreter " +
+                    "that has PyYAML installed.", exception);
+            stream = new YamlStream();
+            using var reader = new StringReader(json);
+            stream.Load(reader);
+        }
         if (stream.Documents.Count == 0) return new YamlMappingNode();
         return stream.Documents[0].RootNode as YamlMappingNode
                ?? throw new InvalidDataException("The OpenEvolve config must be a mapping at the top level.");
+    }
+
+    // Returns the config as JSON (which is also YAML) read by PyYAML, or null when no interpreter with PyYAML ran.
+    private static string? ReadWithPyYaml(string path, string? python)
+    {
+        var start = new System.Diagnostics.ProcessStartInfo(python ?? "python")
+        {
+            RedirectStandardOutput = true,
+            RedirectStandardError = true,
+            UseShellExecute = false,
+            CreateNoWindow = true
+        };
+        start.ArgumentList.Add("-c");
+        start.ArgumentList.Add("import json, sys, yaml; json.dump(yaml.safe_load(open(sys.argv[1], encoding='utf-8')), sys.stdout)");
+        start.ArgumentList.Add(Path.GetFullPath(path));
+        try
+        {
+            using var process = System.Diagnostics.Process.Start(start);
+            if (process is null) return null;
+            Task<string> output = process.StandardOutput.ReadToEndAsync();
+            Task<string> error = process.StandardError.ReadToEndAsync();
+            if (!process.WaitForExit(30_000))
+            {
+                process.Kill(entireProcessTree: true);
+                return null;
+            }
+
+            Task.WaitAll(output, error);
+            return process.ExitCode == 0 && output.Result.Length > 0 ? output.Result : null;
+        }
+        catch (System.ComponentModel.Win32Exception)
+        {
+            return null;
+        }
     }
 
     // Nested sections become dotted keys, as OpenEvolve's dataclasses nest. Lists and the free-form mappings some keys

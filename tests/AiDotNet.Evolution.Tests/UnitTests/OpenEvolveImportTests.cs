@@ -151,13 +151,17 @@ public sealed class OpenEvolveImportTests
         // Stage 1 scores X / 10; a candidate reaching 0.25 (X >= 3) goes on to stage 2, which scores X / 5 and leaves a
         // marker. OpenEvolve merges stage metrics, the later stage winning, and takes combined_score as the fitness.
         File.WriteAllText(Path.Combine(directory.Path, "evaluator.py"), """
-            import os, re
+            import os, re, subprocess, sys
 
             def _x(path):
                 with open(path) as f:
                     return int(re.search(r"X = (\d+)", f.read()).group(1))
 
             def evaluate_stage1(path):
+                # Real evaluators print progress, directly and from processes they start, and it often contains
+                # braces (a dict, a format string). None of it may reach the result the shim prints.
+                print({"scoring": path})
+                subprocess.run([sys.executable, "-c", "print('{child output}')"], check=True)
                 return {"combined_score": _x(path) / 10.0}
 
             def evaluate_stage2(path):

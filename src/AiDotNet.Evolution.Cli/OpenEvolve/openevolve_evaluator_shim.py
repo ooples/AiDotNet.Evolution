@@ -140,6 +140,13 @@ def main():
     config = CONFIG  # noqa: F821 - prepended by the CLI
     _verify(config)
     source = sys.stdin.read()
+    # OpenEvolve evaluators print progress to stdout, which is where the result goes. Point stdout at stderr while the
+    # evaluator runs, at the descriptor level so processes it starts are redirected too, and keep the original for the
+    # result.
+    sys.stdout.flush()
+    result_stream = os.fdopen(os.dup(1), "w", encoding="utf-8")
+    os.dup2(2, 1)
+    sys.stdout = sys.stderr
     handle, path = tempfile.mkstemp(suffix=config["file_suffix"], text=True)
     try:
         with os.fdopen(handle, "w", encoding="utf-8") as candidate:
@@ -163,7 +170,9 @@ def main():
                if isinstance(v, (int, float)) and not isinstance(v, bool) and math.isfinite(float(v))}
     text = {k: (v if isinstance(v, str) else json.dumps(v, default=str)) for k, v in artifacts.items()}
     quality = _fitness(metrics, config["feature_dimensions"])
-    print(json.dumps({"quality": quality if math.isfinite(quality) else 0.0, "metrics": numeric, "artifacts": text}))
+    result_stream.write(json.dumps({"quality": quality if math.isfinite(quality) else 0.0, "metrics": numeric, "artifacts": text}))
+    result_stream.write("\n")
+    result_stream.flush()
 
 
 # The CLI checks for this marker: the script's entry point is evaluate(program_path) in the user's file.

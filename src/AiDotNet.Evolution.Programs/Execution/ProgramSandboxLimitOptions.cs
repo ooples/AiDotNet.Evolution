@@ -29,7 +29,7 @@ namespace AiDotNet.Evolution.Programs;
 public sealed class ProgramSandboxLimitOptions
 {
     /// <summary>The largest wall-clock limit accepted by <see cref="Validate"/>, in seconds.</summary>
-    public const int MaxTimeLimitSeconds = 3600;
+    public const int MaxTimeLimitSeconds = 86_400;
 
     /// <summary>The largest memory limit accepted by <see cref="Validate"/>, in megabytes.</summary>
     public const int MaxMemoryLimitMb = 1_048_576;
