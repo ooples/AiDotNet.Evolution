@@ -31,6 +31,66 @@ internal sealed class RunFile
     public string RuntimeVersion { get; init; } = "aidotnet-evolve-local";
     /// <summary>A repertoire exported by an earlier run whose programs join the seeds; used by <c>run</c>, ignored by <c>resume</c>.</summary>
     public string? WarmStart { get; init; }
+    /// <summary>Whole rewrites (the default) or diffs against the parent (OpenEvolve's <c>diff_based_evolution</c>).</summary>
+    public ProgramEvolutionMode Mode { get; init; } = ProgramEvolutionMode.FullRewrite;
+    /// <summary>Extra models sampled beside <see cref="Model"/> by weight (OpenEvolve's <c>llm.models</c>); empty for one model.</summary>
+    public List<RunModel> AdditionalModels { get; init; } = new();
+    /// <summary>The system prompt for proposals, or <c>null</c> for the built-in one (OpenEvolve's <c>prompt.system_message</c>).</summary>
+    public string? SystemMessage { get; init; }
+    /// <summary>Islands, migration, selection and stopping; defaults reproduce a single-island uniform search.</summary>
+    public RunSearch Search { get; init; } = new();
+    /// <summary>How an unmodified OpenEvolve evaluator is run; <c>null</c> when <see cref="Evaluator"/> follows this CLI's contract.</summary>
+    public RunOpenEvolveEvaluator? OpenEvolveEvaluator { get; init; }
+}
+
+/// <summary>Search settings OpenEvolve exposes under <c>database</c>, <c>prompt</c> and the top level.</summary>
+internal sealed class RunSearch
+{
+    public int Islands { get; init; } = 1;
+    /// <summary>Generations between migrations; zero never migrates.</summary>
+    public int MigrationInterval { get; init; }
+    public double MigrationRate { get; init; } = 0.1;
+    /// <summary>OpenEvolve's exploration/exploitation/elite parent ratios; all null keeps uniform parent selection.</summary>
+    public double? ExplorationRatio { get; init; }
+    public double? ExploitationRatio { get; init; }
+    public double? EliteRatio { get; init; }
+    /// <summary>Top programs shown in each prompt (OpenEvolve's <c>prompt.num_top_programs</c>).</summary>
+    public int? TopPrograms { get; init; }
+    /// <summary>Diverse programs shown in each prompt (OpenEvolve's <c>prompt.num_diverse_programs</c>).</summary>
+    public int? DiversePrograms { get; init; }
+    /// <summary>Evaluator metrics used as archive axes, with their bin counts; empty keeps program length alone.</summary>
+    public List<RunMetricDescriptor> MetricDescriptors { get; init; } = new();
+    /// <summary>Evaluations without improvement before stopping; null never stops early.</summary>
+    public long? EarlyStoppingPatience { get; init; }
+    public double EarlyStoppingMinimumImprovement { get; init; }
+    /// <summary>Retries for an evaluation that failed or timed out (OpenEvolve's <c>evaluator.max_retries</c>).</summary>
+    public int EvaluationRetries { get; init; }
+    /// <summary>A memory cap per evaluation in MiB, enforced by the sandbox; null for none.</summary>
+    public int? EvaluationMemoryLimitMb { get; init; }
+    /// <summary>Whether evaluator artifacts are fed into later prompts (OpenEvolve's <c>prompt.include_artifacts</c>).</summary>
+    public bool IncludeArtifacts { get; init; } = true;
+    public int? MaxArtifactBytes { get; init; }
+}
+
+internal sealed class RunMetricDescriptor
+{
+    public required string Name { get; init; }
+    public double Minimum { get; init; }
+    public double Maximum { get; init; } = 1;
+    public int Bins { get; init; } = 10;
+}
+
+/// <summary>Runs an OpenEvolve evaluator (<c>evaluate(program_path)</c> or cascade stages) through a Python shim.</summary>
+internal sealed class RunOpenEvolveEvaluator
+{
+    /// <summary>The Python interpreter; <c>python</c> on PATH when null.</summary>
+    public string? Python { get; init; }
+    public bool Cascade { get; init; }
+    public List<double> CascadeThresholds { get; init; } = new();
+    public string FileSuffix { get; init; } = ".py";
+    public int TimeoutSeconds { get; init; } = 300;
+    /// <summary>Metrics excluded from the fitness average, as OpenEvolve excludes its feature dimensions.</summary>
+    public List<string> FeatureDimensions { get; init; } = new();
 }
 
 /// <summary>How the CLI reaches the model (OpenEvolve's <c>provider</c> plus its manual mode).</summary>
@@ -68,6 +128,8 @@ internal sealed class RunModel
     /// <summary>The manual provider's queue directory, relative to the run file.</summary>
     public string? ManualQueue { get; init; }
     public int ManualTimeoutSeconds { get; init; } = 3600;
+    /// <summary>Relative sampling weight when several models are configured (OpenEvolve's <c>weight</c>).</summary>
+    public double Weight { get; init; } = 1;
 }
 
 internal sealed class RunBudget
@@ -126,12 +188,15 @@ internal static class RunCommand
             throw new InvalidDataException(outputDirectory + " already holds run '" + run.RunId + "'; use resume, or choose another output. Runs never overwrite.");
 
         string initial = ReadBounded(Path.Combine(baseDirectory, run.InitialProgram), run.Budget.MaxProgramChars);
-        string evaluator = ReadBounded(Path.Combine(baseDirectory, run.Evaluator), MaxRunFileBytes);
+        string evaluator = LoadEvaluator(run, baseDirectory);
         string tracePath = NextTracePath(outputDirectory);
         using var marker = RunMarker.Create(outputDirectory, run.RunId, tracePath);
 
         using var execution = CreateExecution(run);
-        IProgramChatClient model = CreateModel(run.Model, baseDirectory);
+        IProgramChatClient model = run.AdditionalModels.Count == 0
+            ? CreateModel(run.Model, baseDirectory)
+            : new WeightedEnsembleChatClient(new[] { run.Model }.Concat(run.AdditionalModels)
+                .Select(member => new WeightedChatModel(CreateModel(member, baseDirectory), member.Weight)).ToList());
         using var ownedModel = model as IDisposable;
 
         var programOptions = new ProgramProposalOptions
@@ -140,17 +205,29 @@ internal static class RunCommand
             TaskDescription = run.TaskDescription,
             MaxProgramChars = run.Budget.MaxProgramChars
         };
+        foreach (RunMetricDescriptor metric in run.Search.MetricDescriptors.Where(metric => metric.Name != "length"))
+            programOptions.MetricDescriptors.Add(metric.Name);
         var fitness = CreateFitness(run, execution, evaluator);
         var task = new ProgramEvolutionTask(fitness, new ProgramDescriptorSet(new[] { new ProgramLengthDescriptor() }), programOptions);
-        var variation = new LlmProgramVariationOperator(model, programOptions, new LlmProgramVariationOptions
+        var variationOptions = new LlmProgramVariationOptions
         {
-            Mode = ProgramEvolutionMode.FullRewrite,
+            Mode = run.Mode,
+            SystemMessage = run.SystemMessage,
             Temperature = run.Model.Temperature,
             TopP = run.Model.TopP,
             ReasoningEffort = run.Model.ReasoningEffort,
             MaxOutputTokens = run.Model.MaxOutputTokens
-        });
-        var descriptors = new[] { new EvolutionDescriptorDefinition("length", 0, run.Budget.MaxProgramChars, 64) };
+        };
+        if (run.Search.TopPrograms is int topPrograms) variationOptions.MaxTopPrograms = topPrograms;
+        var variation = new LlmProgramVariationOperator(model, programOptions, variationOptions);
+        // Program length stands for OpenEvolve's built-in "complexity" axis. Configured descriptors replace it, as
+        // OpenEvolve's feature_dimensions replace its defaults; "length" among them keeps it.
+        EvolutionDescriptorDefinition[] descriptors = run.Search.MetricDescriptors.Count == 0
+            ? new[] { new EvolutionDescriptorDefinition("length", 0, run.Budget.MaxProgramChars, 64) }
+            : run.Search.MetricDescriptors.Select(metric => metric.Name == "length"
+                ? new EvolutionDescriptorDefinition("length", 0, run.Budget.MaxProgramChars, metric.Bins)
+                : new EvolutionDescriptorDefinition(metric.Name, metric.Minimum, metric.Maximum, metric.Bins,
+                    EvolutionOutOfRangePolicy.Clamp)).ToArray();
         var codec = new ProgramGenomeCodec();
         EvolutionReuseScope scope = Scope(task, codec, run);
 
@@ -194,8 +271,27 @@ internal static class RunCommand
             // let a Ctrl+C run up to 8 more model calls before the run reports.
             ProposalBatchSize = run.Budget.Parallelism,
             CheckpointInterval = 1,
-            Resume = resume
+            Resume = resume,
+            IslandCount = run.Search.Islands,
+            MigrationInterval = run.Search.Islands > 1 ? run.Search.MigrationInterval : 0,
+            MigrationRate = run.Search.MigrationRate,
+            MaxRetries = run.Search.EvaluationRetries
         };
+        if (run.Search.ExplorationRatio is not null || run.Search.ExploitationRatio is not null || run.Search.EliteRatio is not null)
+        {
+            options.SelectionPolicy = EvolutionSelectionPolicyKind.Ratio;
+            if (run.Search.ExplorationRatio is double exploration) options.Selection.ExplorationRatio = exploration;
+            if (run.Search.ExploitationRatio is double exploitation) options.Selection.ExploitationRatio = exploitation;
+            if (run.Search.EliteRatio is double elite) options.Selection.EliteRatio = elite;
+        }
+        if (run.Search.DiversePrograms is int diverse) options.Selection.DiverseInspirationCount = diverse;
+        if (run.Search.EarlyStoppingPatience is long patience)
+        {
+            options.EarlyStopping.PatienceEvaluations = patience;
+            options.EarlyStopping.MinimumImprovement = run.Search.EarlyStoppingMinimumImprovement;
+        }
+        options.Artifacts.DeliverToNextProposal = run.Search.IncludeArtifacts;
+        if (run.Search.MaxArtifactBytes is int artifactBytes) options.Artifacts.MaxArtifactBytes = artifactBytes;
 
         EvolutionRunResult<ProgramGenome> result;
         using (var tracer = new EvolutionTraceObserver<ProgramGenome>(new EvolutionTraceOptions { Enabled = true, Path = tracePath }, run.RunId, descriptors))
@@ -301,7 +397,7 @@ internal static class RunCommand
         if (run.Model.ApiKeyEnvironmentVariable is { } variable && string.IsNullOrEmpty(Environment.GetEnvironmentVariable(variable)))
             throw new InvalidDataException(MissingKeyMessage(variable));
         string initial = ReadBounded(Path.Combine(baseDirectory, run.InitialProgram), run.Budget.MaxProgramChars);
-        string evaluator = ReadBounded(Path.Combine(baseDirectory, run.Evaluator), MaxRunFileBytes);
+        string evaluator = LoadEvaluator(run, baseDirectory);
         ProbeWritable(outputDirectory);
 
         EvolutionTaskResult seed;
@@ -336,7 +432,24 @@ internal static class RunCommand
         var sandbox = new ProgramSandboxOptions { RuntimeVersion = run.RuntimeVersion };
         sandbox.Limits.TimeLimitSeconds = run.Budget.EvaluationTimeLimitSeconds;
         sandbox.Limits.MaxConcurrentExecutions = run.Budget.Parallelism;
+        if (run.Search.EvaluationMemoryLimitMb is int memory) sandbox.Limits.MemoryLimitMb = memory;
+        if (run.OpenEvolveEvaluator is { } openEvolve)
+        {
+            // Up to three cascade stages each get the OpenEvolve timeout; the sandbox limit covers them all.
+            int stages = openEvolve.Cascade ? 3 : 1;
+            sandbox.Limits.TimeLimitSeconds = Math.Max(sandbox.Limits.TimeLimitSeconds, stages * openEvolve.TimeoutSeconds + 10);
+            if (openEvolve.Python is { } python)
+                sandbox.SetInterpreter(ProgramLanguage.Python, new ProgramInterpreterSpecification(python, "{source}"));
+        }
         return new ProcessProgramExecutionEngine(sandbox);
+    }
+
+    /// <summary>The evaluator script to run: the file itself, or the OpenEvolve shim that imports it.</summary>
+    private static string LoadEvaluator(RunFile run, string baseDirectory)
+    {
+        string path = Path.GetFullPath(Path.Combine(baseDirectory, run.Evaluator));
+        string source = ReadBounded(path, MaxRunFileBytes); // bounds and existence, whichever form runs
+        return run.OpenEvolveEvaluator is { } openEvolve ? OpenEvolveEvaluatorShim.Build(path, openEvolve) : source;
     }
 
     private static ScriptProgramFitnessEvaluator CreateFitness(RunFile run, ProcessProgramExecutionEngine execution, string evaluator)

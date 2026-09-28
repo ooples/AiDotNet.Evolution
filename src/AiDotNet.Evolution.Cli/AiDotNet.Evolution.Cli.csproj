@@ -25,5 +25,8 @@
     <None Include="../AiDotNet.Evolution.Programs/AIDOTNET-LICENSE.txt" Pack="true" PackagePath="AIDOTNET-LICENSE.txt"/>
     <ProjectReference Include="../AiDotNet.Evolution/AiDotNet.Evolution.csproj"/>
     <ProjectReference Include="../AiDotNet.Evolution.Programs/AiDotNet.Evolution.Programs.csproj"/>
+    <!-- Reads OpenEvolve config.yaml files (V1-56); the libraries themselves stay free of it. -->
+    <PackageReference Include="YamlDotNet" Version="18.1.0"/>
+    <EmbeddedResource Include="OpenEvolve/openevolve_evaluator_shim.py" LogicalName="AiDotNet.Evolution.Cli.OpenEvolve.openevolve_evaluator_shim.py"/>
   </ItemGroup>
 </Project>
