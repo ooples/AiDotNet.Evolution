@@ -138,12 +138,17 @@ public sealed class EvolutionDurableSessionBridgeTests
     [Fact]
     public async Task EngineTimeoutCancelsOldDurableWorkWithoutOverwritingReplacementOrRefundingCost()
     {
-        using var fixture = new Fixture(); using var session = Session(retry: true);
+        // A fake clock: the first attempt's timeout fires when the test advances it, not after a real second on a loaded
+        // runner, which could also expire the retry before it was asked for (the old net471 flake).
+        var clock = new Microsoft.Extensions.Time.Testing.FakeTimeProvider();
+        using var fixture = new Fixture(); using var session = Session(retry: true, time: clock);
         using var coordinator = fixture.Open(session); var bridge = Bridge(session, coordinator);
         using var guard = new CancellationTokenSource(TimeSpan.FromSeconds(20));
         var first = Assert.Single(await session.AskAsync(1, guard.Token)); bridge.Enqueue(first);
         var original = coordinator.Claim(Worker(session, "a"))!;
-        var second = Assert.Single(await session.AskAsync(1, guard.Token));
+        Task<IReadOnlyList<EvolutionAskItem<int>>> retry = session.AskAsync(1, guard.Token);
+        clock.Advance(TimeSpan.FromSeconds(1));
+        var second = Assert.Single(await retry);
         Assert.Equal(2, second.Context.AttemptCount); Assert.Equal(1, bridge.ReconcileExpiredWork());
         Assert.Equal(EvolutionWorkHeartbeat.Canceled, coordinator.Heartbeat(original.Identity, "a"));
         Assert.False(bridge.Enqueue(first)); Assert.True(bridge.Enqueue(second));
@@ -257,10 +262,11 @@ public sealed class EvolutionDurableSessionBridgeTests
     private static EvolutionTaskResult Decode(string value) => EvolutionTaskResult.Completed(double.Parse(value, CultureInfo.InvariantCulture), new Dictionary<string, double> { ["x"] = 7 });
     private static EvolutionWorkerProfile Worker(EvolutionSession<int> session, string id) => new(id, session.CompatibilityHash);
     private static EvolutionDurableSessionBridge<int> Bridge(EvolutionSession<int> session, DurableEvolutionWorkCoordinator coordinator) => new(session, coordinator, Decode, new(), Cost(1), Cost(5));
-    private static EvolutionSession<int> Session(bool retry = false, bool legacy = false)
+    private static EvolutionSession<int> Session(bool retry = false, bool legacy = false, TimeProvider? time = null)
     {
         var options = new EvolutionEngineOptions
         {
+            TimeProvider = time ?? TimeProvider.System,
             RunId = "durable-session",
             Seed = ulong.MaxValue,
             MaxProposals = 1,

@@ -69,6 +69,10 @@ public sealed class ProgramSandboxOptions
     /// </remarks>
     public bool AllowUnsafeInProcessExecution { get; set; }
 
+    /// <summary>Gets or sets the clock the time limit is measured on; <see cref="TimeProvider.System"/> by default.</summary>
+    /// <remarks>A fake provider lets a test fire the limit at a chosen moment. It never changes what a run means.</remarks>
+    public TimeProvider TimeProvider { get; set; } = TimeProvider.System;
+
     /// <summary>Builds the default per-language interpreter table.</summary>
     /// <returns>
     /// A table covering <see cref="ProgramLanguage.Python"/>, <see cref="ProgramLanguage.JavaScript"/>, and
@@ -129,7 +133,8 @@ public sealed class ProgramSandboxOptions
             Mode = Mode,
             Limits = Limits is null ? new ProgramSandboxLimitOptions() : Limits.Clone(),
             WorkingDirectory = WorkingDirectory,
-            AllowUnsafeInProcessExecution = AllowUnsafeInProcessExecution
+            AllowUnsafeInProcessExecution = AllowUnsafeInProcessExecution,
+            TimeProvider = TimeProvider ?? TimeProvider.System
         };
 
         clone._interpreters.Clear();
