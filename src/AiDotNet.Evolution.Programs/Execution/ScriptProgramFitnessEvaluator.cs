@@ -177,7 +177,7 @@ public sealed class ScriptProgramFitnessEvaluator : IProgramFitnessEvaluator, IE
             EvolutionTaskResult failed = Failed(code, "The evaluator script did not complete; its captured output is attached as artifacts.");
             var output = new List<EvolutionArtifact>(2);
             foreach ((string key, string? text) in new[] { ("stdout", response.StdOut), ("stderr", response.StdErr) })
-                if (!string.IsNullOrEmpty(text))
+                if (!string.IsNullOrEmpty(text) && output.Count < _options.MaxArtifactCount)
                     output.Add(new EvolutionArtifact(key, ProgramText.Sanitize(ProgramText.Bound(text, _options.MaxArtifactLength))));
             return new EvolutionTaskResult(EvolutionEvaluationStatus.Failed, costUnits: failed.CostUnits,
                 diagnostics: failed.Diagnostics, artifacts: output);

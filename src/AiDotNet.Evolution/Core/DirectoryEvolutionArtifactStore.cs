@@ -39,8 +39,9 @@ public sealed class DirectoryEvolutionArtifactStore : IEvolutionArtifactStore
         Guard.NotNull(content);
         string hex = Hash(content);
         string path = PathFor(hex);
-        // Re-storing refreshes the blob, so retention counts from its latest use.
-        if (File.Exists(path) && TryRefresh(path)) return Prefix + hex;
+        // Re-storing refreshes the blob, so retention counts from its latest use. A damaged blob is not refreshed: the
+        // bytes in hand repair it, so the returned reference stays readable.
+        if (File.Exists(path) && IsIntact(path, content.Length, hex) && TryRefresh(path)) return Prefix + hex;
         string temporary = Child("." + hex + "." + Guid.NewGuid().ToString("N", CultureInfo.InvariantCulture) + ".tmp");
         File.WriteAllBytes(temporary, content);
         try
@@ -49,7 +50,8 @@ public sealed class DirectoryEvolutionArtifactStore : IEvolutionArtifactStore
         }
         catch (IOException) when (File.Exists(path))
         {
-            // Another writer stored the same content first; both copies are identical.
+            // Either another writer stored the same content first, or the existing blob is damaged and is replaced.
+            if (!IsIntact(path, content.Length, hex)) File.Copy(temporary, path, overwrite: true);
         }
         finally
         {
@@ -107,6 +109,21 @@ public sealed class DirectoryEvolutionArtifactStore : IEvolutionArtifactStore
 
     // Names here are generated (validated hex plus a fixed suffix), never rooted; joining explicitly keeps the directory.
     private string Child(string name) => _directory.TrimEnd(Path.DirectorySeparatorChar, Path.AltDirectorySeparatorChar) + Path.DirectorySeparatorChar + name;
+
+    // A blob is intact when it has the expected length and its content hashes to its name.
+    private static bool IsIntact(string path, long length, string hex)
+    {
+        try
+        {
+            if (new FileInfo(path).Length != length) return false;
+            return string.Equals(Hash(File.ReadAllBytes(path)), hex, StringComparison.Ordinal);
+        }
+        catch (Exception exception) when (exception is IOException or UnauthorizedAccessException)
+        {
+            // Unreadable counts as damaged; the caller rewrites it from the bytes in hand.
+            return false;
+        }
+    }
 
     private static string Hash(byte[] content)
     {

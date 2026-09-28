@@ -196,6 +196,25 @@ public sealed class ScriptEvidenceAdversarialTests
         Assert.Equal(1, kept.CostUnits);
     }
 
+    [Theory]
+    [InlineData(0)]
+    [InlineData(1)]
+    public async Task A_failed_script_keeps_no_more_captured_output_than_the_artifact_count_allows(int limit)
+    {
+        var runner = new ScriptedProgramExecutionEngine(_ => new ProgramExecuteResponse
+        {
+            Success = false,
+            Language = ProgramLanguage.Python,
+            ExitCode = -1,
+            ErrorCode = ProgramExecuteErrorCode.TimeoutOrCanceled,
+            StdOut = "partial progress 40%",
+            StdErr = "still running"
+        });
+        var result = await new ScriptProgramFitnessEvaluator(runner, "# evaluate",
+            new() { RetainArtifactText = true, MaxArtifactCount = limit }).EvaluateAsync(Candidate, Context);
+        Assert.Equal(new[] { "stdout", "stderr" }.Take(limit), result.Artifacts.Select(artifact => artifact.Key));
+    }
+
     [Fact]
     public async Task ExplicitAndDerivedScoresShareOneRegisteredDirection()
     {

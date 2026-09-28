@@ -250,4 +250,18 @@ public sealed class ArtifactStoreParityTests : IDisposable
         Assert.Contains("spill-v1", stored.SnapshotAndValidate().ToCanonicalString());
         Assert.Throws<ArgumentOutOfRangeException>(() => new EvolutionArtifactOptions { MaxStoredBytesPerEvaluation = 0 }.SnapshotAndValidate());
     }
+    [Fact]
+    public void Storing_content_again_repairs_a_damaged_blob_instead_of_returning_an_unreadable_reference()
+    {
+        var store = new DirectoryEvolutionArtifactStore(_root);
+        byte[] content = Encoding.UTF8.GetBytes(string.Concat(Enumerable.Repeat("payload ", 64)));
+        string reference = store.Put(content);
+        string path = Directory.GetFiles(_root).Single(file => !Path.GetFileName(file).StartsWith(".", StringComparison.Ordinal));
+        File.WriteAllBytes(path, content.Take(10).ToArray()); // truncated on disk
+        Assert.False(store.TryRead(reference, out _));
+
+        Assert.Equal(reference, store.Put(content));
+        Assert.True(store.TryRead(reference, out byte[] repaired));
+        Assert.Equal(content, repaired);
+    }
 }
