@@ -3,11 +3,13 @@ using System.Text.Json;
 using AiDotNet.Evolution;
 
 // V1-75: does the engine keep a slow model busy? Proposals take log-normal time (median 100 ms, p95 400 ms: the
-// story's 10 s / 40 s scaled down 100x). Usage: EvolutionLatency <proposals> <concurrency> [Auto|Batch|Pipeline]
+// story's 10 s / 40 s scaled down 100x). Usage: EvolutionLatency <proposals> <concurrency> [Auto|Batch|Pipeline|Continuous]
+// LATENCY_MODE=Opportunistic commits in completion order; LATENCY_WAVE_MULTIPLE sets the pipeline wave and
+// LATENCY_WINDOW_MULTIPLE the continuous window, each as a multiple of the concurrency.
 if (args.Length is < 2 or > 3 || !int.TryParse(args[0], out int proposals) || !int.TryParse(args[1], out int concurrency) ||
     proposals is < 16 or > 100_000 || concurrency is < 1 or > 256)
 {
-    Console.Error.WriteLine("Usage: EvolutionLatency <proposals 16..100000> <concurrency 1..256> [Auto|Batch|Pipeline]");
+    Console.Error.WriteLine("Usage: EvolutionLatency <proposals 16..100000> <concurrency 1..256> [Auto|Batch|Pipeline|Continuous]");
     return 2;
 }
 EvolutionDispatchMode dispatch = args.Length == 3 ? Enum.Parse<EvolutionDispatchMode>(args[2], ignoreCase: false) : EvolutionDispatchMode.Auto;
