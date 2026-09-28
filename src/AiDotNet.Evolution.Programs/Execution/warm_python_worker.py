@@ -56,6 +56,14 @@ def run_candidate(source, stdin_text):
         return 1
 
 
+def max_descriptor():
+    try:
+        limit = os.sysconf("SC_OPEN_MAX")
+    except (ValueError, OSError):
+        limit = -1
+    return limit if limit > 0 else 65536
+
+
 def forked(request):
     import resource
     import select
@@ -72,6 +80,11 @@ def forked(request):
             os.close(err_read)
             os.dup2(out_write, 1)
             os.dup2(err_write, 2)
+            # fork() copies every open descriptor, whatever its inheritable flag, including the protocol's request
+            # and reply pipes. Close all of them so a candidate cannot read later requests or forge its own reply.
+            devnull = os.open(os.devnull, os.O_RDONLY)
+            os.dup2(devnull, 0)
+            os.closerange(3, max_descriptor())
             sys.stdout = os.fdopen(1, "w", encoding="utf-8", buffering=1)
             sys.stderr = os.fdopen(2, "w", encoding="utf-8", buffering=1)
             os.chdir(workspace)
@@ -94,12 +107,10 @@ def forked(request):
     deadline = time.monotonic() + request["time_limit"]
     open_fds = [out_read, err_read]
     timed_out = False
-    while open_fds:
-        remaining = deadline - time.monotonic()
-        if remaining <= 0:
-            timed_out = True
-            break
-        ready, _, _ = select.select(open_fds, [], [], min(remaining, 0.5))
+    status = None
+
+    def drain(timeout):
+        ready, _, _ = select.select(open_fds, [], [], timeout)
         for fd in ready:
             data = os.read(fd, 65536)
             if not data:
@@ -108,12 +119,35 @@ def forked(request):
             if sizes[fd] < caps[fd]:
                 chunks[fd].append(data)
                 sizes[fd] += len(data)
-    if timed_out:
-        try:
-            os.killpg(pid, signal.SIGKILL)
-        except OSError:
-            pass
-    _, status = os.waitpid(pid, 0)
+        return bool(ready)
+
+    # Wait for the candidate to exit, not for its pipes to close: a descendant that inherited them could hold them
+    # open past a candidate that already finished, and that is not a timeout.
+    while True:
+        waited, exit_status = os.waitpid(pid, os.WNOHANG)
+        if waited:
+            status = exit_status
+            # Whatever the candidate wrote before exiting is already in the pipes; take it without waiting on
+            # descendants that may still hold them.
+            while open_fds and drain(0):
+                pass
+            break
+        remaining = deadline - time.monotonic()
+        if remaining <= 0:
+            timed_out = True
+            break
+        if open_fds:
+            drain(min(remaining, 0.05))
+        else:
+            # Both pipes are closed, so exit is imminent; poll briefly rather than add latency to every candidate.
+            time.sleep(min(remaining, 0.001))
+    # End the candidate's process group: the candidate itself on a timeout, and any descendants in either case.
+    try:
+        os.killpg(pid, signal.SIGKILL)
+    except OSError:
+        pass
+    if status is None:
+        _, status = os.waitpid(pid, 0)
     for fd in (out_read, err_read):
         os.close(fd)
     try:
