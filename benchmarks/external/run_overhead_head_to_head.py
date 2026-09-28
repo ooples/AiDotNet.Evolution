@@ -20,6 +20,15 @@ HERE = Path(__file__).resolve().parent
 ROOT = HERE.parents[1]
 
 
+# A normal run takes under a minute. OpenEvolve occasionally deadlocks with its process pool (reproduced once in
+# seven runs of 600 iterations on 4 workers that otherwise take 6 s); such a run is killed, counted and re-run.
+HANG_SECONDS = 180
+
+
+class Hung(Exception):
+    pass
+
+
 def once(system, n, workers, upstream):
     if system == "aidotnet":
         command = ["dotnet", str(ROOT / "benchmarks/EvolutionOverhead/bin/Release/net10.0/EvolutionOverhead.dll"), str(n), str(workers), "1"]
@@ -32,7 +41,9 @@ def once(system, n, workers, upstream):
         process = subprocess.Popen(command, stdout=stdout, stderr=stderr, text=True)
         tree = psutil.Process(process.pid)
         try:
-            returncode = process.wait(timeout=900)
+            returncode = process.wait(timeout=HANG_SECONDS)
+        except subprocess.TimeoutExpired:
+            returncode = None
         finally:
             leftovers = []
             try:
@@ -48,6 +59,8 @@ def once(system, n, workers, upstream):
         stdout.seek(0)
         stderr.seek(0)
         output, errors = stdout.read(), stderr.read()
+    if returncode is None:
+        raise Hung(f"{system} n={n} w={workers} exceeded {HANG_SECONDS} s")
     if returncode != 0:
         raise RuntimeError(f"{system} n={n} w={workers} failed: {errors[-500:]}")
     return json.loads(output.strip().splitlines()[-1])
@@ -66,12 +79,16 @@ def main():
     # difference go negative, which produced impossible negative ratios in its interval (V1-70). OpenEvolve's 2N must
     # stay below its population cap (1000) so no program is evicted before it is counted.
     sizes = {"aidotnet": args.ours_n, "openevolve": args.openevolve_n}
-    rows, cells = [], {}
+    rows, cells, hangs = [], {}, []
     for workers in [int(w) for w in args.workers.split(",")]:
         for repeat in range(args.repeats):
             for system, n in sizes.items():  # alternate systems within a repeat, fresh processes each time
                 for attempt in range(3):
-                    small, large = once(system, n, workers, args.upstream), once(system, 2 * n, workers, args.upstream)
+                    try:
+                        small, large = once(system, n, workers, args.upstream), once(system, 2 * n, workers, args.upstream)
+                    except Hung as hung:
+                        hangs.append(dict(system=system, workers=workers, repeat=repeat, detail=str(hung)))
+                        continue
                     # Divided by the evaluations each run actually completed, not the number requested: an iteration
                     # OpenEvolve drops is not orchestrated work and must not dilute its cost per evaluation.
                     extra = large["Evaluations"] - small["Evaluations"]
@@ -82,7 +99,7 @@ def main():
                     if per_eval > 0:
                         break
                 else:
-                    raise RuntimeError(f"{system} w={workers} gave a non-positive difference three times; raise N")
+                    raise RuntimeError(f"{system} w={workers} could not be measured in three attempts (hung, or a non-positive difference; raise N)")
                 rows.append(dict(system=system, workers=workers, repeat=repeat, n=n, small=small, large=large,
                                  per_eval_seconds=per_eval))
                 cells.setdefault((system, workers), []).append(dict(per_eval=per_eval, memory=large["PeakWorkingSetBytes"]))
@@ -107,7 +124,7 @@ def main():
     result = dict(story="V1-70 #175 (rerun of V1-30 #120)", repeats=args.repeats, sizes=sizes,
                   method="(T(2N)-T(N))/N, fresh processes, null LLM and evaluator; ratio = median of per-repeat paired ratios, 95% percentile bootstrap",
                   headline=False, note="A C# controller vs a Python one is expected to favour us (R12); not a headline claim.",
-                  summary=summary, rows=rows)
+                  summary=summary, hangs=hangs, rows=rows)
     Path(args.output).write_text(json.dumps(result, indent=1) + "\n", encoding="utf-8")
     for s in summary:
         print(json.dumps({k: (round(v, 3) if isinstance(v, float) else v) for k, v in s.items()}))
