@@ -188,6 +188,9 @@ internal static class OpenEvolveConfigImporter
             EvaluatorSystemMessage = evaluatorSystem is null or "evaluator_system_message" ? null : evaluatorSystem,
             ProgramsAsChangesDescription = Boolean(merged["prompt.programs_as_changes_description"]),
             InitialChangesDescription = string.IsNullOrEmpty(initial) ? null : initial,
+            // OpenEvolve strips it and uses it in place of its system_message_changes_description template.
+            SystemMessageChangesDescription = (merged["prompt.system_message_changes_description"] as string)?.Trim() is { Length: > 0 } changes
+                ? changes : null,
             NumTopPrograms = (int?)Integer(merged["prompt.num_top_programs"]),
             NumDiversePrograms = (int?)Integer(merged["prompt.num_diverse_programs"]),
             IncludeArtifacts = Boolean(merged["prompt.include_artifacts"]),

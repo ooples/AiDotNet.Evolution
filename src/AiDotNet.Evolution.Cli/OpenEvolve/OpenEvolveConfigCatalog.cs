@@ -56,7 +56,7 @@ internal static class OpenEvolveConfigCatalog
         new("prompt.system_message", OpenEvolveKeyDisposition.Mapped, "prompt.systemMessage; a template name when a template of that name exists, literal text otherwise (OpenEvolve's guess, made explicit)"),
         new("prompt.evaluator_system_message", OpenEvolveKeyDisposition.Mapped, "prompt.evaluatorSystemMessage, the LLM-feedback judge's system message"),
         new("prompt.programs_as_changes_description", OpenEvolveKeyDisposition.Mapped, "prompt.programsAsChangesDescription"),
-        new("prompt.system_message_changes_description", OpenEvolveKeyDisposition.RefusedUnlessDefault, "the changes-description prompt mode is not implemented"),
+        new("prompt.system_message_changes_description", OpenEvolveKeyDisposition.Mapped, "prompt.systemMessageChangesDescription, replacing that template's text as OpenEvolve does"),
         new("prompt.initial_changes_description", OpenEvolveKeyDisposition.Mapped, "prompt.initialChangesDescription"),
         new("prompt.num_top_programs", OpenEvolveKeyDisposition.Mapped, "prompt.numTopPrograms and search.topPrograms"),
         new("prompt.num_diverse_programs", OpenEvolveKeyDisposition.Mapped, "the inspiration count n: island best, then top programs, then diverse ones up to n, as OpenEvolve fills it"),

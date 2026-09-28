@@ -45,10 +45,14 @@ class StandInModel(http.server.BaseHTTPRequestHandler):
 
 
 def find_files(example):
-    configs = sorted(example.glob("config*.yaml")) or sorted(example.glob("*config*.yaml"))
-    initial = next(iter(sorted(example.glob("initial_program.*"))), None)
-    evaluator = example / "evaluator.py"
-    return (configs[0] if configs else None), initial, (evaluator if evaluator.exists() else None)
+    """The example's task: its own files, or else the first subdirectory that holds a complete one."""
+    for directory in [example] + sorted(p for p in example.rglob("*") if p.is_dir()):
+        configs = sorted(directory.glob("config*.yaml")) or sorted(directory.glob("*config*.yaml"))
+        initial = next(iter(sorted(directory.glob("initial_program.*"))), None)
+        evaluator = directory / "evaluator.py"
+        if configs and initial is not None and evaluator.exists():
+            return configs[0], initial, evaluator
+    return None, None, None
 
 
 def classify(stdout, stderr):
@@ -83,7 +87,7 @@ def main():
     for example in sorted(p for p in (Path(args.upstream) / "examples").iterdir() if p.is_dir()):
         config, initial, evaluator = find_files(example)
         if config is None or initial is None or evaluator is None:
-            rows.append(dict(example=example.name, status="no-config", reason="no top-level config.yaml, initial_program and evaluator.py"))
+            rows.append(dict(example=example.name, status="no-config", reason="no directory holds a config.yaml, initial_program and evaluator.py"))
             continue
         SEED_PROGRAM["text"] = initial.read_text(encoding="utf-8", errors="replace")
         # The stand-in endpoint replaces the example's api_base, as OPENAI_API_BASE would, by rewriting a copy.
@@ -96,7 +100,7 @@ def main():
         run = subprocess.run(
             ["dotnet", args.cli, "run", "--openevolve-config", str(copied), str(initial), str(evaluator),
              "--iterations", str(args.iterations), "--output", str(work / "out"), "--python", args.python],
-            capture_output=True, text=True, timeout=1800, env=env, cwd=str(example))
+            capture_output=True, text=True, timeout=1800, env=env, cwd=str(initial.parent))
         if run.returncode == 0:
             result = json.loads(run.stdout)
             rows.append(dict(example=example.name, status="passed", completed=result.get("CompletedEvaluations"),

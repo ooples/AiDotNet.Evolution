@@ -56,6 +56,8 @@ internal sealed class RunPrompt
     public string? EvaluatorSystemMessage { get; init; }
     public bool ProgramsAsChangesDescription { get; init; }
     public string? InitialChangesDescription { get; init; }
+    /// <summary>Replaces the changes-description system text (OpenEvolve's <c>prompt.system_message_changes_description</c>).</summary>
+    public string? SystemMessageChangesDescription { get; init; }
     public int? NumTopPrograms { get; init; }
     public int? NumDiversePrograms { get; init; }
     public bool? IncludeArtifacts { get; init; }
@@ -512,6 +514,8 @@ internal static class RunCommand
         if (source.EvaluatorSystemMessage is { } evaluatorSystem) prompt.EvaluatorSystemMessage = evaluatorSystem;
         prompt.ProgramsAsChangesDescription = source.ProgramsAsChangesDescription;
         if (source.InitialChangesDescription is { } initial) prompt.InitialChangesDescription = initial;
+        if (source.SystemMessageChangesDescription is { } changesSystem)
+            prompt.TemplateOverrides[ProgramPromptTemplateKey.SystemMessageChangesDescription] = changesSystem;
         if (source.NumTopPrograms is int top) prompt.NumTopPrograms = top;
         if (source.NumDiversePrograms is int diverse) prompt.NumDiversePrograms = diverse;
         if (source.IncludeArtifacts is bool artifacts) prompt.IncludeArtifacts = artifacts;

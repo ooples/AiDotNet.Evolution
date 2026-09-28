@@ -98,7 +98,7 @@ is refused rather than mixed into an ongoing run.
 | `prompt.system_message` | Mapped | prompt.systemMessage; a template name when a template of that name exists, literal text otherwise (OpenEvolve's guess, made explicit) |
 | `prompt.evaluator_system_message` | Mapped | prompt.evaluatorSystemMessage, the LLM-feedback judge's system message |
 | `prompt.programs_as_changes_description` | Mapped | prompt.programsAsChangesDescription |
-| `prompt.system_message_changes_description` | RefusedUnlessDefault | the changes-description prompt mode is not implemented |
+| `prompt.system_message_changes_description` | Mapped | prompt.systemMessageChangesDescription, replacing that template's text as OpenEvolve does |
 | `prompt.initial_changes_description` | Mapped | prompt.initialChangesDescription |
 | `prompt.num_top_programs` | Mapped | prompt.numTopPrograms and search.topPrograms |
 | `prompt.num_diverse_programs` | Mapped | the inspiration count n: island best, then top programs, then diverse ones up to n, as OpenEvolve fills it |
