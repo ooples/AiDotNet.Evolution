@@ -67,7 +67,7 @@ jobs:
           dotnet test tests/AiDotNet.Evolution.Tests/AiDotNet.Evolution.Tests.csproj
           --configuration Release --framework net10.0 --no-restore --verbosity normal
           --blame-hang --blame-hang-timeout 120s --blame-crash
-          --collect:"XPlat Code Coverage" --results-directory ./coverage
+          --collect:"XPlat Code Coverage" --results-directory ./coverage/evolution-tests-net10.0
           --
           DataCollectionRunSettings.DataCollectors.DataCollector.Configuration.Format=cobertura
       - name: Test net8.0
@@ -78,10 +78,13 @@ jobs:
       - name: Verify standalone program and compiler contracts
         shell: pwsh
         run: |
-          dotnet test tests/AiDotNet.Evolution.CSharp.Tests/AiDotNet.Evolution.CSharp.Tests.csproj -c Release --no-restore `
-            --collect:"XPlat Code Coverage" --results-directory ./coverage `
-            -- DataCollectionRunSettings.DataCollectors.DataCollector.Configuration.Format=cobertura
-          if ($LASTEXITCODE -ne 0) { throw 'Standalone program migration tests failed.' }
+          # One run per framework, each into its own directory, so the ratchet can prove which reports arrived.
+          foreach ($framework in 'net10.0', 'net8.0') {
+            dotnet test tests/AiDotNet.Evolution.CSharp.Tests/AiDotNet.Evolution.CSharp.Tests.csproj -c Release --no-restore `
+              --framework $framework --collect:"XPlat Code Coverage" --results-directory "./coverage/csharp-tests-$framework" `
+              -- DataCollectionRunSettings.DataCollectors.DataCollector.Configuration.Format=cobertura
+            if ($LASTEXITCODE -ne 0) { throw "Standalone program migration tests failed on $framework." }
+          }
       - name: Verify numeric quality harness contracts
         shell: pwsh
         env:
@@ -204,10 +207,15 @@ jobs:
       - name: Enforce coverage ratchet
         shell: pwsh
         run: |
+          # The baseline was recorded over exactly these project/framework reports. A count alone cannot prove that: a
+          # missing report and a duplicated one would still add up, and the merge would grade a different scope.
+          $expected = 'evolution-tests-net10.0', 'csharp-tests-net10.0', 'csharp-tests-net8.0'
+          foreach ($scope in $expected) {
+            $found = @(Get-ChildItem -Path "coverage/$scope" -Recurse -Filter coverage.cobertura.xml -ErrorAction SilentlyContinue)
+            if ($found.Count -ne 1) { throw "Expected one coverage report for $scope, found $($found.Count)." }
+          }
           $reports = @(Get-ChildItem -Path coverage -Recurse -Filter coverage.cobertura.xml)
-          # One report per test project (and target framework); grading only the first one measured whichever project
-          # happened to sort first. Every report is merged and the merged result is graded.
-          if ($reports.Count -lt 2) { throw "Expected coverage from every test project, found $($reports.Count) report(s)." }
+          if ($reports.Count -ne $expected.Count) { throw "Expected $($expected.Count) coverage reports, found $($reports.Count)." }
           dotnet tool install dotnet-reportgenerator-globaltool --version 5.5.11 --tool-path ./.tools
           if ($LASTEXITCODE -ne 0) { throw 'Installing ReportGenerator failed.' }
           ./.tools/reportgenerator "-reports:coverage/**/coverage.cobertura.xml" "-targetdir:coverage/merged" "-reporttypes:Cobertura"
