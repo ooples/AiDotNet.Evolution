@@ -39,12 +39,17 @@ namespace AiDotNet.Evolution;
 /// </remarks>
 public sealed class MapElitesArchive<TGenome> :
     IGrowableEvolutionArchive<TGenome>,
-    IEvolutionArchiveMutationSource<TGenome>
+    IEvolutionArchiveMutationSource<TGenome>,
+    IEvolutionIndexedArchive<TGenome>
 {
     private readonly EvolutionDescriptorDefinition[] _descriptors;
     private readonly EvolutionDescriptorDefinition[] _configuredDescriptors;
     private readonly ReadOnlyCollection<EvolutionDescriptorDefinition> _descriptorView;
     private readonly SortedDictionary<string, EvolutionArchiveEntry<TGenome>> _cells = new(StringComparer.Ordinal);
+    // The occupied cells in the same ordinal key order as _cells, kept in step by the common mutations (a replacement
+    // is one slot write, a new cell one binary insert) and rebuilt only after bulk changes. Sample and selection read
+    // it by index, so steady-state proposals no longer copy the whole archive whenever its version changes (V1-72).
+    private List<EvolutionArchiveEntry<TGenome>>? _order;
     private readonly int _capacity;
     private readonly long _maximumGridCells;
     private readonly bool _hasGrowAxis;
@@ -164,7 +169,7 @@ public sealed class MapElitesArchive<TGenome> :
         {
             if (_entries is null || _entriesVersion != Version)
             {
-                _entries = Array.AsReadOnly(_cells.Values.ToArray());
+                _entries = Array.AsReadOnly(Order.ToArray());
                 _entriesVersion = Version;
             }
             return _entries;
@@ -214,6 +219,7 @@ public sealed class MapElitesArchive<TGenome> :
             if (Comparer.Compare(candidateEntry, incumbent) >= 0)
                 return Mutation(EvolutionArchiveInsertionResult.NotImproved, removed: removed);
             _cells[key.StableKey] = candidateEntry;
+            if (_order is not null) _order[OrderIndex(key.StableKey)] = candidateEntry;
             AddRemoved(ref removed, incumbent);
             PromoteIfBest(candidateEntry);
             Version++;
@@ -223,6 +229,7 @@ public sealed class MapElitesArchive<TGenome> :
         if (_cells.Count < Capacity)
         {
             _cells.Add(key.StableKey, candidateEntry);
+            if (_order is not null) _order.Insert(~OrderIndex(key.StableKey), candidateEntry);
             PromoteIfBest(candidateEntry);
             Version++;
             return Mutation(EvolutionArchiveInsertionResult.Inserted, candidateEntry, removed);
@@ -235,6 +242,11 @@ public sealed class MapElitesArchive<TGenome> :
             return Mutation(EvolutionArchiveInsertionResult.NotImproved, removed: removed);
         _cells.Remove(worst.Cell.StableKey);
         _cells.Add(key.StableKey, candidateEntry);
+        if (_order is not null)
+        {
+            _order.RemoveAt(OrderIndex(worst.Cell.StableKey));
+            _order.Insert(~OrderIndex(key.StableKey), candidateEntry);
+        }
         AddRemoved(ref removed, worst);
         if (ReferenceEquals(_best, worst)) _best = null;
         PromoteIfBest(candidateEntry);
@@ -268,8 +280,37 @@ public sealed class MapElitesArchive<TGenome> :
     {
         Guard.NotNull(random);
         if (_cells.Count == 0) return null;
-        IReadOnlyList<EvolutionArchiveEntry<TGenome>> entries = Entries;
-        return entries[random.NextInt(entries.Count)];
+        List<EvolutionArchiveEntry<TGenome>> order = Order;
+        return order[random.NextInt(order.Count)];
+    }
+
+    int IEvolutionIndexedArchive<TGenome>.Count => _cells.Count;
+
+    EvolutionArchiveEntry<TGenome> IEvolutionIndexedArchive<TGenome>.EntryAt(int index) => Order[index];
+
+    int IEvolutionIndexedArchive<TGenome>.IndexOf(EvolutionArchiveEntry<TGenome> entry)
+    {
+        Guard.NotNull(entry);
+        int index = OrderIndex(entry.Cell.StableKey);
+        return index >= 0 && ReferenceEquals(Order[index], entry) ? index : -1;
+    }
+
+    private List<EvolutionArchiveEntry<TGenome>> Order => _order ??= new List<EvolutionArchiveEntry<TGenome>>(_cells.Values);
+
+    // Binary search of the ordered cells by ordinal key: the index when present, else the complement of the insert point.
+    private int OrderIndex(string stableKey)
+    {
+        List<EvolutionArchiveEntry<TGenome>> order = Order;
+        int low = 0, high = order.Count - 1;
+        while (low <= high)
+        {
+            int middle = low + ((high - low) >> 1);
+            int comparison = string.CompareOrdinal(order[middle].Cell.StableKey, stableKey);
+            if (comparison == 0) return middle;
+            if (comparison < 0) low = middle + 1;
+            else high = middle - 1;
+        }
+        return ~low;
     }
 
     /// <summary>Widens any Grow axis that cannot bin the supplied values, then rebins existing entries.</summary>
@@ -367,6 +408,7 @@ public sealed class MapElitesArchive<TGenome> :
         }
 
         _cells.Clear();
+        _order = null;
         List<EvolutionArchiveEntry<TGenome>>? removed = null;
         foreach (EvolutionArchiveEntry<TGenome> entry in rebinned)
         {
@@ -378,6 +420,7 @@ public sealed class MapElitesArchive<TGenome> :
             }
             if (incumbent is not null) AddRemoved(ref removed, incumbent);
             _cells[entry.Cell.StableKey] = entry;
+            _order = null;
         }
 
         // The retained entries are new objects, so the cached best reference has to be rebuilt rather than kept.
@@ -446,8 +489,10 @@ public sealed class MapElitesArchive<TGenome> :
             _descriptors[axis] = staged._descriptors[axis];
         TotalGridCells = staged.TotalGridCells;
         _cells.Clear();
+        _order = null;
         foreach (KeyValuePair<string, EvolutionArchiveEntry<TGenome>> cell in staged._cells)
             _cells.Add(cell.Key, cell.Value);
+            _order = null;
         _best = staged._best;
         Version++;
         return _cells.Count;
@@ -513,6 +558,7 @@ public sealed class MapElitesArchive<TGenome> :
         TotalGridCells = staged.TotalGridCells;
         foreach (KeyValuePair<string, EvolutionArchiveEntry<TGenome>> cell in staged._cells)
             _cells.Add(cell.Key, cell.Value);
+            _order = null;
         _best = staged._best;
         Version = version;
         _entries = null;
