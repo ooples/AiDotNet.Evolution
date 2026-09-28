@@ -9,7 +9,11 @@ see [Running, stopping and resuming a search](RUNNING_AND_RESUMING.md).
 Every archive exposes an `IEvolutionArchiveView<TGenome>`: its descriptor definitions and their
 hash, the optimisation direction, the number of occupied cells, a version that increases on every
 change, the entries, the best entry, and `Get(cell)` for one `EvolutionCellKey`. Observers, reports
-and selection policies read archives only through this view.
+and selection policies read archives only through this view. `EvolutionArchiveSnapshot<TGenome>`
+copies a view at one moment, so it can be handed outside the engine while the run carries on.
+
+`EvolutionArchiveQuery` adds queries by a named metric rather than by the single quality score:
+`BestBy`, `TopBy`, `WithMetric` and `MetricNames`, on an archive or on a whole run's result.
 
 A multi-objective archive also implements `IEvolutionParetoArchiveView<TGenome>`. Its
 `ParetoDefinition` is `null` for a scalar snapshot, and `InfeasibleEntries` lists the exploratory
@@ -27,13 +31,13 @@ Two optional interfaces let an archive survive a checkpoint:
 ## Choosing parents
 
 A selection policy returns an `EvolutionSelection<TGenome>`: one parent entry and the inspiration
-entries shown alongside it. `EvolutionEngineOptions.SelectionPolicy` picks a built-in policy, or you
-can pass your own `ISelectionPolicy<TGenome>` to the engine.
+entries shown alongside it. `EvolutionEngineOptions.SelectionPolicy` (`EvolutionSelectionPolicyKind`)
+picks a built-in policy, or you can pass your own `ISelectionPolicy<TGenome>` to the engine.
 
 | Policy | Kind | Parent | Inspirations |
 | --- | --- | --- | --- |
 | `UniformEvolutionSelectionPolicy<TGenome>` | `Uniform` (default) | a uniformly random occupied cell | distinct, uniformly sampled |
-| ratio selection | `Ratio` | exploration, exploitation or island-best draw by `EvolutionEngineOptions.Selection` ratios | top and diverse counts from the same options |
+| `RatioEvolutionSelectionPolicy<TGenome>` | `Ratio` | exploration, exploitation or island-best draw by `EvolutionEngineOptions.Selection` ratios | top and diverse counts from the same options |
 | `CuriosityEvolutionSelectionPolicy<TGenome>` | `Curiosity` | weighted by a bounded curiosity score that rises when a parent's offspring improve the archive | as uniform |
 | `DoubleEvolutionSelectionPolicy<TGenome>` | `Double` | uniform | the highest-quality elites |
 
@@ -67,8 +71,9 @@ quality, and history size.
 
 Every `MigrationInterval` units of `MigrationTrigger` (`EvolutionMigrationTrigger`:
 `CommittedBatches`, or `IslandGenerations` for the highest per-island generation), the engine asks
-the migration policy for transfers. Each one is an `EvolutionMigration<TGenome>` naming the source
-island, the destination island and the copied entry.
+the migration policy (an `IMigrationPolicy<TGenome>`, passed to the engine) for transfers. Each one
+is an `EvolutionMigration<TGenome>` naming the source island, the destination island and the copied
+entry.
 
 - `RingMigrationPolicy<TGenome>` copies each island's best distinct elites to the next island.
 - `TopologyMigrationPolicy<TGenome>` does the same along any `EvolutionMigrationTopology`: `Ring`

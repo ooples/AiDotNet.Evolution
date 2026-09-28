@@ -51,7 +51,9 @@ public sealed class EvolutionSelectionPolicyTests
         first.Observe(childEvaluation, EvolutionArchiveInsertionResult.Inserted);
         string state = first.CaptureState();
         var restored = new CuriosityEvolutionSelectionPolicy<TestGenome>();
-        restored.RestoreState(state);
+        // The engine checkpoints a learning policy through this interface.
+        IOutcomeAwareEvolutionSelectionPolicy<TestGenome> outcomeAware = restored;
+        outcomeAware.RestoreState(state);
 
         Assert.Equal(2.0, first.Scores["parent"]);
         Assert.Equal(first.Scores, restored.Scores);

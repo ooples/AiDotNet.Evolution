@@ -117,7 +117,8 @@ public sealed class EvolutionReplicationTests
             var report = await new EvolutionReplicateRunner<int>("invalid", Plan(), ledger, (_, _, _) => new(result))
                 .RunAsync(Candidate, Context(), "batch");
             Assert.False(report.IsComplete); Assert.Equal(0.75m, report.ChargedCostUnits);
-            Assert.Equal(EvolutionResourceOutcome.Failed, ledger.Snapshot().Receipts.Single().Outcome);
+            EvolutionResourceReceipt receipt = ledger.Snapshot().Receipts.Single();
+        Assert.Equal(EvolutionResourceOutcome.Failed, receipt.Outcome);
         }
     }
 

@@ -34,7 +34,7 @@ public sealed class EvolutionPipelineTests
         var engine = Engine(new ProbeTask(variation, reversed: true), variation, options);
         await engine.RunAsync(new[] { new TestGenome(1) });
         Assert.Equal(EvolutionExecutionMode.Opportunistic, engine.PipelineReport!.ExecutionMode);
-        var committed = engine.PipelineReport.Schedule.Where(entry => entry.Kind == EvolutionPipelineScheduleKind.Commit && entry.Generation > 0);
+        IEnumerable<EvolutionPipelineScheduleEntry> committed = engine.PipelineReport.Schedule.Where(entry => entry.Kind == EvolutionPipelineScheduleKind.Commit && entry.Generation > 0);
         Assert.Equal(variation.Observed, committed.Select(entry => entry.Generation));
         Assert.Equal(16, variation.Observed.Distinct().Count());
     }

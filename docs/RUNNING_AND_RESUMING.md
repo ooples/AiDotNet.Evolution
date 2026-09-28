@@ -29,7 +29,9 @@ archive that grows implements `IGrowableEvolutionArchive<TGenome>` (`MapElitesAr
 does), so its widened ranges survive a checkpoint.
 
 When you do not know sensible bounds in advance, `EvolutionDescriptorCalibration` derives the whole
-grid from what a seed population measured. `EvolutionDescriptorCalibrationOptions` sets the bin
+grid from what a seed population measured. For a single descriptor, `EvolutionDescriptorCalibrator`
+collects observed values in any order with `Observe` and turns them into a fixed definition with
+`Freeze`. `EvolutionDescriptorCalibrationOptions` sets the bin
 count, the padding added around the observed range, the span used when every seed measured the same
 value, and the out-of-range policy of the resulting definitions.
 
@@ -44,7 +46,8 @@ simple default behind your back. See [Typed search spaces](TYPED_SEARCH_SPACES.m
 ### Optional stages
 
 - `ICascadeEvolutionTask<TGenome>` adds ordered, increasingly expensive evaluation stages to a task.
-  `EvolutionEngineOptions.Cascade` sets their thresholds.
+  `EvolutionEngineOptions.Cascade` (`EvolutionCascadeOptions`) enables them and sets each stage's
+  threshold and timeout, and whether stages that reject a candidate count against the budget.
 - `ICandidateRefiner<TGenome>` gets a chance to improve each proposal before it is evaluated. It
   receives an `EvolutionRefinementContext`, which carries the evaluation id and a `StableRandom`
   derived for that evaluation.
@@ -64,7 +67,9 @@ that a budget was actually spent on evaluations rather than on rejected or faile
 
 ### Early stopping
 
-`EvolutionEngineOptions.EarlyStopping` stops a run that has stopped improving. Every reading of the
+`EvolutionEngineOptions.EarlyStopping` (`EvolutionEarlyStoppingOptions`) stops a run that has
+stopped improving: after `PatienceEvaluations` evaluations without an improvement of at least
+`MinimumImprovement` in the chosen metric. Every reading of the
 criterion ends in an `EvolutionEarlyStoppingOutcome`: `Improved`, `NotImproved` or `Unmeasurable`.
 A reading is unmeasurable when there is nothing to compare, and
 `EvolutionEarlyStoppingUnmeasurableReason` says why: `MetricNotReported`, `EmptyFeasibleFront`,
@@ -95,7 +100,8 @@ An evaluation can return artifacts, such as a program's captured output. Evaluat
 untrusted: `EvolutionArtifactSanitizer.Sanitize` strips terminal control sequences and
 credential-shaped substrings, and `WouldRedact` reports whether it would change anything. Content
 too large (or not text) to keep inline goes to an `IEvolutionArtifactStore`, set through
-`EvolutionArtifactOptions.Store`.
+`EvolutionArtifactOptions.Store`. `DirectoryEvolutionArtifactStore` is the shipped store: it keeps
+content in one directory addressed by its hash, with optional retention that `Prune` enforces.
 
 ## Saving and resuming
 
@@ -130,7 +136,9 @@ or the infeasible-exploration pool).
 ## Traces
 
 `EvolutionTraceObserver<TGenome>` streams one `EvolutionTraceRecord` per evaluation to a
-crash-safe trace file. `EvolutionTraceFile.Read` (or `ReadAsync`) returns an
-`EvolutionTraceReadResult`: the records, whether the file was complete, its format and compression,
-and the summary if one was written. A trace cut off by a crash still reads. `IsComplete` tells you
+crash-safe trace file, in the `EvolutionTraceFormat` you choose (`JsonLines` or a single `Json`
+document). An `EvolutionTraceSummary` is kept beside it, with the records written and dropped and the
+bytes written. `EvolutionTraceFile.Read` (or `ReadAsync`) returns an `EvolutionTraceReadResult`: the
+records, whether the file was complete, its format and compression, and the summary if one was
+written. A trace cut off by a crash still reads. `IsComplete` tells you
 it was cut off, so you never mistake a partial trace for a whole run.

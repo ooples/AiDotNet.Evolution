@@ -148,11 +148,12 @@ public sealed partial class EvolutionDeploymentLifecycleTests
                 search.OnCandidateCreated += _ => created++;
             }, format, new MapElitesAutoMLOptions { InitialPopulationSize = 1, MaxProposalMultiplier = 10000 });
         Assert.True(lifecycle.Select(Envelope(0)).IsFallback);
-        var result = await lifecycle.RetunePendingAsync(retuner, _ => Task.CompletedTask);
+        EvolutionDeploymentDecision result = await lifecycle.RetunePendingAsync(retuner, _ => Task.CompletedTask);
         Assert.True(result.Activated, result.Outcome);
         Assert.InRange(created, 1, 3);
-        var selected = lifecycle.Select(Envelope(0));
+        EvolutionDeploymentSelection selected = lifecycle.Select(Envelope(0));
         Assert.False(selected.IsFallback);
+        Assert.Equal(EvolutionDeploymentArtifactKind.TrainedModel, selected.Artifact.Kind);
         var restoredArtifact = Registry().Load(selected.Artifact.Id, Envelope(0));
         using var restored = restoredArtifact.RestoreModel(() => new MultipleRegression<double>(), format);
         var heldout = new Matrix<double>(1, 2); heldout[0, 0] = 4; heldout[0, 1] = 0.5;

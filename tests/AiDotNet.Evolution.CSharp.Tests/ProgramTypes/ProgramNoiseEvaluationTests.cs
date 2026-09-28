@@ -41,10 +41,11 @@ public sealed class ProgramNoiseEvaluationTests
     public async Task InvalidCorrectnessPreventsExpensiveFitnessAndCannotPassScreen()
     {
         int calls = 0;
-        var report = await Session(Ledger(), correctness: Eval(_ => 0), screen: Eval(_ => { calls++; return 1; }))
+        ProgramNoiseScreenReport report = await Session(Ledger(), correctness: Eval(_ => 0), screen: Eval(_ => { calls++; return 1; }))
             .ScreenAndAuditAsync("batch", new[] { new ProgramGenome("bad") }, 7, 11);
         Assert.False(report.IsComplete); Assert.Equal(0, calls);
-        Assert.False(report.Entries[0].Passed); Assert.Equal(1, report.ChargedCostUnits);
+        ProgramNoiseScreenEntry entry = report.Entries[0];
+        Assert.False(entry.Passed); Assert.Equal(1, report.ChargedCostUnits);
     }
 
     [Fact]

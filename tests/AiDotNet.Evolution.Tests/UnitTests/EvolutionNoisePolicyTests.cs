@@ -27,7 +27,7 @@ public sealed class EvolutionNoisePolicyTests
             Assert.True(identities.Add(context.SampleIdentity));
             return new(Value(direction == EvolutionOptimizationDirection.Maximize ? genome : 1 - genome, direction));
         }
-        var result = await Challenge(ledger, Measure, Measure, direction).RunAsync(0, Candidate(1), Candidate(0), Context);
+        EvolutionIncumbentChallengeReport result = await Challenge(ledger, Measure, Measure, direction).RunAsync(0, Candidate(1), Candidate(0), Context);
         Assert.True(result.IsConfirmed);
         Assert.Equal("candidate-0", result.IncumbentId);
         Assert.Equal("candidate-1", result.CandidateId);
@@ -136,8 +136,8 @@ public sealed class EvolutionNoisePolicyTests
     public async Task FullCensusIdentifiesUsefulRejectsWithoutSamplingRadius()
     {
         var ledger = Ledger();
-        var result = await Audit(ledger).RunAsync("audit", Enumerable.Range(0, 4).Select(Candidate).ToArray(), 37);
-        Assert.Equal(2, result.Entries.Count(row => row.DefinitelyUseful));
+        EvolutionRejectionAuditReport result = await Audit(ledger).RunAsync("audit", Enumerable.Range(0, 4).Select(Candidate).ToArray(), 37);
+        Assert.Equal(2, result.Entries.Count((EvolutionRejectionAuditEntry row) => row.DefinitelyUseful));
         Assert.Equal(.5, result.FalseRejectionRateLower);
         Assert.Equal(.5, result.FalseRejectionRateUpper);
         Assert.Equal(256, result.ChargedCostUnits);

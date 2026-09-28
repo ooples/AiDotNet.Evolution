@@ -12,12 +12,19 @@ A program search plugs three interfaces into the engine:
 - `IProgramVariationOperator` proposes a child from a parent, usually by asking a model. It reports
   its model usage through `GetUsage()` as a `ProgramEvolutionLlmUsage`: proposals, chat calls,
   retries, abandoned proposals, provider errors and token counts. `LlmProgramVariationOperator` is
-  the shipped implementation.
+  the shipped implementation, configured by `LlmProgramVariationOptions`. Those options cover the
+  `ProgramEvolutionMode` (`Diff` or `FullRewrite`), retries and samples per attempt, inspirations,
+  the prompt's program length, the system message and sampling (temperature, top-p, output tokens,
+  and a `ProgramReasoningEffort` of `Low`, `Medium` or `High` for models that support it).
 - `IProgramFitnessEvaluator` scores a candidate and returns an evolution task result.
+  `DelegateProgramFitnessEvaluator` wraps your own function as one.
 - `IProgramDescriptor` computes one named, finite behaviour descriptor from a program's text, used as
   an archive coordinate. `IVersionedProgramDescriptor` also publishes a hash of its configuration,
   so changing a descriptor's settings changes the run's identity. `IRebasableProgramDescriptor`
   measures against reference programs and can be pointed at a new set with `Rebase`.
+  Three descriptors ship. `ProgramLengthDescriptor` measures the normalised source length.
+  `ProgramTokenComplexityDescriptor` counts lexical tokens. `ProgramDiversityDescriptor` measures
+  distance from a reference set of programs.
 
 `ProgramGenomeCodec` serialises `ProgramGenome` values for portable checkpoints.
 
@@ -29,7 +36,16 @@ A proposal is a conversation of `ProgramChatMessage` values, each with a `Progra
 `ProgramChatResponse`, with the text and, when the provider reports it, a `ProgramChatUsage` of token
 counts. Usage is what the provider said, not a charge or a budget admission.
 
-`OpenAiCompatibleChatClient` talks to any OpenAI-compatible endpoint. `OpenAiCompatibleChatClientOptions`
+Four clients ship:
+
+- `ClaudeCodeChatClient` uses the Claude Code CLI (`claude -p`) and its login session, configured by
+  `ClaudeCodeChatClientOptions`.
+- `ManualProgramChatClient` writes each prompt to a queue directory for a person to answer, which is
+  useful for inspecting prompts or evolving by hand.
+- `WeightedEnsembleChatClient` sends each request to one member of a weighted set of
+  `WeightedChatModel`s, like OpenEvolve's `llm.models`. `GetMemberStatistics` reports calls and
+  failures per member.
+- `OpenAiCompatibleChatClient` talks to any OpenAI-compatible endpoint. `OpenAiCompatibleChatClientOptions`
 mirror OpenEvolve's per-model settings: the endpoint, model and API key, plus the request timeout,
 retry count and delay, and a response size limit.
 
@@ -65,7 +81,9 @@ reaches a prompt or a log.
 
 ## Reading the model's answer
 
-In diff mode, the answer is a set of SEARCH/REPLACE blocks. `ProgramDiff.Parse` returns a
+In diff mode, the answer is a set of SEARCH/REPLACE blocks. `ProgramDiffOptions` sets the three
+markers, whether carriage returns and near-miss whitespace are accepted, whether a reply that changes
+nothing is rejected, and the block limit. `ProgramDiff.Parse` returns a
 `ProgramDiffParseResult`: the `ProgramDiffBlock` edits it recovered, plus a `ProgramDiffFailure` for
 each block it rejected. Each failure has a `ProgramDiffFailureReason`, for example `SearchTextNotFound`,
 `OutsideEvolveBlock`, `AmbiguousTarget` or `ResultUnchanged`. `ProgramDiff.SplitByTarget` returns a

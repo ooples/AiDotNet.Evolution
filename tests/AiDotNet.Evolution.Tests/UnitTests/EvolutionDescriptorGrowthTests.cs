@@ -119,7 +119,9 @@ public sealed class EvolutionDescriptorGrowthTests
         Add(grown, 3, "c", 3, 1.5);
 
         MapElitesArchive<TestGenome> restored = GrowingArchive();
-        restored.Restore(grown.Entries.ToArray(), grown.Descriptors, grown.Version);
+        // Restored through the interface the engine uses on resume, not the concrete archive.
+        ICheckpointableEvolutionArchive<TestGenome> checkpointable = restored;
+        checkpointable.Restore(grown.Entries.ToArray(), grown.Descriptors, grown.Version);
 
         Assert.Equal(grown.TotalGridCells, restored.TotalGridCells);
         Assert.Equal(grown.Version, restored.Version);
@@ -136,7 +138,8 @@ public sealed class EvolutionDescriptorGrowthTests
     [Fact]
     public void BoundsThatAreNotAWideningOfTheConfiguredOnesAreRefused()
     {
-        Assert.Throws<InvalidDataException>(() => GrowingArchive().RestoreDescriptorBounds(
+        IGrowableEvolutionArchive<TestGenome> growable = GrowingArchive();
+        Assert.Throws<InvalidDataException>(() => growable.RestoreDescriptorBounds(
             new[] { new EvolutionDescriptorDefinition("x", 0.25, 1, 5, EvolutionOutOfRangePolicy.Grow) }));
 
         Assert.Throws<InvalidDataException>(() => GrowingArchive().RestoreDescriptorBounds(
