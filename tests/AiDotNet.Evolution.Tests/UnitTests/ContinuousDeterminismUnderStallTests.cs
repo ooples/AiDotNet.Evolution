@@ -45,22 +45,6 @@ public sealed class ContinuousDeterminismUnderStallTests
         return (await engine.RunAsync(new[] { 3, 17, 41, 58 })).StateHash;
     }
 
-    internal static readonly System.Collections.Concurrent.ConcurrentDictionary<long, string> Log = new();
-    [Fact]
-    public async Task Probe()
-    {
-        var runs = new List<SortedDictionary<long, string>>();
-        foreach (long stall in new[] { -1L, 5L })
-        {
-            Log.Clear();
-            await Run(stall);
-            runs.Add(new SortedDictionary<long, string>(Log));
-        }
-        var diffs = runs[0].Keys.Union(runs[1].Keys).OrderBy(k => k)
-            .Where(k => !runs[0].TryGetValue(k, out var a) || !runs[1].TryGetValue(k, out var b) || a != b)
-            .Take(6).Select(k => k + ": " + (runs[0].TryGetValue(k, out var a) ? a : "-") + " vs " + (runs[1].TryGetValue(k, out var b) ? b : "-"));
-        Assert.Fail(string.Join(" | ", diffs));
-    }
     private sealed class StallTask(long stalledEvaluation) : IEvolutionTask<int>
     {
         public string Id => "stall";
@@ -73,7 +57,6 @@ public sealed class ContinuousDeterminismUnderStallTests
         public async ValueTask<EvolutionTaskResult> EvaluateAsync(EvolutionCandidate<int> candidate, EvolutionEvaluationContext context,
             CancellationToken cancellationToken = default)
         {
-            Log[context.EvaluationId] = candidate.CanonicalGenome.Genome + "@" + context.Generation;
             await Task.Delay(context.EvaluationId == stalledEvaluation ? 3000 : 5, cancellationToken);
             int genome = candidate.CanonicalGenome.Genome;
             return EvolutionTaskResult.Completed(genome * 7919 % 1000 / 1000.0, new Dictionary<string, double> { ["x"] = genome % 100 });
