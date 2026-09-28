@@ -402,7 +402,7 @@ public sealed partial class EvolutionEngine<TGenome>
             }
 
             TimeSpan retryDelay = RetryDelayForAttempt(highestAttempt);
-            if (retryDelay > TimeSpan.Zero) await Task.Delay(retryDelay, cancellationToken).ConfigureAwait(false);
+            if (retryDelay > TimeSpan.Zero) await EvolutionClock.Delay(_options.TimeProvider, retryDelay, cancellationToken).ConfigureAwait(false);
 
             using (var semaphore = new SemaphoreSlim(_options.MaxDegreeOfParallelism, _options.MaxDegreeOfParallelism))
             {
@@ -505,9 +505,13 @@ public sealed partial class EvolutionEngine<TGenome>
         Func<EvolutionEvaluationContext, CancellationToken, ValueTask<EvolutionTaskResult>> invoke,
         CancellationToken cancellationToken)
     {
-        using (var linked = CancellationTokenSource.CreateLinkedTokenSource(cancellationToken))
+        // The deadline runs on the configured clock, so a fake clock fires it deterministically in tests.
+        using CancellationTokenSource? deadline = timeout.HasValue
+            ? EvolutionClock.CreateCancellationTokenSource(_options.TimeProvider, timeout.Value) : null;
+        using (var linked = deadline is null
+            ? CancellationTokenSource.CreateLinkedTokenSource(cancellationToken)
+            : CancellationTokenSource.CreateLinkedTokenSource(cancellationToken, deadline.Token))
         {
-            if (timeout.HasValue) linked.CancelAfter(timeout.Value);
             Task<EvolutionTaskResult> work;
             try
             {
@@ -529,7 +533,7 @@ public sealed partial class EvolutionEngine<TGenome>
             {
                 using (var abandonment = CancellationTokenSource.CreateLinkedTokenSource(cancellationToken))
                 {
-                    Task limit = Task.Delay(timeout.Value + _options.EvaluationGracePeriod.Value, abandonment.Token);
+                    Task limit = EvolutionClock.Delay(_options.TimeProvider, timeout.Value + _options.EvaluationGracePeriod.Value, abandonment.Token);
                     Task winner = await Task.WhenAny(work, limit).ConfigureAwait(false);
                     if (!ReferenceEquals(winner, work))
                     {

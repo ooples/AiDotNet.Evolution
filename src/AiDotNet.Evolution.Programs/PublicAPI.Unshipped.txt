@@ -1683,6 +1683,8 @@ static AiDotNet.Evolution.Programs.Experience.ProgramExperienceQuery.operator !=
 static AiDotNet.Evolution.Programs.Experience.ProgramExperienceQuery.operator ==(AiDotNet.Evolution.Programs.Experience.ProgramExperienceQuery? left, AiDotNet.Evolution.Programs.Experience.ProgramExperienceQuery? right) -> bool
 static AiDotNet.Evolution.Programs.Experience.ProgramExperienceRetrieval.operator !=(AiDotNet.Evolution.Programs.Experience.ProgramExperienceRetrieval? left, AiDotNet.Evolution.Programs.Experience.ProgramExperienceRetrieval? right) -> bool
 static AiDotNet.Evolution.Programs.Experience.ProgramExperienceRetrieval.operator ==(AiDotNet.Evolution.Programs.Experience.ProgramExperienceRetrieval? left, AiDotNet.Evolution.Programs.Experience.ProgramExperienceRetrieval? right) -> bool
+AiDotNet.Evolution.Programs.ProgramSandboxOptions.TimeProvider.get -> System.TimeProvider!
+AiDotNet.Evolution.Programs.ProgramSandboxOptions.TimeProvider.set -> void
 AiDotNet.Evolution.Programs.ClaudeCodeChatClient
 AiDotNet.Evolution.Programs.ClaudeCodeChatClient.ClaudeCodeChatClient(AiDotNet.Evolution.Programs.ClaudeCodeChatClientOptions! options) -> void
 AiDotNet.Evolution.Programs.ClaudeCodeChatClient.GetResponseAsync(System.Collections.Generic.IReadOnlyList<AiDotNet.Evolution.Programs.ProgramChatMessage!>! messages, AiDotNet.Evolution.Programs.ProgramChatOptions? options = null, System.Threading.CancellationToken cancellationToken = default(System.Threading.CancellationToken)) -> System.Threading.Tasks.Task<AiDotNet.Evolution.Programs.ProgramChatResponse!>!
