@@ -53,7 +53,7 @@ Peak working set grew with run length: 43 MB at 1,000 evaluations, 83 MB at 16,0
 
 ## Hangs
 
-OpenEvolve deadlocked in 3 of about 180 runs: `n=600` at 4, 8 and 16 workers. These runs normally take 6 s. The
+OpenEvolve deadlocked 3 times, once each at `n=600` on 4, 8 and 16 workers. The campaign kept 90 OpenEvolve runs. These runs normally take 6 s. The
 harness kills a run that exceeds 180 s, records it under `hangs` in the JSON, and re-measures it. OpenEvolve also
 left pool workers alive after a run. These inherited the harness's output pipe and hung the first rerun for over an
 hour, so child output now goes to files and every descendant is killed after each run.
