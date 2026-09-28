@@ -63,7 +63,6 @@ AiDotNet.Evolution.Deployment.EvolutionDeploymentDecision
 AiDotNet.Evolution.Deployment.EvolutionDeploymentDecision.Activated.get -> bool
 AiDotNet.Evolution.Deployment.EvolutionDeploymentDecision.ArtifactId.get -> string?
 AiDotNet.Evolution.Deployment.EvolutionDeploymentDecision.EvidenceId.get -> string?
-AiDotNet.Evolution.Deployment.EvolutionDeploymentDecision.Outcome.get -> string!
 AiDotNet.Evolution.Deployment.EvolutionDeploymentEnvelope
 AiDotNet.Evolution.Deployment.EvolutionDeploymentEnvelope.CompilerHash.get -> string!
 AiDotNet.Evolution.Deployment.EvolutionDeploymentEnvelope.DatasetHash.get -> string!
@@ -145,3 +144,19 @@ static AiDotNet.Evolution.Deployment.EvolutionDeploymentEvaluators.Model<TModel>
 static AiDotNet.Evolution.Deployment.EvolutionDeploymentEvaluators.Program(AiDotNet.Evolution.Programs.IProgramFitnessEvaluator! correctness, AiDotNet.Evolution.Programs.IProgramFitnessEvaluator! fitness, ulong rootSeed = 1234) -> System.Func<AiDotNet.Evolution.Deployment.EvolutionDeployableArtifact!, int, System.Threading.CancellationToken, System.Threading.Tasks.ValueTask<AiDotNet.Evolution.Deployment.EvolutionDeploymentMeasurement!>>!
 static AiDotNet.Evolution.Deployment.EvolutionDeploymentRetuners.AutoML<T, TInput, TOutput>(System.Func<AiDotNet.Evolution.Deployment.EvolutionDeploymentEnvelope!, (TInput TrainingInputs, TOutput TrainingTargets, TInput ValidationInputs, TOutput ValidationTargets)>! dataFactory, System.Action<AiDotNet.Evolution.AutoML.MapElitesAutoML<T, TInput, TOutput>!, AiDotNet.Evolution.Deployment.EvolutionDeploymentEnvelope!>! configure, string! serializationVersion, AiDotNet.Evolution.AutoML.MapElitesAutoMLOptions? options = null) -> System.Func<AiDotNet.Evolution.Deployment.EvolutionDeploymentRetuneRequest!, System.Threading.CancellationToken, System.Threading.Tasks.Task<AiDotNet.Evolution.Deployment.EvolutionDeployableArtifact!>!>!
 static AiDotNet.Evolution.Deployment.EvolutionDeploymentRetuners.Program(System.Func<AiDotNet.Evolution.Deployment.EvolutionDeploymentEnvelope!, AiDotNet.Evolution.Deployment.ProgramDeploymentSearchOptions!>! optionsFactory, System.Func<AiDotNet.Evolution.Deployment.EvolutionDeploymentEnvelope!, AiDotNet.Evolution.Programs.IProgramFitnessEvaluator!>! correctnessFactory, AiDotNet.Evolution.EvolutionOptimizationDirection direction) -> System.Func<AiDotNet.Evolution.Deployment.EvolutionDeploymentRetuneRequest!, System.Threading.CancellationToken, System.Threading.Tasks.Task<AiDotNet.Evolution.Deployment.EvolutionDeployableArtifact!>!>!
+AiDotNet.Evolution.Deployment.EvolutionDeploymentDecision.Outcome.get -> AiDotNet.Evolution.Deployment.EvolutionDeploymentOutcome
+AiDotNet.Evolution.Deployment.EvolutionDeploymentOutcome
+AiDotNet.Evolution.Deployment.EvolutionDeploymentOutcome.Abandoned = 6 -> AiDotNet.Evolution.Deployment.EvolutionDeploymentOutcome
+AiDotNet.Evolution.Deployment.EvolutionDeploymentOutcome.BudgetDenied = 9 -> AiDotNet.Evolution.Deployment.EvolutionDeploymentOutcome
+AiDotNet.Evolution.Deployment.EvolutionDeploymentOutcome.Busy = 5 -> AiDotNet.Evolution.Deployment.EvolutionDeploymentOutcome
+AiDotNet.Evolution.Deployment.EvolutionDeploymentOutcome.Healthy = 10 -> AiDotNet.Evolution.Deployment.EvolutionDeploymentOutcome
+AiDotNet.Evolution.Deployment.EvolutionDeploymentOutcome.InsufficientImprovement = 1 -> AiDotNet.Evolution.Deployment.EvolutionDeploymentOutcome
+AiDotNet.Evolution.Deployment.EvolutionDeploymentOutcome.InvalidValidation = 2 -> AiDotNet.Evolution.Deployment.EvolutionDeploymentOutcome
+AiDotNet.Evolution.Deployment.EvolutionDeploymentOutcome.Monitoring = 11 -> AiDotNet.Evolution.Deployment.EvolutionDeploymentOutcome
+AiDotNet.Evolution.Deployment.EvolutionDeploymentOutcome.NotRequested = 8 -> AiDotNet.Evolution.Deployment.EvolutionDeploymentOutcome
+AiDotNet.Evolution.Deployment.EvolutionDeploymentOutcome.PersistencePolicyDenied = 7 -> AiDotNet.Evolution.Deployment.EvolutionDeploymentOutcome
+AiDotNet.Evolution.Deployment.EvolutionDeploymentOutcome.Promoted = 0 -> AiDotNet.Evolution.Deployment.EvolutionDeploymentOutcome
+AiDotNet.Evolution.Deployment.EvolutionDeploymentOutcome.Quarantined = 3 -> AiDotNet.Evolution.Deployment.EvolutionDeploymentOutcome
+AiDotNet.Evolution.Deployment.EvolutionDeploymentOutcome.QuarantinedFallback = 13 -> AiDotNet.Evolution.Deployment.EvolutionDeploymentOutcome
+AiDotNet.Evolution.Deployment.EvolutionDeploymentOutcome.RolledBack = 12 -> AiDotNet.Evolution.Deployment.EvolutionDeploymentOutcome
+AiDotNet.Evolution.Deployment.EvolutionDeploymentOutcome.Stale = 4 -> AiDotNet.Evolution.Deployment.EvolutionDeploymentOutcome

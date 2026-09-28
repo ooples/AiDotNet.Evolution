@@ -317,6 +317,7 @@ against the declared public API, so a type added, removed or reclassified withou
 | `AiDotNet.Evolution.Deployment.EvolutionDeploymentRetuners` | Stable | [DEPLOYMENT.md](DEPLOYMENT.md), [EvolutionDeploymentAdapterTests](../tests/AiDotNet.Evolution.Deployment.Tests/EvolutionDeploymentAdapterTests.cs) |
 | `AiDotNet.Evolution.Deployment.EvolutionDeploymentSelection` | Stable | [DEPLOYMENT.md](DEPLOYMENT.md), [EvolutionDeploymentAdapterTests](../tests/AiDotNet.Evolution.Deployment.Tests/EvolutionDeploymentAdapterTests.cs) |
 | `AiDotNet.Evolution.Deployment.ProgramDeploymentSearchOptions` | Stable | [DEPLOYMENT_MIGRATION.md](migration/DEPLOYMENT_MIGRATION.md), [EvolutionDeploymentAdapterTests](../tests/AiDotNet.Evolution.Deployment.Tests/EvolutionDeploymentAdapterTests.cs) |
+| `AiDotNet.Evolution.Deployment.EvolutionDeploymentOutcome` | Stable | [DEPLOYMENT.md](DEPLOYMENT.md), [EvolutionDeploymentAdversarialTests](../tests/AiDotNet.Evolution.Deployment.Tests/EvolutionDeploymentAdversarialTests.cs) |
 
 ## AiDotNet.Evolution.Programs
 

@@ -104,10 +104,10 @@ public sealed class EvolutionDeploymentLifecycle
             long epoch;
             lock (_gate)
             {
-                if (_pending is null || _storageFaulted) return new Prepared("NotRequested");
+                if (_pending is null || _storageFaulted) return new Prepared(EvolutionDeploymentOutcome.NotRequested);
                 var now = DateTimeOffset.UtcNow;
                 if (_retunes >= _policy.MaximumRetunes || _lastRetune is { } last && now - last < _policy.Cooldown)
-                    return new Prepared("BudgetDenied");
+                    return new Prepared(EvolutionDeploymentOutcome.BudgetDenied);
                 requested = _pending; _pending = null; epoch = _epoch; _retunes++; _lastRetune = now;
             }
             await idleGate(token).ConfigureAwait(false);
@@ -123,8 +123,8 @@ public sealed class EvolutionDeploymentLifecycle
     private async Task<EvolutionDeploymentDecision> ExecuteAsync(Func<CancellationToken, Task<Prepared>> prepare, CancellationToken cancellationToken)
     {
         cancellationToken.ThrowIfCancellationRequested();
-        if (!_policy.AllowBestEffortPersistence) return new("PersistencePolicyDenied", false);
-        if (!await _operation.WaitAsync(0, cancellationToken).ConfigureAwait(false)) return new("Busy", false);
+        if (!_policy.AllowBestEffortPersistence) return new(EvolutionDeploymentOutcome.PersistencePolicyDenied, false);
+        if (!await _operation.WaitAsync(0, cancellationToken).ConfigureAwait(false)) return new(EvolutionDeploymentOutcome.Busy, false);
         var deadline = CancellationTokenSource.CreateLinkedTokenSource(cancellationToken);
         Task<Prepared>? work = null;
         bool deferred = false;
@@ -137,22 +137,22 @@ public sealed class EvolutionDeploymentLifecycle
             try
             {
                 if (await Task.WhenAny(work, Task.Delay(System.Threading.Timeout.Infinite, wait.Token)).ConfigureAwait(false) != work)
-                { cancellationToken.ThrowIfCancellationRequested(); return new("Abandoned", false); }
+                { cancellationToken.ThrowIfCancellationRequested(); return new(EvolutionDeploymentOutcome.Abandoned, false); }
                 Prepared result = await work.ConfigureAwait(false);
                 deadline.Token.ThrowIfCancellationRequested();
-                if (result.Outcome != "Approved") return new(result.Outcome, false, result.Candidate?.Id, result.EvidenceId);
+                if (result.Outcome is { } refused) return new(refused, false, result.Candidate?.Id, result.EvidenceId);
                 var candidate = result.Candidate ?? throw new InvalidOperationException("Missing prepared artifact.");
                 lock (_gate)
                 {
                     if (_epoch != result.Epoch || _observed.Key != candidate.Envelope.Key || _storageFaulted)
-                        return new("Stale", false, candidate.Id, result.EvidenceId);
+                        return new(EvolutionDeploymentOutcome.Stale, false, candidate.Id, result.EvidenceId);
                     deadline.Token.ThrowIfCancellationRequested();
                     var incumbent = result.Incumbent ?? throw new InvalidOperationException("An approved preparation carries no incumbent.");
                     var evidenceId = result.EvidenceId ?? throw new InvalidOperationException("An approved preparation carries no evidence id.");
                     if (!_registry.TryPromote(result.Revision, candidate, incumbent, evidenceId))
-                        return new("Stale", false, candidate.Id, result.EvidenceId);
+                        return new(EvolutionDeploymentOutcome.Stale, false, candidate.Id, result.EvidenceId);
                     _cached = candidate; _pending = null; _windows.Clear(); _monitoredRevision = null;
-                    return new("Promoted", true, candidate.Id, result.EvidenceId);
+                    return new(EvolutionDeploymentOutcome.Promoted, true, candidate.Id, result.EvidenceId);
                 }
             }
             finally { wait.Cancel(); }
@@ -172,11 +172,11 @@ public sealed class EvolutionDeploymentLifecycle
     private async Task<Prepared> PrepareAsync(EvolutionDeployableArtifact candidate, long epoch, CancellationToken token)
     {
         lock (_gate)
-            if (_epoch != epoch || _observed.Key != candidate.Envelope.Key || _storageFaulted) return new("Stale");
+            if (_epoch != epoch || _observed.Key != candidate.Envelope.Key || _storageFaulted) return new(EvolutionDeploymentOutcome.Stale);
         var slot = _registry.ReadSlot();
         var incumbent = Select(slot, candidate.Envelope).Artifact;
         if (candidate.Kind != incumbent.Kind) throw new InvalidDataException("Candidate and incumbent use different deployment kinds.");
-        if (_registry.IsQuarantined(candidate.Id) || _registry.IsQuarantined(incumbent.Id)) return new("Quarantined");
+        if (_registry.IsQuarantined(candidate.Id) || _registry.IsQuarantined(incumbent.Id)) return new(EvolutionDeploymentOutcome.Quarantined);
         _registry.Stage(candidate); _registry.Stage(incumbent);
         var pairs = new DeploymentMeasurementPair[_policy.PairedSamples];
         var observations = new List<object>(2 * _policy.PairedSamples);
@@ -193,9 +193,9 @@ public sealed class EvolutionDeploymentLifecycle
         {
             // Alternate order without changing the shared pair index supplied to the independent protocol.
             var first = await Measure(i % 2 == 0 ? candidate : incumbent, i).ConfigureAwait(false);
-            if (!Usable(first)) return Rejected("InvalidValidation");
+            if (!Usable(first)) return Rejected(EvolutionDeploymentOutcome.InvalidValidation);
             var second = await Measure(i % 2 == 0 ? incumbent : candidate, i).ConfigureAwait(false);
-            if (!Usable(second)) return Rejected("InvalidValidation");
+            if (!Usable(second)) return Rejected(EvolutionDeploymentOutcome.InvalidValidation);
             pairs[i] = new DeploymentMeasurementPair
             { Candidate = DeploymentRawMeasurement.From(i % 2 == 0 ? first : second), Incumbent = DeploymentRawMeasurement.From(i % 2 == 0 ? second : first) };
         }
@@ -212,9 +212,9 @@ public sealed class EvolutionDeploymentLifecycle
         };
         evidence.Validate();
         string evidenceId = _registry.RetainEvidence(JsonSerializer.SerializeToUtf8Bytes(evidence));
-        return new Prepared(evidence.Qualifies(_policy) ? "Approved" : "InsufficientImprovement", candidate, incumbent, slot.Revision, epoch, evidenceId);
+        return new Prepared(evidence.Qualifies(_policy) ? null : EvolutionDeploymentOutcome.InsufficientImprovement, candidate, incumbent, slot.Revision, epoch, evidenceId);
 
-        Prepared Rejected(string reason) => new(reason, candidate, incumbent, slot.Revision, epoch,
+        Prepared Rejected(EvolutionDeploymentOutcome reason) => new(reason, candidate, incumbent, slot.Revision, epoch,
             _registry.RetainEvidence(JsonSerializer.SerializeToUtf8Bytes(new
             {
                 SchemaVersion = 1,
@@ -237,7 +237,7 @@ public sealed class EvolutionDeploymentLifecycle
         var copy = measurements.ToArray();
         if (copy.Any(value => value is null || !value.IsFresh || value.Direction != _policy.Direction))
             throw new ArgumentException("Monitoring requires fresh measurements in the configured objective direction.");
-        if (!await _operation.WaitAsync(0, cancellationToken).ConfigureAwait(false)) return new("Busy", false);
+        if (!await _operation.WaitAsync(0, cancellationToken).ConfigureAwait(false)) return new(EvolutionDeploymentOutcome.Busy, false);
         try
         {
             var slot = _registry.ReadSlot();
@@ -245,7 +245,7 @@ public sealed class EvolutionDeploymentLifecycle
             lock (_gate)
             {
                 if (observed.IsFallback || slot.Revision != observed.Revision || slot.ActiveId != observed.Artifact.Id ||
-                    _observed.Key != observed.Artifact.Envelope.Key || _storageFaulted) return new("Stale", false);
+                    _observed.Key != observed.Artifact.Envelope.Key || _storageFaulted) return new(EvolutionDeploymentOutcome.Stale, false);
                 epoch = _epoch;
             }
             var validation = DeploymentEncoding.Parse<DeploymentValidationEvidence>(_registry.ReadEvidence(slot.ValidationEvidenceId ?? throw new InvalidDataException("The active slot has no validation evidence.")));
@@ -264,10 +264,10 @@ public sealed class EvolutionDeploymentLifecycle
                 if (_monitoredRevision != slot.Revision) { _monitoredRevision = slot.Revision; _lastObservation = null; _windows.Clear(); }
                 if (_lastObservation is { } last && observedAt <= last) throw new ArgumentException("Monitoring windows must advance in time.");
                 _lastObservation = observedAt;
-                if (!regression) { _windows.Clear(); return new("Healthy", false); }
+                if (!regression) { _windows.Clear(); return new(EvolutionDeploymentOutcome.Healthy, false); }
                 if (_windows.Count == _policy.ConsecutiveRegressions) _windows.RemoveAt(0);
                 _windows.Add(new MonitoringWindow { ObservedAtUtc = observedAt.ToUniversalTime(), Measurements = copy.Select(DeploymentRawMeasurement.From).ToArray() });
-                if (_windows.Count < _policy.ConsecutiveRegressions) return new("Monitoring", false);
+                if (_windows.Count < _policy.ConsecutiveRegressions) return new(EvolutionDeploymentOutcome.Monitoring, false);
             }
             string evidence = _registry.RetainEvidence(JsonSerializer.SerializeToUtf8Bytes(new
             {
@@ -286,11 +286,11 @@ public sealed class EvolutionDeploymentLifecycle
             cancellationToken.ThrowIfCancellationRequested();
             lock (_gate)
             {
-                if (_epoch != epoch) return new("Stale", false, observed.Artifact.Id, evidence);
+                if (_epoch != epoch) return new(EvolutionDeploymentOutcome.Stale, false, observed.Artifact.Id, evidence);
                 bool applied = _registry.TryQuarantine(slot.Revision, observed.Artifact.Id, evidence, observed.Artifact.Envelope, out var prior);
-                if (!applied) return new("Stale", false, observed.Artifact.Id, evidence);
+                if (!applied) return new(EvolutionDeploymentOutcome.Stale, false, observed.Artifact.Id, evidence);
                 _cached = prior; _windows.Clear(); _pending = prior is null ? _observed : null;
-                return new(prior is null ? "QuarantinedFallback" : "RolledBack", prior is not null, prior?.Id, evidence);
+                return new(prior is null ? EvolutionDeploymentOutcome.QuarantinedFallback : EvolutionDeploymentOutcome.RolledBack, prior is not null, prior?.Id, evidence);
             }
         }
         catch (Exception error) when (StorageFailure(error)) { lock (_gate) { _storageFaulted = true; _pending = null; } throw; }
@@ -316,10 +316,11 @@ public sealed class EvolutionDeploymentLifecycle
     private static bool StorageFailure(Exception error) => error is IOException or InvalidDataException or UnauthorizedAccessException or JsonException;
     private sealed class Prepared
     {
-        internal Prepared(string outcome, EvolutionDeployableArtifact? candidate = null, EvolutionDeployableArtifact? incumbent = null,
+        // A null outcome means the comparison approved the candidate; any value is why it was not promoted.
+        internal Prepared(EvolutionDeploymentOutcome? outcome, EvolutionDeployableArtifact? candidate = null, EvolutionDeployableArtifact? incumbent = null,
             string? revision = null, long epoch = 0, string? evidenceId = null)
         { Outcome = outcome; Candidate = candidate; Incumbent = incumbent; Revision = revision; Epoch = epoch; EvidenceId = evidenceId; }
-        internal string Outcome { get; }
+        internal EvolutionDeploymentOutcome? Outcome { get; }
         internal EvolutionDeployableArtifact? Candidate { get; }
         internal EvolutionDeployableArtifact? Incumbent { get; }
         internal string? Revision { get; }

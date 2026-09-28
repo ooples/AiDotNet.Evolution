@@ -57,6 +57,16 @@ in your own units, and whether it is a fresh measurement rather than reused sear
 Operations never overlap. A second call while one is running returns a `Busy` decision instead of
 waiting.
 
+A decision's `Outcome` is an `EvolutionDeploymentOutcome`:
+
+- promotion: `Promoted`, `InsufficientImprovement`, `InvalidValidation` or `Quarantined`;
+- scheduling: `Busy`, `Stale`, `Abandoned`, `PersistencePolicyDenied`, `NotRequested` or
+  `BudgetDenied`;
+- monitoring: `Healthy`, `Monitoring`, `RolledBack` or `QuarantinedFallback`.
+
+Before 1.0 it was a string. Each value keeps its old name, so `Outcome.ToString()` still returns the
+same text.
+
 ## MAP-Elites AutoML
 
 `MapElitesAutoML<T, TInput, TOutput>` runs AutoML model search as a quality-diversity search.

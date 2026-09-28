@@ -149,7 +149,7 @@ public sealed partial class EvolutionDeploymentLifecycleTests
             }, format, new MapElitesAutoMLOptions { InitialPopulationSize = 1, MaxProposalMultiplier = 10000 });
         Assert.True(lifecycle.Select(Envelope(0)).IsFallback);
         EvolutionDeploymentDecision result = await lifecycle.RetunePendingAsync(retuner, _ => Task.CompletedTask);
-        Assert.True(result.Activated, result.Outcome);
+        Assert.True(result.Activated, result.Outcome.ToString());
         Assert.InRange(created, 1, 3);
         EvolutionDeploymentSelection selected = lifecycle.Select(Envelope(0));
         Assert.False(selected.IsFallback);
