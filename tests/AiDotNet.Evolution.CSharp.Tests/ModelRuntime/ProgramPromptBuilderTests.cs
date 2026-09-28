@@ -569,6 +569,34 @@ public sealed class ProgramPromptBuilderTests
         return options;
     }
 
+    [Fact]
+    public void Previous_attempt_changes_are_bounded_only_when_diff_summary_limits_are_set()
+    {
+        // Spaced words: a long unbroken token would be redacted as credential-shaped before bounding.
+        string changes = string.Join("\n", Enumerable.Range(1, 6).Select(i => "line " + i + " " + string.Concat(Enumerable.Repeat("ab ", 14))));
+        ProgramPromptContext Context()
+        {
+            var context = new ProgramPromptContext(new ProgramGenome(ParentSource, ProgramLanguage.Python));
+            context.PreviousAttempts = new List<ProgramPromptAttempt>
+            {
+                new(1, changes, new Dictionary<string, double> { ["accuracy"] = 0.5 }, new Dictionary<string, double> { ["accuracy"] = 0.4 })
+            };
+            return context;
+        }
+        string Render(ProgramEvolutionPromptOptions options) =>
+            string.Join("\n", new ProgramPromptBuilder(options).Build(Context(), new StableRandom(1UL)).Messages.Select(m => m.Text));
+
+        string unbounded = Render(new ProgramEvolutionPromptOptions());
+        Assert.Contains("line 6", unbounded);
+
+        var limits = new ProgramEvolutionPromptOptions { DiffSummaryMaxLines = 2, DiffSummaryMaxLineLength = 20 };
+        string bounded = Render(limits);
+        Assert.Contains("line 1 ab ab ab a...", bounded);
+        Assert.DoesNotContain("line 3", bounded);
+        Assert.Contains("... (4 more lines)", bounded);
+        Assert.NotEqual(new ProgramPromptBuilder(new ProgramEvolutionPromptOptions()).VersionHash, new ProgramPromptBuilder(limits).VersionHash);
+    }
+
     private static ProgramPromptContext SimpleContext() => new(new ProgramGenome(ParentSource, ProgramLanguage.Python));
 
     private static ProgramPromptContext RichContext()
