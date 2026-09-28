@@ -40,6 +40,31 @@ public sealed partial class EvolutionDeploymentLifecycleTests
     }
 
     [Fact]
+    public async Task Private_program_search_refuses_resource_accounting_instead_of_ignoring_it()
+    {
+        ProgramDeploymentSearchOptions Options(ProgramEvolutionResourceOptions? resources) => new()
+        {
+            SeedPrograms = new List<string> { "base" },
+            CustomVariation = new DeploymentVariation(),
+            CustomFitnessEvaluator = new DelegateProgramFitnessEvaluator(_ => 1),
+            ResourceAccounting = resources
+        };
+
+        var plain = EvolutionDeploymentRetuners.Program(_ => Options(null),
+            _ => new DelegateProgramFitnessEvaluator(_ => 1), EvolutionOptimizationDirection.Maximize);
+        EvolutionDeployableArtifact tuned = await plain(new EvolutionDeploymentRetuneRequest(Envelope(), Policy()), CancellationToken.None);
+        Assert.False(string.IsNullOrEmpty(tuned.ReadProgram().Source));
+
+        var ledger = new EvolutionResourceLedger("deployment-accounting",
+            new EvolutionResources(new Dictionary<string, decimal> { ["cost_units"] = 10 }));
+        var accounted = EvolutionDeploymentRetuners.Program(
+            _ => Options(new ProgramEvolutionResourceOptions(ledger, 1, "deployment-cost-v1")),
+            _ => new DelegateProgramFitnessEvaluator(_ => 1), EvolutionOptimizationDirection.Maximize);
+        await Assert.ThrowsAsync<NotSupportedException>(() =>
+            accounted(new EvolutionDeploymentRetuneRequest(Envelope(), Policy()), CancellationToken.None));
+    }
+
+    [Fact]
     public async Task ProgramAdapter_UsesFreshCorrectnessBeforeFitnessAndPreservesBothCosts()
     {
         int fitnessCalls = 0;

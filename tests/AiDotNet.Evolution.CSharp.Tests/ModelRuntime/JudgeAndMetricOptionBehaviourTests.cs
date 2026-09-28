@@ -96,6 +96,27 @@ public sealed class JudgeAndMetricOptionBehaviourTests
         Assert.Equal(ProgramChatResponseFormat.Text, plain.LastOptions?.ResponseFormat);
     }
 
+    [Fact]
+    public void ResourceAccounting_on_a_task_changes_its_identity_by_cost_unit_semantics()
+    {
+        // The caller's evaluator owns ledger charging; the task only records which cost units its results are
+        // in, so a checkpoint taken under one cost-unit semantics cannot resume under another.
+        var ledger = new EvolutionResourceLedger("task-accounting",
+            new EvolutionResources(new Dictionary<string, decimal> { ["cost_units"] = 10 }));
+        string Hash(ProgramEvolutionResourceOptions? resources) => new ProgramEvolutionTask(
+            new DelegateProgramFitnessEvaluator(_ => 1),
+            options: new ProgramTaskOptions { ResourceAccounting = resources }).VersionHash;
+
+        string plain = Hash(null);
+        string first = Hash(new ProgramEvolutionResourceOptions(ledger, 1, "cost-units-v1"));
+        string second = Hash(new ProgramEvolutionResourceOptions(ledger, 1, "cost-units-v2"));
+
+        Assert.Equal(plain, Hash(null));
+        Assert.NotEqual(plain, first);
+        Assert.NotEqual(first, second);
+        Assert.Equal(first, Hash(new ProgramEvolutionResourceOptions(ledger, 5, "cost-units-v1")));
+    }
+
     private static LlmJudgeProgramFitnessEvaluator Judge(LlmFeedbackOptions options, FakeChatClient? client = null) =>
         new(client ?? new FakeChatClient(Answer), Measured(), null, options);
 
