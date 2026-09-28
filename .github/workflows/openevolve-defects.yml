@@ -37,3 +37,4 @@ jobs:
         with:
           name: openevolve-defects-${{ matrix.openevolve }}
           path: TestResults/openevolve-defects-${{ matrix.openevolve }}.json
+          if-no-files-found: error

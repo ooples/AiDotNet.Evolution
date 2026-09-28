@@ -133,33 +133,66 @@ def d4_cells_drift() -> dict:
 
 def d5_completion_order_decides() -> dict:
     # The controller applies whichever future it finds done first (process_parallel.py), and the database
-    # keeps the first arrival on a tie, so the archive depends on which worker finished first.
-    def winner(order: list[float]) -> str:
+    # keeps the first arrival on a tie. The same two equal-fitness programs for one cell are applied in
+    # both orders, each into a fresh database, and the cell's owner is compared.
+    def owner(order: tuple[str, str]) -> str:
         db = database()
         db.add(program(0.0, 0.0))
         db.add(program(0.0, 1.0))
-        arrivals = [program(0.7, 0.4) for _ in order]
-        for member in arrivals:
-            db.add(member)
-        cell = occupant(db, arrivals[0]) or occupant(db, arrivals[1])
-        owner = db.island_feature_maps[0].get(cell)
-        return "first" if owner == arrivals[0].id else "second" if owner == arrivals[1].id else "neither"
+        arrivals = {name: Program(id=name, code=f"pass  # {name}", metrics={"combined_score": 0.7, "x": 0.4})
+                    for name in order}
+        for name in order:
+            db.add(arrivals[name])
+        cell = occupant(db, arrivals["A"]) or occupant(db, arrivals["B"])
+        return str(db.island_feature_maps[0].get(cell)) if cell is not None else "neither"
 
-    a_then_b = winner([0.7, 0.7])
+    a_first = owner(("A", "B"))
+    b_first = owner(("B", "A"))
     return {
-        "reproduced": a_then_b == "first",
-        "observation": "two equal-fitness results for one cell: the cell keeps whichever the controller applied "
-        f"first ({a_then_b}); process_parallel.py applies futures in the order it finds them done",
+        "reproduced": a_first != b_first,
+        "observation": f"one cell, two equal-fitness programs: applied A then B the owner is {a_first}; "
+        f"applied B then A it is {b_first}. process_parallel.py applies futures in the order it finds them done",
     }
 
 
+def alive(pid: int) -> bool:
+    if sys.platform == "win32":
+        import ctypes
+
+        handle = ctypes.windll.kernel32.OpenProcess(0x1000, False, pid)  # PROCESS_QUERY_LIMITED_INFORMATION
+        if not handle:
+            return False
+        code = ctypes.c_ulong()
+        ctypes.windll.kernel32.GetExitCodeProcess(handle, ctypes.byref(code))
+        ctypes.windll.kernel32.CloseHandle(handle)
+        return code.value == 259  # STILL_ACTIVE
+    try:
+        os.kill(pid, 0)
+    except ProcessLookupError:
+        return False
+    except PermissionError:
+        return True
+    # A killed child of this process stays a zombie until reaped; that is not a running process.
+    stat = pathlib.Path(f"/proc/{pid}/stat")
+    if stat.exists():
+        return stat.read_text().rsplit(")", 1)[1].split()[0] != "Z"
+    return True
+
+
 def d6_timeout_keeps_running() -> dict:
+    # The hung evaluation detaches a child that would sleep for a minute, as the paired test's candidate does,
+    # then keeps looping. Both are checked at the same deadline as ours: the timeout plus one second.
     work = pathlib.Path(tempfile.mkdtemp(prefix="oe-d6-"))
     heartbeat = work / "heartbeat"
+    child_pid = work / "child.pid"
     evaluation = work / "evaluator.py"
     evaluation.write_text(
-        "import time\n"
+        "import subprocess, sys, time\n"
         "def evaluate(program_path):\n"
+        "    flags = 0x00000008 | 0x00000200 if sys.platform == 'win32' else 0\n"
+        "    child = subprocess.Popen([sys.executable, '-c', 'import time; time.sleep(60)'], creationflags=flags,\n"
+        "                             start_new_session=sys.platform != 'win32')\n"
+        f"    open({str(child_pid)!r}, 'w').write(str(child.pid))\n"
         "    deadline = time.time() + 6\n"
         "    count = 0\n"
         "    while time.time() < deadline:\n"
@@ -169,26 +202,33 @@ def d6_timeout_keeps_running() -> dict:
         "    return {'combined_score': 1.0}\n",
         encoding="utf-8",
     )
-    config = EvaluatorConfig(timeout=1, max_retries=0, cascade_evaluation=False, parallel_evaluations=1)
+    timeout = 1
+    config = EvaluatorConfig(timeout=timeout, max_retries=0, cascade_evaluation=False, parallel_evaluations=1)
     evaluator = Evaluator(config, str(evaluation))
 
-    async def run() -> tuple[dict, int, int, float]:
+    async def run() -> tuple[dict, int, int, float, int | None, bool]:
         started = time.monotonic()
         metrics = await evaluator.evaluate_program("def f():\n    return 1\n", "hung")
         returned = time.monotonic() - started
         at_return = int(heartbeat.read_text() or 0)
-        await asyncio.sleep(1.0)
+        await asyncio.sleep(max(0.0, started + timeout + 1 - time.monotonic()))
         a_second_later = int(heartbeat.read_text() or 0)
-        return metrics, at_return, a_second_later, returned
+        pid = int(child_pid.read_text()) if child_pid.exists() else None
+        return metrics, at_return, a_second_later, returned, pid, pid is not None and alive(pid)
 
-    metrics, at_return, later, returned = asyncio.run(run())
+    metrics, at_return, later, returned, pid, child_alive = asyncio.run(run())
+    if pid is not None and child_alive:
+        try:
+            os.kill(pid, 9 if sys.platform != "win32" else 1)
+        except OSError:
+            pass
     still_running = later > at_return
     return {
-        "reproduced": still_running,
-        "observation": f"evaluate_program returned after {returned:.2f}s with {sorted(metrics)}; the hung "
-        f"evaluation's heartbeat went {at_return} -> {later} over the following second",
+        "reproduced": still_running or child_alive,
+        "observation": f"evaluate_program returned after {returned:.2f}s with {sorted(metrics)}; at timeout + 1 s "
+        f"the hung evaluation's heartbeat had gone {at_return} -> {later} and its detached child "
+        f"(pid {pid}) was {'still running' if child_alive else 'gone' if pid is not None else 'never started'}",
     }
-
 
 def d7_bins_overridden() -> dict:
     requested = 10
