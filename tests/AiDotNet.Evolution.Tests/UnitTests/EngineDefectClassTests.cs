@@ -59,10 +59,11 @@ public sealed class EngineDefectClassTests
     [Fact]
     public async Task D5_the_result_does_not_depend_on_which_worker_finishes_first()
     {
-        // OpenEvolve commits results as workers finish, so the same seed gives different runs. Here the evaluator's delay
-        // is reversed between two runs, so evaluations finish in opposite orders, and the state must be identical.
-        async Task<string> Run(Func<int, int> delayMs, EvolutionExecutionMode mode = EvolutionExecutionMode.Deterministic)
+        // OpenEvolve commits results as workers finish, so the same seed gives different runs. Here a gate releases the
+        // in-flight evaluations in an order the test chooses, reversed between two runs, and the state must be identical.
+        async Task<(string Hash, IReadOnlyList<int> Order)> Run(Func<int, int> priority, EvolutionExecutionMode mode = EvolutionExecutionMode.Deterministic)
         {
+            const int inFlight = 4;
             var options = new EvolutionEngineOptions
             {
                 RunId = "d5",
@@ -71,36 +72,56 @@ public sealed class EngineDefectClassTests
                 MaxProposals = 80,
                 MaxGenerations = 80,
                 ProposalBatchSize = 8,
-                MaxDegreeOfParallelism = 4,
+                MaxDegreeOfParallelism = inFlight,
                 MigrationInterval = 0,
                 CheckpointInterval = 0,
                 ExecutionMode = mode,
                 // Continuous dispatch plans each proposal from the archive as it stands, so completion order could reach
                 // what later proposals see; batch dispatch would hide order by committing whole batches.
                 Dispatch = EvolutionDispatchMode.Continuous,
-                MaxInFlight = 4
+                MaxInFlight = inFlight
             };
-            var engine = new EvolutionEngine<TestGenome>(new OrderedDelayTask(delayMs), new IncrementVariation(),
+            var task = new GatedOrderTask(priority, inFlight);
+            var engine = new EvolutionEngine<TestGenome>(task, new IncrementVariation(),
                 _ => new MapElitesArchive<TestGenome>(new[] { new EvolutionDescriptorDefinition("x", 0, 100, 10, EvolutionOutOfRangePolicy.Clamp) }),
                 options);
-            return (await engine.RunAsync(Enumerable.Range(0, 8).Select(i => new TestGenome(i * 5)).ToArray())).StateHash;
+            string hash = (await engine.RunAsync(Enumerable.Range(0, 8).Select(i => new TestGenome(i * 5)).ToArray())).StateHash;
+            return (hash, task.CompletionOrder);
         }
 
-        string fastFirst = await Run(value => 1 + value % 7 * 3);
-        string slowFirst = await Run(value => 1 + (6 - value % 7) * 3);
-        Assert.Equal(fastFirst, slowFirst);
+        Func<int, int> lowFirst = value => value % 7;
+        Func<int, int> highFirst = value => 6 - value % 7;
+        var (lowHash, lowOrder) = await Run(lowFirst);
+        var (highHash, highOrder) = await Run(highFirst);
+        // The schedules really do reorder completions, observed rather than assumed from timing.
+        Assert.NotEqual(lowOrder, highOrder);
+        Assert.Equal(lowHash, highHash);
         // Control: committing in completion order, as OpenEvolve does, the two schedules do give different runs, so the
-        // schedules really reorder completions and the equality above is the deterministic mode's doing.
-        Assert.NotEqual(await Run(value => 1 + value % 7 * 3, EvolutionExecutionMode.Opportunistic),
-            await Run(value => 1 + (6 - value % 7) * 3, EvolutionExecutionMode.Opportunistic));
+        // equality above is the deterministic mode's doing.
+        var (lowOpportunistic, lowOpportunisticOrder) = await Run(lowFirst, EvolutionExecutionMode.Opportunistic);
+        var (highOpportunistic, highOpportunisticOrder) = await Run(highFirst, EvolutionExecutionMode.Opportunistic);
+        Assert.NotEqual(lowOpportunisticOrder, highOpportunisticOrder);
+        Assert.NotEqual(lowOpportunistic, highOpportunistic);
     }
 
-    // Completes after a delay that depends only on the genome, so a schedule changes completion order and nothing else.
-    private sealed class OrderedDelayTask(Func<int, int> delayMs) : IEvolutionTask<TestGenome>
+    // Holds each evaluation until the window is full, then releases the waiting one the schedule ranks first, so the
+    // completion order is chosen by the test rather than by timer resolution. Near the end of a run the window cannot
+    // fill; after a quiet interval the gate releases anyway, still in schedule order, so it cannot deadlock.
+    private sealed class GatedOrderTask(Func<int, int> priority, int window) : IEvolutionTask<TestGenome>
     {
-        public string Id => "ordered-delay";
-        public string VersionHash => "ordered-delay-v1";
-        public string EvaluatorVersionHash => "ordered-delay-evaluator-v1";
+        private static readonly TimeSpan QuietInterval = TimeSpan.FromMilliseconds(100);
+        private readonly object _gate = new();
+        private readonly List<(int Value, TaskCompletionSource<bool> Release)> _waiting = new();
+        private readonly List<int> _order = new();
+
+        public string Id => "gated-order";
+        public string VersionHash => "gated-order-v1";
+        public string EvaluatorVersionHash => "gated-order-evaluator-v1";
+
+        public IReadOnlyList<int> CompletionOrder
+        {
+            get { lock (_gate) return _order.ToArray(); }
+        }
 
         public ValueTask<EvolutionCanonicalGenome<TestGenome>> CanonicalizeAsync(TestGenome genome, CancellationToken cancellationToken = default) =>
             new(new EvolutionCanonicalGenome<TestGenome>(new TestGenome(genome.Value), genome.Value.ToString(System.Globalization.CultureInfo.InvariantCulture)));
@@ -109,8 +130,41 @@ public sealed class EngineDefectClassTests
             CancellationToken cancellationToken = default)
         {
             int value = candidate.CanonicalGenome.Genome.Value;
-            await Task.Delay(delayMs(value), cancellationToken);
+            var release = new TaskCompletionSource<bool>(TaskCreationOptions.RunContinuationsAsynchronously);
+            lock (_gate)
+            {
+                _waiting.Add((value, release));
+                if (_waiting.Count >= window) ReleaseFirst();
+            }
+
+            while (!release.Task.IsCompleted)
+            {
+                Task finished = await Task.WhenAny(release.Task, Task.Delay(QuietInterval, cancellationToken));
+                if (finished == release.Task) break;
+                cancellationToken.ThrowIfCancellationRequested();
+                lock (_gate)
+                {
+                    if (!release.Task.IsCompleted) ReleaseFirst();
+                }
+            }
+
             return EvolutionTaskResult.Completed(value % 17, new Dictionary<string, double> { ["x"] = Math.Min(100, value) });
+        }
+
+        // Caller holds _gate. Ties go to the smaller value, then to arrival order, so the schedule alone decides.
+        private void ReleaseFirst()
+        {
+            int best = 0;
+            for (int i = 1; i < _waiting.Count; i++)
+            {
+                int rank = priority(_waiting[i].Value), bestRank = priority(_waiting[best].Value);
+                if (rank < bestRank || (rank == bestRank && _waiting[i].Value < _waiting[best].Value)) best = i;
+            }
+
+            (int value, TaskCompletionSource<bool> release) = _waiting[best];
+            _waiting.RemoveAt(best);
+            _order.Add(value);
+            release.SetResult(true);
         }
     }
 }
