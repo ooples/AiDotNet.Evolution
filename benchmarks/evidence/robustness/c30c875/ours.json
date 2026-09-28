@@ -1,0 +1,61 @@
+{
+  "commit": "c30c875",
+  "framework": "net10.0",
+  "os": "windows",
+  "passed": 10,
+  "total": 10,
+  "public_options": 272,
+  "unexercised_options": 0,
+  "results": [
+    {
+      "test": "AiDotNet.Evolution.CSharp.Tests.Execution.HungCandidateDefectClassTests.D6_a_hung_candidate_and_the_process_it_detached_are_gone_within_the_timeout_plus_one_second",
+      "outcome": "Passed",
+      "duration": "00:00:03.4098567"
+    },
+    {
+      "test": "AiDotNet.Evolution.Tests.ArchiveDefectClassTests.D1_a_non_finite_quality_cannot_complete_so_it_can_never_hold_a_cell",
+      "outcome": "Passed",
+      "duration": "00:00:00.0009957"
+    },
+    {
+      "test": "AiDotNet.Evolution.Tests.ArchiveDefectClassTests.D3_a_program_that_loses_its_cell_is_not_an_archive_member",
+      "outcome": "Passed",
+      "duration": "00:00:00.0766384"
+    },
+    {
+      "test": "AiDotNet.Evolution.Tests.ArchiveDefectClassTests.D4_an_occupant_keeps_its_cell_when_later_values_arrive_outside_the_range",
+      "outcome": "Passed",
+      "duration": "00:00:00.0022005"
+    },
+    {
+      "test": "AiDotNet.Evolution.Tests.ArchiveDefectClassTests.D7_the_grid_has_exactly_the_requested_bins(bins: 1)",
+      "outcome": "Passed",
+      "duration": "00:00:00.0169344"
+    },
+    {
+      "test": "AiDotNet.Evolution.Tests.ArchiveDefectClassTests.D7_the_grid_has_exactly_the_requested_bins(bins: 10)",
+      "outcome": "Passed",
+      "duration": "00:00:00.0000243"
+    },
+    {
+      "test": "AiDotNet.Evolution.Tests.ArchiveDefectClassTests.D7_the_grid_has_exactly_the_requested_bins(bins: 37)",
+      "outcome": "Passed",
+      "duration": "00:00:00.0007379"
+    },
+    {
+      "test": "AiDotNet.Evolution.Tests.EngineDefectClassTests.D2_a_program_rejected_as_not_novel_leaves_nothing_behind",
+      "outcome": "Passed",
+      "duration": "00:00:00.3158363"
+    },
+    {
+      "test": "AiDotNet.Evolution.Tests.EngineDefectClassTests.D5_the_result_does_not_depend_on_which_worker_finishes_first",
+      "outcome": "Passed",
+      "duration": "00:00:00.5530216"
+    },
+    {
+      "test": "AiDotNet.Evolution.Tests.OptionCoverageTests.D8_every_public_option_is_exercised_by_a_test",
+      "outcome": "Passed",
+      "duration": "00:00:00.1460303"
+    }
+  ]
+}
