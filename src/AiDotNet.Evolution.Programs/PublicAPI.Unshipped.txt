@@ -1704,3 +1704,4 @@ override AiDotNet.Evolution.Programs.WeightedChatModel.GetHashCode() -> int
 override AiDotNet.Evolution.Programs.WeightedChatModel.ToString() -> string!
 static AiDotNet.Evolution.Programs.WeightedChatModel.operator !=(AiDotNet.Evolution.Programs.WeightedChatModel? left, AiDotNet.Evolution.Programs.WeightedChatModel? right) -> bool
 static AiDotNet.Evolution.Programs.WeightedChatModel.operator ==(AiDotNet.Evolution.Programs.WeightedChatModel? left, AiDotNet.Evolution.Programs.WeightedChatModel? right) -> bool
+const AiDotNet.Evolution.Programs.WeightedEnsembleChatClient.MaximumMembers = 256 -> int

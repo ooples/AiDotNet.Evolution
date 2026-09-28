@@ -67,11 +67,31 @@ public sealed class WeightedEnsembleChatClientTests
     }
 
     [Fact]
+    public async Task A_provider_failure_is_counted_even_when_the_caller_has_cancelled()
+    {
+        using var cancellation = new CancellationTokenSource();
+        cancellation.Cancel();
+        var ensemble = new WeightedEnsembleChatClient(new[] { new WeightedChatModel(new NamedClient("broken", new HttpRequestException("down")), 1) });
+        await Assert.ThrowsAsync<HttpRequestException>(() => ensemble.GetResponseAsync(new[] { ProgramChatMessage.User("x") }, null, cancellation.Token));
+        Assert.Equal(1, ensemble.GetMemberStatistics()[0].Failures);
+    }
+
+    [Fact]
     public void Invalid_ensembles_are_refused()
     {
         Assert.Throws<ArgumentException>(() => new WeightedEnsembleChatClient(Array.Empty<WeightedChatModel>()));
         Assert.Throws<ArgumentException>(() => new WeightedEnsembleChatClient(new[] { new WeightedChatModel(new NamedClient("a"), 0) }));
         Assert.Throws<ArgumentException>(() => new WeightedEnsembleChatClient(new[] { new WeightedChatModel(new NamedClient("a"), double.NaN) }));
+        Assert.Throws<ArgumentException>(() => new WeightedEnsembleChatClient(new[]
+        {
+            new WeightedChatModel(new NamedClient("a"), double.MaxValue), new WeightedChatModel(new NamedClient("b"), double.MaxValue)
+        }));
+        Assert.Throws<ArgumentException>(() => new WeightedEnsembleChatClient(
+            Enumerable.Repeat(new WeightedChatModel(new NamedClient("a"), 1), int.MaxValue)));
+        // Distinct configurations never share an identity, even when ids contain the separators.
+        Assert.NotEqual(
+            new WeightedEnsembleChatClient(new[] { new WeightedChatModel(new NamedClient("a:1,b"), 1) }).ModelId,
+            new WeightedEnsembleChatClient(new[] { new WeightedChatModel(new NamedClient("a"), 1), new WeightedChatModel(new NamedClient("b"), 1) }).ModelId);
     }
 
     [Fact]

@@ -23,6 +23,9 @@ public sealed record WeightedChatModel(IProgramChatClient Client, double Weight)
 /// </remarks>
 public sealed class WeightedEnsembleChatClient : IProgramChatClient
 {
+    /// <summary>The most members one ensemble may have.</summary>
+    public const int MaximumMembers = 256;
+
     private readonly WeightedChatModel[] _members;
     private readonly double[] _cumulative;
     private readonly long[] _calls;
@@ -33,21 +36,32 @@ public sealed class WeightedEnsembleChatClient : IProgramChatClient
     public WeightedEnsembleChatClient(IEnumerable<WeightedChatModel> members)
     {
         ProgramGuard.NotNull(members);
-        _members = members.ToArray();
+        // Bounded before materializing, so an unbounded sequence cannot exhaust memory.
+        var list = new List<WeightedChatModel>();
+        foreach (WeightedChatModel member in members)
+        {
+            if (list.Count == MaximumMembers)
+                throw new ArgumentException($"An ensemble may have at most {MaximumMembers} models.", nameof(members));
+            list.Add(member);
+        }
+        _members = list.ToArray();
         if (_members.Length == 0) throw new ArgumentException("An ensemble needs at least one model.", nameof(members));
         if (_members.Any(member => member is null || member.Client is null))
             throw new ArgumentException("Ensemble members and their clients cannot be null.", nameof(members));
         if (_members.Any(member => double.IsNaN(member.Weight) || double.IsInfinity(member.Weight) || member.Weight <= 0))
             throw new ArgumentException("Every weight must be positive and finite.", nameof(members));
         double total = _members.Sum(member => member.Weight);
+        if (double.IsInfinity(total)) throw new ArgumentException("The weights' total must be finite.", nameof(members));
         _cumulative = new double[_members.Length];
         double running = 0;
         for (int i = 0; i < _members.Length; i++) { running += _members[i].Weight / total; _cumulative[i] = running; }
         _cumulative[_members.Length - 1] = 1.0;
         _calls = new long[_members.Length];
         _failures = new long[_members.Length];
+        // Length-prefixed, so ids containing the separators cannot make two different ensembles share an identity.
         ModelId = "ensemble(" + string.Join(",", _members.Select(member =>
-            member.Client.ModelId + ":" + member.Weight.ToString("R", CultureInfo.InvariantCulture))) + ")";
+            member.Client.ModelId.Length.ToString(CultureInfo.InvariantCulture) + ":" + member.Client.ModelId + ":" +
+            member.Weight.ToString("R", CultureInfo.InvariantCulture))) + ")";
     }
 
     /// <inheritdoc/>
@@ -80,7 +94,7 @@ public sealed class WeightedEnsembleChatClient : IProgramChatClient
             ProgramChatResponse response = await member.GetResponseAsync(messages, options, cancellationToken).ConfigureAwait(false);
             return new ProgramChatResponse(response.Message, response.Usage, response.ModelId ?? member.ModelId);
         }
-        catch (Exception) when (!cancellationToken.IsCancellationRequested)
+        catch (Exception exception) when (!(exception is OperationCanceledException && cancellationToken.IsCancellationRequested))
         {
             Interlocked.Increment(ref _failures[index]);
             throw;
