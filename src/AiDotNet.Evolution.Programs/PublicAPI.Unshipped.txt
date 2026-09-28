@@ -1683,3 +1683,5 @@ static AiDotNet.Evolution.Programs.Experience.ProgramExperienceQuery.operator !=
 static AiDotNet.Evolution.Programs.Experience.ProgramExperienceQuery.operator ==(AiDotNet.Evolution.Programs.Experience.ProgramExperienceQuery? left, AiDotNet.Evolution.Programs.Experience.ProgramExperienceQuery? right) -> bool
 static AiDotNet.Evolution.Programs.Experience.ProgramExperienceRetrieval.operator !=(AiDotNet.Evolution.Programs.Experience.ProgramExperienceRetrieval? left, AiDotNet.Evolution.Programs.Experience.ProgramExperienceRetrieval? right) -> bool
 static AiDotNet.Evolution.Programs.Experience.ProgramExperienceRetrieval.operator ==(AiDotNet.Evolution.Programs.Experience.ProgramExperienceRetrieval? left, AiDotNet.Evolution.Programs.Experience.ProgramExperienceRetrieval? right) -> bool
+AiDotNet.Evolution.Programs.ProgramSandboxOptions.TimeProvider.get -> System.TimeProvider!
+AiDotNet.Evolution.Programs.ProgramSandboxOptions.TimeProvider.set -> void
