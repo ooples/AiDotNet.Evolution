@@ -1685,3 +1685,22 @@ static AiDotNet.Evolution.Programs.Experience.ProgramExperienceRetrieval.operato
 static AiDotNet.Evolution.Programs.Experience.ProgramExperienceRetrieval.operator ==(AiDotNet.Evolution.Programs.Experience.ProgramExperienceRetrieval? left, AiDotNet.Evolution.Programs.Experience.ProgramExperienceRetrieval? right) -> bool
 AiDotNet.Evolution.Programs.ProgramTaskOptions.MetricDescriptors.get -> System.Collections.Generic.IList<string!>!
 AiDotNet.Evolution.Programs.ProgramTaskOptions.MetricDescriptors.set -> void
+AiDotNet.Evolution.Programs.WeightedChatModel
+AiDotNet.Evolution.Programs.WeightedChatModel.<Clone>$() -> AiDotNet.Evolution.Programs.WeightedChatModel!
+AiDotNet.Evolution.Programs.WeightedChatModel.Client.get -> AiDotNet.Evolution.Programs.IProgramChatClient!
+AiDotNet.Evolution.Programs.WeightedChatModel.Client.init -> void
+AiDotNet.Evolution.Programs.WeightedChatModel.Deconstruct(out AiDotNet.Evolution.Programs.IProgramChatClient! Client, out double Weight) -> void
+AiDotNet.Evolution.Programs.WeightedChatModel.Equals(AiDotNet.Evolution.Programs.WeightedChatModel? other) -> bool
+AiDotNet.Evolution.Programs.WeightedChatModel.Weight.get -> double
+AiDotNet.Evolution.Programs.WeightedChatModel.Weight.init -> void
+AiDotNet.Evolution.Programs.WeightedChatModel.WeightedChatModel(AiDotNet.Evolution.Programs.IProgramChatClient! Client, double Weight) -> void
+AiDotNet.Evolution.Programs.WeightedEnsembleChatClient
+AiDotNet.Evolution.Programs.WeightedEnsembleChatClient.GetMemberStatistics() -> System.Collections.Generic.IReadOnlyList<(string! ModelId, long Calls, long Failures)>!
+AiDotNet.Evolution.Programs.WeightedEnsembleChatClient.GetResponseAsync(System.Collections.Generic.IReadOnlyList<AiDotNet.Evolution.Programs.ProgramChatMessage!>! messages, AiDotNet.Evolution.Programs.ProgramChatOptions? options = null, System.Threading.CancellationToken cancellationToken = default(System.Threading.CancellationToken)) -> System.Threading.Tasks.Task<AiDotNet.Evolution.Programs.ProgramChatResponse!>!
+AiDotNet.Evolution.Programs.WeightedEnsembleChatClient.ModelId.get -> string!
+AiDotNet.Evolution.Programs.WeightedEnsembleChatClient.WeightedEnsembleChatClient(System.Collections.Generic.IEnumerable<AiDotNet.Evolution.Programs.WeightedChatModel!>! members) -> void
+override AiDotNet.Evolution.Programs.WeightedChatModel.Equals(object? obj) -> bool
+override AiDotNet.Evolution.Programs.WeightedChatModel.GetHashCode() -> int
+override AiDotNet.Evolution.Programs.WeightedChatModel.ToString() -> string!
+static AiDotNet.Evolution.Programs.WeightedChatModel.operator !=(AiDotNet.Evolution.Programs.WeightedChatModel? left, AiDotNet.Evolution.Programs.WeightedChatModel? right) -> bool
+static AiDotNet.Evolution.Programs.WeightedChatModel.operator ==(AiDotNet.Evolution.Programs.WeightedChatModel? left, AiDotNet.Evolution.Programs.WeightedChatModel? right) -> bool
