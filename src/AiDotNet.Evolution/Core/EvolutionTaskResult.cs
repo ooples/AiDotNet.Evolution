@@ -31,6 +31,9 @@ public sealed class EvolutionTaskResult
     /// <summary>The largest number of artifacts one result may carry before the engine's own budgets apply.</summary>
     public const int MaximumArtifacts = 64;
 
+    /// <summary>The largest total binary artifact content one result may carry.</summary>
+    public const long MaximumBinaryContentBytes = 256L * 1024 * 1024;
+
     /// <summary>The largest number of diagnostics one result may carry.</summary>
     public const int MaximumDiagnostics = 64;
 
@@ -104,18 +107,29 @@ public sealed class EvolutionTaskResult
         if (diagnosticCopy.Any(item => item is null)) throw new ArgumentException("Diagnostics cannot contain null entries.", nameof(diagnostics));
         EvolutionArtifact[] artifactCopy = ToBoundedArray(artifacts, MaximumArtifacts, nameof(artifacts));
         if (artifactCopy.Any(item => item is null)) throw new ArgumentException("Artifacts cannot contain null entries.", nameof(artifacts));
+        // FromBytes bounds one payload; this bounds their sum, before the engine copies or stores anything.
+        if (artifactCopy.Sum(item => (long)item.ContentLength) > MaximumBinaryContentBytes)
+            throw new ArgumentException($"Binary artifacts cannot exceed {MaximumBinaryContentBytes} bytes in total.", nameof(artifacts));
 
         Status = status;
         Quality = quality;
         Direction = direction;
-        _descriptors = new ReadOnlyDictionary<string, double>(descriptorCopy);
-        _metrics = new ReadOnlyDictionary<string, double>(metricCopy);
-        _objectives = Array.AsReadOnly(objectiveCopy);
-        _constraintViolations = Array.AsReadOnly(violationCopy);
+        // Empty parts share one immutable instance: the engine keeps a result per evaluated genome, and most have no
+        // metrics, objectives, violations, diagnostics or artifacts, so separate empty wrappers were half of each one.
+        _descriptors = descriptorCopy.Count == 0 ? EmptyNamedValues : new ReadOnlyDictionary<string, double>(descriptorCopy);
+        _metrics = metricCopy.Count == 0 ? EmptyNamedValues : new ReadOnlyDictionary<string, double>(metricCopy);
+        _objectives = objectiveCopy.Length == 0 ? EmptyValues : Array.AsReadOnly(objectiveCopy);
+        _constraintViolations = violationCopy.Length == 0 ? EmptyValues : Array.AsReadOnly(violationCopy);
         CostUnits = costUnits;
-        _diagnostics = Array.AsReadOnly(diagnosticCopy);
-        _artifacts = Array.AsReadOnly(artifactCopy);
+        _diagnostics = diagnosticCopy.Length == 0 ? EmptyDiagnostics : Array.AsReadOnly(diagnosticCopy);
+        _artifacts = artifactCopy.Length == 0 ? EmptyArtifacts : Array.AsReadOnly(artifactCopy);
     }
+
+    private static readonly ReadOnlyDictionary<string, double> EmptyNamedValues =
+        new(new Dictionary<string, double>(StringComparer.Ordinal));
+    private static readonly ReadOnlyCollection<double> EmptyValues = Array.AsReadOnly(Array.Empty<double>());
+    private static readonly ReadOnlyCollection<EvolutionDiagnostic> EmptyDiagnostics = Array.AsReadOnly(Array.Empty<EvolutionDiagnostic>());
+    private static readonly ReadOnlyCollection<EvolutionArtifact> EmptyArtifacts = Array.AsReadOnly(Array.Empty<EvolutionArtifact>());
 
     /// <summary>Gets the terminal status.</summary>
     public EvolutionEvaluationStatus Status { get; }

@@ -12,6 +12,7 @@ aidotnet-evolve compare <traceA> <traceB>
 aidotnet-evolve export  <trace> <output-directory> [--include-source <program-file>]
 aidotnet-evolve inspect-export <export-directory>
 aidotnet-evolve report  <trace> <output.html>
+aidotnet-evolve watch   <trace> <output.html> [--interval <seconds>]
 ```
 
 Exit codes: `0` success; `2` a usage or input error (the message is on standard error); `3` a run in which every
@@ -59,9 +60,14 @@ run file's directory. Unknown fields are refused, and enums are written as names
 | `runId` | yes | Checkpoint identity. `resume` continues the run with this id. |
 | `initialProgram` | yes | The seed program. It is evaluated first and needs no model call. |
 | `evaluator` | yes | A script that reads the candidate source on **standard input** and prints one JSON object with a numeric `quality`, and optionally `metrics`, `descriptors` and `artifacts`. It must contain the entry-point marker `evaluate`. |
-| `model.endpoint` | yes | An OpenAI-compatible base URL; requests go to `<endpoint>/chat/completions`. Plain `http` is accepted only for loopback addresses. |
+| `model.provider` | no (`OpenAiCompatible`) | `OpenAiCompatible`, `ClaudeCode` (the `claude` CLI and its login; run isolated from your profile) or `Manual` (a person answers each prompt through `model.manualQueue`). |
+| `model.endpoint` | for `OpenAiCompatible` | An OpenAI-compatible base URL; requests go to `<endpoint>/chat/completions`. Plain `http` is accepted only for loopback addresses. |
 | `model.name` | yes | The model name sent in each request. |
 | `model.apiKeyEnvironmentVariable` | no | The environment variable holding a bearer key. Omit it for a local endpoint that needs none. The key never appears in the run file. |
+| `model.topP` / `model.reasoningEffort` | no | Nucleus sampling in (0, 1], and `Low`, `Medium` or `High` for models that support reasoning effort. |
+| `model.maxRetries` / `model.retryDelaySeconds` | no (3 / 5) | Retries for throttled (429), failed (5xx) or timed-out calls; the delay doubles each retry. Other errors are not retried. |
+| `model.maxBudgetUsd` / `model.claudeExecutable` | no | `ClaudeCode` only: a per-call spending cap passed as `--max-budget-usd`, and the executable (`claude` on PATH by default). |
+| `model.manualQueue` / `model.manualTimeoutSeconds` | for `Manual` | The directory where `NNNNNN.prompt.json` is written and `NNNNNN.response.txt` is read (write it under another name, then rename), and how long to wait for each answer (default 3600). |
 | `budget.maxEvaluations` | yes | The total number of evaluations, seed included. `resume` continues toward the same total, so raise it in the run file to extend a finished run. |
 | `budget.parallelism` | no (1) | Concurrent evaluations. It is also the proposal batch size, so a graceful stop takes effect within one round. Keep it unchanged between `run` and `resume`: the batch size is part of the checkpoint's compatibility, so a different value is refused on resume. |
 | `output` | yes | Holds `checkpoints/`, one `trace-NNN.jsonl` per run or resume session, and `best.<ext>`. |

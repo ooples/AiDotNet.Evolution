@@ -28,6 +28,7 @@ public sealed class EvolutionSearchGenome : IImmutableEvolutionGenome<EvolutionS
         SchemaHash = schemaHash;
         var copy = new SortedDictionary<string, EvolutionParameterValue>(StringComparer.Ordinal);
         foreach (KeyValuePair<string, EvolutionParameterValue> pair in values) copy.Add(pair.Key, pair.Value);
+        _storage = copy;
         Values = new ReadOnlyDictionary<string, EvolutionParameterValue>(copy);
         Identity = EvolutionHash.Combine(new[] { "search-genome-v1", schemaHash }.Concat(copy.Select(pair =>
             EvolutionHash.Combine(new[] { pair.Key, pair.Value.Canonical }))));
@@ -51,12 +52,32 @@ public sealed class EvolutionSearchGenome : IImmutableEvolutionGenome<EvolutionS
         return (TEnum)System.Enum.Parse(typeof(TEnum), value, ignoreCase: false);
     }
     /// <inheritdoc/>
-    public EvolutionSearchGenome CreateOwnedSnapshot() => new(SchemaHash, Values);
+    /// <remarks>
+    /// A new instance, as the contract requires, sharing this one's values and identity: both are immutable (the values
+    /// sit in a private dictionary nothing mutates), so re-copying and re-hashing them only cost allocations.
+    /// </remarks>
+    public EvolutionSearchGenome CreateOwnedSnapshot() => new(this);
+
+    // A distinct genome with its own read-only view over the same storage. The storage is private and never mutated
+    // after construction, so sharing it is safe, and the identity it hashes to is reused rather than recomputed.
+    private EvolutionSearchGenome(EvolutionSearchGenome source)
+    {
+        SchemaHash = source.SchemaHash;
+        _storage = source._storage;
+        Values = new ReadOnlyDictionary<string, EvolutionParameterValue>(_storage);
+        Identity = source.Identity;
+    }
+
+    private readonly SortedDictionary<string, EvolutionParameterValue> _storage;
+
+    internal EvolutionSearchGenome CreateValidatedCopy() => new(this);
 }
 
 /// <summary>An immutable mixed/conditional parameter space, sampler, feature encoder and checkpoint codec.</summary>
 public sealed class EvolutionSearchSpace : IEvolutionGenomeCodec<EvolutionSearchGenome>
 {
+    private readonly HashSet<string> _parameterNames;
+
     internal EvolutionSearchSpace(EvolutionParameter[] parameters)
     {
         if (parameters.Length == 0) throw new ArgumentException("A search space needs at least one parameter.", nameof(parameters));
@@ -71,6 +92,7 @@ public sealed class EvolutionSearchSpace : IEvolutionGenomeCodec<EvolutionSearch
             prior.Add(parameter.Name, parameter);
         }
         Parameters = Array.AsReadOnly(parameters);
+        _parameterNames = new HashSet<string>(parameters.Select(parameter => parameter.Name), StringComparer.Ordinal);
         FeatureCount = parameters.Sum(parameter => parameter.Kind == EvolutionParameterKind.Categorical ? parameter.Categories.Count + 1 : 2);
         if (FeatureCount > 4096) throw new ArgumentException("The expanded feature vector exceeds 4096 coordinates.", nameof(parameters));
         VersionHash = EvolutionHash.Combine(new[] { "typed-search-space-v1" }.Concat(parameters.Select(parameter => parameter.DefinitionHash)));
@@ -92,7 +114,7 @@ public sealed class EvolutionSearchSpace : IEvolutionGenomeCodec<EvolutionSearch
         foreach (KeyValuePair<string, EvolutionParameterValue> pair in values)
         {
             if (supplied.Count >= Parameters.Count || pair.Key is null || supplied.ContainsKey(pair.Key) ||
-                !Parameters.Any(parameter => parameter.Name == pair.Key) || pair.Value is null)
+                !_parameterNames.Contains(pair.Key) || pair.Value is null)
                 throw new ArgumentException("Unknown, duplicate, null or excessive parameter value.", nameof(values));
             supplied.Add(pair.Key, pair.Value);
         }
@@ -122,7 +144,11 @@ public sealed class EvolutionSearchSpace : IEvolutionGenomeCodec<EvolutionSearch
     {
         Guard.NotNull(genome);
         if (genome.SchemaHash != VersionHash) throw new ArgumentException("The genome belongs to a different search space.", nameof(genome));
-        return CreateGenome(genome.Values);
+        // A genome can only be constructed by a space (the constructor is internal), and one stamped with this space's
+        // version hash was validated by a space with identical definitions. So the independently owned copy this method
+        // promises shares the immutable values and identity instead of rebuilding and re-hashing them on every call,
+        // which was the dominant per-evaluation allocation.
+        return genome.CreateValidatedCopy();
     }
 
     /// <summary>Encodes activity explicitly and categories one-hot; inactive and minimum-valued parameters remain distinguishable.</summary>
