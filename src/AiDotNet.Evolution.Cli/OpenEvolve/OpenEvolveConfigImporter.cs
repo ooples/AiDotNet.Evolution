@@ -75,7 +75,13 @@ internal static class OpenEvolveConfigImporter
         int maxIterations = iterations ?? (int)(Integer(merged["max_iterations"]) ?? 10000);
         if (maxIterations < 1) throw new InvalidDataException("max_iterations must be at least 1.");
         List<RunMetricDescriptor> descriptors = Descriptors(merged, notes);
-        int timeout = (int)(Integer(merged["evaluator.timeout"]) ?? 300);
+        long configuredTimeout = Integer(merged["evaluator.timeout"]) ?? 300;
+        // OpenEvolve has no upper bound; the sandbox refuses a wall clock past a day. Cap it and say so.
+        int stageCount = Boolean(merged["evaluator.cascade_evaluation"]) ? 3 : 1;
+        int timeout = (int)Math.Clamp(configuredTimeout, 1, (ProgramSandboxLimitOptions.MaxTimeLimitSeconds - 10) / stageCount);
+        if (timeout != configuredTimeout)
+            notes.Add($"evaluator.timeout = {configuredTimeout} s: OpenEvolve sets no ceiling, but the sandbox limits each " +
+                      $"evaluation to {ProgramSandboxLimitOptions.MaxTimeLimitSeconds} s, so each stage runs for at most {timeout} s.");
         int? memory = (int?)Integer(merged["evaluator.memory_limit_mb"]);
         if (memory is null) notes.Add("evaluator.memory_limit_mb is null: OpenEvolve sets no limit, the sandbox caps each evaluation at " +
                                       ImportedMemoryLimitMb + " MiB.");
@@ -96,9 +102,9 @@ internal static class OpenEvolveConfigImporter
             Output = ".",
             Model = models[0],
             AdditionalModels = models.Skip(1).ToList(),
-            Language = language is null ? ProgramLanguage.Python : ParseLanguage(language),
+            Language = language is null ? ProgramLanguage.Python : ParseLanguage(language, notes),
             Mode = Boolean(merged["diff_based_evolution"]) ? ProgramEvolutionMode.Diff : ProgramEvolutionMode.FullRewrite,
-            Prompt = Prompt(merged, Path.GetDirectoryName(Path.GetFullPath(configPath)) ?? "."),
+            Prompt = Prompt(merged),
             LlmFeedback = Boolean(merged["evaluator.use_llm_feedback"])
                 ? new RunLlmFeedback
                 {
@@ -168,10 +174,12 @@ internal static class OpenEvolveConfigImporter
         "system_message_with_changes_description", "top_program", "user_message_with_changes_description"
     };
 
-    private static RunPrompt Prompt(Dictionary<string, object?> merged, string configDirectory)
+    private static RunPrompt Prompt(Dictionary<string, object?> merged)
     {
         string? templates = merged["prompt.template_dir"] as string;
-        string? templateDirectory = templates is null ? null : Path.GetFullPath(Path.Combine(configDirectory, templates));
+        // OpenEvolve opens template_dir as given, so a relative path is relative to the working directory (its examples
+        // write "examples/<name>/prompts" and run from the repository root), not to the config file.
+        string? templateDirectory = templates is null ? null : Path.GetFullPath(templates);
         bool IsTemplate(string name) => OpenEvolveTemplates.Contains(name) ||
             (templateDirectory is not null && File.Exists(Path.Combine(templateDirectory, name + ".txt")));
         string? system = merged["prompt.system_message"] as string;
@@ -313,13 +321,15 @@ internal static class OpenEvolveConfigImporter
         _ => throw new InvalidDataException("llm.provider = " + provider + ": not supported (openai or claude_code).")
     };
 
-    private static ProgramLanguage ParseLanguage(string language) => language.ToLowerInvariant() switch
+    // OpenEvolve's language is only a label for prompts and code fences; the evaluator decides how a candidate runs.
+    // A language with no dedicated support (a prompt, "text", "markdown") is evolved as generic text, as there.
+    private static ProgramLanguage ParseLanguage(string language, List<string> notes)
     {
-        "python" => ProgramLanguage.Python,
-        _ => Enum.TryParse(language, ignoreCase: true, out ProgramLanguage parsed)
-            ? parsed
-            : throw new InvalidDataException("language = " + language + ": not a language this CLI runs.")
-    };
+        if (string.Equals(language, "python", StringComparison.OrdinalIgnoreCase)) return ProgramLanguage.Python;
+        if (Enum.TryParse(language, ignoreCase: true, out ProgramLanguage parsed) && Enum.IsDefined(parsed)) return parsed;
+        notes.Add("language = " + language + ": no dedicated support, so the program is evolved as generic text.");
+        return ProgramLanguage.Generic;
+    }
 
     private static ProgramReasoningEffort ParseEffort(string effort) =>
         Enum.TryParse(effort, ignoreCase: true, out ProgramReasoningEffort parsed)

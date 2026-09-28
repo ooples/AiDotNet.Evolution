@@ -44,15 +44,37 @@ class StandInModel(http.server.BaseHTTPRequestHandler):
         pass
 
 
+def first(directory, patterns):
+    for pattern in patterns:
+        found = sorted(p for p in directory.glob(pattern) if p.is_file())
+        if found:
+            return found[0]
+    return None
+
+
 def find_files(example):
-    """The example's task: its own files, or else the first subdirectory that holds a complete one."""
+    """The example's task: its own files, or else the first subdirectory that holds one.
+
+    OpenEvolve takes the initial program, evaluator and config as arguments, so examples name them freely
+    (initial_program.py, init_program.py, initial_prompt.txt; evaluator.py, evaluator_stub.py; config.yaml,
+    config.yml). The config is optional there: without one, OpenEvolve runs on its defaults, and so does this.
+    """
     for directory in [example] + sorted(p for p in example.rglob("*") if p.is_dir()):
-        configs = sorted(directory.glob("config*.yaml")) or sorted(directory.glob("*config*.yaml"))
-        initial = next(iter(sorted(directory.glob("initial_program.*"))), None)
-        evaluator = directory / "evaluator.py"
-        if configs and initial is not None and evaluator.exists():
-            return configs[0], initial, evaluator
+        initial = first(directory, ["initial_program.*", "init_program.*", "initial_*.*"])
+        evaluator = first(directory, ["evaluator.py", "evaluator*.py"])
+        if initial is not None and evaluator is not None:
+            config = first(directory, ["config.yaml", "config.yml", "config*.yaml", "config*.yml", "*config*.yaml"])
+            return config, initial, evaluator
     return None, None, None
+
+
+def first_diagnostic(output):
+    for trace in sorted(output.glob("trace-*.jsonl")):
+        for line in trace.read_text(encoding="utf-8", errors="replace").splitlines():
+            record = json.loads(line) if line.strip().startswith("{") else {}
+            for diagnostic in record.get("diagnostics") or []:
+                return (diagnostic.get("code", "") + ": " + diagnostic.get("message", ""))[:300]
+    return "no evaluation completed and no diagnostic was recorded"
 
 
 def classify(stdout, stderr):
@@ -86,25 +108,38 @@ def main():
     rows = []
     for example in sorted(p for p in (Path(args.upstream) / "examples").iterdir() if p.is_dir()):
         config, initial, evaluator = find_files(example)
-        if config is None or initial is None or evaluator is None:
-            rows.append(dict(example=example.name, status="no-config", reason="no directory holds a config.yaml, initial_program and evaluator.py"))
+        if initial is None or evaluator is None:
+            rows.append(dict(example=example.name, status="no-task",
+                             reason="no directory holds both an initial program and an evaluator"))
+            print(json.dumps(rows[-1]), flush=True)
             continue
         SEED_PROGRAM["text"] = initial.read_text(encoding="utf-8", errors="replace")
         # The stand-in endpoint replaces the example's api_base, as OPENAI_API_BASE would, by rewriting a copy.
         work = Path(tempfile.mkdtemp(prefix="oe-smoke-" + example.name + "-"))
-        text = config.read_text(encoding="utf-8", errors="replace")
+        text = config.read_text(encoding="utf-8", errors="replace") if config is not None else ""
         text = re.sub(r"(?m)^(\s*api_base:).*$", r"\1 " + endpoint, text)
         text = re.sub(r"(?m)^(\s*-?\s*name:)\s*[\"']?[^\"'\n]+[\"']?\s*$", r"\1 stand-in", text)
-        copied = work / config.name
+        # Every provider is pointed at the stand-in, so an example written for claude_code runs without the CLI.
+        text = re.sub(r"(?m)^(\s*-?\s*provider:).*$", r"\1 openai", text)
+        copied = work / (config.name if config is not None else "config.yaml")
         copied.write_text(text, encoding="utf-8")
         run = subprocess.run(
             ["dotnet", args.cli, "run", "--openevolve-config", str(copied), str(initial), str(evaluator),
              "--iterations", str(args.iterations), "--output", str(work / "out"), "--python", args.python],
-            capture_output=True, text=True, timeout=1800, env=env, cwd=str(initial.parent))
+            # OpenEvolve's examples are run from the repository root (openevolve-run.py examples/<name>/...), and some
+            # configs name paths relative to it, such as lm_eval's template_dir.
+            capture_output=True, text=True, timeout=1800, env=env, cwd=str(Path(args.upstream)))
         if run.returncode == 0:
             result = json.loads(run.stdout)
-            rows.append(dict(example=example.name, status="passed", completed=result.get("CompletedEvaluations"),
-                             best=result.get("BestQuality")))
+            completed = result.get("CompletedEvaluations") or 0
+            if completed > 0:
+                rows.append(dict(example=example.name, status="passed", completed=completed,
+                                 best=result.get("BestQuality")))
+            else:
+                # The run finished but no evaluation completed: the evaluator failed on every program, usually for a
+                # missing dependency or data file. Report the evaluator's own diagnostic.
+                rows.append(dict(example=example.name, status="evaluator", reason=first_diagnostic(work / "out"),
+                                 completed=0))
         else:
             status, reason = classify(run.stdout, run.stderr)
             rows.append(dict(example=example.name, status=status, reason=reason, exit=run.returncode))

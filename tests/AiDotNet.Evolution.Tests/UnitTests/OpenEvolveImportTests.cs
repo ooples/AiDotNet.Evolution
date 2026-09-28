@@ -212,14 +212,97 @@ public sealed class OpenEvolveImportTests
         }
     }
 
-    private static OpenEvolveImport Import(TemporaryDirectory directory, string yaml)
+    [Fact]
+    public void An_evaluator_timeout_past_the_sandbox_ceiling_is_capped_with_a_note()
+    {
+        using var directory = new TemporaryDirectory();
+        OpenEvolveImport ordinary = Import(directory, "llm:\n  name: m\nevaluator:\n  timeout: 300\n");
+        Assert.Equal(300, ordinary.Run.Budget.EvaluationTimeLimitSeconds);
+        Assert.DoesNotContain(ordinary.Notes, note => note.StartsWith("evaluator.timeout", StringComparison.Ordinal));
+
+        // arc_benchmark sets 180,000 s; every stage together must fit the sandbox's ceiling.
+        OpenEvolveImport single = Import(directory, "llm:\n  name: m\nevaluator:\n  timeout: 180000\n  cascade_evaluation: false\n");
+        Assert.Equal(ProgramSandboxLimitOptions.MaxTimeLimitSeconds - 10, single.Run.Budget.EvaluationTimeLimitSeconds);
+        OpenEvolveImport cascade = Import(directory, "llm:\n  name: m\nevaluator:\n  timeout: 180000\n  cascade_evaluation: true\n");
+        Assert.Equal((ProgramSandboxLimitOptions.MaxTimeLimitSeconds - 10) / 3, cascade.Run.Budget.EvaluationTimeLimitSeconds);
+        Assert.Contains(cascade.Notes, note => note.StartsWith("evaluator.timeout = 180000 s", StringComparison.Ordinal));
+    }
+
+    [Fact]
+    public void A_language_without_dedicated_support_is_evolved_as_generic_text()
+    {
+        using var directory = new TemporaryDirectory();
+        Assert.Equal(ProgramLanguage.Python, Import(directory, "llm:\n  name: m\nlanguage: python\n").Run.Language);
+        Assert.Equal(ProgramLanguage.Rust, Import(directory, "llm:\n  name: m\nlanguage: rust\n").Run.Language);
+
+        OpenEvolveImport text = Import(directory, "llm:\n  name: m\nlanguage: text\n");
+        Assert.Equal(ProgramLanguage.Generic, text.Run.Language);
+        Assert.Contains(text.Notes, note => note.StartsWith("language = text", StringComparison.Ordinal));
+    }
+
+    [Fact]
+    public void A_relative_template_dir_is_resolved_against_the_working_directory_as_openevolve_does()
+    {
+        using var directory = new TemporaryDirectory();
+        string prompts = Path.Combine(directory.Path, "nested", "prompts");
+        Directory.CreateDirectory(prompts);
+        string relative = Path.GetRelativePath(Environment.CurrentDirectory, prompts).Replace('\\', '/');
+
+        OpenEvolveImport imported = Import(directory, "llm:\n  name: m\nprompt:\n  template_dir: \"" + relative + "\"\n");
+
+        // Resolving it against the config file's folder instead would point somewhere else entirely.
+        Assert.Equal(Path.GetFullPath(prompts), imported.Run.Prompt?.TemplateDirectory);
+    }
+
+    [Fact]
+    public void A_config_only_pyyaml_accepts_is_read_the_way_openevolve_reads_it()
+    {
+        using var directory = new TemporaryDirectory();
+        // A double-quoted scalar continued on a line indented less than its key: the YAML spec refuses it, PyYAML (which
+        // OpenEvolve uses) accepts it. attention_optimization's config is written this way.
+        const string Yaml = "llm:\n  name: m\nprompt:\n  system_message: \"\n  You optimise attention kernels.\n    Be precise.\"\n";
+        bool pyYaml = HasPyYaml();
+
+        if (pyYaml)
+        {
+            OpenEvolveImport imported = Import(directory, Yaml, Python);
+            Assert.Contains("You optimise attention kernels.", imported.Run.Prompt?.SystemMessage, StringComparison.Ordinal);
+        }
+        else
+        {
+            var refused = Assert.Throws<InvalidDataException>(() => Import(directory, Yaml, Python));
+            Assert.Contains("PyYAML", refused.Message, StringComparison.Ordinal);
+        }
+    }
+
+    private static bool HasPyYaml()
+    {
+        try
+        {
+            using var probe = System.Diagnostics.Process.Start(new System.Diagnostics.ProcessStartInfo(Python, "-c \"import yaml\"")
+            {
+                UseShellExecute = false,
+                RedirectStandardError = true,
+                CreateNoWindow = true
+            });
+            if (probe is null) return false;
+            probe.WaitForExit(30_000);
+            return probe.HasExited && probe.ExitCode == 0;
+        }
+        catch (System.ComponentModel.Win32Exception)
+        {
+            return false;
+        }
+    }
+
+    private static OpenEvolveImport Import(TemporaryDirectory directory, string yaml, string? python = null)
     {
         string config = Path.Combine(directory.Path, "config.yaml");
         File.WriteAllText(config, yaml);
         File.WriteAllText(Path.Combine(directory.Path, "initial_program.py"), "X = 0\n");
         File.WriteAllText(Path.Combine(directory.Path, "evaluator.py"), "def evaluate(path):\n    return {}\n");
         return OpenEvolveConfigImporter.Import(config, Path.Combine(directory.Path, "initial_program.py"),
-            Path.Combine(directory.Path, "evaluator.py"), iterations: null, python: null);
+            Path.Combine(directory.Path, "evaluator.py"), iterations: null, python: python);
     }
 
     private static string RepositoryRoot()

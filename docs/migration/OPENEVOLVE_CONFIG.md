@@ -68,7 +68,7 @@ is refused rather than mixed into an ongoing run.
 | `log_level` | NoEffect | logging only; every run writes a trace |
 | `log_dir` | NoEffect | logs, trace and checkpoints go under --output |
 | `random_seed` | Mapped | budget.seed; null (OpenEvolve's unseeded run) becomes 42 and is reported |
-| `language` | Mapped | language; null means python |
+| `language` | Mapped | language; null means python, and a language without dedicated support (text, a prompt) is evolved as generic text |
 | `file_suffix` | Mapped | the suffix of the candidate file the evaluator receives |
 | `llm.api_base` | Mapped | model.endpoint for every model that does not set its own; OPENAI_API_BASE when unset, as in OpenEvolve |
 | `llm.api_key` | NoEffect | never read from the file (examples ship placeholders); the key comes from OPENAI_API_KEY, as OpenEvolve falls back to |
@@ -94,7 +94,7 @@ is refused rather than mixed into an ongoing run.
 | `llm.primary_model_weight` | Mapped | model.weight |
 | `llm.secondary_model` | Mapped | a second model in additionalModels |
 | `llm.secondary_model_weight` | Mapped | its weight |
-| `prompt.template_dir` | Mapped | prompt.templateDirectory, templates layered over ours by stem; a missing directory is an error |
+| `prompt.template_dir` | Mapped | prompt.templateDirectory, relative to the working directory as in OpenEvolve; templates layered over ours by stem; a missing directory is an error |
 | `prompt.system_message` | Mapped | prompt.systemMessage; a template name when a template of that name exists, literal text otherwise (OpenEvolve's guess, made explicit) |
 | `prompt.evaluator_system_message` | Mapped | prompt.evaluatorSystemMessage, the LLM-feedback judge's system message |
 | `prompt.programs_as_changes_description` | Mapped | prompt.programsAsChangesDescription |
@@ -140,7 +140,7 @@ is refused rather than mixed into an ongoing run.
 | `database.novelty_llm` | RefusedUnlessDefault | LLM novelty judging is not wired into the CLI |
 | `database.embedding_model` | RefusedUnlessDefault | embedding novelty is not wired into the CLI |
 | `database.similarity_threshold` | RefusedUnlessDefault | embedding novelty is not wired into the CLI |
-| `evaluator.timeout` | Mapped | openEvolveEvaluator.timeoutSeconds per stage and budget.evaluationTimeLimitSeconds |
+| `evaluator.timeout` | Mapped | openEvolveEvaluator.timeoutSeconds per stage and budget.evaluationTimeLimitSeconds, capped with a note so all stages fit the 24 h sandbox ceiling |
 | `evaluator.max_retries` | Mapped | search.evaluationRetries |
 | `evaluator.memory_limit_mb` | Mapped | search.evaluationMemoryLimitMb, enforced by the sandbox (OpenEvolve declares it but does not enforce it) |
 | `evaluator.cpu_limit` | RefusedUnlessDefault | CPU-time limits are not configurable yet |
