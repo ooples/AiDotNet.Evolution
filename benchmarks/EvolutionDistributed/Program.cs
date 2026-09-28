@@ -66,9 +66,10 @@ internal static class Harness
             CheckpointInterval = 0,
             MigrationInterval = 0,
             ExecutionMode = EvolutionExecutionMode.Deterministic,
-            // Continuous dispatch keeps every worker busy instead of idling at the tail of each batch; the
-            // deterministic mode still commits in evaluation order, so worker count and timing cannot change the run.
-            Dispatch = EvolutionDispatchMode.Continuous,
+            // Batch dispatch commits whole batches, so a lease held for seconds by a dead worker cannot change the
+            // run. Continuous dispatch keeps workers busier but needs the deterministic admission bound (#199) to
+            // stay independent of such a stall.
+            Dispatch = options.Optional("dispatch") == "continuous" ? EvolutionDispatchMode.Continuous : EvolutionDispatchMode.Batch,
             MaxInFlight = 16,
             // Longer than a lease plus a re-evaluation, so a killed worker is recovered by lease re-issue, not by an
             // engine retry that would change the trajectory.
