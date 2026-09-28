@@ -1,0 +1,128 @@
+{
+ "examples": [
+  {
+   "example": "algotune",
+   "status": "evaluator",
+   "reason": "program_script_script_failed: The evaluator script did not complete; untrusted failure text was withheld.",
+   "completed": 0
+  },
+  {
+   "example": "alphaevolve_math_problems",
+   "status": "passed",
+   "completed": 1,
+   "best": null
+  },
+  {
+   "example": "arc_benchmark",
+   "status": "passed",
+   "completed": 4,
+   "best": 0
+  },
+  {
+   "example": "attention_optimization",
+   "status": "evaluator",
+   "reason": "program_script_script_failed: The evaluator script did not complete; untrusted failure text was withheld.",
+   "completed": 0
+  },
+  {
+   "example": "background_blur",
+   "status": "passed",
+   "completed": 1,
+   "best": null
+  },
+  {
+   "example": "circle_packing",
+   "status": "passed",
+   "completed": 2,
+   "best": 0
+  },
+  {
+   "example": "circle_packing_with_artifacts",
+   "status": "passed",
+   "completed": 1,
+   "best": null
+  },
+  {
+   "example": "claude_code_quickstart",
+   "status": "passed",
+   "completed": 4,
+   "best": 1.0426861952988475
+  },
+  {
+   "example": "function_minimization",
+   "status": "passed",
+   "completed": 4,
+   "best": 1.2761190259498967
+  },
+  {
+   "example": "k_module_problem",
+   "status": "passed",
+   "completed": 2,
+   "best": 0
+  },
+  {
+   "example": "llm_prompt_optimization",
+   "status": "evaluator",
+   "reason": "program_script_script_failed: The evaluator script did not complete; untrusted failure text was withheld.",
+   "completed": 0
+  },
+  {
+   "example": "lm_eval",
+   "status": "passed",
+   "completed": 4,
+   "best": 0
+  },
+  {
+   "example": "mlx_metal_kernel_opt",
+   "status": "evaluator",
+   "reason": "program_script_script_failed: The evaluator script did not complete; untrusted failure text was withheld.",
+   "completed": 0
+  },
+  {
+   "example": "online_judge_programming",
+   "status": "passed",
+   "completed": 4,
+   "best": 0
+  },
+  {
+   "example": "r_robust_regression",
+   "status": "passed",
+   "completed": 1,
+   "best": null
+  },
+  {
+   "example": "rust_adaptive_sort",
+   "status": "passed",
+   "completed": 1,
+   "best": null
+  },
+  {
+   "example": "signal_processing",
+   "status": "passed",
+   "completed": 4,
+   "best": 13.727942564158825
+  },
+  {
+   "example": "sldbench",
+   "status": "refused",
+   "reason": "import refused",
+   "exit": 2
+  },
+  {
+   "example": "symbolic_regression",
+   "status": "no-task",
+   "reason": "no directory holds both an initial program and an evaluator"
+  },
+  {
+   "example": "tsp_tour_minimization",
+   "status": "no-task",
+   "reason": "no directory holds both an initial program and an evaluator"
+  },
+  {
+   "example": "web_scraper_optillm",
+   "status": "passed",
+   "completed": 1,
+   "best": null
+  }
+ ]
+}
