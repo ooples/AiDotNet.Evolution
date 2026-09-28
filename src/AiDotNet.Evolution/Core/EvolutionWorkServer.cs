@@ -215,6 +215,7 @@ public sealed class EvolutionWorkServer : IDisposable
 
     private async Task ServeAsync(TcpClient client, string peer)
     {
+        using TcpClient connection = client;
         try
         {
             client.NoDelay = true;
@@ -256,8 +257,7 @@ public sealed class EvolutionWorkServer : IDisposable
         }
         finally
         {
-            lock (_sync) _clients.Remove(client);
-            client.Dispose();
+            lock (_sync) _clients.Remove(connection);
             Raise(EvolutionWorkServerEventKind.Closed, peer);
         }
     }

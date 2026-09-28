@@ -48,7 +48,11 @@ public sealed class ResourceLimitEnforcementTests
             "print('both finished')\n";
         ProgramExecuteResponse over = await Run(source, limits => limits.MemoryLimitMb = 128);
         Assert.Equal(ProgramExecuteErrorCode.MemoryLimitExceeded, over.ErrorCode);
-        Assert.DoesNotContain("both finished", over.StdOut, StringComparison.Ordinal);
+        // Both children together need about 180 MB, so at most one can finish allocating. Which process dies differs
+        // by OS: Linux terminates the whole tree, while a Windows job refuses the child's commit and the parent may
+        // still print before the tree is killed. So assert on the children, not on the parent's last line.
+        int allocated = over.StdOut.Split(new[] { "allocated" }, StringSplitOptions.None).Length - 1;
+        Assert.True(allocated < 2, $"both children allocated 80 MB under a 128 MB tree limit: {over.StdOut}");
     }
 
     [Fact]
