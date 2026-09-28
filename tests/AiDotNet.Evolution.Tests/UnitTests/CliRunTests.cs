@@ -248,6 +248,45 @@ public sealed class CliRunTests
         using (JsonDocument finished = JsonDocument.Parse(after))
             Assert.False(finished.RootElement.GetProperty("Running").GetBoolean()); // the marker goes with the run
     }
+    [Fact]
+    public async Task Watch_keeps_a_self_refreshing_report_current_until_the_run_ends()
+    {
+        using var directory = new TemporaryDirectory();
+        using var model = new FakeChatModel();
+        using var reached = new ManualResetEventSlim(false);
+        using var release = new ManualResetEventSlim(false);
+        model.OnCall = call => { if (call == 2) { reached.Set(); release.Wait(TimeSpan.FromSeconds(60)); } };
+        File.WriteAllText(Path.Combine(directory.Path, "initial.py"), "X = 0\n");
+        File.WriteAllText(Path.Combine(directory.Path, "evaluator.py"), Evaluator);
+        string runFile = WriteRun(directory.Path, model.Endpoint, maxEvaluations: 3);
+        string trace = Path.Combine(directory.Path, "out", "trace-000.jsonl");
+        string page = Path.Combine(directory.Path, "live.html");
+
+        using var interrupt = new AiDotNet.Evolution.Cli.RunInterrupt();
+        var running = Task.Run(() => AiDotNet.Evolution.Cli.RunCommand.Execute(runFile, false, new StringWriter(), new StringWriter(), interrupt));
+        Task<int> watching = Task.FromResult(0);
+        try
+        {
+            Assert.True(reached.Wait(TimeSpan.FromSeconds(60)), "the run never reached its second model call");
+            watching = Task.Run(() => AiDotNet.Evolution.Cli.Program.Watch(trace, page, 1, CancellationToken.None));
+            for (int i = 0; i < 200 && !File.Exists(page); i++) await Task.Delay(50);
+            string live = await File.ReadAllTextAsync(page);
+            Assert.Contains("http-equiv=\"refresh\"", live);
+            Assert.Contains("<strong>live</strong>", live);
+            Assert.DoesNotContain("<script", live);
+            Assert.DoesNotContain("http://", live.Replace("http-equiv", ""));
+        }
+        finally
+        {
+            release.Set();
+            Assert.Equal(0, await running);
+        }
+        // Once the run's marker is gone, watch renders a final page without the refresh and exits.
+        Assert.Equal(0, await watching.WaitAsync(TimeSpan.FromSeconds(60)));
+        string final = await File.ReadAllTextAsync(page);
+        Assert.DoesNotContain("http-equiv=\"refresh\"", final);
+        Assert.Contains("3 evaluations", final);
+    }
     [Theory]
     [InlineData(1, 0)]                                      // one press: stop at the batch boundary and report
     [InlineData(2, AiDotNet.Evolution.Cli.RunCommand.AbortedExitCode)] // two presses: abort, checkpoint still written
