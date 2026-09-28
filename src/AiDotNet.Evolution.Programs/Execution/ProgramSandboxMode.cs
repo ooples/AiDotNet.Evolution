@@ -12,5 +12,11 @@ public enum ProgramSandboxMode
     /// <summary>Caller-provisioned remote boundary; no serving connector is included in this package.</summary>
     Serving = 1,
     /// <summary>Caller-supplied unsafe in-process execution; never implemented by the process runner.</summary>
-    InProcessUnsafe = 2
+    InProcessUnsafe = 2,
+    /// <summary>A pre-started Python interpreter forks a fresh, limit-bearing child per candidate (Linux and macOS);
+    /// run by <see cref="WarmPythonExecutionEngine"/>.</summary>
+    WarmForkWorker = 3,
+    /// <summary>A pre-started Python interpreter runs candidates one after another in fresh namespaces, replaced after a
+    /// timeout, a failure or a set count; weaker isolation, run by <see cref="WarmPythonExecutionEngine"/>.</summary>
+    WarmReusedWorker = 4
 }

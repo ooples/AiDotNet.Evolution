@@ -8,6 +8,7 @@ using AiDotNet.Evolution.Programs;
 //   baseline  one long-lived interpreter that execs each candidate in-process and replies on a pipe, the way
 //             OpenEvolve's process pool evaluates; its round trip is the cost of evaluation without isolation.
 //   process   ProcessProgramExecutionEngine: a fresh, limit-bearing process per candidate, killed as a tree.
+//   warm      WarmPythonExecutionEngine: a forked child per candidate on Linux and macOS, a reused interpreter on Windows.
 // Added latency is sandbox minus baseline at each percentile.
 if (args.Length is < 2 or > 3 || !int.TryParse(args[1], out int evaluations) || evaluations is < 10 or > 100_000)
 {
@@ -19,14 +20,20 @@ int warmup = args.Length == 3 && int.TryParse(args[2], out int w) && w >= 0 ? w 
 const string Candidate = "def solve(x):\n    return x * 2\n\nprint(solve(21))\n";
 
 double[] baseline = await Baseline(python, Candidate, evaluations, warmup);
-double[] process = await Sandbox(python, Candidate, evaluations, warmup);
+double[] process = await Sandbox(python, Candidate, evaluations, warmup, ProgramSandboxMode.OutOfProcessWorker);
+// The fork worker needs fork(); on Windows only the reused worker is measured.
+ProgramSandboxMode warmMode = OperatingSystem.IsWindows() ? ProgramSandboxMode.WarmReusedWorker : ProgramSandboxMode.WarmForkWorker;
+double[] warm = await Sandbox(python, Candidate, evaluations, warmup, warmMode);
 Console.WriteLine(JsonSerializer.Serialize(new
 {
     Os = System.Runtime.InteropServices.RuntimeInformation.OSDescription,
     Python = python, Evaluations = evaluations,
     BaselineMs = Summary(baseline), ProcessMs = Summary(process),
     AddedP50Ms = Percentile(process, 0.50) - Percentile(baseline, 0.50),
-    AddedP95Ms = Percentile(process, 0.95) - Percentile(baseline, 0.95)
+    AddedP95Ms = Percentile(process, 0.95) - Percentile(baseline, 0.95),
+    WarmMode = warmMode.ToString(), WarmMs = Summary(warm),
+    WarmAddedP50Ms = Percentile(warm, 0.50) - Percentile(baseline, 0.50),
+    WarmAddedP95Ms = Percentile(warm, 0.95) - Percentile(baseline, 0.95)
 }));
 return 0;
 
@@ -96,12 +103,15 @@ static async Task<byte[]> ReadFrame(Stream stream)
     return body;
 }
 
-static async Task<double[]> Sandbox(string python, string candidate, int evaluations, int warmup)
+static async Task<double[]> Sandbox(string python, string candidate, int evaluations, int warmup, ProgramSandboxMode mode)
 {
-    var options = new ProgramSandboxOptions();
+    var options = new ProgramSandboxOptions { Mode = mode, AllowUnsafeInProcessExecution = mode == ProgramSandboxMode.WarmReusedWorker };
     options.SetInterpreter(ProgramLanguage.Python, new ProgramInterpreterSpecification(python, "{source}"));
     options.Limits.MaxConcurrentExecutions = 1;
-    using var engine = new ProcessProgramExecutionEngine(options);
+    IProgramExecutionEngine engine = mode == ProgramSandboxMode.OutOfProcessWorker
+        ? new ProcessProgramExecutionEngine(options)
+        : new WarmPythonExecutionEngine(options, recycleAfter: 100_000);
+    using var owned = (IDisposable)engine;
     var times = new List<double>(evaluations);
     for (int i = 0; i < warmup + evaluations; i++)
     {

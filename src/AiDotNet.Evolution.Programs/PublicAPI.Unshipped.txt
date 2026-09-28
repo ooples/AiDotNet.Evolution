@@ -1764,3 +1764,15 @@ override AiDotNet.Evolution.Programs.WeightedChatModel.ToString() -> string!
 static AiDotNet.Evolution.Programs.WeightedChatModel.operator !=(AiDotNet.Evolution.Programs.WeightedChatModel? left, AiDotNet.Evolution.Programs.WeightedChatModel? right) -> bool
 static AiDotNet.Evolution.Programs.WeightedChatModel.operator ==(AiDotNet.Evolution.Programs.WeightedChatModel? left, AiDotNet.Evolution.Programs.WeightedChatModel? right) -> bool
 const AiDotNet.Evolution.Programs.WeightedEnsembleChatClient.MaximumMembers = 256 -> int
+AiDotNet.Evolution.Programs.ProgramSandboxMode.WarmForkWorker = 3 -> AiDotNet.Evolution.Programs.ProgramSandboxMode
+AiDotNet.Evolution.Programs.ProgramSandboxMode.WarmReusedWorker = 4 -> AiDotNet.Evolution.Programs.ProgramSandboxMode
+AiDotNet.Evolution.Programs.WarmPythonExecutionEngine
+AiDotNet.Evolution.Programs.WarmPythonExecutionEngine.ActiveExecutionCount.get -> int
+AiDotNet.Evolution.Programs.WarmPythonExecutionEngine.Dispose() -> void
+AiDotNet.Evolution.Programs.WarmPythonExecutionEngine.ExecuteAsync(AiDotNet.Evolution.Programs.ProgramExecuteRequest! request, System.Threading.CancellationToken cancellationToken = default(System.Threading.CancellationToken)) -> System.Threading.Tasks.Task<AiDotNet.Evolution.Programs.ProgramExecuteResponse!>!
+AiDotNet.Evolution.Programs.WarmPythonExecutionEngine.Id.get -> string!
+AiDotNet.Evolution.Programs.WarmPythonExecutionEngine.QueuedExecutionCount.get -> int
+AiDotNet.Evolution.Programs.WarmPythonExecutionEngine.RecycleAfter.get -> int
+AiDotNet.Evolution.Programs.WarmPythonExecutionEngine.TryExecute(AiDotNet.Evolution.Programs.ProgramLanguage language, string! sourceCode, string! input, out string! output, out string? errorMessage, System.Threading.CancellationToken cancellationToken = default(System.Threading.CancellationToken)) -> bool
+AiDotNet.Evolution.Programs.WarmPythonExecutionEngine.VersionHash.get -> string!
+AiDotNet.Evolution.Programs.WarmPythonExecutionEngine.WarmPythonExecutionEngine(AiDotNet.Evolution.Programs.ProgramSandboxOptions! options, int recycleAfter = 100) -> void
