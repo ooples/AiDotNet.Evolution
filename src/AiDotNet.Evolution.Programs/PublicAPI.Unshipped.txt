@@ -1742,3 +1742,5 @@ AiDotNet.Evolution.Programs.ProgramReasoningEffort
 AiDotNet.Evolution.Programs.ProgramReasoningEffort.High = 2 -> AiDotNet.Evolution.Programs.ProgramReasoningEffort
 AiDotNet.Evolution.Programs.ProgramReasoningEffort.Low = 0 -> AiDotNet.Evolution.Programs.ProgramReasoningEffort
 AiDotNet.Evolution.Programs.ProgramReasoningEffort.Medium = 1 -> AiDotNet.Evolution.Programs.ProgramReasoningEffort
+AiDotNet.Evolution.Programs.ProgramTaskOptions.MetricDescriptors.get -> System.Collections.Generic.IList<string!>!
+AiDotNet.Evolution.Programs.ProgramTaskOptions.MetricDescriptors.set -> void
