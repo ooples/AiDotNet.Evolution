@@ -43,7 +43,8 @@ public sealed class ProposalProvenanceTests : IDisposable
         string childId,
         ProgramProposalOutcome outcome = ProgramProposalOutcome.Accepted,
         int attempt = 1,
-        DateTimeOffset requestedAt = default) =>
+        DateTimeOffset requestedAt = default,
+        string responseText = "answer") =>
         new(proposalId, evaluationId, parentId, attempt, outcome)
         {
             ChildGenomeId = childId,
@@ -51,7 +52,7 @@ public sealed class ProposalProvenanceTests : IDisposable
             OperatorId = "llm-program-variation",
             PromptHash = "hash-" + proposalId,
             PromptText = "### USER\nimprove\n",
-            ResponseText = "answer",
+            ResponseText = responseText,
             InputTokens = 11,
             OutputTokens = 7,
             RequestedAtUtc = requestedAt == default ? Epoch.AddSeconds(evaluationId) : requestedAt,
@@ -142,6 +143,35 @@ public sealed class ProposalProvenanceTests : IDisposable
             await sink.RecordAsync(Record("p1", 1, "a", "b"));
             await sink.RecordAsync(Record("p2", 2, "b", "c"));
             Assert.Equal(0, sink.SegmentsWritten);
+        }
+    }
+
+    [Fact]
+    public async Task MaxSegmentBytesCountsUtf8BytesNotCharacters()
+    {
+        // A record whose text is two bytes per character in UTF-8. Its serialized line is measured from an unbounded
+        // segment, then the limit is set between the line's character count and its byte count: a sink that counted
+        // characters would stay under it, while one counting UTF-8 bytes must flush on this single record.
+        ProposalProvenanceRecord wide = Record("p1", 1, "a", "b", responseText: new string('é', 400));
+        string measureDirectory = Path.Combine(_directory, "measure");
+        using (var sink = new JsonLinesProposalProvenanceSink(measureDirectory, new ProposalProvenanceOptions { FlushEveryRecords = 1000 }))
+        {
+            await sink.RecordAsync(wide);
+        }
+
+        string[] segments = Directory.GetFiles(measureDirectory, "*.jsonl", SearchOption.AllDirectories);
+        Assert.Single(segments);
+        byte[] written = File.ReadAllBytes(segments[0]);
+        long bytes = written.Length;
+        long characters = System.Text.Encoding.UTF8.GetString(written).Length;
+        Assert.True(bytes - characters >= 400, $"the record is not multibyte enough to discriminate: {bytes} bytes, {characters} characters");
+
+        string boundedDirectory = Path.Combine(_directory, "bounded");
+        var between = new ProposalProvenanceOptions { FlushEveryRecords = 1000, MaxSegmentBytes = (bytes + characters) / 2 };
+        using (var sink = new JsonLinesProposalProvenanceSink(boundedDirectory, between))
+        {
+            await sink.RecordAsync(wide);
+            Assert.Equal(1, sink.SegmentsWritten);
         }
     }
 
