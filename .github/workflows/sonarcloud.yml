@@ -1,6 +1,9 @@
 name: SonarCloud
 
 on:
+  # The merge queue tests each PR combined with everything ahead of it; required checks must report there too.
+  merge_group:
+    types: [checks_requested]
   push:
     branches: [main]
   pull_request:
@@ -47,7 +50,12 @@ jobs:
         run: |
           $hasToken = -not [string]::IsNullOrWhiteSpace($env:SONAR_TOKEN)
           $isDependabot = $env:RUN_ACTOR -eq 'dependabot[bot]'
-          if ($hasToken) {
+          if ($env:GITHUB_EVENT_NAME -eq 'merge_group') {
+            # The PR was analysed on its own head and main is analysed on push; a queue entry is neither, so only build and test run.
+            Write-Host '::notice::SonarCloud analysis is not run for merge-queue entries; the PR head and main are analysed.'
+            'enabled=false' | Out-File -FilePath $env:GITHUB_OUTPUT -Append -Encoding utf8
+          }
+          elseif ($hasToken) {
             'enabled=true' | Out-File -FilePath $env:GITHUB_OUTPUT -Append -Encoding utf8
           }
           elseif ($isDependabot) {

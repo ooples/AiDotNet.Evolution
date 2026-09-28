@@ -1,6 +1,9 @@
 name: Dependency Review
 
 on:
+  # The merge queue tests each PR combined with everything ahead of it; required checks must report there too.
+  merge_group:
+    types: [checks_requested]
   pull_request:
     branches: [main, feat/competitive-evolution-platform, 'feat/evolution-us-*', feat/evolution-us02-efficacy, feat/evolution-us05-campaign-budget, feat/evolution-us07-ablation-integration, feat/evolution-us08-portfolio-integration]
 
@@ -15,5 +18,8 @@ jobs:
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
       - uses: actions/dependency-review-action@a1d282b36b6f3519aa1f3fc636f609c47dddb294 # v5.0.0
         with:
+          # A queue entry has no pull request, so compare the queue's own base and head commits.
+          base-ref: ${{ github.event.merge_group.base_sha || github.event.pull_request.base.sha }}
+          head-ref: ${{ github.event.merge_group.head_sha || github.event.pull_request.head.sha }}
           fail-on-severity: moderate
           deny-licenses: GPL-2.0, GPL-3.0, AGPL-1.0, AGPL-3.0
