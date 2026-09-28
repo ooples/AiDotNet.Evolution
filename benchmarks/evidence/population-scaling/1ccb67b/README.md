@@ -33,7 +33,7 @@ Both systems use a null variation/LLM and a null evaluator in-process, one worke
 | our cost at 50,000 elites / at 100 elites | <= 1.25x | **0.55x** (met) |
 | OpenEvolve growth, population 100 to 5,000 | reported | **7.4x** |
 
-Our per-repeat spread is under 3 us, except one 50,000-elite repeat at 55.5 us (the other four were 26.8-27.9 us).
+Our per-repeat spread is under 3 us, except one 50,000-elite repeat at 55.5 us (the other four were 26.8-27.4 us).
 OpenEvolve's spread widens with size: 62.7-209.7 ms at 5,000.
 
 Our cost falls slightly at the largest sizes rather than staying exactly flat. The steady-state work per evaluation is
