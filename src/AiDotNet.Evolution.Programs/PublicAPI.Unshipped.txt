@@ -1685,3 +1685,5 @@ static AiDotNet.Evolution.Programs.Experience.ProgramExperienceRetrieval.operato
 static AiDotNet.Evolution.Programs.Experience.ProgramExperienceRetrieval.operator ==(AiDotNet.Evolution.Programs.Experience.ProgramExperienceRetrieval? left, AiDotNet.Evolution.Programs.Experience.ProgramExperienceRetrieval? right) -> bool
 AiDotNet.Evolution.Programs.ProgramSandboxOptions.TimeProvider.get -> System.TimeProvider!
 AiDotNet.Evolution.Programs.ProgramSandboxOptions.TimeProvider.set -> void
+AiDotNet.Evolution.Programs.ProgramTaskOptions.MetricDescriptors.get -> System.Collections.Generic.IList<string!>!
+AiDotNet.Evolution.Programs.ProgramTaskOptions.MetricDescriptors.set -> void
