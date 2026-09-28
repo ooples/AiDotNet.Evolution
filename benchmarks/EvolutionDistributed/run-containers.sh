@@ -11,7 +11,8 @@
 #   tp4     throughput with four remote workers and a 1 s evaluator (continuous dispatch)
 # single and multi use batch dispatch, which commits whole batches and so is unaffected by a lease a dead worker
 # holds for seconds. Continuous dispatch keeps workers busier; its independence from such a stall depends on the
-# deterministic admission bound from #199, so it is measured here for throughput only.
+# deterministic admission bound from #199, so it is not used for the kill test. tp1 and tp4 still must reach the
+# same state: the run's result may not depend on how many workers evaluate it.
 # Workers reach the coordinator only over the container network. The share volume carries the bootstrap file
 # (certificate fingerprint and compatibility hash), mounted read-only on the workers.
 set -euo pipefail
