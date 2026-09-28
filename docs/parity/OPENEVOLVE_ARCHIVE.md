@@ -8,7 +8,7 @@ reproduced against the pinned package.
 | --- | --- | --- |
 | `feature_dimensions: [complexity]` | `ProgramLengthDescriptor` (or `ProgramTokenComplexityDescriptor`) in a `ProgramDescriptorSet` | `ProgramDescriptorTests` |
 | `feature_dimensions: [diversity]` | `ProgramDiversityDescriptor` against fixed reference sources | `ProgramDescriptorTests` |
-| `feature_dimensions: [score]` | `ProgramTaskOptions.QualityDescriptorName` | `ProgramDescriptorPromotionTests` |
+| `feature_dimensions: [score]` | `EvolutionEngineOptions.QualityDescriptorName` (existing, engine-wide) | `EvolutionCoreParityTests` |
 | `feature_dimensions: [<any metric>]` | `ProgramTaskOptions.MetricDescriptors`; a missing metric is refused, as OpenEvolve raises | `ProgramDescriptorPromotionTests` |
 | `feature_bins` (int or per-dimension dict) | `EvolutionDescriptorDefinition(name, min, max, bins)` per dimension, used exactly | `ArchiveDefectClassTests.D7_*` |
 | `diversity_reference_size` | size of the reference set given to `ProgramDiversityDescriptor` | `ProgramDescriptorTests` |

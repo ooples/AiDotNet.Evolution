@@ -153,7 +153,7 @@ public sealed class ProgramEvolutionTask : IEvolutionTask<ProgramGenome>, IEvolu
             throw new InvalidOperationException("The fitness evaluator returned no result or resource receipt.");
         }
 
-        bool promotes = _options.MetricDescriptors.Count > 0 || _options.QualityDescriptorName is not null;
+        bool promotes = _options.MetricDescriptors.Count > 0;
         if ((_descriptors.Count == 0 && !promotes) || result.Status != EvolutionEvaluationStatus.Completed) return result;
 
         var merged = new Dictionary<string, double>(StringComparer.Ordinal);
@@ -165,7 +165,6 @@ public sealed class ProgramEvolutionTask : IEvolutionTask<ProgramGenome>, IEvolu
                 throw new InvalidDataException("Descriptor metric '" + name + "' is missing or not finite; the evaluator must report it for every completed evaluation.");
             merged[name] = value;
         }
-        if (_options.QualityDescriptorName is { } qualityName && result.Quality is { } quality) merged[qualityName] = quality;
         foreach (KeyValuePair<string, double> pair in result.Descriptors) merged[pair.Key] = pair.Value;
 
         var mergedResult = new EvolutionTaskResult(
@@ -205,10 +204,9 @@ public sealed class ProgramEvolutionTask : IEvolutionTask<ProgramGenome>, IEvolu
         };
 
         // Only when used, so existing task identities (and checkpoints) are unchanged.
-        if (options.MetricDescriptors.Count > 0 || options.QualityDescriptorName is not null)
+        if (options.MetricDescriptors.Count > 0)
         {
             components.Add("program-descriptor-promotion-v1");
-            components.Add(options.QualityDescriptorName ?? string.Empty);
             components.AddRange(options.MetricDescriptors);
         }
 

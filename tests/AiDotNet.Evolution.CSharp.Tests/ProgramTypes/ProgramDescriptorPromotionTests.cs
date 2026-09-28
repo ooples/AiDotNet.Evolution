@@ -4,7 +4,7 @@ using Xunit;
 
 namespace AiDotNet.Evolution.CSharp.Tests.ProgramTypes;
 
-/// <summary>V1-55: OpenEvolve's "score" and custom-metric feature dimensions, as archive descriptors.</summary>
+/// <summary>V1-55: OpenEvolve's custom-metric feature dimensions, as archive descriptors.</summary>
 public sealed class ProgramDescriptorPromotionTests
 {
     private static readonly EvolutionEvaluationContext Context = new(0, 1234UL, 7UL, 1);
@@ -20,13 +20,12 @@ public sealed class ProgramDescriptorPromotionTests
             null, options);
 
     [Fact]
-    public async System.Threading.Tasks.Task Named_metrics_and_the_score_become_descriptors()
+    public async System.Threading.Tasks.Task Named_metrics_become_descriptors()
     {
-        var options = new ProgramTaskOptions { MetricDescriptors = { "runtime_ms" }, QualityDescriptorName = "score" };
+        var options = new ProgramTaskOptions { MetricDescriptors = { "runtime_ms" } };
         EvolutionTaskResult result = await Task(options, new Dictionary<string, double> { ["runtime_ms"] = 12.5, ["other"] = 3 })
             .EvaluateAsync(Candidate(new ProgramGenome("x")), Context);
         Assert.Equal(12.5, result.Descriptors["runtime_ms"]);
-        Assert.Equal(0.75, result.Descriptors["score"]);
         Assert.False(result.Descriptors.ContainsKey("other"));
     }
 
@@ -53,11 +52,9 @@ public sealed class ProgramDescriptorPromotionTests
     {
         Assert.Throws<ArgumentException>(() => new ProgramTaskOptions { MetricDescriptors = { " " } }.Validate());
         Assert.Throws<ArgumentException>(() => new ProgramTaskOptions { MetricDescriptors = { "a", "a" } }.Validate());
-        Assert.Throws<ArgumentException>(() => new ProgramTaskOptions { MetricDescriptors = { "score" }, QualityDescriptorName = "score" }.Validate());
         var metrics = new Dictionary<string, double> { ["a"] = 1 };
         string plain = Task(new ProgramTaskOptions(), metrics).VersionHash;
         Assert.NotEqual(plain, Task(new ProgramTaskOptions { MetricDescriptors = { "a" } }, metrics).VersionHash);
-        Assert.NotEqual(plain, Task(new ProgramTaskOptions { QualityDescriptorName = "score" }, metrics).VersionHash);
         Assert.Equal(plain, Task(new ProgramTaskOptions(), metrics).VersionHash);
     }
 }
