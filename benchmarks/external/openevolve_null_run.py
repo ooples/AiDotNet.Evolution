@@ -14,9 +14,16 @@ import tempfile
 import time
 
 EVALUATOR = """
+import os
+
 def evaluate(program_path):
     with open(program_path, encoding="utf-8") as f:
         n = len(f.read())
+    # One line per call, in a file of the worker process that ran it. A single shared file would lose lines: on Windows
+    # append is a seek then a write, so two processes appending at once can overwrite each other.
+    path = os.path.join(os.environ["OE_NULL_EVALUATION_LOG"], str(os.getpid()) + ".log")
+    with open(path, "a", encoding="utf-8") as log:
+        log.write("1\\n")
     return {"combined_score": float(n % 97) / 97.0}
 """
 
@@ -31,7 +38,8 @@ class NullLLM:
 
     async def generate_with_context(self, system_message, messages, **kwargs):
         self.calls += 1
-        return f"```python\ndef solve(x):\n    v = {self.calls % 1000}\n    return x + v\n```"
+        # The process id keeps proposals from different pool workers distinct: each worker has its own counter.
+        return f"```python\ndef solve(x):\n    v = {os.getpid()}_{self.calls}\n    return x + v\n```"
 
 
 def init_null_llm(configuration):
@@ -75,6 +83,9 @@ async def main(upstream, iterations, workers, islands):
     work = Path(tempfile.mkdtemp(prefix="oe-null-"))
     (work / "initial.py").write_text("def solve(x):\n    return x + 1\n", encoding="utf-8")
     (work / "evaluator.py").write_text(EVALUATOR, encoding="utf-8")
+    evaluation_log = work / "evaluations"
+    evaluation_log.mkdir()
+    os.environ["OE_NULL_EVALUATION_LOG"] = str(evaluation_log)  # inherited by the worker pool
     config = Config()
     config.max_iterations = iterations
     config.random_seed = 42
@@ -98,15 +109,28 @@ async def main(upstream, iterations, workers, islands):
         started = time.perf_counter()
         await engine.run(iterations=iterations)
         seconds = time.perf_counter() - started
-    # Measured, not requested: an iteration that failed or was dropped must not count as orchestrated work.
-    added = sum(1 for program in engine.database.programs.values() if program.iteration_found > 0)
+    # Measured, not requested. Counted as evaluator calls, not surviving programs: OpenEvolve deletes a program that
+    # loses its cell once it is orphaned, so the database undercounts completed work. The initial program's call is
+    # excluded, since OpenEvolve evaluates it outside the iterations.
+    added = sum(len(log.read_text(encoding="utf-8").splitlines()) for log in evaluation_log.glob("*.log")) - 1
     print(json.dumps(dict(System="openevolve", Requested=iterations, Evaluations=added, Workers=workers, Islands=islands,
                           Seconds=seconds, PeakWorkingSetBytes=memory.peak)))
-    if added < iterations:
-        raise SystemExit(f"only {added} of {iterations} iterations produced a program")
+
 
 
 if __name__ == "__main__":
     import logging
     logging.disable(logging.CRITICAL)
-    asyncio.run(main(Path(sys.argv[1]), int(sys.argv[2]), int(sys.argv[3]), int(sys.argv[4])))
+    try:
+        asyncio.run(main(Path(sys.argv[1]), int(sys.argv[2]), int(sys.argv[3]), int(sys.argv[4])))
+    finally:
+        # OpenEvolve can leave pool workers running after run() returns; once this process exits they are orphans the
+        # harness cannot find, and they keep burning CPU under the next measurement. Stop them here, while they are ours.
+        import psutil
+        workers = psutil.Process().children(recursive=True)
+        for worker in workers:
+            try:
+                worker.kill()
+            except psutil.NoSuchProcess:
+                pass
+        psutil.wait_procs(workers, timeout=30)

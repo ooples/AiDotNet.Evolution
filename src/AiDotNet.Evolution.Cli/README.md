@@ -13,6 +13,7 @@ aidotnet-evolve compare <traceA> <traceB>
 aidotnet-evolve export  <trace> <output-directory> [--include-source <program-file>]
 aidotnet-evolve inspect-export <export-directory>
 aidotnet-evolve report  <trace> <output.html>
+aidotnet-evolve watch   <trace> <output.html> [--interval <seconds>]
 ```
 
 Traces are the JSONL files written by `EvolutionTraceObserver`. `report` writes a self-contained HTML page (no scripts,

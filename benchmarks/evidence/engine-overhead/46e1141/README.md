@@ -1,3 +1,6 @@
+> **Superseded** by [../5699058/README.md](../5699058/README.md) (V1-70, #175). This run's intervals include negative
+> ratios, and its OpenEvolve column divided by requested rather than completed evaluations.
+
 # V1-30: engine overhead, AiDotNet.Evolution vs pinned OpenEvolve (null evaluators)
 
 **Not a headline claim (R12):** a C# controller against a Python one is expected to win on overhead.
