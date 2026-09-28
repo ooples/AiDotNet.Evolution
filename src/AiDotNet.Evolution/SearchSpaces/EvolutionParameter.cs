@@ -180,8 +180,13 @@ public sealed class EvolutionParameter
         return EvolutionParameterValue.Numeric(Kind == EvolutionParameterKind.Integer ? Math.Round(value, MidpointRounding.AwayFromZero) : value);
     }
 
-    internal bool IsActive(IReadOnlyDictionary<string, EvolutionParameterValue> values) => Conditions.All(condition =>
-        values.TryGetValue(condition.Parameter, out EvolutionParameterValue? parent) && condition.AnyOf.Contains(parent));
+    // A loop, not Conditions.All(...): this runs for every parameter of every genome built, and the lambda allocated each time.
+    internal bool IsActive(IReadOnlyDictionary<string, EvolutionParameterValue> values)
+    {
+        foreach (EvolutionParameterCondition condition in Conditions)
+            if (!values.TryGetValue(condition.Parameter, out EvolutionParameterValue? parent) || !condition.AnyOf.Contains(parent)) return false;
+        return true;
+    }
     internal string DefinitionHash => EvolutionHash.Combine(new[] { Name, Kind.ToString(),
         EvolutionParameterValue.Numeric(Minimum).Canonical, EvolutionParameterValue.Numeric(Maximum).Canonical,
         EvolutionHash.Combine(Categories) }.Concat(Conditions.OrderBy(condition => condition.Parameter, StringComparer.Ordinal)
