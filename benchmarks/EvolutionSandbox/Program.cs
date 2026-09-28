@@ -19,7 +19,12 @@ if (args.Length is < 2 or > 4 || !int.TryParse(args[1], out int evaluations) || 
 }
 string? dockerImage = args.Length == 4 ? args[3] : null;
 string python = args[0];
-int warmup = args.Length == 3 && int.TryParse(args[2], out int w) && w >= 0 ? w : 20;
+int warmup = 20;
+if (args.Length >= 3 && (!int.TryParse(args[2], out warmup) || warmup < 0))
+{
+    Console.Error.WriteLine("warmup must be a non-negative integer.");
+    return 2;
+}
 const string Candidate = "def solve(x):\n    return x * 2\n\nprint(solve(21))\n";
 
 double[] baseline = await Baseline(python, Candidate, evaluations, warmup);
@@ -150,10 +155,13 @@ static async Task<double[]> Docker(string image, string candidate, int evaluatio
             start.ArgumentList.Add(argument);
         long begin = Stopwatch.GetTimestamp();
         using Process process = Process.Start(start) ?? throw new InvalidOperationException("docker did not start.");
-        string output = await process.StandardOutput.ReadToEndAsync();
-        await process.WaitForExitAsync();
+        // Both streams are read while the container runs, so a full stderr pipe cannot stall it before exit.
+        Task<string> stdout = process.StandardOutput.ReadToEndAsync();
+        Task<string> stderr = process.StandardError.ReadToEndAsync();
+        await Task.WhenAll(stdout, stderr, process.WaitForExitAsync());
         double ms = Stopwatch.GetElapsedTime(begin).TotalMilliseconds;
-        if (process.ExitCode != 0 || output.Trim() != "42") throw new InvalidOperationException("Docker run failed: " + await process.StandardError.ReadToEndAsync());
+        string output = await stdout;
+        if (process.ExitCode != 0 || output.Trim() != "42") throw new InvalidOperationException("Docker run failed: " + await stderr);
         if (i >= warmup) times.Add(ms);
     }
     return times.ToArray();
