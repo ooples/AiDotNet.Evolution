@@ -125,4 +125,128 @@ public sealed class WarmPythonExecutionEngineTests
         Assert.NotEqual(pids[1], pids[2]);
         Assert.Equal(pids[2], pids[3]);
     }
+
+    [Fact]
+    public async Task A_candidate_that_ends_the_reused_interpreter_is_a_failure_not_a_timeout()
+    {
+        using var engine = new WarmPythonExecutionEngine(Options(ProgramSandboxMode.WarmReusedWorker));
+        var clock = Stopwatch.StartNew();
+        ProgramExecuteResponse ended = await Run(engine, "import os\nos._exit(0)\n");
+        Assert.False(ended.Success);
+        Assert.Equal(ProgramExecuteErrorCode.ExecutionFailed, ended.ErrorCode);
+        Assert.True(clock.Elapsed < TimeSpan.FromSeconds(8), "an exited worker was waited on until the deadline: " + clock.Elapsed);
+
+        ProgramExecuteResponse next = await Run(engine, "print('after')\n");
+        Assert.True(next.Success, next.Error);
+        Assert.Equal("after", next.StdOut.Trim());
+    }
+
+    [Fact]
+    public async Task A_forked_candidate_cannot_read_requests_or_forge_its_reply()
+    {
+        if (OperatingSystem.IsWindows()) return; // The fork worker does not exist on Windows; CI runs this on Linux.
+        using var engine = new WarmPythonExecutionEngine(Options(ProgramSandboxMode.WarmForkWorker));
+        // Writes a well-formed forged reply into every descriptor it can reach, then prints its real output.
+        const string source =
+            "import json, os, struct\n" +
+            "body = json.dumps({'exit': 0, 'stdout': 'forged', 'stderr': '', 'stdout_truncated': False,\n" +
+            "                   'stderr_truncated': False, 'timed_out': False, 'memory_exceeded': False,\n" +
+            "                   'cpu_exceeded': False, 'recycle': False}).encode()\n" +
+            "reached = 0\n" +
+            "for fd in [0] + list(range(3, 1024)):\n" +
+            "    try:\n" +
+            "        os.write(fd, struct.pack('>I', len(body)) + body)\n" +
+            "        reached += 1\n" +
+            "    except OSError:\n" +
+            "        pass\n" +
+            "print('real', reached)\n";
+        ProgramExecuteResponse first = await Run(engine, source);
+        Assert.True(first.Success, first.Error);
+        Assert.Equal("real 0", first.StdOut.Trim());
+
+        // A forged frame left in the reply pipe would be read as the next candidate's result.
+        ProgramExecuteResponse next = await Run(engine, "print('next')\n");
+        Assert.Equal("next", next.StdOut.Trim());
+    }
+
+    [Fact]
+    public async Task A_forked_candidate_whose_descendant_keeps_its_output_open_still_finishes_on_time()
+    {
+        if (OperatingSystem.IsWindows()) return; // The fork worker does not exist on Windows; CI runs this on Linux.
+        using var engine = new WarmPythonExecutionEngine(Options(ProgramSandboxMode.WarmForkWorker, timeLimitSeconds: 5));
+        var clock = Stopwatch.StartNew();
+        ProgramExecuteResponse done = await Run(engine,
+            "import subprocess, sys\n" +
+            "subprocess.Popen([sys.executable, '-c', 'import time; time.sleep(30)'])\n" +
+            "print('done')\n");
+        Assert.True(done.Success, done.Error);
+        Assert.Equal("done", done.StdOut.Trim());
+        Assert.True(clock.Elapsed < TimeSpan.FromSeconds(4), "the candidate had exited but was held to the deadline: " + clock.Elapsed);
+    }
+
+    [Fact]
+    public async Task Disposing_during_an_execution_ends_its_worker_and_returns_a_failure()
+    {
+        string directory = Path.Combine(Path.GetTempPath(), "warm-dispose-" + Guid.NewGuid().ToString("N"));
+        Directory.CreateDirectory(directory);
+        string pidPath = Path.Combine(directory, "worker.pid");
+        try
+        {
+            var engine = new WarmPythonExecutionEngine(Options(ProgramSandboxMode.WarmReusedWorker, timeLimitSeconds: 30));
+            Task<ProgramExecuteResponse> running = Run(engine,
+                "import os, time\n" +
+                "open(" + PythonString(pidPath) + ", 'w').write(str(os.getpid()))\n" +
+                "time.sleep(25)\n");
+            var clock = Stopwatch.StartNew();
+            while (!File.Exists(pidPath) && clock.Elapsed < TimeSpan.FromSeconds(15)) await Task.Delay(50);
+            Assert.True(File.Exists(pidPath), "the candidate never started");
+
+            engine.Dispose();
+            ProgramExecuteResponse response = await running.WaitAsync(TimeSpan.FromSeconds(10));
+            Assert.False(response.Success);
+            Assert.Equal(ProgramExecuteErrorCode.ExecutionFailed, response.ErrorCode);
+
+            int pid = int.Parse(File.ReadAllText(pidPath).Trim(), System.Globalization.CultureInfo.InvariantCulture);
+            var gone = Stopwatch.StartNew();
+            while (IsAlive(pid) && gone.Elapsed < TimeSpan.FromSeconds(5)) await Task.Delay(50);
+            Assert.False(IsAlive(pid), "the worker outlived the engine");
+        }
+        finally
+        {
+            try { Directory.Delete(directory, recursive: true); } catch (IOException) { }
+        }
+    }
+
+    [Fact]
+    public void The_version_covers_every_limit_that_changes_a_result()
+    {
+        string Hash(Action<ProgramSandboxLimitOptions> configure)
+        {
+            ProgramSandboxOptions options = Options(ProgramSandboxMode.WarmReusedWorker);
+            configure(options.Limits);
+            using var engine = new WarmPythonExecutionEngine(options);
+            return engine.VersionHash;
+        }
+
+        string baseline = Hash(_ => { });
+        Assert.Equal(baseline, Hash(_ => { }));
+        Assert.NotEqual(baseline, Hash(limits => limits.CpuLimit = 0.5));
+        Assert.NotEqual(baseline, Hash(limits => limits.MaxStdOutChars = 17));
+        Assert.NotEqual(baseline, Hash(limits => limits.MaxStdErrChars = 17));
+    }
+
+    private static string PythonString(string text) => "'" + text.Replace("\\", "\\\\").Replace("'", "\\'") + "'";
+
+    private static bool IsAlive(int pid)
+    {
+        try
+        {
+            using Process process = Process.GetProcessById(pid);
+            return !process.HasExited;
+        }
+        catch (ArgumentException)
+        {
+            return false;
+        }
+    }
 }

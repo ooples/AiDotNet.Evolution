@@ -45,9 +45,11 @@ public sealed class WarmPythonExecutionEngine : IProgramExecutionEngine, IProgra
     private readonly bool _fork;
     private readonly SemaphoreSlim _slots;
     private readonly ConcurrentBag<Worker> _idle = new();
+    // Workers running a candidate, so Dispose can end them too rather than leave their processes behind.
+    private readonly ConcurrentDictionary<Worker, byte> _busy = new();
     private int _queued;
     private int _active;
-    private bool _disposed;
+    private volatile bool _disposed;
 
     /// <summary>Creates the engine. Workers start on first use.</summary>
     /// <param name="options">The sandbox options. <see cref="ProgramSandboxOptions.Mode"/> must be
@@ -88,7 +90,9 @@ public sealed class WarmPythonExecutionEngine : IProgramExecutionEngine, IProgra
         {
             "warm-python-execution-v1", _options.Mode.ToString(), _python, _options.RuntimeVersion,
             recycleAfter.ToString(CultureInfo.InvariantCulture), _limits.TimeLimitSeconds.ToString(CultureInfo.InvariantCulture),
-            _limits.MemoryLimitMb.ToString(CultureInfo.InvariantCulture), EvolutionHash.Compute(ReadScript())
+            _limits.MemoryLimitMb.ToString(CultureInfo.InvariantCulture), _limits.CpuLimit.ToString("R", CultureInfo.InvariantCulture),
+            _limits.MaxStdOutChars.ToString(CultureInfo.InvariantCulture), _limits.MaxStdErrChars.ToString(CultureInfo.InvariantCulture),
+            EvolutionHash.Compute(ReadScript())
         });
     }
 
@@ -157,6 +161,8 @@ public sealed class WarmPythonExecutionEngine : IProgramExecutionEngine, IProgra
         try
         {
             worker = _idle.TryTake(out Worker? idle) && idle.IsUsable ? idle : await StartWorkerAsync(cancellationToken).ConfigureAwait(false);
+            _busy[worker] = 0;
+            if (_disposed) return Failed(ProgramExecuteErrorCode.ExecutionFailed, "The engine was disposed before the candidate ran.");
             var frame = new JsonObject
             {
                 ["source"] = request.SourceCode,
@@ -172,16 +178,12 @@ public sealed class WarmPythonExecutionEngine : IProgramExecutionEngine, IProgra
             // A fork worker enforces the wall clock itself and replies; a reused worker cannot interrupt the candidate
             // it is running, so the engine stops waiting at the limit and replaces the worker.
             TimeSpan wait = _fork ? _limits.GetTimeLimit() + ReplyMargin : _limits.GetTimeLimit();
-            JsonNode? reply = await worker.ExchangeAsync(frame, wait, cancellationToken).ConfigureAwait(false);
+            (JsonNode? reply, WorkerReadOutcome outcome) = await worker.ExchangeAsync(frame, wait, cancellationToken).ConfigureAwait(false);
             if (reply is null)
             {
                 worker.Dispose();
                 worker = null;
-                bool canceled = cancellationToken.IsCancellationRequested;
-                return Failed(canceled ? ProgramExecuteErrorCode.TimeoutOrCanceled : _fork ? ProgramExecuteErrorCode.ExecutionFailed : ProgramExecuteErrorCode.TimeoutOrCanceled,
-                    canceled ? "Execution was canceled." :
-                    _fork ? "The warm worker stopped responding and was replaced." :
-                    $"Execution exceeded the {_limits.TimeLimitSeconds.ToString(CultureInfo.InvariantCulture)} second limit and the worker was replaced.");
+                return NoReply(outcome, cancellationToken.IsCancellationRequested);
             }
 
             worker.Completed++;
@@ -198,10 +200,40 @@ public sealed class WarmPythonExecutionEngine : IProgramExecutionEngine, IProgra
         }
         finally
         {
-            if (worker is not null && !_disposed) _idle.Add(worker);
+            if (worker is not null)
+            {
+                _busy.TryRemove(worker, out _);
+                if (_disposed) worker.Dispose();
+                else
+                {
+                    _idle.Add(worker);
+                    // Dispose may have drained the pool between the check and the add; do not leave this one behind.
+                    if (_disposed) DrainIdle();
+                }
+            }
+
             Interlocked.Decrement(ref _active);
             _slots.Release();
         }
+    }
+
+    // A missing reply is a timeout only when the deadline passed. A worker that exited closed the pipe at once: the
+    // candidate crashed the interpreter or called os._exit, and that is a failure, not a timeout.
+    private ProgramExecuteResponse NoReply(WorkerReadOutcome outcome, bool canceled)
+    {
+        if (canceled) return Failed(ProgramExecuteErrorCode.TimeoutOrCanceled, "Execution was canceled.");
+        if (_disposed) return Failed(ProgramExecuteErrorCode.ExecutionFailed, "The engine was disposed during execution.");
+        if (outcome == WorkerReadOutcome.WorkerExited)
+            return Failed(ProgramExecuteErrorCode.ExecutionFailed, "The warm worker exited during the candidate and was replaced.");
+        return _fork
+            ? Failed(ProgramExecuteErrorCode.ExecutionFailed, "The warm worker stopped responding and was replaced.")
+            : Failed(ProgramExecuteErrorCode.TimeoutOrCanceled,
+                $"Execution exceeded the {_limits.TimeLimitSeconds.ToString(CultureInfo.InvariantCulture)} second limit and the worker was replaced.");
+    }
+
+    private void DrainIdle()
+    {
+        while (_idle.TryTake(out Worker? idle)) idle.Dispose();
     }
 
     private ProgramExecuteResponse FromReply(JsonNode reply)
@@ -263,7 +295,7 @@ public sealed class WarmPythonExecutionEngine : IProgramExecutionEngine, IProgra
 
         Process process = Process.Start(start) ?? throw new InvalidOperationException("The Python interpreter did not start.");
         var worker = new Worker(process, _fork ? null : WindowsJobObject.TryCreate(_limits.GetMemoryLimitBytes()));
-        JsonNode? ready = await worker.ReadAsync(TimeSpan.FromSeconds(30), cancellationToken).ConfigureAwait(false);
+        (JsonNode? ready, _) = await worker.ReadAsync(TimeSpan.FromSeconds(30), cancellationToken).ConfigureAwait(false);
         if (ready?["ready"]?.GetValue<bool>() != true)
         {
             worker.Dispose();
@@ -302,8 +334,10 @@ public sealed class WarmPythonExecutionEngine : IProgramExecutionEngine, IProgra
     {
         if (_disposed) return;
         _disposed = true;
-        while (_idle.TryTake(out Worker? worker)) worker.Dispose();
-        _slots.Dispose();
+        DrainIdle();
+        // Ending a busy worker closes its pipe, so the execution waiting on it returns at once and its finally
+        // disposes nothing twice. The semaphore is left undisposed: in-flight executions still release it.
+        foreach (Worker busy in _busy.Keys) busy.Dispose();
         try
         {
             Directory.Delete(_workspace, recursive: true);
@@ -318,12 +352,20 @@ public sealed class WarmPythonExecutionEngine : IProgramExecutionEngine, IProgra
         }
     }
 
+    private enum WorkerReadOutcome
+    {
+        Reply,
+        DeadlineOrCanceled,
+        WorkerExited
+    }
+
     private sealed class Worker : IDisposable
     {
         private readonly Process _process;
         private readonly WindowsJobObject? _job;
         private readonly Stream _input;
         private readonly Stream _output;
+        private int _disposed;
 
         internal Worker(Process process, WindowsJobObject? job)
         {
@@ -344,7 +386,7 @@ public sealed class WarmPythonExecutionEngine : IProgramExecutionEngine, IProgra
 
         internal bool IsUsable => !_process.HasExited;
 
-        internal async Task<JsonNode?> ExchangeAsync(JsonObject request, TimeSpan timeout, CancellationToken cancellationToken)
+        internal async Task<(JsonNode? Reply, WorkerReadOutcome Outcome)> ExchangeAsync(JsonObject request, TimeSpan timeout, CancellationToken cancellationToken)
         {
             byte[] body = Encoding.UTF8.GetBytes(request.ToJsonString());
             byte[] header = new byte[4];
@@ -355,7 +397,7 @@ public sealed class WarmPythonExecutionEngine : IProgramExecutionEngine, IProgra
             return await ReadAsync(timeout, cancellationToken).ConfigureAwait(false);
         }
 
-        internal async Task<JsonNode?> ReadAsync(TimeSpan timeout, CancellationToken cancellationToken)
+        internal async Task<(JsonNode? Reply, WorkerReadOutcome Outcome)> ReadAsync(TimeSpan timeout, CancellationToken cancellationToken)
         {
             using var deadline = CancellationTokenSource.CreateLinkedTokenSource(cancellationToken);
             deadline.CancelAfter(timeout);
@@ -367,20 +409,21 @@ public sealed class WarmPythonExecutionEngine : IProgramExecutionEngine, IProgra
                 if (length is < 2 or > 64 * 1024 * 1024) throw new InvalidDataException("The warm worker sent an invalid frame.");
                 byte[] body = new byte[length];
                 await _output.ReadExactlyAsync(body, deadline.Token).ConfigureAwait(false);
-                return JsonNode.Parse(body);
+                return (JsonNode.Parse(body), WorkerReadOutcome.Reply);
             }
             catch (OperationCanceledException)
             {
-                return null;
+                return (null, WorkerReadOutcome.DeadlineOrCanceled);
             }
             catch (EndOfStreamException)
             {
-                return null;
+                return (null, WorkerReadOutcome.WorkerExited);
             }
         }
 
         public void Dispose()
         {
+            if (Interlocked.Exchange(ref _disposed, 1) == 1) return;
             try
             {
                 if (!_process.HasExited) _process.Kill(entireProcessTree: true);
