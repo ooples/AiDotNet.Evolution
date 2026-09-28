@@ -91,4 +91,15 @@ async def main(upstream, iterations, workers):
 if __name__ == "__main__":
     import logging
     logging.disable(logging.CRITICAL)
-    asyncio.run(main(Path(sys.argv[1]), int(sys.argv[2]), int(sys.argv[3])))
+    try:
+        asyncio.run(main(Path(sys.argv[1]), int(sys.argv[2]), int(sys.argv[3])))
+    finally:
+        # OpenEvolve can leave pool workers running after run() returns; stop them while they are still our children.
+        import psutil
+        workers = psutil.Process().children(recursive=True)
+        for worker in workers:
+            try:
+                worker.kill()
+            except psutil.NoSuchProcess:
+                pass
+        psutil.wait_procs(workers, timeout=30)
