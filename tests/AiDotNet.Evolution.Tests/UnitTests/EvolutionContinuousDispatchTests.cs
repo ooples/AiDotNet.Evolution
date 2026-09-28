@@ -222,7 +222,7 @@ public sealed class EvolutionContinuousDispatchTests
 
         // The seen set and the cache are exactly what the forced save reconstructs; the rest of the payload records
         // wall-clock timings and so differs between any two runs.
-        EvolutionCheckpoint forced = cancelled.Saved[^1];
+        EvolutionCheckpoint forced = cancelled.Saved[cancelled.Saved.Count - 1];
         EvolutionCheckpoint? expected = uninterrupted.Saved.SingleOrDefault(checkpoint => checkpoint.Sequence == forced.Sequence);
         (string seen, string cache) = Reconstructed(forced);
         if (expected is null)
@@ -266,7 +266,7 @@ public sealed class EvolutionContinuousDispatchTests
         }
 
         public Task<EvolutionCheckpoint?> LoadLatestAsync(string runId, CancellationToken cancellationToken = default) =>
-            Task.FromResult(Saved.Count == 0 ? null : Saved[^1]);
+            Task.FromResult(Saved.Count == 0 ? null : Saved[Saved.Count - 1]);
     }
 
     private sealed class CancelAfterEvaluations(int count, CancellationTokenSource cancellation) : IEvolutionObserver<TestGenome>
