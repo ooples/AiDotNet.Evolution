@@ -1,4 +1,3 @@
-#if NET5_0_OR_GREATER
 using System.Globalization;
 using System.Net;
 using System.Security.Authentication;
@@ -83,7 +82,7 @@ public sealed class EvolutionWorkServerTests : IDisposable
     [Fact]
     public async Task A_certificate_that_does_not_match_the_pin_is_refused()
     {
-        using X509Certificate2 other = SelfSigned();
+        using X509Certificate2 other = SelfSigned(other: true);
         await Assert.ThrowsAsync<AuthenticationException>(() => EvolutionWorkRemoteClient.ConnectAsync(
             "127.0.0.1", _server.LocalEndPoint.Port, EvolutionWorkServer.ComputeFingerprint(other), Token));
 
@@ -154,15 +153,23 @@ public sealed class EvolutionWorkServerTests : IDisposable
     }
 
     // SChannel will not serve an ephemeral key, so the certificate is round-tripped through PFX to persist it.
-    private static X509Certificate2 SelfSigned()
+    // .NET Framework 4.7.1 cannot create a certificate (no CertificateRequest), so it loads a committed test-only one
+    // (EvolutionWorkServerTestCertificates); that is what lets its TLS path - the #else branches - run at all.
+    private static X509Certificate2 SelfSigned(bool other = false)
     {
+#if NET5_0_OR_GREATER
         using RSA key = RSA.Create(2048);
-        var request = new CertificateRequest("CN=evolution-work-test", key, HashAlgorithmName.SHA256, RSASignaturePadding.Pkcs1);
+        var request = new CertificateRequest(other ? "CN=evolution-work-test-other" : "CN=evolution-work-test", key,
+            HashAlgorithmName.SHA256, RSASignaturePadding.Pkcs1);
         using X509Certificate2 ephemeral = request.CreateSelfSigned(DateTimeOffset.UtcNow.AddMinutes(-5), DateTimeOffset.UtcNow.AddDays(1));
 #if NET9_0_OR_GREATER
         return X509CertificateLoader.LoadPkcs12(ephemeral.Export(X509ContentType.Pfx), null);
 #else
         return new X509Certificate2(ephemeral.Export(X509ContentType.Pfx));
+#endif
+#else
+        return new X509Certificate2(Convert.FromBase64String(
+            other ? EvolutionWorkServerTestCertificates.Other : EvolutionWorkServerTestCertificates.Server));
 #endif
     }
 
@@ -175,4 +182,3 @@ public sealed class EvolutionWorkServerTests : IDisposable
         try { Directory.Delete(_directory, recursive: true); } catch (IOException) { }
     }
 }
-#endif
