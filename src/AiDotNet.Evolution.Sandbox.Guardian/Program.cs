@@ -31,6 +31,7 @@ internal static class Program
     private const int DescendantsSurvivedExitCode = 124;
     private const int SigStop = 19;
     private const int MaximumSweeps = 64;
+    private static readonly TimeSpan TerminationGrace = TimeSpan.FromSeconds(2);
 
     [DllImport("libc", SetLastError = true)]
     private static extern int prctl(int option, ulong arg2, ulong arg3, ulong arg4, ulong arg5);
@@ -99,8 +100,16 @@ internal static class Program
             Reap();
         }
 
-        Reap();
-        return Children(Environment.ProcessId).Count == 0;
+        // kill only sends the signal: a child can still be exiting, or be a zombie waiting to be reaped, when the sweep
+        // ends. Keep reaping for a bounded time and report survivors only if some are still there at the deadline.
+        var deadline = Stopwatch.StartNew();
+        while (true)
+        {
+            Reap();
+            if (Children(Environment.ProcessId).Count == 0) return true;
+            if (deadline.Elapsed >= TerminationGrace) return false;
+            Thread.Sleep(10);
+        }
     }
 
     private static void Reap()

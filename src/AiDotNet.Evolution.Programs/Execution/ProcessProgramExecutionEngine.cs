@@ -61,10 +61,12 @@ public sealed class ProcessProgramExecutionEngine : IProgramExecutionEngine, IPr
 
     private static readonly bool WindowsHost = DetectWindowsHost();
     private static readonly bool LinuxHost = RuntimeInformation.IsOSPlatform(OSPlatform.Linux);
-    // The watch starts fast, so a limit crossed early is caught early, and backs off: each poll walks the tree through
-    // /proc, and a long run with a wide tree should not pay that fifty times a second. The ulimit backstops still cap
-    // growth faster than the widest interval.
+    // The watch polls fast while a run is young and backs off only after that: each poll walks the tree through /proc,
+    // and a long run with a wide tree should not pay that fifty times a second. The fast phase is what catches a burst:
+    // a candidate that allocates quickly crosses the memory limit and then dies at the shell's address-space backstop
+    // within a few hundred milliseconds, and a watch already backing off there misses the crossing entirely.
     private static readonly TimeSpan ResourcePollInterval = TimeSpan.FromMilliseconds(20);
+    private static readonly TimeSpan FastResourcePollingPeriod = TimeSpan.FromSeconds(2);
     private static readonly TimeSpan MaximumResourcePollInterval = TimeSpan.FromMilliseconds(200);
     // 128 + SIGXCPU: the kernel's CPU-time backstop ended the process.
     private const int ExitCodeCpuLimitSignal = 152;
@@ -439,12 +441,13 @@ public sealed class ProcessProgramExecutionEngine : IProgramExecutionEngine, IPr
         bool watched = job?.ReportsViolations == true || LinuxHost;
         ProgramExecuteErrorCode? violation = null;
         TimeSpan poll = ResourcePollInterval;
+        var watchClock = Stopwatch.StartNew();
         while (watched && !exitTask.IsCompleted)
         {
             violation = ReadViolation(job, processId);
             if (violation is not null) break;
             await Task.WhenAny(exitTask, Task.Delay(poll)).ConfigureAwait(false);
-            if (poll < MaximumResourcePollInterval)
+            if (watchClock.Elapsed >= FastResourcePollingPeriod && poll < MaximumResourcePollInterval)
                 poll = TimeSpan.FromTicks(Math.Min(poll.Ticks * 2, MaximumResourcePollInterval.Ticks));
         }
 
