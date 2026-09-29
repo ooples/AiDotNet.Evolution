@@ -26,7 +26,8 @@ public sealed class ResourceLimitEnforcementTests
     {
         var clock = Stopwatch.StartNew();
         ProgramExecuteResponse over = await Run(Allocate(1024), limits => limits.MemoryLimitMb = 128);
-        Assert.Equal(ProgramExecuteErrorCode.MemoryLimitExceeded, over.ErrorCode);
+        Assert.True(over.ErrorCode == ProgramExecuteErrorCode.MemoryLimitExceeded,
+            $"expected MemoryLimitExceeded, got {over.ErrorCode} after {clock.Elapsed.TotalSeconds:F1} s: {over.Error}");
         Assert.False(over.Success);
         Assert.DoesNotContain("allocated", over.StdOut, StringComparison.Ordinal);
         Assert.True(clock.Elapsed < TimeSpan.FromSeconds(15), "the wall-clock limit ended it, not the memory limit");
@@ -60,7 +61,9 @@ public sealed class ResourceLimitEnforcementTests
     {
         var clock = Stopwatch.StartNew();
         ProgramExecuteResponse over = await Run("while True:\n    pass\n", limits => limits.CpuTimeLimitSeconds = 1);
-        Assert.Equal(ProgramExecuteErrorCode.CpuTimeLimitExceeded, over.ErrorCode);
+        // The engine's own account (exit code, which limit it saw) makes a runner-specific failure diagnosable.
+        Assert.True(over.ErrorCode == ProgramExecuteErrorCode.CpuTimeLimitExceeded,
+            $"expected CpuTimeLimitExceeded, got {over.ErrorCode} after {clock.Elapsed.TotalSeconds:F1} s: {over.Error}");
         Assert.False(over.Success);
         Assert.True(clock.Elapsed < TimeSpan.FromSeconds(15), "the wall-clock limit ended it, not the CPU-time limit");
 
