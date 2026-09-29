@@ -28,6 +28,8 @@ internal static class Program
     private const int WaitNoHang = 1;
     private const int UsageExitCode = 2;
     private const int SetupFailedExitCode = 125;
+    private const int DescendantsSurvivedExitCode = 124;
+    private const int SigStop = 19;
     private const int MaximumSweeps = 64;
 
     [DllImport("libc", SetLastError = true)]
@@ -72,23 +74,33 @@ internal static class Program
             return SetupFailedExitCode;
         }
 
-        KillAndReapDescendants();
+        // A descendant that outlives the sweep would be reparented to init and escape: say so rather than hide it.
+        if (!KillAndReapDescendants())
+        {
+            Console.Error.WriteLine("sandbox guardian: descendants survived termination.");
+            return DescendantsSurvivedExitCode;
+        }
+
         return exitCode;
     }
 
     // Everything still alive below this process is a detached descendant that outlived its command. Killing one can
     // reparent ITS children here too, so this sweeps until a pass finds nothing (bounded, in case of a fork bomb).
-    private static void KillAndReapDescendants()
+    // Each sweep stops every child first, so none can fork between being listed and being killed. Returns false when
+    // descendants are still alive after the bound.
+    private static bool KillAndReapDescendants()
     {
         for (int sweep = 0; sweep < MaximumSweeps; sweep++)
         {
             List<int> children = Children(Environment.ProcessId);
             if (children.Count == 0) break;
+            foreach (int child in children) kill(child, SigStop);
             foreach (int child in children) kill(child, SigKill);
             Reap();
         }
 
         Reap();
+        return Children(Environment.ProcessId).Count == 0;
     }
 
     private static void Reap()

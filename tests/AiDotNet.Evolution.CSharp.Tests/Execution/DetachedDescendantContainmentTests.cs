@@ -66,11 +66,13 @@ public sealed class DetachedDescendantContainmentTests
         string pidFile = Path.Combine(directory, "grandchild.pid");
         try
         {
-            // The grandchild touches 400 MB while the candidate itself stays small and waits; under a 128 MB limit the
-            // run must end as a memory violation, well before the candidate's own 15 s wait or the wall-clock limit.
+            // The grandchild touches 160 MB and holds it while the candidate itself stays small and waits; under a 128 MB
+            // limit the run must end as a memory violation, well before the candidate's own 15 s wait. 160 MB, not more:
+            // the shell's ulimit -v backstop (twice the limit) also binds the grandchild, and an allocation that ran into it
+            // would kill the grandchild between two polls and leave nothing over the limit to see.
             const string allocate =
                 "        chunks = []\n" +
-                "        for _ in range(40):\n" +
+                "        for _ in range(16):\n" +
                 "            chunks.append(b'\\x01' * (10 * 1024 * 1024))\n";
             var clock = Stopwatch.StartNew();
             ProgramExecuteResponse response = await Run(DoubleFork(pidFile, allocate, 15), limits => limits.MemoryLimitMb = 128);

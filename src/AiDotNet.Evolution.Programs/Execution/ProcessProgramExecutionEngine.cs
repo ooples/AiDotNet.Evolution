@@ -68,6 +68,7 @@ public sealed class ProcessProgramExecutionEngine : IProgramExecutionEngine, IPr
     private static readonly TimeSpan MaximumResourcePollInterval = TimeSpan.FromMilliseconds(200);
     // 128 + SIGXCPU: the kernel's CPU-time backstop ended the process.
     private const int ExitCodeCpuLimitSignal = 152;
+    private const int ExitCodeQuotaExceeded = unchecked((int)0xC0000044); // STATUS_QUOTA_EXCEEDED
     private const string PosixShellPath = "/bin/sh";
 
     private readonly ProgramSandboxOptions _options;
@@ -187,7 +188,7 @@ public sealed class ProcessProgramExecutionEngine : IProgramExecutionEngine, IPr
             lock (_lifecycle)
             {
                 _leases--;
-                if (_disposed && _leases == 0) _concurrency.Dispose();
+                if (_disposed && _leases == 0) ReleaseResources();
             }
         }
     }
@@ -322,9 +323,15 @@ public sealed class ProcessProgramExecutionEngine : IProgramExecutionEngine, IPr
         {
             if (_disposed) return;
             _disposed = true;
-            if (_leases == 0) _concurrency.Dispose();
+            if (_leases == 0) ReleaseResources();
         }
+    }
 
+    // Called under _lifecycle once disposed and no admitted execution remains: an execution still running may be about to
+    // launch through the guardian, so its directory goes with the last lease, not with Dispose.
+    private void ReleaseResources()
+    {
+        _concurrency.Dispose();
         if (_guardian.IsValueCreated) _guardian.Value?.Delete();
     }
 
@@ -484,7 +491,10 @@ public sealed class ProcessProgramExecutionEngine : IProgramExecutionEngine, IPr
 
         // A limit can also end the process on its own: the job refuses a commit or the kernel's CPU backstop fires.
         ProgramExecuteErrorCode? afterExit = job?.ReadViolation()
-            ?? (LinuxHost && exitCode == ExitCodeCpuLimitSignal ? ProgramExecuteErrorCode.CpuTimeLimitExceeded : null);
+            ?? (LinuxHost && exitCode == ExitCodeCpuLimitSignal ? ProgramExecuteErrorCode.CpuTimeLimitExceeded : (ProgramExecuteErrorCode?)null)
+            // The job ends a process past its CPU-time limit with STATUS_QUOTA_EXCEEDED. Its port notification can arrive
+            // after the exit is observed (seen on GitHub's Windows runners), so the exit status settles it on its own.
+            ?? (job is not null && exitCode == ExitCodeQuotaExceeded ? ProgramExecuteErrorCode.CpuTimeLimitExceeded : (ProgramExecuteErrorCode?)null);
         if (afterExit is not null)
         {
             return ResourceExceeded(language, compileOnly, afterExit.Value, exitCode, stdOutReader, stdErrReader);

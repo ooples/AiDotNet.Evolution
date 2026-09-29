@@ -17,7 +17,11 @@ internal static class LinuxProcessTree
     /// <summary>Sums resident memory and CPU time over a process and its live descendants.</summary>
     /// <param name="rootProcessId">The process at the root of the tree.</param>
     /// <param name="includeRoot">Whether the root's own usage counts; the sandbox guardian's own runtime does not.</param>
-    /// <returns>The totals, or <c>null</c> when the root cannot be read (for example because it already exited).</returns>
+    /// <returns>
+    /// The totals, or <c>null</c> when the root cannot be read (for example because it already exited). A tree larger than
+    /// the walk's bound reports <see cref="long.MaxValue"/> for both: a partial total would let the unvisited descendants
+    /// escape the limits, so an unmeasurable tree fails closed as over every limit.
+    /// </returns>
     public static (long ResidentBytes, TimeSpan CpuTime)? Measure(int rootProcessId, bool includeRoot = true)
     {
         if (rootProcessId <= 0) return null;
@@ -49,9 +53,9 @@ internal static class LinuxProcessTree
             foreach (int child in Children(processId)) pending.Enqueue(child);
         }
 
-        return readRoot
-            ? (residentPages * pageSize, TimeSpan.FromSeconds(ticks / TicksPerSecond))
-            : null;
+        if (!readRoot) return null;
+        if (pending.Count > 0) return (long.MaxValue, TimeSpan.MaxValue);
+        return (residentPages * pageSize, TimeSpan.FromSeconds(ticks / TicksPerSecond));
     }
 
     private static bool TryReadStat(int processId, out long residentPages, out long cpuTicks)
