@@ -62,6 +62,12 @@ public sealed class EvolutionWorkRemoteClient : IDisposable
 #endif
                 var connection = new EvolutionWorkRemoteClient(client, ssl);
                 await connection.WriteAsync(AuthenticationFrame(workerToken)).ConfigureAwait(false);
+                // The server acknowledges an accepted token and closes the connection on a refused one.
+                string? acknowledgement = await connection._reader.ReadLineAsync().ConfigureAwait(false);
+                if (acknowledgement is null)
+                    throw new AuthenticationException("The coordinator refused the worker token.");
+                if (!string.Equals(acknowledgement, EvolutionWorkProtocol.AuthenticatedFrame, StringComparison.Ordinal))
+                    throw new AuthenticationException("The coordinator did not acknowledge the worker token.");
                 return connection;
             }
         }

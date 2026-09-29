@@ -13,6 +13,9 @@ public sealed partial class EvolutionWorkProtocol : IDisposable
     public const int Version = 1;
     /// <summary>Maximum UTF-8 bytes per request or reply, independently of the coordinator's stricter payload bounds.</summary>
     public const int MaximumFrameBytes = 16 * 1024 * 1024;
+
+    /// <summary>The frame a server sends after accepting a worker's token; a refused worker is closed without it.</summary>
+    internal const string AuthenticatedFrame = "{\"op\":\"authenticated\"}";
     private static readonly UTF8Encoding Utf8 = new(false, true);
     private readonly object _sync = new();
     private readonly Func<DateTimeOffset>? _utcNow;

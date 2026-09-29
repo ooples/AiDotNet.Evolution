@@ -69,10 +69,10 @@ public sealed class EvolutionWorkServerTests : IDisposable
     [Fact]
     public async Task A_wrong_token_is_refused_and_the_right_one_is_not()
     {
-        using EvolutionWorkRemoteClient impostor = await EvolutionWorkRemoteClient.ConnectAsync(
-            "127.0.0.1", _server.LocalEndPoint.Port, _server.CertificateFingerprint, "not-the-worker-token-at-all");
-        // The server closes the connection: a clean close reads as refusal, a reset as an I/O failure.
-        Exception refused = await Assert.ThrowsAnyAsync<Exception>(() => impostor.SendAsync(Request("status").ToJsonString()));
+        // ConnectAsync itself reports the refusal, as documented: the server closes the connection instead of
+        // acknowledging the token. A clean close reads as refusal, a reset as an I/O failure.
+        Exception refused = await Assert.ThrowsAnyAsync<Exception>(() => EvolutionWorkRemoteClient.ConnectAsync(
+            "127.0.0.1", _server.LocalEndPoint.Port, _server.CertificateFingerprint, "not-the-worker-token-at-all"));
         Assert.True(refused is AuthenticationException or IOException, refused.GetType().Name);
 
         using EvolutionWorkRemoteClient worker = await Connect();

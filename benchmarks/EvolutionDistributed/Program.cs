@@ -176,6 +176,9 @@ internal static class Harness
             }
         }
 
+        // Workers stay connected until the server is disposed below, so a Faulted event can still add to the list.
+        string[] faultSnapshot;
+        lock (faults) faultSnapshot = faults.ToArray();
         var report = new JsonObject
         {
             ["stateHash"] = result.StateHash,
@@ -188,7 +191,7 @@ internal static class Harness
             ["workersAwaited"] = waitWorkers,
             ["evalMs"] = evalMs,
             ["bestQuality"] = result.Best?.Evaluation.Quality,
-            ["serverFaults"] = new JsonArray(faults.Select(f => (JsonNode)f).ToArray()),
+            ["serverFaults"] = new JsonArray(faultSnapshot.Select(f => (JsonNode)f).ToArray()),
             ["committed"] = committed
         };
         string text = report.ToJsonString(new JsonSerializerOptions { WriteIndented = true });

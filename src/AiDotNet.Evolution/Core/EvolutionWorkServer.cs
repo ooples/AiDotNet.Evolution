@@ -245,8 +245,15 @@ public sealed class EvolutionWorkServer : IDisposable
                 if (line is null) return;
                 string reply = Dispatch(line, peer);
                 byte[] bytes = Encoding.UTF8.GetBytes(reply + "\n");
-                await ssl.WriteAsync(bytes, 0, bytes.Length).ConfigureAwait(false);
-                await ssl.FlushAsync().ConfigureAwait(false);
+                // A peer that stops reading would otherwise block this write once the send buffer fills and hold the
+                // connection slot until Dispose; the idle timeout bounds writes the same way it bounds reads.
+                using (var writing = CancellationTokenSource.CreateLinkedTokenSource(_stopping.Token))
+                {
+                    writing.CancelAfter(_options.IdleTimeout);
+                    using CancellationTokenRegistration abort = writing.Token.Register(client.Dispose);
+                    await ssl.WriteAsync(bytes, 0, bytes.Length).ConfigureAwait(false);
+                    await ssl.FlushAsync().ConfigureAwait(false);
+                }
             }
         }
         catch (Exception exception) when (exception is IOException or ObjectDisposedException or SocketException
@@ -281,7 +288,15 @@ public sealed class EvolutionWorkServer : IDisposable
         }
 
         string? first = await reader.ReadLineAsync().ConfigureAwait(false);
-        if (first is not null && TokenMatches(first)) return true;
+        if (first is not null && TokenMatches(first))
+        {
+            // Acknowledged, so the client's ConnectAsync can tell an accepted token from a refused one (a refused
+            // peer is closed without a reply) instead of learning it on its first request.
+            byte[] acknowledgement = Encoding.UTF8.GetBytes(EvolutionWorkProtocol.AuthenticatedFrame + "\n");
+            await ssl.WriteAsync(acknowledgement, 0, acknowledgement.Length).ConfigureAwait(false);
+            await ssl.FlushAsync().ConfigureAwait(false);
+            return true;
+        }
         Raise(EvolutionWorkServerEventKind.AuthenticationRefused, peer);
         return false;
     }

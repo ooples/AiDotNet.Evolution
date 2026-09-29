@@ -8,11 +8,9 @@ on:
   workflow_dispatch:
   pull_request:
     paths:
-      - src/AiDotNet.Evolution/Core/EvolutionWork*.cs
-      - src/AiDotNet.Evolution/Core/DurableEvolutionWorkCoordinator*.cs
-      - src/AiDotNet.Evolution/Core/EvolutionDurableSessionBridge.cs
-      - src/AiDotNet.Evolution/Core/BoundedLineReader.cs
-      - src/AiDotNet.Evolution/Core/EvolutionEngine*.cs
+      # The whole engine: the state-hash checks (single == multi, tp1 == tp4) depend on the session, the archive,
+      # the engine options, selection and random streams as much as on the work protocol itself.
+      - src/AiDotNet.Evolution/**
       - benchmarks/EvolutionDistributed/**
       - .github/workflows/distributed-evaluation.yml
 
