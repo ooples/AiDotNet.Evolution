@@ -21,6 +21,26 @@
     <ProjectReference Include="../AiDotNet.Evolution/AiDotNet.Evolution.csproj"/>
     <PackageReference Include="Newtonsoft.Json" Version="13.0.4"/>
   </ItemGroup>
+  <!--
+    The Linux sandbox guardian (SandboxGuardian) is embedded rather than packaged: every dll under lib/ would become a
+    compile reference for consumers. The project reference only orders the build; the target embeds its output.
+  -->
+  <ItemGroup>
+    <ProjectReference Include="../AiDotNet.Evolution.Sandbox.Guardian/AiDotNet.Evolution.Sandbox.Guardian.csproj"
+                      ReferenceOutputAssembly="false" Private="false"/>
+  </ItemGroup>
+  <Target Name="EmbedSandboxGuardian" BeforeTargets="AssignTargetPaths" DependsOnTargets="ResolveProjectReferences">
+    <MSBuild Projects="../AiDotNet.Evolution.Sandbox.Guardian/AiDotNet.Evolution.Sandbox.Guardian.csproj"
+             Targets="GetTargetPath" Properties="Configuration=$(Configuration);TargetFramework=net8.0">
+      <Output TaskParameter="TargetOutputs" ItemName="_SandboxGuardianAssembly"/>
+    </MSBuild>
+    <ItemGroup>
+      <EmbeddedResource Include="@(_SandboxGuardianAssembly)"
+                        LogicalName="AiDotNet.Evolution.Programs.Execution.SandboxGuardian.dll"/>
+      <EmbeddedResource Include="@(_SandboxGuardianAssembly->'%(RootDir)%(Directory)%(Filename).runtimeconfig.json')"
+                        LogicalName="AiDotNet.Evolution.Programs.Execution.SandboxGuardian.runtimeconfig.json"/>
+    </ItemGroup>
+  </Target>
   <!-- V1-11: the public API is declared (PublicAPI.*.txt) and every change to it must be too. -->
   <ItemGroup>
     <PackageReference Include="Microsoft.CodeAnalysis.PublicApiAnalyzers" Version="5.6.0" PrivateAssets="all"/>

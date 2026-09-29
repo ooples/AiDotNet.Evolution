@@ -16,8 +16,9 @@ internal static class LinuxProcessTree
 
     /// <summary>Sums resident memory and CPU time over a process and its live descendants.</summary>
     /// <param name="rootProcessId">The process at the root of the tree.</param>
+    /// <param name="includeRoot">Whether the root's own usage counts; the sandbox guardian's own runtime does not.</param>
     /// <returns>The totals, or <c>null</c> when the root cannot be read (for example because it already exited).</returns>
-    public static (long ResidentBytes, TimeSpan CpuTime)? Measure(int rootProcessId)
+    public static (long ResidentBytes, TimeSpan CpuTime)? Measure(int rootProcessId, bool includeRoot = true)
     {
         if (rootProcessId <= 0) return null;
 
@@ -40,8 +41,11 @@ internal static class LinuxProcessTree
             }
 
             if (processId == rootProcessId) readRoot = true;
-            residentPages += resident;
-            ticks += cpuTicks;
+            if (processId != rootProcessId || includeRoot)
+            {
+                residentPages += resident;
+                ticks += cpuTicks;
+            }
             foreach (int child in Children(processId)) pending.Enqueue(child);
         }
 

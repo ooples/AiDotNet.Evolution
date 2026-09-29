@@ -81,6 +81,8 @@ public sealed class ProcessProgramExecutionEngine : IProgramExecutionEngine, IPr
     public int ActiveExecutionCount => Volatile.Read(ref _activeExecutions);
     private readonly string _pinnedPath;
     private readonly string _workspaceRoot;
+    // Linux only: the per-execution child subreaper that keeps double-forked descendants in the measured tree.
+    private readonly Lazy<SandboxGuardian?> _guardian;
     private bool _disposed;
     private readonly object _lifecycle = new();
     private int _leases;
@@ -123,6 +125,10 @@ public sealed class ProcessProgramExecutionEngine : IProgramExecutionEngine, IPr
         {
             _workspaceRoot = Path.GetFullPath(configuredWorkingDirectory);
         }
+
+        _guardian = new Lazy<SandboxGuardian?>(
+            () => LinuxHost && File.Exists(PosixShellPath) ? SandboxGuardian.TryPrepare(_workspaceRoot, PosixShellPath) : null,
+            LazyThreadSafetyMode.ExecutionAndPublication);
         VersionHash = EvolutionHash.Combine(new[]
         {
             "process-program-execution-v1-owned-request-complete-output",
@@ -318,6 +324,8 @@ public sealed class ProcessProgramExecutionEngine : IProgramExecutionEngine, IPr
             _disposed = true;
             if (_leases == 0) _concurrency.Dispose();
         }
+
+        if (_guardian.IsValueCreated) _guardian.Value?.Delete();
     }
 
     private async Task<ProgramExecuteResponse> RunAsync(
@@ -591,9 +599,23 @@ public sealed class ProcessProgramExecutionEngine : IProgramExecutionEngine, IPr
 #if NET5_0_OR_GREATER
         if (!WindowsHost && File.Exists(PosixShellPath))
         {
-            startInfo.FileName = PosixShellPath;
+            string script = BuildPosixScript(specification, template, sourcePath, workspace);
+            if (_guardian.Value is { } guardian)
+            {
+                // The guardian sits outside the shell's ulimits (a .NET runtime under ulimit -v would not start) and
+                // outside the measured usage; everything the script starts is below it, detached or not.
+                startInfo.FileName = guardian.Host;
+                startInfo.ArgumentList.Add("exec");
+                startInfo.ArgumentList.Add(guardian.AssemblyPath);
+                startInfo.ArgumentList.Add(PosixShellPath);
+            }
+            else
+            {
+                startInfo.FileName = PosixShellPath;
+            }
+
             startInfo.ArgumentList.Add("-c");
-            startInfo.ArgumentList.Add(BuildPosixScript(specification, template, sourcePath, workspace));
+            startInfo.ArgumentList.Add(script);
             return;
         }
 #endif
@@ -764,7 +786,9 @@ public sealed class ProcessProgramExecutionEngine : IProgramExecutionEngine, IPr
     private ProgramExecuteErrorCode? ReadViolation(WindowsJobObject? job, int processId)
     {
         if (job?.ReadViolation() is { } reported) return reported;
-        if (!LinuxHost || LinuxProcessTree.Measure(processId) is not { } usage) return null;
+        // Under the guardian the root is the guardian itself; its own runtime is not the candidate's usage.
+        bool guarded = _guardian.IsValueCreated && _guardian.Value is not null;
+        if (!LinuxHost || LinuxProcessTree.Measure(processId, includeRoot: !guarded) is not { } usage) return null;
         if (usage.ResidentBytes > _limits.GetMemoryLimitBytes()) return ProgramExecuteErrorCode.MemoryLimitExceeded;
         return usage.CpuTime >= _limits.GetCpuTimeLimit() ? ProgramExecuteErrorCode.CpuTimeLimitExceeded : null;
     }
