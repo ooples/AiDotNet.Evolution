@@ -1,0 +1,22 @@
+<Project Sdk="Microsoft.NET.Sdk">
+  <!--
+    The Linux sandbox's per-execution guardian (#205 review): a child subreaper between the engine and a candidate, so
+    a descendant that double-forks away from the candidate's tree is reparented HERE instead of to init, where the
+    engine's /proc walk and tree kill still reach it. Embedded in AiDotNet.Evolution.Programs and written out at run
+    time, like the warm Python worker; it is not a package of its own.
+  -->
+  <PropertyGroup>
+    <OutputType>Exe</OutputType>
+    <TargetFramework>net8.0</TargetFramework>
+    <!-- Runs on whatever runtime the host has, 8 or later. -->
+    <RollForward>Major</RollForward>
+    <ImplicitUsings>enable</ImplicitUsings>
+    <Nullable>enable</Nullable>
+    <TreatWarningsAsErrors>true</TreatWarningsAsErrors>
+    <UseAppHost>false</UseAppHost>
+    <IsPackable>false</IsPackable>
+    <InvariantGlobalization>true</InvariantGlobalization>
+    <UseSystemResourceKeys>true</UseSystemResourceKeys>
+    <SatelliteResourceLanguages>en</SatelliteResourceLanguages>
+  </PropertyGroup>
+</Project>
