@@ -91,7 +91,10 @@ public sealed class ResourceLimitEnforcementTests
         {
             using Process? probe = Process.Start(new ProcessStartInfo(Python, "--version")
             {
-                UseShellExecute = false, RedirectStandardOutput = true, RedirectStandardError = true, CreateNoWindow = true
+                UseShellExecute = false,
+                RedirectStandardOutput = true,
+                RedirectStandardError = true,
+                CreateNoWindow = true
             });
             if (probe is null) return $"'{Python}' could not be started.";
             return probe.WaitForExit(30_000) && probe.ExitCode == 0 ? null : $"'{Python} --version' did not succeed.";
