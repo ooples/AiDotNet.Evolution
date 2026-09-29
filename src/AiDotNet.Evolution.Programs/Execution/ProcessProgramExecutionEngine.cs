@@ -61,7 +61,11 @@ public sealed class ProcessProgramExecutionEngine : IProgramExecutionEngine, IPr
 
     private static readonly bool WindowsHost = DetectWindowsHost();
     private static readonly bool LinuxHost = RuntimeInformation.IsOSPlatform(OSPlatform.Linux);
+    // The watch starts fast, so a limit crossed early is caught early, and backs off: each poll walks the tree through
+    // /proc, and a long run with a wide tree should not pay that fifty times a second. The ulimit backstops still cap
+    // growth faster than the widest interval.
     private static readonly TimeSpan ResourcePollInterval = TimeSpan.FromMilliseconds(20);
+    private static readonly TimeSpan MaximumResourcePollInterval = TimeSpan.FromMilliseconds(200);
     // 128 + SIGXCPU: the kernel's CPU-time backstop ended the process.
     private const int ExitCodeCpuLimitSignal = 152;
     private const string PosixShellPath = "/bin/sh";
@@ -419,11 +423,14 @@ public sealed class ProcessProgramExecutionEngine : IProgramExecutionEngine, IPr
         Task<bool> exitTask = WaitForExitAsync(process, timeoutSource.Token);
         bool watched = job?.ReportsViolations == true || LinuxHost;
         ProgramExecuteErrorCode? violation = null;
+        TimeSpan poll = ResourcePollInterval;
         while (watched && !exitTask.IsCompleted)
         {
             violation = ReadViolation(job, processId);
             if (violation is not null) break;
-            await Task.WhenAny(exitTask, Task.Delay(ResourcePollInterval)).ConfigureAwait(false);
+            await Task.WhenAny(exitTask, Task.Delay(poll)).ConfigureAwait(false);
+            if (poll < MaximumResourcePollInterval)
+                poll = TimeSpan.FromTicks(Math.Min(poll.Ticks * 2, MaximumResourcePollInterval.Ticks));
         }
 
         if (violation is not null)

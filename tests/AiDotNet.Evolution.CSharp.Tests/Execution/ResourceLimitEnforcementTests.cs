@@ -83,8 +83,29 @@ public sealed class ResourceLimitEnforcementTests
         Assert.Contains("rested", sleeper.StdOut, StringComparison.Ordinal);
     }
 
+    // These tests need a real interpreter. Without one every run is ExecutionFailed, which reads like a sandbox
+    // defect; fail with the actual cause instead. Not a skip: CI provides Python, and a skip would hide lost coverage.
+    private static readonly Lazy<string?> MissingInterpreter = new(() =>
+    {
+        try
+        {
+            using Process? probe = Process.Start(new ProcessStartInfo(Python, "--version")
+            {
+                UseShellExecute = false, RedirectStandardOutput = true, RedirectStandardError = true, CreateNoWindow = true
+            });
+            if (probe is null) return $"'{Python}' could not be started.";
+            return probe.WaitForExit(30_000) && probe.ExitCode == 0 ? null : $"'{Python} --version' did not succeed.";
+        }
+        catch (System.ComponentModel.Win32Exception exception)
+        {
+            return $"'{Python}' was not found ({exception.Message}).";
+        }
+    });
+
     private static async Task<ProgramExecuteResponse> Run(string source, Action<ProgramSandboxLimitOptions> configure)
     {
+        if (MissingInterpreter.Value is { } missing)
+            Assert.Fail("These tests need Python on PATH or in EVOLUTION_PYTHON: " + missing);
         var options = new ProgramSandboxOptions();
         options.SetInterpreter(ProgramLanguage.Python, new ProgramInterpreterSpecification(Python, "{source}"));
         options.Limits.TimeLimitSeconds = 20;
