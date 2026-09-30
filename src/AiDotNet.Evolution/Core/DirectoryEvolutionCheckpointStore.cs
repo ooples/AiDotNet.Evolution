@@ -34,7 +34,7 @@ namespace AiDotNet.Evolution;
 /// the newest good save. If a save file is damaged, the store quietly moves on to the previous one instead of failing,
 /// and <see cref="ListCheckpoints"/> shows you which files exist and how good each of them was.</para>
 /// </remarks>
-public sealed class DirectoryEvolutionCheckpointStore : IEvolutionCheckpointStore
+public sealed class DirectoryEvolutionCheckpointStore : IEvolutionCheckpointSegmentStore
 {
     /// <summary>The prefix every snapshot file name starts with.</summary>
     public const string FileNamePrefix = "checkpoint-";
@@ -96,6 +96,131 @@ public sealed class DirectoryEvolutionCheckpointStore : IEvolutionCheckpointStor
 
     /// <summary>Gets the resolved absolute directory snapshots are written to.</summary>
     public string DirectoryPath { get; }
+
+    /// <summary>The subdirectory, under <see cref="DirectoryPath"/>, that holds each run's segments.</summary>
+    public const string SegmentDirectoryName = "segments";
+
+    /// <inheritdoc/>
+    /// <remarks>
+    /// The segment is written to a temporary file, flushed to disk and renamed over its final name, so a crash leaves
+    /// either the whole segment or the previous one. It is subject to the same byte limit as a snapshot.
+    /// </remarks>
+    public async Task WriteSegmentAsync(string runId, long segmentId, Func<Stream, CancellationToken, Task> write,
+        CancellationToken cancellationToken = default)
+    {
+        Guard.NotNullOrWhiteSpace(runId);
+        Guard.NotNull(write);
+        if (segmentId < 0) throw new ArgumentOutOfRangeException(nameof(segmentId));
+        cancellationToken.ThrowIfCancellationRequested();
+        string directory = SegmentDirectory(runId.Trim());
+        Directory.CreateDirectory(directory);
+        string targetPath = EvolutionPath.Join(directory, SegmentFileName(segmentId));
+        string tempPath = EvolutionPath.Join(directory, $".{SegmentFileName(segmentId)}.{Guid.NewGuid():N}.tmp");
+        try
+        {
+            using (var stream = new FileStream(tempPath, FileMode.CreateNew, FileAccess.Write, FileShare.None,
+                       bufferSize: 81920, useAsync: true))
+            {
+                await write(stream, cancellationToken).ConfigureAwait(false);
+                if (stream.Length > _maxCheckpointBytes)
+                    throw new InvalidDataException($"The evolution checkpoint segment exceeds the {_maxCheckpointBytes}-byte limit.");
+                await stream.FlushAsync(cancellationToken).ConfigureAwait(false);
+                stream.Flush(flushToDisk: true);
+            }
+
+            cancellationToken.ThrowIfCancellationRequested();
+            if (File.Exists(targetPath)) File.Replace(tempPath, targetPath, destinationBackupFileName: null, ignoreMetadataErrors: true);
+            else File.Move(tempPath, targetPath);
+        }
+        finally
+        {
+            TryDelete(tempPath);
+        }
+    }
+
+    /// <inheritdoc/>
+    public Task<Stream?> OpenSegmentAsync(string runId, long segmentId, CancellationToken cancellationToken = default)
+    {
+        Guard.NotNullOrWhiteSpace(runId);
+        if (segmentId < 0) throw new ArgumentOutOfRangeException(nameof(segmentId));
+        cancellationToken.ThrowIfCancellationRequested();
+        string path = EvolutionPath.Join(SegmentDirectory(runId.Trim()), SegmentFileName(segmentId));
+        try
+        {
+            if (new FileInfo(path).Length > _maxCheckpointBytes)
+                throw new InvalidDataException($"The evolution checkpoint segment exceeds the {_maxCheckpointBytes}-byte limit.");
+            return Task.FromResult<Stream?>(new FileStream(path, FileMode.Open, FileAccess.Read, FileShare.Read,
+                bufferSize: 81920, useAsync: true));
+        }
+        catch (FileNotFoundException)
+        {
+            return Task.FromResult<Stream?>(null);
+        }
+        catch (DirectoryNotFoundException)
+        {
+            return Task.FromResult<Stream?>(null);
+        }
+    }
+
+    // One subdirectory per run, named by a digest so any run identifier is a safe path.
+    private string SegmentDirectory(string runId) =>
+        EvolutionPath.Join(EvolutionPath.Join(_directory, SegmentDirectoryName), EvolutionHash.Compute(runId).Substring(0, 32));
+
+    private static string SegmentFileName(long segmentId) =>
+        "segment-" + segmentId.ToString("D20", CultureInfo.InvariantCulture) + ".json";
+
+    /// <summary>Deletes the run's segments that no retained snapshot names, except any newer than the newest named one.</summary>
+    /// <remarks>
+    /// A segment newer than every named one can belong to a save still in progress, or to one that crashed before its
+    /// checkpoint was written; the next save of that identifier replaces it. Like snapshot retention, this is
+    /// best-effort housekeeping and never fails a save.
+    /// </remarks>
+    private void CollectSegments(string runId, IEnumerable<EvolutionCheckpoint> retained)
+    {
+        var named = new HashSet<long>();
+        foreach (EvolutionCheckpoint checkpoint in retained) named.UnionWith(checkpoint.SegmentIds);
+        if (named.Count == 0) return;
+        long newest = named.Max();
+        string directory = SegmentDirectory(runId);
+        IEnumerable<string> files;
+        try
+        {
+            if (!Directory.Exists(directory)) return;
+            files = Directory.EnumerateFiles(directory, "segment-*.json").ToList();
+        }
+        catch (IOException)
+        {
+            return;
+        }
+        catch (UnauthorizedAccessException)
+        {
+            return;
+        }
+
+        foreach (string file in files)
+        {
+            string name = Path.GetFileNameWithoutExtension(file);
+            if (!long.TryParse(name.Substring("segment-".Length), NumberStyles.None, CultureInfo.InvariantCulture, out long id)) continue;
+            if (named.Contains(id) || id > newest) continue;
+            TryDelete(file);
+        }
+    }
+
+    private static void TryDelete(string path)
+    {
+        try
+        {
+            if (File.Exists(path)) File.Delete(path);
+        }
+        catch (IOException)
+        {
+            // Best effort: a file held open by a reader is removed by a later save.
+        }
+        catch (UnauthorizedAccessException)
+        {
+            // Best effort, for the same reason.
+        }
+    }
 
     /// <inheritdoc/>
     public Task SaveAsync(EvolutionCheckpoint checkpoint, CancellationToken cancellationToken = default)
@@ -302,6 +427,8 @@ public sealed class DirectoryEvolutionCheckpointStore : IEvolutionCheckpointStor
         int bestQuota = _retention.KeepBest < 1 ? 1 : _retention.KeepBest;
         for (int index = 0; index < byQuality.Count && index < bestQuota; index++)
             protectedNames.Add(byQuality[index].Key.FileName);
+
+        CollectSegments(runId, loaded.Where(item => protectedNames.Contains(item.Key.FileName)).Select(item => item.Value));
 
         foreach (KeyValuePair<SnapshotFile, EvolutionCheckpoint> item in loaded)
         {
@@ -549,6 +676,8 @@ public sealed class DirectoryEvolutionCheckpointStore : IEvolutionCheckpointStor
         public double? Quality { get; set; }
         /// <summary>Gets or sets the direction a larger <see cref="Quality"/> is better in.</summary>
         public EvolutionOptimizationDirection QualityDirection { get; set; }
+        /// <summary>Gets or sets the store segments the checkpoint needs; <c>null</c> when it needs none.</summary>
+        public List<long>? SegmentIds { get; set; }
         /// <summary>Gets or sets the checksum over every other field of this document.</summary>
         public string DocumentChecksum { get; set; } = string.Empty;
 
@@ -563,7 +692,8 @@ public sealed class DirectoryEvolutionCheckpointStore : IEvolutionCheckpointStor
                 Payload = checkpoint.Payload,
                 Checksum = checkpoint.Checksum,
                 Quality = checkpoint.Quality,
-                QualityDirection = checkpoint.QualityDirection
+                QualityDirection = checkpoint.QualityDirection,
+                SegmentIds = checkpoint.SegmentIds.Count == 0 ? null : checkpoint.SegmentIds.ToList()
             };
             document.DocumentChecksum = document.ComputeDocumentChecksum();
             return document;
@@ -573,7 +703,7 @@ public sealed class DirectoryEvolutionCheckpointStore : IEvolutionCheckpointStor
             string.Equals(DocumentChecksum, ComputeDocumentChecksum(), StringComparison.Ordinal);
 
         public EvolutionCheckpoint ToCheckpoint() => new(RunId, Sequence, CompatibilityHash, Payload, Checksum,
-            SchemaVersion, Quality, QualityDirection);
+            SchemaVersion, Quality, QualityDirection, SegmentIds ?? new List<long>());
 
         // The payload is hashed inline while the whole input fits EvolutionHash.Combine's character bound, exactly as
         // before, so every existing snapshot still verifies. A larger payload (a checkpoint may be up to 256 MB; about
@@ -591,7 +721,12 @@ public sealed class DirectoryEvolutionCheckpointStore : IEvolutionCheckpointStor
                 Checksum,
                 EvolutionHash.EncodeNullableDouble(Quality),
                 ((int)QualityDirection).ToString(CultureInfo.InvariantCulture)
-            };
+            }
+            // Only a segmented snapshot adds a component, so every snapshot written before segments still verifies.
+            .Concat(SegmentIds is { Count: > 0 } segments
+                ? new[] { "segments:" + string.Join(",", segments.Select(id => id.ToString(CultureInfo.InvariantCulture))) }
+                : Array.Empty<string>())
+            .ToArray();
             string[] inline = Components(Payload);
             // Exactly the inputs Combine accepted before keep the inline form; only ones it refused take the digest form.
             return EvolutionHash.Combine(EvolutionHash.FitsCombine(inline)
