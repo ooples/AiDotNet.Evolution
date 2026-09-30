@@ -19,11 +19,12 @@ A multi-objective archive also implements `IEvolutionParetoArchiveView<TGenome>`
 `ParetoDefinition` is `null` for a scalar snapshot, and `InfeasibleEntries` lists the exploratory
 candidates it keeps separately from the feasible front. See [Pareto search](PARETO_SEARCH.md).
 
-Two optional interfaces let an archive survive a checkpoint:
+Three optional interfaces let an archive survive a checkpoint:
 
 - `ICheckpointableEvolutionArchive<TGenome>` restores an exact, versioned snapshot. Resume requires
   it.
-- `IGrowableEvolutionArchive<TGenome>` also checkpoints descriptor ranges widened during the run by
+- `IGrowableEvolutionArchive<TGenome>` extends `ICheckpointableEvolutionArchive<TGenome>` and also
+  checkpoints descriptor ranges widened during the run by
   `EvolutionOutOfRangePolicy.Grow`.
 - `ICheckpointableParetoArchive<TGenome>` restores a Pareto archive's deployable and exploratory
   populations without mixing their admission rules.

@@ -169,9 +169,9 @@ dotnet run --project examples/MultiFidelitySearch -c Release -- --regression 32 
   `EvolutionFidelityLevel`, the purpose (search or confirmation), its replication report, and how many
   continuation tokens were accepted or rejected when it resumed from a lower level.
 - `Promotions`: one `EvolutionFidelityPromotion` per decision to measure a candidate at the next
-  level. Each records the source batch, the levels, the candidate's rank, whether the promotion was an
-  exploration slot, and the scheduler and evaluator versions that made it, so the decision can be
-  audited later.
+  level. Each records the genome, the source batch, the levels, the candidate's rank and whether the
+  promotion was an exploration slot. The report's `SchedulerVersionHash`, `SearchEvaluatorVersionHash`
+  and `ConfirmationEvaluatorVersionHash` identify what made those decisions, so they can be audited later.
 
 A measurement that can continue at a higher fidelity carries an `EvolutionFidelityResumeState`: an
 opaque continuation token bound to one genome, replicate, evaluator version and source level. The

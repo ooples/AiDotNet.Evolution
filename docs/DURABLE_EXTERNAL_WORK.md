@@ -231,6 +231,9 @@ serialization/resume. They do not claim arbitrary partial-batch crash continuati
   its evaluation context and id, and the `WorkIdentity` that durable delivery fences on.
 - `DurableEvolutionWorkCoordinator.Heartbeat` returns an `EvolutionWorkHeartbeat`: `Renewed`,
   `Expired`, `Canceled`, `Completed` or `UnknownLease`. A worker that gets anything but `Renewed`
-  should stop, because its result will not be accepted.
+  should stop evaluating, because its result will not be accepted. After `Expired` or `Canceled`
+  it should still `Commit` its actual resources: the lease stays reserved at its maximum until
+  that final receipt arrives, and a late receipt settles the original reservation exactly once.
+  `Completed` and `UnknownLease` need no further call.
 - `GetResult` and `GetDeliveryResult` return `EvolutionCommittedWork`: the identity, payload,
   provenance, actual resources and outcome of a stored result, and whether it was accepted.

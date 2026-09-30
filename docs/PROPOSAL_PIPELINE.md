@@ -98,5 +98,6 @@ After a pipelined run, `EvolutionEngine<TGenome>.PipelineReport` returns an `Evo
 the wave size, queue capacities, worker counts, execution mode and call totals, separate from the
 deterministic search state. Its `Schedule` is a list of `EvolutionPipelineScheduleEntry` records,
 each with a kind (`EvolutionPipelineScheduleKind`: `ProposalSnapshot`, `Commit` or `WaveAborted`), the
-evaluation id and generation. Callback timings are left out on purpose, so two replays of a
-deterministic run produce the same schedule.
+evaluation id, generation and identity. The schedule entries carry no timings, so two replays of a
+deterministic run produce the same `Schedule`; the report's `ProposalBusySeconds`,
+`EvaluationBusySeconds` and `ElapsedSeconds` are timings and differ between replays.

@@ -140,5 +140,5 @@ crash-safe trace file, in the `EvolutionTraceFormat` you choose (`JsonLines` or 
 document). An `EvolutionTraceSummary` is kept beside it, with the records written and dropped and the
 bytes written. `EvolutionTraceFile.Read` (or `ReadAsync`) returns an `EvolutionTraceReadResult`: the
 records, whether the file was complete, its format and compression, and the summary if one was
-written. A trace cut off by a crash still reads. `IsComplete` tells you
-it was cut off, so you never mistake a partial trace for a whole run.
+written. A trace cut off by a crash still reads, and its `IsComplete` is false, so you never mistake
+a partial trace for a whole run.
