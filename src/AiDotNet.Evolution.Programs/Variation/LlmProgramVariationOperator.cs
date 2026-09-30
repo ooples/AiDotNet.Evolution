@@ -411,6 +411,10 @@ public sealed class LlmProgramVariationOperator : ICheckpointableVariationOperat
     /// <summary>Tells the model what has already been tried on this same parent, and how it went.</summary>
     /// <param name="promptContext">The context being built.</param>
     /// <param name="parentGenomeId">The parent whose attempt history is relevant.</param>
+    /// <param name="context">
+    /// The proposal's context. With concurrent proposals it fixes which recorded attempts this proposal may see, so the
+    /// prompt does not depend on which other model calls happened to finish first.
+    /// </param>
     /// <remarks>
     /// Within a single proposal a rejected answer is already fed back into the conversation, so the model can see
     /// its own mistake. Across proposals it cannot: the next call starts a fresh conversation from the same parent
