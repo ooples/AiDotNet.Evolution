@@ -46,9 +46,13 @@ public sealed class RunPolicyContractTests
     {
         // Each reading of the criterion ends in one of these outcomes, and the report must total each of them, so
         // an unmeasurable criterion can never pass for one that saw no improvement.
+        // That the totals are right in a real run is checked in EvolutionEarlyStoppingCriterionTests, where improved
+        // plus not-improved readings must equal the measured ones.
         foreach (string outcome in Enum.GetNames(typeof(EvolutionEarlyStoppingOutcome)))
         {
-            Assert.NotNull(typeof(EvolutionEarlyStoppingReport).GetProperty(outcome + "Readings"));
+            System.Reflection.PropertyInfo? readings = typeof(EvolutionEarlyStoppingReport).GetProperty(outcome + "Readings");
+            Assert.NotNull(readings);
+            Assert.Equal(typeof(long), readings.PropertyType);
         }
 
         Assert.Equal(

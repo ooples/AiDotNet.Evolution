@@ -111,6 +111,7 @@ public sealed class EvolutionEarlyStoppingCriterionTests
         Assert.Single(report.UnmeasurableReasons);
         Assert.Equal(report.UnmeasurableReadings, report.UnmeasurableEvaluations);
         Assert.Equal(report.MeasuredReadings + report.UnmeasurableReadings, report.Readings);
+        Assert.Equal(report.ImprovedReadings + report.NotImprovedReadings, report.MeasuredReadings);
         Assert.True(report.WasEverMeasurable);
     }
 
