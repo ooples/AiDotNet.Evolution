@@ -13,6 +13,7 @@ public static class Program
     private const string Usage = """
         Usage:
           aidotnet-evolve run     <run.json>
+          aidotnet-evolve run --openevolve-config <config.yaml> <initial_program> <evaluator.py> [--iterations N] [--output DIR] [--python EXE]
           aidotnet-evolve resume  <run.json>
           aidotnet-evolve preflight <run.json>
           aidotnet-evolve inspect <trace>
@@ -29,6 +30,8 @@ public static class Program
         {
             return args switch
             {
+                ["run", "--openevolve-config", string config, string initial, string evaluator, .. var rest] =>
+                    RunOpenEvolve(config, initial, evaluator, rest),
                 ["run", string runFile] => Evolve(runFile, resume: false),
                 ["resume", string runFile] => Evolve(runFile, resume: true),
                 ["preflight", string runFile] => RunCommand.Preflight(runFile, Console.Out, CancellationToken.None),
@@ -63,6 +66,46 @@ public static class Program
         Console.CancelKeyPress += handler;
         try { return RunCommand.Execute(runFile, resume, Console.Out, Console.Error, interrupt); }
         finally { Console.CancelKeyPress -= handler; }
+    }
+
+    // OpenEvolve's openevolve-run.py takes the same three files. The translated run file and a per-key report are written to
+    // the output directory first, so the run can be resumed, and the translation checked, like any other run.
+    private static int RunOpenEvolve(string config, string initial, string evaluator, string[] rest)
+    {
+        int? iterations = null;
+        string output = "openevolve_output";
+        string? python = null;
+        for (int i = 0; i < rest.Length; i += 2)
+        {
+            if (i + 1 >= rest.Length) return Fail("error: " + rest[i] + " needs a value.");
+            switch (rest[i])
+            {
+                case "--iterations" when int.TryParse(rest[i + 1], NumberStyles.None, CultureInfo.InvariantCulture, out int count) && count >= 1:
+                    iterations = count;
+                    break;
+                case "--output":
+                    output = rest[i + 1];
+                    break;
+                case "--python":
+                    python = rest[i + 1];
+                    break;
+                default:
+                    return Fail("error: unknown or invalid option " + rest[i] + " " + rest[i + 1] + "." + Environment.NewLine + Usage);
+            }
+        }
+        OpenEvolveImport imported = OpenEvolveConfigImporter.Import(config, initial, evaluator, iterations, python);
+        Directory.CreateDirectory(output);
+        string runFile = Path.Combine(output, "run.json");
+        File.WriteAllText(runFile, JsonSerializer.Serialize(imported.Run, RunCommand.RunFileJson));
+        File.WriteAllText(Path.Combine(output, "openevolve-import.json"), JsonSerializer.Serialize(new
+        {
+            Source = Path.GetFullPath(config),
+            imported.Notes,
+            Keys = imported.Entries.Select(entry => new { entry.Key, entry.Value, Disposition = entry.Disposition.ToString(), entry.Ours, entry.FromConfig })
+        }, Json));
+        Console.Error.WriteLine("imported " + Path.GetFullPath(config) + " -> " + Path.GetFullPath(runFile) + " (report: openevolve-import.json)");
+        foreach (string note in imported.Notes) Console.Error.WriteLine("note: " + note);
+        return Evolve(runFile, resume: false);
     }
 
     private static int Print(string text) { Console.WriteLine(text); return 0; }

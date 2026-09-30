@@ -22,7 +22,7 @@ public sealed class CliRunTests
         print(json.dumps(evaluate(sys.stdin.read())))
         """;
 
-    private static (int Code, string Output, string Error) Run(params string[] args)
+    internal static (int Code, string Output, string Error) Run(params string[] args)
     {
         var output = new StringWriter();
         var error = new StringWriter();
@@ -588,7 +588,7 @@ public sealed class CliRunTests
     }
 
     /// <summary>A loopback OpenAI-compatible /v1/chat/completions endpoint proposing X = 1, 2, 3, ... in a python fence.</summary>
-    private sealed class FakeChatModel : IDisposable
+    internal sealed class FakeChatModel : IDisposable
     {
         private readonly HttpListener _listener = new();
         private readonly Task _loop;
