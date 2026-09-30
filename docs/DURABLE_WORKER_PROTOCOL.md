@@ -20,7 +20,41 @@ The newline framing below applies to the subprocess host, not the length-delimit
 This is a trusted local pipe/library protocol, not an authenticated network service. A
 remote deployment must add access control, transport security, worker isolation and durable
 physical-operation receipts. Anyone with control access can enqueue/cancel work or declare
-costs; a lease token is correlation, not authorization.
+costs; a lease token is correlation, not authorization. `EvolutionWorkServer` (below) supplies
+the first two for workers on other machines.
+
+## Remote workers over TLS
+
+`EvolutionWorkServer` serves a coordinator the application owns to workers on other hosts. It
+uses the same newline-delimited frames as the subprocess host, carried over TLS:
+
+- The server presents its certificate, and workers pin its SHA-256 fingerprint
+  (`EvolutionWorkServer.CertificateFingerprint`) instead of trusting a certificate authority.
+- The first frame on a connection must be `{"op":"authenticate","token":"..."}`. A wrong
+  token, or any other first frame, closes the connection. Until then, frames are capped at
+  4 KiB.
+- Remote workers may only `claim`, `heartbeat`, `commit`, and read `delivery`, `unsettled` and
+  `status`. `enqueue`, `cancel`, `result`, `open` and `close` are refused and stay with the
+  process that owns the coordinator.
+- The token authorises the worker pool, not one worker id. Any holder can act as any worker
+  id, so issue it only to machines you would let evaluate.
+
+```csharp
+using var server = new EvolutionWorkServer(coordinator, certificateWithKey, workerToken,
+    new EvolutionWorkServerOptions { Port = 7070, OnEvent = e => log(e) });
+server.Start();
+
+// On a worker host:
+using var worker = await EvolutionWorkRemoteClient.ConnectAsync(host, 7070, fingerprint, workerToken);
+string reply = await worker.SendAsync(claimJson);
+```
+
+A worker that dies keeps its lease until the lease expires. The coordinator then re-issues the
+work under a new lease, and a late commit from the dead worker's lease is `stale`. Batch
+dispatch commits whole batches, so that delay cannot change the run.
+`benchmarks/EvolutionDistributed` shows it across containers: after a worker is killed, every
+evaluation is committed once, the killed lease is re-issued, and the final state hash equals a
+single-host run.
 
 ## Wire contract
 
