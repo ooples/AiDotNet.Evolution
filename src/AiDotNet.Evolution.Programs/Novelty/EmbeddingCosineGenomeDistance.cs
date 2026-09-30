@@ -61,9 +61,12 @@ public sealed class EmbeddingCosineGenomeDistance
     /// <param name="genomes">At most 257 programs.</param>
     /// <param name="cancellationToken">Cancels the request.</param>
     /// <returns><c>true</c> when every program is cached afterwards; <c>false</c> when the batch is too large for the
-    /// cache, the client failed, or its vectors were inconsistent. A failure never throws.</returns>
+    /// cache, the client failed, or its vectors were inconsistent. A provider failure is reported this way and never
+    /// throws.</returns>
+    /// <exception cref="ArgumentNullException"><paramref name="genomes"/> is null.</exception>
     /// <exception cref="ArgumentException">More than 257 programs, or a null one.</exception>
     /// <exception cref="InvalidOperationException">The client's or fallback's identity changed.</exception>
+    /// <exception cref="OperationCanceledException"><paramref name="cancellationToken"/> was canceled.</exception>
     public async ValueTask<bool> PrimeAsync(IEnumerable<ProgramGenome> genomes, CancellationToken cancellationToken = default) =>
         (await PrimeWithReceiptAsync(genomes, cancellationToken).ConfigureAwait(false)).Success;
 
