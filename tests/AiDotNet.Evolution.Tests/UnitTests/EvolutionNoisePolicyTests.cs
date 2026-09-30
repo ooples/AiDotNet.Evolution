@@ -27,7 +27,7 @@ public sealed class EvolutionNoisePolicyTests
             Assert.True(identities.Add(context.SampleIdentity));
             return new(Value(direction == EvolutionOptimizationDirection.Maximize ? genome : 1 - genome, direction));
         }
-        var result = await Challenge(ledger, Measure, Measure, direction).RunAsync(0, Candidate(1), Candidate(0), Context);
+        EvolutionIncumbentChallengeReport result = await Challenge(ledger, Measure, Measure, direction).RunAsync(0, Candidate(1), Candidate(0), Context);
         Assert.True(result.IsConfirmed);
         Assert.Equal("candidate-0", result.IncumbentId);
         Assert.Equal("candidate-1", result.CandidateId);
@@ -45,7 +45,7 @@ public sealed class EvolutionNoisePolicyTests
         var result = await Challenge(Ledger(), (g, _, _) => new(Value(g)), (g, _, _) => new(Value(1 - g)))
             .RunAsync(0, Candidate(1), Candidate(0), Context);
         Assert.False(result.IsConfirmed);
-        Assert.Equal("not-confirmed", result.Outcome);
+        Assert.Equal(EvolutionIncumbentChallengeOutcome.NotConfirmed, result.Outcome);
         Assert.True(result.LowerImprovementBound < 0);
     }
 
@@ -55,7 +55,7 @@ public sealed class EvolutionNoisePolicyTests
         int confirmationCalls = 0;
         var result = await Challenge(Ledger(), (_, _, _) => new(Value(.5)), (_, _, _) => { confirmationCalls++; return new(Value(1)); })
             .RunAsync(0, Candidate(1), Candidate(0), Context);
-        Assert.Equal("not-promising", result.Outcome);
+        Assert.Equal(EvolutionIncumbentChallengeOutcome.NotPromising, result.Outcome);
         Assert.Equal(0, confirmationCalls);
         Assert.Equal(8, result.ChargedCostUnits);
         Assert.Null(result.CandidateConfirmation);
@@ -83,7 +83,7 @@ public sealed class EvolutionNoisePolicyTests
         var result = await Challenge(ledger, (g, _, _) => new(Value(g)), (g, _, _) => new(Value(g)))
             .RunAsync(0, Candidate(1), Candidate(0), Context);
         Assert.False(result.IsConfirmed);
-        Assert.Equal("candidate-confirmation-incomplete", result.Outcome);
+        Assert.Equal(EvolutionIncumbentChallengeOutcome.CandidateConfirmationIncomplete, result.Outcome);
         Assert.Equal(10, result.ChargedCostUnits);
         Assert.Equal(2, result.CandidateConfirmation!.Samples.Count);
         Assert.Null(result.LowerImprovementBound);
@@ -99,7 +99,7 @@ public sealed class EvolutionNoisePolicyTests
             if (++calls == 4) cancellation.Cancel();
             return new(Value(g));
         }, (g, _, _) => new(Value(g))).RunAsync(0, Candidate(1), Candidate(0), Context, cancellation.Token);
-        Assert.Equal("canceled", result.Outcome);
+        Assert.Equal(EvolutionIncumbentChallengeOutcome.Canceled, result.Outcome);
         Assert.Equal(4, result.CandidateSearch.Samples.Count);
         Assert.Equal(4, result.ChargedCostUnits);
         Assert.Null(result.IncumbentSearch);
@@ -136,8 +136,8 @@ public sealed class EvolutionNoisePolicyTests
     public async Task FullCensusIdentifiesUsefulRejectsWithoutSamplingRadius()
     {
         var ledger = Ledger();
-        var result = await Audit(ledger).RunAsync("audit", Enumerable.Range(0, 4).Select(Candidate).ToArray(), 37);
-        Assert.Equal(2, result.Entries.Count(row => row.DefinitelyUseful));
+        EvolutionRejectionAuditReport result = await Audit(ledger).RunAsync("audit", Enumerable.Range(0, 4).Select(Candidate).ToArray(), 37);
+        Assert.Equal(2, result.Entries.Count((EvolutionRejectionAuditEntry row) => row.DefinitelyUseful));
         Assert.Equal(.5, result.FalseRejectionRateLower);
         Assert.Equal(.5, result.FalseRejectionRateUpper);
         Assert.Equal(256, result.ChargedCostUnits);

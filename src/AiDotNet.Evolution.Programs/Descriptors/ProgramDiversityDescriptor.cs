@@ -40,15 +40,17 @@ public sealed class ProgramDiversityDescriptor : IRebasableProgramDescriptor
     /// The programs the candidate is compared with. Entries are normalized, deduplicated, and sorted ordinally, so
     /// the order they are supplied in does not affect the result.
     /// </param>
-    /// <param name="name">The archive dimension name this descriptor fills.</param>
     /// <exception cref="ArgumentNullException"><paramref name="referenceSources"/> is <c>null</c>, or an entry is <c>null</c>.</exception>
-    /// <exception cref="ArgumentException"><paramref name="name"/> is empty or white space.</exception>
     public ProgramDiversityDescriptor(IEnumerable<string> referenceSources)
         : this(referenceSources, DefaultName)
     {
     }
 
     /// <summary>Initializes a diversity descriptor against fixed reference sources with an explicit dimension name.</summary>
+    /// <param name="referenceSources">The programs the candidate is compared with; order does not matter.</param>
+    /// <param name="name">The archive dimension name this descriptor fills.</param>
+    /// <exception cref="ArgumentNullException"><paramref name="referenceSources"/> is <c>null</c>, or an entry is <c>null</c>.</exception>
+    /// <exception cref="ArgumentException"><paramref name="name"/> is empty or white space.</exception>
     public ProgramDiversityDescriptor(IEnumerable<string> referenceSources, string name)
     {
         ProgramGuard.NotNull(referenceSources);
@@ -74,9 +76,7 @@ public sealed class ProgramDiversityDescriptor : IRebasableProgramDescriptor
 
     /// <summary>Initializes a diversity descriptor against a fixed set of reference genomes.</summary>
     /// <param name="referenceGenomes">The genomes the candidate is compared with.</param>
-    /// <param name="name">The archive dimension name this descriptor fills.</param>
     /// <exception cref="ArgumentNullException"><paramref name="referenceGenomes"/> is <c>null</c>, or an entry is <c>null</c>.</exception>
-    /// <exception cref="ArgumentException"><paramref name="name"/> is empty or white space.</exception>
     public ProgramDiversityDescriptor(IEnumerable<ProgramGenome> referenceGenomes)
         : this(referenceGenomes, DefaultName)
     {

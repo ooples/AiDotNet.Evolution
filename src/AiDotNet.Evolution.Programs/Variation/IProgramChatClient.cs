@@ -11,7 +11,15 @@ public interface IProgramChatClient
 }
 
 /// <summary>Roles supported by a text proposal conversation.</summary>
-public enum ProgramChatRole { System, User, Assistant }
+public enum ProgramChatRole
+{
+    /// <summary>Standing instructions.</summary>
+    System,
+    /// <summary>A request.</summary>
+    User,
+    /// <summary>A model reply.</summary>
+    Assistant
+}
 
 /// <summary>An immutable text message. Provider adapters must not reinterpret source as tool requests.</summary>
 public sealed class ProgramChatMessage
@@ -44,18 +52,24 @@ public sealed class ProgramChatOptions
     public double? Temperature { get; set; }
     /// <summary>Maximum generated tokens.</summary>
     public int? MaxOutputTokens { get; set; }
-    /// <summary>Proposal-local sampling seed.</summary>
     /// <summary>Gets or sets nucleus sampling (OpenEvolve's <c>top_p</c>), or <c>null</c> for the provider default.</summary>
     public double? TopP { get; set; }
 
     /// <summary>Gets or sets the reasoning effort for models that support it, or <c>null</c> for the provider default.</summary>
     public ProgramReasoningEffort? ReasoningEffort { get; set; }
 
+    /// <summary>Proposal-local sampling seed.</summary>
     public int? Seed { get; set; }
 }
 
 /// <summary>Provider response-format request, not a guarantee that returned text is valid.</summary>
-public enum ProgramChatResponseFormat { Text, Json }
+public enum ProgramChatResponseFormat
+{
+    /// <summary>Free text.</summary>
+    Text,
+    /// <summary>A JSON object.</summary>
+    Json
+}
 
 /// <summary>Exposes a wrapped client so judging can discover an explicitly configured panel.</summary>
 public interface IProgramChatClientDecorator : IProgramChatClient

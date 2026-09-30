@@ -9,7 +9,7 @@ public sealed partial class EvolutionPersistentEvaluationTests
     {
         var store = new StubStore { Read = () => Record() }; var ledger = CacheLedger(2);
         var cache = Cache(store, ledger); var key = Key();
-        var hit = await cache.LookupAsync(key, "first", Observed);
+        EvolutionEvaluationCacheLookup hit = await cache.LookupAsync(key, "first", Observed);
         Assert.Equal(EvolutionEvaluationReuseDecision.Eligible, hit.Decision);
         Assert.Equal(EvolutionMeasurementOriginKind.PersistentReuse, hit.ReusedResult!.MeasurementOrigin!.Kind);
         Assert.Equal(0, hit.ReusedResult.CostUnits);

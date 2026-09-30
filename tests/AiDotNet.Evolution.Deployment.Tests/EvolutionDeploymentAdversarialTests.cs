@@ -33,7 +33,7 @@ public sealed partial class EvolutionDeploymentLifecycleTests
             lifecycle.Select(Envelope(1));
             return Task.FromResult(Program("winner", request.Envelope));
         }, _ => Task.CompletedTask);
-        Assert.Equal("Stale", decision.Outcome);
+        Assert.Equal(EvolutionDeploymentOutcome.Stale, decision.Outcome);
         Assert.Equal(1, calls);
         Assert.Null(Registry().ReadSlot().ActiveId);
         Assert.True(lifecycle.RetuneRequested);
@@ -47,7 +47,7 @@ public sealed partial class EvolutionDeploymentLifecycleTests
                 EvolutionOptimizationDirection.Maximize,
                 TimeSpan.FromMilliseconds(artifact.ReadProgram().Source == "winner" ? 10 : 1), 1)));
         var decision = await lifecycle.PromoteAsync(Program("winner"));
-        Assert.Equal("InsufficientImprovement", decision.Outcome);
+        Assert.Equal(EvolutionDeploymentOutcome.InsufficientImprovement, decision.Outcome);
         Assert.NotEmpty(Registry().ReadEvidence(decision.EvidenceId!));
         Assert.Null(Registry().ReadSlot().ActiveId);
     }
@@ -60,8 +60,8 @@ public sealed partial class EvolutionDeploymentLifecycleTests
         var selection = lifecycle.Select(Envelope());
         var slow = new EvolutionDeploymentMeasurement(true, 2, EvolutionOptimizationDirection.Maximize, TimeSpan.FromMilliseconds(10), 1);
         var now = DateTimeOffset.UtcNow;
-        Assert.Equal("Monitoring", (await lifecycle.ObserveAsync(selection, new[] { slow, slow }, now)).Outcome);
-        Assert.Equal("RolledBack", (await lifecycle.ObserveAsync(selection, new[] { slow, slow }, now.AddSeconds(1))).Outcome);
+        Assert.Equal(EvolutionDeploymentOutcome.Monitoring, (await lifecycle.ObserveAsync(selection, new[] { slow, slow }, now)).Outcome);
+        Assert.Equal(EvolutionDeploymentOutcome.RolledBack, (await lifecycle.ObserveAsync(selection, new[] { slow, slow }, now.AddSeconds(1))).Outcome);
     }
 
     [Fact]

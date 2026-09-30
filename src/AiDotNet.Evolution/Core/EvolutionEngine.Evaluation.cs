@@ -31,7 +31,7 @@ public sealed partial class EvolutionEngine<TGenome>
     }
 
     /// <summary>Allocates identity and selects inputs on the single writer, without invoking a proposal backend.</summary>
-    private VariationRequest? CreateVariationRequest(Dictionary<int, PipelineArchiveContext>? snapshots = null)
+    private VariationRequest? CreateVariationRequest(Dictionary<int, PipelineArchiveContext>? snapshots = null, long committedBefore = 0)
     {
         long evaluationId = _nextEvaluationId;
         int island = (int)(evaluationId % _islands.Length);
@@ -94,7 +94,7 @@ public sealed partial class EvolutionEngine<TGenome>
             .Concat(selection.Inspirations.Select(entry => FingerprintPipelineEvaluation(entry.Evaluation))));
         var context = snapshots is null
             ? new EvolutionVariationContext<TGenome>(selection.Parent, selection.Inspirations, proposalRandom, generation, island, parentArtifacts, view)
-            : new EvolutionVariationContext<TGenome>(selection.Parent, selection.Inspirations, proposalRandom, generation, island, parentArtifacts, view, identity!, evaluationId);
+            : new EvolutionVariationContext<TGenome>(selection.Parent, selection.Inspirations, proposalRandom, generation, island, parentArtifacts, view, identity!, evaluationId, committedBefore);
         return new VariationRequest(evaluationId, island, lineage, context);
     }
 
@@ -272,7 +272,7 @@ public sealed partial class EvolutionEngine<TGenome>
                 };
             }
 
-            if (!_seen.Add(canonical.Id))
+            if (!AddSeen(canonical.Id))
             {
                 return new WorkItem(lineage)
                 {
@@ -287,7 +287,7 @@ public sealed partial class EvolutionEngine<TGenome>
 
             if (!IsStructurallyNovel(canonical, island))
             {
-                _seen.Remove(canonical.Id);
+                RemoveSeen(canonical.Id);
                 return new WorkItem(lineage)
                 {
                     EvaluationId = evaluationId,
@@ -628,16 +628,17 @@ public sealed partial class EvolutionEngine<TGenome>
                 {
                     insertion = AddToArchive(item.Island, item.Candidate, evaluation);
                     if (_options.EnableEvaluationCache && item.CacheStatus != EvolutionCacheStatus.Hit)
-                        _cache[item.Candidate.CanonicalGenome.Id] = WithoutArtifacts(result);
+                        SetCached(item.Candidate.CanonicalGenome.Id, WithoutArtifacts(result));
                     RecordCompletedEvaluation(item.Island, item.Candidate, evaluation);
                 }
             }
             else if (item.Candidate is not null && !_options.DeduplicateFailedCandidates &&
                      IsFailureLike(evaluation.Status))
             {
-                _seen.Remove(item.Candidate.CanonicalGenome.Id);
+                RemoveSeen(item.Candidate.CanonicalGenome.Id);
             }
 
+            RememberCommitted(item);
             if (item.CacheStatus != EvolutionCacheStatus.Hit) QueueLineageArtifacts(item, evaluation);
 
             if (_selection is IOutcomeAwareEvolutionSelectionPolicy<TGenome> adaptiveSelection)
@@ -669,6 +670,7 @@ public sealed partial class EvolutionEngine<TGenome>
 
             if (_checkpointStore is not null && _options.CheckpointInterval > 0) _commitsSinceCheckpoint++;
         }
+        EnforceDeduplicationCapacity();
         return failedFast;
     }
 

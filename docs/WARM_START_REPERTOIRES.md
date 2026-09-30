@@ -99,3 +99,13 @@ dotnet test tests/AiDotNet.Evolution.Tests/AiDotNet.Evolution.Tests.csproj -c Re
 dotnet test tests/AiDotNet.Evolution.Tests/AiDotNet.Evolution.Tests.csproj -c Release -f net8.0
 dotnet test tests/AiDotNet.Evolution.Tests/AiDotNet.Evolution.Tests.csproj -c Release -f net471
 ```
+
+## Entries and import decisions
+
+A repertoire's `Entries` are `EvolutionRepertoireEntry` values: a portable canonical seed (the source
+genome id, the payload and its SHA-256), with no fitness attached. Importing into a new task
+re-evaluates every seed. Each import produces an `EvolutionRepertoireImportDecision` naming the source
+genome, the id it canonicalised to in the current task, and its `EvolutionRepertoireImportStatus`:
+`Accepted`, `Duplicate` (it matched a seed already imported) or `Rejected` (the current task or codec
+could not validate it: it failed to decode, its identity did not match unchanged task semantics, or
+it failed the codec round trip). Decisions never carry exception text from the source run.

@@ -3,12 +3,20 @@
 
 namespace AiDotNet.Evolution.Programs.Novelty;
 
+/// <summary>Line-level Levenshtein distance between two normalised programs, divided by the longer line count.</summary>
+/// <remarks>Programs in different languages are at distance 1. Lines past the limit are folded into one hashed line,
+/// so very long programs cost bounded time.</remarks>
 public sealed class ProgramLineEditDistance : IGenomeDistance<ProgramGenome>
 {
+    /// <summary>The metric identity reported as <see cref="Id"/>.</summary>
     public const string MetricId = "program-line-edit";
 
+    /// <summary>The default number of lines compared individually.</summary>
     public const int DefaultMaxComparedLines = 2_000;
 
+    /// <summary>Creates the distance.</summary>
+    /// <param name="maxComparedLines">Lines compared individually, 1 to 4096.</param>
+    /// <exception cref="ArgumentOutOfRangeException">The limit is out of range.</exception>
     public ProgramLineEditDistance(int maxComparedLines = DefaultMaxComparedLines)
     {
         if (maxComparedLines < 1 || maxComparedLines > 4_096)
@@ -20,13 +28,17 @@ public sealed class ProgramLineEditDistance : IGenomeDistance<ProgramGenome>
         MaxComparedLines = maxComparedLines;
     }
 
+    /// <summary>Gets how many lines are compared individually.</summary>
     public int MaxComparedLines { get; }
 
+    /// <inheritdoc />
     public string Id => MetricId;
 
+    /// <inheritdoc />
     public string VersionHash =>
         MetricId + "-v2-" + MaxComparedLines.ToString(System.Globalization.CultureInfo.InvariantCulture);
 
+    /// <inheritdoc />
     public double Distance(ProgramGenome first, ProgramGenome second)
     {
         ProgramGuard.NotNull(first);
@@ -35,6 +47,12 @@ public sealed class ProgramLineEditDistance : IGenomeDistance<ProgramGenome>
         return Compute(first.NormalizedSource, second.NormalizedSource, MaxComparedLines);
     }
 
+    /// <summary>Computes the distance between two source texts.</summary>
+    /// <param name="first">One source.</param>
+    /// <param name="second">The other.</param>
+    /// <param name="maxComparedLines">Lines compared individually, 1 to 4096.</param>
+    /// <returns>A distance in [0, 1].</returns>
+    /// <exception cref="ArgumentOutOfRangeException">The limit is out of range.</exception>
     public static double ComputeDistance(string first, string second, int maxComparedLines = DefaultMaxComparedLines)
     {
         ProgramGuard.NotNull(first);

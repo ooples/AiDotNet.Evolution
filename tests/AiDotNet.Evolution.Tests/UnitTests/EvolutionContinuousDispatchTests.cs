@@ -202,6 +202,117 @@ public sealed class EvolutionContinuousDispatchTests
     private static TestGenome[] Seeds(int count) =>
         Enumerable.Range(1, count).Select(value => new TestGenome(value)).ToArray();
 
+    [Theory]
+    [InlineData(6, 0)]
+    [InlineData(13, 0)]
+    [InlineData(22, 0)]
+    [InlineData(6, 3)]
+    [InlineData(9, 3)]
+    [InlineData(13, 3)]
+    [InlineData(22, 3)]
+    public async Task ACancelledRunSavesExactlyThePayloadItsLastSafeBoundaryWouldHaveSaved(int cancelAfter, int capacity)
+    {
+        // A safe boundary no longer serialises the seen set and cache when it is captured; a later forced save recovers
+        // them by undoing the changes made since. Continuous dispatch commits past its last drain before the cancel lands,
+        // so the forced save has real changes to undo, and must still produce the uninterrupted run's payload for that drain.
+        var uninterrupted = new RecordingCheckpointStore();
+        await ObservedEngine(uninterrupted, observer: null, capacity).RunAsync(Seeds(4));
+
+        var cancelled = new RecordingCheckpointStore();
+        using var cancellation = new CancellationTokenSource();
+        var observer = new CancelAfterEvaluations(cancelAfter, cancellation);
+        await Assert.ThrowsAnyAsync<OperationCanceledException>(() =>
+            ObservedEngine(cancelled, observer, capacity).RunAsync(Seeds(4), cancellation.Token));
+
+        // The seen set and the cache are exactly what the forced save reconstructs; the rest of the payload records
+        // wall-clock timings and so differs between any two runs.
+        EvolutionCheckpoint forced = cancelled.Saved[cancelled.Saved.Count - 1];
+        EvolutionCheckpoint? expected = uninterrupted.Saved.SingleOrDefault(checkpoint => checkpoint.Sequence == forced.Sequence);
+        (string seen, string cache, string order) = Reconstructed(forced);
+        if (expected is null)
+        {
+            // Cancelled before the first drain: the last safe boundary is the run's start, which has seen nothing.
+            Assert.Equal("[]", seen);
+            Assert.Equal("[]", cache);
+            Assert.Equal(capacity > 0 ? "[]" : "null", order);
+        }
+        else
+        {
+            (string expectedSeen, string expectedCache, string expectedOrder) = Reconstructed(expected);
+            Assert.NotEqual("[]", expectedSeen);
+            Assert.Equal(expectedSeen, seen);
+            Assert.Equal(expectedCache, cache);
+            Assert.Equal(expectedOrder, order);
+        }
+    }
+
+    private static (string Seen, string Cache, string Order) Reconstructed(EvolutionCheckpoint checkpoint)
+    {
+        using var document = System.Text.Json.JsonDocument.Parse(checkpoint.Payload);
+        System.Text.Json.JsonElement root = document.RootElement;
+        string order = root.TryGetProperty("DeduplicationOrder", out System.Text.Json.JsonElement value) ? value.GetRawText() : "null";
+        return (root.GetProperty("SeenGenomeIds").GetRawText(), root.GetProperty("Cache").GetRawText(), order);
+    }
+
+    [Fact]
+    public async Task AResumedCappedRunCancelledBeforeItsFirstDrainSavesTheStateItResumedFrom()
+    {
+        // The only boundary that is captured but never saved before commits forget earlier genomes is a resumed run''s
+        // start: it holds restored cache entries, and its first commits evict some of them. A cancel before the first
+        // drain must save exactly the state it resumed from, so each forgotten entry has to be restored by the undo.
+        var store = new RecordingCheckpointStore();
+        await ObservedEngine(store, observer: null, 3, budget: 20).RunAsync(Seeds(4));
+        EvolutionCheckpoint resumedFrom = store.Saved[store.Saved.Count - 1];
+        Assert.NotEqual("[]", Reconstructed(resumedFrom).Cache);
+
+        using var cancellation = new CancellationTokenSource();
+        await Assert.ThrowsAnyAsync<OperationCanceledException>(() =>
+            ObservedEngine(store, new CancelAfterEvaluations(3, cancellation), 3, budget: 40, resume: true)
+                .RunAsync(Seeds(4), cancellation.Token));
+
+        EvolutionCheckpoint forced = store.Saved[store.Saved.Count - 1];
+        Assert.NotSame(resumedFrom, forced);
+        Assert.Equal(Reconstructed(resumedFrom), Reconstructed(forced));
+    }
+    private static EvolutionEngine<TestGenome> ObservedEngine(IEvolutionCheckpointStore store, IEvolutionObserver<TestGenome>? observer,
+        int capacity, int budget = 40, bool resume = false)
+    {
+        EvolutionEngineOptions options = Options(EvolutionDispatchMode.Continuous, budget);
+        options.CheckpointInterval = 8;
+        options.DeduplicationCapacity = capacity;
+        options.Resume = resume;
+        return new EvolutionEngine<TestGenome>(new ConcurrencyProbeTask(gateAt: 0), new DistinctVariation(),
+            // With a capacity, two cells keep most genomes out of the archive, so they can be forgotten between the drain
+            // and the cancel; archived genomes are never forgotten, and with fifty cells every one would be.
+            _ => new MapElitesArchive<TestGenome>(new[] { new EvolutionDescriptorDefinition("x", 0, 1000, capacity > 0 ? 2 : 50, EvolutionOutOfRangePolicy.Clamp) }),
+            options, observer: observer, checkpointStore: store, genomeCodec: new TestGenomeCodec());
+    }
+
+    private sealed class RecordingCheckpointStore : IEvolutionCheckpointStore
+    {
+        public List<EvolutionCheckpoint> Saved { get; } = new();
+
+        public Task SaveAsync(EvolutionCheckpoint checkpoint, CancellationToken cancellationToken = default)
+        {
+            Saved.Add(checkpoint);
+            return Task.CompletedTask;
+        }
+
+        public Task<EvolutionCheckpoint?> LoadLatestAsync(string runId, CancellationToken cancellationToken = default) =>
+            Task.FromResult(Saved.Count == 0 ? null : Saved[Saved.Count - 1]);
+    }
+
+    private sealed class CancelAfterEvaluations(int count, CancellationTokenSource cancellation) : IEvolutionObserver<TestGenome>
+    {
+        public int Seen { get; private set; }
+
+        public ValueTask OnEventAsync(EvolutionEvent<TestGenome> evolutionEvent, CancellationToken cancellationToken = default)
+        {
+            if (evolutionEvent.Kind == EvolutionEventKind.Evaluated && ++Seen == count) cancellation.Cancel();
+            return default;
+        }
+    }
+
     private static EvolutionEngineOptions Options(EvolutionDispatchMode dispatch, int maxAttempts = 12) => new()
     {
         RunId = "dispatch-run",

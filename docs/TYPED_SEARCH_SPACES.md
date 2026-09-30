@@ -105,3 +105,16 @@ Batch size one avoids stale populations. Pending samples, distribution state and
 The numeric development harness includes `DiagonalCma` alongside random search, hill climbing and fixed/adaptive
 MAP-Elites controls, with matched initial populations and evaluator-call budgets. These are development comparisons,
 not a claim that this emitter wins across workloads. It remains opt-in.
+
+## Parameter kinds and conditions
+
+Each `EvolutionParameter` has an `EvolutionParameterKind`, which decides how it is sampled and
+normalised: `Real` (uniform between the bounds), `Integer` (both endpoints included), `Logarithmic`
+(a positive value sampled uniformly in log space) or `Categorical` (one of a fixed set of choices).
+Create one with `EvolutionParameter.Real`, `Integer`, `Logarithmic` or `Categorical`.
+
+A parameter can depend on an earlier one. `parameter.When(parent, values...)` adds an
+`EvolutionParameterCondition`: the parameter is active only when `parent` takes one of the listed
+values. Several conditions on one parameter must all hold. An inactive parameter has no canonical
+value: it is dropped when a configuration is canonicalised, so a setting that does not apply cannot
+make two otherwise identical configurations look different to the cache.

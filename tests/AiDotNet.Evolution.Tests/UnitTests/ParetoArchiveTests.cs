@@ -215,7 +215,9 @@ public sealed class ParetoArchiveTests
         var archive = new ParetoArchive<TestGenome>(Definition());
         Assert.Null(archive.Sample(new StableRandom(1, 2)));
         Add(archive, 0, "a", 1, .1, .9); Add(archive, 1, "b", 100, .5, .5); Add(archive, 2, "c", 1, .9, .1);
-        var one = new StableRandom(1, 2); var two = new StableRandom(1, 2); var policy = new ParetoEvolutionSelectionPolicy<TestGenome>();
+        var one = new StableRandom(1, 2); var two = new StableRandom(1, 2);
+        // The engine recognises a policy that may pick infeasible exploration parents by this interface.
+        IInfeasibleExplorationSelectionPolicy<TestGenome> policy = new ParetoEvolutionSelectionPolicy<TestGenome>();
         var parents = new HashSet<string>();
         for (int i = 0; i < 50; i++)
         {
@@ -276,14 +278,16 @@ public sealed class ParetoArchiveTests
         var options = Options(); options.Resume = true;
         var resumed = await Engine(options, store).RunAsync(seeds);
         Assert.Equal(full.StateHash, resumed.StateHash);
-        Assert.NotNull(full.ParetoFront); Assert.True(full.ParetoFront!.Entries.Count > 1);
-        Assert.Same(full.ParetoFront.Representative, full.Best);
+        EvolutionParetoFront<TestGenome>? front = full.ParetoFront;
+        Assert.NotNull(front);
+        Assert.True(front.Entries.Count > 1);
+        Assert.Same(front.Representative, full.Best);
         Assert.Empty(full.GlobalElites); Assert.DoesNotContain(full.RetainedFailures, failure => failure.Code == "descriptor_missing");
         var checkpoint = (await store.LoadLatestAsync(options.RunId))!;
         Assert.Contains("\"SchemaVersion\":8", checkpoint.Payload);
         var contents = EvolutionEngine<TestGenome>.ReadCheckpoint(checkpoint, new TestGenomeCodec());
-        Assert.Equal(full.ParetoFront.Definition.DefinitionHash, contents.ParetoFront!.Definition.DefinitionHash);
-        Assert.Equal(full.ParetoFront.Hypervolume(), contents.ParetoFront.Hypervolume());
+        Assert.Equal(front.Definition.DefinitionHash, contents.ParetoFront!.Definition.DefinitionHash);
+        Assert.Equal(front.Hypervolume(), contents.ParetoFront.Hypervolume());
         await Assert.ThrowsAsync<InvalidDataException>(async () => await Engine(options, store, Definition(resolution: .1)).RunAsync(seeds));
     }
 
@@ -796,7 +800,8 @@ public sealed class ParetoArchiveTests
         var invalid = new EvolutionArchiveEntry<TestGenome>(source.InfeasibleEntries![0].Cell, source.Entries[0].Candidate, source.Entries[0].Evaluation);
         Assert.Throws<ArgumentException>(() => copy.RestoreWithExploration(source.Entries, new[] { invalid }, source.Descriptors, 5));
         Assert.Empty(copy.Entries); Assert.Empty(copy.InfeasibleEntries!); Assert.Equal(0, copy.Version);
-        copy.RestoreWithExploration(source.Entries, source.InfeasibleEntries, source.Descriptors, source.Version);
+        ICheckpointableParetoArchive<TestGenome> restorable = copy;
+        restorable.RestoreWithExploration(source.Entries, source.InfeasibleEntries, source.Descriptors, source.Version);
         Assert.Single(copy.Entries); Assert.Single(copy.InfeasibleEntries!); Assert.Equal(source.Version, copy.Version);
         var overflow = new ParetoArchive<TestGenome>(Exploring()); overflow.Restore(Array.Empty<EvolutionArchiveEntry<TestGenome>>(), overflow.Descriptors, long.MaxValue);
         Assert.Throws<OverflowException>(() => Add(overflow, 0, "a", 1, .2, .2, 1)); Assert.Empty(overflow.InfeasibleEntries!);

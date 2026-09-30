@@ -76,7 +76,9 @@ public sealed class EvolutionFidelityCheckpointTests
         Assert.Single(paused.Batches); Assert.False(paused.Batches[0].Measurements.IsComplete);
         var resumedLedger = Ledger(); resumedLedger.RestoreState(saved!.GetResourceState());
         var resumed = await Scheduler(resumedLedger, new Evaluator()).RunCheckpointedAsync("failed", Candidates(), 1, (_, _) => new(true), saved);
-        Assert.True(resumed.IsComplete); Assert.DoesNotContain(resumed.Promotions, promotion => promotion.GenomeId == "candidate-0");
+        Assert.True(resumed.IsComplete);
+        IReadOnlyList<EvolutionFidelityPromotion> promotions = resumed.Promotions;
+        Assert.DoesNotContain(promotions, promotion => promotion.GenomeId == "candidate-0");
         Assert.Equal(Json(paused.Batches[0]), Json(resumed.Batches[0]));
         Assert.Equal(unknown ? 1 : 0, resumed.Resources.Unknown);
     }

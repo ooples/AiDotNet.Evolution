@@ -130,3 +130,22 @@ quiescent persistence, fail-closed overrun handling and evaluator integration.
 Consumer-specific model/compiler/device metering and currency conversion still need
 their own receipt/isolation evidence; this PR does not silently instrument arbitrary
 consumer code or claim that every external producer already has a hard bound.
+
+## Ledger types
+
+- `EvolutionResourceLedger.ReserveBatch` admits several requests together and returns an
+  `EvolutionResourceAdmission` for each, holding the request and, when it was admitted, its
+  reservation. A denied request never acquires a reservation.
+- `EvolutionResourceLedger.Receipts` lists an `EvolutionResourceReceipt` per settled operation: the
+  stage, attempt, estimate, maximum and actual charge, the outcome, and whether the charge exceeded
+  the estimate or the maximum.
+- `EvolutionResourceLedger.Snapshot()` returns an `EvolutionResourceSnapshot` whose `Stages` give an
+  `EvolutionResourceStageSnapshot` per stage: amounts spent and
+  reserved, and how many operations were admitted, settled or are unknown. Unknown work is charged at
+  its maximum.
+
+A variation operator that charges for proposals implements `IEvolutionProposalCostProvider`. Its
+`GetProposalCost(generation)` returns an `EvolutionProposalCost`: the operation id, the amount
+charged, the outcome, and whether the cost is unknown or exceeded its maximum.
+`ResourceMeteredVariationOperator<TGenome>` implements it, and credit and escalation use it to
+measure proposal cost from actual charges.
