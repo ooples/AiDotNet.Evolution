@@ -60,7 +60,7 @@ public sealed class ResourceBudgetWorkflowTests
         {
             var ledger = Ledger(6);
             var requests = new[] { Request("03"), Request("01"), Request("02") };
-            var wave = ledger.ReserveBatch(reverse ? Enumerable.Reverse(requests) : requests);
+            IReadOnlyList<EvolutionResourceAdmission> wave = ledger.ReserveBatch(reverse ? Enumerable.Reverse(requests) : requests);
             Assert.Equal(new[] { "01", "02", "03" }, wave.Select(row => row.Request.OperationId));
             Assert.Equal(new[] { true, true, false }, wave.Select(row => row.Reservation is not null));
             Assert.Equal(6, ledger.Snapshot().Reserved["cost_units"]);

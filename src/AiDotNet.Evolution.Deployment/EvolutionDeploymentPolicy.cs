@@ -125,10 +125,10 @@ public sealed class EvolutionDeploymentRetuneRequest
 /// <summary>An explicit deployment decision with retained raw evidence, never an implied authorization to merge or publish packages.</summary>
 public sealed class EvolutionDeploymentDecision
 {
-    internal EvolutionDeploymentDecision(string outcome, bool activated, string? artifactId = null, string? evidenceId = null)
+    internal EvolutionDeploymentDecision(EvolutionDeploymentOutcome outcome, bool activated, string? artifactId = null, string? evidenceId = null)
     { Outcome = outcome; Activated = activated; ArtifactId = artifactId; EvidenceId = evidenceId; }
     /// <summary>Gets the terminal decision or scheduling reason.</summary>
-    public string Outcome { get; }
+    public EvolutionDeploymentOutcome Outcome { get; }
     /// <summary>Gets whether this operation changed the persisted active implementation.</summary>
     public bool Activated { get; }
     /// <summary>Gets the selected candidate or rollback artifact, when applicable.</summary>

@@ -500,7 +500,8 @@ public sealed class ProposalProvenanceTests : IDisposable
         Assert.Equal(child.Id, lineage.FinalGenomeId);
         Assert.Equal(parent.Id, lineage.RootGenomeId);
         Assert.Equal(1, lineage.Depth);
-        Assert.Contains("return x * 2", lineage.Steps[0].Record.ResponseText, StringComparison.Ordinal);
+        ProposalProvenanceLineageStep first = lineage.Steps[0];
+        Assert.Contains("return x * 2", first.Record.ResponseText, StringComparison.Ordinal);
     }
 
     private sealed class ThrowingProvenanceSink : IProposalProvenanceSink

@@ -19,7 +19,8 @@ public sealed partial class AdaptiveIslandSearchTests
         var ledger = Ledger(); var policy = Metered(ledger);
         await policy.ProposeAsync(Context(1, 0));
         policy.Observe(Evaluation(1, 0, 0), null);
-        Assert.Equal(2, policy.Statistics[0].RemainingRestartProposals);
+        EvolutionIslandStatistics firstIsland = policy.Statistics[0];
+        Assert.Equal(2, firstIsland.RemainingRestartProposals);
         await policy.ProposeAsync(Context(2, 0));
         if (restore)
         {

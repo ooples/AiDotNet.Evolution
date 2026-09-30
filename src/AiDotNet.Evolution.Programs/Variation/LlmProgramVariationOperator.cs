@@ -13,10 +13,7 @@ using Newtonsoft.Json;
 namespace AiDotNet.Evolution.Programs;
 
 /// <summary>Proposes the next candidate program by asking a chat model to edit or rewrite the parent.</summary>
-/// <typeparam name="T">
-/// The numeric type the AiDotNet chat abstraction is parameterized on, matching the chat client supplied to the
-/// constructor. It is a marker for ecosystem consistency and does not affect prompting.
-/// </typeparam>
+
 /// <remarks>
 /// <para>
 /// The operator turns one archive parent into one new <see cref="ProgramGenome"/>. It renders the prompt through a
@@ -976,16 +973,6 @@ public sealed class LlmProgramVariationOperator : ICheckpointableVariationOperat
         return EvolutionHash.Combine(components);
     }
 
-    /// <summary>Builds the per-call settings, offsetting the seed so repeated samples are not identical requests.</summary>
-    /// <param name="random">The proposal's deterministic stream.</param>
-    /// <param name="sample">Which sample of the current prompt this is, counting from zero.</param>
-    /// <returns>The settings for one call.</returns>
-    /// <remarks>
-    /// Within one attempt the conversation does not change, so with a pinned seed every sample would be a
-    /// byte-identical request and drawing several of them would buy nothing but tokens. Offsetting by the sample
-    /// index keeps the run reproducible while making each draw a different one, which is the whole point of drawing
-    /// more than one.
-    /// </remarks>
     // Lessons from earlier programs of this task, appended to the final user message within the binding's budget.
     private void AppendExperience(List<ProgramChatMessage> messages)
     {
@@ -998,6 +985,16 @@ public sealed class LlmProgramVariationOperator : ICheckpointableVariationOperat
             "Each line is a hypothesis that was tried and what it produced. Build on what worked; do not repeat what did not.\n" + lessons);
     }
 
+    /// <summary>Builds the per-call settings, offsetting the seed so repeated samples are not identical requests.</summary>
+    /// <param name="random">The proposal's deterministic stream.</param>
+    /// <param name="sample">Which sample of the current prompt this is, counting from zero.</param>
+    /// <returns>The settings for one call.</returns>
+    /// <remarks>
+    /// Within one attempt the conversation does not change, so with a pinned seed every sample would be a
+    /// byte-identical request and drawing several of them would buy nothing but tokens. Offsetting by the sample
+    /// index keeps the run reproducible while making each draw a different one, which is the whole point of drawing
+    /// more than one.
+    /// </remarks>
     private ProgramChatOptions BuildChatOptions(StableRandom random, int sample = 0)
     {
         int baseSeed = _variationOptions.Seed ?? unchecked((int)(random.NextUInt32() & 0x7FFFFFFF));
