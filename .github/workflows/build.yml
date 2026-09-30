@@ -389,7 +389,7 @@ jobs:
     name: Build and test net471
     if: "${{ !(github.event_name == 'push' && startsWith(github.event.head_commit.message, 'chore(main): release')) && !startsWith(github.head_ref, 'release-please--') }}"
     runs-on: windows-latest
-    timeout-minutes: 15
+    timeout-minutes: 25
     steps:
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
       - uses: actions/setup-dotnet@a98b56852c35b8e3190ac28c8c2271da59106c68 # v6.0.0
@@ -399,6 +399,10 @@ jobs:
       - run: dotnet restore AiDotNet.Evolution.slnx
       - run: dotnet build tests/AiDotNet.Evolution.Tests/AiDotNet.Evolution.Tests.csproj --configuration Release --framework net471 --no-restore
       - run: dotnet test tests/AiDotNet.Evolution.Tests/AiDotNet.Evolution.Tests.csproj --configuration Release --framework net471 --no-build --verbosity normal --blame-hang --blame-hang-timeout 120s --blame-crash
+      # The sandbox's limits are enforced differently per OS (job object here, /proc on Linux), so its
+      # enforcement tests run on Windows too, not only in the Linux test job.
+      - name: Sandbox enforcement on Windows
+        run: dotnet test tests/AiDotNet.Evolution.CSharp.Tests/AiDotNet.Evolution.CSharp.Tests.csproj --configuration Release --framework net10.0 --no-restore --filter "FullyQualifiedName~.Execution." --verbosity normal --blame-hang --blame-hang-timeout 120s
 
   package:
     name: Pack and validate NuGet

@@ -5,8 +5,8 @@ using System.Runtime.InteropServices;
 namespace AiDotNet.Evolution.Programs;
 
 /// <summary>
-/// Wraps a Windows job object that caps the memory of a sandboxed child process and terminates whatever is still
-/// running in it when the handle closes.
+/// Wraps a Windows job object that caps the memory and user-mode CPU time of a sandboxed child process, reports
+/// which cap it hit, and terminates whatever is still running in it when the handle closes.
 /// </summary>
 /// <remarks>
 /// The type is Windows-only and every entry point is guarded, so on any other platform the factory returns
@@ -21,16 +21,33 @@ internal sealed class WindowsJobObject : IDisposable
     private const uint JobObjectLimitProcessMemory = 0x0000_0100;
     private const uint JobObjectLimitJobMemory = 0x0000_0200;
     private const uint JobObjectLimitKillOnJobClose = 0x0000_2000;
+    private const uint JobObjectLimitProcessTime = 0x0000_0002;
+    private const uint JobObjectLimitJobTime = 0x0000_0004;
+    private const int JobObjectAssociateCompletionPortInformation = 7;
+    private const uint MessageEndOfJobTime = 1;
+    private const uint MessageEndOfProcessTime = 3;
+    private const uint MessageProcessMemoryLimit = 9;
+    private const uint MessageJobMemoryLimit = 10;
 
     private IntPtr _handle;
+    private IntPtr _port;
+    private ProgramExecuteErrorCode? _violation;
     private bool _disposed;
 
-    private WindowsJobObject(IntPtr handle) => _handle = handle;
+    private WindowsJobObject(IntPtr handle, IntPtr port)
+    {
+        _handle = handle;
+        _port = port;
+    }
 
-    /// <summary>Creates a job object that limits committed memory and kills its members when disposed.</summary>
+    /// <summary>Gets whether the job can report which limit it hit.</summary>
+    public bool ReportsViolations => _port != IntPtr.Zero;
+
+    /// <summary>Creates a job object that limits committed memory and CPU time and kills its members when disposed.</summary>
     /// <param name="memoryLimitBytes">The per-process and per-job commit limit in bytes; values below one are ignored.</param>
+    /// <param name="cpuTimeLimit">The per-process and per-job user-mode CPU time limit; zero or less is ignored.</param>
     /// <returns>The job object, or <c>null</c> when the platform is not Windows or the operating system refused.</returns>
-    public static WindowsJobObject? TryCreate(long memoryLimitBytes)
+    public static WindowsJobObject? TryCreate(long memoryLimitBytes, TimeSpan cpuTimeLimit)
     {
         if (!IsWindows() || memoryLimitBytes <= 0)
         {
@@ -61,6 +78,13 @@ internal sealed class WindowsJobObject : IDisposable
             JobObjectLimitProcessMemory | JobObjectLimitJobMemory | JobObjectLimitKillOnJobClose;
         information.ProcessMemoryLimit = new UIntPtr((ulong)memoryLimitBytes);
         information.JobMemoryLimit = new UIntPtr((ulong)memoryLimitBytes);
+        if (cpuTimeLimit > TimeSpan.Zero)
+        {
+            // Both are in 100-nanosecond ticks, which is TimeSpan's unit.
+            information.BasicLimitInformation.LimitFlags |= JobObjectLimitProcessTime | JobObjectLimitJobTime;
+            information.BasicLimitInformation.PerProcessUserTimeLimit = cpuTimeLimit.Ticks;
+            information.BasicLimitInformation.PerJobUserTimeLimit = cpuTimeLimit.Ticks;
+        }
 
         int size = Marshal.SizeOf(typeof(JobObjectExtendedLimitInformationNative));
         IntPtr buffer = Marshal.AllocHGlobal(size);
@@ -83,7 +107,64 @@ internal sealed class WindowsJobObject : IDisposable
             Marshal.FreeHGlobal(buffer);
         }
 
-        return new WindowsJobObject(handle);
+        return new WindowsJobObject(handle, TryAssociatePort(handle));
+    }
+
+    /// <summary>Reports the first limit the job's members hit, reading any notifications posted since the last call.</summary>
+    /// <returns>The violated limit, or <c>null</c> when none was hit or the job cannot report violations.</returns>
+    public ProgramExecuteErrorCode? ReadViolation()
+    {
+        if (_disposed || _port == IntPtr.Zero) return _violation;
+        try
+        {
+            while (GetQueuedCompletionStatus(_port, out uint message, out _, out _, 0))
+            {
+                ProgramExecuteErrorCode? observed = message switch
+                {
+                    MessageProcessMemoryLimit or MessageJobMemoryLimit => ProgramExecuteErrorCode.MemoryLimitExceeded,
+                    MessageEndOfProcessTime or MessageEndOfJobTime => ProgramExecuteErrorCode.CpuTimeLimitExceeded,
+                    _ => null
+                };
+                _violation ??= observed;
+            }
+        }
+        catch (EntryPointNotFoundException)
+        {
+            // Without the port the job still enforces its limits; it just cannot say which one fired.
+        }
+
+        return _violation;
+    }
+
+    private static IntPtr TryAssociatePort(IntPtr job)
+    {
+        IntPtr port;
+        try
+        {
+            port = CreateIoCompletionPort(new IntPtr(-1), IntPtr.Zero, UIntPtr.Zero, 1);
+        }
+        catch (EntryPointNotFoundException)
+        {
+            return IntPtr.Zero;
+        }
+
+        if (port == IntPtr.Zero) return IntPtr.Zero;
+
+        var association = new JobObjectAssociateCompletionPortNative { CompletionKey = job, CompletionPort = port };
+        int size = Marshal.SizeOf(typeof(JobObjectAssociateCompletionPortNative));
+        IntPtr buffer = Marshal.AllocHGlobal(size);
+        try
+        {
+            Marshal.StructureToPtr(association, buffer, fDeleteOld: false);
+            if (SetInformationJobObject(job, JobObjectAssociateCompletionPortInformation, buffer, (uint)size)) return port;
+        }
+        finally
+        {
+            Marshal.FreeHGlobal(buffer);
+        }
+
+        CloseHandle(port);
+        return IntPtr.Zero;
     }
 
     /// <summary>Adds a running process to this job so the memory cap applies to it and to whatever it starts.</summary>
@@ -120,6 +201,12 @@ internal sealed class WindowsJobObject : IDisposable
             CloseHandle(_handle);
             _handle = IntPtr.Zero;
         }
+
+        if (_port != IntPtr.Zero)
+        {
+            CloseHandle(_port);
+            _port = IntPtr.Zero;
+        }
     }
 
     private static bool IsWindows()
@@ -149,6 +236,22 @@ internal sealed class WindowsJobObject : IDisposable
     [DllImport("kernel32.dll", SetLastError = true)]
     [return: MarshalAs(UnmanagedType.Bool)]
     private static extern bool CloseHandle(IntPtr handle);
+
+    [DllImport("kernel32.dll", SetLastError = true)]
+    private static extern IntPtr CreateIoCompletionPort(
+        IntPtr fileHandle, IntPtr existingCompletionPort, UIntPtr completionKey, uint numberOfConcurrentThreads);
+
+    [DllImport("kernel32.dll", SetLastError = true)]
+    [return: MarshalAs(UnmanagedType.Bool)]
+    private static extern bool GetQueuedCompletionStatus(
+        IntPtr completionPort, out uint numberOfBytes, out UIntPtr completionKey, out IntPtr overlapped, uint milliseconds);
+
+    [StructLayout(LayoutKind.Sequential)]
+    private struct JobObjectAssociateCompletionPortNative
+    {
+        public IntPtr CompletionKey;
+        public IntPtr CompletionPort;
+    }
 
     [StructLayout(LayoutKind.Sequential)]
     private struct IoCountersNative
