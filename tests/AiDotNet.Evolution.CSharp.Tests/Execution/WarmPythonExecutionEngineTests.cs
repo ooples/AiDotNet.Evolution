@@ -268,16 +268,18 @@ public sealed class WarmPythonExecutionEngineTests
                 "import os, time\n" +
                 "open(" + PythonString(pidPath) + ", 'w').write(str(os.getpid()))\n" +
                 "time.sleep(25)\n");
+            // Python creates the file before it writes the pid, so wait for the pid itself: disposing between the two
+            // killed the worker with the file still empty (seen on the net471 CI runner).
             var clock = Stopwatch.StartNew();
-            while (!File.Exists(pidPath) && clock.Elapsed < TimeSpan.FromSeconds(15)) await Task.Delay(50);
-            Assert.True(File.Exists(pidPath), "the candidate never started");
+            int pid = 0;
+            while (!TryReadPid(pidPath, out pid) && clock.Elapsed < TimeSpan.FromSeconds(15)) await Task.Delay(50);
+            Assert.True(pid > 0, "the candidate never started");
 
             engine.Dispose();
             ProgramExecuteResponse response = await running.WaitAsync(TimeSpan.FromSeconds(10));
             Assert.False(response.Success);
             Assert.Equal(ProgramExecuteErrorCode.ExecutionFailed, response.ErrorCode);
 
-            int pid = int.Parse(File.ReadAllText(pidPath).Trim(), System.Globalization.CultureInfo.InvariantCulture);
             var gone = Stopwatch.StartNew();
             while (IsAlive(pid) && gone.Elapsed < TimeSpan.FromSeconds(5)) await Task.Delay(50);
             Assert.False(IsAlive(pid), "the worker outlived the engine");
@@ -285,6 +287,21 @@ public sealed class WarmPythonExecutionEngineTests
         finally
         {
             try { Directory.Delete(directory, recursive: true); } catch (IOException) { }
+        }
+    }
+
+    private static bool TryReadPid(string path, out int pid)
+    {
+        pid = 0;
+        try
+        {
+            return File.Exists(path) &&
+                   int.TryParse(File.ReadAllText(path).Trim(), System.Globalization.NumberStyles.None,
+                       System.Globalization.CultureInfo.InvariantCulture, out pid) && pid > 0;
+        }
+        catch (IOException)
+        {
+            return false;
         }
     }
 
