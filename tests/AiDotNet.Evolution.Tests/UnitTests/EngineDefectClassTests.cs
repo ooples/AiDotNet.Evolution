@@ -61,7 +61,8 @@ public sealed class EngineDefectClassTests
     {
         // OpenEvolve commits results as workers finish, so the same seed gives different runs. Here a gate releases the
         // in-flight evaluations in an order the test chooses, reversed between two runs, and the state must be identical.
-        async Task<(string Hash, IReadOnlyList<int> Order)> Run(Func<int, int> priority, EvolutionExecutionMode mode = EvolutionExecutionMode.Deterministic)
+        async Task<(string Hash, IReadOnlyList<int> Order, IReadOnlyList<int> Observed)> Run(Func<int, int> priority,
+            EvolutionExecutionMode mode = EvolutionExecutionMode.Deterministic)
         {
             const int inFlight = 4;
             var options = new EvolutionEngineOptions
@@ -82,26 +83,50 @@ public sealed class EngineDefectClassTests
                 MaxInFlight = inFlight
             };
             var task = new GatedOrderTask(priority, inFlight);
+            var observer = new EvaluatedOrder();
             var engine = new EvolutionEngine<TestGenome>(task, new IncrementVariation(),
                 _ => new MapElitesArchive<TestGenome>(new[] { new EvolutionDescriptorDefinition("x", 0, 100, 10, EvolutionOutOfRangePolicy.Clamp) }),
-                options);
+                options, observer: observer);
             string hash = (await engine.RunAsync(Enumerable.Range(0, 8).Select(i => new TestGenome(i * 5)).ToArray())).StateHash;
-            return (hash, task.CompletionOrder);
+            return (hash, task.CompletionOrder, observer.Values);
         }
 
         Func<int, int> lowFirst = value => value % 7;
         Func<int, int> highFirst = value => 6 - value % 7;
-        var (lowHash, lowOrder) = await Run(lowFirst);
-        var (highHash, highOrder) = await Run(highFirst);
+        var (lowHash, lowOrder, lowObserved) = await Run(lowFirst);
+        var (highHash, highOrder, highObserved) = await Run(highFirst);
         // The schedules really do reorder completions, observed rather than assumed from timing.
         Assert.NotEqual(lowOrder, highOrder);
         Assert.Equal(lowHash, highHash);
+        // What the engine reports is identical too: deterministic mode commits in identifier order.
+        Assert.Equal(lowObserved, highObserved);
         // Control: committing in completion order, as OpenEvolve does, the two schedules do give different runs, so the
         // equality above is the deterministic mode's doing.
-        var (lowOpportunistic, lowOpportunisticOrder) = await Run(lowFirst, EvolutionExecutionMode.Opportunistic);
-        var (highOpportunistic, highOpportunisticOrder) = await Run(highFirst, EvolutionExecutionMode.Opportunistic);
+        var (lowOpportunistic, lowOpportunisticOrder, lowOpportunisticObserved) = await Run(lowFirst, EvolutionExecutionMode.Opportunistic);
+        var (highOpportunistic, highOpportunisticOrder, highOpportunisticObserved) = await Run(highFirst, EvolutionExecutionMode.Opportunistic);
         Assert.NotEqual(lowOpportunisticOrder, highOpportunisticOrder);
         Assert.NotEqual(lowOpportunistic, highOpportunistic);
+        // Opportunistic mode commits in the order the engine sees evaluations finish, so its Evaluated events are the
+        // engine's own record of completion order, not the gate's: the two schedules must reorder that as well.
+        Assert.NotEqual(lowOpportunisticObserved, highOpportunisticObserved);
+    }
+
+    // Records the genome of every Evaluated event, in the order the engine emits them.
+    private sealed class EvaluatedOrder : IEvolutionObserver<TestGenome>
+    {
+        private readonly List<int> _values = new();
+
+        public IReadOnlyList<int> Values
+        {
+            get { lock (_values) return _values.ToArray(); }
+        }
+
+        public ValueTask OnEventAsync(EvolutionEvent<TestGenome> evolutionEvent, CancellationToken cancellationToken = default)
+        {
+            if (evolutionEvent.Kind == EvolutionEventKind.Evaluated && evolutionEvent.Candidate is { } candidate)
+                lock (_values) _values.Add(candidate.CanonicalGenome.Genome.Value);
+            return default;
+        }
     }
 
     // Holds each evaluation until the window is full, then releases the waiting one the schedule ranks first, so the
