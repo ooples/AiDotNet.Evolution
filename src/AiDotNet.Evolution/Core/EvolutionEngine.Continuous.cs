@@ -152,7 +152,7 @@ public sealed partial class EvolutionEngine<TGenome>
             lowestInFlightId = lowestInFlightId.HasValue
                 ? Math.Min(lowestInFlightId.Value, item.EvaluationId)
                 : item.EvaluationId;
-            if (item.AddedToSeen && item.Candidate is not null) _seen.Remove(item.Candidate.CanonicalGenome.Id);
+            if (item.AddedToSeen && item.Candidate is not null) RemoveSeen(item.Candidate.CanonicalGenome.Id);
             _evaluationAttempts -= item.ChargedAttempts;
             _proposals--;
             if (item.IsSeed) continue;

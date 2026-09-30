@@ -32,6 +32,8 @@ internal static class EvolutionEngineDocuments
         public List<StatusCountDocument>? StatusCounts { get; set; }
         public List<string>? SeenGenomeIds { get; set; }
         public List<CacheDocument>? Cache { get; set; }
+        // Committed genomes in the order they will be forgotten; present only when DeduplicationCapacity is set.
+        public List<string>? DeduplicationOrder { get; set; }
         public List<DiagnosticDocument>? Failures { get; set; }
         public double? EarlyStoppingBest { get; set; }
         public double? EarlyStoppingArchiveMetric { get; set; }
