@@ -4,12 +4,16 @@
     <ImplicitUsings>enable</ImplicitUsings>
     <Nullable>enable</Nullable>
     <TreatWarningsAsErrors>true</TreatWarningsAsErrors>
+    <!-- The experience memory is experimental (AIDEVO004); this assembly uses it deliberately. -->
+    <NoWarn>$(NoWarn);AIDEVO004</NoWarn>
+    <GenerateDocumentationFile>true</GenerateDocumentationFile>
     <Version>0.2.0</Version>
     <Description>Compiler-neutral bounded program improvement and artifact-bound promotion.</Description>
     <RepositoryUrl>https://github.com/ooples/AiDotNet.Evolution</RepositoryUrl>
     <PackageLicenseFile>AIDOTNET-LICENSE.txt</PackageLicenseFile>
     <PackageReadmeFile>README.md</PackageReadmeFile>
     <EnablePackageValidation>true</EnablePackageValidation>
+    <PackageValidationBaselineVersion>0.2.0</PackageValidationBaselineVersion>
   </PropertyGroup>
   <ItemGroup>
     <None Include="AIDOTNET-LICENSE.txt" Pack="true" PackagePath="AIDOTNET-LICENSE.txt"/>

@@ -1,3 +1,5 @@
+using System.Diagnostics.CodeAnalysis;
+
 namespace AiDotNet.Evolution.Programs.Experience;
 
 /// <summary>Connects an <see cref="LlmProgramVariationOperator"/> to a <see cref="ProgramExperienceStore"/>.</summary>
@@ -7,6 +9,7 @@ namespace AiDotNet.Evolution.Programs.Experience;
 /// lesson for every evaluated program. The store keeps its own guarantees: final-test evidence never enters it, and
 /// retrieval never crosses task identity or version.
 /// </remarks>
+[Experimental("AIDEVO004")]
 public sealed class ProgramExperienceBinding
 {
     /// <summary>Creates a binding.</summary>
@@ -46,6 +49,7 @@ public sealed class ProgramExperienceBinding
 /// <see cref="ProgramExperienceOutcome.Invalid"/>, and anything that did not complete
 /// <see cref="ProgramExperienceOutcome.Failed"/>. Evidence is recorded as search-partition evidence.
 /// </remarks>
+[Experimental("AIDEVO004")]
 public sealed class ProgramExperienceRecorder : IEvolutionObserver<ProgramGenome>
 {
     private readonly ProgramExperienceBinding _binding;

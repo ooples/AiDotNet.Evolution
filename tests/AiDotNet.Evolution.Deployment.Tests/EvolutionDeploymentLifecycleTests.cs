@@ -103,7 +103,7 @@ public sealed partial class EvolutionDeploymentLifecycleTests : IDisposable
     {
         int calls = 0;
         var denied = Lifecycle(Policy(allow: false), (artifact, pair, token) => { calls++; return Evaluate(artifact, pair, token); });
-        Assert.Equal("PersistencePolicyDenied", (await denied.PromoteAsync(Program("winner"))).Outcome);
+        Assert.Equal(EvolutionDeploymentOutcome.PersistencePolicyDenied, (await denied.PromoteAsync(Program("winner"))).Outcome);
         Assert.Equal(0, calls);
         var order = new List<string>();
         var lifecycle = Lifecycle(evaluate: (artifact, pair, token) =>
@@ -127,9 +127,16 @@ public sealed partial class EvolutionDeploymentLifecycleTests : IDisposable
         var lifecycle = Lifecycle(evaluate: (_, _, _) => { calls++; return new(Measurement(100, correct, fresh)); });
         var result = await lifecycle.PromoteAsync(Program("winner"));
         Assert.False(result.Activated);
-        Assert.Equal("InvalidValidation", result.Outcome);
+        Assert.Equal(EvolutionDeploymentOutcome.InvalidValidation, result.Outcome);
         Assert.Equal(1, calls);
         Assert.NotEmpty(Registry().ReadEvidence(result.EvidenceId!));
+        // Schema-1 rejection evidence names its reason; it must not become the enum's number.
+        string evidenceId = Assert.IsType<string>(result.EvidenceId);
+        using (var evidence = System.Text.Json.JsonDocument.Parse(Registry().ReadEvidence(evidenceId)))
+        {
+            Assert.Equal(1, evidence.RootElement.GetProperty("SchemaVersion").GetInt32());
+            Assert.Equal("InvalidValidation", evidence.RootElement.GetProperty("Reason").GetString());
+        }
         Assert.True(lifecycle.Select(Envelope()).IsFallback);
     }
 
@@ -141,7 +148,7 @@ public sealed partial class EvolutionDeploymentLifecycleTests : IDisposable
         var lifecycle = Lifecycle(evaluate: (artifact, pair, _) => new(Measurement(
             artifact.ReadProgram().Source == "base" ? 1 : kind == 0 ? 1 : pair == 0 ? 0.99 : 1.01)));
         var result = await lifecycle.PromoteAsync(Program("winner"));
-        Assert.Equal("InsufficientImprovement", result.Outcome);
+        Assert.Equal(EvolutionDeploymentOutcome.InsufficientImprovement, result.Outcome);
         Assert.False(result.Activated);
         Assert.NotEmpty(Registry().ReadEvidence(result.EvidenceId!));
     }
@@ -159,7 +166,7 @@ public sealed partial class EvolutionDeploymentLifecycleTests : IDisposable
             Assert.True((await Lifecycle().PromoteAsync(Program("newer"))).Activated);
         }
         finally { release.TrySetResult(true); }
-        Assert.Equal("Stale", (await pending).Outcome);
+        Assert.Equal(EvolutionDeploymentOutcome.Stale, (await pending).Outcome);
         Assert.Equal(Program("newer").Id, first.Select(Envelope()).Artifact.Id);
     }
 
@@ -181,7 +188,7 @@ public sealed partial class EvolutionDeploymentLifecycleTests : IDisposable
         Assert.True(result.Activated);
         Assert.False(lifecycle.Select(Envelope(1)).IsFallback);
         lifecycle.Select(Envelope(2));
-        Assert.Equal("BudgetDenied", (await lifecycle.RetunePendingAsync((_, _) => throw new InvalidOperationException(), _ => Task.CompletedTask)).Outcome);
+        Assert.Equal(EvolutionDeploymentOutcome.BudgetDenied, (await lifecycle.RetunePendingAsync((_, _) => throw new InvalidOperationException(), _ => Task.CompletedTask)).Outcome);
         Assert.Equal(1, calls); Assert.Equal(1, lifecycle.AdmittedRetunes);
     }
 
@@ -200,9 +207,9 @@ public sealed partial class EvolutionDeploymentLifecycleTests : IDisposable
         try
         {
             await Arrived(entered);
-            Assert.Equal("Abandoned", (await pending).Outcome);
+            Assert.Equal(EvolutionDeploymentOutcome.Abandoned, (await pending).Outcome);
             lifecycle.Select(Envelope(0));
-            Assert.Equal("Busy", (await lifecycle.RetunePendingAsync((request, _) => Task.FromResult(Program("winner", request.Envelope)), _ => Task.CompletedTask)).Outcome);
+            Assert.Equal(EvolutionDeploymentOutcome.Busy, (await lifecycle.RetunePendingAsync((request, _) => Task.FromResult(Program("winner", request.Envelope)), _ => Task.CompletedTask)).Outcome);
             Assert.Equal(1, lifecycle.AdmittedRetunes);
         }
         finally { release.TrySetResult(true); await Arrived(exited); }
@@ -218,9 +225,9 @@ public sealed partial class EvolutionDeploymentLifecycleTests : IDisposable
         var observed = lifecycle.Select(Envelope());
         var bad = new[] { Measurement(0), Measurement(0) };
         var now = DateTimeOffset.UtcNow;
-        Assert.Equal("Monitoring", (await lifecycle.ObserveAsync(observed, bad, now)).Outcome);
+        Assert.Equal(EvolutionDeploymentOutcome.Monitoring, (await lifecycle.ObserveAsync(observed, bad, now)).Outcome);
         var result = await lifecycle.ObserveAsync(observed, bad, now.AddSeconds(1));
-        Assert.Equal("RolledBack", result.Outcome);
+        Assert.Equal(EvolutionDeploymentOutcome.RolledBack, result.Outcome);
         Assert.True(result.Activated);
         Assert.Equal(Program("base").Id, result.ArtifactId);
         Assert.True(Registry().IsQuarantined(observed.Artifact.Id));
@@ -230,9 +237,9 @@ public sealed partial class EvolutionDeploymentLifecycleTests : IDisposable
         var current = restarted.Select(Envelope());
         Assert.False(current.IsFallback);
         Assert.Equal(Program("base").Id, current.Artifact.Id);
-        Assert.Equal("Healthy", (await restarted.ObserveAsync(current, new[] { Measurement(1), Measurement(1) }, now.AddSeconds(2))).Outcome);
-        Assert.Equal("Stale", (await lifecycle.ObserveAsync(observed, bad, now.AddSeconds(3))).Outcome);
-        Assert.Equal("Quarantined", (await lifecycle.PromoteAsync(Program("winner"))).Outcome);
+        Assert.Equal(EvolutionDeploymentOutcome.Healthy, (await restarted.ObserveAsync(current, new[] { Measurement(1), Measurement(1) }, now.AddSeconds(2))).Outcome);
+        Assert.Equal(EvolutionDeploymentOutcome.Stale, (await lifecycle.ObserveAsync(observed, bad, now.AddSeconds(3))).Outcome);
+        Assert.Equal(EvolutionDeploymentOutcome.Quarantined, (await lifecycle.PromoteAsync(Program("winner"))).Outcome);
     }
 
     [Fact]
@@ -245,7 +252,7 @@ public sealed partial class EvolutionDeploymentLifecycleTests : IDisposable
         var now = DateTimeOffset.UtcNow;
         var bad = new[] { Measurement(0), Measurement(0) };
         await lifecycle.ObserveAsync(selected, bad, now);
-        Assert.Equal("QuarantinedFallback", (await lifecycle.ObserveAsync(selected, bad, now.AddSeconds(1))).Outcome);
+        Assert.Equal(EvolutionDeploymentOutcome.QuarantinedFallback, (await lifecycle.ObserveAsync(selected, bad, now.AddSeconds(1))).Outcome);
         Assert.True(Registry().IsQuarantined(selected.Artifact.Id));
         Assert.True(lifecycle.Select(Envelope()).IsFallback);
         Assert.True(lifecycle.RetuneRequested);
@@ -262,10 +269,10 @@ public sealed partial class EvolutionDeploymentLifecycleTests : IDisposable
         await lifecycle.ObserveAsync(selected, bad, now);
         await Assert.ThrowsAsync<ArgumentException>(() => lifecycle.ObserveAsync(selected, bad, now));
         Assert.False(lifecycle.StorageFaulted);
-        Assert.Equal("Healthy", (await lifecycle.ObserveAsync(selected, new[] { Measurement(2), Measurement(2) }, now.AddSeconds(1))).Outcome);
-        Assert.Equal("Monitoring", (await lifecycle.ObserveAsync(selected, bad, now.AddSeconds(2))).Outcome);
+        Assert.Equal(EvolutionDeploymentOutcome.Healthy, (await lifecycle.ObserveAsync(selected, new[] { Measurement(2), Measurement(2) }, now.AddSeconds(1))).Outcome);
+        Assert.Equal(EvolutionDeploymentOutcome.Monitoring, (await lifecycle.ObserveAsync(selected, bad, now.AddSeconds(2))).Outcome);
         await lifecycle.PromoteAsync(Program("newer"));
-        Assert.Equal("Stale", (await lifecycle.ObserveAsync(selected, bad, now.AddSeconds(3))).Outcome);
+        Assert.Equal(EvolutionDeploymentOutcome.Stale, (await lifecycle.ObserveAsync(selected, bad, now.AddSeconds(3))).Outcome);
         Assert.False(Registry().IsQuarantined(selected.Artifact.Id));
     }
 

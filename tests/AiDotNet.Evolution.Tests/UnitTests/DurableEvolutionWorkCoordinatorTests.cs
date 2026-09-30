@@ -49,7 +49,10 @@ public sealed class DurableEvolutionWorkCoordinatorTests
         Assert.NotEqual(first.Identity.LeaseId, retry.Identity.LeaseId); Assert.Equal(2, retry.DeliveryNumber);
         Assert.Equal(10, coordinator.Resources.Reserved["cost_units"]);
         Assert.Equal(EvolutionWorkCommitDisposition.Stale, coordinator.Commit(first.Identity, first.WorkerId, "old", "receipt-a", Cost(3)));
-        Assert.Null(coordinator.GetResult(1, 1)); Assert.False(coordinator.GetDeliveryResult(first.Identity, first.WorkerId)!.Accepted);
+        Assert.Null(coordinator.GetResult(1, 1));
+        EvolutionCommittedWork? staleDelivery = coordinator.GetDeliveryResult(first.Identity, first.WorkerId);
+        Assert.NotNull(staleDelivery);
+        Assert.False(staleDelivery.Accepted);
         Assert.Equal(3, coordinator.Resources.Spent["cost_units"]); Assert.Equal(5, coordinator.Resources.Reserved["cost_units"]);
         Assert.Equal(EvolutionWorkCommitDisposition.DuplicateStale, coordinator.Commit(first.Identity, first.WorkerId, "old", "receipt-a", Cost(3)));
         Assert.Equal(EvolutionWorkCommitDisposition.Accepted, coordinator.Commit(retry.Identity, retry.WorkerId, "new", "receipt-b", Cost(4)));

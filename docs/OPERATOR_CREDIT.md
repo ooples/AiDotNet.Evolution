@@ -89,3 +89,22 @@ when their credit denominator ignores one. Every method stops at its first reser
 The smoke verifies 24 paired runs, exact replay, measured-only winners, complete attribution and all-stage receipt reconciliation.
 The engine integration tests separately verify checkpoint resume. Representative held-out comparisons against the best static preset,
 realistic cost ratios, consumer integrations and any decision to promote adaptation as a default remain open.
+
+## Credit and statistics types
+
+`AdaptiveVariationPortfolio<TGenome>` raises `CreditCommitted` with an `EvolutionOperatorCredit` for
+each finished proposal. It names the evaluation, genome, operator and policy versions, the parent and
+child quality, and the proposal cost. It is diagnostic evidence and is never fed back into learning.
+`LastCredit` holds the most recent one.
+
+`Statistics` returns an `EvolutionOperatorStatistics` per arm: proposals, outcomes, reward sum and
+mean reward.
+
+## Escalating between model tiers
+
+`EscalatingVariationOperator<TGenome>` takes tiers ordered from cheapest to strongest (for example
+Haiku, Sonnet, Opus) and a failure count. After that many consecutive failed or non-improving
+outcomes it moves to the next tier, and any success returns it to the cheapest. Each move is recorded
+as an `EvolutionEscalation`: the generation, the tiers and operators involved, the failures that
+triggered it, and the added cost when the tiers report proposal costs. `TierProposals` and
+`TierSuccesses` count use and success per tier.

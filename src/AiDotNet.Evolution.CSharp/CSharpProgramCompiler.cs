@@ -17,8 +17,15 @@ public sealed class CSharpProgramCompiler : IProgramCompiler
     private static readonly CSharpParseOptions ParseOptions = new(LanguageVersion.CSharp12, DocumentationMode.None);
     private readonly MetadataReference[] _references;
     private readonly TimeSpan _timeout;
+
+    /// <summary>Gets the identity of the compiler, its options, the target and the reference images.</summary>
     public string Fingerprint { get; }
 
+    /// <summary>Loads the reference images a program compiles against.</summary>
+    /// <param name="referencePaths">1-64 distinct single-module managed assemblies, each at most 32 MiB and 128 MiB together.</param>
+    /// <param name="targetIdentity">Names the runtime the program targets; part of <see cref="Fingerprint"/>.</param>
+    /// <param name="timeoutSeconds">The limit for one parse or build, 1 to 30 seconds.</param>
+    /// <exception cref="ArgumentException">A reference is invalid, duplicated or too large, or an argument is out of range.</exception>
     public CSharpProgramCompiler(IEnumerable<string> referencePaths, string targetIdentity, int timeoutSeconds = 10)
     {
         ArgumentNullException.ThrowIfNull(referencePaths);
@@ -59,6 +66,7 @@ public sealed class CSharpProgramCompiler : IProgramCompiler
         }));
     }
 
+    /// <inheritdoc />
     public IReadOnlyList<EditTarget> Catalog(ProgramSnapshot source, CancellationToken cancellationToken = default)
     {
         using var timeout = Timeout(cancellationToken);
@@ -84,6 +92,7 @@ public sealed class CSharpProgramCompiler : IProgramCompiler
         return targets.AsReadOnly();
     }
 
+    /// <inheritdoc />
     public ProgramSnapshot Apply(ProgramSnapshot parent, PatchPlan plan, CancellationToken cancellationToken = default)
     {
         ArgumentNullException.ThrowIfNull(plan);
@@ -128,6 +137,7 @@ public sealed class CSharpProgramCompiler : IProgramCompiler
         return candidate;
     }
 
+    /// <inheritdoc />
     public ProgramBuild Build(ProgramSnapshot source, CancellationToken cancellationToken = default)
     {
         using var timeout = Timeout(cancellationToken);

@@ -3,10 +3,14 @@
 
 namespace AiDotNet.Evolution.Programs.Novelty;
 
+/// <summary>Jaccard distance between the token sets of two normalised programs; cheap and order-insensitive.</summary>
+/// <remarks>Programs in different languages are at distance 1. Token sets are memoised by program id.</remarks>
 public sealed class ProgramTokenSetDistance : IGenomeDistance<ProgramGenome>
 {
+    /// <summary>The metric identity reported as <see cref="Id"/>.</summary>
     public const string MetricId = "program-token-set";
 
+    /// <summary>The default number of memoised token sets.</summary>
     public const int DefaultMemoCapacity = 1_024;
 
     private readonly Dictionary<string, HashSet<string>> _memo = new(StringComparer.Ordinal);
@@ -15,6 +19,9 @@ public sealed class ProgramTokenSetDistance : IGenomeDistance<ProgramGenome>
     private readonly Dictionary<string, int> _sizes = new(StringComparer.Ordinal);
     private long _memoCharacters;
 
+    /// <summary>Creates the distance.</summary>
+    /// <param name="memoCapacity">How many token sets are memoised, 0 to 8192; 0 disables the memo.</param>
+    /// <exception cref="ArgumentOutOfRangeException">The capacity is out of range.</exception>
     public ProgramTokenSetDistance(int memoCapacity = DefaultMemoCapacity)
     {
         if (memoCapacity < 0 || memoCapacity > 8_192)
@@ -26,12 +33,16 @@ public sealed class ProgramTokenSetDistance : IGenomeDistance<ProgramGenome>
         MemoCapacity = memoCapacity;
     }
 
+    /// <summary>Gets how many token sets are memoised.</summary>
     public int MemoCapacity { get; }
 
+    /// <inheritdoc />
     public string Id => MetricId;
 
+    /// <inheritdoc />
     public string VersionHash => MetricId + "-v2";
 
+    /// <inheritdoc />
     public double Distance(ProgramGenome first, ProgramGenome second)
     {
         ProgramGuard.NotNull(first);
@@ -41,6 +52,7 @@ public sealed class ProgramTokenSetDistance : IGenomeDistance<ProgramGenome>
         return Jaccard(TokensFor(first), TokensFor(second));
     }
 
+    /// <summary>Empties the memo.</summary>
     public void ClearMemo()
     {
         lock (_gate)
@@ -83,6 +95,10 @@ public sealed class ProgramTokenSetDistance : IGenomeDistance<ProgramGenome>
         return tokens;
     }
 
+    /// <summary>Computes the distance between two source texts without the memo.</summary>
+    /// <param name="first">One source.</param>
+    /// <param name="second">The other.</param>
+    /// <returns>A distance in [0, 1].</returns>
     public static double ComputeDistance(string first, string second)
     {
         ProgramGuard.NotNull(first);

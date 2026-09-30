@@ -7,8 +7,12 @@ using AiDotNet.Evolution.Prompts;
 
 namespace AiDotNet.Evolution.Programs.Novelty;
 
+/// <summary>Asks a chat model whether a candidate differs meaningfully from an existing program.</summary>
+/// <remarks>Both programs are redacted and bounded before they are sent, and the prompt tells the model to treat
+/// them as data. The seed is derived from the two program ids, so the same pair gets the same request.</remarks>
 public sealed class LlmProgramNoveltyJudge : IProgramNoveltyJudge
 {
+    /// <summary>The default bound on each program sent to the model, in bytes.</summary>
     public const int DefaultMaxProgramBytes = 12_000;
 
     private const string TruncationNotice = "... (program truncated to fit the novelty-judging limit)";
@@ -27,11 +31,22 @@ public sealed class LlmProgramNoveltyJudge : IProgramNoveltyJudge
     private readonly IProgramChatClient _chatClient;
     private readonly string _modelId;
     private readonly string _versionHash;
+    /// <summary>Gets the identity of the model and every setting that shapes the request.</summary>
+    /// <exception cref="InvalidOperationException">The chat client's model identity changed.</exception>
     public string VersionHash { get { EnsureIdentity(); return _versionHash; } }
+
+    /// <summary>The longest answer parsed; a longer one counts as <see cref="ProgramNoveltyVerdict.Unavailable"/>.</summary>
     public const int MaxResponseChars = 65_536;
     private long _judgements;
     private long _unavailable;
 
+    /// <summary>Creates a judge over a chat client.</summary>
+    /// <param name="chatClient">The model transport. Its model identity must not change.</param>
+    /// <param name="maxProgramBytes">The bound on each program sent, 256 to 1,000,000 bytes.</param>
+    /// <param name="temperature">Sampling temperature, 0 to 2, or <c>null</c> for the provider default.</param>
+    /// <param name="maxOutputTokens">The reply token limit, positive, or <c>null</c> for none.</param>
+    /// <param name="id">The judge identity.</param>
+    /// <exception cref="ArgumentOutOfRangeException">A limit is out of range.</exception>
     public LlmProgramNoveltyJudge(
         IProgramChatClient chatClient,
         int maxProgramBytes = DefaultMaxProgramBytes,
@@ -72,18 +87,25 @@ public sealed class LlmProgramNoveltyJudge : IProgramNoveltyJudge
             Newtonsoft.Json.JsonConvert.SerializeObject(new { maxProgramBytes, temperature, maxOutputTokens, MaxResponseChars }) });
     }
 
+    /// <inheritdoc />
     public string Id { get; }
 
+    /// <summary>Gets the bound on each program sent, in bytes.</summary>
     public int MaxProgramBytes { get; }
 
+    /// <summary>Gets the sampling temperature, or <c>null</c>.</summary>
     public double? Temperature { get; }
 
+    /// <summary>Gets the reply token limit, or <c>null</c>.</summary>
     public int? MaxOutputTokens { get; }
 
+    /// <summary>Gets how many judgements were requested.</summary>
     public long Judgements => Interlocked.Read(ref _judgements);
 
+    /// <summary>Gets how many answers could not be read as a verdict.</summary>
     public long UnavailableAnswers => Interlocked.Read(ref _unavailable);
 
+    /// <inheritdoc />
     public async ValueTask<ProgramNoveltyVerdict> JudgeAsync(
         ProgramGenome candidate,
         ProgramGenome incumbent,
@@ -131,6 +153,10 @@ public sealed class LlmProgramNoveltyJudge : IProgramNoveltyJudge
         return verdict;
     }
 
+    /// <summary>Reads a verdict from the first word of an answer.</summary>
+    /// <param name="answer">The model's reply.</param>
+    /// <returns><see cref="ProgramNoveltyVerdict.NotNovel"/> for NOT_NOVEL (or NOT NOVEL, NOT-NOVEL, NOTNOVEL),
+    /// <see cref="ProgramNoveltyVerdict.Novel"/> for NOVEL, ignoring case; otherwise <see cref="ProgramNoveltyVerdict.Unavailable"/>.</returns>
     public static ProgramNoveltyVerdict ParseVerdict(string answer)
     {
         ArgumentNullException.ThrowIfNull(answer);

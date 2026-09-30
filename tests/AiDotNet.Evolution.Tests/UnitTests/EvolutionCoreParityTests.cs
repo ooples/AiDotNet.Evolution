@@ -52,7 +52,8 @@ public sealed class EvolutionCoreParityTests
             EliteRatio = 0,
             ExploitationEliteCount = 1
         });
-        policy.UseEliteIndex(foreign.Entries, island: 1);
+        IEliteIndexAwareEvolutionSelectionPolicy<TestGenome> aware = policy;
+        aware.UseEliteIndex(foreign.Entries, island: 1);
 
         EvolutionSelection<TestGenome> selection = Assert.IsType<EvolutionSelection<TestGenome>>(
             policy.Select(archive, new StableRandom(11), inspirationCount: 1));
@@ -333,7 +334,8 @@ public sealed class EvolutionCoreParityTests
             .RunAsync(Seeds(1));
 
         Assert.Equal(1, byRoundRobin.Islands[1].Count);
-        Assert.Equal(1, byRoundRobin.IslandStatuses[1].Generation);
+        EvolutionIslandStatus secondIsland = byRoundRobin.IslandStatuses[1];
+        Assert.Equal(1, secondIsland.Generation);
         Assert.Equal(0, byInheritance.Islands[1].Count);
         Assert.Equal(0, byInheritance.IslandStatuses[1].Generation);
         Assert.Equal(1, byInheritance.IslandStatuses[0].Generation);

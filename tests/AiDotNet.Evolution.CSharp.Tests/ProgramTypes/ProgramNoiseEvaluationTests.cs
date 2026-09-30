@@ -41,10 +41,11 @@ public sealed class ProgramNoiseEvaluationTests
     public async Task InvalidCorrectnessPreventsExpensiveFitnessAndCannotPassScreen()
     {
         int calls = 0;
-        var report = await Session(Ledger(), correctness: Eval(_ => 0), screen: Eval(_ => { calls++; return 1; }))
+        ProgramNoiseScreenReport report = await Session(Ledger(), correctness: Eval(_ => 0), screen: Eval(_ => { calls++; return 1; }))
             .ScreenAndAuditAsync("batch", new[] { new ProgramGenome("bad") }, 7, 11);
         Assert.False(report.IsComplete); Assert.Equal(0, calls);
-        Assert.False(report.Entries[0].Passed); Assert.Equal(1, report.ChargedCostUnits);
+        ProgramNoiseScreenEntry entry = report.Entries[0];
+        Assert.False(entry.Passed); Assert.Equal(1, report.ChargedCostUnits);
     }
 
     [Fact]
@@ -52,7 +53,7 @@ public sealed class ProgramNoiseEvaluationTests
     {
         var report = await Session(Ledger(), hidden: Eval(g => g.Source == "good" ? 0 : 1))
             .ChallengeAsync(0, new("good"), new("bad"), 7);
-        Assert.False(report.IsConfirmed); Assert.Equal("not-confirmed", report.Outcome);
+        Assert.False(report.IsConfirmed); Assert.Equal(EvolutionIncumbentChallengeOutcome.NotConfirmed, report.Outcome);
         Assert.Equal(272, report.ChargedCostUnits);
     }
 

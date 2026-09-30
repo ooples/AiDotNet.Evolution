@@ -110,7 +110,10 @@ public sealed class EvolutionFidelityCheckpointValidationTests
         Assert.Equal(0, last.AcceptedTokens);
         Assert.Equal(0, last.RejectedTokens);
         var sample = samples[1];
-        string sampleId = paused.Batches[4].Measurements.Samples[1].Context.SampleIdentity;
+        EvolutionFidelityBatch<int> pausedBatch = paused.Batches[4];
+        EvolutionReplicationReport measurements = pausedBatch.Measurements;
+        EvolutionReplicateMeasurement pausedSample = measurements.Samples[1];
+        string sampleId = pausedSample.Context.SampleIdentity;
 
         switch (corruption)
         {

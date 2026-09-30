@@ -11,7 +11,7 @@ namespace AiDotNet.Evolution.Programs;
 /// did not were left out, so a caller that only wants best effort can use it directly. A caller that wants
 /// correctness checks <see cref="IsSuccess"/>, which is <c>false</c> when any block failed, when nothing applied,
 /// or when the result came back byte identical to the original while
-/// <see cref="AiDotNet.Configuration.ProgramDiffOptions.RejectWhenNoBlockApplied"/> is set. That last check is what
+/// <see cref="ProgramDiffOptions.RejectWhenNoBlockApplied"/> is set. That last check is what
 /// stops an evolution run from spending evaluator budget on a child that is a copy of its parent, which the
 /// reference implementation does routinely because it never notices that zero blocks applied.
 /// </para>

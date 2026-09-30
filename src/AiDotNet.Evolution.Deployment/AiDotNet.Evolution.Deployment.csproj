@@ -4,12 +4,14 @@
     <ImplicitUsings>enable</ImplicitUsings>
     <Nullable>enable</Nullable>
     <TreatWarningsAsErrors>true</TreatWarningsAsErrors>
+    <GenerateDocumentationFile>true</GenerateDocumentationFile>
     <Version>0.2.0</Version>
     <PackageLicenseFile>AIDOTNET-LICENSE.txt</PackageLicenseFile>
     <PackageReadmeFile>README.md</PackageReadmeFile>
     <RepositoryUrl>https://github.com/ooples/AiDotNet.Evolution</RepositoryUrl>
     <Description>Optional standalone Evolution deployment lifecycle and MAP-Elites model consumer.</Description>
     <EnablePackageValidation>true</EnablePackageValidation>
+    <PackageValidationBaselineVersion>0.2.0</PackageValidationBaselineVersion>
   </PropertyGroup>
   <ItemGroup>
     <None Include="README.md" Pack="true" PackagePath="README.md"/>

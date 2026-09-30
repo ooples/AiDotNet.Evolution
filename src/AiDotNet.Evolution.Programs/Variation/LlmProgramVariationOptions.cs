@@ -68,6 +68,7 @@ public sealed class LlmProgramVariationOptions
     /// Gets or sets a store whose lessons for this task are added to every proposal prompt, or <c>null</c> for none.
     /// </summary>
     /// <remarks>Not part of the operator's identity: the store's contents change as a run proceeds.</remarks>
+    [System.Diagnostics.CodeAnalysis.Experimental("AIDEVO004")]
     public AiDotNet.Evolution.Programs.Experience.ProgramExperienceBinding? Experience { get; set; }
 
     /// <summary>Gets or sets nucleus sampling passed to the chat client (OpenEvolve's <c>top_p</c>), or <c>null</c> for its default.</summary>
