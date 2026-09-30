@@ -42,30 +42,56 @@ public sealed class ApiClassificationTests
     }
 
     [Fact]
-    public void Every_stable_type_has_a_test_and_a_guide()
+    public void Every_stable_type_links_a_test_that_uses_it_and_a_guide_that_names_it()
     {
-        string tests = Text(Directory.EnumerateFiles(Path.Combine(Root, "tests"), "*.cs", SearchOption.AllDirectories)
-            .Where(path => !path.EndsWith(nameof(ApiClassificationTests) + ".cs", StringComparison.Ordinal)));
-        string guides = Text(Directory.EnumerateFiles(Path.Combine(Root, "docs"), "*.md", SearchOption.TopDirectoryOnly)
-            .Concat(Directory.EnumerateFiles(Path.Combine(Root, "docs", "migration"), "*.md", SearchOption.AllDirectories))
-            .Where(path => !NotGuides.Contains(Path.GetFileName(path), StringComparer.Ordinal))
-            .Concat(Directory.EnumerateFiles(Path.Combine(Root, "examples"), "*.*", SearchOption.AllDirectories)
-                .Where(path => path.EndsWith(".cs", StringComparison.Ordinal) || path.EndsWith(".md", StringComparison.Ordinal))));
-
-        var untested = new List<string>();
-        var unguided = new List<string>();
-        foreach (KeyValuePair<string, (string Package, string? Id)> declared in DeclaredTypes())
+        // The evidence is the table's own links, reviewed with the table, rather than any mention anywhere: a type named
+        // only in a comment, or only in some unrelated file, is not evidence that it is tested or documented.
+        string docs = Path.Combine(Root, "docs");
+        string testsRoot = Path.Combine(Root, "tests") + Path.DirectorySeparatorChar;
+        var failures = new List<string>();
+        int stable = 0;
+        foreach (string line in File.ReadAllLines(Path.Combine(docs, "API-CLASSIFICATION.md")))
         {
-            string type = declared.Key;
-            if (declared.Value.Id is not null) continue;
-            string name = Regex.Replace(type.Substring(type.LastIndexOf('.') + 1), "[<`].*", string.Empty, RegexOptions.None, RegexTimeout);
-            var word = new Regex(@"\b" + Regex.Escape(name) + @"\b", RegexOptions.None, RegexTimeout);
-            if (!word.IsMatch(tests)) untested.Add(type);
-            if (!word.IsMatch(guides)) unguided.Add(type);
+            Match row = Row.Match(line);
+            if (!row.Success || row.Groups["id"].Success) continue;
+            stable++;
+            string type = row.Groups["type"].Value.Replace("&lt;", "<").Replace("&gt;", ">");
+            Regex word = Word(ShortName(type));
+            bool tested = false, guided = false;
+            foreach (Match link in Link.Matches(line))
+            {
+                string target = Path.GetFullPath(Path.Combine(docs, link.Groups["path"].Value));
+                if (!File.Exists(target))
+                {
+                    failures.Add(type + ": linked evidence " + link.Groups["path"].Value + " does not exist");
+                    continue;
+                }
+
+                bool code = target.EndsWith(".cs", StringComparison.Ordinal);
+                string text = code ? CodeOnly(File.ReadAllText(target)) : File.ReadAllText(target);
+                if (code && target.StartsWith(testsRoot, StringComparison.Ordinal) &&
+                    !target.EndsWith(nameof(ApiClassificationTests) + ".cs", StringComparison.Ordinal)) tested |= word.IsMatch(text);
+                else guided |= word.IsMatch(text);
+            }
+
+            if (!tested) failures.Add(type + ": no linked test uses it in code");
+            if (!guided) failures.Add(type + ": no linked guide or example names it");
         }
 
-        Assert.True(untested.Count == 0, "Stable types no test names: " + string.Join(", ", untested));
-        Assert.True(unguided.Count == 0, "Stable types no guide or example names: " + string.Join(", ", unguided));
+        Assert.True(stable > 300, $"only {stable} stable rows were read; the table is not being parsed");
+        Assert.True(failures.Count == 0, string.Join("\n", failures));
+    }
+
+    [Fact]
+    public void Code_evidence_ignores_comments_and_longer_names()
+    {
+        // Negative controls for the rule above: a mention in a comment or a string, and a longer type sharing the prefix,
+        // are not uses, while a string containing // does not hide the code after it.
+        Regex word = Word("EvolutionWorkServer");
+        Assert.DoesNotMatch(word, CodeOnly("// EvolutionWorkServer is not used here\n/* EvolutionWorkServer */ int x = 1;"));
+        Assert.DoesNotMatch(word, CodeOnly("var options = new EvolutionWorkServerOptions();"));
+        Assert.DoesNotMatch(word, CodeOnly("Assert.Equal(\"EvolutionWorkServer\", name);"));
+        Assert.Matches(word, CodeOnly("string url = \"http://host\"; using var server = new EvolutionWorkServer(c, cert, token);"));
     }
 
     [Fact]
@@ -84,7 +110,9 @@ public sealed class ApiClassificationTests
     private static Dictionary<string, (string Package, string? Id)> DeclaredTypes()
     {
         var types = new Dictionary<string, (string, string?)>(StringComparer.Ordinal);
-        foreach (string api in Directory.EnumerateFiles(Path.Combine(Root, "src"), "PublicAPI.Unshipped.txt", SearchOption.AllDirectories))
+        // Shipped declarations are public too: a type moved there on release must stay classified.
+        foreach (string api in Directory.EnumerateFiles(Path.Combine(Root, "src"), "PublicAPI.*.txt", SearchOption.AllDirectories)
+                     .Where(path => Path.GetFileName(path) is "PublicAPI.Shipped.txt" or "PublicAPI.Unshipped.txt"))
         {
             string package = Path.GetFileName(Path.GetDirectoryName(api)) ?? string.Empty;
             foreach (string raw in File.ReadAllLines(api))
@@ -103,6 +131,21 @@ public sealed class ApiClassificationTests
         return types;
     }
 
+    private static readonly Regex Link = new(@"\[[^\]]+\]\((?<path>[^)]+)\)", RegexOptions.None, RegexTimeout);
+
+    // Comments and the contents of string and character literals are removed: a name written in either is not a use.
+    // Literals are matched first, so a "//" inside one does not hide the code after it.
+    private static readonly Regex CommentOrLiteral = new(
+        @"//[^\n]*|/\*.*?\*/|@""(?:""""|[^""])*""|""(?:\\.|[^""\\\n])*""|'(?:\\.|[^'\\\n])'",
+        RegexOptions.Singleline, RegexTimeout);
+
+    private static string CodeOnly(string source) =>
+        CommentOrLiteral.Replace(source, match => match.Value.StartsWith("/", StringComparison.Ordinal) ? " " : "\"\"");
+
+    private static string ShortName(string type) =>
+        Regex.Replace(type.Substring(type.LastIndexOf('.') + 1), "[<`].*", string.Empty, RegexOptions.None, RegexTimeout);
+
+    private static Regex Word(string name) => new(@"\b" + Regex.Escape(name) + @"\b", RegexOptions.None, RegexTimeout);
     private static string Text(IEnumerable<string> paths) =>
         string.Join("\n", paths.Where(path => path.IndexOf(Path.DirectorySeparatorChar + "obj" + Path.DirectorySeparatorChar, StringComparison.Ordinal) < 0
                                               && path.IndexOf(Path.DirectorySeparatorChar + "bin" + Path.DirectorySeparatorChar, StringComparison.Ordinal) < 0)

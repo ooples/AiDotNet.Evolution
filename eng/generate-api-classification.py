@@ -18,11 +18,19 @@ def files(folder, patterns, exclude=()):
                 continue
             yield path, path.read_text(encoding="utf-8", errors="replace")
 
-tests = list(files("tests", ["*.cs"]))
+# Comments and literal contents are dropped (literals are matched first, so "//" inside one hides nothing): a type
+# named only in a comment or a string is not a test of it. ApiClassificationTests applies the same rule to the linked files.
+comment_or_literal = re.compile(r'//[^\n]*|/\*.*?\*/|@"(?:""|[^"])*"|"(?:\\.|[^"\\\n])*"|' + r"'(?:\\.|[^'\\\n])'", re.S)
+def code_only(source):
+    return comment_or_literal.sub(lambda m: " " if m.group(0).startswith("/") else '""', source)
+
+tests = [(p, code_only(t)) for p, t in files("tests", ["*.cs"], exclude={"ApiClassificationTests.cs"})]
 guides = [(p, t) for p, t in files("docs", ["*.md"], exclude={"API-CLASSIFICATION.md", "COMPETITIVE_ANALYSIS_AND_ROADMAP.md", "IMPLEMENTATION_STATUS.md", "USER_STORY_DELIVERY.md"}) if p.parent.name in ("docs", "migration")] + list(files("examples", ["*.cs", "*.md"]))
 
 rows = []
-for api in sorted((root / "src").rglob("PublicAPI.Unshipped.txt")):
+seen = set()
+# Shipped declarations are public too: a type moved there on release must stay classified.
+for api in sorted([*(root / "src").rglob("PublicAPI.Shipped.txt"), *(root / "src").rglob("PublicAPI.Unshipped.txt")]):
     package = api.parent.name
     for line in api.read_text(encoding="utf-8").splitlines():
         line = line.strip()
@@ -32,6 +40,9 @@ for api in sorted((root / "src").rglob("PublicAPI.Unshipped.txt")):
         if not m:
             continue
         full = m.group(2)
+        if (package, full) in seen:
+            continue
+        seen.add((package, full))
         name = re.sub(r"<.*", "", full.split(".")[-1].split("`")[0])
         if not name or name[0].islower():
             continue
