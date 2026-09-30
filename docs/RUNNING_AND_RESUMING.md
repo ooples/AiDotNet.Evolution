@@ -123,6 +123,17 @@ them), and the store must keep every segment a retained checkpoint names. `Direc
 stores them under its `segments` subdirectory and deletes those no retained snapshot names;
 `InMemoryEvolutionCheckpointStore` keeps those of its latest checkpoint.
 
+`EvolutionEngineOptions.CheckpointFormat` decides whether the engine uses them. The deduplication set and
+evaluation cache grow with every distinct genome a run evaluates, so an inline checkpoint repeats all of
+them on every save. With `EvolutionCheckpointFormat.Auto`, the default, checkpoints stay inline, self-contained
+and readable by older engines until the two together reach `CheckpointSegmentThreshold` entries (50,000 by
+default). After that each save writes one segment with only what changed, and every 32 segments a base
+segment restates both. `Inline` always writes self-contained checkpoints; `Segmented` always uses segments and
+requires a segment store. A segmented checkpoint needs its store: copy a `DirectoryEvolutionCheckpointStore`
+directory whole to move the run, or choose `Inline` when checkpoints must travel on their own. On resume the
+engine checks each segment's SHA-256, and the format is not part of the compatibility hash, so a run can resume
+under a different one.
+
 Both stores have `ForOutputDirectory(outputDirectory, runId, ...)`, which places files through
 `EvolutionOutputLayout`. The layout derives every path a run writes (the checkpoints and traces
 folders, the checkpoint path and trace paths) from one output directory and run id, so the CLI and

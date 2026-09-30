@@ -44,7 +44,10 @@ internal static class EvolutionEngineDocuments
         public List<ArchiveDocument>? Islands { get; set; }
         // Present when the deduplication set and cache live in store segments (V1-73): the segments that rebuild them,
         // a base then deltas in order, and the identifier the next segment takes. SeenGenomeIds and Cache are absent.
+        // Omitted when absent, so an inline payload stays byte-for-byte what engines before segments wrote.
+        [JsonIgnore(Condition = JsonIgnoreCondition.WhenWritingNull)]
         public List<SegmentReferenceDocument>? Segments { get; set; }
+        [JsonIgnore(Condition = JsonIgnoreCondition.WhenWritingNull)]
         public long? NextSegmentId { get; set; }
     }
 

@@ -104,11 +104,15 @@ public sealed class SegmentedCheckpointTests
         Assert.True(Assert.IsType<JsonArray>(inline["Cache"]).Count > 40);
         foreach (KeyValuePair<string, JsonNode?> field in inline)
         {
+            // Islands carry each evaluation's elapsed time, which differs between any two runs.
             if (field.Key is "SeenGenomeIds" or "Cache" or "SchemaVersion" or "BudgetOptions" or "Islands") continue;
             Assert.Equal(field.Value?.ToJsonString(), segmented[field.Key]?.ToJsonString());
         }
         Assert.Equal(inline["SchemaVersion"]!.GetValue<int>() + 4, segmented["SchemaVersion"]!.GetValue<int>());
         Assert.NotEmpty(Assert.IsType<JsonArray>(segmented["Segments"]));
+        // An inline payload names no segments at all, so it is what engines before segments wrote.
+        Assert.False(inline.ContainsKey("Segments"));
+        Assert.False(inline.ContainsKey("NextSegmentId"));
     }
 
     [Fact]
@@ -158,17 +162,24 @@ public sealed class SegmentedCheckpointTests
     [Fact]
     public async Task An_inline_run_resumes_a_segmented_checkpoint_and_continues_inline()
     {
-        var store = new InMemoryEvolutionCheckpointStore();
-        await Engine(Options(30, EvolutionCheckpointFormat.Segmented, 0), store).RunAsync(Seeds());
-        EvolutionEngineOptions resume = Options(90, EvolutionCheckpointFormat.Inline, 0);
-        resume.Resume = true;
-        EvolutionRunResult<TestGenome> resumed = await Engine(resume, store).RunAsync(Seeds());
-        EvolutionRunResult<TestGenome> uninterrupted = await Engine(Options(90, EvolutionCheckpointFormat.Inline, 0),
-            new InMemoryEvolutionCheckpointStore()).RunAsync(Seeds());
+        // Resumed inline from a segmented checkpoint, the run reaches exactly what it reaches resumed from an inline one.
+        async Task<(string Hash, EvolutionCheckpoint Latest)> ResumeInlineFrom(EvolutionCheckpointFormat written)
+        {
+            var store = new InMemoryEvolutionCheckpointStore();
+            await Engine(Options(32, written, 0), store).RunAsync(Seeds());
+            EvolutionEngineOptions resume = Options(96, EvolutionCheckpointFormat.Inline, 0);
+            resume.Resume = true;
+            string hash = (await Engine(resume, store).RunAsync(Seeds())).StateHash;
+            return (hash, Assert.IsType<EvolutionCheckpoint>(await store.LoadLatestAsync("segmented")));
+        }
 
-        Assert.Equal(uninterrupted.StateHash, resumed.StateHash);
-        EvolutionCheckpoint latest = Assert.IsType<EvolutionCheckpoint>(await store.LoadLatestAsync("segmented"));
-        Assert.Empty(latest.SegmentIds);
+        var fromSegmented = await ResumeInlineFrom(EvolutionCheckpointFormat.Segmented);
+        var fromInline = await ResumeInlineFrom(EvolutionCheckpointFormat.Inline);
+        Assert.Equal(fromInline.Hash, fromSegmented.Hash);
+        Assert.Empty(fromSegmented.Latest.SegmentIds);
+        // The saves after the resume are inline again: the seen set is back in the payload and no segments are named.
+        Assert.NotEmpty(Assert.IsType<JsonArray>(Payload(fromSegmented.Latest)["SeenGenomeIds"]));
+        Assert.False(Payload(fromSegmented.Latest).ContainsKey("Segments"));
     }
 
     private static TestGenome[] Seeds() => new[] { new TestGenome(0) };

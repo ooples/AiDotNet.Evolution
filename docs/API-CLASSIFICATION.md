@@ -290,6 +290,7 @@ against the declared public API, so a type added, removed or reclassified withou
 | `AiDotNet.Evolution.EvolutionWorkServerEventKind` | Stable | [DURABLE_WORKER_PROTOCOL.md](DURABLE_WORKER_PROTOCOL.md), [EvolutionWorkServerTests](../tests/AiDotNet.Evolution.Tests/UnitTests/EvolutionWorkServerTests.cs) |
 | `AiDotNet.Evolution.EvolutionWorkServerOptions` | Stable | [DURABLE_WORKER_PROTOCOL.md](DURABLE_WORKER_PROTOCOL.md), [EvolutionWorkServerTests](../tests/AiDotNet.Evolution.Tests/UnitTests/EvolutionWorkServerTests.cs) |
 | `AiDotNet.Evolution.IEvolutionCheckpointSegmentStore` | Stable | [RUNNING_AND_RESUMING.md](RUNNING_AND_RESUMING.md), [EvolutionCheckpointSegmentStoreTests](../tests/AiDotNet.Evolution.Tests/UnitTests/EvolutionCheckpointSegmentStoreTests.cs) |
+| `AiDotNet.Evolution.EvolutionCheckpointFormat` | Stable | [RUNNING_AND_RESUMING.md](RUNNING_AND_RESUMING.md), [SegmentedCheckpointTests](../tests/AiDotNet.Evolution.Tests/UnitTests/SegmentedCheckpointTests.cs) |
 
 ## AiDotNet.Evolution.CSharp
 
