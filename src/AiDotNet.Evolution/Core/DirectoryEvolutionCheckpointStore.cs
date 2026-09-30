@@ -246,9 +246,9 @@ public sealed class DirectoryEvolutionCheckpointStore : IEvolutionCheckpointSegm
                     throw new InvalidDataException(
                         "The checkpoint directory is at its package file limit and retention could not free a slot.");
             }
-            byte[] written = Persist(checkpoint, cancellationToken);
+            string written = Persist(checkpoint, cancellationToken);
             preloaded[FileNameFor(checkpoint.Sequence)] = checkpoint;
-            _lastWritten = (FileNameFor(checkpoint.Sequence), Sha256(written), checkpoint);
+            _lastWritten = (FileNameFor(checkpoint.Sequence), written, checkpoint);
             ApplyRetention(checkpoint.RunId, preloaded);
         }
         return Task.CompletedTask;
@@ -498,29 +498,85 @@ public sealed class DirectoryEvolutionCheckpointStore : IEvolutionCheckpointSegm
         }
     }
 
-    private static string Sha256(byte[] content)
+    // The snapshot around its payload is small, so it is serialized with a placeholder where the payload goes, and the
+    // payload itself is escaped into the file in bounded chunks. Letting the serializer escape it rented a character
+    // buffer up to six times the payload's length (about 300 MB at 50,000 evaluations), which the shared pool then kept.
+    // The bytes differ only in how the string is escaped, so they decode to exactly the same snapshot.
+    private static void WriteSnapshot(Stream stream, EvolutionCheckpoint checkpoint)
     {
-        using SHA256 sha = SHA256.Create();
-        return Convert.ToBase64String(sha.ComputeHash(content));
+        SnapshotDocument document = SnapshotDocument.From(checkpoint);
+        string placeholder = "payload-" + Guid.NewGuid().ToString("N");
+        document.Payload = placeholder;
+        string outline = JsonSerializer.Serialize(document, EvolutionJson.Indented);
+        int at = outline.IndexOf("\"" + placeholder + "\"", StringComparison.Ordinal);
+        if (at < 0 || outline.IndexOf(placeholder, at + placeholder.Length + 2, StringComparison.Ordinal) >= 0)
+            throw new InvalidOperationException("The checkpoint snapshot outline is malformed.");
+
+        var utf8 = new UTF8Encoding(encoderShouldEmitUTF8Identifier: false);
+        byte[] prefix = utf8.GetBytes(outline.Substring(0, at + 1));
+        stream.Write(prefix, 0, prefix.Length);
+        WriteEscaped(stream, checkpoint.Payload, utf8);
+        byte[] suffix = utf8.GetBytes(outline.Substring(at + placeholder.Length + 1));
+        stream.Write(suffix, 0, suffix.Length);
     }
 
-    private byte[] Persist(EvolutionCheckpoint checkpoint, CancellationToken cancellationToken)
+    // Writes a string's JSON escaping, without its quotes, a chunk at a time: quote, backslash and control characters
+    // are escaped, everything else is written as UTF-8. A surrogate pair is never split across chunks.
+    private static void WriteEscaped(Stream stream, string text, Encoding utf8)
+    {
+        const int Chunk = 16 * 1024;
+        var escaped = new StringBuilder(Chunk + 16);
+        byte[] bytes = new byte[utf8.GetMaxByteCount(Chunk + 16) + 16];
+        int index = 0;
+        while (index < text.Length)
+        {
+            escaped.Clear();
+            int end = Math.Min(text.Length, index + Chunk);
+            if (end < text.Length && char.IsHighSurrogate(text[end - 1])) end++;
+            for (; index < end; index++)
+            {
+                char c = text[index];
+                switch (c)
+                {
+                    case '"': escaped.Append("\\\""); break;
+                    case '\\': escaped.Append("\\\\"); break;
+                    case '\n': escaped.Append("\\n"); break;
+                    case '\r': escaped.Append("\\r"); break;
+                    case '\t': escaped.Append("\\t"); break;
+                    default:
+                        if (c < ' ') escaped.Append("\\u").Append(((int)c).ToString("x4", CultureInfo.InvariantCulture));
+                        else escaped.Append(c);
+                        break;
+                }
+            }
+
+            string piece = escaped.ToString();
+            int count = utf8.GetBytes(piece, 0, piece.Length, bytes, 0);
+            stream.Write(bytes, 0, count);
+        }
+    }
+
+    // Returns the SHA-256 of the bytes written. The snapshot is serialized straight into the file: building it as one
+    // string and then one byte array first held two more copies of the whole payload at every save (V1-73), and those
+    // grown buffers stayed with the process long after the save.
+    private string Persist(EvolutionCheckpoint checkpoint, CancellationToken cancellationToken)
     {
         string targetPath = EvolutionPath.Join(_directory, FileNameFor(checkpoint.Sequence));
         string tempPath = EvolutionPath.Join(_directory,
             $".{FileNameFor(checkpoint.Sequence)}.{Guid.NewGuid():N}.tmp");
-        string json = JsonSerializer.Serialize(SnapshotDocument.From(checkpoint), EvolutionJson.Indented);
-        byte[] payload = new UTF8Encoding(encoderShouldEmitUTF8Identifier: false).GetBytes(json);
-        if (payload.LongLength > _maxCheckpointBytes)
-            throw new InvalidDataException($"The evolution checkpoint exceeds the {_maxCheckpointBytes}-byte limit.");
+        string digest;
         try
         {
-            using (var stream = new FileStream(tempPath, FileMode.CreateNew, FileAccess.Write, FileShare.None))
+            using (var stream = new FileStream(tempPath, FileMode.CreateNew, FileAccess.Write, FileShare.None, bufferSize: 81920))
             {
                 cancellationToken.ThrowIfCancellationRequested();
-                stream.Write(payload, 0, payload.Length);
+                WriteSnapshot(stream, checkpoint);
+                if (stream.Length > _maxCheckpointBytes)
+                    throw new InvalidDataException($"The evolution checkpoint exceeds the {_maxCheckpointBytes}-byte limit.");
                 stream.Flush(flushToDisk: true);
             }
+
+            digest = TryHashFile(tempPath) ?? throw new IOException("The checkpoint just written could not be read back.");
 
             cancellationToken.ThrowIfCancellationRequested();
             if (File.Exists(targetPath))
@@ -547,7 +603,7 @@ public sealed class DirectoryEvolutionCheckpointStore : IEvolutionCheckpointSegm
                 }
             }
         }
-        return payload;
+        return digest;
     }
 
     /// <summary>Builds the fixed-width file name one sequence is stored under.</summary>

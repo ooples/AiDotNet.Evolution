@@ -45,6 +45,7 @@ static EvolutionEngine<EvolutionSearchGenome> Engine(int evaluations, int checkp
             MaxGenerations = evaluations, ProposalBatchSize = 8, MaxDegreeOfParallelism = 4, MigrationInterval = 0,
             CheckpointInterval = checkpointEvery, Resume = resume,
             EnableEvaluationCache = Environment.GetEnvironmentVariable("SOAK_EVALUATION_CACHE") != "0",
+            CheckpointFormat = Enum.TryParse(Environment.GetEnvironmentVariable("SOAK_CHECKPOINT_FORMAT"), out EvolutionCheckpointFormat format) ? format : EvolutionCheckpointFormat.Auto,
             DeduplicationCapacity = int.TryParse(Environment.GetEnvironmentVariable("SOAK_DEDUP_CAPACITY"), out int capacity) ? capacity : 0
         }, observer: observer, checkpointStore: new DirectoryEvolutionCheckpointStore(storeDir, maxCheckpointBytes: 256L * 1024 * 1024),
         genomeCodec: space);
