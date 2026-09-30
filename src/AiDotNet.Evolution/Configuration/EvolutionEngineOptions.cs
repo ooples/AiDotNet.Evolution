@@ -250,6 +250,18 @@ public sealed class EvolutionEngineOptions
     /// <summary>Gets or sets whether completed canonical evaluations are reused across islands and proposals.</summary>
     public bool EnableEvaluationCache { get; set; } = true;
 
+    /// <summary>
+    /// Gets or sets how many distinct committed genomes the engine remembers for duplicate detection and the evaluation
+    /// cache; zero, the default, remembers every one.
+    /// </summary>
+    /// <remarks>
+    /// Both structures grow with every distinct evaluation, so a very long run holds and checkpoints state proportional
+    /// to its length. With a capacity set, the oldest committed genome is forgotten first (commit order), so a genome
+    /// proposed again after it was forgotten is evaluated again rather than reported as a duplicate. That changes
+    /// results, so a non-zero capacity is part of the run's compatibility identity.
+    /// </remarks>
+    public int DeduplicationCapacity { get; set; }
+
     /// <summary>Gets or sets whether final failed/timed-out identities remain permanently deduplicated.</summary>
     public bool DeduplicateFailedCandidates { get; set; }
 
@@ -547,6 +559,7 @@ public sealed class EvolutionEngineOptions
         if (InspirationCount < 0) throw new ArgumentOutOfRangeException(nameof(InspirationCount));
         if (InspirationCount > EvolutionCollectionLimits.MaximumLineageIdentities)
             throw new ArgumentOutOfRangeException(nameof(InspirationCount));
+        if (DeduplicationCapacity < 0) throw new ArgumentOutOfRangeException(nameof(DeduplicationCapacity));
         Guard.Positive(MaxRetainedFailures);
         if (MaxRetainedFailures > EvolutionCollectionLimits.MaximumResultEntries)
             throw new ArgumentOutOfRangeException(nameof(MaxRetainedFailures));
@@ -675,6 +688,7 @@ public sealed class EvolutionEngineOptions
             CheckpointInterval = CheckpointInterval,
             Resume = Resume,
             EnableEvaluationCache = EnableEvaluationCache,
+            DeduplicationCapacity = DeduplicationCapacity,
             DeduplicateFailedCandidates = DeduplicateFailedCandidates,
             IslandCount = IslandCount,
             MigrationInterval = MigrationInterval,
@@ -741,7 +755,11 @@ public sealed class EvolutionEngineOptions
         Field("target-quality", EvolutionHash.EncodeNullableDouble(TargetQuality))
     }.Concat(Dispatch == EvolutionDispatchMode.Pipeline
         ? new[] { Field("pipeline", Pipeline.ToCanonicalString()) }
-        : Array.Empty<KeyValuePair<string, string>>()).ToArray();
+        : Array.Empty<KeyValuePair<string, string>>())
+        // Only when set, so every existing run keeps its identity and its checkpoints stay resumable.
+        .Concat(DeduplicationCapacity > 0
+            ? new[] { Field("deduplication-capacity", DeduplicationCapacity.ToString(CultureInfo.InvariantCulture)) }
+            : Array.Empty<KeyValuePair<string, string>>()).ToArray();
 
     /// <summary>Lists every option that only bounds or locates a run, as ordered name/value pairs.</summary>
     /// <remarks>

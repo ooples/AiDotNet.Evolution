@@ -2129,6 +2129,8 @@ AiDotNet.Evolution.IEvolutionLatencyProfile.IsLatencyBound.get -> bool
 AiDotNet.Evolution.ResourceMeteredEvolutionTask<TGenome>.IsLatencyBound.get -> bool
 AiDotNet.Evolution.ResourceMeteredVariationOperator<TGenome>.IsLatencyBound.get -> bool
 AiDotNet.Evolution.EvolutionVariationContext<TGenome>.CommittedBefore.get -> long?
+AiDotNet.Evolution.EvolutionEngineOptions.DeduplicationCapacity.get -> int
+AiDotNet.Evolution.EvolutionEngineOptions.DeduplicationCapacity.set -> void
 AiDotNet.Evolution.EvolutionEngineOptions.TimeProvider.get -> System.TimeProvider!
 AiDotNet.Evolution.EvolutionEngineOptions.TimeProvider.set -> void
 AiDotNet.Evolution.DirectoryEvolutionArtifactStore
@@ -2150,3 +2152,42 @@ AiDotNet.Evolution.IEvolutionArtifactStore.TryRead(string! reference, out byte[]
 const AiDotNet.Evolution.EvolutionArtifact.MaximumContentBytes = 67108864 -> int
 static AiDotNet.Evolution.EvolutionArtifact.FromBytes(string! key, byte[]! content, string! mediaType) -> AiDotNet.Evolution.EvolutionArtifact!
 const AiDotNet.Evolution.EvolutionTaskResult.MaximumBinaryContentBytes = 268435456 -> long
+AiDotNet.Evolution.EvolutionWorkRemoteClient
+AiDotNet.Evolution.EvolutionWorkRemoteClient.Dispose() -> void
+AiDotNet.Evolution.EvolutionWorkRemoteClient.SendAsync(string! requestJson, System.Threading.CancellationToken cancellationToken = default(System.Threading.CancellationToken)) -> System.Threading.Tasks.Task<string!>!
+AiDotNet.Evolution.EvolutionWorkServer
+AiDotNet.Evolution.EvolutionWorkServer.CertificateFingerprint.get -> string!
+AiDotNet.Evolution.EvolutionWorkServer.Dispose() -> void
+AiDotNet.Evolution.EvolutionWorkServer.EvolutionWorkServer(AiDotNet.Evolution.DurableEvolutionWorkCoordinator! coordinator, System.Security.Cryptography.X509Certificates.X509Certificate2! certificate, string! workerToken, AiDotNet.Evolution.EvolutionWorkServerOptions? options = null) -> void
+AiDotNet.Evolution.EvolutionWorkServer.LocalEndPoint.get -> System.Net.IPEndPoint!
+AiDotNet.Evolution.EvolutionWorkServer.Start() -> void
+AiDotNet.Evolution.EvolutionWorkServerEvent
+AiDotNet.Evolution.EvolutionWorkServerEvent.EvolutionWorkServerEvent(AiDotNet.Evolution.EvolutionWorkServerEventKind kind, string! remoteEndPoint, System.Exception? exception = null) -> void
+AiDotNet.Evolution.EvolutionWorkServerEvent.Exception.get -> System.Exception?
+AiDotNet.Evolution.EvolutionWorkServerEvent.Kind.get -> AiDotNet.Evolution.EvolutionWorkServerEventKind
+AiDotNet.Evolution.EvolutionWorkServerEvent.RemoteEndPoint.get -> string!
+AiDotNet.Evolution.EvolutionWorkServerEventKind
+AiDotNet.Evolution.EvolutionWorkServerEventKind.Accepted = 1 -> AiDotNet.Evolution.EvolutionWorkServerEventKind
+AiDotNet.Evolution.EvolutionWorkServerEventKind.Authenticated = 2 -> AiDotNet.Evolution.EvolutionWorkServerEventKind
+AiDotNet.Evolution.EvolutionWorkServerEventKind.AuthenticationRefused = 3 -> AiDotNet.Evolution.EvolutionWorkServerEventKind
+AiDotNet.Evolution.EvolutionWorkServerEventKind.Closed = 7 -> AiDotNet.Evolution.EvolutionWorkServerEventKind
+AiDotNet.Evolution.EvolutionWorkServerEventKind.ConnectionLimitReached = 5 -> AiDotNet.Evolution.EvolutionWorkServerEventKind
+AiDotNet.Evolution.EvolutionWorkServerEventKind.Faulted = 6 -> AiDotNet.Evolution.EvolutionWorkServerEventKind
+AiDotNet.Evolution.EvolutionWorkServerEventKind.Listening = 0 -> AiDotNet.Evolution.EvolutionWorkServerEventKind
+AiDotNet.Evolution.EvolutionWorkServerEventKind.OperationRefused = 4 -> AiDotNet.Evolution.EvolutionWorkServerEventKind
+AiDotNet.Evolution.EvolutionWorkServerOptions
+AiDotNet.Evolution.EvolutionWorkServerOptions.BindAddress.get -> string!
+AiDotNet.Evolution.EvolutionWorkServerOptions.BindAddress.set -> void
+AiDotNet.Evolution.EvolutionWorkServerOptions.EvolutionWorkServerOptions() -> void
+AiDotNet.Evolution.EvolutionWorkServerOptions.HandshakeTimeout.get -> System.TimeSpan
+AiDotNet.Evolution.EvolutionWorkServerOptions.HandshakeTimeout.set -> void
+AiDotNet.Evolution.EvolutionWorkServerOptions.IdleTimeout.get -> System.TimeSpan
+AiDotNet.Evolution.EvolutionWorkServerOptions.IdleTimeout.set -> void
+AiDotNet.Evolution.EvolutionWorkServerOptions.MaximumConnections.get -> int
+AiDotNet.Evolution.EvolutionWorkServerOptions.MaximumConnections.set -> void
+AiDotNet.Evolution.EvolutionWorkServerOptions.OnEvent.get -> System.Action<AiDotNet.Evolution.EvolutionWorkServerEvent!>?
+AiDotNet.Evolution.EvolutionWorkServerOptions.OnEvent.set -> void
+AiDotNet.Evolution.EvolutionWorkServerOptions.Port.get -> int
+AiDotNet.Evolution.EvolutionWorkServerOptions.Port.set -> void
+static AiDotNet.Evolution.EvolutionWorkRemoteClient.ConnectAsync(string! host, int port, string! certificateFingerprint, string! workerToken, System.Threading.CancellationToken cancellationToken = default(System.Threading.CancellationToken)) -> System.Threading.Tasks.Task<AiDotNet.Evolution.EvolutionWorkRemoteClient!>!
+static AiDotNet.Evolution.EvolutionWorkServer.ComputeFingerprint(System.Security.Cryptography.X509Certificates.X509Certificate! certificate) -> string!

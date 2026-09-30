@@ -1,0 +1,40 @@
+name: Distributed evaluation
+
+# V1-61 (#174): a run whose evaluations are done by workers in separate containers (separate network
+# namespaces) reaching the coordinator over TLS. Verifies exactly-once commits, lease re-issue after a worker
+# is killed, the same final state as a single-host run, and four-worker throughput.
+
+on:
+  workflow_dispatch:
+  pull_request:
+    paths:
+      # The whole engine: the state-hash checks (single == multi, tp1 == tp4) depend on the session, the archive,
+      # the engine options, selection and random streams as much as on the work protocol itself.
+      - src/AiDotNet.Evolution/**
+      - benchmarks/EvolutionDistributed/**
+      - .github/workflows/distributed-evaluation.yml
+
+permissions:
+  contents: read
+
+jobs:
+  multi-host:
+    runs-on: ubuntu-latest
+    timeout-minutes: 30
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+      - uses: actions/setup-dotnet@a98b56852c35b8e3190ac28c8c2271da59106c68 # v6.0.0
+        with:
+          dotnet-version: '10.0.x'
+          dotnet-quality: preview
+      - name: Publish the harness
+        run: dotnet publish benchmarks/EvolutionDistributed -c Release -o publish
+      - name: Run across containers
+        run: bash benchmarks/EvolutionDistributed/run-containers.sh publish results
+      - name: Verify
+        run: python3 benchmarks/EvolutionDistributed/verify.py results
+      - uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a # v7.0.1
+        if: always()
+        with:
+          name: distributed-evaluation
+          path: results

@@ -29,7 +29,7 @@ namespace AiDotNet.Evolution.Programs;
 public sealed class ProgramSandboxLimitOptions
 {
     /// <summary>The largest wall-clock limit accepted by <see cref="Validate"/>, in seconds.</summary>
-    public const int MaxTimeLimitSeconds = 3600;
+    public const int MaxTimeLimitSeconds = 86_400;
 
     /// <summary>The largest memory limit accepted by <see cref="Validate"/>, in megabytes.</summary>
     public const int MaxMemoryLimitMb = 1_048_576;
@@ -45,7 +45,11 @@ public sealed class ProgramSandboxLimitOptions
     /// Enforced through a Windows job object on Windows and through <c>ulimit -v</c> on Unix when a POSIX shell is
     /// available. Where neither mechanism is available the limit is not applied and the wall-clock limit remains the
     /// effective bound. Job creation/assignment and shell-limit failures can also leave memory uncapped.
-    /// The response does not currently attest whether enforcement succeeded.
+    /// On Linux the engine also measures the resident memory of the process tree and terminates it past this limit;
+    /// on Windows the job reports a refused commit. Either way the response reports
+    /// <see cref="ProgramExecuteErrorCode.MemoryLimitExceeded"/>. On Linux the address-space cap is set at twice this
+    /// limit, so a single request beyond that is refused by the kernel before it is resident and surfaces as the
+    /// program's own failure.
     /// </remarks>
     public int MemoryLimitMb { get; set; } = 256;
 
@@ -56,6 +60,19 @@ public sealed class ProgramSandboxLimitOptions
     /// container-backed engine. It never relaxes <see cref="TimeLimitSeconds"/>.
     /// </remarks>
     public double CpuLimit { get; set; } = 1.0;
+
+    /// <summary>
+    /// Gets or sets the CPU time one execution may use across its process tree, in seconds, or <c>null</c> to derive
+    /// it as <see cref="TimeLimitSeconds"/> times <see cref="CpuLimit"/>.
+    /// </summary>
+    /// <remarks>
+    /// Enforced through the Windows job's user-time limit and, on Linux, by the engine measuring the process tree plus
+    /// a <c>ulimit -t</c> backstop one second later. A process past it is terminated and the response reports
+    /// <see cref="ProgramExecuteErrorCode.CpuTimeLimitExceeded"/>. A single-threaded program cannot use more CPU time
+    /// than wall-clock time, so the derived default only binds a multi-threaded tree; set it lower than
+    /// <see cref="TimeLimitSeconds"/> to bound compute rather than waiting.
+    /// </remarks>
+    public int? CpuTimeLimitSeconds { get; set; }
 
     /// <summary>Gets or sets the largest accepted program source, in characters. Defaults to 200,000.</summary>
     public int MaxSourceCodeChars { get; set; } = 200_000;
@@ -81,6 +98,7 @@ public sealed class ProgramSandboxLimitOptions
         TimeLimitSeconds = TimeLimitSeconds,
         MemoryLimitMb = MemoryLimitMb,
         CpuLimit = CpuLimit,
+        CpuTimeLimitSeconds = CpuTimeLimitSeconds,
         MaxSourceCodeChars = MaxSourceCodeChars,
         MaxStdInChars = MaxStdInChars,
         MaxStdOutChars = MaxStdOutChars,
@@ -101,6 +119,8 @@ public sealed class ProgramSandboxLimitOptions
             MemoryLimitMb, $"Value must be between 1 and {MaxMemoryLimitMb} megabytes.");
         Require(!double.IsNaN(CpuLimit) && !double.IsInfinity(CpuLimit) && CpuLimit > 0.0, nameof(CpuLimit),
             CpuLimit, "Value must be a positive finite number of CPU cores.");
+        Require(CpuTimeLimitSeconds is null or > 0 and <= MaxTimeLimitSeconds, nameof(CpuTimeLimitSeconds),
+            CpuTimeLimitSeconds ?? 0, $"Value must be between 1 and {MaxTimeLimitSeconds} seconds, or null.");
         Require(MaxSourceCodeChars > 0, nameof(MaxSourceCodeChars),
             MaxSourceCodeChars, "Value must be greater than zero.");
         Require(MaxStdInChars >= 0, nameof(MaxStdInChars), MaxStdInChars, "Value cannot be negative.");
@@ -115,6 +135,14 @@ public sealed class ProgramSandboxLimitOptions
     /// <returns>A positive time span derived from <see cref="TimeLimitSeconds"/>.</returns>
     public TimeSpan GetTimeLimit() =>
         TimeSpan.FromSeconds(TimeLimitSeconds > 0 ? TimeLimitSeconds : 1);
+
+    /// <summary>Gets the CPU-time limit for the process tree.</summary>
+    /// <returns><see cref="CpuTimeLimitSeconds"/>, or the wall-clock limit scaled by <see cref="CpuLimit"/>, at least one second.</returns>
+    public TimeSpan GetCpuTimeLimit()
+    {
+        double seconds = CpuTimeLimitSeconds ?? Math.Ceiling(TimeLimitSeconds * (CpuLimit > 0.0 ? CpuLimit : 1.0));
+        return TimeSpan.FromSeconds(Math.Min(Math.Max(seconds, 1.0), int.MaxValue));
+    }
 
     /// <summary>Gets the memory limit in bytes.</summary>
     /// <returns>The memory limit converted from megabytes, or zero when the limit is not positive.</returns>

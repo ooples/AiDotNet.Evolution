@@ -39,12 +39,20 @@ namespace AiDotNet.Evolution;
 /// </remarks>
 public sealed class MapElitesArchive<TGenome> :
     IGrowableEvolutionArchive<TGenome>,
-    IEvolutionArchiveMutationSource<TGenome>
+    IEvolutionArchiveMutationSource<TGenome>,
+    IEvolutionIndexedArchive<TGenome>
 {
     private readonly EvolutionDescriptorDefinition[] _descriptors;
     private readonly EvolutionDescriptorDefinition[] _configuredDescriptors;
     private readonly ReadOnlyCollection<EvolutionDescriptorDefinition> _descriptorView;
     private readonly SortedDictionary<string, EvolutionArchiveEntry<TGenome>> _cells = new(StringComparer.Ordinal);
+    // The occupied cells in the same ordinal key order as _cells, kept in step by the common mutations (a replacement
+    // is one slot write, a new cell one binary insert) and rebuilt only after bulk changes. Sample and selection read
+    // it by index, so steady-state proposals no longer copy the whole archive whenever its version changes (V1-72).
+    private OrderedArchiveEntries<TGenome>? _order;
+    // How many cells hold each genome, kept with the ordered view. Selection must exclude every entry with the parent's
+    // genome, and it can do that from the view in O(k) only when the parent's genome occupies exactly one cell.
+    private Dictionary<string, int>? _genomeCells;
     private readonly int _capacity;
     private readonly long _maximumGridCells;
     private readonly bool _hasGrowAxis;
@@ -164,7 +172,7 @@ public sealed class MapElitesArchive<TGenome> :
         {
             if (_entries is null || _entriesVersion != Version)
             {
-                _entries = Array.AsReadOnly(_cells.Values.ToArray());
+                _entries = Array.AsReadOnly(Order.Items().ToArray());
                 _entriesVersion = Version;
             }
             return _entries;
@@ -214,6 +222,9 @@ public sealed class MapElitesArchive<TGenome> :
             if (Comparer.Compare(candidateEntry, incumbent) >= 0)
                 return Mutation(EvolutionArchiveInsertionResult.NotImproved, removed: removed);
             _cells[key.StableKey] = candidateEntry;
+            if (_order is not null) _order.Replace(key.StableKey, candidateEntry);
+            CountGenome(incumbent, -1);
+            CountGenome(candidateEntry, 1);
             AddRemoved(ref removed, incumbent);
             PromoteIfBest(candidateEntry);
             Version++;
@@ -223,6 +234,8 @@ public sealed class MapElitesArchive<TGenome> :
         if (_cells.Count < Capacity)
         {
             _cells.Add(key.StableKey, candidateEntry);
+            if (_order is not null) _order.Insert(candidateEntry);
+            CountGenome(candidateEntry, 1);
             PromoteIfBest(candidateEntry);
             Version++;
             return Mutation(EvolutionArchiveInsertionResult.Inserted, candidateEntry, removed);
@@ -235,6 +248,13 @@ public sealed class MapElitesArchive<TGenome> :
             return Mutation(EvolutionArchiveInsertionResult.NotImproved, removed: removed);
         _cells.Remove(worst.Cell.StableKey);
         _cells.Add(key.StableKey, candidateEntry);
+        if (_order is not null)
+        {
+            _order.Remove(worst.Cell.StableKey);
+            _order.Insert(candidateEntry);
+        }
+        CountGenome(worst, -1);
+        CountGenome(candidateEntry, 1);
         AddRemoved(ref removed, worst);
         if (ReferenceEquals(_best, worst)) _best = null;
         PromoteIfBest(candidateEntry);
@@ -268,8 +288,46 @@ public sealed class MapElitesArchive<TGenome> :
     {
         Guard.NotNull(random);
         if (_cells.Count == 0) return null;
-        IReadOnlyList<EvolutionArchiveEntry<TGenome>> entries = Entries;
-        return entries[random.NextInt(entries.Count)];
+        OrderedArchiveEntries<TGenome> order = Order;
+        return order[random.NextInt(order.Count)];
+    }
+
+    int IEvolutionIndexedArchive<TGenome>.Count => _cells.Count;
+
+    EvolutionArchiveEntry<TGenome> IEvolutionIndexedArchive<TGenome>.EntryAt(int index) => Order[index];
+
+    int IEvolutionIndexedArchive<TGenome>.IndexOf(EvolutionArchiveEntry<TGenome> entry)
+    {
+        Guard.NotNull(entry);
+        int index = OrderIndex(entry.Cell.StableKey);
+        return index >= 0 && ReferenceEquals(Order[index], entry) ? index : -1;
+    }
+
+    bool IEvolutionIndexedArchive<TGenome>.HoldsGenomeOnce(string genomeId)
+    {
+        if (_order is null || _genomeCells is null)
+        {
+            _genomeCells = new Dictionary<string, int>(StringComparer.Ordinal);
+            foreach (EvolutionArchiveEntry<TGenome> entry in Order.Items()) CountGenome(entry, 1);
+        }
+        return _genomeCells.TryGetValue(genomeId, out int cells) && cells == 1;
+    }
+
+    private void CountGenome(EvolutionArchiveEntry<TGenome> entry, int delta)
+    {
+        if (_genomeCells is null) return;
+        string id = entry.Evaluation.GenomeId;
+        int cells = (_genomeCells.TryGetValue(id, out int current) ? current : 0) + delta;
+        if (cells == 0) _genomeCells.Remove(id);
+        else _genomeCells[id] = cells;
+    }
+
+    private OrderedArchiveEntries<TGenome> Order => _order ??= new OrderedArchiveEntries<TGenome>(_cells.Values);
+
+    // The index of a cell's key when present, else the complement of its insert point.
+    private int OrderIndex(string stableKey)
+    {
+        return Order.IndexOf(stableKey);
     }
 
     /// <summary>Widens any Grow axis that cannot bin the supplied values, then rebins existing entries.</summary>
@@ -367,6 +425,8 @@ public sealed class MapElitesArchive<TGenome> :
         }
 
         _cells.Clear();
+        _order = null;
+        _genomeCells = null;
         List<EvolutionArchiveEntry<TGenome>>? removed = null;
         foreach (EvolutionArchiveEntry<TGenome> entry in rebinned)
         {
@@ -378,6 +438,8 @@ public sealed class MapElitesArchive<TGenome> :
             }
             if (incumbent is not null) AddRemoved(ref removed, incumbent);
             _cells[entry.Cell.StableKey] = entry;
+            _order = null;
+            _genomeCells = null;
         }
 
         // The retained entries are new objects, so the cached best reference has to be rebuilt rather than kept.
@@ -446,8 +508,12 @@ public sealed class MapElitesArchive<TGenome> :
             _descriptors[axis] = staged._descriptors[axis];
         TotalGridCells = staged.TotalGridCells;
         _cells.Clear();
+        _order = null;
+        _genomeCells = null;
         foreach (KeyValuePair<string, EvolutionArchiveEntry<TGenome>> cell in staged._cells)
             _cells.Add(cell.Key, cell.Value);
+        _order = null;
+        _genomeCells = null;
         _best = staged._best;
         Version++;
         return _cells.Count;
@@ -513,6 +579,8 @@ public sealed class MapElitesArchive<TGenome> :
         TotalGridCells = staged.TotalGridCells;
         foreach (KeyValuePair<string, EvolutionArchiveEntry<TGenome>> cell in staged._cells)
             _cells.Add(cell.Key, cell.Value);
+        _order = null;
+        _genomeCells = null;
         _best = staged._best;
         Version = version;
         _entries = null;
