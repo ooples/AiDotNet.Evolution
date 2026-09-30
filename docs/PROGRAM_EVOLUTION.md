@@ -110,6 +110,15 @@ request for `Serving` (a caller-provisioned remote boundary) or `InProcessUnsafe
 weakened. A separate process does not isolate the filesystem, network or identity; run hostile
 programs inside a container or VM you provision.
 
+`WarmPythonExecutionEngine` removes most of the per-candidate process start for Python.
+`ProgramSandboxMode.WarmForkWorker` (Linux and macOS) keeps one interpreter warm and forks a fresh child
+for each candidate, so every candidate is still a separate process with its own memory and CPU-time
+limits, reported as `MemoryLimitExceeded` and `CpuTimeLimitExceeded` like the process runner.
+`ProgramSandboxMode.WarmReusedWorker` (any OS) runs candidates one after another in one interpreter, each
+in a fresh namespace. They share a process, so it requires `AllowUnsafeInProcessExecution`, and the
+worker is replaced after a timeout, after a failure and every `RecycleAfter` candidates. The
+`sandbox-overhead` workflow measures what each mode adds per evaluation.
+
 A run is a `ProgramExecuteRequest` (language, source, standard input, allowed languages) and returns
 a `ProgramExecuteResponse`: success, exit code, captured output with truncation flags, and on failure
 a `ProgramExecuteErrorCode` such as `TimeoutOrCanceled`, `CompilationFailed` or `ExecutionFailed`.
