@@ -13,6 +13,10 @@ public sealed partial class EvolutionEngine<TGenome>
     private const int EngineMeasurementOriginSchemaVersion = 7;
     private const int EngineParetoSchemaVersion = 8;
     private const int EngineParetoConstraintSchemaVersion = 9;
+    // A payload whose deduplication set and cache are in store segments (V1-73) records its feature version plus this
+    // offset (10 to 13), so every reader that predates segments refuses it instead of resuming with an empty set.
+    private const int SegmentedSchemaOffset = 4;
+    private const int EngineSegmentedSchemaVersion = EngineStateSchemaVersion + SegmentedSchemaOffset;
     private string? _safePayload;
     private long _safeSequence;
     // The last safe boundary's document, minus the seen set and the cache. Those two grow with every evaluation, so
@@ -75,6 +79,8 @@ public sealed partial class EvolutionEngine<TGenome>
                 }).ToList(),
             Islands = _islands.Select(archive => ArchiveDocument.From(archive, SerializeGenome)).ToList()
         };
+        // Changes between the previous boundary and this one are what the next segment must add.
+        if (_segmentManifest.Count > 0) _unsavedChanges.AddRange(_safeChanges);
         _safeDocument = document;
         _safePayload = null;
         _safeChanges.Clear();
@@ -148,14 +154,16 @@ public sealed partial class EvolutionEngine<TGenome>
 
     private void SetCached(string id, EvolutionTaskResult result)
     {
-        RecordSafeChange(SafeChangeKind.CacheSet, id, _cache.TryGetValue(id, out EvolutionTaskResult? previous) ? previous : null);
+        RecordSafeChange(SafeChangeKind.CacheSet, id, _cache.TryGetValue(id, out EvolutionTaskResult? previous) ? previous : null, result);
         _cache[id] = result;
     }
 
     /// <summary>Records a change to the seen set or the cache so the last safe boundary can be recovered.</summary>
-    private void RecordSafeChange(SafeChangeKind kind, string key, EvolutionTaskResult? previous = null)
+    private void RecordSafeChange(SafeChangeKind kind, string key, EvolutionTaskResult? previous = null,
+        EvolutionTaskResult? value = null)
     {
-        if (_safeDocument is not null) _safeChanges.Add(new SafeChange(kind, key, previous));
+        // Once segments exist every change is kept: the next segment is built from them, not from a full copy.
+        if (_safeDocument is not null || _segmentManifest.Count > 0) _safeChanges.Add(new SafeChange(kind, key, previous, value));
     }
 
     /// <summary>Returns the last safe boundary's payload, serialising it on first use.</summary>
@@ -219,16 +227,30 @@ public sealed partial class EvolutionEngine<TGenome>
         OrderDequeued
     }
 
-    private readonly record struct SafeChange(SafeChangeKind Kind, string Key, EvolutionTaskResult? Previous);
+    private readonly record struct SafeChange(SafeChangeKind Kind, string Key, EvolutionTaskResult? Previous,
+        EvolutionTaskResult? Value = null);
 
     private async Task SaveCheckpointAsync(bool force, CancellationToken cancellationToken)
     {
         if (_checkpointStore is null) return;
         if (!force && (_options.CheckpointInterval == 0 || _commitsSinceCheckpoint < _options.CheckpointInterval)) return;
-        if (SafePayload() is not { } payload) return;
-        var checkpoint = new EvolutionCheckpoint(_options.RunId, _safeSequence, _compatibilityHash, payload,
-            EvolutionCheckpoint.CurrentSchemaVersion, BestQualityAcrossIslands(), _islands[0].Direction);
+        EvolutionCheckpoint checkpoint;
+        if (SegmentStoreForSave() is { } segmentStore)
+        {
+            if (await PrepareSegmentedCheckpointAsync(segmentStore, cancellationToken).ConfigureAwait(false) is not { } segmented)
+                return;
+            checkpoint = segmented;
+        }
+        else
+        {
+            // Switching to inline (an Inline run resuming a segmented checkpoint) drops the segment bookkeeping.
+            if (_segmentManifest.Count > 0) ResetSegments();
+            if (SafePayload() is not { } payload) return;
+            checkpoint = new EvolutionCheckpoint(_options.RunId, _safeSequence, _compatibilityHash, payload,
+                EvolutionCheckpoint.CurrentSchemaVersion, BestQualityAcrossIslands(), _islands[0].Direction);
+        }
         await _checkpointStore.SaveAsync(checkpoint, cancellationToken).ConfigureAwait(false);
+        CommitSegmentedCheckpoint(checkpoint);
         _commitsSinceCheckpoint = 0;
         await NotifyAsync(new EvolutionEvent<TGenome>(EvolutionEventKind.Checkpointed, NextEventSequence(),
             message: $"checkpoint {_safeSequence}"), cancellationToken).ConfigureAwait(false);
@@ -244,6 +266,7 @@ public sealed partial class EvolutionEngine<TGenome>
             throw new InvalidDataException(DescribeIncompatibility(checkpoint));
 
         EngineStateDocument state = ReadStateDocument(checkpoint);
+        await LoadSegmentsAsync(checkpoint, state, cancellationToken).ConfigureAwait(false);
         ValidateConfiguredCheckpointBounds(state);
 
         string[] checkpointSeedPayloads = state.SeedPayloads?.ToArray()
@@ -737,19 +760,21 @@ public sealed partial class EvolutionEngine<TGenome>
         // The outer checkpoint version and the engine-state version are different things, and only the latter says
         // whether the fields this reader expects are present. Without this check a payload from an older engine
         // deserializes into an all-default document and reads back as a complete record of a run that found nothing.
-        if (state is null || (state.SchemaVersion != EngineStateSchemaVersion && state.SchemaVersion != EngineMeasurementOriginSchemaVersion &&
-            state.SchemaVersion != EngineParetoSchemaVersion && state.SchemaVersion != EngineParetoConstraintSchemaVersion))
+        int featureVersion = state is null ? 0 : FeatureVersionOf(state);
+        if (state is null || (featureVersion != EngineStateSchemaVersion && featureVersion != EngineMeasurementOriginSchemaVersion &&
+            featureVersion != EngineParetoSchemaVersion && featureVersion != EngineParetoConstraintSchemaVersion) ||
+            (state.SchemaVersion >= EngineSegmentedSchemaVersion) != (state.Segments is not null))
             throw new InvalidDataException(
                 "The evolution engine state schema is invalid; the checkpoint was written by a different engine version.");
 
         ValidatePackageCheckpointBounds(state);
-        if (HasMeasurementOrigins(state) && state.SchemaVersion < EngineMeasurementOriginSchemaVersion)
+        if (HasMeasurementOrigins(state) && featureVersion < EngineMeasurementOriginSchemaVersion)
             throw new InvalidDataException("Measurement-origin metadata requires the versioned checkpoint schema.");
         var paretoIslands = state.Islands!;
         if (paretoIslands.Any(island => island.Pareto is not null))
         {
             bool declaredConstraints = paretoIslands.Any(island => island.Pareto?.ConstraintCount is not null);
-            if (state.SchemaVersion != (declaredConstraints ? EngineParetoConstraintSchemaVersion : EngineParetoSchemaVersion))
+            if (featureVersion != (declaredConstraints ? EngineParetoConstraintSchemaVersion : EngineParetoSchemaVersion))
                 throw new InvalidDataException("Pareto metadata requires the versioned checkpoint schema.");
             var definition = paretoIslands.First(island => island.Pareto is not null).Pareto!.ToDefinition();
             if ((long)paretoIslands.Count * (definition.Capacity + definition.InfeasibleCapacity) > 4096 ||
@@ -758,7 +783,7 @@ public sealed partial class EvolutionEngine<TGenome>
                 throw new InvalidDataException("Pareto checkpoints require compatible bounded fronts without scalar auxiliary indexes.");
             foreach (var island in paretoIslands) ValidateParetoCheckpointArchive(island, definition);
         }
-        else if (state.SchemaVersion == EngineParetoSchemaVersion || state.SchemaVersion == EngineParetoConstraintSchemaVersion)
+        else if (featureVersion == EngineParetoSchemaVersion || featureVersion == EngineParetoConstraintSchemaVersion)
             throw new InvalidDataException("The Pareto checkpoint schema requires objective metadata.");
         else if (paretoIslands.Any(island => island.InfeasibleEntries is not null))
             throw new InvalidDataException("Infeasible exploration requires versioned Pareto metadata.");

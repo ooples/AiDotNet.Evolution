@@ -262,6 +262,21 @@ public sealed class EvolutionEngineOptions
     /// </remarks>
     public int DeduplicationCapacity { get; set; }
 
+    /// <summary>Gets or sets how checkpoints store the deduplication set and evaluation cache.</summary>
+    /// <remarks>
+    /// <see cref="EvolutionCheckpointFormat.Auto"/>, the default, keeps self-contained checkpoints until the run has
+    /// remembered <see cref="CheckpointSegmentThreshold"/> genomes and then switches to store segments, so a save costs
+    /// what changed instead of everything the run has seen. The format changes how state is stored, not what the search
+    /// does, so it is not part of the compatibility hash and a run can resume under a different one.
+    /// </remarks>
+    public EvolutionCheckpointFormat CheckpointFormat { get; set; } = EvolutionCheckpointFormat.Auto;
+
+    /// <summary>
+    /// Gets or sets how many deduplication and cache entries an <see cref="EvolutionCheckpointFormat.Auto"/> run keeps
+    /// inline before it switches to segments. The default is 50,000.
+    /// </summary>
+    public int CheckpointSegmentThreshold { get; set; } = 50_000;
+
     /// <summary>Gets or sets whether final failed/timed-out identities remain permanently deduplicated.</summary>
     public bool DeduplicateFailedCandidates { get; set; }
 
@@ -560,6 +575,9 @@ public sealed class EvolutionEngineOptions
         if (InspirationCount > EvolutionCollectionLimits.MaximumLineageIdentities)
             throw new ArgumentOutOfRangeException(nameof(InspirationCount));
         if (DeduplicationCapacity < 0) throw new ArgumentOutOfRangeException(nameof(DeduplicationCapacity));
+        if (!Enum.IsDefined(typeof(EvolutionCheckpointFormat), CheckpointFormat))
+            throw new ArgumentOutOfRangeException(nameof(CheckpointFormat));
+        if (CheckpointSegmentThreshold < 1) throw new ArgumentOutOfRangeException(nameof(CheckpointSegmentThreshold));
         Guard.Positive(MaxRetainedFailures);
         if (MaxRetainedFailures > EvolutionCollectionLimits.MaximumResultEntries)
             throw new ArgumentOutOfRangeException(nameof(MaxRetainedFailures));
@@ -689,6 +707,8 @@ public sealed class EvolutionEngineOptions
             Resume = Resume,
             EnableEvaluationCache = EnableEvaluationCache,
             DeduplicationCapacity = DeduplicationCapacity,
+            CheckpointFormat = CheckpointFormat,
+            CheckpointSegmentThreshold = CheckpointSegmentThreshold,
             DeduplicateFailedCandidates = DeduplicateFailedCandidates,
             IslandCount = IslandCount,
             MigrationInterval = MigrationInterval,
@@ -784,7 +804,14 @@ public sealed class EvolutionEngineOptions
         // A substituted clock is provenance, like the worker count; the system clock adds nothing, so existing strings are unchanged.
         .Concat(ReferenceEquals(TimeProvider, TimeProvider.System)
             ? Array.Empty<KeyValuePair<string, string>>()
-            : new[] { Field("clock", TimeProvider.GetType().FullName ?? "custom") }).ToArray();
+            : new[] { Field("clock", TimeProvider.GetType().FullName ?? "custom") })
+        // How checkpoints are stored is provenance too, recorded only when it differs from the default.
+        .Concat(CheckpointFormat == EvolutionCheckpointFormat.Auto
+            ? Array.Empty<KeyValuePair<string, string>>()
+            : new[] { Field("checkpoint-format", CheckpointFormat.ToString()) })
+        .Concat(CheckpointSegmentThreshold == 50_000
+            ? Array.Empty<KeyValuePair<string, string>>()
+            : new[] { Field("checkpoint-segment-threshold", CheckpointSegmentThreshold.ToString(CultureInfo.InvariantCulture)) }).ToArray();
 
     /// <summary>Encodes the semantic options into the string the configuration hash is computed from.</summary>
     internal string ToSemanticCanonicalString() => Encode(SemanticFields());

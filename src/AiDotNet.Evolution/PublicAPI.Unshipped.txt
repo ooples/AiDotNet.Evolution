@@ -2210,3 +2210,11 @@ AiDotNet.Evolution.InMemoryEvolutionCheckpointStore.WriteSegmentAsync(string! ru
 AiDotNet.Evolution.DirectoryEvolutionCheckpointStore.OpenSegmentAsync(string! runId, long segmentId, System.Threading.CancellationToken cancellationToken = default(System.Threading.CancellationToken)) -> System.Threading.Tasks.Task<System.IO.Stream?>!
 AiDotNet.Evolution.DirectoryEvolutionCheckpointStore.WriteSegmentAsync(string! runId, long segmentId, System.Func<System.IO.Stream!, System.Threading.CancellationToken, System.Threading.Tasks.Task!>! write, System.Threading.CancellationToken cancellationToken = default(System.Threading.CancellationToken)) -> System.Threading.Tasks.Task!
 const AiDotNet.Evolution.DirectoryEvolutionCheckpointStore.SegmentDirectoryName = "segments" -> string!
+AiDotNet.Evolution.EvolutionCheckpointFormat
+AiDotNet.Evolution.EvolutionCheckpointFormat.Auto = 0 -> AiDotNet.Evolution.EvolutionCheckpointFormat
+AiDotNet.Evolution.EvolutionCheckpointFormat.Inline = 1 -> AiDotNet.Evolution.EvolutionCheckpointFormat
+AiDotNet.Evolution.EvolutionCheckpointFormat.Segmented = 2 -> AiDotNet.Evolution.EvolutionCheckpointFormat
+AiDotNet.Evolution.EvolutionEngineOptions.CheckpointFormat.get -> AiDotNet.Evolution.EvolutionCheckpointFormat
+AiDotNet.Evolution.EvolutionEngineOptions.CheckpointFormat.set -> void
+AiDotNet.Evolution.EvolutionEngineOptions.CheckpointSegmentThreshold.get -> int
+AiDotNet.Evolution.EvolutionEngineOptions.CheckpointSegmentThreshold.set -> void
