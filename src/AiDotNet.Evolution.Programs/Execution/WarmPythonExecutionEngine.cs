@@ -91,6 +91,7 @@ public sealed class WarmPythonExecutionEngine : IProgramExecutionEngine, IProgra
             "warm-python-execution-v1", _options.Mode.ToString(), _python, _options.RuntimeVersion,
             recycleAfter.ToString(CultureInfo.InvariantCulture), _limits.TimeLimitSeconds.ToString(CultureInfo.InvariantCulture),
             _limits.MemoryLimitMb.ToString(CultureInfo.InvariantCulture), _limits.CpuLimit.ToString("R", CultureInfo.InvariantCulture),
+            _limits.CpuTimeLimitSeconds?.ToString(CultureInfo.InvariantCulture) ?? "derived-cpu-time",
             _limits.MaxStdOutChars.ToString(CultureInfo.InvariantCulture), _limits.MaxStdErrChars.ToString(CultureInfo.InvariantCulture),
             EvolutionHash.Compute(ReadScript())
         });
@@ -169,7 +170,7 @@ public sealed class WarmPythonExecutionEngine : IProgramExecutionEngine, IProgra
                 ["stdin"] = request.StdIn ?? string.Empty,
                 ["time_limit"] = _limits.TimeLimitSeconds,
                 ["memory_bytes"] = _limits.GetMemoryLimitBytes(),
-                ["cpu_seconds"] = (int)Math.Ceiling(_limits.TimeLimitSeconds * _limits.CpuLimit),
+                ["cpu_seconds"] = (int)_limits.GetCpuTimeLimit().TotalSeconds,
                 ["max_stdout"] = _limits.MaxStdOutChars,
                 ["max_stderr"] = _limits.MaxStdErrChars,
                 ["fork"] = _fork
@@ -258,7 +259,11 @@ public sealed class WarmPythonExecutionEngine : IProgramExecutionEngine, IProgra
             StdOutTruncated = reply["stdout_truncated"]?.GetValue<bool>() == true,
             StdErrTruncated = reply["stderr_truncated"]?.GetValue<bool>() == true,
             Error = error,
-            ErrorCode = success ? null : timedOut ? ProgramExecuteErrorCode.TimeoutOrCanceled : ProgramExecuteErrorCode.ExecutionFailed
+            ErrorCode = success ? null
+                : timedOut ? ProgramExecuteErrorCode.TimeoutOrCanceled
+                : memory ? ProgramExecuteErrorCode.MemoryLimitExceeded
+                : cpu ? ProgramExecuteErrorCode.CpuTimeLimitExceeded
+                : ProgramExecuteErrorCode.ExecutionFailed
         };
     }
 
@@ -294,7 +299,10 @@ public sealed class WarmPythonExecutionEngine : IProgramExecutionEngine, IProgra
         }
 
         Process process = Process.Start(start) ?? throw new InvalidOperationException("The Python interpreter did not start.");
-        var worker = new Worker(process, _fork ? null : WindowsJobObject.TryCreate(_limits.GetMemoryLimitBytes()));
+        // No CPU-time limit on the job: a reused worker runs many executions, and job CPU time accumulates across all of
+        // them, so a per-execution budget there would end a healthy worker after enough short runs. The per-execution
+        // CPU limit is the worker's RLIMIT_CPU on each forked child (cpu_seconds in the request).
+        var worker = new Worker(process, _fork ? null : WindowsJobObject.TryCreate(_limits.GetMemoryLimitBytes(), TimeSpan.Zero));
         (JsonNode? ready, _) = await worker.ReadAsync(TimeSpan.FromSeconds(30), cancellationToken).ConfigureAwait(false);
         if (ready?["ready"]?.GetValue<bool>() != true)
         {

@@ -170,6 +170,31 @@ public sealed class WarmPythonExecutionEngineTests
     }
 
     [Fact]
+    public async Task A_forked_candidate_past_a_limit_reports_that_limit()
+    {
+        if (OperatingSystem.IsWindows()) return; // The fork worker does not exist on Windows; CI runs this on Linux.
+        ProgramSandboxOptions options = Options(ProgramSandboxMode.WarmForkWorker, timeLimitSeconds: 20);
+        options.Limits.CpuTimeLimitSeconds = 1;
+        options.Limits.MemoryLimitMb = 128;
+        using var engine = new WarmPythonExecutionEngine(options);
+
+        // The same codes the process engine reports, so a caller need not know which engine ran the candidate.
+        ProgramExecuteResponse busy = await Run(engine, "while True:\n    pass\n");
+        Assert.Equal(ProgramExecuteErrorCode.CpuTimeLimitExceeded, busy.ErrorCode);
+
+        ProgramExecuteResponse greedy = await Run(engine,
+            "chunks = [b'\\x01' * (10 * 1024 * 1024) for _ in range(100)]\nprint('allocated')\n");
+        Assert.Equal(ProgramExecuteErrorCode.MemoryLimitExceeded, greedy.ErrorCode);
+        Assert.DoesNotContain("allocated", greedy.StdOut, StringComparison.Ordinal);
+
+        // A control under both limits, so a worker that reported every run as a violation fails too.
+        ProgramExecuteResponse modest = await Run(engine,
+            "chunks = [b'\\x01' * (10 * 1024 * 1024) for _ in range(2)]\nprint('allocated')\n");
+        Assert.True(modest.Success, modest.Error);
+        Assert.Contains("allocated", modest.StdOut, StringComparison.Ordinal);
+    }
+
+    [Fact]
     public async Task A_forked_candidate_whose_descendant_keeps_its_output_open_still_finishes_on_time()
     {
         if (OperatingSystem.IsWindows()) return; // The fork worker does not exist on Windows; CI runs this on Linux.
@@ -231,6 +256,7 @@ public sealed class WarmPythonExecutionEngineTests
         string baseline = Hash(_ => { });
         Assert.Equal(baseline, Hash(_ => { }));
         Assert.NotEqual(baseline, Hash(limits => limits.CpuLimit = 0.5));
+        Assert.NotEqual(baseline, Hash(limits => limits.CpuTimeLimitSeconds = 3));
         Assert.NotEqual(baseline, Hash(limits => limits.MaxStdOutChars = 17));
         Assert.NotEqual(baseline, Hash(limits => limits.MaxStdErrChars = 17));
     }
