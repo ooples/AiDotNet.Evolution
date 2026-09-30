@@ -41,7 +41,7 @@ against the declared public API, so a type added, removed or reclassified withou
 | `AiDotNet.Evolution.EvolutionCanonicalGenome&lt;TGenome&gt;` | Stable | [Program.cs](../examples/AdaptiveIslandSearch/Program.cs), [CompilerTestSupport](../tests/AiDotNet.Evolution.CSharp.Tests/CompilerTestSupport.cs) |
 | `AiDotNet.Evolution.EvolutionCascadeOptions` | Stable | [RUNNING_AND_RESUMING.md](RUNNING_AND_RESUMING.md), [EvolutionOptionClassificationTests](../tests/AiDotNet.Evolution.Tests/UnitTests/EvolutionOptionClassificationTests.cs) |
 | `AiDotNet.Evolution.EvolutionCellKey` | Stable | [SELECTION_ISLANDS_AND_ARCHIVES.md](SELECTION_ISLANDS_AND_ARCHIVES.md), [CompilerTestSupport](../tests/AiDotNet.Evolution.CSharp.Tests/CompilerTestSupport.cs) |
-| `AiDotNet.Evolution.EvolutionCheckpoint` | Stable | [Program.cs](../examples/DurableSession/Program.cs), [DirectoryEvolutionCheckpointStoreTests](../tests/AiDotNet.Evolution.Tests/UnitTests/DirectoryEvolutionCheckpointStoreTests.cs) |
+| `AiDotNet.Evolution.EvolutionCheckpoint` | Stable | [RUNNING_AND_RESUMING.md](RUNNING_AND_RESUMING.md), [DirectoryEvolutionCheckpointStoreTests](../tests/AiDotNet.Evolution.Tests/UnitTests/DirectoryEvolutionCheckpointStoreTests.cs) |
 | `AiDotNet.Evolution.EvolutionCheckpointContents&lt;TGenome&gt;` | Stable | [PARETO_SEARCH.md](PARETO_SEARCH.md), [EvolutionCheckpointReadingTests](../tests/AiDotNet.Evolution.Tests/UnitTests/EvolutionCheckpointReadingTests.cs) |
 | `AiDotNet.Evolution.EvolutionCheckpointDescriptor` | Stable | [RUNNING_AND_RESUMING.md](RUNNING_AND_RESUMING.md), [DirectoryEvolutionCheckpointStoreTests](../tests/AiDotNet.Evolution.Tests/UnitTests/DirectoryEvolutionCheckpointStoreTests.cs) |
 | `AiDotNet.Evolution.EvolutionCheckpointEntry&lt;TGenome&gt;` | Stable | [RUNNING_AND_RESUMING.md](RUNNING_AND_RESUMING.md), [EvolutionCheckpointReadingTests](../tests/AiDotNet.Evolution.Tests/UnitTests/EvolutionCheckpointReadingTests.cs) |
@@ -225,7 +225,7 @@ against the declared public API, so a type added, removed or reclassified withou
 | `AiDotNet.Evolution.IImmutableEvolutionGenome&lt;TGenome&gt;` | Stable | [DURABLE_EXTERNAL_WORK.md](DURABLE_EXTERNAL_WORK.md), [EvolutionAuditRegressionTests](../tests/AiDotNet.Evolution.Tests/UnitTests/EvolutionAuditRegressionTests.cs) |
 | `AiDotNet.Evolution.IInfeasibleExplorationSelectionPolicy&lt;TGenome&gt;` | Stable | [PARETO_SEARCH.md](PARETO_SEARCH.md), [ParetoArchiveTests](../tests/AiDotNet.Evolution.Tests/UnitTests/ParetoArchiveTests.cs) |
 | `AiDotNet.Evolution.IMigrationPolicy&lt;TGenome&gt;` | Stable | [SELECTION_ISLANDS_AND_ARCHIVES.md](SELECTION_ISLANDS_AND_ARCHIVES.md), [EvolutionMigrationTopologyTests](../tests/AiDotNet.Evolution.Tests/UnitTests/EvolutionMigrationTopologyTests.cs) |
-| `AiDotNet.Evolution.InMemoryEvolutionCheckpointStore` | Stable | [Program.cs](../examples/AdaptiveIslandSearch/Program.cs), [AdaptiveIslandSearchTests](../tests/AiDotNet.Evolution.Tests/UnitTests/AdaptiveIslandSearchTests.cs) |
+| `AiDotNet.Evolution.InMemoryEvolutionCheckpointStore` | Stable | [RUNNING_AND_RESUMING.md](RUNNING_AND_RESUMING.md), [AdaptiveIslandSearchTests](../tests/AiDotNet.Evolution.Tests/UnitTests/AdaptiveIslandSearchTests.cs) |
 | `AiDotNet.Evolution.IOutcomeAwareEvolutionSelectionPolicy&lt;TGenome&gt;` | Stable | [SELECTION_ISLANDS_AND_ARCHIVES.md](SELECTION_ISLANDS_AND_ARCHIVES.md), [EvolutionSelectionPolicyTests](../tests/AiDotNet.Evolution.Tests/UnitTests/EvolutionSelectionPolicyTests.cs) |
 | `AiDotNet.Evolution.IOutcomeAwareVariationOperator&lt;TGenome&gt;` | Stable | [ADAPTIVE_ISLANDS.md](ADAPTIVE_ISLANDS.md), [AdaptiveIslandSearchTests](../tests/AiDotNet.Evolution.Tests/UnitTests/AdaptiveIslandSearchTests.cs) |
 | `AiDotNet.Evolution.ISelectionPolicy&lt;TGenome&gt;` | Stable | [SELECTION_ISLANDS_AND_ARCHIVES.md](SELECTION_ISLANDS_AND_ARCHIVES.md), [EvolutionEngineReachabilityTests](../tests/AiDotNet.Evolution.Tests/UnitTests/EvolutionEngineReachabilityTests.cs) |
@@ -289,6 +289,7 @@ against the declared public API, so a type added, removed or reclassified withou
 | `AiDotNet.Evolution.EvolutionWorkServerEvent` | Stable | [DURABLE_WORKER_PROTOCOL.md](DURABLE_WORKER_PROTOCOL.md), [EvolutionWorkServerTests](../tests/AiDotNet.Evolution.Tests/UnitTests/EvolutionWorkServerTests.cs) |
 | `AiDotNet.Evolution.EvolutionWorkServerEventKind` | Stable | [DURABLE_WORKER_PROTOCOL.md](DURABLE_WORKER_PROTOCOL.md), [EvolutionWorkServerTests](../tests/AiDotNet.Evolution.Tests/UnitTests/EvolutionWorkServerTests.cs) |
 | `AiDotNet.Evolution.EvolutionWorkServerOptions` | Stable | [DURABLE_WORKER_PROTOCOL.md](DURABLE_WORKER_PROTOCOL.md), [EvolutionWorkServerTests](../tests/AiDotNet.Evolution.Tests/UnitTests/EvolutionWorkServerTests.cs) |
+| `AiDotNet.Evolution.IEvolutionCheckpointSegmentStore` | Stable | [RUNNING_AND_RESUMING.md](RUNNING_AND_RESUMING.md), [EvolutionCheckpointSegmentStoreTests](../tests/AiDotNet.Evolution.Tests/UnitTests/EvolutionCheckpointSegmentStoreTests.cs) |
 
 ## AiDotNet.Evolution.CSharp
 

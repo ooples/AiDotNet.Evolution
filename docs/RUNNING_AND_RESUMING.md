@@ -116,6 +116,13 @@ Two stores ship:
   file, newest first, including files that failed to load, with each one's sequence, size, validity
   and best quality.
 
+A store can also implement `IEvolutionCheckpointSegmentStore`, which keeps append-only segments beside
+its checkpoints: `WriteSegmentAsync` writes one atomically and `OpenSegmentAsync` reads it back.
+A checkpoint lists the segments it needs in `EvolutionCheckpoint.SegmentIds` (`WithSegmentIds` sets
+them), and the store must keep every segment a retained checkpoint names. `DirectoryEvolutionCheckpointStore`
+stores them under its `segments` subdirectory and deletes those no retained snapshot names;
+`InMemoryEvolutionCheckpointStore` keeps those of its latest checkpoint.
+
 Both stores have `ForOutputDirectory(outputDirectory, runId, ...)`, which places files through
 `EvolutionOutputLayout`. The layout derives every path a run writes (the checkpoints and traces
 folders, the checkpoint path and trace paths) from one output directory and run id, so the CLI and
