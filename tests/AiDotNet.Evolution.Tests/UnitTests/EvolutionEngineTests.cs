@@ -327,14 +327,48 @@ public sealed class EvolutionEngineTests
         var task = new CooperativeBlockingEvolutionTask();
         EvolutionEngineOptions options = Options(2, 1, 1);
         options.TimeLimit = TimeSpan.FromMilliseconds(25);
+        // The limit must fall while the seed is being evaluated. With the real clock a slow start (a cold net471 JIT)
+        // spent the whole 25 ms before the evaluation began, so the clock now advances only once it is running.
+        var clock = new Microsoft.Extensions.Time.Testing.FakeTimeProvider();
+        options.TimeProvider = clock;
         var engine = new EvolutionEngine<TestGenome>(task, new IncrementVariation(), _ => TestArchive(), options);
 
-        EvolutionRunResult<TestGenome> result = await engine.RunAsync(new[] { new TestGenome(1) });
+        Task<EvolutionRunResult<TestGenome>> running = engine.RunAsync(new[] { new TestGenome(1) });
+        var started = System.Diagnostics.Stopwatch.StartNew();
+        while (task.Calls == 0 && started.Elapsed < TimeSpan.FromSeconds(30)) await Task.Delay(5);
+        clock.Advance(TimeSpan.FromMilliseconds(25));
+        EvolutionRunResult<TestGenome> result = await running;
 
         Assert.Equal(EvolutionStopReason.TimeLimitReached, result.StopReason);
         Assert.Equal(1, task.Calls);
         Assert.Equal(0, result.Counters.Proposals);
         Assert.Equal(0, result.Counters.EvaluationAttempts);
+    }
+
+    // Every read of the clock moves it on by a fixed step, so where a limit falls depends only on how many reads happen.
+    private sealed class SteppingClock(TimeSpan step) : TimeProvider
+    {
+        private long _ticks;
+        public override long TimestampFrequency => TimeSpan.TicksPerSecond;
+        public override long GetTimestamp() => Interlocked.Add(ref _ticks, step.Ticks) - step.Ticks;
+    }
+
+    [Theory]
+    [InlineData(EvolutionDispatchMode.Batch)]
+    [InlineData(EvolutionDispatchMode.Continuous)]
+    public async Task A_time_limit_reached_while_building_a_batch_is_the_stop_reason(EvolutionDispatchMode dispatch)
+    {
+        // The limit passes between the check at the top of the loop and the one inside the batch, so the batch is
+        // abandoned before anything is proposed. That empty batch used to be reported as NoCandidates.
+        EvolutionEngineOptions options = Options(8, 2, 1);
+        options.Dispatch = dispatch;
+        options.TimeLimit = TimeSpan.FromMinutes(10);
+        options.TimeProvider = new SteppingClock(TimeSpan.FromMinutes(6));
+        var engine = new EvolutionEngine<TestGenome>(new SyntheticEvolutionTask(), new IncrementVariation(), _ => TestArchive(), options);
+
+        EvolutionRunResult<TestGenome> result = await engine.RunAsync(new[] { new TestGenome(1) });
+
+        Assert.Equal(EvolutionStopReason.TimeLimitReached, result.StopReason);
     }
 
     [Fact]
