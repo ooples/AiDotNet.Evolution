@@ -4,8 +4,12 @@ using System.Globalization;
 
 namespace AiDotNet.Evolution.Programs.Novelty;
 
+/// <summary>Checks a candidate for novelty against the programs it has accepted before evaluating it.</summary>
+/// <remarks>A candidate judged not novel is rejected (or, in advisory mode, evaluated and flagged) without calling
+/// the inner evaluator. Accepted candidates are remembered for later comparisons.</remarks>
 public sealed class NoveltyGatingProgramFitnessEvaluator : IProgramFitnessEvaluator
 {
+    /// <summary>The diagnostic code of a novelty rejection.</summary>
     public const string RejectionCode = "program_not_novel";
 
     private readonly IProgramFitnessEvaluator _inner;
@@ -78,18 +82,25 @@ public sealed class NoveltyGatingProgramFitnessEvaluator : IProgramFitnessEvalua
 
     private long _advisedCount;
 
+    /// <inheritdoc />
     public string Id { get; }
 
+    /// <inheritdoc />
     public string VersionHash { get; }
 
+    /// <summary>Gets the evaluator novel candidates are passed to.</summary>
     public IProgramFitnessEvaluator Inner => _inner;
 
+    /// <summary>Gets the novelty policy.</summary>
     public ProgramNoveltyPolicy Policy => _policy;
 
+    /// <summary>Gets how many candidates were judged novel.</summary>
     public long AcceptedCount => Interlocked.Read(ref _acceptedCount);
 
+    /// <summary>Gets how many candidates were judged not novel.</summary>
     public long RejectedCount => Interlocked.Read(ref _rejectedCount);
 
+    /// <summary>Gets how many programs are remembered for comparison.</summary>
     public int TrackedCount
     {
         get
@@ -98,11 +109,16 @@ public sealed class NoveltyGatingProgramFitnessEvaluator : IProgramFitnessEvalua
         }
     }
 
+    /// <summary>Returns the most recent decision.</summary>
+    /// <returns>The decision, or <c>null</c> before the first evaluation or after <see cref="Reset"/>.</returns>
     public ProgramNoveltyDecision? GetLastDecision()
     {
         lock (_gate) return _lastDecision;
     }
 
+    /// <summary>Adds a program to compare later candidates against, for example a seed or a restored elite.</summary>
+    /// <param name="genome">The program.</param>
+    /// <exception cref="InvalidOperationException">An evaluation is in progress.</exception>
     public void Remember(ProgramGenome genome)
     {
         ProgramGuard.NotNull(genome);
@@ -115,6 +131,8 @@ public sealed class NoveltyGatingProgramFitnessEvaluator : IProgramFitnessEvalua
     public IReadOnlyList<ProgramGenome> GetRememberedGenomes()
     { lock (_gate) return Array.AsReadOnly(_accepted.ToArray()); }
 
+    /// <summary>Forgets every remembered program and the last decision.</summary>
+    /// <exception cref="InvalidOperationException">An evaluation is in progress.</exception>
     public void Reset()
     {
         if (!_serial.Wait(0)) throw new InvalidOperationException("Cannot reset during evaluation.");
@@ -122,6 +140,7 @@ public sealed class NoveltyGatingProgramFitnessEvaluator : IProgramFitnessEvalua
         finally { _serial.Release(); }
     }
 
+    /// <inheritdoc />
     public async ValueTask<EvolutionTaskResult> EvaluateAsync(
         ProgramGenome candidate,
         EvolutionEvaluationContext context,

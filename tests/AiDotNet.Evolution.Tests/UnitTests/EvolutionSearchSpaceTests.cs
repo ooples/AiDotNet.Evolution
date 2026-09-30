@@ -12,6 +12,17 @@ public sealed class EvolutionSearchSpaceTests
         .Add(EvolutionParameter.Real("mix", -1, 1))
         .Add(EvolutionParameter.Integer("fixed", 7, 7))
         .Build();
+
+    [Fact]
+    public void A_condition_names_its_parent_and_the_values_that_activate_it()
+    {
+        EvolutionParameter depth = EvolutionParameter.Integer("depth", 1, 20).When("model", EvolutionParameterValue.Categorical("tree"));
+        EvolutionParameterCondition condition = Assert.Single(depth.Conditions);
+        Assert.Equal("model", condition.Parameter);
+        Assert.Equal(EvolutionParameterValue.Categorical("tree"), Assert.Single(condition.AnyOf));
+        Assert.Equal(EvolutionParameterKind.Integer, depth.Kind);
+        Assert.Equal(EvolutionParameterKind.Logarithmic, EvolutionParameter.Logarithmic("rate", 0.001, 1).Kind);
+    }
     internal static EvolutionSearchSpace Continuous(int dimensions = 2)
     {
         var builder = new EvolutionSearchSpaceBuilder();
@@ -235,7 +246,8 @@ public sealed class EvolutionSearchSpaceTests
             return new ValueTask<EvolutionTaskResult>(new EvolutionTaskResult(EvolutionEvaluationStatus.Completed,
                 direction == EvolutionOptimizationDirection.Maximize ? -square : square, direction, costUnits: 1));
         }, "square-v1", 1, steps: 32, direction: direction);
-        EvolutionSearchGenome result = await refiner.RefineAsync(seed, new EvolutionRefinementContext(0, StableRandom.CreateStream(4, 0)));
+        ICandidateRefiner<EvolutionSearchGenome> engineView = refiner;
+        EvolutionSearchGenome result = await engineView.RefineAsync(seed, new EvolutionRefinementContext(0, StableRandom.CreateStream(4, 0)));
         Assert.True(Math.Abs(result.Number("x0")) < 4); Assert.Equal(4, seed.Number("x0")); Assert.NotSame(seed, result);
         Assert.Equal(33, calls); Assert.Equal(33, ledger.Snapshot().Spent["cost_units"]);
         Assert.All(ledger.Snapshot().Receipts, receipt => Assert.Equal(EvolutionResourceStage.Refinement, receipt.Stage));

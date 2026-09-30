@@ -12,7 +12,7 @@ public sealed class EvolutionMetricQueryTests
             Entry(2, 90, Metrics(("accuracy", 0.1), ("latency", 10))));
 
         Assert.Equal(90, archive.Best?.Evaluation.Quality);
-        Assert.Equal(0.5, archive.BestBy("accuracy")?.Evaluation.Metrics["accuracy"]);
+        Assert.Equal(0.5, EvolutionArchiveQuery.BestBy(archive, "accuracy")?.Evaluation.Metrics["accuracy"]);
         Assert.Equal(10,
             archive.BestBy("latency", EvolutionOptimizationDirection.Minimize)?.Evaluation.Metrics["latency"]);
     }

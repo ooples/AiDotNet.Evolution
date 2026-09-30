@@ -3,10 +3,23 @@
 
 namespace AiDotNet.Evolution.Programs.Novelty;
 
+/// <summary>Whether a candidate program was judged novel, which stage decided, and what the decision cost.</summary>
 public sealed class ProgramNoveltyDecision
 {
+    /// <summary>The longest kept reason; longer reasons are truncated.</summary>
     public const int MaxReasonLength = 240;
 
+    /// <summary>Records a novelty decision.</summary>
+    /// <param name="isNovel">Whether the candidate is novel.</param>
+    /// <param name="decidedBy">The stage that made the decision.</param>
+    /// <param name="reason">Why; truncated to <see cref="MaxReasonLength"/> characters.</param>
+    /// <param name="nearestGenomeId">The closest existing program, if one was compared.</param>
+    /// <param name="nearestStructuralDistance">Its structural distance, if computed.</param>
+    /// <param name="embeddingSimilarity">Its embedding cosine similarity, if computed.</param>
+    /// <param name="structuralComparisons">How many structural distances were computed.</param>
+    /// <param name="embeddingRequests">How many embedding requests were sent.</param>
+    /// <param name="judgeRequests">How many model-judge requests were sent.</param>
+    /// <exception cref="ArgumentOutOfRangeException">A count is negative, a measurement is not finite, or the stage is undefined.</exception>
     public ProgramNoveltyDecision(
         bool isNovel,
         ProgramNoveltyStage decidedBy,
@@ -41,29 +54,41 @@ public sealed class ProgramNoveltyDecision
         JudgeRequests = judgeRequests;
     }
 
+    /// <summary>Gets whether the candidate is novel.</summary>
     public bool IsNovel { get; }
 
+    /// <summary>Gets the stage that decided.</summary>
     public ProgramNoveltyStage DecidedBy { get; }
 
+    /// <summary>Gets why, at most <see cref="MaxReasonLength"/> characters.</summary>
     public string Reason { get; }
 
+    /// <summary>Gets the closest existing program, or <c>null</c>.</summary>
     public string? NearestGenomeId { get; }
 
+    /// <summary>Gets the structural distance to the closest program, or <c>null</c>.</summary>
     public double? NearestStructuralDistance { get; }
 
+    /// <summary>Gets the embedding cosine similarity to the closest program, or <c>null</c>.</summary>
     public double? EmbeddingSimilarity { get; }
 
+    /// <summary>Gets how many structural distances were computed.</summary>
     public int StructuralComparisons { get; }
 
+    /// <summary>Gets how many embedding requests were sent.</summary>
     public int EmbeddingRequests { get; }
 
+    /// <summary>Gets how many model-judge requests were sent.</summary>
     public int JudgeRequests { get; }
 
+    /// <summary>Gets whether the decision needed no paid request.</summary>
     public bool WasFree => EmbeddingRequests == 0 && JudgeRequests == 0;
 
     /// <summary>One task work unit per embedding or judge request; not a monetary or token charge.</summary>
     public double CostUnits => (double)EmbeddingRequests + JudgeRequests;
 
+    /// <summary>Summarises the verdict, deciding stage and request counts.</summary>
+    /// <returns>A short description.</returns>
     public override string ToString() =>
         (IsNovel ? "novel" : "not-novel") + " by " + DecidedBy +
         " (embeddings=" + EmbeddingRequests.ToString(System.Globalization.CultureInfo.InvariantCulture) +

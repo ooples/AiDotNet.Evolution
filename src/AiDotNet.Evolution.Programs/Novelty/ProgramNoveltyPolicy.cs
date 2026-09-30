@@ -4,6 +4,11 @@ using System.Globalization;
 
 namespace AiDotNet.Evolution.Programs.Novelty;
 
+/// <summary>Decides whether a candidate is novel in up to three stages, cheapest first.</summary>
+/// <remarks>A structural distance at or above the threshold is novel for free. Otherwise, when an embedding client is
+/// set, the nearest neighbours are embedded and a similarity below the threshold is novel. Otherwise, when a judge is
+/// set, it compares the candidate with its most similar neighbour. Without optional stages, a structurally close
+/// candidate is not novel.</remarks>
 public sealed class ProgramNoveltyPolicy
 {
     private readonly EmbeddingNoveltyOptions _options;
@@ -18,6 +23,11 @@ public sealed class ProgramNoveltyPolicy
     private long _judgeRequests;
     private long _freeDecisions;
 
+    /// <summary>Creates a policy.</summary>
+    /// <param name="options">Thresholds and limits, or <c>null</c> for the defaults.</param>
+    /// <param name="structuralDistance">The structural distance, or <c>null</c> for <see cref="ProgramTokenSetDistance"/>.</param>
+    /// <param name="embeddingClient">Enables the embedding stage, or <c>null</c>.</param>
+    /// <param name="judge">Enables the model-judge stage, or <c>null</c>.</param>
     public ProgramNoveltyPolicy(
         EmbeddingNoveltyOptions? options = null,
         IGenomeDistance<ProgramGenome>? structuralDistance = null,
@@ -38,26 +48,43 @@ public sealed class ProgramNoveltyPolicy
         });
     }
 
+    /// <summary>Gets the thresholds and limits.</summary>
     public EmbeddingNoveltyOptions Options => _options;
 
+    /// <summary>Gets the structural distance.</summary>
     public IGenomeDistance<ProgramGenome> StructuralDistance => _structuralDistance;
 
+    /// <summary>Gets whether the embedding stage is enabled.</summary>
     public bool HasEmbeddingStage => _embeddingDistance is not null;
 
+    /// <summary>Gets whether the model-judge stage is enabled.</summary>
     public bool HasJudgeStage => _judge is not null;
 
+    /// <summary>Gets how many decisions were made.</summary>
     public long Decisions => Interlocked.Read(ref _decisions);
 
+    /// <summary>Gets how many structural distances were computed.</summary>
     public long StructuralComparisons => Interlocked.Read(ref _structuralComparisons);
 
+    /// <summary>Gets how many embedding requests were sent.</summary>
     public long EmbeddingRequests => _embeddingDistance?.PrimeRequests ?? 0;
 
+    /// <summary>Gets how many judge requests were sent.</summary>
     public long JudgeRequests => Interlocked.Read(ref _judgeRequests);
 
+    /// <summary>Gets how many decisions needed no paid request.</summary>
     public long FreeDecisions => Interlocked.Read(ref _freeDecisions);
 
+    /// <summary>Gets the identity of the options and every stage.</summary>
     public string VersionHash { get; }
 
+    /// <summary>Decides whether a candidate is novel against known programs. Decisions are made one at a time.</summary>
+    /// <param name="candidate">The candidate.</param>
+    /// <param name="known">The programs to compare against, at most <see cref="EmbeddingNoveltyOptions.MaxTrackedGenomes"/>.</param>
+    /// <param name="cancellationToken">Cancels the decision.</param>
+    /// <returns>The decision, its deciding stage and its cost.</returns>
+    /// <exception cref="ArgumentException">The known set is too large or holds a null program.</exception>
+    /// <exception cref="InvalidOperationException">A stage's identity changed, or the structural distance left [0, 1].</exception>
     public async ValueTask<ProgramNoveltyDecision> EvaluateAsync(
         ProgramGenome candidate,
         IReadOnlyList<ProgramGenome> known,

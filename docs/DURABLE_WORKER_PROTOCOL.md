@@ -49,6 +49,11 @@ using var worker = await EvolutionWorkRemoteClient.ConnectAsync(host, 7070, fing
 string reply = await worker.SendAsync(claimJson);
 ```
 
+Each `EvolutionWorkServerEvent` passed to `OnEvent` carries its `EvolutionWorkServerEventKind`, the remote endpoint
+and, for `Faulted`, the exception. `AuthenticationRefused` (a failed TLS handshake or a wrong token),
+`OperationRefused` (an operation remote workers may not perform) and `ConnectionLimitReached` are the ones to
+alert on; the others trace connections through `Listening`, `Accepted`, `Authenticated` and `Closed`.
+
 A worker that dies keeps its lease until the lease expires. The coordinator then re-issues the
 work under a new lease, and a late commit from the dead worker's lease is `stale`. Batch
 dispatch commits whole batches, so that delay cannot change the run.

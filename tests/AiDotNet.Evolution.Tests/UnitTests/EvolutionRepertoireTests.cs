@@ -16,14 +16,14 @@ public sealed class EvolutionRepertoireTests
         string json = repertoire.ToJson();
         var restored = EvolutionRepertoire.FromJson(json);
         Assert.Equal(json, restored.ToJson());
-        Assert.Equal(new[] { "1", "2", "3" }, restored.Entries.Select(entry => entry.SourceGenomeId));
+        Assert.Equal(new[] { "1", "2", "3" }, restored.Entries.Select((EvolutionRepertoireEntry entry) => entry.SourceGenomeId));
         Assert.Equal(0, task.Evaluations);
-        var imported = await restored.ImportAsync(task, codec, Scope(task, codec));
+        EvolutionRepertoireImport<int> imported = await restored.ImportAsync(task, codec, Scope(task, codec));
         Assert.True(imported.IsExactScopeMatch);
         Assert.Equal(0, imported.RejectedCount);
         Assert.Equal(0, imported.DuplicateCount);
         Assert.Equal(3, imported.Decisions.Count);
-        Assert.All(imported.Decisions, decision =>
+        Assert.All(imported.Decisions, (EvolutionRepertoireImportDecision decision) =>
         {
             Assert.Equal(EvolutionRepertoireImportStatus.Accepted, decision.Status);
             Assert.Equal(decision.SourceGenomeId, decision.CurrentGenomeId);

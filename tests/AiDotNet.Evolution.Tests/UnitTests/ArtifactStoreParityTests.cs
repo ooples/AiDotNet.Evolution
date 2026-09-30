@@ -66,7 +66,7 @@ public sealed class ArtifactStoreParityTests : IDisposable
     public async Task Large_text_is_spilled_in_full_and_the_evaluation_keeps_a_bounded_preview()
     {
         string log = string.Concat(Enumerable.Range(0, 400).Select(i => "line " + i + "\n"));
-        var store = new DirectoryEvolutionArtifactStore(_root);
+        IEvolutionArtifactStore store = new DirectoryEvolutionArtifactStore(_root);
         EvolutionEvaluation evaluation = await FirstEvaluation(() => new[] { new EvolutionArtifact("stderr", log) }, a => a.Store = store);
 
         EvolutionArtifact kept = Assert.Single(evaluation.Artifacts);

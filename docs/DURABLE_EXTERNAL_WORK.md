@@ -224,3 +224,16 @@ primitives, enums and the documented immutable BCL values remain implicit; ordin
 dynamic-code-enabled managed execution retains recursive value-field inspection. Additional
 probe cases check explicit struct ownership and actual completed-boundary checkpoint
 serialization/resume. They do not claim arbitrary partial-batch crash continuation.
+
+## Result and lease types
+
+- `EvolutionSession<TGenome>.AskAsync` hands out `EvolutionAskItem<TGenome>` values: the candidate,
+  its evaluation context and id, and the `WorkIdentity` that durable delivery fences on.
+- `DurableEvolutionWorkCoordinator.Heartbeat` returns an `EvolutionWorkHeartbeat`: `Renewed`,
+  `Expired`, `Canceled`, `Completed` or `UnknownLease`. A worker that gets anything but `Renewed`
+  should stop evaluating, because its result will not be accepted. After `Expired` or `Canceled`
+  it should still `Commit` its actual resources: the lease stays reserved at its maximum until
+  that final receipt arrives, and a late receipt settles the original reservation exactly once.
+  `Completed` and `UnknownLease` need no further call.
+- `GetResult` and `GetDeliveryResult` return `EvolutionCommittedWork`: the identity, payload,
+  provenance, actual resources and outcome of a stored result, and whether it was accepted.

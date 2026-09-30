@@ -132,7 +132,9 @@ public sealed partial class AdaptiveIslandSearchTests
         Assert.Equal(new[] { 0, 1 }, restoreOrder);
         Assert.Equal(checkpoint, target.Policy.CaptureState());
         Assert.Equal(generations, target.Policy.Statistics.Sum(island => island.Proposals));
-        Assert.Equal(Math.Min(256, generations), target.Policy.RecentDecisions.Count);
+        IReadOnlyList<EvolutionIslandDecision> decisions = target.Policy.RecentDecisions;
+        Assert.Equal(Math.Min(256, generations), decisions.Count);
+        Assert.All(decisions, decision => Assert.InRange(decision.Island, 0, restoreOrder.Count - 1));
     }
 
     [Fact]
