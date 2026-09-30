@@ -31,7 +31,7 @@ public sealed partial class EvolutionEngine<TGenome>
     }
 
     /// <summary>Allocates identity and selects inputs on the single writer, without invoking a proposal backend.</summary>
-    private VariationRequest? CreateVariationRequest(Dictionary<int, PipelineArchiveContext>? snapshots = null)
+    private VariationRequest? CreateVariationRequest(Dictionary<int, PipelineArchiveContext>? snapshots = null, long committedBefore = 0)
     {
         long evaluationId = _nextEvaluationId;
         int island = (int)(evaluationId % _islands.Length);
@@ -94,7 +94,7 @@ public sealed partial class EvolutionEngine<TGenome>
             .Concat(selection.Inspirations.Select(entry => FingerprintPipelineEvaluation(entry.Evaluation))));
         var context = snapshots is null
             ? new EvolutionVariationContext<TGenome>(selection.Parent, selection.Inspirations, proposalRandom, generation, island, parentArtifacts, view)
-            : new EvolutionVariationContext<TGenome>(selection.Parent, selection.Inspirations, proposalRandom, generation, island, parentArtifacts, view, identity!, evaluationId);
+            : new EvolutionVariationContext<TGenome>(selection.Parent, selection.Inspirations, proposalRandom, generation, island, parentArtifacts, view, identity!, evaluationId, committedBefore);
         return new VariationRequest(evaluationId, island, lineage, context);
     }
 

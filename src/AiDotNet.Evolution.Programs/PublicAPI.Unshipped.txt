@@ -1788,6 +1788,9 @@ AiDotNet.Evolution.Programs.ProgramExecuteErrorCode.MemoryLimitExceeded = 10 -> 
 AiDotNet.Evolution.Programs.ProgramSandboxLimitOptions.CpuTimeLimitSeconds.get -> int?
 AiDotNet.Evolution.Programs.ProgramSandboxLimitOptions.CpuTimeLimitSeconds.set -> void
 AiDotNet.Evolution.Programs.ProgramSandboxLimitOptions.GetCpuTimeLimit() -> System.TimeSpan
+AiDotNet.Evolution.Programs.LlmProgramVariationOperator.SupportsDeterministicConcurrency.get -> bool
+AiDotNet.Evolution.Programs.LlmProgramVariationOptions.ConcurrentProposals.get -> bool
+AiDotNet.Evolution.Programs.LlmProgramVariationOptions.ConcurrentProposals.set -> void
 AiDotNet.Evolution.Programs.ProgramSandboxMode.WarmForkWorker = 3 -> AiDotNet.Evolution.Programs.ProgramSandboxMode
 AiDotNet.Evolution.Programs.ProgramSandboxMode.WarmReusedWorker = 4 -> AiDotNet.Evolution.Programs.ProgramSandboxMode
 AiDotNet.Evolution.Programs.WarmPythonExecutionEngine
