@@ -130,6 +130,13 @@ public sealed partial class EvolutionDeploymentLifecycleTests : IDisposable
         Assert.Equal(EvolutionDeploymentOutcome.InvalidValidation, result.Outcome);
         Assert.Equal(1, calls);
         Assert.NotEmpty(Registry().ReadEvidence(result.EvidenceId!));
+        // Schema-1 rejection evidence names its reason; it must not become the enum's number.
+        string evidenceId = Assert.IsType<string>(result.EvidenceId);
+        using (var evidence = System.Text.Json.JsonDocument.Parse(Registry().ReadEvidence(evidenceId)))
+        {
+            Assert.Equal(1, evidence.RootElement.GetProperty("SchemaVersion").GetInt32());
+            Assert.Equal("InvalidValidation", evidence.RootElement.GetProperty("Reason").GetString());
+        }
         Assert.True(lifecycle.Select(Envelope()).IsFallback);
     }
 

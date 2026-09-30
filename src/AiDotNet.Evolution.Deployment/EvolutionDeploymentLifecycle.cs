@@ -222,7 +222,9 @@ public sealed class EvolutionDeploymentLifecycle
                 CandidateId = candidate.Id,
                 IncumbentId = incumbent.Id,
                 EnvelopeKey = candidate.Envelope.Key,
-                Reason = reason,
+                // Schema 1 records the reason by name. The outcome became an enum, which System.Text.Json writes as a
+                // number, so it is named explicitly to keep retained evidence readable by schema-1 consumers.
+                Reason = reason.ToString(),
                 Observations = observations
             })));
     }
