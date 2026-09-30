@@ -15,6 +15,11 @@ public sealed partial class EvolutionEngine<TGenome>
     private const int EngineParetoConstraintSchemaVersion = 9;
     private string? _safePayload;
     private long _safeSequence;
+    // The last safe boundary's document, minus the seen set and the cache. Those two grow with every evaluation, so
+    // serialising them at each boundary made a checkpointed run quadratic: 84 s for 20,000 evaluations, almost all of it
+    // here (V1-73). They are recovered when a save needs them, by undoing the changes logged since the boundary.
+    private EngineStateDocument? _safeDocument;
+    private readonly List<SafeChange> _safeChanges = new();
 
     private void CaptureSafeState(TGenome[] seeds, int seedIndex)
     {
@@ -51,12 +56,7 @@ public sealed partial class EvolutionEngine<TGenome>
                 Status = pair.Key,
                 Count = pair.Value
             }).ToList(),
-            SeenGenomeIds = _seen.OrderBy(value => value, StringComparer.Ordinal).ToList(),
-            Cache = _cache.OrderBy(pair => pair.Key, StringComparer.Ordinal).Select(pair => new CacheDocument
-            {
-                GenomeId = pair.Key,
-                Result = TaskResultDocument.From(pair.Value)
-            }).ToList(),
+
             Failures = _failures.Select(DiagnosticDocument.From).ToList(),
             EarlyStoppingBest = _earlyStoppingBest,
             EarlyStoppingArchiveMetric = UsesIncrementalEarlyStoppingArchiveMetric() &&
@@ -75,9 +75,126 @@ public sealed partial class EvolutionEngine<TGenome>
                 }).ToList(),
             Islands = _islands.Select(archive => ArchiveDocument.From(archive, SerializeGenome)).ToList()
         };
+        _safeDocument = document;
+        _safePayload = null;
+        _safeChanges.Clear();
+        _safeSequence++;
+    }
+
+    // Every change to the seen set or the cache goes through these, so a deferred safe state can be recovered.
+    private bool AddSeen(string id)
+    {
+        if (!_seen.Add(id)) return false;
+        RecordSafeChange(SafeChangeKind.SeenAdded, id);
+        return true;
+    }
+
+    private void RemoveSeen(string id)
+    {
+        if (_seen.Remove(id)) RecordSafeChange(SafeChangeKind.SeenRemoved, id);
+    }
+
+    // Called once per committed item. With a capacity, a newly remembered genome joins the queue and the oldest beyond
+    // the capacity is forgotten from both the seen set and the cache.
+    private void RememberCommitted(WorkItem item)
+    {
+        int capacity = _options.DeduplicationCapacity;
+        if (capacity <= 0 || !item.AddedToSeen || item.Candidate is null) return;
+        string id = item.Candidate.CanonicalGenome.Id;
+        if (!_seen.Contains(id)) return;
+        _deduplicationOrder.Enqueue(id);
+        RecordSafeChange(SafeChangeKind.OrderEnqueued, id);
+    }
+
+    // Once per commit batch: forgets the oldest remembered genomes beyond the capacity. A genome an archive, the
+    // global elite index, an island history or the pending-artifact queue still holds is kept and moved to the back,
+    // since forgetting it would let the same elite be evaluated again; those structures are bounded, so the excess is.
+    private void EnforceDeduplicationCapacity()
+    {
+        int capacity = _options.DeduplicationCapacity;
+        if (capacity <= 0 || _deduplicationOrder.Count <= capacity) return;
+        HashSet<string> held = HeldGenomeIds();
+        int passes = _deduplicationOrder.Count;
+        while (_deduplicationOrder.Count > capacity && passes-- > 0)
+        {
+            string oldest = _deduplicationOrder.Dequeue();
+            RecordSafeChange(SafeChangeKind.OrderDequeued, oldest);
+            if (held.Contains(oldest))
+            {
+                _deduplicationOrder.Enqueue(oldest);
+                RecordSafeChange(SafeChangeKind.OrderEnqueued, oldest);
+                continue;
+            }
+            RemoveSeen(oldest);
+            if (_cache.TryGetValue(oldest, out EvolutionTaskResult? previous))
+            {
+                RecordSafeChange(SafeChangeKind.CacheRemoved, oldest, previous);
+                _cache.Remove(oldest);
+            }
+        }
+    }
+
+    private HashSet<string> HeldGenomeIds()
+    {
+        var held = new HashSet<string>(StringComparer.Ordinal);
+        foreach (IEvolutionArchive<TGenome> archive in _islands)
+            foreach (EvolutionArchiveEntry<TGenome> entry in archive.Entries) held.Add(entry.Evaluation.GenomeId);
+        foreach (EvolutionEliteRecord<TGenome> record in _globalElites.Entries) held.Add(record.Entry.Evaluation.GenomeId);
+        foreach (EvolutionIslandHistory<TGenome> history in _histories)
+            foreach (EvolutionArchiveEntry<TGenome> entry in history.Entries) held.Add(entry.Evaluation.GenomeId);
+        foreach (string genomeId in _pendingArtifactOrder) held.Add(genomeId);
+        return held;
+    }
+
+    private void SetCached(string id, EvolutionTaskResult result)
+    {
+        RecordSafeChange(SafeChangeKind.CacheSet, id, _cache.TryGetValue(id, out EvolutionTaskResult? previous) ? previous : null);
+        _cache[id] = result;
+    }
+
+    /// <summary>Records a change to the seen set or the cache so the last safe boundary can be recovered.</summary>
+    private void RecordSafeChange(SafeChangeKind kind, string key, EvolutionTaskResult? previous = null)
+    {
+        if (_safeDocument is not null) _safeChanges.Add(new SafeChange(kind, key, previous));
+    }
+
+    /// <summary>Returns the last safe boundary's payload, serialising it on first use.</summary>
+    private string? SafePayload()
+    {
+        if (_safePayload is not null || _safeDocument is not { } document) return _safePayload;
+        var seen = new HashSet<string>(_seen, StringComparer.Ordinal);
+        var cache = new Dictionary<string, EvolutionTaskResult>(_cache, StringComparer.Ordinal);
+        var order = new List<string>(_deduplicationOrder);
+        for (int i = _safeChanges.Count - 1; i >= 0; i--)
+        {
+            SafeChange change = _safeChanges[i];
+            switch (change.Kind)
+            {
+                case SafeChangeKind.SeenAdded: seen.Remove(change.Key); break;
+                case SafeChangeKind.SeenRemoved: seen.Add(change.Key); break;
+                case SafeChangeKind.CacheSet:
+                    if (change.Previous is null) cache.Remove(change.Key);
+                    else cache[change.Key] = change.Previous;
+                    break;
+                case SafeChangeKind.CacheRemoved:
+                    if (change.Previous is not null) cache[change.Key] = change.Previous;
+                    break;
+                case SafeChangeKind.OrderEnqueued: order.RemoveAt(order.Count - 1); break;
+                case SafeChangeKind.OrderDequeued: order.Insert(0, change.Key); break;
+                default: throw new InvalidOperationException("Unknown safe-state change.");
+            }
+        }
+        document.SeenGenomeIds = seen.OrderBy(value => value, StringComparer.Ordinal).ToList();
+        document.Cache = cache.OrderBy(pair => pair.Key, StringComparer.Ordinal).Select(pair => new CacheDocument
+        {
+            GenomeId = pair.Key,
+            Result = TaskResultDocument.From(pair.Value)
+        }).ToList();
+        document.DeduplicationOrder = _options.DeduplicationCapacity > 0 ? order : null;
         if (HasMeasurementOrigins(document)) document.SchemaVersion = EngineMeasurementOriginSchemaVersion;
-        if (document.Islands.Any(island => island.Pareto is not null)) document.SchemaVersion = EngineParetoSchemaVersion;
-        if (document.Islands.Any(island => island.Pareto?.ConstraintCount is not null)) document.SchemaVersion = EngineParetoConstraintSchemaVersion;
+        IReadOnlyList<ArchiveDocument> islands = document.Islands ?? new List<ArchiveDocument>();
+        if (islands.Any(island => island.Pareto is not null)) document.SchemaVersion = EngineParetoSchemaVersion;
+        if (islands.Any(island => island.Pareto?.ConstraintCount is not null)) document.SchemaVersion = EngineParetoConstraintSchemaVersion;
         string payload = JsonSerializer.Serialize(document, EvolutionStateJsonContext.Default.EngineStateDocument);
         if (payload.Length > EvolutionCollectionLimits.MaximumCheckpointBytes ||
             Encoding.UTF8.GetByteCount(payload) > EvolutionCollectionLimits.MaximumCheckpointBytes)
@@ -87,14 +204,29 @@ public sealed partial class EvolutionEngine<TGenome>
                 $"{EvolutionCollectionLimits.MaximumCheckpointBytes}-byte package limit.");
         }
         _safePayload = payload;
-        _safeSequence++;
+        _safeDocument = null;
+        _safeChanges.Clear();
+        return payload;
     }
+
+    private enum SafeChangeKind
+    {
+        SeenAdded,
+        SeenRemoved,
+        CacheSet,
+        CacheRemoved,
+        OrderEnqueued,
+        OrderDequeued
+    }
+
+    private readonly record struct SafeChange(SafeChangeKind Kind, string Key, EvolutionTaskResult? Previous);
 
     private async Task SaveCheckpointAsync(bool force, CancellationToken cancellationToken)
     {
-        if (_checkpointStore is null || _safePayload is null) return;
+        if (_checkpointStore is null) return;
         if (!force && (_options.CheckpointInterval == 0 || _commitsSinceCheckpoint < _options.CheckpointInterval)) return;
-        var checkpoint = new EvolutionCheckpoint(_options.RunId, _safeSequence, _compatibilityHash, _safePayload,
+        if (SafePayload() is not { } payload) return;
+        var checkpoint = new EvolutionCheckpoint(_options.RunId, _safeSequence, _compatibilityHash, payload,
             EvolutionCheckpoint.CurrentSchemaVersion, BestQualityAcrossIslands(), _islands[0].Direction);
         await _checkpointStore.SaveAsync(checkpoint, cancellationToken).ConfigureAwait(false);
         _commitsSinceCheckpoint = 0;
@@ -213,6 +345,22 @@ public sealed partial class EvolutionEngine<TGenome>
             _cache[cached.GenomeId] = result;
         }
 
+        _deduplicationOrder.Clear();
+        if (_options.DeduplicationCapacity > 0)
+        {
+            List<string> order = state.DeduplicationOrder
+                ?? throw new InvalidDataException("The checkpoint deduplication order is missing.");
+            // The order may exceed the capacity: genomes an archive or history still holds are never forgotten.
+            if (order.Distinct(StringComparer.Ordinal).Count() != order.Count ||
+                order.Any(id => id is null || !_seen.Contains(id)))
+                throw new InvalidDataException("The checkpoint deduplication order is invalid.");
+            foreach (string id in order) _deduplicationOrder.Enqueue(id);
+        }
+        else if (state.DeduplicationOrder is not null)
+        {
+            throw new InvalidDataException("The checkpoint records a deduplication order but no capacity is configured.");
+        }
+
         _failures.Clear();
         foreach (DiagnosticDocument diagnostic in state.Failures ?? new List<DiagnosticDocument>())
             RetainFailure(diagnostic.ToDiagnostic());
@@ -266,6 +414,8 @@ public sealed partial class EvolutionEngine<TGenome>
         RestoreIslandHistories(state);
         _safeSequence = checkpoint.Sequence;
         _safePayload = checkpoint.Payload;
+        _safeDocument = null;
+        _safeChanges.Clear();
         return new RestoredSeeds(seeds, state.SeedIndex);
     }
 
@@ -1001,6 +1151,13 @@ public sealed partial class EvolutionEngine<TGenome>
             Append(builder, "cache:" + cached.Key);
             AppendTaskResult(builder, cached.Value);
             stream.Flush(builder);
+        }
+        if (_options.DeduplicationCapacity > 0)
+        {
+            // Which genome is forgotten next is state: two runs that differ only here diverge at the next eviction.
+            Append(builder, "deduplication-order");
+            Append(builder, _deduplicationOrder.Count);
+            foreach (string id in _deduplicationOrder) { Append(builder, id); stream.Flush(builder); }
         }
         Append(builder, "selection");
         Append(builder, _selection is IOutcomeAwareEvolutionSelectionPolicy<TGenome> adaptiveSelection

@@ -93,8 +93,12 @@ public sealed partial class EvolutionEngine<TGenome>
                         break;
                     }
 
-                    // Exactly one replacement per commit: that pairing is what makes the schedule reproducible.
-                    await FillOneAsync(state, semaphore, runTimer, cancellationToken).ConfigureAwait(false);
+                    // Refill at this commit point, against the archive as it stands after exactly these commits. In a
+                    // full window that is one replacement per commit. A window left short (no parent existed yet when
+                    // the seeds were admitted) must also be topped up here: topping it up at the loop head instead
+                    // happened after however many commits a wake-up had batched, so a slow evaluation changed which
+                    // archive later proposals were planned from.
+                    await FillWindowAsync(state, semaphore, runTimer, cancellationToken).ConfigureAwait(false);
                 }
             }
         }
@@ -148,7 +152,7 @@ public sealed partial class EvolutionEngine<TGenome>
             lowestInFlightId = lowestInFlightId.HasValue
                 ? Math.Min(lowestInFlightId.Value, item.EvaluationId)
                 : item.EvaluationId;
-            if (item.AddedToSeen && item.Candidate is not null) _seen.Remove(item.Candidate.CanonicalGenome.Id);
+            if (item.AddedToSeen && item.Candidate is not null) RemoveSeen(item.Candidate.CanonicalGenome.Id);
             _evaluationAttempts -= item.ChargedAttempts;
             _proposals--;
             if (item.IsSeed) continue;

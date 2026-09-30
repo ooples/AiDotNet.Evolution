@@ -41,6 +41,24 @@ public sealed class UniformEvolutionSelectionPolicy<TGenome> : ISelectionPolicy<
         EvolutionArchiveEntry<TGenome>? parent = archive.Sample(random);
         if (parent is null) return null;
 
+        if (archive is IEvolutionIndexedArchive<TGenome> indexed && inspirationCount > 0)
+        {
+            // Drawn from a copy, so a fallback starts from the untouched stream; on success the caller's stream is
+            // advanced through exactly the same draws.
+            StableRandom trial = StableRandom.Restore(random.CaptureState());
+            List<EvolutionArchiveEntry<TGenome>>? fast = SelectIndexed(indexed, parent, trial, inspirationCount);
+            if (fast is not null)
+            {
+                int length = indexed.Count - 1;
+                for (int i = 0; i < fast.Count; i++) random.NextInt(i, length);
+                return new EvolutionSelection<TGenome>(parent, fast.AsReadOnly());
+            }
+        }
+        else if (inspirationCount == 0)
+        {
+            return new EvolutionSelection<TGenome>(parent, new List<EvolutionArchiveEntry<TGenome>>().AsReadOnly());
+        }
+
         EvolutionArchiveEntry<TGenome>[] candidates = archive.Entries
             .Where(entry => entry.Evaluation.GenomeId != parent.Evaluation.GenomeId)
             .ToArray();
@@ -55,5 +73,29 @@ public sealed class UniformEvolutionSelectionPolicy<TGenome> : ISelectionPolicy<
             inspirations.Add(candidates[i]);
         }
         return new EvolutionSelection<TGenome>(parent, inspirations.AsReadOnly());
+    }
+    // The same draws as the materialised path, in O(k): candidates are the entries without the parent, in entry order,
+    // and a partial Fisher-Yates over that virtual list records only the slots it has swapped. Returns null to fall back
+    // when the parent is not the only entry with its genome, which the virtual list cannot express.
+    private static List<EvolutionArchiveEntry<TGenome>>? SelectIndexed(IEvolutionIndexedArchive<TGenome> archive,
+        EvolutionArchiveEntry<TGenome> parent, StableRandom random, int inspirationCount)
+    {
+        int parentIndex = archive.IndexOf(parent);
+        // The virtual list skips one slot, so it matches the filtered list only when no other entry shares the genome.
+        if (parentIndex < 0 || !archive.HoldsGenomeOnce(parent.Evaluation.GenomeId)) return null;
+        int length = archive.Count - 1;
+        int take = Math.Min(inspirationCount, length);
+        var swapped = new Dictionary<int, int>(take * 2);
+        var chosen = new List<EvolutionArchiveEntry<TGenome>>(take);
+        for (int i = 0; i < take; i++)
+        {
+            int selected = random.NextInt(i, length);
+            int atSelected = swapped.TryGetValue(selected, out int s) ? s : selected;
+            int atI = swapped.TryGetValue(i, out int v) ? v : i;
+            swapped[selected] = atI;
+            swapped[i] = atSelected;
+            chosen.Add(archive.EntryAt(atSelected < parentIndex ? atSelected : atSelected + 1));
+        }
+        return chosen;
     }
 }

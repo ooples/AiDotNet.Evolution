@@ -2,6 +2,7 @@
 // Original license retained in src/AiDotNet.Evolution.Programs/AIDOTNET-LICENSE.txt.
 using System.Globalization;
 using System.Diagnostics;
+using System.Runtime.InteropServices;
 using System.Text;
 using AiDotNet.Evolution.Programs;
 
@@ -24,8 +25,11 @@ namespace AiDotNet.Evolution.Programs;
 /// reported as truncated instead of exhausting host memory, and it never blocks on a full pipe. A wall-clock limit
 /// cancels the run and kills the whole process tree — <c>Kill(entireProcessTree)</c> where the framework offers it,
 /// with a <c>taskkill /T /F</c> fallback on Windows. Process-tree termination is best effort and is not containment
-/// of arbitrary detached or reparented descendants. Memory limits are attempted through a Windows job object or
-/// <c>ulimit -v</c> inside a POSIX shell; creation, assignment or shell-limit failure does not fail the run closed.
+/// of arbitrary detached or reparented descendants. Memory and CPU-time limits are enforced through a Windows job
+/// object, or on Linux by measuring the tree through <c>/proc</c> with <c>ulimit</c> backstops; a tree past either
+/// limit is terminated and reported as <see cref="ProgramExecuteErrorCode.MemoryLimitExceeded"/> or
+/// <see cref="ProgramExecuteErrorCode.CpuTimeLimitExceeded"/>. Creation, assignment or shell-limit failure does not
+/// fail the run closed.
 /// <see cref="CanEnforceMemoryLimit"/> reports platform capability, not per-execution enforcement. A
 /// semaphore bounds how many executions run at once, and the wall-clock limit starts only after that semaphore is
 /// acquired, so a queued candidate is never charged for time it spent waiting.
@@ -56,6 +60,17 @@ public sealed class ProcessProgramExecutionEngine : IProgramExecutionEngine, IPr
     private const int TaskKillTimeoutMilliseconds = 5000;
 
     private static readonly bool WindowsHost = DetectWindowsHost();
+    private static readonly bool LinuxHost = RuntimeInformation.IsOSPlatform(OSPlatform.Linux);
+    // The watch polls fast while a run is young and backs off only after that: each poll walks the tree through /proc,
+    // and a long run with a wide tree should not pay that fifty times a second. The fast phase is what catches a burst:
+    // a candidate that allocates quickly crosses the memory limit and then dies at the shell's address-space backstop
+    // within a few hundred milliseconds, and a watch already backing off there misses the crossing entirely.
+    private static readonly TimeSpan ResourcePollInterval = TimeSpan.FromMilliseconds(20);
+    private static readonly TimeSpan FastResourcePollingPeriod = TimeSpan.FromSeconds(2);
+    private static readonly TimeSpan MaximumResourcePollInterval = TimeSpan.FromMilliseconds(200);
+    // 128 + SIGXCPU: the kernel's CPU-time backstop ended the process.
+    private const int ExitCodeCpuLimitSignal = 152;
+    private const int ExitCodeQuotaExceeded = unchecked((int)0xC0000044); // STATUS_QUOTA_EXCEEDED
     private const string PosixShellPath = "/bin/sh";
 
     private readonly ProgramSandboxOptions _options;
@@ -69,6 +84,8 @@ public sealed class ProcessProgramExecutionEngine : IProgramExecutionEngine, IPr
     public int ActiveExecutionCount => Volatile.Read(ref _activeExecutions);
     private readonly string _pinnedPath;
     private readonly string _workspaceRoot;
+    // Linux only: the per-execution child subreaper that keeps double-forked descendants in the measured tree.
+    private readonly Lazy<SandboxGuardian?> _guardian;
     private bool _disposed;
     private readonly object _lifecycle = new();
     private int _leases;
@@ -111,6 +128,10 @@ public sealed class ProcessProgramExecutionEngine : IProgramExecutionEngine, IPr
         {
             _workspaceRoot = Path.GetFullPath(configuredWorkingDirectory);
         }
+
+        _guardian = new Lazy<SandboxGuardian?>(
+            () => LinuxHost && File.Exists(PosixShellPath) ? SandboxGuardian.TryPrepare(_workspaceRoot, PosixShellPath) : null,
+            LazyThreadSafetyMode.ExecutionAndPublication);
         VersionHash = EvolutionHash.Combine(new[]
         {
             "process-program-execution-v1-owned-request-complete-output",
@@ -169,7 +190,7 @@ public sealed class ProcessProgramExecutionEngine : IProgramExecutionEngine, IPr
             lock (_lifecycle)
             {
                 _leases--;
-                if (_disposed && _leases == 0) _concurrency.Dispose();
+                if (_disposed && _leases == 0) ReleaseResources();
             }
         }
     }
@@ -304,8 +325,16 @@ public sealed class ProcessProgramExecutionEngine : IProgramExecutionEngine, IPr
         {
             if (_disposed) return;
             _disposed = true;
-            if (_leases == 0) _concurrency.Dispose();
+            if (_leases == 0) ReleaseResources();
         }
+    }
+
+    // Called under _lifecycle once disposed and no admitted execution remains: an execution still running may be about to
+    // launch through the guardian, so its directory goes with the last lease, not with Dispose.
+    private void ReleaseResources()
+    {
+        _concurrency.Dispose();
+        if (_guardian.IsValueCreated) _guardian.Value?.Delete();
     }
 
     private async Task<ProgramExecuteResponse> RunAsync(
@@ -372,7 +401,7 @@ public sealed class ProcessProgramExecutionEngine : IProgramExecutionEngine, IPr
         using var deadline = new CancellationTokenSource(_limits.GetTimeLimit(), _options.TimeProvider);
         using var timeoutSource = CancellationTokenSource.CreateLinkedTokenSource(cancellationToken, deadline.Token);
 
-        using WindowsJobObject? job = WindowsJobObject.TryCreate(_limits.GetMemoryLimitBytes());
+        using WindowsJobObject? job = WindowsJobObject.TryCreate(_limits.GetMemoryLimitBytes(), _limits.GetCpuTimeLimit());
         using var process = new Process { StartInfo = startInfo };
 
         try
@@ -408,7 +437,28 @@ public sealed class ProcessProgramExecutionEngine : IProgramExecutionEngine, IPr
         Task stdErrTask = stdErrReader.PumpAsync(process.StandardError, timeoutSource.Token);
         Task stdInTask = WriteStandardInputAsync(process, stdIn);
 
-        bool exited = await WaitForExitAsync(process, timeoutSource.Token).ConfigureAwait(false);
+        Task<bool> exitTask = WaitForExitAsync(process, timeoutSource.Token);
+        bool watched = job?.ReportsViolations == true || LinuxHost;
+        ProgramExecuteErrorCode? violation = null;
+        TimeSpan poll = ResourcePollInterval;
+        var watchClock = Stopwatch.StartNew();
+        while (watched && !exitTask.IsCompleted)
+        {
+            violation = ReadViolation(job, processId);
+            if (violation is not null) break;
+            await Task.WhenAny(exitTask, Task.Delay(poll)).ConfigureAwait(false);
+            if (watchClock.Elapsed >= FastResourcePollingPeriod && poll < MaximumResourcePollInterval)
+                poll = TimeSpan.FromTicks(Math.Min(poll.Ticks * 2, MaximumResourcePollInterval.Ticks));
+        }
+
+        if (violation is not null)
+        {
+            TryKillProcessTree(process, processId);
+            await DrainAsync(stdOutTask, stdErrTask, stdInTask).ConfigureAwait(false);
+            return ResourceExceeded(language, compileOnly, violation.Value, -1, stdOutReader, stdErrReader);
+        }
+
+        bool exited = await exitTask.ConfigureAwait(false);
         if (!exited)
         {
             TryKillProcessTree(process, processId);
@@ -441,6 +491,18 @@ public sealed class ProcessProgramExecutionEngine : IProgramExecutionEngine, IPr
         (string Text, bool Truncated) capturedOut = stdOutReader.Snapshot();
         (string Text, bool Truncated) capturedErr = stdErrReader.Snapshot();
         int exitCode = TryGetExitCode(process);
+
+        // A limit can also end the process on its own: the job refuses a commit or the kernel's CPU backstop fires.
+        ProgramExecuteErrorCode? afterExit = job?.ReadViolation()
+            ?? (LinuxHost && exitCode == ExitCodeCpuLimitSignal ? ProgramExecuteErrorCode.CpuTimeLimitExceeded : (ProgramExecuteErrorCode?)null)
+            // The job ends a process past its CPU-time limit with STATUS_QUOTA_EXCEEDED. Its port notification can arrive
+            // after the exit is observed (seen on GitHub's Windows runners), so the exit status settles it on its own.
+            ?? (job is not null && exitCode == ExitCodeQuotaExceeded ? ProgramExecuteErrorCode.CpuTimeLimitExceeded : (ProgramExecuteErrorCode?)null);
+        if (afterExit is not null)
+        {
+            return ResourceExceeded(language, compileOnly, afterExit.Value, exitCode, stdOutReader, stdErrReader);
+        }
+
         bool success = exitCode == 0;
 
         return new ProgramExecuteResponse
@@ -550,9 +612,23 @@ public sealed class ProcessProgramExecutionEngine : IProgramExecutionEngine, IPr
 #if NET5_0_OR_GREATER
         if (!WindowsHost && File.Exists(PosixShellPath))
         {
-            startInfo.FileName = PosixShellPath;
+            string script = BuildPosixScript(specification, template, sourcePath, workspace);
+            if (_guardian.Value is { } guardian)
+            {
+                // The guardian sits outside the shell's ulimits (a .NET runtime under ulimit -v would not start) and
+                // outside the measured usage; everything the script starts is below it, detached or not.
+                startInfo.FileName = guardian.Host;
+                startInfo.ArgumentList.Add("exec");
+                startInfo.ArgumentList.Add(guardian.AssemblyPath);
+                startInfo.ArgumentList.Add(PosixShellPath);
+            }
+            else
+            {
+                startInfo.FileName = PosixShellPath;
+            }
+
             startInfo.ArgumentList.Add("-c");
-            startInfo.ArgumentList.Add(BuildPosixScript(specification, template, sourcePath, workspace));
+            startInfo.ArgumentList.Add(script);
             return;
         }
 #endif
@@ -570,7 +646,9 @@ public sealed class ProcessProgramExecutionEngine : IProgramExecutionEngine, IPr
         string workspace)
     {
         var script = new StringBuilder();
-        long kilobytes = _limits.GetMemoryLimitBytes() / 1024L;
+        // Backstops only: the engine measures the tree's resident memory and CPU time and terminates it at the
+        // limit. The address-space cap sits at twice the limit so an interpreter's reservations do not trip it first.
+        long kilobytes = _limits.GetMemoryLimitBytes() / 1024L * 2L;
         if (kilobytes > 0)
         {
             // A shell whose ulimit cannot set the requested resource must not abort the script, so every limit is
@@ -588,14 +666,8 @@ public sealed class ProcessProgramExecutionEngine : IProgramExecutionEngine, IPr
         return script.ToString();
     }
 
-    private int GetCpuTimeLimitSeconds()
-    {
-        double cores = _limits.CpuLimit > 0.0 ? _limits.CpuLimit : 1.0;
-        double seconds = Math.Ceiling(_limits.TimeLimitSeconds * cores);
-        if (seconds < 1.0) seconds = 1.0;
-        if (seconds > int.MaxValue) seconds = int.MaxValue;
-        return (int)seconds;
-    }
+    private int GetCpuTimeLimitSeconds() =>
+        (int)Math.Min(Math.Ceiling(_limits.GetCpuTimeLimit().TotalSeconds) + 1.0, int.MaxValue);
 #endif
 
     private void ScrubEnvironment(ProcessStartInfo startInfo, string workspace)
@@ -722,6 +794,44 @@ public sealed class ProcessProgramExecutionEngine : IProgramExecutionEngine, IPr
         {
             // Every pump already swallows its own stream faults; this guards the aggregate.
         }
+    }
+
+    private ProgramExecuteErrorCode? ReadViolation(WindowsJobObject? job, int processId)
+    {
+        if (job?.ReadViolation() is { } reported) return reported;
+        // Under the guardian the root is the guardian itself; its own runtime is not the candidate's usage.
+        bool guarded = _guardian.IsValueCreated && _guardian.Value is not null;
+        if (!LinuxHost || LinuxProcessTree.Measure(processId, includeRoot: !guarded) is not { } usage) return null;
+        if (usage.ResidentBytes > _limits.GetMemoryLimitBytes()) return ProgramExecuteErrorCode.MemoryLimitExceeded;
+        return usage.CpuTime >= _limits.GetCpuTimeLimit() ? ProgramExecuteErrorCode.CpuTimeLimitExceeded : null;
+    }
+
+    private ProgramExecuteResponse ResourceExceeded(
+        ProgramLanguage language,
+        bool compileOnly,
+        ProgramExecuteErrorCode violation,
+        int exitCode,
+        BoundedOutputReader stdOutReader,
+        BoundedOutputReader stdErrReader)
+    {
+        (string Text, bool Truncated) capturedOut = stdOutReader.Snapshot();
+        (string Text, bool Truncated) capturedErr = stdErrReader.Snapshot();
+        return new ProgramExecuteResponse
+        {
+            Success = false,
+            Language = language,
+            CompilationAttempted = compileOnly,
+            CompilationSucceeded = compileOnly ? false : null,
+            ExitCode = exitCode,
+            StdOut = capturedOut.Text,
+            StdErr = capturedErr.Text,
+            StdOutTruncated = capturedOut.Truncated,
+            StdErrTruncated = capturedErr.Truncated,
+            Error = violation == ProgramExecuteErrorCode.MemoryLimitExceeded
+                ? $"Execution exceeded the {_limits.MemoryLimitMb.ToString(CultureInfo.InvariantCulture)} MB memory limit and the process tree was terminated."
+                : $"Execution exceeded the {_limits.GetCpuTimeLimit().TotalSeconds.ToString(CultureInfo.InvariantCulture)} second CPU-time limit and the process tree was terminated.",
+            ErrorCode = violation
+        };
     }
 
     private static async Task<bool> WaitForExitAsync(Process process, CancellationToken cancellationToken)

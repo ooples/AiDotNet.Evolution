@@ -217,6 +217,8 @@ public sealed class SandboxedProgramFitnessEvaluator : IProgramFitnessEvaluator,
     private static string DescribeFailure(ProgramExecuteResponse response) => response.ErrorCode switch
     {
         ProgramExecuteErrorCode.TimeoutOrCanceled => "timeout",
+        ProgramExecuteErrorCode.MemoryLimitExceeded => "memory_limit_exceeded",
+        ProgramExecuteErrorCode.CpuTimeLimitExceeded => "cpu_time_limit_exceeded",
         ProgramExecuteErrorCode.CompilationFailed => "compile_failed",
         ProgramExecuteErrorCode.ExecutionFailed => "execution_failed",
         ProgramExecuteErrorCode.LanguageNotDetected => "language_not_detected",

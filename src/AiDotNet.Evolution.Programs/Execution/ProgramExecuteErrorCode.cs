@@ -26,5 +26,9 @@ public enum ProgramExecuteErrorCode
     /// <summary>A compile-only request failed to compile.</summary>
     CompilationFailed = 8,
     /// <summary>The program could not start or exited non-zero.</summary>
-    ExecutionFailed = 9
+    ExecutionFailed = 9,
+    /// <summary>The program's process tree exceeded the memory limit and was terminated.</summary>
+    MemoryLimitExceeded = 10,
+    /// <summary>The program's process tree used more CPU time than allowed and was terminated.</summary>
+    CpuTimeLimitExceeded = 11
 }

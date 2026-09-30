@@ -272,7 +272,7 @@ public sealed partial class EvolutionEngine<TGenome>
                 };
             }
 
-            if (!_seen.Add(canonical.Id))
+            if (!AddSeen(canonical.Id))
             {
                 return new WorkItem(lineage)
                 {
@@ -287,7 +287,7 @@ public sealed partial class EvolutionEngine<TGenome>
 
             if (!IsStructurallyNovel(canonical, island))
             {
-                _seen.Remove(canonical.Id);
+                RemoveSeen(canonical.Id);
                 return new WorkItem(lineage)
                 {
                     EvaluationId = evaluationId,
@@ -628,16 +628,17 @@ public sealed partial class EvolutionEngine<TGenome>
                 {
                     insertion = AddToArchive(item.Island, item.Candidate, evaluation);
                     if (_options.EnableEvaluationCache && item.CacheStatus != EvolutionCacheStatus.Hit)
-                        _cache[item.Candidate.CanonicalGenome.Id] = WithoutArtifacts(result);
+                        SetCached(item.Candidate.CanonicalGenome.Id, WithoutArtifacts(result));
                     RecordCompletedEvaluation(item.Island, item.Candidate, evaluation);
                 }
             }
             else if (item.Candidate is not null && !_options.DeduplicateFailedCandidates &&
                      IsFailureLike(evaluation.Status))
             {
-                _seen.Remove(item.Candidate.CanonicalGenome.Id);
+                RemoveSeen(item.Candidate.CanonicalGenome.Id);
             }
 
+            RememberCommitted(item);
             if (item.CacheStatus != EvolutionCacheStatus.Hit) QueueLineageArtifacts(item, evaluation);
 
             if (_selection is IOutcomeAwareEvolutionSelectionPolicy<TGenome> adaptiveSelection)
@@ -669,6 +670,7 @@ public sealed partial class EvolutionEngine<TGenome>
 
             if (_checkpointStore is not null && _options.CheckpointInterval > 0) _commitsSinceCheckpoint++;
         }
+        EnforceDeduplicationCapacity();
         return failedFast;
     }
 
