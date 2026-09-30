@@ -127,6 +127,52 @@ public sealed class WarmPythonExecutionEngineTests
     }
 
     [Fact]
+    public async Task A_discarded_worker_is_no_longer_tracked_as_busy()
+    {
+        // Each of these ends its worker: no reply (the interpreter exits), and a recycle after every candidate.
+        using var engine = new WarmPythonExecutionEngine(Options(ProgramSandboxMode.WarmReusedWorker), recycleAfter: 1);
+        for (int i = 0; i < 3; i++)
+        {
+            await Run(engine, "import os\nos._exit(0)\n");
+            await Run(engine, "print(\"ok\")\n");
+        }
+        Assert.Equal(0, engine.BusyWorkerCount);
+    }
+
+    [Fact]
+    public async Task A_worker_whose_exchange_was_canceled_is_not_used_again()
+    {
+        using var engine = new WarmPythonExecutionEngine(Options(ProgramSandboxMode.WarmReusedWorker, timeLimitSeconds: 30));
+        using (var cancel = new CancellationTokenSource(TimeSpan.FromMilliseconds(500)))
+        {
+            // Canceled mid-exchange: the engine may report it or throw; either way the worker must not be reused.
+            bool completedNormally;
+            try
+            {
+                ProgramExecuteResponse canceled = await engine.ExecuteAsync(new ProgramExecuteRequest
+                {
+                    Language = ProgramLanguage.Python,
+                    SourceCode = "import time\ntime.sleep(20)\nprint(\"late\")\n"
+                }, cancel.Token);
+                completedNormally = canceled.Success;
+            }
+            catch (OperationCanceledException)
+            {
+                completedNormally = false;
+            }
+            Assert.False(completedNormally);
+        }
+
+        // The next candidate must get its own answer, not the canceled one's late reply from a reused pipe.
+        var clock = Stopwatch.StartNew();
+        ProgramExecuteResponse next = await Run(engine, "print(\"fresh\")\n");
+        Assert.True(next.Success, next.Error);
+        Assert.Equal("fresh", next.StdOut.Trim());
+        Assert.True(clock.Elapsed < TimeSpan.FromSeconds(15), "the next candidate waited on the canceled one: " + clock.Elapsed);
+        Assert.Equal(0, engine.BusyWorkerCount);
+    }
+
+    [Fact]
     public async Task A_candidate_that_ends_the_reused_interpreter_is_a_failure_not_a_timeout()
     {
         using var engine = new WarmPythonExecutionEngine(Options(ProgramSandboxMode.WarmReusedWorker));

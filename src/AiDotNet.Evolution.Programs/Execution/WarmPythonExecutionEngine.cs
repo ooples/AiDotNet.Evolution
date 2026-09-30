@@ -109,6 +109,9 @@ public sealed class WarmPythonExecutionEngine : IProgramExecutionEngine, IProgra
     /// <inheritdoc />
     public int QueuedExecutionCount => Volatile.Read(ref _queued);
 
+    // Workers currently tracked as running a candidate; zero whenever no execution is in progress.
+    internal int BusyWorkerCount => _busy.Count;
+
     /// <inheritdoc />
     public int ActiveExecutionCount => Volatile.Read(ref _active);
 
@@ -159,10 +162,15 @@ public sealed class WarmPythonExecutionEngine : IProgramExecutionEngine, IProgra
 
         Interlocked.Increment(ref _active);
         Worker? worker = null;
+        // The busy entry is removed whatever happens to the worker, and only a worker that finished a whole exchange goes
+        // back to the pool: an exception or a cancellation can leave half a frame in its pipe, so it is disposed instead.
+        Worker? tracked = null;
+        bool reusable = false;
         try
         {
             worker = _idle.TryTake(out Worker? idle) && idle.IsUsable ? idle : await StartWorkerAsync(cancellationToken).ConfigureAwait(false);
             _busy[worker] = 0;
+            tracked = worker;
             if (_disposed) return Failed(ProgramExecuteErrorCode.ExecutionFailed, "The engine was disposed before the candidate ran.");
             var frame = new JsonObject
             {
@@ -191,6 +199,7 @@ public sealed class WarmPythonExecutionEngine : IProgramExecutionEngine, IProgra
             bool recycle = reply["recycle"]?.GetValue<bool>() == true || (!_fork && worker.Completed >= RecycleAfter);
             ProgramExecuteResponse response = FromReply(reply);
             if (recycle) { worker.Dispose(); worker = null; }
+            reusable = true;
             return response;
         }
         catch (Exception exception) when (exception is IOException or InvalidOperationException or JsonException or System.ComponentModel.Win32Exception)
@@ -201,9 +210,14 @@ public sealed class WarmPythonExecutionEngine : IProgramExecutionEngine, IProgra
         }
         finally
         {
+            if (tracked is not null) _busy.TryRemove(tracked, out _);
+            if (worker is not null && !reusable)
+            {
+                worker.Dispose();
+                worker = null;
+            }
             if (worker is not null)
             {
-                _busy.TryRemove(worker, out _);
                 if (_disposed) worker.Dispose();
                 else
                 {
