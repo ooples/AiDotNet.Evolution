@@ -204,8 +204,53 @@ public sealed class MapElitesAutoMLIntegrationTests
         Assert.Equal(baseline, await Hash(_ => { }));
         Assert.NotEqual(baseline, await Hash(options => options.InspirationCount = 1));
         Assert.NotEqual(baseline, await Hash(options => options.IslandCount = 2));
-        Assert.NotEqual(baseline, await Hash(options => options.MigrationInterval = 1));
-        Assert.NotEqual(baseline, await Hash(options => options.MigrantsPerIsland = 1));
+    }
+
+    [Fact(Timeout = 240000)]
+    public async Task SearchAsync_MigrationBetweenTwoIslandsChangesTheSearchNotOnlyItsIdentity()
+    {
+        // One island cannot migrate, so the baseline has two with migration off. Enabling it must change the archive the
+        // search ends with, which the run identity alone cannot do: proposals draw from the seed and evaluation id, not
+        // the hash. Three model families give the islands different elites to exchange; one family was exhausted after six
+        // trials, before any migration could matter.
+        (Matrix<double> trainX, Vector<double> trainY, Matrix<double> validationX, Vector<double> validationY) =
+            CreateRegressionData();
+        async Task<(string Hash, string Archive)> Run(Action<MapElitesAutoMLOptions> configure)
+        {
+            var options = new MapElitesAutoMLOptions
+            {
+                Seed = 17,
+                InitialPopulationSize = 2,
+                ComplexityBinCount = 4,
+                ArchiveCapacity = 8,
+                MutationProbability = 0.5,
+                ExplorationProbability = 0,
+                IslandCount = 2,
+                MigrationInterval = 0
+            };
+            configure(options);
+            using var autoML = new MapElitesAutoML<double, Matrix<double>, Vector<double>>(options);
+            autoML.TrialLimit = 40;
+            autoML.EnsembleOptions.Enabled = false;
+            autoML.SetCandidateModels(new List<Type>
+            {
+                typeof(AiDotNetConsumer::AiDotNet.Regression.PolynomialRegression<>),
+                typeof(AiDotNetConsumer::AiDotNet.Regression.MultipleRegression<>),
+                typeof(AiDotNetConsumer::AiDotNet.Regression.SimpleRegression<>)
+            });
+            _ = await autoML.SearchAsync(trainX, trainY, validationX, validationY, TimeSpan.FromSeconds(60));
+            return (autoML.ArchiveStateHash, string.Join(";", autoML.Archive.Select(DescribeEntry)));
+        }
+
+        var isolated = await Run(_ => { });
+        Assert.Equal(isolated, await Run(_ => { }));
+        var migrating = await Run(options => options.MigrationInterval = 1);
+        Assert.NotEqual(isolated.Hash, migrating.Hash);
+        Assert.NotEqual(isolated.Archive, migrating.Archive);
+        // How many elites move is behaviour too, not only identity.
+        var fewerMigrants = await Run(options => { options.MigrationInterval = 1; options.MigrantsPerIsland = 1; });
+        Assert.NotEqual(migrating.Hash, fewerMigrants.Hash);
+        Assert.NotEqual(migrating.Archive, fewerMigrants.Archive);
     }
 
     [Fact]
@@ -216,6 +261,7 @@ public sealed class MapElitesAutoMLIntegrationTests
         Assert.Throws<ArgumentOutOfRangeException>(() =>
             new MapElitesAutoML<double, Matrix<double>, Vector<double>>(options));
     }
+
 
     private static MapElitesAutoML<double, Matrix<double>, Vector<double>> CreateSearch(ulong seed)
     {
