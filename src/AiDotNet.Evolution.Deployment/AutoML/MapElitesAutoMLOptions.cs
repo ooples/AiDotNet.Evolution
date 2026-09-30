@@ -19,7 +19,7 @@ namespace AiDotNet.Evolution.AutoML;
 /// settings control that exploration: how many random seed configurations to try first, how finely to slice
 /// complexity, how often to mutate or explore instead of refining known elites, and how many elites may
 /// inspire one new proposal. Attach an instance through
-/// <see cref="AutoMLOptions{T,TInput,TOutput}.MapElites"/> when <c>SearchStrategy</c> is
+/// <c>AutoMLOptions.MapElites</c> when <c>SearchStrategy</c> is
 /// <c>AutoMLSearchStrategy.MapElites</c>. The defaults suit most tabular problems, so start by changing only
 /// <see cref="Seed"/> for reproducibility and <see cref="ComplexityBinCount"/> for a coarser or finer archive.</para>
 /// <para>

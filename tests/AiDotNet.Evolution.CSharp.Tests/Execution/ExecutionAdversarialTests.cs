@@ -43,7 +43,8 @@ public sealed class ExecutionAdversarialTests
         Task<ProgramExecuteResponse> first = engine.ExecuteAsync(new() { Language = ProgramLanguage.Python, SourceCode = "ignored" });
         var request = new ProgramExecuteRequest { Language = ProgramLanguage.Python, SourceCode = "ignored", StdIn = "original\n", CompileOnly = true };
         Task<ProgramExecuteResponse> second = engine.ExecuteAsync(request);
-        Assert.Equal(1, engine.QueuedExecutionCount);
+        IProgramExecutionTelemetrySource telemetry = engine;
+        Assert.Equal(1, telemetry.QueuedExecutionCount);
         request.StdIn = new string('x', 100);
         request.CompileOnly = false;
         engine.Dispose();

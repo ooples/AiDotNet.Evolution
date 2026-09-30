@@ -86,7 +86,7 @@ public sealed class ProgramFoundationAdversarialTests
     public void Split_targets_validates_options_and_refuses_ambiguous_edits()
     {
         var blocks = new[] { new ProgramDiffBlock("x", "y") };
-        var result = ProgramDiff.SplitByTarget(blocks, "x", "x");
+        ProgramDiffTargetSplit result = ProgramDiff.SplitByTarget(blocks, "x", "x");
         Assert.False(result.IsSuccess);
         Assert.Equal(ProgramDiffFailureReason.AmbiguousTarget, Assert.Single(result.Failures).Reason);
         Assert.Throws<ArgumentOutOfRangeException>(() => ProgramDiff.SplitByTarget(blocks, "x", "note", new ProgramTaskOptions { MaxProgramChars = 0 }));
@@ -142,6 +142,9 @@ public sealed class ProgramFoundationAdversarialTests
             new ProgramDiversityDescriptor(new[] { "a" }));
         string identity = original.VersionHash;
         var rebased = original.Rebase(new[] { new ProgramGenome("abcdef") });
+        IRebasableProgramDescriptor diversity = new ProgramDiversityDescriptor(new[] { "a" });
+        IVersionedProgramDescriptor rebasedDiversity = diversity.Rebase(new[] { new ProgramGenome("abcdef") });
+        Assert.NotEqual(diversity.VersionHash, rebasedDiversity.VersionHash);
         Assert.Equal(identity, original.VersionHash);
         Assert.NotEqual(identity, rebased.VersionHash);
         Assert.NotEqual(original.Compute(new ProgramGenome("xyz"))["diversity"], rebased.Compute(new ProgramGenome("xyz"))["diversity"]);

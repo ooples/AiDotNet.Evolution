@@ -2,28 +2,76 @@ using System.Text.Json;
 
 namespace AiDotNet.Evolution.Programs;
 
+/// <summary>Asks a verifier to test one exact artifact.</summary>
+/// <param name="Nonce">A fresh value the receipt must echo, so a receipt cannot be replayed for another request.</param>
+/// <param name="Artifact">The artifact to test.</param>
 public sealed record VerificationRequest(string Nonce, ProgramArtifact Artifact);
 /// <summary>Search feedback must contain only public test diagnostics. Held-out feedback is never sent to a proposer.</summary>
 public sealed record VerificationReceipt(string Nonce, string ArtifactFingerprint, string OracleIdentity,
     bool Correct, double Duration, string Feedback);
+
+/// <summary>Tests an artifact and reports what the test cost.</summary>
+/// <param name="request">The artifact and the nonce to echo.</param>
+/// <param name="cancellationToken">Cancels the test.</param>
+/// <returns>The receipt, with a positive <see cref="ProgramImprovement.CostResource"/> charge.</returns>
 public delegate ValueTask<EvolutionResourceResult<VerificationReceipt>> ProgramVerifier(
     VerificationRequest request, CancellationToken cancellationToken);
+
+/// <summary>Proposes a patch plan, usually by asking a model, and reports what it cost.</summary>
+/// <param name="request">The parent, targets and prior feedback.</param>
+/// <param name="cancellationToken">Cancels the proposal.</param>
+/// <returns>The plan, with a positive <see cref="ProgramImprovement.CostResource"/> charge.</returns>
 public delegate ValueTask<EvolutionResourceResult<PatchPlan>> ProgramPlanner(
     SearchRequest request, CancellationToken cancellationToken);
 
+/// <summary>Configures one <see cref="ProgramImprovement.RunAsync"/> session. Costs are in <see cref="ProgramImprovement.CostResource"/> units.</summary>
+/// <param name="RunId">Names the run's audit folder: 1-64 ASCII letters, digits, <c>-</c> or <c>_</c>. An existing run is refused.</param>
+/// <param name="MeasuredBottleneck">What measurement says limits the program, shown to the planner.</param>
+/// <param name="OracleIdentity">The identity every verification receipt must carry.</param>
+/// <param name="AuditDirectory">Where the run's audit folder is created.</param>
+/// <param name="MaxRepairs">Repair attempts after the first proposal, 0 to 7.</param>
+/// <param name="SetupCost">The charge for creating the compiler.</param>
+/// <param name="BuildCost">The charge for each build.</param>
+/// <param name="PatchCost">The charge for cataloguing targets and for applying each plan.</param>
+/// <param name="AuditCost">The charge for writing each audit record.</param>
+/// <param name="ModelMaximum">The most one planner call may cost.</param>
+/// <param name="VerificationMaximum">The most one verification may cost.</param>
+/// <param name="MinimumSpeedup">How many times faster than the incumbent the candidate must run on held-out tests, 1 to 1000.</param>
 public sealed record ImprovementOptions(string RunId, string MeasuredBottleneck, string OracleIdentity,
     string AuditDirectory, int MaxRepairs = 2, decimal SetupCost = 1, decimal BuildCost = 1,
     decimal PatchCost = 1, decimal AuditCost = 1, decimal ModelMaximum = 10,
     decimal VerificationMaximum = 10, double MinimumSpeedup = 1.0);
 
+/// <summary>The outcome of an improvement session.</summary>
+/// <param name="Promoted">Whether the candidate passed held-out tests and beat the incumbent by the required speedup.</param>
+/// <param name="Incumbent">The compiled starting program.</param>
+/// <param name="Candidate">The last candidate that compiled and passed public tests, or <c>null</c>.</param>
+/// <param name="Attempts">How many proposals were made.</param>
+/// <param name="Reason">Why it was or was not promoted.</param>
+/// <param name="BaselineConfirmation">The incumbent's held-out receipt, when a candidate reached that stage.</param>
+/// <param name="CandidateConfirmation">The candidate's held-out receipt, when it reached that stage.</param>
 public sealed record ImprovementResult(bool Promoted, ProgramArtifact Incumbent, ProgramArtifact? Candidate,
     int Attempts, string Reason, VerificationReceipt? BaselineConfirmation, VerificationReceipt? CandidateConfirmation);
 
 /// <summary>One bounded proposal/repair session and one sealed final comparison. Not an OS execution sandbox.</summary>
 public static class ProgramImprovement
 {
+    /// <summary>The resource name every charge in a session is made in.</summary>
     public const string CostResource = "program_work_units";
 
+    /// <summary>Runs one proposal and repair session, then one sealed held-out comparison.</summary>
+    /// <param name="parent">The program to improve. It must compile and pass public tests.</param>
+    /// <param name="compilerFactory">Creates the compiler.</param>
+    /// <param name="planner">Proposes patch plans.</param>
+    /// <param name="searchVerifier">Runs public tests, whose feedback may reach the planner.</param>
+    /// <param name="heldOutVerifier">Runs held-out tests; their feedback never reaches the planner.</param>
+    /// <param name="ledger">The ledger every stage is charged to.</param>
+    /// <param name="options">Costs, limits and the audit location.</param>
+    /// <param name="cancellationToken">Cancels the session.</param>
+    /// <returns>Whether a candidate was promoted, with its evidence.</returns>
+    /// <exception cref="IOException">The run's audit folder already exists.</exception>
+    /// <exception cref="InvalidOperationException">The parent does not compile or fails public tests.</exception>
+    /// <exception cref="InvalidDataException">A planner, compiler or verifier returned unbounded or mismatched evidence.</exception>
     public static async Task<ImprovementResult> RunAsync(ProgramSnapshot parent, Func<IProgramCompiler> compilerFactory,
         ProgramPlanner planner, ProgramVerifier searchVerifier, ProgramVerifier heldOutVerifier,
         EvolutionResourceLedger ledger, ImprovementOptions options, CancellationToken cancellationToken = default)
@@ -160,6 +208,9 @@ public static class ProgramImprovement
         return result;
     }
 
+    /// <summary>Creates a resource amount in <see cref="CostResource"/> units.</summary>
+    /// <param name="amount">The amount.</param>
+    /// <returns>The resources.</returns>
     public static EvolutionResources Units(decimal amount) => EvolutionResources.Of(CostResource, amount);
     private static string Bounded(string text) => text is null || text.Length > 4096
         ? throw new InvalidDataException("Diagnostics exceed their bound.") : text;

@@ -91,6 +91,7 @@ public sealed class MapElitesAutoML<T, TInput, TOutput> :
     /// <inheritdoc/>
     public string ArchiveStateHash { get; private set; } = string.Empty;
 
+    /// <inheritdoc/>
     protected override AutoMLModelBase<T, TInput, TOutput> CreateInstanceForCopy() => new MapElitesAutoML<T, TInput, TOutput>(_options);
 
     /// <inheritdoc/>

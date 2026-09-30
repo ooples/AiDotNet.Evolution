@@ -22,7 +22,7 @@ public sealed class EvolutionFidelityTests
         internal ValueTask<EvolutionFidelityEvaluationResult> Evaluate(int genome, EvolutionFidelityEvaluationContext context, CancellationToken token)
         {
             token.ThrowIfCancellationRequested(); Calls.Add((genome, context)); OnCall?.Invoke(genome, context);
-            if (context.Resume is { } resume)
+            if (context.Resume is EvolutionFidelityResumeState resume)
             {
                 byte[] payload = resume.CopyToken();
                 Assert.Equal(genome, payload[0]); Assert.Equal(context.Replicate.Index, payload[1]);
