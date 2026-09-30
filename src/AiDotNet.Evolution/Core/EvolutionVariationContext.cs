@@ -24,11 +24,12 @@ public sealed class EvolutionVariationContext<TGenome>
     internal EvolutionVariationContext(EvolutionArchiveEntry<TGenome> parent,
         IReadOnlyList<EvolutionArchiveEntry<TGenome>> inspirations, StableRandom random, long generation, int island,
         IReadOnlyList<EvolutionArtifact> parentArtifacts, IEvolutionArchiveView<TGenome> archive,
-        string proposalIdentity, long evaluationId)
+        string proposalIdentity, long evaluationId, long committedBefore)
         : this(parent, inspirations, random, generation, island, parentArtifacts, archive)
     {
         ProposalIdentity = proposalIdentity;
         EvaluationId = evaluationId;
+        CommittedBefore = committedBefore;
     }
 
     /// <summary>Gets the stable run/configuration/parent/snapshot identity in pipeline mode; null for legacy callers.</summary>
@@ -36,6 +37,15 @@ public sealed class EvolutionVariationContext<TGenome>
 
     /// <summary>Gets the allocated evaluation identity in pipeline mode; null for legacy callers.</summary>
     public long? EvaluationId { get; }
+
+    /// <summary>
+    /// Gets the evaluation identity below which every evaluation had committed when this proposal was planned, in
+    /// snapshot (pipeline or concurrent continuous) mode; null for legacy callers.
+    /// </summary>
+    /// <remarks>An operator that keeps history across overlapping calls can read only records below this horizon: they
+    /// all finished before the proposal was planned, so what the call sees does not depend on which calls finish first.
+    /// Horizons never decrease in planning order.</remarks>
+    public long? CommittedBefore { get; }
 
     /// <summary>Initializes a variation context.</summary>
     /// <param name="parent">The selected parent elite.</param>

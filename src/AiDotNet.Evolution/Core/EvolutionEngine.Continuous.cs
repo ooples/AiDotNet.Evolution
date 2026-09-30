@@ -33,7 +33,8 @@ public sealed partial class EvolutionEngine<TGenome>
     private async Task<EvolutionStopReason> RunContinuousLoopAsync(TGenome[] seeds, int seedIndex, Stopwatch runTimer,
         CancellationToken cancellationToken)
     {
-        var state = new ContinuousState(seeds, seedIndex, _options.ResolveInFlightWindow());
+        var state = new ContinuousState(seeds, seedIndex, _options.ResolveInFlightWindow(),
+            _variation is IDeterministicConcurrentVariationOperator<TGenome> concurrent && concurrent.SupportsDeterministicConcurrency);
 
         using var semaphore = new SemaphoreSlim(_options.MaxDegreeOfParallelism, _options.MaxDegreeOfParallelism);
         try
@@ -44,7 +45,7 @@ public sealed partial class EvolutionEngine<TGenome>
 
                 await FillWindowAsync(state, semaphore, runTimer, cancellationToken).ConfigureAwait(false);
 
-                if (state.InFlight.Count == 0)
+                if (state.InFlight.Count == 0 && state.Proposing.Count == 0)
                 {
                     // The window is drained, which is the only point at which the run's counters describe exactly
                     // what has been committed. Capturing here is what makes the final checkpoint the run's real
@@ -63,10 +64,15 @@ public sealed partial class EvolutionEngine<TGenome>
                 }
 
                 DispatchWaiting(state, semaphore, cancellationToken);
-                if (state.Running.Count > 0)
+                StartProposals(state, cancellationToken);
+                await AdmitFinishedProposalsAsync(state, semaphore, cancellationToken).ConfigureAwait(false);
+                List<Task> awaited = WaitableWork(state);
+                if (awaited.Count > 0)
                 {
-                    await Task.WhenAny(state.Running.Values).ConfigureAwait(false);
+                    await Task.WhenAny(awaited).ConfigureAwait(false);
                     await ReapFinishedAsync(state, semaphore, cancellationToken).ConfigureAwait(false);
+                    await AdmitFinishedProposalsAsync(state, semaphore, cancellationToken).ConfigureAwait(false);
+                    StartProposals(state, cancellationToken);
                 }
 
                 while (TryTakeCommittable(state, out WorkItem? ready) && ready is not null)
@@ -116,13 +122,14 @@ public sealed partial class EvolutionEngine<TGenome>
         }
     }
 
-    /// <summary>Waits for every dispatched evaluation to unwind, ignoring how each one ended.</summary>
+    /// <summary>Waits for every dispatched evaluation and outstanding proposal to unwind, ignoring how each ended.</summary>
     private static async Task DrainRunningAsync(ContinuousState state)
     {
-        if (state.Running.Count == 0) return;
+        if (state.Running.Count == 0 && state.Proposing.Count == 0) return;
         try
         {
-            await Task.WhenAll(state.Running.Values).ConfigureAwait(false);
+            await Task.WhenAll(state.Running.Values.Concat(state.Proposing.Select(proposal => proposal.Response)
+                .OfType<Task>())).ConfigureAwait(false);
         }
 #pragma warning disable CA1031
         catch (Exception exception) when (EvolutionExceptionPolicy.IsRecoverable(exception))
@@ -137,6 +144,76 @@ public sealed partial class EvolutionEngine<TGenome>
         }
     }
 
+    /// <summary>Starts planned model calls, oldest first, until <c>Pipeline.MaxProposalConcurrency</c> are running.</summary>
+    /// <remarks>
+    /// Calls start on the loop, in identifier order, so an operator that fixes its view of history when a call starts
+    /// sees horizons that never go backwards. The cap bounds spend and provider load separately from the window, which
+    /// bounds staleness; it changes only when calls run, never what they are asked.
+    /// </remarks>
+    private void StartProposals(ContinuousState state, CancellationToken cancellationToken)
+    {
+        int running = state.Proposing.Count(proposal => proposal.Response is not null && !proposal.Response.IsCompleted);
+        foreach (ContinuousProposal proposal in state.Proposing)
+        {
+            if (running >= _options.Pipeline.MaxProposalConcurrency) break;
+            if (proposal.Response is not null) continue;
+            proposal.Response = InvokeVariationAsync(proposal.Request, cancellationToken);
+            if (!proposal.Response.IsCompleted) running++;
+        }
+    }
+
+    /// <summary>Returns the lowest identifier not yet committed: every admitted or outstanding item is uncommitted.</summary>
+    private long LowestUncommitted(ContinuousState state) =>
+        state.InFlight.Select(entry => entry.EvaluationId)
+            .Concat(state.Proposing.Select(entry => entry.Request.EvaluationId))
+            .DefaultIfEmpty(_nextEvaluationId).Min();
+
+    /// <summary>Returns the tasks whose completion can let the loop make progress.</summary>
+    private List<Task> WaitableWork(ContinuousState state)
+    {
+        var tasks = new List<Task>(state.Running.Values);
+        if (state.Proposing.Count == 0) return tasks;
+        // Any running call can unblock the loop: its completion frees a slot for the next planned call. Finished calls
+        // are left out, because one that is not the next to admit would make every wait return at once.
+        foreach (ContinuousProposal proposal in state.Proposing)
+            if (proposal.Response is { IsCompleted: false } response) tasks.Add(response);
+        return tasks;
+    }
+
+    /// <summary>Turns finished proposals into window entries and dispatches their evaluations.</summary>
+    /// <remarks>
+    /// Admission reads the evaluation cache, the duplicate set and the archive (for structural novelty), and commits
+    /// change all three. A deterministic run therefore admits proposal N at exactly one point: in identifier order,
+    /// once the committed prefix reaches N minus <see cref="ContinuousState.AdmissionLag"/>, while
+    /// <see cref="TryTakeCommittable"/> holds the commit of that prefix's next item until N is admitted. What N sees
+    /// is then fixed, whenever its model call happens to return. An opportunistic run admits whatever has finished.
+    /// </remarks>
+    private async Task AdmitFinishedProposalsAsync(ContinuousState state, SemaphoreSlim semaphore,
+        CancellationToken cancellationToken)
+    {
+        bool admitted = false;
+        while (true)
+        {
+            int index = _options.ExecutionMode == EvolutionExecutionMode.Deterministic
+                ? (state.Proposing.Count > 0 && state.Proposing[0].Response is { IsCompleted: true } &&
+                   LowestUncommitted(state) >= state.Proposing[0].Request.EvaluationId - state.AdmissionLag ? 0 : -1)
+                : state.Proposing.FindIndex(proposal => proposal.Response is { IsCompleted: true });
+            if (index < 0) break;
+            ContinuousProposal proposal = state.Proposing[index];
+            if (proposal.Response is not Task<VariationResponse> call) break;
+            // The proposal leaves Proposing only once it is an InFlight item. If either await throws (a cancelled model
+            // call, or cancellation during completion), it is still listed, so the rollback undoes its identifier and
+            // counters instead of losing them.
+            VariationResponse response = await call.ConfigureAwait(false);
+            WorkItem item = await CompleteVariationAsync(proposal.Request, response, cancellationToken).ConfigureAwait(false);
+            item.IsSeed = false;
+            state.Proposing.RemoveAt(index);
+            state.InFlight.Add(item);
+            admitted = true;
+        }
+        if (admitted) DispatchWaiting(state, semaphore, cancellationToken);
+    }
+
     /// <summary>Undoes exactly the proposals that were prepared but never committed.</summary>
     /// <remarks>
     /// A snapshot taken after the last commit cannot do this job, because by then the window already holds prepared
@@ -147,6 +224,17 @@ public sealed partial class EvolutionEngine<TGenome>
     private void RollbackInFlight(ContinuousState state)
     {
         long? lowestInFlightId = null;
+        foreach (ContinuousProposal proposal in state.Proposing)
+        {
+            lowestInFlightId = lowestInFlightId.HasValue
+                ? Math.Min(lowestInFlightId.Value, proposal.Request.EvaluationId)
+                : proposal.Request.EvaluationId;
+            _proposals--;
+            _generation--;
+            int island = proposal.Request.Island;
+            if (island >= 0 && island < _islandGenerations.Length) _islandGenerations[island]--;
+        }
+        state.Proposing.Clear();
         foreach (WorkItem item in state.InFlight)
         {
             lowestInFlightId = lowestInFlightId.HasValue
@@ -182,7 +270,7 @@ public sealed partial class EvolutionEngine<TGenome>
     private async Task FillWindowAsync(ContinuousState state, SemaphoreSlim semaphore, Stopwatch runTimer,
         CancellationToken cancellationToken)
     {
-        while (state.InFlight.Count < state.Window && state.Stop is null && !state.DrainingForCheckpoint &&
+        while (state.Occupied < state.Window && state.Stop is null && !state.DrainingForCheckpoint &&
                await FillOneAsync(state, semaphore, runTimer, cancellationToken).ConfigureAwait(false))
         {
             // FillOneAsync performs the admission; the loop continues until the window or a run limit stops it.
@@ -194,7 +282,7 @@ public sealed partial class EvolutionEngine<TGenome>
     private async Task<bool> FillOneAsync(ContinuousState state, SemaphoreSlim semaphore, Stopwatch runTimer,
         CancellationToken cancellationToken)
     {
-        if (state.Stop is not null || state.DrainingForCheckpoint || state.InFlight.Count >= state.Window) return false;
+        if (state.Stop is not null || state.DrainingForCheckpoint || state.Occupied >= state.Window) return false;
         cancellationToken.ThrowIfCancellationRequested();
 
         // A stop request has to reach the proposing side, not only the loop head. Checking it only where the window
@@ -210,7 +298,24 @@ public sealed partial class EvolutionEngine<TGenome>
 
         // Admitted work that has not been charged yet still consumes the budget, so counting it here keeps admission
         // a function of the window's contents rather than of how far the evaluator happens to have got.
-        int uncharged = state.InFlight.Count(item => item.RequiresEvaluation && item.ChargedAttempts == 0);
+        // With overlapping model calls, whether a late proposal has resolved yet (and turned out to be a cache hit or a
+        // duplicate) depends on which call returned first, so only the ones the commit order guarantees are admitted may
+        // be discounted: every identifier up to the last commit plus the admission lag. Later ones stay reserved whether
+        // or not they have resolved, which keeps this check a function of the commit count. The cost is that a run can
+        // stop up to AdmissionLag evaluations short of the budget when those late proposals would not have needed one.
+        // Serial proposing resolves each proposal before the next check, so it keeps the exact count.
+        int uncharged;
+        if (state.ConcurrentProposals)
+        {
+            long admittedThrough = LowestUncommitted(state) - 1 + state.AdmissionLag;
+            uncharged = state.InFlight.Count(item => item.ChargedAttempts == 0 &&
+                                                     (item.RequiresEvaluation || item.EvaluationId > admittedThrough)) +
+                        state.Proposing.Count;
+        }
+        else
+        {
+            uncharged = state.InFlight.Count(item => item.RequiresEvaluation && item.ChargedAttempts == 0);
+        }
         if (_evaluationAttempts + uncharged >= _options.MaxEvaluationAttempts)
         {
             state.Stop = EvolutionStopReason.EvaluationBudgetReached;
@@ -232,6 +337,18 @@ public sealed partial class EvolutionEngine<TGenome>
             {
                 state.Stop = EvolutionStopReason.GenerationLimitReached;
                 return false;
+            }
+            if (state.ConcurrentProposals)
+            {
+                // The request is planned here, paired with a commit exactly as a serial proposal would be, and
+                // reads a snapshot of the archive, so the model call can overlap later commits without seeing them.
+                // Every identifier below the oldest outstanding one has committed, so that is the history horizon.
+                long committedBefore = LowestUncommitted(state);
+                VariationRequest? request = CreateVariationRequest(new Dictionary<int, PipelineArchiveContext>(), committedBefore);
+                if (request is null) return false;
+                state.Proposing.Add(new ContinuousProposal(request));
+                StartProposals(state, cancellationToken);
+                return true;
             }
             PreparedProposal? prepared = await PrepareVariationAsync(cancellationToken).ConfigureAwait(false);
             if (prepared is null) return false;
@@ -335,6 +452,10 @@ public sealed partial class EvolutionEngine<TGenome>
         {
             WorkItem head = state.InFlight.OrderBy(item => item.EvaluationId).First();
             if (head.RequiresEvaluation || head.Result is null) return false;
+            // The other half of the admission rule: every proposal within AdmissionLag of this commit must be admitted
+            // first, so none of them can see this commit's effect on the cache, duplicate set or archive.
+            if (state.Proposing.Count > 0 && state.Proposing[0].Request.EvaluationId <= head.EvaluationId + state.AdmissionLag)
+                return false;
             ready = head;
             return true;
         }
@@ -363,8 +484,10 @@ public sealed partial class EvolutionEngine<TGenome>
     /// <summary>The mutable bookkeeping of one continuous run, kept in one place so the loop reads as a pipeline.</summary>
     private sealed class ContinuousState
     {
-        public ContinuousState(TGenome[] seeds, int seedIndex, int window)
+        public ContinuousState(TGenome[] seeds, int seedIndex, int window, bool concurrentProposals)
         {
+            ConcurrentProposals = concurrentProposals;
+            AdmissionLag = window / 2;
             Seeds = seeds;
             SeedIndex = seedIndex;
             CommittedSeeds = seedIndex;
@@ -379,5 +502,25 @@ public sealed partial class EvolutionEngine<TGenome>
         public EvolutionStopReason? Stop { get; set; }
         public List<WorkItem> InFlight { get; } = new();
         public Dictionary<long, Task> Running { get; } = new();
+        /// <summary>Planned proposals whose model call is still outstanding, in identifier order.</summary>
+        public List<ContinuousProposal> Proposing { get; } = new();
+        /// <summary>Whether the operator lets proposals overlap each other and later commits.</summary>
+        public bool ConcurrentProposals { get; }
+        /// <summary>
+        /// How many commits a finished proposal may run ahead of: proposal N is admitted when the committed prefix
+        /// reaches N minus this. Half the window, which is part of the run's identity, so up to this many evaluations
+        /// overlap while the rest of the window keeps model calls running.
+        /// </summary>
+        public int AdmissionLag { get; }
+        /// <summary>Window slots taken by outstanding proposals and admitted evaluations together.</summary>
+        public int Occupied => InFlight.Count + Proposing.Count;
+    }
+
+    /// <summary>A planned proposal whose model call is running outside the loop.</summary>
+    private sealed class ContinuousProposal(VariationRequest request)
+    {
+        public VariationRequest Request { get; } = request;
+        /// <summary>The model call, or null while it waits for a proposal slot.</summary>
+        public Task<VariationResponse>? Response { get; set; }
     }
 }

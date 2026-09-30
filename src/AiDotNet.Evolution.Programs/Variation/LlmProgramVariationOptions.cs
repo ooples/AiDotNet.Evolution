@@ -65,6 +65,15 @@ public sealed class LlmProgramVariationOptions
     public double? Temperature { get; set; }
 
     /// <summary>
+    /// Gets or sets whether several proposals may call the model at once, up to
+    /// <see cref="EvolutionEngineOptions.Pipeline"/>'s <c>MaxProposalConcurrency</c>, under
+    /// <see cref="EvolutionDispatchMode.Pipeline"/> or <see cref="EvolutionDispatchMode.Continuous"/> dispatch. Off by
+    /// default, when proposals run one at a time. On, replay stays exact: a prompt reads only the attempt history of
+    /// evaluations that had committed when it was planned, so no prompt depends on which concurrent call returns first.
+    /// </summary>
+    public bool ConcurrentProposals { get; set; }
+
+    /// <summary>
     /// Gets or sets a store whose lessons for this task are added to every proposal prompt, or <c>null</c> for none.
     /// </summary>
     /// <remarks>Not part of the operator's identity: the store's contents change as a run proceeds.</remarks>
@@ -173,6 +182,7 @@ public sealed class LlmProgramVariationOptions
         MaxPromptProgramChars = MaxPromptProgramChars,
         SystemMessage = SystemMessage,
         Temperature = Temperature,
+        ConcurrentProposals = ConcurrentProposals,
         Experience = Experience,
         TopP = TopP,
         ReasoningEffort = ReasoningEffort,

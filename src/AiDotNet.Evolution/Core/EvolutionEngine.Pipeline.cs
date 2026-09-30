@@ -207,6 +207,7 @@ public sealed partial class EvolutionEngine<TGenome>
         Dictionary<int, PipelineArchiveContext> snapshots)
     {
         var plan = new List<PipelineProposal>(limit);
+        long committedBefore = _nextEvaluationId; // every earlier wave has committed
         while (plan.Count < limit)
         {
             if (seedIndex < seeds.Length)
@@ -219,7 +220,7 @@ public sealed partial class EvolutionEngine<TGenome>
             else
             {
                 if (_generation >= _options.MaxGenerations) break;
-                VariationRequest? request = CreateVariationRequest(snapshots);
+                VariationRequest? request = CreateVariationRequest(snapshots, committedBefore);
                 if (request is null) break;
                 plan.Add(new PipelineProposal(request.EvaluationId, request.Island, request.Lineage, default!, request, null));
                 _pipelineStatistics!.Record(EvolutionPipelineScheduleKind.ProposalSnapshot, request.EvaluationId, request.Lineage.Generation, request.Context.ProposalIdentity!);

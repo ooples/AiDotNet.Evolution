@@ -63,7 +63,8 @@ namespace AiDotNet.Evolution.Programs;
 /// and asks again instead of wasting the round. You supply the chat client, so no model is contacted unless you
 /// configure one.</para>
 /// </remarks>
-public sealed class LlmProgramVariationOperator : ICheckpointableVariationOperator<ProgramGenome>, IProgramVariationOperator, IEvolutionLatencyProfile
+public sealed class LlmProgramVariationOperator : ICheckpointableVariationOperator<ProgramGenome>, IProgramVariationOperator, IEvolutionLatencyProfile,
+    IDeterministicConcurrentVariationOperator<ProgramGenome>
 {
     /// <inheritdoc/>
     /// <remarks>Every proposal is a model call, so proposals wait on external latency.</remarks>
@@ -85,6 +86,21 @@ public sealed class LlmProgramVariationOperator : ICheckpointableVariationOperat
     private readonly ProposalProvenanceOptions _provenanceOptions;
     private readonly object _attemptLock = new();
     private readonly Queue<ProgramProposalAttempt> _attempts = new();
+
+    // Concurrent mode (LlmProgramVariationOptions.ConcurrentProposals). Records are ordered by (evaluation id, sequence),
+    // not by arrival, and a prompt reads only the records of evaluations below its context's CommittedBefore horizon.
+    // Those had all committed, so had all finished, when the proposal was planned: the view is the same whichever
+    // model call returns first. Horizons only grow in planning order and the engine starts calls in that order, so a
+    // record falls out of history only once no later prompt can still ask for it.
+    private readonly SortedList<(long Id, int Sequence), ProgramProposalAttempt> _ordered = new();
+    private readonly Dictionary<long, ProgramProposalAttempt[]> _frozen = new();
+    private long _frozenHorizon = long.MinValue;
+    private long _nextUnidentifiedRecord = long.MinValue / 2;
+
+    /// <inheritdoc/>
+    /// <remarks>True when <see cref="LlmProgramVariationOptions.ConcurrentProposals"/> is set; the chat client must then
+    /// accept overlapping calls (every client in this package does).</remarks>
+    public bool SupportsDeterministicConcurrency => _variationOptions.ConcurrentProposals;
     private long _provenanceFailures;
     private long _proposals;
     private long _chatCalls;
@@ -192,7 +208,7 @@ public sealed class LlmProgramVariationOperator : ICheckpointableVariationOperat
     {
         lock (_attemptLock)
         {
-            return _attempts.ToArray();
+            return _variationOptions.ConcurrentProposals ? _ordered.Values.ToArray() : _attempts.ToArray();
         }
     }
 
@@ -221,6 +237,8 @@ public sealed class LlmProgramVariationOperator : ICheckpointableVariationOperat
         ProgramPromptResult prompt = _promptBuilder.Build(BuildPromptContext(context, parent), context.Random);
         var messages = new List<ProgramChatMessage>(prompt.Messages);
         AppendExperience(messages);
+        int recordSequence = 0;
+        long recordId = RecordId(context);
 
         bool recordProvenance = _provenanceSink is not null && _provenanceOptions.Enabled;
         string proposalId = recordProvenance ? BuildProposalId(context) : string.Empty;
@@ -285,7 +303,7 @@ public sealed class LlmProgramVariationOperator : ICheckpointableVariationOperat
             {
                 Interlocked.Increment(ref _providerErrors);
                 string typeName = exception.GetType().Name;
-                Record(parent.Id, attemptNumber, ProgramProposalOutcome.ProviderError, typeName);
+                Record(context, recordId, recordSequence++, parent.Id, attemptNumber, ProgramProposalOutcome.ProviderError, typeName);
                 if (recordProvenance)
                 {
                     await RecordProvenanceAsync(
@@ -305,7 +323,7 @@ public sealed class LlmProgramVariationOperator : ICheckpointableVariationOperat
             CheckModelIdentity();
             ProgramProposalOutcome outcome = TryBuildChild(
                 parent, responseText, prompt.Mode, out ProgramGenome child, out string feedback);
-            Record(parent.Id, attemptNumber, outcome, feedback, inputTokens, outputTokens);
+            Record(context, recordId, recordSequence++, parent.Id, attemptNumber, outcome, feedback, inputTokens, outputTokens);
             if (recordProvenance)
             {
                 await RecordProvenanceAsync(
@@ -323,7 +341,7 @@ public sealed class LlmProgramVariationOperator : ICheckpointableVariationOperat
         }
 
         Interlocked.Increment(ref _abandoned);
-        Record(parent.Id, Math.Max(attemptNumber, 1), ProgramProposalOutcome.Exhausted,
+        Record(context, recordId, recordSequence++, parent.Id, Math.Max(attemptNumber, 1), ProgramProposalOutcome.Exhausted,
             "Every permitted attempt failed; the parent was returned unchanged.");
         return parent;
     }
@@ -384,7 +402,7 @@ public sealed class LlmProgramVariationOperator : ICheckpointableVariationOperat
             promptContext.Artifacts = artifacts;
         }
 
-        ApplyPreviousAttempts(promptContext, context.Parent.Evaluation.GenomeId);
+        ApplyPreviousAttempts(promptContext, context.Parent.Evaluation.GenomeId, context);
         ApplyArchiveContext(promptContext, context);
         SplitDiagnostics(evaluation.Diagnostics, promptContext);
         return promptContext;
@@ -393,13 +411,17 @@ public sealed class LlmProgramVariationOperator : ICheckpointableVariationOperat
     /// <summary>Tells the model what has already been tried on this same parent, and how it went.</summary>
     /// <param name="promptContext">The context being built.</param>
     /// <param name="parentGenomeId">The parent whose attempt history is relevant.</param>
+    /// <param name="context">
+    /// The proposal's context. With concurrent proposals it fixes which recorded attempts this proposal may see, so the
+    /// prompt does not depend on which other model calls happened to finish first.
+    /// </param>
     /// <remarks>
     /// Within a single proposal a rejected answer is already fed back into the conversation, so the model can see
     /// its own mistake. Across proposals it cannot: the next call starts a fresh conversation from the same parent
     /// and is free to repeat an edit that failed to parse or applied to nothing. This surfaces the recorded
     /// attempts for that parent so the same dead end is not paid for twice.
     /// </remarks>
-    private void ApplyPreviousAttempts(ProgramPromptContext promptContext, string parentGenomeId)
+    private void ApplyPreviousAttempts(ProgramPromptContext promptContext, string parentGenomeId, EvolutionVariationContext<ProgramGenome> context)
     {
         int limit = _variationOptions.MaxPreviousAttempts;
         if (limit <= 0) return;
@@ -407,7 +429,7 @@ public sealed class LlmProgramVariationOperator : ICheckpointableVariationOperat
         ProgramProposalAttempt[] recorded;
         lock (_attemptLock)
         {
-            recorded = _attempts.ToArray();
+            recorded = _variationOptions.ConcurrentProposals ? Frozen(context) : _attempts.ToArray();
         }
 
         var recent = new List<ProgramPromptAttempt>();
@@ -731,7 +753,60 @@ public sealed class LlmProgramVariationOperator : ICheckpointableVariationOperat
         return ProgramProposalOutcome.Accepted;
     }
 
+    // Called under _attemptLock. History as of this proposal's planning: the newest records below its horizon, capped at
+    // the history capacity exactly as the serial queue is. A context without a horizon comes from serial dispatch,
+    // where every earlier call has already finished, so it sees everything.
+    private ProgramProposalAttempt[] Frozen(EvolutionVariationContext<ProgramGenome> context)
+    {
+        int capacity = _variationOptions.MaxRecordedAttempts;
+        if (context.CommittedBefore is not long horizon)
+            return _ordered.Values.Skip(Math.Max(0, _ordered.Count - capacity)).ToArray();
+        if (_frozen.TryGetValue(horizon, out ProgramProposalAttempt[]? frozen)) return frozen;
+        int below = CountBelow(horizon);
+        frozen = _ordered.Values.Skip(Math.Max(0, below - capacity)).Take(Math.Min(below, capacity)).ToArray();
+        if (horizon > _frozenHorizon)
+        {
+            _frozenHorizon = horizon;
+            foreach (long stale in _frozen.Keys.Where(existing => existing < horizon).ToArray()) _frozen.Remove(stale);
+            TrimBelowFrozenHorizon(capacity);
+        }
+        _frozen[horizon] = frozen;
+        return frozen;
+    }
+
+    // Records at or above the newest horizon may still be read by a prompt planned later; below it only the newest
+    // capacity can be, because every later horizon is at least as high.
+    private void TrimBelowFrozenHorizon(int capacity)
+    {
+        while (CountBelow(_frozenHorizon) > capacity) _ordered.RemoveAt(0);
+    }
+
+    private int CountBelow(long horizon)
+    {
+        IList<(long Id, int Sequence)> keys = _ordered.Keys;
+        int low = 0, high = keys.Count;
+        while (low < high)
+        {
+            int middle = low + (high - low) / 2;
+            if (keys[middle].Id < horizon) low = middle + 1;
+            else high = middle;
+        }
+        return low;
+    }
+
+    // Records are keyed by evaluation identifier, which snapshot dispatch assigns. A context without one (serial
+    // dispatch) takes the next key from a range below every identifier the engine issues and above restored history, so
+    // the two can never collide; those contexts carry no horizon, so where they sort only decides trimming order.
+    internal long RecordId(EvolutionVariationContext<ProgramGenome> context)
+    {
+        if (context.EvaluationId is long id) return id;
+        lock (_attemptLock) return _nextUnidentifiedRecord++;
+    }
+
     private void Record(
+        EvolutionVariationContext<ProgramGenome> context,
+        long recordId,
+        int sequence,
         string parentId,
         int attemptNumber,
         ProgramProposalOutcome outcome,
@@ -743,6 +818,17 @@ public sealed class LlmProgramVariationOperator : ICheckpointableVariationOperat
         if (capacity == 0) return;
 
         var attempt = new ProgramProposalAttempt(parentId, attemptNumber, outcome, detail, inputTokens, outputTokens);
+        if (_variationOptions.ConcurrentProposals)
+        {
+            lock (_attemptLock)
+            {
+                _ordered[(recordId, sequence)] = attempt;
+                // The oldest by evaluation id, never by arrival. Serial dispatch has no horizon and trims like the queue.
+                if (context.CommittedBefore is null) { while (_ordered.Count > capacity) _ordered.RemoveAt(0); }
+                else TrimBelowFrozenHorizon(capacity);
+            }
+            return;
+        }
         lock (_attemptLock)
         {
             while (_attempts.Count >= capacity) _attempts.Dequeue();
@@ -760,7 +846,12 @@ public sealed class LlmProgramVariationOperator : ICheckpointableVariationOperat
     public string CaptureState()
     {
         ProgramProposalAttempt[] recorded;
-        lock (_attemptLock) { recorded = _attempts.ToArray(); }
+        lock (_attemptLock)
+        {
+            recorded = _variationOptions.ConcurrentProposals
+                ? _ordered.Values.Skip(Math.Max(0, _ordered.Count - _variationOptions.MaxRecordedAttempts)).ToArray()
+                : _attempts.ToArray();
+        }
 
         var document = new AttemptStateDocument
         {
@@ -825,7 +916,16 @@ public sealed class LlmProgramVariationOperator : ICheckpointableVariationOperat
         lock (_attemptLock)
         {
             _attempts.Clear();
-            foreach (ProgramProposalAttempt attempt in restored) _attempts.Enqueue(attempt);
+            _ordered.Clear();
+            _frozen.Clear();
+            _frozenHorizon = long.MinValue;
+            long restoredId = long.MinValue;
+            foreach (ProgramProposalAttempt attempt in restored)
+            {
+                if (!_variationOptions.ConcurrentProposals) { _attempts.Enqueue(attempt); continue; }
+                // Restored history predates every evaluation of the resumed run, so it sits below every horizon.
+                _ordered[(restoredId++, 0)] = attempt;
+            }
         }
     }
 
@@ -1114,6 +1214,8 @@ public sealed class LlmProgramVariationOperator : ICheckpointableVariationOperat
                 : "stream",
             promptBuilder.VersionHash
         };
+        // Only when set, so existing operator identities are unchanged: concurrent history changes what prompts contain.
+        if (variationOptions.ConcurrentProposals) components.Add("concurrent-proposals-v1");
         // Only when set, so existing operator identities are unchanged.
         if (variationOptions.TopP is not null || variationOptions.ReasoningEffort is not null)
         {
