@@ -102,9 +102,9 @@ public sealed class EvolutionCheckpointSegmentStoreTests
     [Fact]
     public async Task A_payload_with_every_character_that_needs_escaping_round_trips_exactly()
     {
-        // The directory store escapes the payload itself, in 16K chunks; a surrogate pair straddles the first boundary.
+        // The directory store escapes the payload itself, in 4K chunks; a surrogate pair straddles the first boundary.
         var text = new StringBuilder();
-        text.Append('x', 16 * 1024 - 1).Append("\U0001F600");
+        text.Append('x', 4 * 1024 - 1).Append("\U0001F600");
         for (int i = 0; i < 40_000; i++) text.Append("q\"b\\n\n r\r t\t c\u0001 e\u00e9 z\u4e2d s\U0001F680|");
         string payload = text.ToString();
         using var directory = new TemporaryDirectory();

@@ -499,7 +499,7 @@ public sealed class DirectoryEvolutionCheckpointStore : IEvolutionCheckpointSegm
     }
 
     // The snapshot around its payload is small, so it is serialized with a placeholder where the payload goes, and the
-    // payload itself is escaped into the file in bounded chunks. Letting the serializer escape it rented a character
+    // payload itself is escaped into the file in 4K chunks. Letting the serializer escape it rented a character
     // buffer up to six times the payload's length (about 300 MB at 50,000 evaluations), which the shared pool then kept.
     // The bytes differ only in how the string is escaped, so they decode to exactly the same snapshot.
     private static void WriteSnapshot(Stream stream, EvolutionCheckpoint checkpoint)
@@ -521,16 +521,19 @@ public sealed class DirectoryEvolutionCheckpointStore : IEvolutionCheckpointSegm
     }
 
     // Writes a string's JSON escaping, without its quotes, a chunk at a time: quote, backslash and control characters
-    // are escaped, everything else is written as UTF-8. A surrogate pair is never split across chunks.
+    // are escaped, everything else is written as UTF-8. One character and one byte buffer serve every chunk, so a save
+    // allocates nothing per chunk, and a surrogate pair is never split across chunks.
     private static void WriteEscaped(Stream stream, string text, Encoding utf8)
     {
-        const int Chunk = 16 * 1024;
-        var escaped = new StringBuilder(Chunk + 16);
-        byte[] bytes = new byte[utf8.GetMaxByteCount(Chunk + 16) + 16];
+        // 4K characters keeps both buffers below the large-object threshold, so a save adds no large-object churn.
+        const int Chunk = 4 * 1024;
+        // Room for a whole chunk escaped at the worst rate (a control character becomes six characters).
+        char[] escaped = new char[(Chunk + 1) * 6];
+        byte[] bytes = new byte[utf8.GetMaxByteCount(escaped.Length)];
         int index = 0;
         while (index < text.Length)
         {
-            escaped.Clear();
+            int length = 0;
             int end = Math.Min(text.Length, index + Chunk);
             if (end < text.Length && char.IsHighSurrogate(text[end - 1])) end++;
             for (; index < end; index++)
@@ -538,23 +541,35 @@ public sealed class DirectoryEvolutionCheckpointStore : IEvolutionCheckpointSegm
                 char c = text[index];
                 switch (c)
                 {
-                    case '"': escaped.Append("\\\""); break;
-                    case '\\': escaped.Append("\\\\"); break;
-                    case '\n': escaped.Append("\\n"); break;
-                    case '\r': escaped.Append("\\r"); break;
-                    case '\t': escaped.Append("\\t"); break;
+                    case '"': escaped[length++] = '\\'; escaped[length++] = '"'; break;
+                    case '\\': escaped[length++] = '\\'; escaped[length++] = '\\'; break;
+                    case '\n': escaped[length++] = '\\'; escaped[length++] = 'n'; break;
+                    case '\r': escaped[length++] = '\\'; escaped[length++] = 'r'; break;
+                    case '\t': escaped[length++] = '\\'; escaped[length++] = 't'; break;
                     default:
-                        if (c < ' ') escaped.Append("\\u").Append(((int)c).ToString("x4", CultureInfo.InvariantCulture));
-                        else escaped.Append(c);
+                        if (c < ' ')
+                        {
+                            escaped[length++] = '\\';
+                            escaped[length++] = 'u';
+                            escaped[length++] = '0';
+                            escaped[length++] = '0';
+                            escaped[length++] = HexDigit(c >> 4);
+                            escaped[length++] = HexDigit(c & 0xF);
+                        }
+                        else
+                        {
+                            escaped[length++] = c;
+                        }
                         break;
                 }
             }
 
-            string piece = escaped.ToString();
-            int count = utf8.GetBytes(piece, 0, piece.Length, bytes, 0);
+            int count = utf8.GetBytes(escaped, 0, length, bytes, 0);
             stream.Write(bytes, 0, count);
         }
     }
+
+    private static char HexDigit(int value) => (char)(value < 10 ? '0' + value : 'a' + value - 10);
 
     // Returns the SHA-256 of the bytes written. The snapshot is serialized straight into the file: building it as one
     // string and then one byte array first held two more copies of the whole payload at every save (V1-73), and those
