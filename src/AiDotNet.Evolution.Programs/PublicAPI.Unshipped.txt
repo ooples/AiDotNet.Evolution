@@ -1788,3 +1788,6 @@ AiDotNet.Evolution.Programs.ProgramExecuteErrorCode.MemoryLimitExceeded = 10 -> 
 AiDotNet.Evolution.Programs.ProgramSandboxLimitOptions.CpuTimeLimitSeconds.get -> int?
 AiDotNet.Evolution.Programs.ProgramSandboxLimitOptions.CpuTimeLimitSeconds.set -> void
 AiDotNet.Evolution.Programs.ProgramSandboxLimitOptions.GetCpuTimeLimit() -> System.TimeSpan
+AiDotNet.Evolution.Programs.LlmProgramVariationOperator.SupportsDeterministicConcurrency.get -> bool
+AiDotNet.Evolution.Programs.LlmProgramVariationOptions.ConcurrentProposals.get -> bool
+AiDotNet.Evolution.Programs.LlmProgramVariationOptions.ConcurrentProposals.set -> void
