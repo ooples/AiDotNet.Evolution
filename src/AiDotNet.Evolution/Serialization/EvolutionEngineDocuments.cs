@@ -46,6 +46,9 @@ internal static class EvolutionEngineDocuments
         // every other checkpoint is byte-for-byte what it was.
         [JsonIgnore(Condition = JsonIgnoreCondition.WhenWritingNull)]
         public List<CarriedEvaluationDocument>? CarriedEvaluations { get; set; }
+        // How many items that batch planned, so a resumed run replans at least those whatever its limits.
+        [JsonIgnore(Condition = JsonIgnoreCondition.WhenWritingDefault)]
+        public int CarriedBatchSize { get; set; }
     }
 
     internal sealed class OptionFieldDocument

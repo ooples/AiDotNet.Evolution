@@ -416,20 +416,24 @@ public sealed partial class EvolutionEngine<TGenome>
             cancellationToken.ThrowIfCancellationRequested();
             if (Volatile.Read(ref _stopRequested) != 0) return EvolutionStopReason.Canceled;
             EvolutionStopReason? limit = GetLimitStopReason(runTimer);
-            if (limit.HasValue) return limit.Value;
+            int carriedSize = TakeCarriedBatchSize();
+            if (limit.HasValue && carriedSize == 0) return limit.Value;
+            CloseCarriedBatch(seeds, seedIndex);
 
             BatchTransaction transaction = CaptureBatchTransaction();
             var batch = new List<WorkItem>(Math.Min(_options.ProposalBatchSize, 1024));
             int evaluationsRequired = 0;
-            bool truncatedByBudget = false;
+            bool truncatedByBudget = false, stoppedByLimit = false;
             BeginBatchCalls();
             try
             {
                 while (batch.Count < _options.ProposalBatchSize)
                 {
                     cancellationToken.ThrowIfCancellationRequested();
+                    // The carried batch is replanned whole before any limit applies.
+                    bool replaying = batch.Count < carriedSize;
                     limit = GetLimitStopReason(runTimer);
-                    if (limit.HasValue) break;
+                    if (limit.HasValue && !replaying) { stoppedByLimit = true; break; }
 
                     PreparedProposal? prepared;
                     if (seedIndex < seeds.Length)
@@ -438,7 +442,7 @@ public sealed partial class EvolutionEngine<TGenome>
                     }
                     else
                     {
-                        if (_generation >= _options.MaxGenerations) break;
+                        if (_generation >= _options.MaxGenerations && !replaying) { stoppedByLimit = true; break; }
                         prepared = await PrepareVariationAsync(cancellationToken).ConfigureAwait(false);
                         if (prepared is null) break;
                     }
@@ -448,7 +452,7 @@ public sealed partial class EvolutionEngine<TGenome>
                         batch.Add(prepared.Item);
                         if (prepared.Item.RequiresEvaluation) evaluationsRequired++;
                     }
-                    if (_evaluationAttempts + evaluationsRequired >= _options.MaxEvaluationAttempts)
+                    if (batch.Count >= carriedSize && _evaluationAttempts + evaluationsRequired >= _options.MaxEvaluationAttempts)
                     {
                         // A larger budget would have planned more of this batch from the same archive.
                         truncatedByBudget = batch.Count < _options.ProposalBatchSize;
@@ -485,8 +489,10 @@ public sealed partial class EvolutionEngine<TGenome>
             }
             UpdateEarlyStopping(batch.Count);
             // A batch the budget cut short is not a boundary: the checkpoint stays before it and carries its calls.
+            // A replayed carried batch that a lowered limit ends at its old size stays carried for a later resume.
+            truncatedByBudget |= carriedSize > 0 && stoppedByLimit && batch.Count < _options.ProposalBatchSize;
             if (!truncatedByBudget) CaptureSafeState(seeds, seedIndex);
-            SettleBatchCalls(truncatedByBudget);
+            SettleBatchCalls(truncatedByBudget, batch.Count);
             await SaveCheckpointAsync(force: false,
                 cancellationToken.IsCancellationRequested ? CancellationToken.None : cancellationToken).ConfigureAwait(false);
             cancellationToken.ThrowIfCancellationRequested();

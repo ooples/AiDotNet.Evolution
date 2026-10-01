@@ -18,6 +18,37 @@ public sealed partial class EvolutionEngine<TGenome>
     private readonly Dictionary<(long EvaluationId, int Stage, int Attempt), CarriedEvaluationDocument> _carriedCalls = new();
     // The calls of a truncated batch, to be saved with the boundary before it; null once a full batch commits.
     private List<CarriedEvaluationDocument>? _pendingCarried;
+    private int _pendingCarriedSize;
+    // The size of the truncated batch the checkpoint carries. Until a batch replans that many items, no limit may stop
+    // planning: the carried batch is work the run already did, and a resumed run that dropped it would report less.
+    private int _carriedBatchSize;
+
+    // True while the last committed batch was carried rather than made a boundary.
+    private bool _boundaryLags;
+
+    // Only the last batch can be carried. Before another batch plans, a carried one becomes a boundary, so a run that
+    // goes on past it (a cache hit left budget unspent) never drops its work from the checkpoint.
+    private void CloseCarriedBatch(TGenome[] seeds, int seedIndex)
+    {
+        if (!_boundaryLags) return;
+        _boundaryLags = false;
+        lock (_callGate)
+        {
+            _pendingCarried = null;
+            _pendingCarriedSize = 0;
+        }
+        CaptureSafeState(seeds, seedIndex);
+    }
+
+    private int TakeCarriedBatchSize()
+    {
+        lock (_callGate)
+        {
+            int size = _carriedBatchSize;
+            _carriedBatchSize = 0;
+            return size;
+        }
+    }
 
     private void BeginBatchCalls()
     {
@@ -63,13 +94,16 @@ public sealed partial class EvolutionEngine<TGenome>
 
     // After a batch commits: a full batch is a boundary and carries nothing; a truncated one keeps the earlier boundary
     // and carries its calls.
-    private void SettleBatchCalls(bool truncated)
+    private void SettleBatchCalls(bool truncated, int batchSize)
     {
         lock (_callGate)
         {
             _pendingCarried = truncated ? new List<CarriedEvaluationDocument>(_batchCalls) : null;
+            _pendingCarriedSize = truncated ? batchSize : 0;
             _carriedCalls.Clear();
+            _carriedBatchSize = 0;
         }
+        _boundaryLags = truncated;
     }
 
     // Puts the truncated batch's calls into the boundary that is about to be saved. The boundary is a new revision, so
@@ -77,15 +111,20 @@ public sealed partial class EvolutionEngine<TGenome>
     private void AttachCarried()
     {
         List<CarriedEvaluationDocument>? carried;
+        int size;
         lock (_callGate)
         {
             carried = _pendingCarried;
+            size = _pendingCarriedSize;
             _pendingCarried = null;
+            _pendingCarriedSize = 0;
         }
-        if (carried is null || carried.Count == 0) return;
+        // A truncated batch that made no evaluator calls (every item a cache hit) is still carried by its size.
+        if (carried is null || size == 0) return;
         if (_safeDocument is { } document)
         {
             document.CarriedEvaluations = carried;
+            document.CarriedBatchSize = size;
         }
         else if (_safePayload is { } payload)
         {
@@ -94,6 +133,7 @@ public sealed partial class EvolutionEngine<TGenome>
                 ?? throw new InvalidOperationException("The checkpoint boundary is not a JSON object.");
             node["CarriedEvaluations"] = System.Text.Json.JsonSerializer.SerializeToNode(carried,
                 EvolutionStateJsonContext.Default.ListCarriedEvaluationDocument);
+            node["CarriedBatchSize"] = size;
             _safePayload = node.ToJsonString();
         }
         else
@@ -108,6 +148,9 @@ public sealed partial class EvolutionEngine<TGenome>
         lock (_callGate)
         {
             _carriedCalls.Clear();
+            _carriedBatchSize = state.CarriedBatchSize;
+            if (_carriedBatchSize < 0 || (_carriedBatchSize == 0 && state.CarriedEvaluations is { Count: > 0 }))
+                throw new InvalidDataException("The checkpoint carries evaluations without the batch they belong to.");
             foreach (CarriedEvaluationDocument call in state.CarriedEvaluations ?? new List<CarriedEvaluationDocument>())
             {
                 if (call is null || call.Result is null || call.EvaluationId < 0 || call.Attempt < 1 ||
