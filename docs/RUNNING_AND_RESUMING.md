@@ -134,6 +134,17 @@ directory whole to move the run, or choose `Inline` when checkpoints must travel
 engine checks each segment's SHA-256, and the format is not part of the compatibility hash, so a run can resume
 under a different one.
 
+For a long run on .NET 6 or later, also let the garbage collector return memory it no longer needs:
+set `DOTNET_GCConserveMemory=7` in the environment, or add it to the application's runtime configuration:
+
+```json
+{ "configProperties": { "System.GC.ConserveMemory": 7 } }
+```
+
+A run's live memory stays flat once its deduplication set is bounded, but by default the collector keeps
+freed memory committed, so the process's working set can sit well above what the run holds. The soak
+evidence in `benchmarks/evidence/soak` is measured both ways.
+
 Both stores have `ForOutputDirectory(outputDirectory, runId, ...)`, which places files through
 `EvolutionOutputLayout`. The layout derives every path a run writes (the checkpoints and traces
 folders, the checkpoint path and trace paths) from one output directory and run id, so the CLI and
