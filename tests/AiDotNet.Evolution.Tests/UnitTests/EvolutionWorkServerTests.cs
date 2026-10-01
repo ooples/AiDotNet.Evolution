@@ -109,6 +109,85 @@ public sealed class EvolutionWorkServerTests : IDisposable
         Assert.Equal(6, claimed.Distinct().Count());
     }
 
+    // A server of its own, so a test can set the options under test without disturbing the shared one.
+    private EvolutionWorkServer Serve(EvolutionWorkServerOptions options)
+    {
+        options.BindAddress = "127.0.0.1";
+        var server = new EvolutionWorkServer(_coordinator, _certificate, Token, options);
+        server.Start();
+        return server;
+    }
+
+    private static Task<EvolutionWorkRemoteClient> ConnectTo(EvolutionWorkServer server) =>
+        EvolutionWorkRemoteClient.ConnectAsync("127.0.0.1", server.LocalEndPoint.Port, server.CertificateFingerprint, Token);
+
+    [Fact]
+    public void Port_binds_the_port_asked_for()
+    {
+        var probe = new System.Net.Sockets.TcpListener(IPAddress.Loopback, 0);
+        probe.Start();
+        int free = ((IPEndPoint)probe.LocalEndpoint).Port;
+        probe.Stop();
+        using EvolutionWorkServer server = Serve(new EvolutionWorkServerOptions { Port = free });
+        Assert.Equal(free, server.LocalEndPoint.Port);
+    }
+
+    [Fact]
+    public async Task MaximumConnections_refuses_a_connection_past_the_limit()
+    {
+        var events = new List<EvolutionWorkServerEvent>();
+        using EvolutionWorkServer server = Serve(new EvolutionWorkServerOptions
+        {
+            MaximumConnections = 1,
+            OnEvent = e => { lock (events) events.Add(e); }
+        });
+        using EvolutionWorkRemoteClient first = await ConnectTo(server);
+        await Assert.ThrowsAnyAsync<Exception>(async () =>
+        {
+            using EvolutionWorkRemoteClient second = await ConnectTo(server);
+            await second.SendAsync(Request("status").ToJsonString());
+        });
+        lock (events) Assert.Contains(events, e => e.Kind == EvolutionWorkServerEventKind.ConnectionLimitReached);
+        // The connection within the limit is unaffected.
+        JsonObject reply = Assert.IsType<JsonObject>(JsonNode.Parse(await first.SendAsync(Request("status").ToJsonString())));
+        Assert.True(reply["ok"]?.GetValue<bool>());
+    }
+
+    [Fact]
+    public async Task HandshakeTimeout_closes_a_connection_that_never_starts_tls()
+    {
+        var events = new List<EvolutionWorkServerEvent>();
+        using EvolutionWorkServer server = Serve(new EvolutionWorkServerOptions
+        {
+            HandshakeTimeout = TimeSpan.FromMilliseconds(300),
+            OnEvent = e => { lock (events) events.Add(e); }
+        });
+        using var silent = new System.Net.Sockets.TcpClient();
+        await silent.ConnectAsync(IPAddress.Loopback, server.LocalEndPoint.Port);
+        var clock = System.Diagnostics.Stopwatch.StartNew();
+        // A read returns 0 once the server closes the socket; it would otherwise wait until the test times out.
+        silent.ReceiveTimeout = 20_000;
+        int read = silent.GetStream().Read(new byte[16], 0, 16);
+        Assert.Equal(0, read);
+        Assert.True(clock.Elapsed < TimeSpan.FromSeconds(10), "the silent connection stayed open: " + clock.Elapsed);
+        // The server dropped it, by its own timeout: the abandoned TLS handshake fails and the connection is closed.
+        bool closed = SpinWait.SpinUntil(() => { lock (events) return events.Any(e => e.Kind == EvolutionWorkServerEventKind.Closed); }, TimeSpan.FromSeconds(5));
+        Assert.True(closed, "the server never closed the silent connection");
+        lock (events)
+            Assert.Contains(events, e => e.Kind is EvolutionWorkServerEventKind.Faulted or EvolutionWorkServerEventKind.AuthenticationRefused);
+    }
+
+    [Fact]
+    public async Task IdleTimeout_closes_an_authenticated_connection_that_goes_quiet()
+    {
+        using EvolutionWorkServer server = Serve(new EvolutionWorkServerOptions { IdleTimeout = TimeSpan.FromMilliseconds(300) });
+        using EvolutionWorkRemoteClient worker = await ConnectTo(server);
+        JsonObject first = Assert.IsType<JsonObject>(JsonNode.Parse(await worker.SendAsync(Request("status").ToJsonString())));
+        Assert.True(first["ok"]?.GetValue<bool>());
+        await Task.Delay(TimeSpan.FromSeconds(2));
+        await Assert.ThrowsAnyAsync<Exception>(() => worker.SendAsync(Request("status").ToJsonString()));
+    }
+
     private Task<EvolutionWorkRemoteClient> Connect() =>
         EvolutionWorkRemoteClient.ConnectAsync("127.0.0.1", _server.LocalEndPoint.Port, _server.CertificateFingerprint, Token);
 

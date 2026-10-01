@@ -1431,6 +1431,8 @@ AiDotNet.Evolution.EvolutionTraceSummary.ImprovementCount.init -> void
 AiDotNet.Evolution.EvolutionTraceSummary.ImprovementRate.get -> double
 AiDotNet.Evolution.EvolutionTraceSummary.IsClosed.get -> bool
 AiDotNet.Evolution.EvolutionTraceSummary.IsClosed.init -> void
+AiDotNet.Evolution.EvolutionTraceSummary.IsMetricSummaryTruncated.get -> bool
+AiDotNet.Evolution.EvolutionTraceSummary.IsMetricSummaryTruncated.init -> void
 AiDotNet.Evolution.EvolutionTraceSummary.IsTruncated.get -> bool
 AiDotNet.Evolution.EvolutionTraceSummary.IsTruncated.init -> void
 AiDotNet.Evolution.EvolutionTraceSummary.MeanEvaluatorSeconds.get -> double

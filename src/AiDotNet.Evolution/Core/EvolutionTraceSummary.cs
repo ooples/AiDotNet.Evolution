@@ -111,6 +111,13 @@ public sealed class EvolutionTraceSummary
     /// <summary>Gets whether a record bound or a write failure stopped the trace before the run ended.</summary>
     public bool IsTruncated { get; init; }
 
+    /// <summary>
+    /// Gets whether more distinct metric names arrived than <see cref="EvolutionTraceOptions.MaxTrackedMetrics"/> keeps, so the
+    /// per-metric delta maps omit some metrics.
+    /// </summary>
+    /// <remarks>This limits the summary only: every record is still written, so it does not set <see cref="IsTruncated"/>.</remarks>
+    public bool IsMetricSummaryTruncated { get; init; }
+
     /// <summary>Gets whether the trace was closed cleanly rather than left open by a crash.</summary>
     public bool IsClosed { get; init; }
 

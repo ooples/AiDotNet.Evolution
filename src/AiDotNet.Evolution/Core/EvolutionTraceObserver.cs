@@ -72,6 +72,7 @@ public sealed class EvolutionTraceObserver<TGenome> : IEvolutionObserver<TGenome
     private bool _wroteAnyRecord;
     private bool _faulted;
     private bool _truncated;
+    private bool _metricSummaryTruncated;
     private bool _closed;
     private bool _disposed;
     private long _recordsWritten;
@@ -338,7 +339,8 @@ public sealed class EvolutionTraceObserver<TGenome> : IEvolutionObserver<TGenome
             if (!_totalMetricDeltas.ContainsKey(pair.Key) &&
                 _totalMetricDeltas.Count >= _options.MaxTrackedMetrics)
             {
-                _truncated = true;
+                // Only the summary loses this metric; the record itself is still written.
+                _metricSummaryTruncated = true;
                 continue;
             }
             _totalMetricDeltas.TryGetValue(pair.Key, out double total);
@@ -468,6 +470,7 @@ public sealed class EvolutionTraceObserver<TGenome> : IEvolutionObserver<TGenome
         RecordsDropped = _recordsDropped,
         BytesWritten = _bytesWritten,
         IsTruncated = _truncated || _faulted,
+        IsMetricSummaryTruncated = _metricSummaryTruncated,
         IsClosed = _closed,
         ObserverFailures = _observerFailures,
         FirstFailureMessage = _firstFailureMessage,
