@@ -55,4 +55,7 @@
     <AdditionalFiles Include="PublicAPI.Shipped.txt"/>
     <AdditionalFiles Include="PublicAPI.Unshipped.txt"/>
   </ItemGroup>
+  <ItemGroup>
+    <EmbeddedResource Include="Execution\warm_python_worker.py" LogicalName="AiDotNet.Evolution.Programs.Execution.warm_python_worker.py" />
+  </ItemGroup>
 </Project>
