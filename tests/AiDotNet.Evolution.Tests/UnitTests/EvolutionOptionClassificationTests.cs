@@ -22,7 +22,10 @@ public sealed class EvolutionOptionClassificationTests
         nameof(EvolutionEngineOptions.Resume),
         nameof(EvolutionEngineOptions.MaxDegreeOfParallelism),
         // When time is read, never what a run means: a fake clock replays the same run, so it is provenance only.
-        nameof(EvolutionEngineOptions.TimeProvider)
+        nameof(EvolutionEngineOptions.TimeProvider),
+        // How checkpoints store the deduplication set and cache, never what is in them: a run resumes under either format.
+        nameof(EvolutionEngineOptions.CheckpointFormat),
+        nameof(EvolutionEngineOptions.CheckpointSegmentThreshold)
     };
 
     // The third category, and the only one allowed to appear in NEITHER canonical string. A derived option does not

@@ -49,6 +49,13 @@ internal static class EvolutionEngineDocuments
         // How many items that batch planned, so a resumed run replans at least those whatever its limits.
         [JsonIgnore(Condition = JsonIgnoreCondition.WhenWritingDefault)]
         public int CarriedBatchSize { get; set; }
+        // Present when the deduplication set and cache live in store segments (V1-73): the segments that rebuild them,
+        // a base then deltas in order, and the identifier the next segment takes. SeenGenomeIds and Cache are absent.
+        // Omitted when absent, so an inline payload stays byte-for-byte what engines before segments wrote.
+        [JsonIgnore(Condition = JsonIgnoreCondition.WhenWritingNull)]
+        public List<SegmentReferenceDocument>? Segments { get; set; }
+        [JsonIgnore(Condition = JsonIgnoreCondition.WhenWritingNull)]
+        public long? NextSegmentId { get; set; }
     }
 
     internal sealed class OptionFieldDocument
@@ -107,6 +114,25 @@ internal static class EvolutionEngineDocuments
         public int Attempt { get; set; }
         public bool Abandoned { get; set; }
         public TaskResultDocument? Result { get; set; }
+    }
+
+    internal sealed class SegmentReferenceDocument
+    {
+        public long Id { get; set; }
+        public bool IsBase { get; set; }
+        public string Sha256 { get; set; } = string.Empty;
+    }
+
+    // One store segment. A base lists the whole deduplication set and cache; a delta lists what changed since the
+    // previous segment. The collection names match the engine state so the same preflight limits apply.
+    internal sealed class StateSegmentDocument
+    {
+        public int SchemaVersion { get; set; }
+        public bool IsBase { get; set; }
+        public List<string>? SeenGenomeIds { get; set; }
+        public List<string>? RemovedGenomeIds { get; set; }
+        public List<CacheDocument>? Cache { get; set; }
+        public List<string>? RemovedCacheIds { get; set; }
     }
 
     internal sealed class CacheDocument

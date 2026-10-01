@@ -31,14 +31,35 @@ public sealed class BudgetStopResumeTests
     {
         const int budget = 200;
         var store = new InMemoryEvolutionCheckpointStore();
-        await Engine(stopAfter, store, resume: false, dispatch).RunAsync(Seeds());
-        EvolutionRunResult<TestGenome> resumed = await Engine(budget, store, resume: true, dispatch).RunAsync(Seeds());
-        EvolutionRunResult<TestGenome> uninterrupted = await Engine(budget, new InMemoryEvolutionCheckpointStore(), resume: false, dispatch).RunAsync(Seeds());
+        SyntheticEvolutionTask firstTask = new(), resumedTask = new(), uninterruptedTask = new();
+        await Engine(stopAfter, store, resume: false, dispatch, firstTask).RunAsync(Seeds());
+        EvolutionRunResult<TestGenome> resumed = await Engine(budget, store, resume: true, dispatch, resumedTask).RunAsync(Seeds());
+        EvolutionRunResult<TestGenome> uninterrupted = await Engine(budget, new InMemoryEvolutionCheckpointStore(), resume: false, dispatch, uninterruptedTask).RunAsync(Seeds());
 
         Assert.Equal(uninterrupted.Counters.CompletedEvaluations, resumed.Counters.CompletedEvaluations);
         Assert.Equal(uninterrupted.StateHash, resumed.StateHash);
+        // Nothing the first run evaluated is evaluated again: a cut-short batch's calls are replayed, not repeated.
+        Assert.Equal(uninterruptedTask.Calls, firstTask.Calls + resumedTask.Calls);
     }
 
+    [Theory]
+    [MemberData(nameof(Stops))]
+    public async Task A_segmented_checkpoint_carries_a_cut_short_batch_exactly(EvolutionDispatchMode dispatch, int stopAfter)
+    {
+        // Segments hold the deduplication set and cache; the carried batch's changes must stay out of them until it
+        // becomes a boundary, or the resumed run would start with genomes the boundary never saw.
+        var store = new InMemoryEvolutionCheckpointStore();
+        SyntheticEvolutionTask firstTask = new(), resumedTask = new(), uninterruptedTask = new();
+        await Engine(stopAfter, store, resume: false, dispatch, firstTask, format: EvolutionCheckpointFormat.Segmented).RunAsync(Seeds());
+        EvolutionCheckpoint saved = Assert.IsType<EvolutionCheckpoint>(await store.LoadLatestAsync("budget-resume"));
+        Assert.NotEmpty(saved.SegmentIds);
+        EvolutionRunResult<TestGenome> resumed = await Engine(200, store, resume: true, dispatch, resumedTask, format: EvolutionCheckpointFormat.Segmented).RunAsync(Seeds());
+        EvolutionRunResult<TestGenome> uninterrupted = await Engine(200, new InMemoryEvolutionCheckpointStore(), resume: false, dispatch, uninterruptedTask).RunAsync(Seeds());
+
+        Assert.Equal(uninterrupted.Counters.CompletedEvaluations, resumed.Counters.CompletedEvaluations);
+        Assert.Equal(uninterrupted.StateHash, resumed.StateHash);
+        Assert.Equal(uninterruptedTask.Calls, firstTask.Calls + resumedTask.Calls);
+    }
 
     [Theory]
     [MemberData(nameof(Stops))]
@@ -68,7 +89,8 @@ public sealed class BudgetStopResumeTests
     private static TestGenome[] Seeds() => new[] { new TestGenome(0) };
 
     private static EvolutionEngine<TestGenome> Engine(int budget, IEvolutionCheckpointStore store, bool resume,
-        EvolutionDispatchMode dispatch = EvolutionDispatchMode.Batch, SyntheticEvolutionTask? task = null, int maxGenerations = 1000) =>
+        EvolutionDispatchMode dispatch = EvolutionDispatchMode.Batch, SyntheticEvolutionTask? task = null, int maxGenerations = 1000,
+        EvolutionCheckpointFormat format = EvolutionCheckpointFormat.Auto) =>
         new(task ?? new SyntheticEvolutionTask(), new CyclingVariation(),
             _ => new MapElitesArchive<TestGenome>(new[] { new EvolutionDescriptorDefinition("x", 0, 100, 4) }),
             new EvolutionEngineOptions
@@ -82,6 +104,7 @@ public sealed class BudgetStopResumeTests
                 MaxDegreeOfParallelism = 1,
                 MigrationInterval = 0,
                 CheckpointInterval = 4,
+                CheckpointFormat = format,
                 Resume = resume,
                 Dispatch = dispatch
             }, checkpointStore: store, genomeCodec: new TestGenomeCodec());

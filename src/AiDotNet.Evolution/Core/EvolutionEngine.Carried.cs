@@ -129,12 +129,18 @@ public sealed partial class EvolutionEngine<TGenome>
         else if (_safePayload is { } payload)
         {
             // Once serialized the boundary no longer tracks later changes, so the calls are added to its JSON directly.
-            var node = System.Text.Json.Nodes.JsonNode.Parse(payload)?.AsObject()
-                ?? throw new InvalidOperationException("The checkpoint boundary is not a JSON object.");
-            node["CarriedEvaluations"] = System.Text.Json.JsonSerializer.SerializeToNode(carried,
-                EvolutionStateJsonContext.Default.ListCarriedEvaluationDocument);
-            node["CarriedBatchSize"] = size;
-            _safePayload = node.ToJsonString();
+            _safePayload = WithCarried(payload, carried, size);
+        }
+        else if (_savedSegmentedCheckpoint is { } saved && _savedSegmentBoundary == _safeSequence)
+        {
+            // A segmented save drops the boundary document once the store accepts it, so the boundary survives only as
+            // that checkpoint. Its next revision is the same state, naming the same segments, with the calls added.
+            _safeSequence++;
+            _savedSegmentedCheckpoint = new EvolutionCheckpoint(saved.RunId, _safeSequence, saved.CompatibilityHash,
+                    WithCarried(saved.Payload, carried, size), saved.SchemaVersion, saved.Quality, saved.QualityDirection)
+                .WithSegmentIds(saved.SegmentIds);
+            _savedSegmentBoundary = _safeSequence;
+            return;
         }
         else
         {
@@ -143,19 +149,41 @@ public sealed partial class EvolutionEngine<TGenome>
         _safeSequence++;
     }
 
+    private static string WithCarried(string payload, List<CarriedEvaluationDocument> carried, int size)
+    {
+        var node = System.Text.Json.Nodes.JsonNode.Parse(payload)?.AsObject()
+            ?? throw new InvalidOperationException("The checkpoint boundary is not a JSON object.");
+        node["CarriedEvaluations"] = System.Text.Json.JsonSerializer.SerializeToNode(carried,
+            EvolutionStateJsonContext.Default.ListCarriedEvaluationDocument);
+        node["CarriedBatchSize"] = size;
+        // The version was chosen before the calls were added; results that carry a measurement origin need its schema.
+        if (carried.Any(call => call.Result?.MeasurementOriginJson is not null) &&
+            node["SchemaVersion"] is System.Text.Json.Nodes.JsonValue value && value.TryGetValue(out int version))
+        {
+            bool segmented = version >= EngineSegmentedSchemaVersion;
+            int feature = segmented ? version - SegmentedSchemaOffset : version;
+            if (feature < EngineMeasurementOriginSchemaVersion)
+                node["SchemaVersion"] = EngineMeasurementOriginSchemaVersion + (segmented ? SegmentedSchemaOffset : 0);
+        }
+        return node.ToJsonString();
+    }
+
     private void LoadCarried(EngineStateDocument state)
     {
         lock (_callGate)
         {
             _carriedCalls.Clear();
             _carriedBatchSize = state.CarriedBatchSize;
-            if (_carriedBatchSize < 0 || (_carriedBatchSize == 0 && state.CarriedEvaluations is { Count: > 0 }))
+            if (_carriedBatchSize < 0 || (_carriedBatchSize == 0 && state.CarriedEvaluations is { Count: > 0 }) ||
+                (state.CarriedEvaluations?.Count ?? 0) > EvolutionCollectionLimits.MaximumResultEntries)
                 throw new InvalidDataException("The checkpoint carries evaluations without the batch they belong to.");
             foreach (CarriedEvaluationDocument call in state.CarriedEvaluations ?? new List<CarriedEvaluationDocument>())
             {
                 if (call is null || call.Result is null || call.EvaluationId < 0 || call.Attempt < 1 ||
                     call.EvaluationId >= state.NextEvaluationId + EvolutionCollectionLimits.MaximumResultEntries)
                     throw new InvalidDataException("A carried evaluation in the checkpoint is invalid.");
+                // The same bounds a cached result is held to: a carried result is replayed into the run exactly as one.
+                ValidateTaskResultBounds(call.Result);
                 var key = (call.EvaluationId, call.Stage, call.Attempt);
                 if (_carriedCalls.ContainsKey(key))
                     throw new InvalidDataException("The checkpoint carries one evaluation call twice.");

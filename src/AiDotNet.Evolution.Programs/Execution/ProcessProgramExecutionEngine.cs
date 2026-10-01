@@ -455,7 +455,7 @@ public sealed class ProcessProgramExecutionEngine : IProgramExecutionEngine, IPr
 
         if (violation is not null)
         {
-            TryKillProcessTree(process, processId);
+            TryKillProcessTree(process, processId, job);
             await DrainAsync(stdOutTask, stdErrTask, stdInTask).ConfigureAwait(false);
             return ResourceExceeded(language, compileOnly, violation.Value, -1, stdOutReader, stdErrReader);
         }
@@ -463,7 +463,7 @@ public sealed class ProcessProgramExecutionEngine : IProgramExecutionEngine, IPr
         bool exited = await exitTask.ConfigureAwait(false);
         if (!exited)
         {
-            TryKillProcessTree(process, processId);
+            TryKillProcessTree(process, processId, job);
             await DrainAsync(stdOutTask, stdErrTask, stdInTask).ConfigureAwait(false);
 
             (string Text, bool Truncated) timedOutStdOut = stdOutReader.Snapshot();
@@ -873,8 +873,12 @@ public sealed class ProcessProgramExecutionEngine : IProgramExecutionEngine, IPr
 #endif
     }
 
-    private static void TryKillProcessTree(Process process, int processId)
+    private static void TryKillProcessTree(Process process, int processId, WindowsJobObject? job)
     {
+        // On Windows the job holds the whole tree, including descendants that detached into their own process group, so
+        // terminating it is immediate and complete. A Framework Kill() would end only the candidate, and taskkill /T run
+        // after it can no longer find the children of a parent that is already gone.
+        job?.TryTerminate();
         bool killedTree = false;
         try
         {
