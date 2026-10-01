@@ -1,0 +1,64 @@
+name: Sandbox overhead
+
+# V1-76 (#181): the per-evaluation cost of process isolation, measured on each OS the sandbox supports. Runs on pull
+# requests that touch the sandbox or this benchmark, and on demand; the JSON is uploaded as evidence, not gated.
+on:
+  pull_request:
+    branches: [main]
+    paths:
+      - 'benchmarks/EvolutionSandbox/**'
+      - 'src/AiDotNet.Evolution.Programs/Execution/**'
+      - '.github/workflows/sandbox-overhead.yml'
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+concurrency:
+  group: ${{ github.workflow }}-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  measure:
+    name: Sandbox overhead (${{ matrix.os }})
+    strategy:
+      fail-fast: false
+      matrix:
+        os: [ubuntu-latest, windows-latest]
+    runs-on: ${{ matrix.os }}
+    timeout-minutes: 30
+    env:
+      DOTNET_NOLOGO: true
+      DOTNET_CLI_TELEMETRY_OPTOUT: true
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          persist-credentials: false
+      - uses: actions/setup-dotnet@a98b56852c35b8e3190ac28c8c2271da59106c68 # v6.0.0
+        with:
+          dotnet-version: '10.0.x'
+      - name: Measure
+        shell: pwsh
+        run: |
+          dotnet build benchmarks/EvolutionSandbox/EvolutionSandbox.csproj -c Release
+          if ($LASTEXITCODE -ne 0) { throw 'Build failed.' }
+          # The runner image's CPython; resolved to its real executable so no launcher shim is timed.
+          $python = if ($IsWindows) { (Get-Command python).Source } else { (Get-Command python3).Source }
+          $python = & $python -c "import sys, os; print(os.path.realpath(sys.executable))"
+          New-Item -ItemType Directory -Force TestResults/sandbox-overhead | Out-Null
+          # Linux runners have Docker; measure a fresh container per candidate there (a slim CPython image, pulled first so the pull is not timed).
+          $docker = @()
+          if ($IsLinux) {
+            $image = 'python:3.12-slim'
+            docker pull $image | Out-Null
+            $docker = @($image)
+          }
+          dotnet benchmarks/EvolutionSandbox/bin/Release/net10.0/EvolutionSandbox.dll $python 500 50 @docker |
+            Tee-Object -FilePath "TestResults/sandbox-overhead/${{ matrix.os }}.json"
+          if ($LASTEXITCODE -ne 0) { throw 'Measurement failed.' }
+      - name: Upload
+        if: always()
+        uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a # v7.0.1
+        with:
+          name: sandbox-overhead-${{ matrix.os }}
+          path: TestResults/sandbox-overhead

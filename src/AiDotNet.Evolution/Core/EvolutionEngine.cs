@@ -464,6 +464,9 @@ public sealed partial class EvolutionEngine<TGenome>
 
             if (batch.Count == 0)
             {
+                // A limit reached while the batch was being built left it empty; that limit, not a lack of candidates, is
+                // why the run stops (a time limit crossed between the check at the top of the loop and this batch).
+                if (limit.HasValue) return limit.Value;
                 if (_evaluationAttempts >= _options.MaxEvaluationAttempts) return EvolutionStopReason.EvaluationBudgetReached;
                 if (_proposals >= _options.MaxProposals) return EvolutionStopReason.ProposalBudgetReached;
                 if (_generation >= _options.MaxGenerations) return EvolutionStopReason.GenerationLimitReached;

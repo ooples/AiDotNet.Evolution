@@ -111,6 +111,22 @@ public sealed class ProcessProgramExecutionEngineTests
         Assert.Equal(ProgramExecuteErrorCode.ExecutionFailed, response.ErrorCode);
     }
 
+    // The grandchild's shell may still hold the marker open for writing, and a plain read is then refused with a sharing
+    // violation on Windows. Read it shared, and treat a file that is momentarily locked as not written yet.
+    private static string ReadWhileWritten(string path)
+    {
+        try
+        {
+            using var stream = new FileStream(path, FileMode.Open, FileAccess.Read, FileShare.ReadWrite | FileShare.Delete);
+            using var reader = new StreamReader(stream);
+            return reader.ReadToEnd();
+        }
+        catch (IOException)
+        {
+            return string.Empty;
+        }
+    }
+
     [Fact]
     public async Task TimeoutTerminatesTheWholeProcessTree()
     {
@@ -132,7 +148,7 @@ public sealed class ProcessProgramExecutionEngineTests
             using var engine = new ProcessProgramExecutionEngine(options);
             var stopwatch = Stopwatch.StartNew();
             Task<ProgramExecuteResponse> running = engine.ExecuteAsync(Request("ignored"));
-            while (!(File.Exists(marker) && File.ReadAllText(marker).Contains("start", StringComparison.Ordinal)) && stopwatch.Elapsed < TimeSpan.FromSeconds(15))
+            while (!(File.Exists(marker) && ReadWhileWritten(marker).Contains("start", StringComparison.Ordinal)) && stopwatch.Elapsed < TimeSpan.FromSeconds(15))
                 await Task.Delay(20);
             clock.Advance(TimeSpan.FromSeconds(1));
             ProgramExecuteResponse response = await running;
@@ -148,7 +164,7 @@ public sealed class ProcessProgramExecutionEngineTests
             // where it would have written "end" and still not seeing it is what proves the whole tree was killed;
             // seeing "start" is what proves the grandchild really ran, so the assertion cannot pass vacuously.
             await Task.Delay(TimeSpan.FromSeconds(4));
-            string observed = File.Exists(marker) ? File.ReadAllText(marker) : string.Empty;
+            string observed = File.Exists(marker) ? ReadWhileWritten(marker) : string.Empty;
 
             Assert.True(
                 observed.IndexOf("start", StringComparison.Ordinal) >= 0,

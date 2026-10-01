@@ -495,6 +495,7 @@ against the declared public API, so a type added, removed or reclassified withou
 | `AiDotNet.Evolution.Programs.Experience.ProgramExperienceRecorder` | Experimental (AIDEVO004) | |
 | `AiDotNet.Evolution.Programs.WeightedChatModel` | Stable | [PROGRAM_EVOLUTION.md](PROGRAM_EVOLUTION.md), [WeightedEnsembleChatClientTests](../tests/AiDotNet.Evolution.CSharp.Tests/ModelRuntime/WeightedEnsembleChatClientTests.cs) |
 | `AiDotNet.Evolution.Programs.WeightedEnsembleChatClient` | Stable | [PROGRAM_EVOLUTION.md](PROGRAM_EVOLUTION.md), [WeightedEnsembleChatClientTests](../tests/AiDotNet.Evolution.CSharp.Tests/ModelRuntime/WeightedEnsembleChatClientTests.cs) |
+| `AiDotNet.Evolution.Programs.WarmPythonExecutionEngine` | Stable | [PROGRAM_EVOLUTION.md](PROGRAM_EVOLUTION.md), [WarmPythonExecutionEngineTests](../tests/AiDotNet.Evolution.CSharp.Tests/Execution/WarmPythonExecutionEngineTests.cs) |
 
 ## AiDotNet.Evolution.Surrogates
 

@@ -43,6 +43,45 @@ public sealed class OpenAiCompatibleChatClientTests
 
     private static readonly ProgramChatMessage[] Messages = { ProgramChatMessage.System("sys"), ProgramChatMessage.User("hi") };
 
+    // Answers only when the request is cancelled, like an endpoint that never responds.
+    private sealed class SilentHandler : HttpMessageHandler
+    {
+        protected override async Task<HttpResponseMessage> SendAsync(HttpRequestMessage request, CancellationToken cancellationToken)
+        {
+            await Task.Delay(Timeout.Infinite, cancellationToken);
+            return new HttpResponseMessage(HttpStatusCode.OK);
+        }
+    }
+
+    [Fact]
+    public async Task Timeout_ends_a_request_the_endpoint_never_answers()
+    {
+        OpenAiCompatibleChatClientOptions options = Options();
+        options.Timeout = TimeSpan.FromMilliseconds(300);
+        options.MaxRetries = 0;
+        using var client = new OpenAiCompatibleChatClient(options, new SilentHandler());
+        var clock = System.Diagnostics.Stopwatch.StartNew();
+        await Assert.ThrowsAsync<TimeoutException>(() => client.GetResponseAsync(Messages, new ProgramChatOptions()));
+        Assert.True(clock.Elapsed < TimeSpan.FromSeconds(10), "the request outlived its timeout: " + clock.Elapsed);
+    }
+
+    [Fact]
+    public async Task MaxResponseBytes_refuses_a_larger_body_and_admits_one_within_it()
+    {
+        string large = new string('a', 4096);
+        OpenAiCompatibleChatClientOptions bounded = Options();
+        bounded.MaxResponseBytes = 1024;
+        bounded.MaxRetries = 0;
+        using (var client = new OpenAiCompatibleChatClient(bounded, new FakeHandler(_ => Ok(large))))
+            await Assert.ThrowsAsync<HttpRequestException>(() => client.GetResponseAsync(Messages, new ProgramChatOptions()));
+
+        // Control: the same body is accepted when the bound allows it.
+        OpenAiCompatibleChatClientOptions roomy = Options();
+        roomy.MaxResponseBytes = 64 * 1024;
+        using (var client = new OpenAiCompatibleChatClient(roomy, new FakeHandler(_ => Ok(large))))
+            Assert.Equal(large, (await client.GetResponseAsync(Messages, new ProgramChatOptions())).Text);
+    }
+
     [Fact]
     public async Task Every_openevolve_sampling_option_reaches_the_request()
     {
