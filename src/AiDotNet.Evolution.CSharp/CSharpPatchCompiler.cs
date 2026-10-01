@@ -261,16 +261,47 @@ internal sealed class CSharpPatchCompiler
     // Roslyn observes cancellation between members, not inside one pathological expression, so the token alone let a
     // slow compile run long past its bound (CI measured a one-second bound taking as long as the unbounded compile).
     // The work runs on the pool and the caller stops waiting at the deadline; the abandoned compile is cancelled and
-    // stops at Roslyn's next check, and its result, or failure, is observed and discarded.
-    private static T WithinBound<T>(Func<T> work, Stopwatch timer, TimeSpan bound, CancellationTokenSource timeout)
+    // stops at Roslyn's next check. Every compile, running or abandoned, holds one of a fixed number of slots until it
+    // actually finishes, so repeated timeouts cannot pile up unbounded compilations: once the slots are taken, a new
+    // compile that cannot get one before its own deadline is refused as timed out.
+    private static readonly SemaphoreSlim CompileSlots = new(Math.Max(1, Environment.ProcessorCount), Math.Max(1, Environment.ProcessorCount));
+
+    private static T WithinBound<T>(Func<T> work, Stopwatch timer, TimeSpan bound, CancellationTokenSource timeout) =>
+        WithinBound(work, timer, bound, timeout, CompileSlots);
+
+    internal static T WithinBound<T>(Func<T> work, Stopwatch timer, TimeSpan bound, CancellationTokenSource timeout,
+        SemaphoreSlim slots)
     {
-        Task<T> task = Task.Run(work);
         TimeSpan remaining = bound - timer.Elapsed;
-        if (remaining > TimeSpan.Zero && task.Wait(remaining)) return task.GetAwaiter().GetResult();
+        if (remaining <= TimeSpan.Zero || !slots.Wait(remaining))
+        {
+            timeout.Cancel();
+            throw new OperationCanceledException(timeout.Token);
+        }
+
+        Task<T> task;
+        try
+        {
+            task = Task.Run(work);
+        }
+        catch
+        {
+            slots.Release();
+            throw;
+        }
+        // The slot is released when the compile ends, not when the caller stops waiting, and its outcome is observed.
+        _ = task.ContinueWith(finished =>
+        {
+            slots.Release();
+            return finished.Exception;
+        }, CancellationToken.None, TaskContinuationOptions.ExecuteSynchronously, TaskScheduler.Default);
+
+        // WaitAny reports completion without throwing; GetResult then rethrows the original exception, unwrapped, so the
+        // existing handlers see an ImageLimitException or a cancellation exactly as they would from a direct call.
+        remaining = bound - timer.Elapsed;
+        if (remaining > TimeSpan.Zero) Task.WaitAny(new Task[] { task }, remaining);
         if (task.IsCompleted) return task.GetAwaiter().GetResult();
         timeout.Cancel();
-        _ = task.ContinueWith(abandoned => abandoned.Exception, CancellationToken.None,
-            TaskContinuationOptions.OnlyOnFaulted | TaskContinuationOptions.ExecuteSynchronously, TaskScheduler.Default);
         throw new OperationCanceledException(timeout.Token);
     }
 }
