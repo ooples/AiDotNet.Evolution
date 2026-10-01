@@ -42,7 +42,9 @@ public sealed class OptionCoverageTests
             references, new CSharpCompilationOptions(OutputKind.DynamicallyLinkedLibrary, nullableContextOptions: NullableContextOptions.Enable));
 
         var options = new HashSet<IPropertySymbol>(SymbolEqualityComparer.Default);
-        foreach (SyntaxTree tree in sources.Where(tree => Path.GetFileName(tree.FilePath).EndsWith("Options.cs", StringComparison.Ordinal)))
+        // Every source file, not only those named *Options.cs: ProgramChatOptions, EvolutionWorkServerOptions and the
+        // provider options are declared beside the types that use them. An options type is one whose name says so.
+        foreach (SyntaxTree tree in sources)
         {
             SemanticModel model = compilation.GetSemanticModel(tree);
             foreach (PropertyDeclarationSyntax declaration in tree.GetRoot().DescendantNodes().OfType<PropertyDeclarationSyntax>())
@@ -78,6 +80,7 @@ public sealed class OptionCoverageTests
     private static bool IsPublicOption(IPropertySymbol property)
     {
         if (property.DeclaredAccessibility != Accessibility.Public || property.IsStatic || property.IsIndexer) return false;
+        if (!property.ContainingType.Name.EndsWith("Options", StringComparison.Ordinal)) return false;
         for (INamedTypeSymbol? type = property.ContainingType; type is not null; type = type.ContainingType)
             if (type.DeclaredAccessibility != Accessibility.Public) return false;
         return property.GetMethod is { DeclaredAccessibility: Accessibility.Public } &&
