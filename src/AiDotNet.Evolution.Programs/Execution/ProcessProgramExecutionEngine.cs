@@ -71,6 +71,8 @@ public sealed class ProcessProgramExecutionEngine : IProgramExecutionEngine, IPr
     // 128 + SIGXCPU: the kernel's CPU-time backstop ended the process.
     private const int ExitCodeCpuLimitSignal = 152;
     private const int ExitCodeQuotaExceeded = unchecked((int)0xC0000044); // STATUS_QUOTA_EXCEEDED
+    // How long to wait after exit for a job to report it has no process left, which flushes its limit notifications.
+    private static readonly TimeSpan JobNotificationGrace = TimeSpan.FromMilliseconds(250);
     private const string PosixShellPath = "/bin/sh";
 
     private readonly ProgramSandboxOptions _options;
@@ -493,7 +495,7 @@ public sealed class ProcessProgramExecutionEngine : IProgramExecutionEngine, IPr
         int exitCode = TryGetExitCode(process);
 
         // A limit can also end the process on its own: the job refuses a commit or the kernel's CPU backstop fires.
-        ProgramExecuteErrorCode? afterExit = job?.ReadViolation()
+        ProgramExecuteErrorCode? afterExit = job?.ReadViolationAfterExit(JobNotificationGrace)
             ?? (LinuxHost && exitCode == ExitCodeCpuLimitSignal ? ProgramExecuteErrorCode.CpuTimeLimitExceeded : (ProgramExecuteErrorCode?)null)
             // The job ends a process past its CPU-time limit with STATUS_QUOTA_EXCEEDED. Its port notification can arrive
             // after the exit is observed (seen on GitHub's Windows runners), so the exit status settles it on its own.

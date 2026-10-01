@@ -1,0 +1,80 @@
+{
+  "openevolve_version": "0.4.0",
+  "python": "3.12.3",
+  "platform": "linux",
+  "reproduced": 8,
+  "scenarios": 8,
+  "results": [
+    {
+      "id": "D1",
+      "title": "A NaN score freezes its cell",
+      "method": "probe",
+      "ours": "ArchiveDefectClassTests.D1_a_non_finite_quality_cannot_complete_so_it_can_never_hold_a_cell",
+      "reproduced": true,
+      "observation": "NaN occupant of cell 30 kept it against challengers [1.0, 100.0, 1000000000.0]: True; a finite 0.5 occupant of the same cell was displaced by them: True"
+    },
+    {
+      "id": "D2",
+      "title": "Programs rejected as not novel leak",
+      "method": "probe",
+      "ours": "EngineDefectClassTests.D2_a_program_rejected_as_not_novel_leaves_nothing_behind",
+      "reproduced": true,
+      "observation": "rejected-as-not-novel program in programs: True; in any island: False"
+    },
+    {
+      "id": "D3",
+      "title": "Cell losers join the island",
+      "method": "probe",
+      "ours": "ArchiveDefectClassTests.D3_a_program_that_loses_its_cell_is_not_an_archive_member",
+      "reproduced": true,
+      "observation": "cell loser is an island member: True; owns a cell: False"
+    },
+    {
+      "id": "D4",
+      "title": "Cells drift as bin ranges adapt",
+      "method": "probe",
+      "ours": "ArchiveDefectClassTests.D4_an_occupant_keeps_its_cell_when_later_values_arrive_outside_the_range",
+      "reproduced": true,
+      "observation": "same stored program's cell before/after one wider value arrived: [50] -> [5]"
+    },
+    {
+      "id": "D5",
+      "title": "Results depend on worker completion order",
+      "method": "probe",
+      "ours": "EngineDefectClassTests.D5_the_result_does_not_depend_on_which_worker_finishes_first",
+      "reproduced": true,
+      "observation": "one cell, two equal-fitness programs: applied A then B the owner is A; applied B then A it is B. process_parallel.py applies futures in the order it finds them done"
+    },
+    {
+      "id": "D6",
+      "title": "Timeouts do not stop the evaluation",
+      "method": "probe",
+      "ours": "HungCandidateDefectClassTests.D6_a_hung_candidate_and_the_process_it_detached_are_gone_within_the_timeout_plus_one_second",
+      "reproduced": true,
+      "observation": "evaluate_program returned after 1.00s with ['error', 'timeout']; at timeout + 1 s the hung evaluation's heartbeat had gone 20 -> 40 and its detached child (pid 2411) was still running"
+    },
+    {
+      "id": "D7",
+      "title": "Requested bins are overridden",
+      "method": "probe",
+      "ours": "ArchiveDefectClassTests.D7_the_grid_has_exactly_the_requested_bins",
+      "reproduced": true,
+      "observation": "requested 10 bins per dimension with archive_size=10000 over 2 dimensions; the database uses 100"
+    },
+    {
+      "id": "D8",
+      "title": "Declared options that do nothing",
+      "method": "static",
+      "ours": "OptionCoverageTests.D8_every_public_option_is_exercised_by_a_test",
+      "reproduced": true,
+      "observation": "5 of 5 declared options are read nowhere outside config.py: ['database.diversity_metric=feature_based', 'evaluator.cpu_limit', 'evaluator.distributed', 'evaluator.memory_limit_mb', 'prompt.use_meta_prompting']",
+      "reads": {
+        "prompt.use_meta_prompting": 0,
+        "evaluator.memory_limit_mb": 0,
+        "evaluator.cpu_limit": 0,
+        "evaluator.distributed": 0,
+        "database.diversity_metric=feature_based": 0
+      }
+    }
+  ]
+}

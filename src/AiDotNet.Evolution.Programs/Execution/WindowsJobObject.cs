@@ -28,6 +28,8 @@ internal sealed class WindowsJobObject : IDisposable
     private const uint MessageEndOfProcessTime = 3;
     private const uint MessageProcessMemoryLimit = 9;
     private const uint MessageJobMemoryLimit = 10;
+    // Posted once the job has no live process. The port delivers in order, so every earlier notification precedes it.
+    private const uint MessageActiveProcessZero = 4;
 
     private IntPtr _handle;
     private IntPtr _port;
@@ -117,15 +119,41 @@ internal sealed class WindowsJobObject : IDisposable
         if (_disposed || _port == IntPtr.Zero) return _violation;
         try
         {
-            while (GetQueuedCompletionStatus(_port, out uint message, out _, out _, 0))
+            while (GetQueuedCompletionStatus(_port, out uint message, out _, out _, 0)) Record(message);
+        }
+        catch (EntryPointNotFoundException)
+        {
+            // Without the port the job still enforces its limits; it just cannot say which one fired.
+        }
+
+        return _violation;
+    }
+
+    /// <summary>
+    /// Reports the first limit hit once the job's processes have exited, waiting at most <paramref name="bound"/> for
+    /// the notifications the kernel has yet to deliver.
+    /// </summary>
+    /// <remarks>
+    /// A notification is posted asynchronously, so a candidate whose children failed an allocation and exited can be
+    /// observed as exited before the memory-limit message arrives; reading the port once then reported a clean run (seen
+    /// on GitHub's Windows runners). The port delivers in order and the no-active-process message comes last, so reading
+    /// until it arrives sees every limit any process hit. The bound only matters while a detached process is still alive.
+    /// </remarks>
+    /// <param name="bound">The longest to wait for the job to report that no process is left.</param>
+    /// <returns>The violated limit, or <c>null</c> when none was hit or the job cannot report violations.</returns>
+    public ProgramExecuteErrorCode? ReadViolationAfterExit(TimeSpan bound)
+    {
+        if (_disposed || _port == IntPtr.Zero) return _violation;
+        var clock = System.Diagnostics.Stopwatch.StartNew();
+        try
+        {
+            while (!_noActiveProcess)
             {
-                ProgramExecuteErrorCode? observed = message switch
-                {
-                    MessageProcessMemoryLimit or MessageJobMemoryLimit => ProgramExecuteErrorCode.MemoryLimitExceeded,
-                    MessageEndOfProcessTime or MessageEndOfJobTime => ProgramExecuteErrorCode.CpuTimeLimitExceeded,
-                    _ => null
-                };
-                _violation ??= observed;
+                TimeSpan remaining = bound - clock.Elapsed;
+                if (remaining <= TimeSpan.Zero) break;
+                if (!GetQueuedCompletionStatus(_port, out uint message, out _, out _, (uint)Math.Ceiling(remaining.TotalMilliseconds)))
+                    break;
+                Record(message);
             }
         }
         catch (EntryPointNotFoundException)
@@ -134,6 +162,20 @@ internal sealed class WindowsJobObject : IDisposable
         }
 
         return _violation;
+    }
+
+    private bool _noActiveProcess;
+
+    private void Record(uint message)
+    {
+        if (message == MessageActiveProcessZero) _noActiveProcess = true;
+        ProgramExecuteErrorCode? observed = message switch
+        {
+            MessageProcessMemoryLimit or MessageJobMemoryLimit => ProgramExecuteErrorCode.MemoryLimitExceeded,
+            MessageEndOfProcessTime or MessageEndOfJobTime => ProgramExecuteErrorCode.CpuTimeLimitExceeded,
+            _ => null
+        };
+        _violation ??= observed;
     }
 
     private static IntPtr TryAssociatePort(IntPtr job)

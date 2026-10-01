@@ -1,0 +1,40 @@
+name: OpenEvolve defect classes
+
+# Runs the V1-83 defect scenarios against pinned OpenEvolve releases and uploads what happened. The
+# outcome is evidence recorded next to our robustness suite, not a gate: a reproduced defect is expected.
+
+on:
+  workflow_dispatch:
+  pull_request:
+    paths:
+      - benchmarks/external/openevolve_defect_probe.py
+      - .github/workflows/openevolve-defects.yml
+
+permissions:
+  contents: read
+
+jobs:
+  probe:
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    strategy:
+      fail-fast: false
+      matrix:
+        openevolve: ["0.3.2", "0.4.0"]
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+      - name: Install pinned OpenEvolve
+        run: |
+          python3 -m venv .oe
+          .oe/bin/python -m pip install --quiet "openevolve==${{ matrix.openevolve }}"
+      - name: Run the defect scenarios
+        run: |
+          mkdir -p TestResults
+          .oe/bin/python benchmarks/external/openevolve_defect_probe.py \
+            --output "TestResults/openevolve-defects-${{ matrix.openevolve }}.json"
+      - uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a # v7.0.1
+        if: always()
+        with:
+          name: openevolve-defects-${{ matrix.openevolve }}
+          path: TestResults/openevolve-defects-${{ matrix.openevolve }}.json
+          if-no-files-found: error

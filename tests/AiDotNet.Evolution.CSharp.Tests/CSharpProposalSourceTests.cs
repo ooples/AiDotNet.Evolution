@@ -136,6 +136,8 @@ public sealed class CSharpProposalSourceTests
         Assert.DoesNotContain("MISSING", client.Conversations[1][3].Text);
         Assert.Equal(options.MaxOutputTokens, client.LastOptions?.MaxOutputTokens);
         Assert.NotNull(client.LastOptions?.Seed);
+        // A low, fixed temperature: a patch must stay a valid edit of the snapshot, so the request favours consistency.
+        Assert.Equal(0.2, client.LastOptions?.Temperature);
         Assert.Equal(2, source.GetUsage().ChatCalls);
         Assert.Equal(1, source.GetUsage().Retries);
         Assert.Equal(200, source.GetUsage().InputTokens);

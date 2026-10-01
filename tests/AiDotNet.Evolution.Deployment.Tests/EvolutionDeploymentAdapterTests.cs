@@ -40,6 +40,61 @@ public sealed partial class EvolutionDeploymentLifecycleTests
     }
 
     [Fact]
+    public async Task Private_program_search_language_decides_which_proposals_are_the_same_language()
+    {
+        // The same C# proposals are a language change against the default Generic seeds, but not once the search's
+        // Language says the seeds are C#: then the better child is evaluated and deployed.
+        async Task<(ProgramGenome Program, int Calls)> Search(ProgramLanguage language)
+        {
+            int calls = 0;
+            var retuner = EvolutionDeploymentRetuners.Program(_ => new ProgramDeploymentSearchOptions
+            {
+                SeedPrograms = new List<string> { "base" },
+                Language = language,
+                CustomVariation = new DeploymentVariation(ProgramLanguage.CSharp),
+                CustomFitnessEvaluator = new DelegateProgramFitnessEvaluator(genome =>
+                { calls++; return genome.Source == "winner" ? 2 : 1; })
+            }, _ => new DelegateProgramFitnessEvaluator(_ => 1), EvolutionOptimizationDirection.Maximize);
+            var artifact = await retuner(new EvolutionDeploymentRetuneRequest(Envelope(), Policy()), CancellationToken.None);
+            return (artifact.ReadProgram(), calls);
+        }
+
+        var (csharp, csharpCalls) = await Search(ProgramLanguage.CSharp);
+        Assert.Equal("winner", csharp.Source);
+        Assert.Equal(ProgramLanguage.CSharp, csharp.Language);
+        Assert.True(csharpCalls > 1);
+
+        var (generic, genericCalls) = await Search(ProgramLanguage.Generic);
+        Assert.Equal("base", generic.Source);
+        Assert.Equal(1, genericCalls);
+    }
+
+    [Fact]
+    public async Task Private_program_search_refuses_resource_accounting_instead_of_ignoring_it()
+    {
+        ProgramDeploymentSearchOptions Options(ProgramEvolutionResourceOptions? resources) => new()
+        {
+            SeedPrograms = new List<string> { "base" },
+            CustomVariation = new DeploymentVariation(),
+            CustomFitnessEvaluator = new DelegateProgramFitnessEvaluator(_ => 1),
+            ResourceAccounting = resources
+        };
+
+        var plain = EvolutionDeploymentRetuners.Program(_ => Options(null),
+            _ => new DelegateProgramFitnessEvaluator(_ => 1), EvolutionOptimizationDirection.Maximize);
+        EvolutionDeployableArtifact tuned = await plain(new EvolutionDeploymentRetuneRequest(Envelope(), Policy()), CancellationToken.None);
+        Assert.False(string.IsNullOrEmpty(tuned.ReadProgram().Source));
+
+        var ledger = new EvolutionResourceLedger("deployment-accounting",
+            new EvolutionResources(new Dictionary<string, decimal> { ["cost_units"] = 10 }));
+        var accounted = EvolutionDeploymentRetuners.Program(
+            _ => Options(new ProgramEvolutionResourceOptions(ledger, 1, "deployment-cost-v1")),
+            _ => new DelegateProgramFitnessEvaluator(_ => 1), EvolutionOptimizationDirection.Maximize);
+        await Assert.ThrowsAsync<NotSupportedException>(() =>
+            accounted(new EvolutionDeploymentRetuneRequest(Envelope(), Policy()), CancellationToken.None));
+    }
+
+    [Fact]
     public async Task ProgramAdapter_UsesFreshCorrectnessBeforeFitnessAndPreservesBothCosts()
     {
         int fitnessCalls = 0;
