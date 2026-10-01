@@ -33,6 +33,7 @@ public sealed class HungCandidateDefectClassTests
             using var engine = new ProcessProgramExecutionEngine(options);
             var clock = Stopwatch.StartNew();
             ProgramExecuteResponse response = await engine.ExecuteAsync(new ProgramExecuteRequest { Language = ProgramLanguage.Python, SourceCode = source });
+            TimeSpan returned = clock.Elapsed;
             Assert.Equal(ProgramExecuteErrorCode.TimeoutOrCanceled, response.ErrorCode);
 
             Assert.True(File.Exists(pidPath), "the candidate never started its grandchild, so this test proved nothing");
@@ -44,7 +45,8 @@ public sealed class HungCandidateDefectClassTests
             bool survived = IsAlive(grandchild);
             TimeSpan gone = clock.Elapsed;
             Assert.False(survived, $"the detached grandchild was still running {gone.TotalSeconds:F1} s after the run started");
-            Assert.True(gone <= deadline, $"the grandchild was gone only {gone.TotalSeconds:F1} s after the run started, past {deadline.TotalSeconds:F0} s");
+            Assert.True(gone <= deadline, $"the grandchild was gone only {gone.TotalSeconds:F1} s after the run started, past {deadline.TotalSeconds:F0} s " +
+                $"(the sandbox returned at {returned.TotalSeconds:F1} s)");
         }
         finally
         {
