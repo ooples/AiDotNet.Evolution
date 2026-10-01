@@ -42,6 +42,10 @@ internal static class EvolutionEngineDocuments
         public long AbandonedEvaluations { get; set; }
         public List<PendingArtifactDocument>? PendingArtifacts { get; set; }
         public List<ArchiveDocument>? Islands { get; set; }
+        // Evaluator calls of a batch the budget cut short, replayed when a resumed run replans it. Omitted otherwise, so
+        // every other checkpoint is byte-for-byte what it was.
+        [JsonIgnore(Condition = JsonIgnoreCondition.WhenWritingNull)]
+        public List<CarriedEvaluationDocument>? CarriedEvaluations { get; set; }
     }
 
     internal sealed class OptionFieldDocument
@@ -91,6 +95,15 @@ internal static class EvolutionEngineDocuments
     {
         public EvolutionEvaluationStatus Status { get; set; }
         public long Count { get; set; }
+    }
+
+    internal sealed class CarriedEvaluationDocument
+    {
+        public long EvaluationId { get; set; }
+        public int Stage { get; set; }
+        public int Attempt { get; set; }
+        public bool Abandoned { get; set; }
+        public TaskResultDocument? Result { get; set; }
     }
 
     internal sealed class CacheDocument

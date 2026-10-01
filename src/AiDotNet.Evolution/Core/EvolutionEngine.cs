@@ -421,6 +421,8 @@ public sealed partial class EvolutionEngine<TGenome>
             BatchTransaction transaction = CaptureBatchTransaction();
             var batch = new List<WorkItem>(Math.Min(_options.ProposalBatchSize, 1024));
             int evaluationsRequired = 0;
+            bool truncatedByBudget = false;
+            BeginBatchCalls();
             try
             {
                 while (batch.Count < _options.ProposalBatchSize)
@@ -447,7 +449,11 @@ public sealed partial class EvolutionEngine<TGenome>
                         if (prepared.Item.RequiresEvaluation) evaluationsRequired++;
                     }
                     if (_evaluationAttempts + evaluationsRequired >= _options.MaxEvaluationAttempts)
+                    {
+                        // A larger budget would have planned more of this batch from the same archive.
+                        truncatedByBudget = batch.Count < _options.ProposalBatchSize;
                         break;
+                    }
                 }
 
                 if (batch.Count > 0)
@@ -478,7 +484,9 @@ public sealed partial class EvolutionEngine<TGenome>
                 await MigrateIfDueAsync(CancellationToken.None).ConfigureAwait(false);
             }
             UpdateEarlyStopping(batch.Count);
-            CaptureSafeState(seeds, seedIndex);
+            // A batch the budget cut short is not a boundary: the checkpoint stays before it and carries its calls.
+            if (!truncatedByBudget) CaptureSafeState(seeds, seedIndex);
+            SettleBatchCalls(truncatedByBudget);
             await SaveCheckpointAsync(force: false,
                 cancellationToken.IsCancellationRequested ? CancellationToken.None : cancellationToken).ConfigureAwait(false);
             cancellationToken.ThrowIfCancellationRequested();

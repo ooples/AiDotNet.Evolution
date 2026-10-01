@@ -39,8 +39,12 @@ public sealed partial class EvolutionEngine<TGenome>
                 if (Volatile.Read(ref _stopRequested) != 0) return EvolutionStopReason.Canceled;
                 EvolutionStopReason? limit = GetLimitStopReason(runTimer);
                 if (limit.HasValue) return limit.Value;
-                int waveLimit = (int)Math.Min(settings.WaveSize, Math.Min(_options.MaxProposals - _proposals, _options.MaxEvaluationAttempts - _evaluationAttempts));
+                long attemptsLeft = _options.MaxEvaluationAttempts - _evaluationAttempts;
+                int waveLimit = (int)Math.Min(settings.WaveSize, Math.Min(_options.MaxProposals - _proposals, attemptsLeft));
+                // A larger budget would have planned more of this wave from the same archive.
+                bool truncatedByBudget = attemptsLeft < settings.WaveSize && waveLimit == attemptsLeft;
                 BatchTransaction transaction = CaptureBatchTransaction();
+                BeginBatchCalls();
                 var batch = new List<WorkItem>(waveLimit);
                 var proposals = new Queue<PipelineProposal>();
                 var allProposals = new List<Task>();
@@ -157,7 +161,9 @@ public sealed partial class EvolutionEngine<TGenome>
                 if (_options.MigrationInterval > 0 && _islands.Length > 1)
                 { _batchesSinceMigration++; await MigrateIfDueAsync(CancellationToken.None).ConfigureAwait(false); }
                 UpdateEarlyStopping(batch.Count);
-                CaptureSafeState(seeds, seedIndex);
+                // A wave the budget cut short is not a boundary: the checkpoint stays before it and carries its calls.
+                if (!truncatedByBudget) CaptureSafeState(seeds, seedIndex);
+                SettleBatchCalls(truncatedByBudget);
                 await SaveCheckpointAsync(force: false, CancellationToken.None).ConfigureAwait(false);
                 cancellationToken.ThrowIfCancellationRequested();
                 if (failedFast) return EvolutionStopReason.CandidateFailure;

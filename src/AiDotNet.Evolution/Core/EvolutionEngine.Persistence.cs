@@ -225,6 +225,7 @@ public sealed partial class EvolutionEngine<TGenome>
     {
         if (_checkpointStore is null) return;
         if (!force && (_options.CheckpointInterval == 0 || _commitsSinceCheckpoint < _options.CheckpointInterval)) return;
+        AttachCarried();
         if (SafePayload() is not { } payload) return;
         var checkpoint = new EvolutionCheckpoint(_options.RunId, _safeSequence, _compatibilityHash, payload,
             EvolutionCheckpoint.CurrentSchemaVersion, BestQualityAcrossIslands(), _islands[0].Direction);
@@ -245,6 +246,7 @@ public sealed partial class EvolutionEngine<TGenome>
 
         EngineStateDocument state = ReadStateDocument(checkpoint);
         ValidateConfiguredCheckpointBounds(state);
+        LoadCarried(state);
 
         string[] checkpointSeedPayloads = state.SeedPayloads?.ToArray()
             ?? throw new InvalidDataException("The checkpoint seed list is missing.");

@@ -505,6 +505,18 @@ public sealed partial class EvolutionEngine<TGenome>
         Func<EvolutionEvaluationContext, CancellationToken, ValueTask<EvolutionTaskResult>> invoke,
         CancellationToken cancellationToken)
     {
+        // A call the interrupted run already made, at this evaluation, stage and attempt, returns what it returned then.
+        if (TryTakeCarried(item.EvaluationId, stage, item.AttemptCount, out EvolutionTaskResult? carried)) return carried;
+        long abandonedBefore = Interlocked.Read(ref _abandonedEvaluations);
+        EvolutionTaskResult result = await InvokeEvaluatorCoreAsync(item, stage, timeout, invoke, cancellationToken).ConfigureAwait(false);
+        RecordCall(item.EvaluationId, stage, item.AttemptCount, result, Interlocked.Read(ref _abandonedEvaluations) != abandonedBefore);
+        return result;
+    }
+
+    private async Task<EvolutionTaskResult> InvokeEvaluatorCoreAsync(WorkItem item, int stage, TimeSpan? timeout,
+        Func<EvolutionEvaluationContext, CancellationToken, ValueTask<EvolutionTaskResult>> invoke,
+        CancellationToken cancellationToken)
+    {
         // The deadline runs on the configured clock, so a fake clock fires it deterministically in tests.
         using CancellationTokenSource? deadline = timeout.HasValue
             ? EvolutionClock.CreateCancellationTokenSource(_options.TimeProvider, timeout.Value) : null;

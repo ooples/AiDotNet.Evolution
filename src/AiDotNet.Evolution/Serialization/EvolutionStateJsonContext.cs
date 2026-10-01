@@ -3,6 +3,7 @@ using System.Text.Json.Serialization;
 namespace AiDotNet.Evolution;
 
 [JsonSerializable(typeof(EvolutionEngineDocuments.EngineStateDocument))]
+[JsonSerializable(typeof(List<EvolutionEngineDocuments.CarriedEvaluationDocument>), TypeInfoPropertyName = "ListCarriedEvaluationDocument")]
 [JsonSerializable(typeof(Dictionary<string, double>), TypeInfoPropertyName = "NumericMap")]
 [JsonSerializable(typeof(ResourceMeteredVariationDocuments.State), TypeInfoPropertyName = "MeteredVariationState")]
 [JsonSerializable(typeof(MeasurementOriginDocument))]
