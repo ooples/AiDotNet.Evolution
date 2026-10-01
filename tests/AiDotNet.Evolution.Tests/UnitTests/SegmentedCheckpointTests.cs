@@ -264,12 +264,14 @@ public sealed class SegmentedCheckpointTests
         // The seed (60, no origin) holds the one cell; every later candidate carries an origin and loses to it, so the
         // origins live only in the evaluation cache, which a segmented payload leaves out.
         var store = new InMemoryEvolutionCheckpointStore();
-        EvolutionEngineOptions first = Options(40, EvolutionCheckpointFormat.Segmented, 0);
+        EvolutionEngineOptions first = Options(41, EvolutionCheckpointFormat.Segmented, 0);
         first.EnableEvaluationCache = true;
         EvolutionRunResult<TestGenome> before = await OriginEngine(first, store).RunAsync(new[] { new TestGenome(60) });
 
         EvolutionCheckpoint saved = Assert.IsType<EvolutionCheckpoint>(await store.LoadLatestAsync("segmented"));
         JsonObject payload = Payload(saved);
+        // The run must end on a whole batch: a cut-short one is carried in the payload with its results, origins included.
+        Assert.False(payload.ContainsKey("CarriedEvaluations"), "the last batch was cut short, so its results are in the payload");
         Assert.DoesNotContain("MeasurementOriginJson", payload.ToJsonString(), StringComparison.Ordinal);
         bool cachedOrigin = false;
         foreach (long id in saved.SegmentIds)
@@ -282,6 +284,29 @@ public sealed class SegmentedCheckpointTests
 
         EvolutionEngineOptions resume = Options(80, EvolutionCheckpointFormat.Segmented, 0);
         resume.EnableEvaluationCache = true;
+        resume.Resume = true;
+        EvolutionRunResult<TestGenome> resumed = await OriginEngine(resume, store).RunAsync(new[] { new TestGenome(60) });
+        Assert.True(resumed.Counters.Proposals > before.Counters.Proposals, "the resumed run did not continue past the checkpoint");
+    }
+
+    [Theory]
+    [InlineData(EvolutionCheckpointFormat.Inline)]
+    [InlineData(EvolutionCheckpointFormat.Segmented)]
+    public async Task A_checkpoint_whose_only_measurement_origins_are_in_a_carried_batch_resumes(EvolutionCheckpointFormat format)
+    {
+        // No cache, and the seed holds the one cell, so the only origins in the checkpoint are the results of the batch
+        // the budget cut short, which the checkpoint carries.
+        var store = new InMemoryEvolutionCheckpointStore();
+        EvolutionEngineOptions first = Options(40, format, 0);
+        first.EnableEvaluationCache = false;
+        EvolutionRunResult<TestGenome> before = await OriginEngine(first, store).RunAsync(new[] { new TestGenome(60) });
+        JsonObject payload = Payload(Assert.IsType<EvolutionCheckpoint>(await store.LoadLatestAsync("segmented")));
+        Assert.True(payload.ContainsKey("CarriedEvaluations"), "the last batch was not cut short, so this proves nothing");
+        payload.Remove("CarriedEvaluations");
+        Assert.DoesNotContain("MeasurementOriginJson", payload.ToJsonString(), StringComparison.Ordinal);
+
+        EvolutionEngineOptions resume = Options(80, format, 0);
+        resume.EnableEvaluationCache = false;
         resume.Resume = true;
         EvolutionRunResult<TestGenome> resumed = await OriginEngine(resume, store).RunAsync(new[] { new TestGenome(60) });
         Assert.True(resumed.Counters.Proposals > before.Counters.Proposals, "the resumed run did not continue past the checkpoint");

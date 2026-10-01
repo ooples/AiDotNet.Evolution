@@ -38,9 +38,16 @@ public sealed partial class EvolutionEngine<TGenome>
                 cancellationToken.ThrowIfCancellationRequested();
                 if (Volatile.Read(ref _stopRequested) != 0) return EvolutionStopReason.Canceled;
                 EvolutionStopReason? limit = GetLimitStopReason(runTimer);
-                if (limit.HasValue) return limit.Value;
-                int waveLimit = (int)Math.Min(settings.WaveSize, Math.Min(_options.MaxProposals - _proposals, _options.MaxEvaluationAttempts - _evaluationAttempts));
+                int carriedSize = TakeCarriedBatchSize();
+                if (limit.HasValue && carriedSize == 0) return limit.Value;
+                long attemptsLeft = _options.MaxEvaluationAttempts - _evaluationAttempts;
+                // The carried wave is replanned whole before any limit applies.
+                int waveLimit = Math.Max(carriedSize,
+                    (int)Math.Max(0, Math.Min(settings.WaveSize, Math.Min(_options.MaxProposals - _proposals, attemptsLeft))));
+                bool truncatedByBudget = false;
+                CloseCarriedBatch(seeds, seedIndex);
                 BatchTransaction transaction = CaptureBatchTransaction();
+                BeginBatchCalls();
                 var batch = new List<WorkItem>(waveLimit);
                 var proposals = new Queue<PipelineProposal>();
                 var allProposals = new List<Task>();
@@ -57,7 +64,11 @@ public sealed partial class EvolutionEngine<TGenome>
                 {
                     // A bounded planning buffer fixes identities, snapshots and all first-attempt reservations before
                     // callbacks may refund resources. The smaller submission queues still control runnable work.
-                    List<PipelineProposal> plan = PlanPipelineWave(seeds, ref seedIndex, waveLimit, snapshots);
+                    List<PipelineProposal> plan = PlanPipelineWave(seeds, ref seedIndex, waveLimit, carriedSize, snapshots);
+                    // A larger budget would have planned more of this wave from the same archive. A wave that ran out of
+                    // parents first is short for another reason, and a larger budget would plan it the same.
+                    truncatedByBudget = plan.Count == waveLimit && waveLimit < settings.WaveSize &&
+                        (waveLimit == attemptsLeft || carriedSize > 0);
                     if (meteredVariation is not null) { meteredVariation.BeginPipelinePhase(); proposalResourcePhase = true; }
                     if (meteredTask is not null) { meteredTask.BeginPipelinePhase(); evaluationResourcePhase = true; }
                     foreach (PipelineProposal planned in plan)
@@ -157,7 +168,9 @@ public sealed partial class EvolutionEngine<TGenome>
                 if (_options.MigrationInterval > 0 && _islands.Length > 1)
                 { _batchesSinceMigration++; await MigrateIfDueAsync(CancellationToken.None).ConfigureAwait(false); }
                 UpdateEarlyStopping(batch.Count);
-                CaptureSafeState(seeds, seedIndex);
+                // A wave the budget cut short is not a boundary: the checkpoint stays before it and carries its calls.
+                if (!truncatedByBudget) CaptureSafeState(seeds, seedIndex);
+                SettleBatchCalls(truncatedByBudget, batch.Count);
                 await SaveCheckpointAsync(force: false, CancellationToken.None).ConfigureAwait(false);
                 cancellationToken.ThrowIfCancellationRequested();
                 if (failedFast) return EvolutionStopReason.CandidateFailure;
@@ -203,7 +216,7 @@ public sealed partial class EvolutionEngine<TGenome>
     private bool _pipelineInlineProposals = true;
     private bool _pipelineInlineEvaluations = true;
 
-    private List<PipelineProposal> PlanPipelineWave(TGenome[] seeds, ref int seedIndex, int limit,
+    private List<PipelineProposal> PlanPipelineWave(TGenome[] seeds, ref int seedIndex, int limit, int replay,
         Dictionary<int, PipelineArchiveContext> snapshots)
     {
         var plan = new List<PipelineProposal>(limit);
@@ -219,7 +232,7 @@ public sealed partial class EvolutionEngine<TGenome>
             }
             else
             {
-                if (_generation >= _options.MaxGenerations) break;
+                if (_generation >= _options.MaxGenerations && plan.Count >= replay) break;
                 VariationRequest? request = CreateVariationRequest(snapshots, committedBefore);
                 if (request is null) break;
                 plan.Add(new PipelineProposal(request.EvaluationId, request.Island, request.Lineage, default!, request, null));

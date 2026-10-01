@@ -235,6 +235,8 @@ public sealed partial class EvolutionEngine<TGenome>
     {
         if (_checkpointStore is null) return;
         if (!force && (_options.CheckpointInterval == 0 || _commitsSinceCheckpoint < _options.CheckpointInterval)) return;
+        // A batch the budget cut short is carried by the boundary before it, in either format.
+        AttachCarried();
         EvolutionCheckpoint checkpoint;
         if (SegmentStoreForSave() is { } segmentStore)
         {
@@ -269,6 +271,7 @@ public sealed partial class EvolutionEngine<TGenome>
         EngineStateDocument state = ReadStateDocument(checkpoint);
         await LoadSegmentsAsync(checkpoint, state, cancellationToken).ConfigureAwait(false);
         ValidateConfiguredCheckpointBounds(state);
+        LoadCarried(state);
 
         string[] checkpointSeedPayloads = state.SeedPayloads?.ToArray()
             ?? throw new InvalidDataException("The checkpoint seed list is missing.");
@@ -819,6 +822,7 @@ public sealed partial class EvolutionEngine<TGenome>
 
     private static bool HasMeasurementOrigins(EngineStateDocument state)
     {
+        if (state.CarriedEvaluations?.Any(item => item?.Result?.MeasurementOriginJson is not null) == true) return true;
         if (state.Cache?.Any(item => item?.Result?.MeasurementOriginJson is not null) == true) return true;
         if (state.Islands?.Any(island => island?.Entries?.Any(entry => entry?.Evaluation?.MeasurementOriginJson is not null) == true) == true)
             return true;

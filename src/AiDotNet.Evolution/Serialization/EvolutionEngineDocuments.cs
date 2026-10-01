@@ -42,6 +42,13 @@ internal static class EvolutionEngineDocuments
         public long AbandonedEvaluations { get; set; }
         public List<PendingArtifactDocument>? PendingArtifacts { get; set; }
         public List<ArchiveDocument>? Islands { get; set; }
+        // Evaluator calls of a batch the budget cut short, replayed when a resumed run replans it. Omitted otherwise, so
+        // every other checkpoint is byte-for-byte what it was.
+        [JsonIgnore(Condition = JsonIgnoreCondition.WhenWritingNull)]
+        public List<CarriedEvaluationDocument>? CarriedEvaluations { get; set; }
+        // How many items that batch planned, so a resumed run replans at least those whatever its limits.
+        [JsonIgnore(Condition = JsonIgnoreCondition.WhenWritingDefault)]
+        public int CarriedBatchSize { get; set; }
         // Present when the deduplication set and cache live in store segments (V1-73): the segments that rebuild them,
         // a base then deltas in order, and the identifier the next segment takes. SeenGenomeIds and Cache are absent.
         // Omitted when absent, so an inline payload stays byte-for-byte what engines before segments wrote.
@@ -98,6 +105,15 @@ internal static class EvolutionEngineDocuments
     {
         public EvolutionEvaluationStatus Status { get; set; }
         public long Count { get; set; }
+    }
+
+    internal sealed class CarriedEvaluationDocument
+    {
+        public long EvaluationId { get; set; }
+        public int Stage { get; set; }
+        public int Attempt { get; set; }
+        public bool Abandoned { get; set; }
+        public TaskResultDocument? Result { get; set; }
     }
 
     internal sealed class SegmentReferenceDocument
