@@ -141,7 +141,7 @@ set `DOTNET_GCConserveMemory=7` in the environment, or add it to the application
 { "configProperties": { "System.GC.ConserveMemory": 7 } }
 ```
 
-A run's live memory stays flat once its deduplication set is bounded, but by default the collector keeps
+A run's live memory stays bounded once its deduplication set is bounded, but by default the collector keeps
 freed memory committed, so the process's working set can sit well above what the run holds. The soak
 evidence in `benchmarks/evidence/soak` is measured both ways.
 

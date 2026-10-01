@@ -182,6 +182,86 @@ public sealed class SegmentedCheckpointTests
         Assert.False(Payload(fromSegmented.Latest).ContainsKey("Segments"));
     }
 
+    [Fact]
+    public async Task A_missing_segment_reference_is_refused_as_invalid_data()
+    {
+        var store = new InMemoryEvolutionCheckpointStore();
+        await Engine(Options(12, EvolutionCheckpointFormat.Segmented, 0), store).RunAsync(Seeds());
+        EvolutionCheckpoint saved = Assert.IsType<EvolutionCheckpoint>(await store.LoadLatestAsync("segmented"));
+        JsonObject payload = Payload(saved);
+        Assert.IsType<JsonArray>(payload["Segments"])[0] = null;
+        await store.SaveAsync(Rewritten(saved, payload));
+
+        EvolutionEngineOptions resume = Options(20, EvolutionCheckpointFormat.Segmented, 0);
+        resume.Resume = true;
+        InvalidDataException refused = await Assert.ThrowsAsync<InvalidDataException>(() => Engine(resume, store).RunAsync(Seeds()));
+        Assert.Contains("segment list is invalid", refused.Message, StringComparison.Ordinal);
+    }
+
+    [Fact]
+    public async Task A_segment_is_held_to_the_same_bounds_as_an_inline_cache()
+    {
+        // A cache entry without a result, correctly hashed: only the inline cache checks, run on the rebuilt cache, catch it.
+        var store = new InMemoryEvolutionCheckpointStore();
+        await Engine(Options(12, EvolutionCheckpointFormat.Segmented, 0), store).RunAsync(Seeds());
+        EvolutionCheckpoint saved = Assert.IsType<EvolutionCheckpoint>(await store.LoadLatestAsync("segmented"));
+        JsonObject payload = Payload(saved);
+        JsonObject reference = Assert.IsType<JsonObject>(Assert.IsType<JsonArray>(payload["Segments"])[0]);
+        long id = Assert.IsAssignableFrom<JsonValue>(reference["Id"]).GetValue<long>();
+        JsonObject segment;
+        using (Stream stream = Assert.IsAssignableFrom<Stream>(await store.OpenSegmentAsync("segmented", id)))
+            segment = Assert.IsType<JsonObject>(JsonNode.Parse(stream));
+        Assert.IsType<JsonArray>(segment["Cache"]).Add(new JsonObject { ["GenomeId"] = "crafted", ["Result"] = null });
+        byte[] bytes = System.Text.Encoding.UTF8.GetBytes(segment.ToJsonString());
+        await store.WriteSegmentAsync("segmented", id, (target, token) => target.WriteAsync(bytes, 0, bytes.Length, token));
+        string recorded = Assert.IsAssignableFrom<JsonValue>(reference["Sha256"]).GetValue<string>();
+        string digest;
+        using (var sha = System.Security.Cryptography.SHA256.Create())
+            digest = BitConverter.ToString(sha.ComputeHash(bytes)).Replace("-", string.Empty);
+        reference["Sha256"] = recorded.Any(char.IsLower) ? digest.ToLowerInvariant() : digest;
+        await store.SaveAsync(Rewritten(saved, payload));
+
+        EvolutionEngineOptions resume = Options(20, EvolutionCheckpointFormat.Segmented, 0);
+        resume.Resume = true;
+        InvalidDataException refused = await Assert.ThrowsAsync<InvalidDataException>(() => Engine(resume, store).RunAsync(Seeds()));
+        Assert.Contains("cache entry is incomplete", refused.Message, StringComparison.Ordinal);
+    }
+
+    [Fact]
+    public async Task Every_segment_lists_its_genomes_in_ordinal_order_whatever_the_history()
+    {
+        // A capacity makes the run evict genomes, so hash-table slot order stops matching insertion or key order. Ordinal
+        // order, as the inline payload uses, makes a segment's bytes depend on the state alone.
+        var store = new InMemoryEvolutionCheckpointStore();
+        await Engine(Options(150, EvolutionCheckpointFormat.Segmented, 6), store).RunAsync(Seeds());
+        EvolutionEngineOptions resume = Options(400, EvolutionCheckpointFormat.Segmented, 6);
+        resume.Resume = true;
+        await Engine(resume, store).RunAsync(Seeds());
+
+        EvolutionCheckpoint latest = Assert.IsType<EvolutionCheckpoint>(await store.LoadLatestAsync("segmented"));
+        Assert.NotEmpty(latest.SegmentIds);
+        int listed = 0;
+        foreach (long id in latest.SegmentIds)
+        {
+            JsonObject segment;
+            using (Stream stream = Assert.IsAssignableFrom<Stream>(await store.OpenSegmentAsync("segmented", id)))
+                segment = Assert.IsType<JsonObject>(JsonNode.Parse(stream));
+            foreach (string name in new[] { "SeenGenomeIds", "RemovedGenomeIds", "RemovedCacheIds", "Cache" })
+            {
+                if (segment[name] is not JsonArray array) continue;
+                List<string> keys = array.Select(item => item is JsonObject entry
+                    ? Assert.IsAssignableFrom<JsonValue>(entry["GenomeId"]).GetValue<string>()
+                    : Assert.IsAssignableFrom<JsonValue>(item).GetValue<string>()).ToList();
+                Assert.Equal(keys.OrderBy(key => key, StringComparer.Ordinal), keys);
+                listed += keys.Count;
+            }
+        }
+        Assert.True(listed > 6, "the segments listed too few genomes to show an order");
+    }
+    private static EvolutionCheckpoint Rewritten(EvolutionCheckpoint saved, JsonObject payload) =>
+        new EvolutionCheckpoint(saved.RunId, saved.Sequence + 1, saved.CompatibilityHash, payload.ToJsonString(),
+            saved.SchemaVersion, saved.Quality, saved.QualityDirection).WithSegmentIds(saved.SegmentIds);
+
     private static TestGenome[] Seeds() => new[] { new TestGenome(0) };
 
     private static JsonObject Payload(EvolutionCheckpoint checkpoint) => Assert.IsType<JsonObject>(JsonNode.Parse(checkpoint.Payload));

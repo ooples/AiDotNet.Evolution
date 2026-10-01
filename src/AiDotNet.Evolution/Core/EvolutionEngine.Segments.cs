@@ -150,6 +150,10 @@ public sealed partial class EvolutionEngine<TGenome>
         foreach (KeyValuePair<string, CacheChange> change in sinceBoundary.Cache)
             if (change.Value.Final is null && change.Value.Prior is { } prior && !_cache.ContainsKey(change.Key))
                 cache.Add(new KeyValuePair<string, EvolutionTaskResult>(change.Key, prior));
+        // Ordinal order, as the inline payload writes them, so a segment's bytes depend only on the state and not on the
+        // history of adds and removes that shaped the hash tables (a resumed run rebuilds them in another order).
+        seen.Sort(StringComparer.Ordinal);
+        cache.Sort((left, right) => string.CompareOrdinal(left.Key, right.Key));
         return new BaseSnapshot(seen, cache);
     }
 
@@ -198,7 +202,7 @@ public sealed partial class EvolutionEngine<TGenome>
         await WriteIds(nameof(StateSegmentDocument.SeenGenomeIds), delta.Seen.Where(pair => !pair.Value.Prior && pair.Value.Final)).ConfigureAwait(false);
         await WriteIds(nameof(StateSegmentDocument.RemovedGenomeIds), delta.Seen.Where(pair => pair.Value.Prior && !pair.Value.Final)).ConfigureAwait(false);
         json.WriteStartArray(nameof(StateSegmentDocument.Cache));
-        foreach (KeyValuePair<string, CacheChange> change in delta.Cache)
+        foreach (KeyValuePair<string, CacheChange> change in delta.Cache.OrderBy(pair => pair.Key, StringComparer.Ordinal))
         {
             if (change.Value.Final is not { } final || ReferenceEquals(final, change.Value.Prior)) continue;
             WriteCacheEntry(json, change.Key, final);
@@ -212,7 +216,7 @@ public sealed partial class EvolutionEngine<TGenome>
         async Task WriteIds<TValue>(string name, IEnumerable<KeyValuePair<string, TValue>> ids)
         {
             json.WriteStartArray(name);
-            foreach (KeyValuePair<string, TValue> id in ids)
+            foreach (KeyValuePair<string, TValue> id in ids.OrderBy(pair => pair.Key, StringComparer.Ordinal))
             {
                 json.WriteStringValue(id.Key);
                 await segment.FlushIfFullAsync().ConfigureAwait(false);
@@ -256,8 +260,9 @@ public sealed partial class EvolutionEngine<TGenome>
                 "This checkpoint keeps its deduplication set and cache in store segments, but it was copied without the list " +
                 "of segments it needs. Resume from the store that wrote it, or write portable checkpoints with " +
                 "EvolutionCheckpointFormat.Inline.");
-        if (manifest.Count == 0 || !manifest[0].IsBase || manifest.Skip(1).Any(segment => segment.IsBase) ||
+        if (manifest.Count == 0 ||
             manifest.Any(segment => segment is null || segment.Id < 0 || string.IsNullOrWhiteSpace(segment.Sha256)) ||
+            !manifest[0].IsBase || manifest.Skip(1).Any(segment => segment.IsBase) ||
             !manifest.Select(segment => segment.Id).SequenceEqual(checkpoint.SegmentIds) ||
             state.NextSegmentId is not { } nextId || nextId <= manifest[manifest.Count - 1].Id)
             throw new InvalidDataException("The checkpoint segment list is invalid.");
@@ -285,6 +290,10 @@ public sealed partial class EvolutionEngine<TGenome>
 
         state.SeenGenomeIds = seen.ToList();
         state.Cache = cache.Values.ToList();
+        // The inline checks ran before the segments were read, when both collections were still absent.
+        ValidatePackageCheckpointBounds(state);
+        if (HasMeasurementOrigins(state) && FeatureVersionOf(state) < EngineMeasurementOriginSchemaVersion)
+            throw new InvalidDataException("Measurement-origin metadata requires the versioned checkpoint schema.");
         _segmentManifest = new List<SegmentReferenceDocument>(manifest);
         _nextSegmentId = nextId;
     }
@@ -380,10 +389,10 @@ public sealed partial class EvolutionEngine<TGenome>
                 switch (change.Kind)
                 {
                     case SafeChangeKind.SeenAdded:
-                        seen[change.Key] = new SeenChange(seen.TryGetValue(change.Key, out SeenChange added) ? added.Prior : false, true);
+                        seen[change.Key] = new SeenChange(seen.TryGetValue(change.Key, out SeenChange added) && added.Prior, true);
                         break;
                     case SafeChangeKind.SeenRemoved:
-                        seen[change.Key] = new SeenChange(seen.TryGetValue(change.Key, out SeenChange removed) ? removed.Prior : true, false);
+                        seen[change.Key] = new SeenChange(!seen.TryGetValue(change.Key, out SeenChange removed) || removed.Prior, false);
                         break;
                     case SafeChangeKind.CacheSet:
                         cache[change.Key] = new CacheChange(cache.TryGetValue(change.Key, out CacheChange set) ? set.Prior : change.Previous, change.Value);
@@ -404,6 +413,7 @@ public sealed partial class EvolutionEngine<TGenome>
         private readonly CancellationToken _cancellationToken;
         private readonly MemoryStream _chunk = new();
         private readonly IncrementalHash _hash = IncrementalHash.CreateHash(HashAlgorithmName.SHA256);
+        private long _written;
 
         public SegmentWriter(Stream stream, CancellationToken cancellationToken)
         {
@@ -430,6 +440,11 @@ public sealed partial class EvolutionEngine<TGenome>
             Json.Flush();
             int length = (int)_chunk.Length;
             if (length == 0) return;
+            // Resume refuses a segment above the package limit, so a save must refuse to write one.
+            _written += length;
+            if (_written > EvolutionCollectionLimits.MaximumCheckpointBytes)
+                throw new InvalidDataException(
+                    $"A checkpoint segment exceeds the {EvolutionCollectionLimits.MaximumCheckpointBytes}-byte package limit.");
             byte[] buffer = _chunk.GetBuffer();
             _hash.AppendData(buffer, 0, length);
             await _stream.WriteAsync(buffer, 0, length, _cancellationToken).ConfigureAwait(false);

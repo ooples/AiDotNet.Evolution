@@ -264,8 +264,9 @@ public sealed class EvolutionEngineOptions
 
     /// <summary>Gets or sets how checkpoints store the deduplication set and evaluation cache.</summary>
     /// <remarks>
-    /// <see cref="EvolutionCheckpointFormat.Auto"/>, the default, keeps self-contained checkpoints until the run has
-    /// remembered <see cref="CheckpointSegmentThreshold"/> genomes and then switches to store segments, so a save costs
+    /// <see cref="EvolutionCheckpointFormat.Auto"/>, the default, keeps self-contained checkpoints until the run holds
+    /// <see cref="CheckpointSegmentThreshold"/> deduplication and cache entries together (with the evaluation cache on,
+    /// each distinct evaluated genome is one of each) and then switches to store segments, so a save costs
     /// what changed instead of everything the run has seen. The format changes how state is stored, not what the search
     /// does, so it is not part of the compatibility hash and a run can resume under a different one.
     /// </remarks>

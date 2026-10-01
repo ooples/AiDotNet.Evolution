@@ -169,7 +169,10 @@ public sealed class DirectoryEvolutionCheckpointStore : IEvolutionCheckpointSegm
     private static string SegmentFileName(long segmentId) =>
         "segment-" + segmentId.ToString("D20", CultureInfo.InvariantCulture) + ".json";
 
-    /// <summary>Deletes the run's segments that no retained snapshot names, except any newer than the newest named one.</summary>
+    /// <summary>
+    /// Deletes the run's segments that no retained snapshot names, except any newer than the newest named one while
+    /// some snapshot still names a segment.
+    /// </summary>
     /// <remarks>
     /// A segment newer than every named one can belong to a save still in progress, or to one that crashed before its
     /// checkpoint was written; the next save of that identifier replaces it. Like snapshot retention, this is
@@ -179,8 +182,9 @@ public sealed class DirectoryEvolutionCheckpointStore : IEvolutionCheckpointSegm
     {
         var named = new HashSet<long>();
         foreach (EvolutionCheckpoint checkpoint in retained) named.UnionWith(checkpoint.SegmentIds);
-        if (named.Count == 0) return;
-        long newest = named.Max();
+        // With nothing named, no segmented save is in progress (a segmented save names its segments when it lands), so
+        // every remaining segment is orphaned: for example a run that switched back to the inline format.
+        long newest = named.Count == 0 ? -1 : named.Max();
         string directory = SegmentDirectory(runId);
         IEnumerable<string> files;
         try
@@ -201,7 +205,7 @@ public sealed class DirectoryEvolutionCheckpointStore : IEvolutionCheckpointSegm
         {
             string name = Path.GetFileNameWithoutExtension(file);
             if (!long.TryParse(name.Substring("segment-".Length), NumberStyles.None, CultureInfo.InvariantCulture, out long id)) continue;
-            if (named.Contains(id) || id > newest) continue;
+            if (named.Contains(id) || (named.Count > 0 && id > newest)) continue;
             TryDelete(file);
         }
     }
@@ -512,7 +516,8 @@ public sealed class DirectoryEvolutionCheckpointStore : IEvolutionCheckpointSegm
         if (at < 0 || outline.IndexOf(placeholder, at + placeholder.Length + 2, StringComparison.Ordinal) >= 0)
             throw new InvalidOperationException("The checkpoint snapshot outline is malformed.");
 
-        var utf8 = new UTF8Encoding(encoderShouldEmitUTF8Identifier: false);
+        // Throws on a lone surrogate: a replacement character would persist a snapshot that later fails its checksum.
+        var utf8 = new UTF8Encoding(encoderShouldEmitUTF8Identifier: false, throwOnInvalidBytes: true);
         byte[] prefix = utf8.GetBytes(outline.Substring(0, at + 1));
         stream.Write(prefix, 0, prefix.Length);
         WriteEscaped(stream, checkpoint.Payload, utf8);

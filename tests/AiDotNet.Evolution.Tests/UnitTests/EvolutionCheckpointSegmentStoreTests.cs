@@ -86,6 +86,36 @@ public sealed class EvolutionCheckpointSegmentStoreTests
     }
 
     [Fact]
+    public async Task Directory_retention_deletes_every_segment_once_no_retained_snapshot_names_one()
+    {
+        // A run that switched back to inline checkpoints: once its last segmented snapshot is pruned, nothing is named.
+        using var directory = new TemporaryDirectory();
+        var store = new DirectoryEvolutionCheckpointStore(directory.Path,
+            new EvolutionCheckpointRetentionOptions { KeepLast = 1, KeepBest = 0 });
+        foreach (long id in new long[] { 0, 1 }) await store.WriteSegmentAsync("run", id, Text("s" + id));
+        await store.SaveAsync(Checkpoint(1, 1.0, 0, 1));
+        await store.SaveAsync(Checkpoint(2, 1.0));
+
+        Assert.False(await Exists(store, "run", 0));
+        Assert.False(await Exists(store, "run", 1));
+    }
+
+    [Fact]
+    public async Task A_payload_that_is_not_valid_utf16_fails_the_save_and_keeps_the_last_good_snapshot()
+    {
+        // A lone surrogate would be written as U+FFFD, which no longer matches the checksum of the payload it came from.
+        using var directory = new TemporaryDirectory();
+        var store = new DirectoryEvolutionCheckpointStore(directory.Path);
+        await store.SaveAsync(new EvolutionCheckpoint("run", 1, "compatibility", "good"));
+        await Assert.ThrowsAnyAsync<ArgumentException>(() =>
+            store.SaveAsync(new EvolutionCheckpoint("run", 2, "compatibility", "bad \uD800 payload")));
+
+        EvolutionCheckpoint loaded = Assert.IsType<EvolutionCheckpoint>(await new DirectoryEvolutionCheckpointStore(directory.Path).LoadLatestAsync("run"));
+        Assert.Equal(1, loaded.Sequence);
+        Assert.Equal("good", loaded.Payload);
+    }
+
+    [Fact]
     public void Segment_identifiers_must_increase_and_be_bounded()
     {
         EvolutionCheckpoint plain = new("run", 1, "compatibility", "payload");

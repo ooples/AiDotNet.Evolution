@@ -10,7 +10,7 @@ advises for long runs. Every sample follows a full compacting collection. Growth
 | run | time | working set at 30k | working-set peak growth | working-set final growth | live heap (30k -> 200k) | handles | threads | children |
 | --- | --- | --- | --- | --- | --- | --- | --- | --- |
 | capped 10,000, recommended GC | 83 s | 123 MB | +20.1% | +6.3% | 47 -> 47 MB | 218-221 | 7-10 | 0 |
-| capped 10,000, recommended GC (run 2) | | 116 MB | +64.8% | +64.8% | 47 -> 47 MB | | | 0 |
+| capped 10,000, recommended GC (run 2) | | 116 MB | +64.8% | +64.8% | 15 -> 47 MB | | | 0 |
 | capped 10,000, recommended GC (run 3) | | 134 MB | +10.2% | -1.8% | 47 -> 47 MB | | | 0 |
 | capped 10,000, default GC | 59 s | 441 MB | +8.6% | +3.2% | 47 -> 47 MB | 218-221 | 7-9 | 0 |
 | unbounded, recommended GC | 35 s | 226 MB | +40.4% | +40.1% | 244 -> 343 MB | 252-272 | 18-24 | 0 |
@@ -18,18 +18,22 @@ advises for long runs. Every sample follows a full compacting collection. Growth
 
 Before this change (`benchmarks/evidence/soak/README.md`): unbounded 2,799 MB working set and 576 s; capped live heap 143-199 MB.
 
-**What the numbers say.** With a deduplication capacity, the run's live memory is flat: the heap after a full
-collection is 47 MB at every sample of every run. The working set is not: it moves by tens of megabytes between
-identical runs (+10% to +65% peak under the recommended GC), because it records how much freed memory the collector
-keeps committed, not what the run holds. The default GC keeps more resident (441 MB) but steadier (+8.6%). The
-unbounded runs grow because they remember every distinct genome by design (about 0.5 KB each in the heap).
+**What the numbers say.** With a deduplication capacity, the run's live memory has a ceiling: the heap after a full
+collection never exceeds 46.6 MiB (47 MB) in any sample of any capped run. Three of the four capped runs are at that
+ceiling from the first sample. Run 2 is the exception: it held 14.6 MiB from 30,000 to 160,000 evaluations, then
+stepped to 38.6 and 46.6 MiB at the next two samples and stayed there. That one-time step of about 32 MiB lands on the
+same ceiling the other runs hold. Its cause was not identified, and it is why run 2's live heap reads 15 -> 47 MB.
+
+The working set moves by tens of megabytes between identical runs (+10% to +65% peak under the recommended GC),
+because it records how much freed memory the collector keeps committed, not what the run holds. The default GC keeps
+more resident (441 MB) but steadier (+8.6%). The unbounded runs grow because they remember every distinct genome by
+design (about 0.5 KB each in the heap).
 
 **Against the #178 memory target.** The target is judged on the live heap after a full collection, which is what the
-run holds: with a deduplication capacity it is 47 MB at 30,000 evaluations and 47 MB at 200,000, in every run, under
-both GC settings, so it grows by 0%. Working set is reported alongside but is not the gate, because it also measures the
-collector's retention policy: under the recommended GC three identical runs peaked at +10.2% to +64.8% with the same
-47 MB live heap. Handle, thread and child-process counts do not trend in any run.
-
+run holds. With a deduplication capacity, three of the four capped runs read 47 MB at both 30,000 and 200,000
+evaluations under both GC settings, so they grew by 0%. Run 2 did not hold flat from its own 30,000-evaluation
+sample: it rose from 15 to 47 MB. It never exceeded the 47 MB the other runs hold from the start, and it did not grow
+after the step. Handle, thread and child-process counts do not trend in any run.
 ## Resume fidelity (5 kill points, recommended GC)
 
 Each kill point starts a fresh process, kills its whole tree once it reports that many evaluations, and resumes.
