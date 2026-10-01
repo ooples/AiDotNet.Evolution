@@ -1,7 +1,7 @@
 {
   "openevolve_version": "0.4.0",
-  "python": "3.13.14",
-  "platform": "win32",
+  "python": "3.12.3",
+  "platform": "linux",
   "reproduced": 8,
   "scenarios": 8,
   "results": [
@@ -43,7 +43,7 @@
       "method": "probe",
       "ours": "EngineDefectClassTests.D5_the_result_does_not_depend_on_which_worker_finishes_first",
       "reproduced": true,
-      "observation": "two equal-fitness results for one cell: the cell keeps whichever the controller applied first (first); process_parallel.py applies futures in the order it finds them done"
+      "observation": "one cell, two equal-fitness programs: applied A then B the owner is A; applied B then A it is B. process_parallel.py applies futures in the order it finds them done"
     },
     {
       "id": "D6",
@@ -51,7 +51,7 @@
       "method": "probe",
       "ours": "HungCandidateDefectClassTests.D6_a_hung_candidate_and_the_process_it_detached_are_gone_within_the_timeout_plus_one_second",
       "reproduced": true,
-      "observation": "evaluate_program returned after 1.01s with ['error', 'timeout']; the hung evaluation's heartbeat went 20 -> 40 over the following second"
+      "observation": "evaluate_program returned after 1.00s with ['error', 'timeout']; at timeout + 1 s the hung evaluation's heartbeat had gone 20 -> 40 and its detached child (pid 2411) was still running"
     },
     {
       "id": "D7",

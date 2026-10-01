@@ -23,12 +23,13 @@ against the pinned 0.3.2 and 0.4.0 releases.
 | metric | baseline | target | measured |
 | --- | --- | --- | --- |
 | defect classes with a passing test on ours | 0 of 8 | 8 of 8 | **8 of 8** ([`ours.json`](ours.json)) |
-| public options exercised by a test | unmeasured | 100% | **272 of 272** (`OptionCoverageTests`) |
+| public options exercised by a test | unmeasured | 100% | **311 of 311** (`OptionCoverageTests`) |
 
 ## What each OpenEvolve scenario observed
 
-These are the exact observations in [`openevolve-defects-0.3.2.json`](openevolve-defects-0.3.2.json). 0.4.0
-produced the same results ([`openevolve-defects-0.4.0.json`](openevolve-defects-0.4.0.json)).
+These are the exact observations in [`openevolve-defects-0.3.2.json`](openevolve-defects-0.3.2.json), produced by
+the committed probe in the `openevolve-defects` CI workflow (Python 3.12.3, Linux). 0.4.0 produced the same results
+apart from D6's process id and heartbeat count ([`openevolve-defects-0.4.0.json`](openevolve-defects-0.4.0.json)).
 
 - **D1**: a NaN occupant kept its cell against challengers scoring 1, 100 and 1e9. As a control, the same
   challengers displaced a finite 0.5 occupant of that cell, so they do land in it.
@@ -36,11 +37,11 @@ produced the same results ([`openevolve-defects-0.4.0.json`](openevolve-defects-
   island, because `add()` stores the program before it checks novelty.
 - **D3**: a program that lost its cell comparison was still an island member, and owned no cell.
 - **D4**: the same stored program moved from cell 50 to cell 5 after one wider value arrived.
-- **D5**: two equal-fitness results for one cell: the cell keeps whichever the controller applied first.
+- **D5**: one cell, two equal-fitness programs: applied A then B, the owner is A; applied B then A, it is B.
   `process_parallel.py` applies futures in the order it finds them done, so worker timing decides the
   archive.
-- **D6**: `evaluate_program` returned a timeout after 1.01 s. The hung evaluation's heartbeat went from 20
-  to 40 in the following second: the thread kept running.
+- **D6**: `evaluate_program` returned a timeout after 1.00 s. One second later the hung evaluation's
+  heartbeat had gone from 20 to 36 and the child it detached was still running: neither was stopped.
 - **D7**: 10 requested bins per dimension (archive size 10000, two dimensions) became 100.
 - **D8**: `prompt.use_meta_prompting`, `evaluator.memory_limit_mb`, `evaluator.cpu_limit`,
   `evaluator.distributed` and `diversity_metric: feature_based` are read nowhere outside `config.py`.
@@ -50,8 +51,11 @@ produced the same results ([`openevolve-defects-0.4.0.json`](openevolve-defects-
 - D1–D7 drive OpenEvolve's classes the way its controller does. D2 forces the novelty verdict by replacing
   `_is_novel`, because the real verdict needs an embedding model. D8 is a static scan of the installed
   package.
-- The D8 check on our side is name-based. A test that sets or reads a member with that name counts, even
-  on another type. Every option it flagged when it was written got a behaviour test that sets the
-  option both ways and asserts on the difference (for example `PromptOptionBehaviourTests`,
-  `JudgeAndMetricOptionBehaviourTests` and `CSharpCostOptionBehaviourTests`).
-- Ours ran on net10.0 on Windows. OpenEvolve ran on Python 3.13.14 on Windows. CI reruns both on Linux.
+- The D8 check on our side compiles the sources and tests together and resolves each test reference to its
+  property symbol, so a same-named member on another type does not count. It covers every public settable
+  property of a public type named `*Options`, wherever it is declared. Its limit: any reference in a test
+  counts, without proving the test asserts on the option's effect. Every option it flagged got a
+  behaviour test that sets the option and asserts on the difference (for example `PromptOptionBehaviourTests`,
+  `JudgeAndMetricOptionBehaviourTests`, `CSharpCostOptionBehaviourTests` and the work-server option tests).
+- Ours ran on net10.0 on Windows ([`ours.json`](ours.json), regenerated from this suite). OpenEvolve ran in
+  CI on Linux.

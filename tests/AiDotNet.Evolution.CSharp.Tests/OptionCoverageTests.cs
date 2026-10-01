@@ -3,6 +3,7 @@ using Microsoft.CodeAnalysis;
 using Microsoft.CodeAnalysis.CSharp;
 using Microsoft.CodeAnalysis.CSharp.Syntax;
 using Xunit;
+using Xunit.Abstractions;
 
 namespace AiDotNet.Evolution.CSharp.Tests;
 
@@ -15,7 +16,7 @@ namespace AiDotNet.Evolution.CSharp.Tests;
 /// count for a different options type's <c>Enabled</c>. The sources of every package and every test project are
 /// compiled together, so no test project's build output is needed and each project's tests can reach any option.
 /// </remarks>
-public sealed class OptionCoverageTests
+public sealed class OptionCoverageTests(ITestOutputHelper output)
 {
     [Fact]
     public void D8_every_public_option_is_exercised_by_a_test()
@@ -72,6 +73,8 @@ public sealed class OptionCoverageTests
             .OrderBy(name => name, StringComparer.Ordinal)
             .ToList();
         Assert.True(options.Count > 200, $"only {options.Count} options were found; the scan is not reading the sources");
+        // Recorded with the evidence: how many public options the check covered.
+        output.WriteLine($"public options: {options.Count}; unexercised: {unexercised.Count}");
         // Control: a property every engine test sets resolves to its declaring type, so binding works at all.
         Assert.Contains(exercised, property => property.Name == "Seed" && property.ContainingType.Name == "EvolutionEngineOptions");
         Assert.True(unexercised.Count == 0, "Options no test exercises: " + string.Join(", ", unexercised));
