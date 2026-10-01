@@ -28,6 +28,11 @@ public sealed class EvolutionCheckpoint
     /// <summary>The current public checkpoint schema.</summary>
     public const int CurrentSchemaVersion = 1;
 
+    /// <summary>The most segments one checkpoint may name.</summary>
+    public const int MaximumSegmentCount = 4096;
+
+    private static readonly IReadOnlyList<long> NoSegments = Array.AsReadOnly(Array.Empty<long>());
+
     /// <summary>Initializes a checkpoint and computes its payload checksum.</summary>
     /// <param name="runId">The stable run identifier.</param>
     /// <param name="sequence">The monotonically increasing committed-state sequence.</param>
@@ -46,13 +51,14 @@ public sealed class EvolutionCheckpoint
         int schemaVersion = CurrentSchemaVersion, double? quality = null,
         EvolutionOptimizationDirection qualityDirection = EvolutionOptimizationDirection.Maximize)
         : this(runId, sequence, compatibilityHash, payload, EvolutionHash.Compute(payload), schemaVersion, quality,
-            qualityDirection)
+            qualityDirection, NoSegments)
     {
     }
 
     internal EvolutionCheckpoint(string runId, long sequence, string compatibilityHash, string payload,
         string checksum, int schemaVersion, double? quality = null,
-        EvolutionOptimizationDirection qualityDirection = EvolutionOptimizationDirection.Maximize)
+        EvolutionOptimizationDirection qualityDirection = EvolutionOptimizationDirection.Maximize,
+        IReadOnlyList<long>? segmentIds = null)
     {
         Guard.NotNullOrWhiteSpace(runId);
         Guard.NotNullOrWhiteSpace(compatibilityHash);
@@ -72,6 +78,22 @@ public sealed class EvolutionCheckpoint
         SchemaVersion = schemaVersion;
         Quality = quality;
         QualityDirection = qualityDirection;
+        SegmentIds = segmentIds is null ? NoSegments : CopySegmentIds(segmentIds);
+    }
+
+    private static IReadOnlyList<long> CopySegmentIds(IReadOnlyList<long> segmentIds)
+    {
+        if (segmentIds.Count == 0) return NoSegments;
+        if (segmentIds.Count > MaximumSegmentCount)
+            throw new ArgumentOutOfRangeException(nameof(segmentIds), $"A checkpoint names at most {MaximumSegmentCount} segments.");
+        var copy = new long[segmentIds.Count];
+        for (int i = 0; i < copy.Length; i++)
+        {
+            copy[i] = segmentIds[i];
+            if (copy[i] < 0 || (i > 0 && copy[i] <= copy[i - 1]))
+                throw new ArgumentOutOfRangeException(nameof(segmentIds), "Segment identifiers must be non-negative and strictly increasing.");
+        }
+        return Array.AsReadOnly(copy);
     }
 
     /// <summary>Gets the schema version.</summary>
@@ -103,6 +125,9 @@ public sealed class EvolutionCheckpoint
     /// <summary>Gets the direction in which a larger <see cref="Quality"/> is better.</summary>
     public EvolutionOptimizationDirection QualityDirection { get; }
 
+    /// <summary>Gets the store segments this checkpoint needs, in increasing order; empty when it needs none.</summary>
+    public IReadOnlyList<long> SegmentIds { get; }
+
     /// <summary>Verifies the schema and payload checksum.</summary>
     /// <exception cref="InvalidDataException">The schema or checksum is invalid.</exception>
     public void Validate()
@@ -114,6 +139,21 @@ public sealed class EvolutionCheckpoint
             throw new InvalidDataException("Evolution checkpoint checksum validation failed.");
     }
 
+    /// <summary>Returns a copy of this checkpoint that names the given store segments.</summary>
+    /// <param name="segmentIds">
+    /// The segments of an <see cref="IEvolutionCheckpointSegmentStore"/> the checkpoint needs, in increasing order. A
+    /// store keeps every segment a retained checkpoint names, and one that reloads a checkpoint restores them with this.
+    /// </param>
+    /// <returns>A checkpoint equal to this one apart from <see cref="SegmentIds"/>.</returns>
+    /// <exception cref="ArgumentNullException"><paramref name="segmentIds"/> is <c>null</c>.</exception>
+    /// <exception cref="ArgumentOutOfRangeException">
+    /// <paramref name="segmentIds"/> is not strictly increasing, has a negative identifier, or names more than
+    /// <see cref="MaximumSegmentCount"/> segments.
+    /// </exception>
+    public EvolutionCheckpoint WithSegmentIds(IReadOnlyList<long> segmentIds) =>
+        new(RunId, Sequence, CompatibilityHash, Payload, Checksum, SchemaVersion, Quality, QualityDirection,
+            segmentIds ?? throw new ArgumentNullException(nameof(segmentIds)));
+
     internal EvolutionCheckpoint Clone() =>
-        new(RunId, Sequence, CompatibilityHash, Payload, Checksum, SchemaVersion, Quality, QualityDirection);
+        new(RunId, Sequence, CompatibilityHash, Payload, Checksum, SchemaVersion, Quality, QualityDirection, SegmentIds);
 }

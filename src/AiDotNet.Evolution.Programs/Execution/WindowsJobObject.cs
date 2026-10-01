@@ -229,6 +229,25 @@ internal sealed class WindowsJobObject : IDisposable
         }
     }
 
+    /// <summary>Terminates every process in the job at once, including descendants that detached from their parent.</summary>
+    /// <returns><c>true</c> when the job was terminated.</returns>
+    public bool TryTerminate()
+    {
+        if (_disposed || _handle == IntPtr.Zero)
+        {
+            return false;
+        }
+
+        try
+        {
+            return TerminateJobObject(_handle, 1);
+        }
+        catch (EntryPointNotFoundException)
+        {
+            return false;
+        }
+    }
+
     /// <summary>Closes the job handle, which terminates any process still running inside it.</summary>
     public void Dispose()
     {
@@ -278,6 +297,10 @@ internal sealed class WindowsJobObject : IDisposable
     [DllImport("kernel32.dll", SetLastError = true)]
     [return: MarshalAs(UnmanagedType.Bool)]
     private static extern bool CloseHandle(IntPtr handle);
+
+    [DllImport("kernel32.dll", SetLastError = true)]
+    [return: MarshalAs(UnmanagedType.Bool)]
+    private static extern bool TerminateJobObject(IntPtr job, uint exitCode);
 
     [DllImport("kernel32.dll", SetLastError = true)]
     private static extern IntPtr CreateIoCompletionPort(
