@@ -156,6 +156,7 @@ public sealed partial class EvolutionEngine<TGenome>
     {
         RecordSafeChange(SafeChangeKind.CacheSet, id, _cache.TryGetValue(id, out EvolutionTaskResult? previous) ? previous : null, result);
         _cache[id] = result;
+        if (result.MeasurementOrigin is not null) _cacheHeldMeasurementOrigin = true;
     }
 
     /// <summary>Records a change to the seen set or the cache so the last safe boundary can be recovered.</summary>
@@ -356,6 +357,7 @@ public sealed partial class EvolutionEngine<TGenome>
             if (string.IsNullOrWhiteSpace(id) || !_seen.Add(id)) throw new InvalidDataException("The checkpoint deduplication set is invalid.");
 
         _cache.Clear();
+        _cacheHeldMeasurementOrigin = false;
         foreach (CacheDocument cached in state.Cache ?? new List<CacheDocument>())
         {
             if (string.IsNullOrWhiteSpace(cached.GenomeId) || cached.Result is null || _cache.ContainsKey(cached.GenomeId))
@@ -366,6 +368,7 @@ public sealed partial class EvolutionEngine<TGenome>
             if (result.Status != EvolutionEvaluationStatus.Completed)
                 throw new InvalidDataException("Only completed evaluations may be cached.");
             _cache[cached.GenomeId] = result;
+            if (result.MeasurementOrigin is not null) _cacheHeldMeasurementOrigin = true;
         }
 
         _deduplicationOrder.Clear();

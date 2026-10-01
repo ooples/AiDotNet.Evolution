@@ -19,6 +19,9 @@ public sealed partial class EvolutionEngine<TGenome>
     // The segments the last saved checkpoint names (a base first) and the identifier the next segment takes.
     private List<SegmentReferenceDocument> _segmentManifest = new();
     private long _nextSegmentId;
+    // Set once any cached result has carried a measurement origin. A segmented payload leaves the cache out, so the
+    // schema version cannot be read off the document; the version this implies is never too low, only possibly high.
+    private bool _cacheHeldMeasurementOrigin;
     // Changes between the last saved boundary and the current one: the next delta segment.
     private readonly List<SafeChange> _unsavedChanges = new();
     // What a save prepared; it becomes current only once the store has accepted the checkpoint that names it.
@@ -90,7 +93,11 @@ public sealed partial class EvolutionEngine<TGenome>
         document.DeduplicationOrder = _options.DeduplicationCapacity > 0 ? BoundaryDeduplicationOrder() : null;
         document.Segments = manifest;
         document.NextSegmentId = nextId;
-        document.SchemaVersion = FeatureSchemaVersion(document) + SegmentedSchemaOffset;
+        int featureVersion = FeatureSchemaVersion(document);
+        // The cache was just taken out of the document, so its measurement origins no longer show in it.
+        if (_cacheHeldMeasurementOrigin && featureVersion < EngineMeasurementOriginSchemaVersion)
+            featureVersion = EngineMeasurementOriginSchemaVersion;
+        document.SchemaVersion = featureVersion + SegmentedSchemaOffset;
         string payload = JsonSerializer.Serialize(document, EvolutionStateJsonContext.Default.EngineStateDocument);
         if (payload.Length > EvolutionCollectionLimits.MaximumCheckpointBytes ||
             Encoding.UTF8.GetByteCount(payload) > EvolutionCollectionLimits.MaximumCheckpointBytes)

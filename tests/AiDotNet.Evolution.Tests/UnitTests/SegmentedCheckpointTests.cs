@@ -258,6 +258,60 @@ public sealed class SegmentedCheckpointTests
         }
         Assert.True(listed > 6, "the segments listed too few genomes to show an order");
     }
+    [Fact]
+    public async Task A_segmented_checkpoint_whose_only_measurement_origins_are_cached_resumes()
+    {
+        // The seed (60, no origin) holds the one cell; every later candidate carries an origin and loses to it, so the
+        // origins live only in the evaluation cache, which a segmented payload leaves out.
+        var store = new InMemoryEvolutionCheckpointStore();
+        EvolutionEngineOptions first = Options(40, EvolutionCheckpointFormat.Segmented, 0);
+        first.EnableEvaluationCache = true;
+        EvolutionRunResult<TestGenome> before = await OriginEngine(first, store).RunAsync(new[] { new TestGenome(60) });
+
+        EvolutionCheckpoint saved = Assert.IsType<EvolutionCheckpoint>(await store.LoadLatestAsync("segmented"));
+        JsonObject payload = Payload(saved);
+        Assert.DoesNotContain("MeasurementOriginJson", payload.ToJsonString(), StringComparison.Ordinal);
+        bool cachedOrigin = false;
+        foreach (long id in saved.SegmentIds)
+        {
+            using Stream stream = Assert.IsAssignableFrom<Stream>(await store.OpenSegmentAsync("segmented", id));
+            using var reader = new StreamReader(stream, System.Text.Encoding.UTF8);
+            cachedOrigin |= (await reader.ReadToEndAsync()).Contains("MeasurementOriginJson", StringComparison.Ordinal);
+        }
+        Assert.True(cachedOrigin, "no cached result carried a measurement origin, so this proves nothing");
+
+        EvolutionEngineOptions resume = Options(80, EvolutionCheckpointFormat.Segmented, 0);
+        resume.EnableEvaluationCache = true;
+        resume.Resume = true;
+        EvolutionRunResult<TestGenome> resumed = await OriginEngine(resume, store).RunAsync(new[] { new TestGenome(60) });
+        Assert.True(resumed.Counters.Proposals > before.Counters.Proposals, "the resumed run did not continue past the checkpoint");
+    }
+
+    private sealed class CachedOriginTask : IEvolutionTask<TestGenome>
+    {
+        public string Id => "cached-origin";
+        public string VersionHash => "cached-origin-v1";
+        public string EvaluatorVersionHash => "cached-origin-evaluator-v1";
+
+        public ValueTask<EvolutionCanonicalGenome<TestGenome>> CanonicalizeAsync(TestGenome genome, CancellationToken cancellationToken = default) =>
+            new(new EvolutionCanonicalGenome<TestGenome>(new TestGenome(genome.Value), genome.Value.ToString(System.Globalization.CultureInfo.InvariantCulture)));
+
+        public ValueTask<EvolutionTaskResult> EvaluateAsync(EvolutionCandidate<TestGenome> candidate, EvolutionEvaluationContext context,
+            CancellationToken cancellationToken = default)
+        {
+            int value = candidate.CanonicalGenome.Genome.Value;
+            EvolutionTaskResult result = EvolutionTaskResult.Completed(value, new Dictionary<string, double> { ["x"] = 50 });
+            return new(value == 60 ? result : result.WithMeasurementOrigin(new EvolutionMeasurementOrigin(new string('a', 64), "run", "1",
+                new[] { "sample" }, new DateTimeOffset(2026, 1, 1, 0, 0, 0, TimeSpan.Zero), 1, "calls", "test-v1",
+                EvolutionMeasurementOriginKind.Measured)));
+        }
+    }
+
+    private static EvolutionEngine<TestGenome> OriginEngine(EvolutionEngineOptions options, IEvolutionCheckpointStore store) =>
+        new(new CachedOriginTask(), new CyclingVariation(),
+            _ => new MapElitesArchive<TestGenome>(new[] { new EvolutionDescriptorDefinition("x", 0, 100, 4) }), options,
+            checkpointStore: store, genomeCodec: new TestGenomeCodec());
+
     private static EvolutionCheckpoint Rewritten(EvolutionCheckpoint saved, JsonObject payload) =>
         new EvolutionCheckpoint(saved.RunId, saved.Sequence + 1, saved.CompatibilityHash, payload.ToJsonString(),
             saved.SchemaVersion, saved.Quality, saved.QualityDirection).WithSegmentIds(saved.SegmentIds);
