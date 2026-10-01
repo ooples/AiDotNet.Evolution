@@ -7,7 +7,7 @@
     <!-- The experience memory is experimental (AIDEVO004); this assembly uses it deliberately. -->
     <NoWarn>$(NoWarn);AIDEVO004</NoWarn>
     <GenerateDocumentationFile>true</GenerateDocumentationFile>
-    <Version>0.2.0</Version>
+    <Version>1.0.0</Version>
     <Description>Compiler-neutral bounded program improvement and artifact-bound promotion.</Description>
     <RepositoryUrl>https://github.com/ooples/AiDotNet.Evolution</RepositoryUrl>
     <PackageLicenseFile>AIDOTNET-LICENSE.txt</PackageLicenseFile>
@@ -33,20 +33,15 @@
     compile reference for consumers. The project reference only orders the build; the target embeds its output.
   -->
   <ItemGroup>
-    <ProjectReference Include="../AiDotNet.Evolution.Sandbox.Guardian/AiDotNet.Evolution.Sandbox.Guardian.csproj"
-                      ReferenceOutputAssembly="false" Private="false"
-                      SetTargetFramework="TargetFramework=net8.0"/>
+    <ProjectReference Include="../AiDotNet.Evolution.Sandbox.Guardian/AiDotNet.Evolution.Sandbox.Guardian.csproj" ReferenceOutputAssembly="false" Private="false" SetTargetFramework="TargetFramework=net8.0"/>
   </ItemGroup>
   <Target Name="EmbedSandboxGuardian" BeforeTargets="AssignTargetPaths" DependsOnTargets="ResolveProjectReferences">
-    <MSBuild Projects="../AiDotNet.Evolution.Sandbox.Guardian/AiDotNet.Evolution.Sandbox.Guardian.csproj"
-             Targets="Build" Properties="Configuration=$(Configuration);TargetFramework=net8.0">
+    <MSBuild Projects="../AiDotNet.Evolution.Sandbox.Guardian/AiDotNet.Evolution.Sandbox.Guardian.csproj" Targets="Build" Properties="Configuration=$(Configuration);TargetFramework=net8.0">
       <Output TaskParameter="TargetOutputs" ItemName="_SandboxGuardianAssembly"/>
     </MSBuild>
     <ItemGroup>
-      <EmbeddedResource Include="@(_SandboxGuardianAssembly)"
-                        LogicalName="AiDotNet.Evolution.Programs.Execution.SandboxGuardian.dll"/>
-      <EmbeddedResource Include="@(_SandboxGuardianAssembly->'%(RootDir)%(Directory)%(Filename).runtimeconfig.json')"
-                        LogicalName="AiDotNet.Evolution.Programs.Execution.SandboxGuardian.runtimeconfig.json"/>
+      <EmbeddedResource Include="@(_SandboxGuardianAssembly)" LogicalName="AiDotNet.Evolution.Programs.Execution.SandboxGuardian.dll"/>
+      <EmbeddedResource Include="@(_SandboxGuardianAssembly-&gt;'%(RootDir)%(Directory)%(Filename).runtimeconfig.json')" LogicalName="AiDotNet.Evolution.Programs.Execution.SandboxGuardian.runtimeconfig.json"/>
     </ItemGroup>
   </Target>
   <!-- V1-11: the public API is declared (PublicAPI.*.txt) and every change to it must be too. -->
@@ -56,6 +51,6 @@
     <AdditionalFiles Include="PublicAPI.Unshipped.txt"/>
   </ItemGroup>
   <ItemGroup>
-    <EmbeddedResource Include="Execution\warm_python_worker.py" LogicalName="AiDotNet.Evolution.Programs.Execution.warm_python_worker.py" />
+    <EmbeddedResource Include="Execution\warm_python_worker.py" LogicalName="AiDotNet.Evolution.Programs.Execution.warm_python_worker.py"/>
   </ItemGroup>
 </Project>
