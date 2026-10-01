@@ -30,7 +30,11 @@ public sealed class EngineDefectClassTests
             GlobalEliteCount = 10,
             HistorySize = 10
         };
-        var task = new SyntheticEvolutionTask();
+        // Every evaluation leaves an artifact for the next proposal, so the pending-artifact queue is a real place a
+        // rejected program could linger, not one that is empty whatever happens.
+        options.Artifacts.Enabled = true;
+        options.Artifacts.DeliverToNextProposal = true;
+        var task = new ArtifactTask();
         var store = new InMemoryEvolutionCheckpointStore();
         EvolutionRunResult<TestGenome> result = await new EvolutionEngine<TestGenome>(task, new IncrementVariation(),
             _ => new MapElitesArchive<TestGenome>(new[] { new EvolutionDescriptorDefinition("x", 0, 100, 10, EvolutionOutOfRangePolicy.Clamp) }),
@@ -42,9 +46,10 @@ public sealed class EngineDefectClassTests
         string[] rejected = { "2", "3" };
         Assert.DoesNotContain(result.Islands.SelectMany(island => island.Entries), entry => rejected.Contains(entry.Evaluation.GenomeId));
         Assert.DoesNotContain(result.GlobalElites, record => rejected.Contains(record.Entry.Evaluation.GenomeId));
-        Assert.Empty(result.PendingArtifacts);
+        Assert.DoesNotContain(result.PendingArtifacts.Keys, id => rejected.Contains(id));
         // Positive control: the program that was evaluated does appear in each place, so an absence above is meaningful.
         Assert.Contains(result.GlobalElites, record => record.Entry.Evaluation.GenomeId == "1");
+        Assert.Contains("1", result.PendingArtifacts.Keys);
         EvolutionCheckpoint checkpoint = await store.LoadLatestAsync("d2") ?? throw new InvalidOperationException("no checkpoint");
         using JsonDocument state = JsonDocument.Parse(checkpoint.Payload);
         // Not remembered as seen, so the same program proposed later is judged again rather than written off as a duplicate.
@@ -126,6 +131,29 @@ public sealed class EngineDefectClassTests
             if (evolutionEvent.Kind == EvolutionEventKind.Evaluated && evolutionEvent.Candidate is { } candidate)
                 lock (_values) _values.Add(candidate.CanonicalGenome.Genome.Value);
             return default;
+        }
+    }
+
+    // Completes every candidate with its value as quality and descriptor, and one artifact naming it.
+    private sealed class ArtifactTask : IEvolutionTask<TestGenome>
+    {
+        private int _calls;
+        public int Calls => Volatile.Read(ref _calls);
+        public string Id => "artifact";
+        public string VersionHash => "artifact-v1";
+        public string EvaluatorVersionHash => "artifact-evaluator-v1";
+
+        public ValueTask<EvolutionCanonicalGenome<TestGenome>> CanonicalizeAsync(TestGenome genome, CancellationToken cancellationToken = default) =>
+            new(new EvolutionCanonicalGenome<TestGenome>(new TestGenome(genome.Value), genome.Value.ToString(System.Globalization.CultureInfo.InvariantCulture)));
+
+        public ValueTask<EvolutionTaskResult> EvaluateAsync(EvolutionCandidate<TestGenome> candidate, EvolutionEvaluationContext context,
+            CancellationToken cancellationToken = default)
+        {
+            Interlocked.Increment(ref _calls);
+            int value = candidate.CanonicalGenome.Genome.Value;
+            return new(new EvolutionTaskResult(EvolutionEvaluationStatus.Completed, value,
+                descriptors: new Dictionary<string, double> { ["x"] = value },
+                artifacts: new[] { new EvolutionArtifact("log", "evaluated " + value) }));
         }
     }
 
