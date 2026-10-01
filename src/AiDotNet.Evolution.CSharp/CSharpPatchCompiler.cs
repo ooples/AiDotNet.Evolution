@@ -154,9 +154,10 @@ internal sealed class CSharpPatchCompiler
             var compilation = CSharpCompilation.Create("EvolutionCandidate", new[] { candidateTree }, _references,
                 new CSharpCompilationOptions(OutputKind.DynamicallyLinkedLibrary, optimizationLevel: OptimizationLevel.Release,
                     allowUnsafe: false, deterministic: true, concurrentBuild: false));
-            using var image = new BoundedImageStream();
+            var image = new BoundedImageStream();
             compilerInvoked = true;
-            var emitted = compilation.Emit(image, cancellationToken: timeout.Token);
+            Microsoft.CodeAnalysis.Emit.EmitResult emitted = WithinBound(() => compilation.Emit(image, cancellationToken: timeout.Token),
+                timer, TimeSpan.FromSeconds(_options.CompilationTimeoutSeconds), timeout);
             if (!emitted.Success) return Reject(CompilerFeedback(emitted.Diagnostics));
             return new(proposed, proposed, hypothesis, string.Empty, true, Hash(image.ToArray()), timer.Elapsed);
         }
@@ -256,6 +257,21 @@ internal sealed class CSharpPatchCompiler
         {
             if (Position > MaximumImageBytes - count) throw new ImageLimitException();
         }
+    }
+    // Roslyn observes cancellation between members, not inside one pathological expression, so the token alone let a
+    // slow compile run long past its bound (CI measured a one-second bound taking as long as the unbounded compile).
+    // The work runs on the pool and the caller stops waiting at the deadline; the abandoned compile is cancelled and
+    // stops at Roslyn's next check, and its result, or failure, is observed and discarded.
+    private static T WithinBound<T>(Func<T> work, Stopwatch timer, TimeSpan bound, CancellationTokenSource timeout)
+    {
+        Task<T> task = Task.Run(work);
+        TimeSpan remaining = bound - timer.Elapsed;
+        if (remaining > TimeSpan.Zero && task.Wait(remaining)) return task.GetAwaiter().GetResult();
+        if (task.IsCompleted) return task.GetAwaiter().GetResult();
+        timeout.Cancel();
+        _ = task.ContinueWith(abandoned => abandoned.Exception, CancellationToken.None,
+            TaskContinuationOptions.OnlyOnFaulted | TaskContinuationOptions.ExecuteSynchronously, TaskScheduler.Default);
+        throw new OperationCanceledException(timeout.Token);
     }
 }
 
