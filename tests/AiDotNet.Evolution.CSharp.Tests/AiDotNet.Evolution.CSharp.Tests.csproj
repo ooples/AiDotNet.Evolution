@@ -14,7 +14,7 @@
     <PackageReference Include="Microsoft.Extensions.TimeProvider.Testing" Version="10.0.0" />
     <PackageReference Include="xunit" Version="2.9.3" />
     <PackageReference Include="xunit.runner.visualstudio" Version="2.8.2" PrivateAssets="all" />
-    <PackageReference Include="coverlet.collector" Version="10.0.1" PrivateAssets="all" />
+    <PackageReference Include="coverlet.collector" Version="10.1.0" PrivateAssets="all" />
     <ProjectReference Include="../../src/AiDotNet.Evolution.CSharp/AiDotNet.Evolution.CSharp.csproj" />
     <ProjectReference Include="../../examples/CompilerGuidedSearch/CompilerGuidedSearch.csproj" />
     <None Include="../../examples/CompilerGuidedSearch/bin/$(Configuration)/$(TargetFramework)/CompilerGuidedSearch.runtimeconfig.json" Link="CompilerGuidedSearch.runtimeconfig.json" CopyToOutputDirectory="PreserveNewest" />
