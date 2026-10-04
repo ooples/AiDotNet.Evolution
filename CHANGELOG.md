@@ -1,5 +1,41 @@
 # Changelog
 
+## [1.0.0](https://github.com/ooples/AiDotNet.Evolution/compare/v0.2.0...v1.0.0) (2026-10-04)
+
+
+### ⚠ BREAKING CHANGES
+
+* EvolutionDeploymentDecision.Outcome is EvolutionDeploymentOutcome, not string.
+
+### Features
+
+* classify the v1 public api and enforce it (V1-82) ([#206](https://github.com/ooples/AiDotNet.Evolution/issues/206)) ([9cfb696](https://github.com/ooples/AiDotNet.Evolution/commit/9cfb6963b4c66a2360a35434f863c78cdd93c338))
+* **cli:** a live, self-refreshing run report (V1-59) ([#196](https://github.com/ooples/AiDotNet.Evolution/issues/196)) ([95d85ba](https://github.com/ooples/AiDotNet.Evolution/commit/95d85bae01e5dc476d692d457b1fb59bc2fe2777)), closes [#172](https://github.com/ooples/AiDotNet.Evolution/issues/172)
+* **cli:** run openevolve configs and evaluators unmodified (V1-56) ([#207](https://github.com/ooples/AiDotNet.Evolution/issues/207)) ([de8810c](https://github.com/ooples/AiDotNet.Evolution/commit/de8810cbef588beb39bb01da6b39b272807e27ea))
+* enforced resource limits and multi-host distributed evaluation (V1-61) ([#205](https://github.com/ooples/AiDotNet.Evolution/issues/205)) ([d220e82](https://github.com/ooples/AiDotNet.Evolution/commit/d220e82971ca06be521522c9c5f72591af5fbe9f))
+* **engine:** drive deadlines and delays from a replaceable clock (V1-80) ([#190](https://github.com/ooples/AiDotNet.Evolution/issues/190)) ([ac1c68e](https://github.com/ooples/AiDotNet.Evolution/commit/ac1c68e657a4feb244141db656c673a2452682dd))
+* **engine:** store large and binary artifacts in full (V1-58) ([#188](https://github.com/ooples/AiDotNet.Evolution/issues/188)) ([5b1fbb8](https://github.com/ooples/AiDotNet.Evolution/commit/5b1fbb8e3a4bab65e0905bd43059ff19012d840d))
+* **programs:** feed experience lessons into proposals (V1-52) ([#194](https://github.com/ooples/AiDotNet.Evolution/issues/194)) ([58cfe7b](https://github.com/ooples/AiDotNet.Evolution/commit/58cfe7bbf29f73af3568959355210bb7fb1f418c))
+* **programs:** model provider parity with openevolve (V1-51) ([#189](https://github.com/ooples/AiDotNet.Evolution/issues/189)) ([1396ee0](https://github.com/ooples/AiDotNet.Evolution/commit/1396ee01b384306e995a3446c4d0e7447d431ddf)), closes [#164](https://github.com/ooples/AiDotNet.Evolution/issues/164)
+* **programs:** promote metrics and the score to archive descriptors (V1-55) ([#186](https://github.com/ooples/AiDotNet.Evolution/issues/186)) ([feefca0](https://github.com/ooples/AiDotNet.Evolution/commit/feefca0eb2179916bf2ac175377ed43e461664ea))
+* **programs:** weighted model ensembles (V1-50) ([#195](https://github.com/ooples/AiDotNet.Evolution/issues/195)) ([389c735](https://github.com/ooples/AiDotNet.Evolution/commit/389c7350fbcd6b7ca63091a3b34edb27cc6be777))
+
+
+### Bug Fixes
+
+* resume a budget-truncated batch exactly by carrying its evaluator calls ([#210](https://github.com/ooples/AiDotNet.Evolution/issues/210)) ([b813204](https://github.com/ooples/AiDotNet.Evolution/commit/b81320415077545fa83ce1b8845947bdcc35a0d6))
+
+
+### Performance
+
+* **checkpoints:** segmented, streamed checkpoints for long runs (V1-73) ([#209](https://github.com/ooples/AiDotNet.Evolution/issues/209)) ([d821729](https://github.com/ooples/AiDotNet.Evolution/commit/d82172967f83dd62b7271db0b2f3008cecbb3cba))
+* **engine:** cheaper checkpoint saves, and checkpoints beyond 16 MiB (V1-74) ([#198](https://github.com/ooples/AiDotNet.Evolution/issues/198)) ([08ac70b](https://github.com/ooples/AiDotNet.Evolution/commit/08ac70b11ab025da9db0e4facae299017f079868))
+* **engine:** keep a slow model busy with overlapping proposals (V1-75) ([#199](https://github.com/ooples/AiDotNet.Evolution/issues/199)) ([9feb16d](https://github.com/ooples/AiDotNet.Evolution/commit/9feb16d08da94c550ced5af5447211a39abdcc04))
+* **engine:** keep per-evaluation cost flat as the archive grows (V1-72) ([#201](https://github.com/ooples/AiDotNet.Evolution/issues/201)) ([0de1a75](https://github.com/ooples/AiDotNet.Evolution/commit/0de1a751838b53ccc3225039239678b75e5cc1be))
+* **engine:** stop rebuilding search genomes on every validation (V1-71) ([#197](https://github.com/ooples/AiDotNet.Evolution/issues/197)) ([9e27171](https://github.com/ooples/AiDotNet.Evolution/commit/9e2717170a2cb0e6241ab1234bc233206f03fe46))
+* **engine:** valid overhead intervals against openevolve, and a state hash that stops pinning memory (V1-70) ([#200](https://github.com/ooples/AiDotNet.Evolution/issues/200)) ([65ef0d2](https://github.com/ooples/AiDotNet.Evolution/commit/65ef0d2b7f295aea6215c52fd53080bfad210f08))
+* **programs:** sandbox overhead and warm python workers (V1-76) ([#208](https://github.com/ooples/AiDotNet.Evolution/issues/208)) ([59bd34b](https://github.com/ooples/AiDotNet.Evolution/commit/59bd34b80a498789ace9855273fdb0292c1d32b4))
+
 ## [0.2.0](https://github.com/ooples/AiDotNet.Evolution/compare/v0.1.0...v0.2.0) (2026-09-28)
 
 
