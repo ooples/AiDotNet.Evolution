@@ -13,7 +13,7 @@
     <PackageId>AiDotNet.Evolution.Cli</PackageId>
     <Description>Run and resume AiDotNet.Evolution program evolutions; inspect, compare, export and report runs from their trace files.</Description>
     <IsPackable>true</IsPackable>
-    <Version>0.2.0</Version>
+    <Version>1.0.0</Version>
     <!-- The tool bundles AiDotNet.Evolution.Programs, so it carries that package's original license, as CSharp and Deployment do. -->
     <PackageLicenseFile>AIDOTNET-LICENSE.txt</PackageLicenseFile>
     <PackageRequireLicenseAcceptance>true</PackageRequireLicenseAcceptance>
