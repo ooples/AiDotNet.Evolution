@@ -1,3 +1,4 @@
+using System.Diagnostics.CodeAnalysis;
 using System.Text.Json.Serialization;
 
 namespace AiDotNet.Evolution.Ptx;
@@ -6,6 +7,7 @@ namespace AiDotNet.Evolution.Ptx;
 /// <remarks>The median and the nearest-rank P95 are computed exactly as AiDotNet.Tensors' <c>KernelTimingStatistics</c>
 /// computes them, so evidence exported from here reproduces the same numbers there. Quartiles use linear interpolation
 /// between order statistics (the common "type 7" definition).</remarks>
+[Experimental("AIDEVO005")]
 public sealed class PtxTimingStatistics
 {
     private PtxTimingStatistics(double[] sorted)
@@ -65,6 +67,7 @@ public sealed class PtxTimingStatistics
 }
 
 /// <summary>One interleaved candidate/incumbent measurement.</summary>
+[Experimental("AIDEVO005")]
 public readonly record struct PtxPairedSample
 {
     /// <summary>Creates a pair.</summary>
@@ -93,6 +96,7 @@ public readonly record struct PtxPairedSample
 /// within-pair speedup must reach both the minimum promotion ratio and the calibrated noise ratio, the empirical lower 5%
 /// speedup must be at least one, and the candidate's P95 must not regress past the allowed ratio. The noise ratio is the
 /// P95 of <c>max(s, 1/s)</c> over identical incumbent pairs, so a "win" smaller than the machine's own jitter is refused.</remarks>
+[Experimental("AIDEVO005")]
 public sealed class PtxPairedTimingEvidence
 {
     /// <summary>The fewest pairs, for both the holdout and the control, the gate accepts.</summary>

@@ -10,8 +10,11 @@
     <RepositoryUrl>https://github.com/ooples/AiDotNet.Evolution</RepositoryUrl>
     <PackageLicenseFile>AIDOTNET-LICENSE.txt</PackageLicenseFile>
     <PackageReadmeFile>README.md</PackageReadmeFile>
-    <!-- A new package: there is no published baseline to validate against until its first release. -->
-    <EnablePackageValidation>true</EnablePackageValidation>
+    <!-- The whole package is experimental (AIDEVO005) until its first release; this assembly uses its own types. -->
+    <NoWarn>$(NoWarn);AIDEVO005</NoWarn>
+    <!-- A new package: there is no published baseline to validate against until its first release, so package
+         validation (and its PackageValidationBaselineVersion) is switched on with that release. -->
+    <EnablePackageValidation>false</EnablePackageValidation>
   </PropertyGroup>
   <ItemGroup>
     <None Include="../AiDotNet.Evolution.Programs/AIDOTNET-LICENSE.txt" Pack="true" PackagePath="AIDOTNET-LICENSE.txt"/>

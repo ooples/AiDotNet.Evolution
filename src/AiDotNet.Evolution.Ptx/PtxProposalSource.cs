@@ -1,3 +1,4 @@
+using System.Diagnostics.CodeAnalysis;
 using System.Globalization;
 using System.Text;
 using System.Text.Json;
@@ -379,6 +380,7 @@ internal sealed class PtxProposalSource : ICostedProgramProposalSource
 }
 
 /// <summary>Constructs costed PTX rewrite arms for program evolution portfolios, without the AiDotNet facade.</summary>
+[Experimental("AIDEVO005")]
 public static class PtxProgramVariation
 {
     /// <summary>Charges setup immediately and returns a metered operator; proposals are JIT-checked, not proven correct or fast.</summary>

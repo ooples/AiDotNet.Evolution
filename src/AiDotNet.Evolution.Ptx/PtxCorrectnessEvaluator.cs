@@ -1,8 +1,10 @@
+using System.Diagnostics.CodeAnalysis;
 using System.Globalization;
 
 namespace AiDotNet.Evolution.Ptx;
 
 /// <summary>Why a candidate was accepted or rejected by the correctness gate.</summary>
+[Experimental("AIDEVO005")]
 public enum PtxCorrectnessVerdict
 {
     /// <summary>Every case matched the reference within tolerance.</summary>
@@ -22,6 +24,7 @@ public enum PtxCorrectnessVerdict
 }
 
 /// <summary>The comparison on one shape.</summary>
+[Experimental("AIDEVO005")]
 public sealed class PtxCaseOutcome
 {
     internal PtxCaseOutcome(PtxShapeCase shape, bool passed, string? failure, double maxAbsolute, double maxRelative, long compared, long mismatches, long unspecified)
@@ -55,6 +58,7 @@ public sealed class PtxCaseOutcome
 }
 
 /// <summary>The correctness gate's decision for one candidate.</summary>
+[Experimental("AIDEVO005")]
 public sealed class PtxCorrectnessReport
 {
     internal PtxCorrectnessReport(PtxCorrectnessVerdict verdict, string message, IReadOnlyList<PtxCaseOutcome> cases,
@@ -96,6 +100,7 @@ public sealed class PtxCorrectnessReport
 /// <para>The reference is a trusted CPU implementation when one is supplied, otherwise the incumbent kernel run in the
 /// same worker on the same inputs. A candidate that fails any case is rejected; nothing is timed until all pass.</para>
 /// </remarks>
+[Experimental("AIDEVO005")]
 public sealed class PtxCorrectnessEvaluator
 {
     private readonly PtxProgramCompiler _compiler;

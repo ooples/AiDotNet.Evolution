@@ -1,8 +1,10 @@
+using System.Diagnostics.CodeAnalysis;
 using System.Text.Json.Serialization;
 
 namespace AiDotNet.Evolution.Ptx;
 
 /// <summary>How a buffer's seeded test contents are drawn.</summary>
+[Experimental("AIDEVO005")]
 public sealed class PtxValueDistribution
 {
     /// <summary>Creates a distribution.</summary>
@@ -47,6 +49,7 @@ public sealed class PtxValueDistribution
 }
 
 /// <summary>The accepted numerical difference from the reference: <c>|candidate - reference| &lt;= absolute + relative * |reference|</c>.</summary>
+[Experimental("AIDEVO005")]
 public sealed class PtxTolerance
 {
     /// <summary>Creates a tolerance.</summary>

@@ -1,3 +1,4 @@
+using System.Diagnostics.CodeAnalysis;
 using System.Text;
 using AiDotNet.Evolution.Programs;
 
@@ -15,6 +16,7 @@ namespace AiDotNet.Evolution.Ptx;
 /// <see cref="FileName"/>, the catalog is the entry body's lines, and a built artifact's image is the PTX text.
 /// Compilation does not run the kernel and proves nothing about correctness or speed.</para>
 /// </remarks>
+[Experimental("AIDEVO005")]
 public sealed class PtxProgramCompiler : IProgramCompiler
 {
     /// <summary>The logical file name of the kernel in a <see cref="ProgramSnapshot"/>.</summary>
@@ -162,7 +164,7 @@ public sealed class PtxProgramCompiler : IProgramCompiler
         OptimizationLevel = 4
     };
 
-        /// <summary>A response-level failure is environmental: candidate faults are reported per kernel or per run, never here.</summary>
+    /// <summary>A response-level failure is environmental: candidate faults are reported per kernel or per run, never here.</summary>
     internal static bool IsInfrastructure(string status) =>
         status is "cuda-unavailable" or "no-device" or "invalid-request" or "worker-error" || status.StartsWith("CUDA_ERROR", StringComparison.Ordinal);
 
@@ -184,6 +186,7 @@ public sealed class PtxProgramCompiler : IProgramCompiler
 }
 
 /// <summary>Whether a usable CUDA device is reachable through the isolated worker.</summary>
+[Experimental("AIDEVO005")]
 public sealed class PtxDeviceProbe
 {
     private PtxDeviceProbe(PtxDeviceInfo? device, string message)

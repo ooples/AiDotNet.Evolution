@@ -1,3 +1,4 @@
+using System.Diagnostics.CodeAnalysis;
 using System.Runtime.InteropServices;
 
 namespace AiDotNet.Evolution.Ptx;
@@ -5,6 +6,7 @@ namespace AiDotNet.Evolution.Ptx;
 /// <summary>A trusted CPU implementation that defines a contract's right answer.</summary>
 /// <remarks>When no CPU reference is supplied, the incumbent kernel is the reference instead: it runs on the same seeded
 /// inputs in the same worker, and elements where its own two runs disagree are treated as unspecified.</remarks>
+[Experimental("AIDEVO005")]
 public interface IPtxKernelReference
 {
     /// <summary>Gets a versioned identity; change it whenever the reference's results change.</summary>
@@ -16,6 +18,7 @@ public interface IPtxKernelReference
 }
 
 /// <summary>Creates references from delegates.</summary>
+[Experimental("AIDEVO005")]
 public static class PtxKernelReference
 {
     /// <summary>Wraps a delegate as a reference.</summary>
@@ -34,6 +37,7 @@ public static class PtxKernelReference
 }
 
 /// <summary>The inputs, outputs and shape of one reference computation, as typed spans over contiguous buffers.</summary>
+[Experimental("AIDEVO005")]
 public sealed class PtxReferenceInvocation
 {
     private readonly PtxKernelContract _contract;

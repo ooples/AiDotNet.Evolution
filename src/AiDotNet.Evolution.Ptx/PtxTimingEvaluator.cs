@@ -1,6 +1,8 @@
+using System.Diagnostics.CodeAnalysis;
 namespace AiDotNet.Evolution.Ptx;
 
 /// <summary>How kernels are timed.</summary>
+[Experimental("AIDEVO005")]
 public sealed class PtxTimingOptions
 {
     /// <summary>Gets or sets warm-up runs of each kernel before any sample. Default: 10.</summary>
@@ -41,6 +43,7 @@ public sealed class PtxTimingOptions
 }
 
 /// <summary>The outcome of one paired timing replay.</summary>
+[Experimental("AIDEVO005")]
 public sealed class PtxTimingReport
 {
     internal PtxTimingReport(bool completed, string message, PtxPairedTimingEvidence? evidence, PtxDeviceInfo? device, bool qualifies, bool lockAbandoned,
@@ -81,6 +84,7 @@ public sealed class PtxTimingReport
 /// noise floor, then candidate/incumbent pairs are measured with alternating order, as the Tensors paired replay does.
 /// Timing never establishes correctness: run <see cref="PtxCorrectnessEvaluator"/> first and time only what passed.
 /// </remarks>
+[Experimental("AIDEVO005")]
 public sealed class PtxTimingEvaluator
 {
     private readonly PtxProgramCompiler _compiler;

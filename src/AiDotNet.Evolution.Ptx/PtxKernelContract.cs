@@ -1,3 +1,4 @@
+using System.Diagnostics.CodeAnalysis;
 using System.Text;
 using System.Text.Json;
 using System.Text.Json.Serialization;
@@ -16,6 +17,7 @@ namespace AiDotNet.Evolution.Ptx;
 /// proposal prompt carries the contract verbatim. Contracts serialize to canonical JSON (<see cref="ToJson"/>), so they
 /// can live beside the kernels they describe; <see cref="Fingerprint"/> identifies one exactly.</para>
 /// </remarks>
+[Experimental("AIDEVO005")]
 public sealed class PtxKernelContract
 {
     private static readonly JsonSerializerOptions Json = new()

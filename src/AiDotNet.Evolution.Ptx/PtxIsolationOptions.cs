@@ -1,3 +1,4 @@
+using System.Diagnostics.CodeAnalysis;
 namespace AiDotNet.Evolution.Ptx;
 
 /// <summary>How candidates are isolated: every driver call runs in a separate worker process under a watchdog.</summary>
@@ -8,6 +9,7 @@ namespace AiDotNet.Evolution.Ptx;
 /// <para>The worker ships embedded in this assembly and is written to <see cref="WorkerDirectory"/> on first use; it
 /// runs on the installed <c>dotnet</c> host (8 or later).</para>
 /// </remarks>
+[Experimental("AIDEVO005")]
 public sealed class PtxIsolationOptions
 {
     /// <summary>Gets or sets the wall-clock limit for one worker invocation, 1 second to 1 hour. Default: 2 minutes.</summary>

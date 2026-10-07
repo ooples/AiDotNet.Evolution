@@ -1,5 +1,7 @@
 <Project Sdk="Microsoft.NET.Sdk">
   <PropertyGroup>
+    <!-- Exercises the experimental PTX surface (AIDEVO005) deliberately. -->
+    <NoWarn>$(NoWarn);AIDEVO005</NoWarn>
     <TargetFrameworks>net10.0;net8.0</TargetFrameworks>
     <ImplicitUsings>enable</ImplicitUsings>
     <Nullable>enable</Nullable>

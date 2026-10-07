@@ -1,8 +1,10 @@
+using System.Diagnostics.CodeAnalysis;
 using AiDotNet.Evolution.Programs;
 
 namespace AiDotNet.Evolution.Ptx;
 
 /// <summary>The device a worker ran on.</summary>
+[Experimental("AIDEVO005")]
 public sealed class PtxDeviceInfo
 {
     internal PtxDeviceInfo(PtxWorkerDevice device)
@@ -42,6 +44,7 @@ public sealed class PtxDeviceInfo
 }
 
 /// <summary>Resources the JIT assigned to a loaded kernel.</summary>
+[Experimental("AIDEVO005")]
 public sealed class PtxKernelResources
 {
     /// <summary>Creates a resource record.</summary>
@@ -81,6 +84,7 @@ public sealed class PtxKernelResources
 }
 
 /// <summary>The outcome of validating and loading one PTX candidate.</summary>
+[Experimental("AIDEVO005")]
 public sealed class PtxCompilationResult
 {
     internal PtxCompilationResult(string source, IReadOnlyList<CompilationDiagnostic> diagnostics, PtxLaunchConfiguration launch,

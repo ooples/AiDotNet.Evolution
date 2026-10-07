@@ -1,3 +1,4 @@
+using System.Diagnostics.CodeAnalysis;
 using System.Globalization;
 using System.Text.Json.Serialization;
 
@@ -10,6 +11,7 @@ namespace AiDotNet.Evolution.Ptx;
 /// <c>blockX</c>, <c>blockY</c> and <c>blockZ</c> name the launch's block dimensions, so a grid written as
 /// <c>ceil(N / blockX)</c> stays correct when a candidate changes its block size.
 /// </remarks>
+[Experimental("AIDEVO005")]
 public sealed class PtxExtent : IEquatable<PtxExtent>
 {
     /// <summary>The reserved symbol for the block's x dimension.</summary>

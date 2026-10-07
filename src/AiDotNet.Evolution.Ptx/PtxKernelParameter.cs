@@ -1,8 +1,10 @@
+using System.Diagnostics.CodeAnalysis;
 using System.Text.Json.Serialization;
 
 namespace AiDotNet.Evolution.Ptx;
 
 /// <summary>One kernel argument, in PTX <c>.param</c> order: a guarded device buffer or a by-value scalar.</summary>
+[Experimental("AIDEVO005")]
 public sealed class PtxKernelParameter
 {
     /// <summary>Creates a parameter; prefer the factory methods.</summary>
@@ -119,6 +121,7 @@ public sealed class PtxKernelParameter
 }
 
 /// <summary>A named shape dimension and the range shape fuzzing draws it from.</summary>
+[Experimental("AIDEVO005")]
 public sealed class PtxShapeSymbol
 {
     /// <summary>Creates a symbol.</summary>
@@ -151,6 +154,7 @@ public sealed class PtxShapeSymbol
 }
 
 /// <summary>A kernel's launch: grid dimensions as extents, block dimensions, and dynamic shared memory.</summary>
+[Experimental("AIDEVO005")]
 public sealed class PtxLaunchConfiguration
 {
     /// <summary>Creates a launch configuration.</summary>
@@ -240,6 +244,7 @@ public sealed class PtxLaunchConfiguration
 }
 
 /// <summary>The streaming-multiprocessor target and the resource limits a candidate must respect.</summary>
+[Experimental("AIDEVO005")]
 public sealed class PtxTargetLimits
 {
     /// <summary>Creates limits.</summary>
@@ -299,6 +304,7 @@ public sealed class PtxTargetLimits
 }
 
 /// <summary>One concrete shape the kernel is checked or timed on.</summary>
+[Experimental("AIDEVO005")]
 public sealed class PtxShapeCase
 {
     /// <summary>Creates a case.</summary>

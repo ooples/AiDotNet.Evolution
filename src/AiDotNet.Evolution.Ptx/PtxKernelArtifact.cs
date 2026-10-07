@@ -1,3 +1,4 @@
+using System.Diagnostics.CodeAnalysis;
 using System.Text;
 using System.Text.Json;
 using System.Text.Json.Serialization;
@@ -17,6 +18,7 @@ namespace AiDotNet.Evolution.Ptx;
 /// the correctness errors onto its <c>KernelTuningMeasurement</c>. Registering does not promote: Tensors' own replay and
 /// promotion policy still decide.</para>
 /// </remarks>
+[Experimental("AIDEVO005")]
 public sealed class PtxKernelArtifact
 {
     /// <summary>The artifact schema version.</summary>
@@ -245,6 +247,7 @@ public sealed class PtxKernelArtifact
 }
 
 /// <summary>The deployable part of a PTX winner: the kernel text and how to launch it.</summary>
+[Experimental("AIDEVO005")]
 public sealed class PtxKernelConfiguration : IEquatable<PtxKernelConfiguration>
 {
     /// <summary>Creates a configuration.</summary>
@@ -300,6 +303,7 @@ public sealed class PtxKernelConfiguration : IEquatable<PtxKernelConfiguration>
 }
 
 /// <summary>Canonical text encoding of <see cref="PtxKernelConfiguration"/>, as the Tensors kernel-tuning stores require.</summary>
+[Experimental("AIDEVO005")]
 public sealed class PtxKernelConfigurationCodec : IEvolutionGenomeCodec<PtxKernelConfiguration>
 {
     private static readonly JsonSerializerOptions Json = new() { MaxDepth = 4, PropertyNamingPolicy = JsonNamingPolicy.CamelCase };

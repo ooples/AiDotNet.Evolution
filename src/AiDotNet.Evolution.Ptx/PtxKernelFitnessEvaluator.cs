@@ -1,3 +1,4 @@
+using System.Diagnostics.CodeAnalysis;
 using AiDotNet.Evolution.Programs;
 
 namespace AiDotNet.Evolution.Ptx;
@@ -11,6 +12,7 @@ namespace AiDotNet.Evolution.Ptx;
 /// <para>When no worker or device is available the evaluator throws instead of failing the candidate, so a missing GPU
 /// stops a run rather than silently scoring every proposal as broken.</para>
 /// </remarks>
+[Experimental("AIDEVO005")]
 public sealed class PtxKernelFitnessEvaluator : IProgramFitnessEvaluator
 {
     private readonly PtxCorrectnessEvaluator _correctness;

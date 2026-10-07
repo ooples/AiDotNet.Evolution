@@ -1,6 +1,8 @@
+using System.Diagnostics.CodeAnalysis;
 namespace AiDotNet.Evolution.Ptx;
 
 /// <summary>The element type of a kernel buffer or scalar argument.</summary>
+[Experimental("AIDEVO005")]
 public enum PtxElementType
 {
     /// <summary>IEEE 754 binary32 (<c>.f32</c>).</summary>
@@ -20,6 +22,7 @@ public enum PtxElementType
 }
 
 /// <summary>Whether a kernel argument is a device buffer or a by-value scalar.</summary>
+[Experimental("AIDEVO005")]
 public enum PtxParameterKind
 {
     /// <summary>A global-memory pointer to a buffer the evaluator allocates, fills and guards.</summary>
@@ -29,6 +32,7 @@ public enum PtxParameterKind
 }
 
 /// <summary>How a kernel uses a buffer.</summary>
+[Experimental("AIDEVO005")]
 public enum PtxBufferRole
 {
     /// <summary>Read only: filled from its seeded distribution.</summary>
@@ -40,6 +44,7 @@ public enum PtxBufferRole
 }
 
 /// <summary>How a buffer's seeded contents are drawn.</summary>
+[Experimental("AIDEVO005")]
 public enum PtxDistributionKind
 {
     /// <summary>Uniform real values in [minimum, maximum).</summary>

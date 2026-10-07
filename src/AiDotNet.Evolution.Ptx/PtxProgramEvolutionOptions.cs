@@ -1,9 +1,11 @@
+using System.Diagnostics.CodeAnalysis;
 using System.Globalization;
 using System.Text;
 
 namespace AiDotNet.Evolution.Ptx;
 
 /// <summary>The incumbent's measured profile, shown to the model so rewrites aim at the real bottleneck.</summary>
+[Experimental("AIDEVO005")]
 public sealed class PtxIncumbentProfile
 {
     /// <summary>Creates a profile.</summary>
@@ -60,6 +62,7 @@ public sealed class PtxIncumbentProfile
 /// <remarks>Prices are synthetic work units, not money, and must match the evaluator's cost-unit identity. Every model
 /// request, parse, JIT and evidence write is charged, including failures. Evidence records contain the full prompt,
 /// source and model output; keep <see cref="AuditDirectory"/> private.</remarks>
+[Experimental("AIDEVO005")]
 public sealed class PtxProgramEvolutionOptions
 {
     /// <summary>Gets or sets the operator identity. Default: <c>ptx-kernel-rewrite</c>.</summary>
