@@ -22,10 +22,10 @@ if ($LASTEXITCODE -ne 0) { throw 'Release surrogate consumer failed.' }
 dotnet run --project "$root/eng/fixtures/ReleaseCompilerConsumer" -c Release `
     "-p:ReleaseTestVersion=$Version" @restore
 if ($LASTEXITCODE -ne 0) { throw 'Release compiler consumer failed.' }
-foreach ($id in @('AiDotNet.Evolution', 'AiDotNet.Evolution.Programs', 'AiDotNet.Evolution.CSharp',
+foreach ($id in @('AiDotNet.Evolution', 'AiDotNet.Evolution.Programs', 'AiDotNet.Evolution.CSharp', 'AiDotNet.Evolution.Ptx',
     'AiDotNet.Evolution.Deployment', 'AiDotNet.Evolution.Surrogates')) {
     $metadataPath = Join-Path $cache "$($id.ToLowerInvariant())/$($Version.ToLowerInvariant())/.nupkg.metadata"
     $metadata = Get-Content -LiteralPath $metadataPath -Raw | ConvertFrom-Json
     if ([IO.Path]::GetFullPath($metadata.source) -ne $packages) { throw "Non-local release package restored: $id" }
 }
-Write-Host 'Verified local restore origin for all five product packages.'
+Write-Host 'Verified local restore origin for all six product packages.'
