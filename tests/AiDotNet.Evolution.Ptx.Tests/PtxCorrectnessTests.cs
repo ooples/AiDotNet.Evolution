@@ -85,7 +85,9 @@ public sealed class PtxCorrectnessTests
     {
         var (evaluator, worker) = Evaluator();
         Assert.True(evaluator.Evaluate(Axpy.Source).Passed);
+        // The JIT succeeds; the worker then hangs while running the validation cases.
         worker.ExchangeStatus = PtxWorkerExchangeStatus.TimedOut;
+        worker.ExchangeStatusOperation = PtxWorkerOperation.Validate;
         PtxCorrectnessReport report = evaluator.Evaluate(Axpy.Source);
         Assert.Equal(PtxCorrectnessVerdict.LaunchFailed, report.Verdict);
     }

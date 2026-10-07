@@ -133,7 +133,10 @@ public sealed class PtxProposalSourceTests
         };
         EvolutionResourceResult<ProgramGenome> result = await source.ProposeAsync(Context(parent));
         Assert.Equal(EvolutionResourceOutcome.Rejected, result.Outcome);
-        Assert.Same(parent, result.Value);
+        // A rejected proposal returns the parent itself (an owned snapshot of it), not a variant.
+        Assert.NotNull(result.Value);
+        Assert.Equal(parent.Id, result.Value.Id);
+        Assert.Equal(parent.Source, result.Value.Source);
         Assert.Contains("PTXAS-ERROR at line 38", client.Conversations[1][3].Text, StringComparison.Ordinal);
         Assert.Equal(2m, result.Actual["model_calls"]);
         Assert.Equal(2m, result.Actual["build_calls"]);
@@ -181,7 +184,8 @@ public sealed class PtxProposalSourceTests
             new ProgramEvolutionResourceOptions(ledger, 10, "other-units")));
         MeteredProgramVariationOperator variation = PtxProgramVariation.Create(new ScriptedChatClient(), compiler, options,
             new ProgramEvolutionResourceOptions(ledger, 10, options.CostUnitVersionHash));
-        Assert.Equal("ptx-kernel-rewrite", variation.Id);
+        // The metering wrapper prefixes the operator id (ResourceMeteredVariationOperator), so traces name the metered operator.
+        Assert.Equal("resource-metered:" + options.Id, variation.Id);
         Assert.Equal(0.1m, ledger.Snapshot().Spent["cost_units"]);
         options.AllowPatches = false;
         options.AllowRewrites = false;

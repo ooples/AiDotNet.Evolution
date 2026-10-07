@@ -137,7 +137,8 @@ public sealed class PtxCompilerTests
         Assert.All(catalog, t => Assert.Equal(PtxProgramCompiler.FileName, t.File));
         Assert.Contains(catalog, t => t.Kind == "declaration");
         Assert.Contains(catalog, t => t.Kind == "label");
-        Assert.DoesNotContain(catalog, t => Axpy.Source.Substring(t.Start, t.Length).Contains(".param", StringComparison.Ordinal));
+        // The signature's .param declarations sit outside the body and are never targets; ld.param instructions are body lines.
+        Assert.DoesNotContain(catalog, t => Axpy.Source.Substring(t.Start, t.Length).TrimStart().StartsWith(".param", StringComparison.Ordinal));
         EditTarget fma = catalog.Single(t => Axpy.Source.Substring(t.Start, t.Length) == Axpy.Fma);
         ProgramSnapshot patched = compiler.Apply(parent, new PatchPlan(parent.Fingerprint, "Use mul+add.",
             new[] { new SourceEdit(fma, "    mul.rn.f32 %f4, %f1, %f2;\n    add.rn.f32 %f4, %f4, %f3;") }));

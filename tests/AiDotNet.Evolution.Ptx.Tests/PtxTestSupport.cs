@@ -103,6 +103,8 @@ internal sealed class FakeWorkerTransport : IPtxWorkerTransport
     internal List<PtxWorkerRequest> Requests { get; } = new();
     internal string Status { get; set; } = "ok";
     internal PtxWorkerExchangeStatus ExchangeStatus { get; set; } = PtxWorkerExchangeStatus.Completed;
+    // When set, ExchangeStatus applies only to that operation (e.g. a hang during the validation launch, after a clean JIT).
+    internal PtxWorkerOperation? ExchangeStatusOperation { get; set; }
     internal int ComputeMajor { get; set; } = 7;
     internal int ComputeMinor { get; set; } = 5;
     internal Func<PtxWorkerKernel, PtxWorkerCompiled> Compile { get; set; } = _ => new PtxWorkerCompiled
@@ -121,7 +123,8 @@ internal sealed class FakeWorkerTransport : IPtxWorkerTransport
     {
         cancellationToken.ThrowIfCancellationRequested();
         Requests.Add(request);
-        if (ExchangeStatus != PtxWorkerExchangeStatus.Completed) return new(ExchangeStatus, null, null, "simulated", TimeSpan.FromSeconds(1));
+        if (ExchangeStatus != PtxWorkerExchangeStatus.Completed && (ExchangeStatusOperation is null || ExchangeStatusOperation == request.Operation))
+            return new(ExchangeStatus, null, null, "simulated", TimeSpan.FromSeconds(1));
         var response = new PtxWorkerResponse
         {
             Status = Status,
