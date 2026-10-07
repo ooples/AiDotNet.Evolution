@@ -9,5 +9,6 @@
   </PropertyGroup>
   <ItemGroup>
     <PackageReference Include="AiDotNet.Evolution.CSharp" Version="[$(ReleaseTestVersion)]" />
+    <PackageReference Include="AiDotNet.Evolution.Ptx" Version="[$(ReleaseTestVersion)]" />
   </ItemGroup>
 </Project>

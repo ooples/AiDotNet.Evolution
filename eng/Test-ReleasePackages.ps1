@@ -4,7 +4,7 @@ param(
     [Parameter(Mandatory)] [string] $ExpectedVersion
 )
 $ErrorActionPreference = 'Stop'
-$ids = @('AiDotNet.Evolution', 'AiDotNet.Evolution.Programs', 'AiDotNet.Evolution.CSharp',
+$ids = @('AiDotNet.Evolution', 'AiDotNet.Evolution.Programs', 'AiDotNet.Evolution.CSharp', 'AiDotNet.Evolution.Ptx',
     'AiDotNet.Evolution.Deployment', 'AiDotNet.Evolution.Surrogates', 'AiDotNet.Evolution.Cli')
 # dotnet tool packages: assemblies under tools/<tfm>/any, a DotnetTool package type, and no dependency groups.
 $tools = @{ 'AiDotNet.Evolution.Cli' = 'aidotnet-evolve' }
@@ -38,6 +38,7 @@ foreach ($id in $ids) {
             'AiDotNet.Evolution.Programs' { 'AiDotNet.Evolution' }
             'AiDotNet.Evolution.Surrogates' { 'AiDotNet.Evolution' }
             'AiDotNet.Evolution.CSharp' { 'AiDotNet.Evolution.Programs' }
+            'AiDotNet.Evolution.Ptx' { 'AiDotNet.Evolution.Programs' }
             'AiDotNet.Evolution.Deployment' { 'AiDotNet.Evolution.Programs' }
         }
         if ($requiredDependency) {
