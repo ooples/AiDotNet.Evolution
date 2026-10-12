@@ -6,7 +6,7 @@ internal static class EvolutionPath
     /// <summary>Joins two path components without treating the second component as a replacement root.</summary>
     internal static string Join(string first, string second)
     {
-#if NET471
+#if !NETCOREAPP
         if (string.IsNullOrEmpty(first)) return second;
         if (string.IsNullOrEmpty(second)) return first;
 
@@ -20,7 +20,7 @@ internal static class EvolutionPath
 #endif
     }
 
-#if NET471
+#if !NETCOREAPP
     private static bool IsDirectorySeparator(char value) =>
         value == Path.DirectorySeparatorChar || value == Path.AltDirectorySeparatorChar;
 #endif
