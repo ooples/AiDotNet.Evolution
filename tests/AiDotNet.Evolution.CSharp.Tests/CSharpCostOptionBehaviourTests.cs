@@ -9,6 +9,7 @@ namespace AiDotNet.Evolution.CSharp.Tests;
 /// Each price is raised on its own and the settled cost must rise by exactly that price times the work the
 /// ledger counted for it, so a price that is read but multiplied by the wrong counter fails here too.
 /// </summary>
+[Collection(nameof(WallClockCollection))]
 public sealed class CSharpCostOptionBehaviourTests
 {
     private static readonly string[] Counters =

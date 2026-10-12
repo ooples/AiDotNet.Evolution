@@ -5,6 +5,7 @@ using Xunit;
 namespace AiDotNet.Evolution.CSharp.Tests.Execution;
 
 /// <summary>V1-83 (#185), defect class D6: OpenEvolve 0.3.2 leaves a timed-out candidate's processes running.</summary>
+[Collection(nameof(WallClockCollection))]
 public sealed class HungCandidateDefectClassTests
 {
     private static readonly string Python = Environment.GetEnvironmentVariable("EVOLUTION_PYTHON")
