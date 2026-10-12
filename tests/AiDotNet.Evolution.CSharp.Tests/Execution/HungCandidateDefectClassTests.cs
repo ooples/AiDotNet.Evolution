@@ -31,6 +31,10 @@ public sealed class HungCandidateDefectClassTests
         try
         {
             using var engine = new ProcessProgramExecutionEngine(options);
+            // The engine prepares its guardian and interpreter on first use; that one-time start-up is not part of tearing
+            // down a hung tree, and on a loaded CI runner it alone can eat most of the one-second grace.
+            ProgramExecuteResponse warm = await engine.ExecuteAsync(new ProgramExecuteRequest { Language = ProgramLanguage.Python, SourceCode = "pass\n" });
+            Assert.True(warm.Success, "the warm-up run failed: " + warm.Error);
             var clock = Stopwatch.StartNew();
             ProgramExecuteResponse response = await engine.ExecuteAsync(new ProgramExecuteRequest { Language = ProgramLanguage.Python, SourceCode = source });
             TimeSpan returned = clock.Elapsed;
