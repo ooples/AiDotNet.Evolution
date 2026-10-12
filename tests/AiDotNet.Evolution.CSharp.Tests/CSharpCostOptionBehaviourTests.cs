@@ -60,10 +60,18 @@ public sealed class CSharpCostOptionBehaviourTests
         TimeSpan full;
         while (true)
         {
-            var timer = Stopwatch.StartNew();
-            patient = Attempt(30, depth);
-            full = timer.Elapsed;
-            Assert.DoesNotContain("timed out", patient.Feedback, StringComparison.Ordinal);
+            // Calibrate on the steady-state cost: the first compile at a depth also pays one-time warm-up, so on a
+            // fast host it could pass the target while the bounded (warm) compile below finished inside one second
+            // and never timed out. The faster of two runs is what the bounded attempt will actually take.
+            full = TimeSpan.MaxValue;
+            for (int run = 0; run < 2; run++)
+            {
+                var timer = Stopwatch.StartNew();
+                patient = Attempt(30, depth);
+                TimeSpan elapsed = timer.Elapsed;
+                Assert.DoesNotContain("timed out", patient.Feedback, StringComparison.Ordinal);
+                if (elapsed < full) full = elapsed;
+            }
             if (full > target) break;
             Assert.True(depth < LastDepth, "Even depth " + depth + " compiled in " + full + "; the slow source no longer discriminates.");
             depth++;

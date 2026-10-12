@@ -12,7 +12,7 @@ if ((Get-Item -LiteralPath $adapter).Length -gt 5MB) { throw 'Adapter package ex
 $archive = [System.IO.Compression.ZipFile]::OpenRead($adapter)
 try {
     $required = @('AiDotNet.Evolution.Surrogates.nuspec', 'README.md')
-    foreach ($framework in @('net10.0','net8.0','net471')) {
+    foreach ($framework in @('net10.0','net8.0','net471','net462','netstandard2.0')) {
         $required += "lib/$framework/AiDotNet.Evolution.Surrogates.dll", "lib/$framework/AiDotNet.Evolution.Surrogates.xml"
     }
     $entries = @($archive.Entries | ForEach-Object FullName)
@@ -29,7 +29,7 @@ try {
         throw 'Adapter package identity, version or license differs.'
     }
     $groups = @($nuspec.SelectNodes('//n:dependencies/n:group', $ns))
-    if ($groups.Count -ne 3) { throw 'Adapter must declare all three framework dependency groups.' }
+    if ($groups.Count -ne 5) { throw 'Adapter must declare all five framework dependency groups.' }
     foreach ($group in $groups) {
         $dependencies = @($group.SelectNodes('n:dependency', $ns))
         if ($dependencies.Count -ne 1 -or $dependencies[0].id -ne 'AiDotNet.Evolution' -or $dependencies[0].version -ne $CoreVersion) {
