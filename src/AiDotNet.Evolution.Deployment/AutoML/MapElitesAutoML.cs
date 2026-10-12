@@ -513,8 +513,9 @@ public sealed class MapElitesAutoML<T, TInput, TOutput> :
             "automl-cross-validation-v1",
             CrossValidationOptions.NumberOfFolds.ToString(CultureInfo.InvariantCulture),
             CrossValidationOptions.ValidationType.ToString(),
-            CrossValidationOptions.RandomSeed?.ToString(CultureInfo.InvariantCulture) ??
-                "map-elites-stable-inherited-stream",
+            // AiDotNet 0.234 removed CrossValidationOptions.RandomSeed: the folds always draw from the inherited
+            // stream, which is the component an unseeded policy hashed to before, so those hashes are unchanged.
+            "map-elites-stable-inherited-stream",
             CrossValidationOptions.ShuffleData ? "1" : "0"
         };
         foreach (MetricType metric in CrossValidationOptions.MetricsToCompute ?? Array.Empty<MetricType>())
