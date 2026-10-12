@@ -57,6 +57,14 @@ namespace AiDotNet.Evolution.Programs;
 public sealed class ProcessProgramExecutionEngine : IProgramExecutionEngine, IProgramExecutionTelemetrySource, IDisposable
 {
     private const int DrainTimeoutMilliseconds = 2000;
+
+    // The budget for the SAME drain once the tree has been killed. The pumps are then waiting on pipe handles held
+    // by processes that no longer exist, or by a descendant the kill could not reach, and the output snapshots are
+    // already complete and lock-protected - so all this wait can still collect is output from a process we just
+    // terminated. Two seconds of it is dead time an evolutionary search pays on every timed-out candidate, and it
+    // also put the sandbox's worst-case return at the limit plus two seconds, which is outside the limit plus one
+    // second that the D6 hung-candidate contract asserts.
+    private const int KilledDrainTimeoutMilliseconds = 250;
     private const int TaskKillTimeoutMilliseconds = 5000;
 
     private static readonly bool WindowsHost = DetectWindowsHost();
@@ -456,7 +464,7 @@ public sealed class ProcessProgramExecutionEngine : IProgramExecutionEngine, IPr
         if (violation is not null)
         {
             TryKillProcessTree(process, processId, job);
-            await DrainAsync(stdOutTask, stdErrTask, stdInTask).ConfigureAwait(false);
+            await DrainAsync(stdOutTask, stdErrTask, stdInTask, KilledDrainTimeoutMilliseconds).ConfigureAwait(false);
             return ResourceExceeded(language, compileOnly, violation.Value, -1, stdOutReader, stdErrReader);
         }
 
@@ -464,7 +472,7 @@ public sealed class ProcessProgramExecutionEngine : IProgramExecutionEngine, IPr
         if (!exited)
         {
             TryKillProcessTree(process, processId, job);
-            await DrainAsync(stdOutTask, stdErrTask, stdInTask).ConfigureAwait(false);
+            await DrainAsync(stdOutTask, stdErrTask, stdInTask, KilledDrainTimeoutMilliseconds).ConfigureAwait(false);
 
             (string Text, bool Truncated) timedOutStdOut = stdOutReader.Snapshot();
             (string Text, bool Truncated) timedOutStdErr = stdErrReader.Snapshot();
@@ -775,10 +783,11 @@ public sealed class ProcessProgramExecutionEngine : IProgramExecutionEngine, IPr
         }
     }
 
-    private static async Task DrainAsync(Task stdOutTask, Task stdErrTask, Task stdInTask)
+    private static async Task DrainAsync(
+        Task stdOutTask, Task stdErrTask, Task stdInTask, int timeoutMilliseconds = DrainTimeoutMilliseconds)
     {
         Task all = Task.WhenAll(stdOutTask, stdErrTask, stdInTask);
-        Task completed = await Task.WhenAny(all, Task.Delay(DrainTimeoutMilliseconds)).ConfigureAwait(false);
+        Task completed = await Task.WhenAny(all, Task.Delay(timeoutMilliseconds)).ConfigureAwait(false);
         if (!ReferenceEquals(completed, all))
         {
             // A descendant kept an inherited pipe handle open past the kill. The snapshots are lock-protected, so
