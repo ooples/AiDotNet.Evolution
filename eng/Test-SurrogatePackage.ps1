@@ -29,7 +29,11 @@ try {
         throw 'Adapter package identity, version or license differs.'
     }
     $groups = @($nuspec.SelectNodes('//n:dependencies/n:group', $ns))
-    if ($groups.Count -ne 5) { throw 'Adapter must declare all five framework dependency groups.' }
+    $expectedFrameworks = @('.NETFramework4.6.2', '.NETFramework4.7.1', '.NETStandard2.0', 'net10.0', 'net8.0')
+    $actualFrameworks = @($groups | ForEach-Object { [string]$_.targetFramework } | Sort-Object)
+    if (($actualFrameworks -join '|') -ne (($expectedFrameworks | Sort-Object) -join '|')) {
+        throw "Adapter must declare exactly one dependency group per framework; found: $($actualFrameworks -join ', ')."
+    }
     foreach ($group in $groups) {
         $dependencies = @($group.SelectNodes('n:dependency', $ns))
         if ($dependencies.Count -ne 1 -or $dependencies[0].id -ne 'AiDotNet.Evolution' -or $dependencies[0].version -ne $CoreVersion) {
