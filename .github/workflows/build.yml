@@ -386,7 +386,7 @@ jobs:
           if-no-files-found: warn
 
   legacy:
-    name: Build and test net471
+    name: Build and test .NET Framework (net471, net462)
     if: "${{ !(github.event_name == 'push' && startsWith(github.event.head_commit.message, 'chore(main): release')) && !startsWith(github.head_ref, 'release-please--') }}"
     runs-on: windows-latest
     timeout-minutes: 25
@@ -399,6 +399,8 @@ jobs:
       - run: dotnet restore AiDotNet.Evolution.slnx
       - run: dotnet build tests/AiDotNet.Evolution.Tests/AiDotNet.Evolution.Tests.csproj --configuration Release --framework net471 --no-restore
       - run: dotnet test tests/AiDotNet.Evolution.Tests/AiDotNet.Evolution.Tests.csproj --configuration Release --framework net471 --no-build --verbosity normal --blame-hang --blame-hang-timeout 120s --blame-crash
+      - run: dotnet build tests/AiDotNet.Evolution.Tests/AiDotNet.Evolution.Tests.csproj --configuration Release --framework net462 --no-restore
+      - run: dotnet test tests/AiDotNet.Evolution.Tests/AiDotNet.Evolution.Tests.csproj --configuration Release --framework net462 --no-build --verbosity normal --blame-hang --blame-hang-timeout 120s --blame-crash
       # The sandbox's limits are enforced differently per OS (job object here, /proc on Linux), so its
       # enforcement tests run on Windows too, not only in the Linux test job.
       - name: Sandbox enforcement on Windows

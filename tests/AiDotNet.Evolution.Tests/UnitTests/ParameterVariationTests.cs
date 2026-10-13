@@ -1,4 +1,4 @@
-#if !NET471
+#if !NETFRAMEWORK
 using AiDotNet.Evolution;
 using AiDotNet.Evolution.Host;
 using Xunit;

@@ -116,8 +116,8 @@ public sealed class DirectoryEvolutionEvaluationStore : IEvolutionEvaluationStor
     private string JoinFileName(string fileName)
     {
         // Only generated GUID names and immutable SHA-256 keys reach here, never caller-supplied paths.
-#if NETFRAMEWORK
-        // Path.Join is unavailable on net471. DirectoryPath is canonical and has no trailing separator.
+#if !NETCOREAPP
+        // Path.Join is unavailable before .NET Core 3.0 / .NET Standard 2.1. DirectoryPath is canonical and has no trailing separator.
         return DirectoryPath + Path.DirectorySeparatorChar + fileName;
 #else
         return Path.Join(DirectoryPath, fileName);

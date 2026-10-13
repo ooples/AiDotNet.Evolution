@@ -32,7 +32,11 @@ try {
         'lib/net8.0/AiDotNet.Evolution.dll',
         'lib/net8.0/AiDotNet.Evolution.xml',
         'lib/net471/AiDotNet.Evolution.dll',
-        'lib/net471/AiDotNet.Evolution.xml'
+        'lib/net471/AiDotNet.Evolution.xml',
+        'lib/net462/AiDotNet.Evolution.dll',
+        'lib/net462/AiDotNet.Evolution.xml',
+        'lib/netstandard2.0/AiDotNet.Evolution.dll',
+        'lib/netstandard2.0/AiDotNet.Evolution.xml'
     )
     foreach ($entry in $required) {
         if ($entries -notcontains $entry) {

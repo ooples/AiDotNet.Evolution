@@ -71,7 +71,7 @@ jobs:
           }
 
   legacy:
-    name: Validate release on net471
+    name: Validate release on .NET Framework (net471, net462)
     permissions:
       contents: read
     runs-on: windows-latest
@@ -86,6 +86,7 @@ jobs:
           dotnet-quality: preview
       - run: dotnet restore AiDotNet.Evolution.slnx
       - run: dotnet test tests/AiDotNet.Evolution.Tests/AiDotNet.Evolution.Tests.csproj --configuration Release --framework net471 --no-restore --verbosity normal
+      - run: dotnet test tests/AiDotNet.Evolution.Tests/AiDotNet.Evolution.Tests.csproj --configuration Release --framework net462 --no-restore --verbosity normal
 
   pack:
     name: Pack and sign

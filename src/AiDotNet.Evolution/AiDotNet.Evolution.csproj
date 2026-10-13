@@ -2,7 +2,9 @@
   <PropertyGroup>
     <!-- The owning assembly uses its own experimental surfaces; consumers still receive AIDEVO00x. -->
     <NoWarn>$(NoWarn);AIDEVO001;AIDEVO002;AIDEVO003</NoWarn>
-    <TargetFrameworks>net10.0;net8.0;net471</TargetFrameworks>
+    <TargetFrameworks>net10.0;net8.0;net471;net462;netstandard2.0</TargetFrameworks>
+    <!-- The target's framework family, for conditions in this file (TargetFrameworkIdentifier is inferred later). -->
+    <EvoTargetFrameworkIdentifier>$([MSBuild]::GetTargetFrameworkIdentifier('$(TargetFramework)'))</EvoTargetFrameworkIdentifier>
     <ImplicitUsings>enable</ImplicitUsings>
     <Nullable>enable</Nullable>
     <LangVersion>latest</LangVersion>
@@ -39,7 +41,7 @@
     <None Include="..\..\THIRD-PARTY-NOTICES.md" Pack="true" PackagePath="\"/>
   </ItemGroup>
 
-  <ItemGroup Condition="'$(TargetFramework)' == 'net471'">
+  <ItemGroup Condition="'$(EvoTargetFrameworkIdentifier)' != '.NETCoreApp'">
     <PackageReference Include="System.Text.Json" Version="10.0.12"/>
     <PackageReference Include="Microsoft.Bcl.TimeProvider" Version="10.0.12"/>
   </ItemGroup>
