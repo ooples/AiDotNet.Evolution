@@ -120,6 +120,46 @@ public sealed class OpenEvolveImportTests
         Assert.Empty(run.LlmFeedback?.Models ?? new List<RunModel> { run.Model }); // judges with the proposal models
     }
 
+    /// <summary>
+    /// V1-50 (#163): a configured evaluator model set judges on its own, and the proposal models do
+    /// not leak into it. The empty case is asserted above, where an empty list is what
+    /// <c>RunCommand</c> resolves to the proposal models, as OpenEvolve does.
+    /// </summary>
+    [Fact]
+    public void A_configured_evaluator_model_set_judges_instead_of_the_proposal_models()
+    {
+        using var directory = new TemporaryDirectory();
+        OpenEvolveImport imported = Import(directory, """
+            llm:
+              models:
+                - name: proposer
+                  weight: 1.0
+              evaluator_models:
+                - name: judge-cheap
+                  weight: 0.9
+                - name: judge-strong
+                  weight: 0.1
+                  temperature: 0.2
+            evaluator:
+              use_llm_feedback: true
+            """);
+
+        RunFile run = imported.Run;
+        Assert.Equal("proposer", run.Model.Name);
+        Assert.Empty(run.AdditionalModels);
+
+        List<RunModel> judges = run.LlmFeedback?.Models ?? new List<RunModel>();
+        Assert.Equal(new[] { ("judge-cheap", 0.9), ("judge-strong", 0.1) },
+            judges.Select(judge => (judge.Name, judge.Weight)));
+
+        // A judge that sets no temperature still inherits OpenEvolve's default, like a proposal model.
+        Assert.Equal(0.2, judges[1].Temperature);
+        Assert.Equal(0.7, judges[0].Temperature);
+
+        // The proposal model is not one of the judges: the two sets are separate, not merged.
+        Assert.DoesNotContain("proposer", judges.Select(judge => judge.Name));
+    }
+
     [Fact]
     public void An_unsupported_key_is_accepted_at_its_default_and_refused_by_name_otherwise()
     {
