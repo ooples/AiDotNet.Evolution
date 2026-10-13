@@ -1,3 +1,4 @@
+using System.Text.RegularExpressions;
 using AiDotNet.Evolution;
 using AiDotNet.Evolution.Programs;
 using Xunit;
@@ -114,6 +115,148 @@ public sealed class MetaPromptEvolutionTests
         }
 
         return selected.ToArray();
+    }
+
+    /// <summary>
+    /// A state that fails validation leaves the evolver untouched. Clearing the archive before
+    /// validating meant a half-applied state survived the exception, and a caller that caught it
+    /// could then select or credit against an archive that never existed.
+    /// </summary>
+    [Fact]
+    public async Task A_state_that_fails_validation_does_not_half_apply()
+    {
+        var evolver = new ProgramMetaPromptEvolver(
+            new FakeChatClient("Instruction A: fuse the two passes over the array into one."),
+            Seed, Options());
+        await evolver.ProposeAsync(generation: 5);
+        string hash = evolver.StateHash;
+
+        // The id is derived from the text, so editing the text alone makes the entry inconsistent -
+        // and it is the SECOND entry, so a validator that mutates as it goes has already applied the
+        // first by the time it refuses.
+        string tampered = evolver.CaptureState().Replace(
+            "Instruction A: fuse the two passes over the array into one.",
+            "Instruction A: fuse the two passes over the array into one, carefully.");
+
+        Assert.Throws<InvalidOperationException>(() => evolver.RestoreState(tampered));
+        Assert.Equal(hash, evolver.StateHash);
+        Assert.Equal(2, evolver.Archive.Count);
+    }
+
+    /// <summary>
+    /// A restored route must name an instruction the restored archive holds, and no generation may
+    /// have two routes: either would send an outcome nowhere.
+    /// </summary>
+    [Fact]
+    public async Task A_route_to_a_missing_instruction_or_a_repeated_generation_is_refused()
+    {
+        var evolver = new ProgramMetaPromptEvolver(
+            new FakeChatClient("Instruction A: precompute the lookup table once per run."),
+            Seed, Options());
+        await evolver.ProposeAsync(generation: 5);
+        evolver.Select(new StableRandom(8), generation: 6);
+        string captured = evolver.CaptureState();
+
+        var target = new ProgramMetaPromptEvolver(new FakeChatClient(), Seed, Options());
+        string unknownRoute = Regex.Replace(
+            captured, "\"InstructionId\":\"[^\"]+\"", "\"InstructionId\":\"not-in-the-archive\"",
+            RegexOptions.None, TimeSpan.FromSeconds(1));
+        Assert.Throws<InvalidOperationException>(() => target.RestoreState(unknownRoute));
+
+        string doubled = captured.Replace(
+            "\"Routes\":[",
+            "\"Routes\":[{\"Generation\":6,\"InstructionId\":\"" + evolver.Archive[0].Id + "\"},");
+        Assert.Throws<InvalidOperationException>(() => target.RestoreState(doubled));
+    }
+
+    /// <summary>
+    /// An instruction that still owes an outcome is not evicted. Evicting it would make Observe find
+    /// no candidate and drop that generation's credit without saying so.
+    /// </summary>
+    [Fact]
+    public async Task An_instruction_awaiting_an_outcome_is_not_evicted()
+    {
+        const string first = "Instruction A: hoist the bounds check out of the inner loop.";
+        const string second = "Instruction B: replace the recursion with an explicit stack.";
+        var evolver = new ProgramMetaPromptEvolver(
+            new FakeChatClient(first, second),
+            Seed, Options(selection: ProgramInstructionSelection.Greedy, archive: 2));
+
+        // The archive holds two: the seed and `first`.
+        Assert.Equal(first, await evolver.ProposeAsync(generation: 5));
+
+        // Score both. Which one an unscored draw returns is random, so the quality follows the text
+        // rather than the order: `first` ends up the leader either way.
+        var random = new StableRandom(9);
+        for (int i = 0; i < 2; i++)
+        {
+            string text = evolver.Select(random, 6 + i);
+            evolver.Observe(6 + i, quality: text == first ? 0.9 : 0.1);
+        }
+
+        // Greedy now returns the leader, and this route is left owing an outcome.
+        Assert.Equal(first, evolver.Select(random, generation: 8));
+
+        // Full archive, and the only scored non-seed candidate owes an outcome, so the proposal is
+        // refused rather than quietly costing a credit.
+        Assert.Null(await evolver.ProposeAsync(generation: 10));
+        Assert.Equal(2, evolver.Archive.Count);
+
+        // The credit still lands, which is the point of refusing.
+        evolver.Observe(generation: 8, quality: 0.9);
+        Assert.Equal(0.9, Single(evolver, first).MeanQuality, 10);
+    }
+
+    /// <summary>
+    /// ExplorationProbability at its extremes: zero never leaves the leader, one always draws.
+    /// </summary>
+    [Fact]
+    public async Task Exploration_probability_bounds_the_draw()
+    {
+        const string better = "Instruction A: keep the allocation outside the measured region.";
+
+        ProgramMetaPromptEvolver never =
+            await Scored(ProgramInstructionSelection.EpsilonGreedy, better, exploration: 0.0);
+        var random = new StableRandom(21);
+        for (int i = 0; i < 25; i++) Assert.Equal(better, never.Select(random, 700 + i));
+
+        // At 1.0 every draw is uniform, so over 40 draws the worse instruction must appear.
+        ProgramMetaPromptEvolver always =
+            await Scored(ProgramInstructionSelection.EpsilonGreedy, better, exploration: 1.0);
+        var alwaysRandom = new StableRandom(21);
+        var seen = new HashSet<string>(StringComparer.Ordinal);
+        for (int i = 0; i < 40; i++) seen.Add(always.Select(alwaysRandom, 700 + i));
+        Assert.Equal(2, seen.Count);
+    }
+
+    /// <summary>
+    /// MaxInstructionChars bounds what may become the run's instruction, and MetricPrefix names the
+    /// cost descriptors.
+    /// </summary>
+    [Fact]
+    public async Task Max_instruction_chars_and_metric_prefix_are_honoured()
+    {
+        ProgramMetaPromptOptions options = Options();
+        options.MaxInstructionChars = 80;
+        options.MetricPrefix = "mp_";
+
+        string tooLong = new string('a', 81);
+        string justFits = new string('b', 80);
+        var evolver = new ProgramMetaPromptEvolver(new FakeChatClient(tooLong, justFits), Seed, options);
+
+        Assert.Null(await evolver.ProposeAsync(generation: 5));
+        Assert.Equal(justFits, await evolver.ProposeAsync(generation: 10));
+
+        var descriptors = new Dictionary<string, double>();
+        evolver.WriteCostDescriptors(descriptors);
+        Assert.Equal(2.0, descriptors["mp_calls"]);
+        Assert.Equal(1.0, descriptors["mp_refused"]);
+        Assert.DoesNotContain("meta_prompt_calls", descriptors.Keys);
+
+        // A seed longer than the bound could never be replaced by an answer the evolver accepts, so
+        // the constructor refuses it rather than leaving the meta level unable to do anything.
+        Assert.Throws<ArgumentException>(
+            () => new ProgramMetaPromptEvolver(new FakeChatClient(), new string('c', 81), options));
     }
 
     private static ProgramInstructionCandidate Single(ProgramMetaPromptEvolver evolver, string text)
@@ -340,10 +483,11 @@ public sealed class MetaPromptEvolutionTests
     }
 
     private static async Task<ProgramMetaPromptEvolver> Scored(
-        ProgramInstructionSelection selection, string better)
+        ProgramInstructionSelection selection, string better, double? exploration = null)
     {
-        var evolver = new ProgramMetaPromptEvolver(
-            new FakeChatClient(better), Seed, Options(selection: selection));
+        ProgramMetaPromptOptions options = Options(selection: selection);
+        if (exploration is { } probability) options.ExplorationProbability = probability;
+        var evolver = new ProgramMetaPromptEvolver(new FakeChatClient(better), Seed, options);
         await evolver.ProposeAsync(generation: 5);
 
         // Score both: the seed badly, the new instruction well. Until an instruction is scored it

@@ -348,37 +348,70 @@ public sealed class ProgramMetaPromptEvolver
         if (document.Routes is { Count: > MaximumPendingRoutes })
             throw new InvalidOperationException("The meta-prompt state carries more routes than the evolver will track.");
 
+        if (document.ProposalCalls < 0 || document.RefusedProposals < 0 || document.ProposalCostUnits < 0m)
+            throw new InvalidOperationException("The restored proposal counters are negative.");
+
+        // Validate into local collections and only then replace the live ones. Clearing first meant
+        // a state that failed validation half way left the evolver holding a partial archive with
+        // the old counters, and a caller that caught the exception could then select or credit
+        // against that.
+        var archive = new List<ProgramInstructionCandidate>();
+        var ids = new HashSet<string>(StringComparer.Ordinal);
+        foreach (Entry entry in document.Archive)
+        {
+            if (string.IsNullOrWhiteSpace(entry.Id) || string.IsNullOrWhiteSpace(entry.Text))
+                throw new InvalidOperationException("A restored instruction has no id or no text.");
+
+            // The id is derived from the text, so a mismatch is a rewritten checkpoint rather than
+            // one this evolver wrote, and a duplicate id would make Observe credit whichever entry
+            // came first regardless of which one Select used.
+            if (!string.Equals(entry.Id, Identify(entry.Text), StringComparison.Ordinal))
+                throw new InvalidOperationException("A restored instruction's id does not match its text.");
+            if (!ids.Add(entry.Id))
+                throw new InvalidOperationException("A restored instruction appears twice.");
+
+            // The length bound is the one the constructor applies to the seed. The 16-character
+            // minimum that Accept applies to a model's answer is deliberately NOT applied here: a
+            // legitimately short seed instruction must still restore.
+            if (entry.Text.Length > _options.MaxInstructionChars)
+                throw new InvalidOperationException("A restored instruction is longer than MaxInstructionChars.");
+            if (entry.Uses < 0 || entry.Scored < 0 || entry.Scored > entry.Uses)
+                throw new InvalidOperationException("A restored instruction's use and score counts are inconsistent.");
+            if (double.IsNaN(entry.TotalQuality) || double.IsInfinity(entry.TotalQuality))
+                throw new InvalidOperationException("A restored instruction's total quality is not finite.");
+
+            archive.Add(new ProgramInstructionCandidate(entry.Id, entry.Text, entry.ParentId, entry.Generation)
+            {
+                Uses = entry.Uses,
+                Scored = entry.Scored,
+                TotalQuality = entry.TotalQuality,
+            });
+        }
+
+        if (!ids.Contains(_seedId))
+            throw new InvalidOperationException("The restored archive does not contain the seed instruction.");
+
+        var routes = new Dictionary<long, string>();
+        foreach (Route route in document.Routes ?? new List<Route>())
+        {
+            // A route naming an instruction the archive does not hold would have its outcome
+            // dropped on the floor, and two routes for one generation would lose the first.
+            if (string.IsNullOrWhiteSpace(route.InstructionId))
+                throw new InvalidOperationException("A restored route names no instruction.");
+            if (!ids.Contains(route.InstructionId))
+                throw new InvalidOperationException("A restored route names an instruction the archive does not hold.");
+            if (routes.ContainsKey(route.Generation))
+                throw new InvalidOperationException("A restored generation has two routes.");
+
+            routes[route.Generation] = route.InstructionId;
+        }
+
         lock (_gate)
         {
             _archive.Clear();
-            foreach (Entry entry in document.Archive)
-            {
-                if (string.IsNullOrWhiteSpace(entry.Id) || string.IsNullOrWhiteSpace(entry.Text))
-                    throw new InvalidOperationException("A restored instruction has no id or no text.");
-                if (entry.Uses < 0 || entry.Scored < 0 || entry.Scored > entry.Uses)
-                    throw new InvalidOperationException("A restored instruction's use and score counts are inconsistent.");
-                if (double.IsNaN(entry.TotalQuality) || double.IsInfinity(entry.TotalQuality))
-                    throw new InvalidOperationException("A restored instruction's total quality is not finite.");
-
-                _archive.Add(new ProgramInstructionCandidate(entry.Id, entry.Text, entry.ParentId, entry.Generation)
-                {
-                    Uses = entry.Uses,
-                    Scored = entry.Scored,
-                    TotalQuality = entry.TotalQuality,
-                });
-            }
-
-            if (_archive.All(candidate => candidate.Id != _seedId))
-                throw new InvalidOperationException("The restored archive does not contain the seed instruction.");
-
+            _archive.AddRange(archive);
             _routes.Clear();
-            foreach (Route route in document.Routes ?? new List<Route>())
-            {
-                if (string.IsNullOrWhiteSpace(route.InstructionId))
-                    throw new InvalidOperationException("A restored route names no instruction.");
-                _routes[route.Generation] = route.InstructionId;
-            }
-
+            foreach (KeyValuePair<long, string> route in routes) _routes.Add(route.Key, route.Value);
             _proposalCalls = document.ProposalCalls;
             _proposalCostUnits = document.ProposalCostUnits;
             _refusedProposals = document.RefusedProposals;
@@ -468,8 +501,12 @@ public sealed class ProgramMetaPromptEvolver
     {
         // The seed instruction is never dropped, so a run can always fall back to what it started
         // from. An unscored instruction is not dropped either: it has not had its chance yet.
+        // Nor is one that still owes an outcome: Select has already routed a generation to it, and
+        // dropping it would make Observe find no candidate and discard that generation's credit in
+        // silence. With nothing else eligible, Accept refuses the proposal instead.
         ProgramInstructionCandidate? worst = _archive
-            .Where(candidate => candidate.Id != _seedId && candidate.Scored > 0)
+            .Where(candidate => candidate.Id != _seedId && candidate.Scored > 0
+                && !_routes.ContainsValue(candidate.Id))
             .OrderBy(candidate => candidate.MeanQuality)
             .ThenBy(candidate => candidate.Generation)
             .FirstOrDefault();
