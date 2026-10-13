@@ -76,7 +76,7 @@ necessary but not sufficient, as the three rows below the smoked ones show.
 | `function_minimization` | 1.398 | yes | |
 | `signal_processing` | 0.420 | yes | |
 | `claude_code_quickstart` | 1.424 | no | sets `llm.provider: "claude_code"`, so proposals route to the Claude Code CLI rather than an HTTP endpoint and a loopback stub has nothing to answer: all nine attempts fail |
-| `background_blur` | 0.992 | no | its seed evaluation yields no quality under the CLI, so nothing enters the archive and the run stops with `StopReason: NoCandidates` after one evaluation and zero model calls. The evaluator scores 0.992 when run directly from the example's own directory, so the difference is the sandbox workspace, not the evaluator |
+| `background_blur` | 0.992 | no | **its declared `database.feature_dimensions` empty the archive.** The run stops with `StopReason: NoCandidates` after one evaluation, a null best quality and zero model calls; removing only that key from the config copy makes the same example run and pass. See *The feature-dimension gap* below |
 | `circle_packing_with_artifacts` | 0.364 | no | same mechanism as `background_blur` |
 | `k_module_problem` | 0.0 | no | its own seed scores zero, so a positive-quality assertion cannot distinguish a working run from a broken one |
 | `online_judge_programming` | 0.0 | no | same, and its evaluator needs `requests` |
@@ -100,6 +100,26 @@ Python literal, so on Windows the path becomes an invalid escape - `SyntaxError:
 'unicodeescape' codec can't decode bytes ... truncated \UXXXXXXXX escape` - and every candidate
 scores zero. Measured by running `examples/circle_packing/evaluator.py` directly on its own seed
 program on both platforms.
+
+## The feature-dimension gap
+
+`background_blur` and `circle_packing_with_artifacts` are not blocked by anything about their
+models, their endpoints or their evaluators. They are blocked by `database.feature_dimensions`.
+
+Measured with a within-run control: the same example ran twice in one process against one build,
+once with its config as upstream ships it and once with only the `feature_dimensions` key removed.
+The first stops with `StopReason: NoCandidates`, `CompletedEvaluations: 1`, `BestQuality: null` and
+`ModelUsage.Proposals: 0`. The second completes three iterations and passes every assertion. Nothing
+else differed, so a build, environment or ordering difference cannot explain it.
+
+A declared feature dimension therefore leaves the seed candidate unplaceable, the archive empty, and
+the run with no parent to propose from. Upstream runs these examples with those dimensions, so this
+is a parity gap on our side rather than a property of the examples — which makes it #169's business
+("every supported key maps to ours"), not a reason to exclude them permanently.
+
+**Not yet established:** which of the declared dimensions does it (`background_blur` names
+`complexity` and `ssim`) and why the candidate ends up unplaceable rather than clamped into a bin.
+The two examples stay out of the smoke until that is fixed, rather than being asserted on.
 
 ## The two that do not
 

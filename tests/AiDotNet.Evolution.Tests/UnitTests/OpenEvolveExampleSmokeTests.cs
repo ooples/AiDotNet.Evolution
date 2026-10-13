@@ -58,12 +58,12 @@ public sealed class OpenEvolveExampleSmokeTests
     /// loopback stub to answer, and all nine attempts fail.
     /// </description></item>
     /// <item><description>
-    /// <c>background_blur</c> and <c>circle_packing_with_artifacts</c> evaluate the seed and then
-    /// never ask the model at all, because that evaluation yields no quality: the run reports
-    /// <c>StopReason: NoCandidates</c> with one completed evaluation, a null best quality and zero
-    /// model calls, so nothing ever entered the archive to propose from. Both evaluators score
-    /// above zero when run directly from the example's own directory, so what differs is the
-    /// sandbox workspace rather than the evaluator.
+    /// <c>background_blur</c> and <c>circle_packing_with_artifacts</c> are blocked by their declared
+    /// <c>database.feature_dimensions</c>: the run stops with <c>StopReason: NoCandidates</c> after
+    /// one evaluation with a null best quality and no model calls, and removing only that key from
+    /// the config copy makes the same example run and pass. That is a parity gap on our side rather
+    /// than a property of the examples, so they are excluded until it is fixed - see *The
+    /// feature-dimension gap* in the ledger.
     /// </description></item>
     /// </list>
     /// </remarks>
