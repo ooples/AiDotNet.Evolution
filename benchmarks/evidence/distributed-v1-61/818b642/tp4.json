@@ -1,0 +1,183 @@
+{
+  "stateHash": "4cfb9f694aae1274c32ae53470023723e68fd37361222cdccddc605b5c02cbd4",
+  "evaluationsAsked": 28,
+  "resultsDelivered": 28,
+  "resultsMissing": 0,
+  "elapsedSeconds": 7.6983582,
+  "evaluationsPerSecond": 3.6371391500073353,
+  "localWorkers": 0,
+  "workersAwaited": 4,
+  "evalMs": 0,
+  "bestQuality": 0.978,
+  "serverFaults": [],
+  "committed": [
+    {
+      "evaluationId": 0,
+      "attempt": 1,
+      "leaseId": "6a66815a152c49488d45bcc2ac269c04",
+      "provenance": "worker:tp4-w3"
+    },
+    {
+      "evaluationId": 1,
+      "attempt": 1,
+      "leaseId": "8e0ad9a3848041fba81f419af1c1df98",
+      "provenance": "worker:tp4-w4"
+    },
+    {
+      "evaluationId": 2,
+      "attempt": 1,
+      "leaseId": "e4dfdadaa0074cdc90d7320ad57a2e8f",
+      "provenance": "worker:tp4-w1"
+    },
+    {
+      "evaluationId": 3,
+      "attempt": 1,
+      "leaseId": "3f188e0c61b4421d9d0f35235c941ea5",
+      "provenance": "worker:tp4-w2"
+    },
+    {
+      "evaluationId": 5,
+      "attempt": 1,
+      "leaseId": "dc6f0cfae81945659e260e702720f1e6",
+      "provenance": "worker:tp4-w3"
+    },
+    {
+      "evaluationId": 6,
+      "attempt": 1,
+      "leaseId": "e14c0dd500e84fb78e7bc434aa269d79",
+      "provenance": "worker:tp4-w1"
+    },
+    {
+      "evaluationId": 9,
+      "attempt": 1,
+      "leaseId": "785a626da8224b8eaafe167eaabee463",
+      "provenance": "worker:tp4-w4"
+    },
+    {
+      "evaluationId": 10,
+      "attempt": 1,
+      "leaseId": "4b1165cc80da4921904b39c0ff4b10f2",
+      "provenance": "worker:tp4-w2"
+    },
+    {
+      "evaluationId": 11,
+      "attempt": 1,
+      "leaseId": "96d6ebb0c7c34e57a9804b914cffd41e",
+      "provenance": "worker:tp4-w3"
+    },
+    {
+      "evaluationId": 12,
+      "attempt": 1,
+      "leaseId": "9ae3c9405e16413e9e2d1fff95f413b6",
+      "provenance": "worker:tp4-w1"
+    },
+    {
+      "evaluationId": 13,
+      "attempt": 1,
+      "leaseId": "d45fea3511af4dfd8ebe1c794f948caa",
+      "provenance": "worker:tp4-w4"
+    },
+    {
+      "evaluationId": 14,
+      "attempt": 1,
+      "leaseId": "3af66aa8a3ce4b05baab42a55744414e",
+      "provenance": "worker:tp4-w2"
+    },
+    {
+      "evaluationId": 15,
+      "attempt": 1,
+      "leaseId": "aa044f6fc5144f5faa98fad4851b8b57",
+      "provenance": "worker:tp4-w3"
+    },
+    {
+      "evaluationId": 18,
+      "attempt": 1,
+      "leaseId": "d5b43da252ff47b9abd49c62fbe317c5",
+      "provenance": "worker:tp4-w1"
+    },
+    {
+      "evaluationId": 19,
+      "attempt": 1,
+      "leaseId": "6fb3efbb02844462b0ad049e81aac65a",
+      "provenance": "worker:tp4-w4"
+    },
+    {
+      "evaluationId": 20,
+      "attempt": 1,
+      "leaseId": "68575a2f0d9f4e16b382f611dac5c4b1",
+      "provenance": "worker:tp4-w2"
+    },
+    {
+      "evaluationId": 22,
+      "attempt": 1,
+      "leaseId": "1886942f4dc94673aa53c0a0e0cb71bf",
+      "provenance": "worker:tp4-w3"
+    },
+    {
+      "evaluationId": 23,
+      "attempt": 1,
+      "leaseId": "aad69e573ce049b9a7cc0b50bb4d9c7d",
+      "provenance": "worker:tp4-w1"
+    },
+    {
+      "evaluationId": 24,
+      "attempt": 1,
+      "leaseId": "6c5deefda6e942b78718887f278412c5",
+      "provenance": "worker:tp4-w4"
+    },
+    {
+      "evaluationId": 25,
+      "attempt": 1,
+      "leaseId": "718e9a7a098b4c26bd16c054bc9d7306",
+      "provenance": "worker:tp4-w2"
+    },
+    {
+      "evaluationId": 26,
+      "attempt": 1,
+      "leaseId": "e5013438843f4c628f50d0a7c9cf35de",
+      "provenance": "worker:tp4-w3"
+    },
+    {
+      "evaluationId": 29,
+      "attempt": 1,
+      "leaseId": "46f507663f8d4e38bdaf92a2e08a29f6",
+      "provenance": "worker:tp4-w1"
+    },
+    {
+      "evaluationId": 30,
+      "attempt": 1,
+      "leaseId": "a9006a76f10d429980947db4afd2adac",
+      "provenance": "worker:tp4-w4"
+    },
+    {
+      "evaluationId": 31,
+      "attempt": 1,
+      "leaseId": "6b30bee7570644f098cb46b04f481b63",
+      "provenance": "worker:tp4-w2"
+    },
+    {
+      "evaluationId": 34,
+      "attempt": 1,
+      "leaseId": "1bee1b0082cb4fc1bcff813385cd4e2f",
+      "provenance": "worker:tp4-w3"
+    },
+    {
+      "evaluationId": 35,
+      "attempt": 1,
+      "leaseId": "2afbbb05d42e47e5afc2e7328abf60cc",
+      "provenance": "worker:tp4-w1"
+    },
+    {
+      "evaluationId": 36,
+      "attempt": 1,
+      "leaseId": "553a3b6f09234c9e8738eed3e76a8ac6",
+      "provenance": "worker:tp4-w4"
+    },
+    {
+      "evaluationId": 39,
+      "attempt": 1,
+      "leaseId": "dea909e87f6e4b1b945b945efaa729e4",
+      "provenance": "worker:tp4-w2"
+    }
+  ]
+}
