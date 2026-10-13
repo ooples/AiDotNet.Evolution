@@ -120,6 +120,80 @@ public sealed class OpenEvolveImportTests
         Assert.Empty(run.LlmFeedback?.Models ?? new List<RunModel> { run.Model }); // judges with the proposal models
     }
 
+    /// <summary>
+    /// A run that produces no candidate reports why, rather than only that it produced none.
+    /// </summary>
+    /// <remarks>
+    /// A declared <c>database.feature_dimensions</c> entry is requested of the evaluator on every
+    /// completed evaluation, and <c>ProgramEvolutionTask</c> refuses an evaluation that omits it
+    /// rather than filing the program in cell zero. That refusal is correct, but the run previously
+    /// surfaced only <c>StopReason: NoCandidates</c>, which is true and useless: the engine was
+    /// holding the diagnostic that explained it. Three investigation sessions on #169 went into
+    /// recovering by hand what this now prints.
+    /// </remarks>
+    [Fact]
+    public void A_run_that_produces_no_candidate_reports_the_reason()
+    {
+        using var directory = new TemporaryDirectory();
+        using var model = new CliRunTests.FakeChatModel();
+
+        // The evaluator reports a score but never the declared "ssim" dimension, which is the shape
+        // upstream's background_blur has on its failure path.
+        File.WriteAllText(Path.Combine(directory.Path, "initial_program.py"), "X = 0\n");
+        File.WriteAllText(Path.Combine(directory.Path, "evaluator.py"),
+            "def evaluate(path):\n    return {\"combined_score\": 0.5}\n");
+        File.WriteAllText(Path.Combine(directory.Path, "config.yaml"), $"""
+            max_iterations: 2
+            random_seed: 5
+            diff_based_evolution: false
+            llm:
+              api_base: {model.Endpoint}
+              models:
+                - name: fake-model
+              timeout: 20
+              retries: 0
+            database:
+              num_islands: 1
+              feature_dimensions:
+                - complexity
+                - ssim
+            evaluator:
+              timeout: 30
+            """);
+
+        string? previousKey = Environment.GetEnvironmentVariable("OPENAI_API_KEY");
+        Environment.SetEnvironmentVariable("OPENAI_API_KEY", "unused-by-the-fake");
+        try
+        {
+            string output = Path.Combine(directory.Path, "out");
+            var (code, stdout, error) = CliRunTests.Run(
+                "run", "--openevolve-config", Path.Combine(directory.Path, "config.yaml"),
+                Path.Combine(directory.Path, "initial_program.py"),
+                Path.Combine(directory.Path, "evaluator.py"),
+                "--output", output, "--python", Python);
+
+            using JsonDocument result = JsonDocument.Parse(stdout);
+            JsonElement failures = result.RootElement.GetProperty("Failures");
+
+            // The point of the change: the reason travels with the result.
+            Assert.True(failures.GetArrayLength() > 0,
+                "a run with no candidate reported no failures; stdout=" + stdout + " stderr=" + error);
+            // The message is deliberately generic; the descriptor's name is in Data, which is the
+            // part that tells a reader which dimension their evaluator has to report.
+            Assert.Equal("descriptor_missing", failures[0].GetProperty("Code").GetString());
+            Assert.Equal("ssim", failures[0].GetProperty("Data").GetProperty("descriptor").GetString());
+
+            // And on stderr, where a reader looks first.
+            Assert.Contains("the run produced no candidate", error, StringComparison.Ordinal);
+            Assert.Contains("descriptor=ssim", error, StringComparison.Ordinal);
+            _ = code;
+        }
+        finally
+        {
+            Environment.SetEnvironmentVariable("OPENAI_API_KEY", previousKey);
+        }
+    }
+
     [Fact]
     public void An_unsupported_key_is_accepted_at_its_default_and_refused_by_name_otherwise()
     {

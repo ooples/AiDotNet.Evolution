@@ -117,7 +117,13 @@ the run with no parent to propose from. Upstream runs these examples with those 
 is a parity gap on our side rather than a property of the examples — which makes it #169's business
 ("every supported key maps to ours"), not a reason to exclude them permanently.
 
-**Not yet established:** which of the declared dimensions does it (`background_blur` names
+The engine was holding the answer all along: it retains a `descriptor_missing` diagnostic whose
+`data.descriptor` names the dimension, and the CLI never printed it - a run reported
+`StopReason: NoCandidates` and nothing else. The result now carries `Failures` (code, message and
+data per retained failure) and stderr names the first one, so this diagnosis takes one run instead
+of the three sessions it took here.
+
+**Still open:** which of the declared dimensions does it (`background_blur` names
 `complexity` and `ssim`) and why the candidate ends up unplaceable rather than clamped into a bin.
 The two examples stay out of the smoke until that is fixed, rather than being asserted on.
 

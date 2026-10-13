@@ -384,13 +384,37 @@ internal static class RunCommand
             Checkpoints = Path.Combine(outputDirectory, "checkpoints"),
             Repertoire = repertoirePath,
             WarmStart = warmStart,
-            ModelUsage = variation.GetUsage()
+            ModelUsage = variation.GetUsage(),
+            // Why the run ended the way it did. The engine retains the failures it survived, and
+            // without them a run whose every evaluation was refused reports only
+            // StopReason: NoCandidates - true, and useless for finding out why. Redacted
+            // diagnostics keep their code and say so rather than leaking their message.
+            Failures = result.RetainedFailures
+                .Select(diagnostic => new
+                {
+                    diagnostic.Code,
+                    Message = diagnostic.IsRedacted ? "<redacted>" : diagnostic.Message,
+                    // Data carries the actionable detail - for descriptor_missing it is the
+                    // descriptor's own name - and the message alone is deliberately generic.
+                    Data = diagnostic.IsRedacted ? null : diagnostic.Data,
+                })
+                .ToArray()
         }, Program.Json));
         if (best is not null)
         {
             string bestPath = Path.Combine(outputDirectory, "best" + Extension(run.Language));
             File.WriteAllText(bestPath, best.Candidate.CanonicalGenome.Genome.Source, new UTF8Encoding(false));
         }
+        if (best is null && result.RetainedFailures.Count > 0)
+        {
+            EvolutionDiagnostic first = result.RetainedFailures[0];
+            string detail = first.IsRedacted || first.Data.Count == 0
+                ? string.Empty
+                : " (" + string.Join(", ", first.Data.Select(pair => pair.Key + "=" + pair.Value)) + ")";
+            error.WriteLine("error: the run produced no candidate. First retained failure ["
+                + first.Code + "]: " + (first.IsRedacted ? "<redacted>" : first.Message) + detail);
+        }
+
         ProgramEvolutionLlmUsage usage = variation.GetUsage();
         if (usage.ChatCalls > 0 && usage.ProviderErrors >= usage.ChatCalls)
         {
