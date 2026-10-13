@@ -377,10 +377,10 @@ jobs:
           .local/program-env/bin/python -m unittest discover -s benchmarks/external -p test_openevolve_configs.py -v
           .local/program-env/bin/python -m unittest discover -s benchmarks/external -p test_campaign_runner.py -v
           .local/program-env/bin/python benchmarks/external/run_program_comparison.py --aidotnet benchmarks/EvolutionComparison/bin/Release/net10.0/EvolutionComparison.dll --upstream .local/openevolve-upstream --output TestResults/program-comparison
-      - name: OpenEvolve example import ledger against the pinned checkout
+      - name: OpenEvolve example ledger and smoke against the pinned checkout
         # The ledger in docs/parity/OPENEVOLVE_EXAMPLES.md claims a per-example disposition. Here,
         # and only here, is a checkout to re-measure it against: elsewhere the test returns early.
-        run: dotnet test tests/AiDotNet.Evolution.Tests/AiDotNet.Evolution.Tests.csproj -c Release -f net10.0 --filter "FullyQualifiedName~OpenEvolveExampleLedgerTests"
+        run: dotnet test tests/AiDotNet.Evolution.Tests/AiDotNet.Evolution.Tests.csproj -c Release -f net10.0 --filter "FullyQualifiedName~OpenEvolveExample"
       - name: Validate actual container isolation and independent oracles
         run: |
           docker build --tag evolution-program-sandbox:ci --file benchmarks/external/sandbox/Dockerfile .

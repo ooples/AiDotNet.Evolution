@@ -48,6 +48,30 @@ is the one an example's own README points at. Examples carrying several (`algotu
 | `tsp_tour_minimization` | `examples/tsp_tour_minimization/config.yaml` | yes | 4 mapping note(s) |
 | `web_scraper_optillm` | `examples/web_scraper_optillm/config.yaml` | yes | 2 mapping note(s) |
 
+## The smoke run
+
+`OpenEvolveExampleSmokeTests` takes the other half of the criterion for one example:
+`circle_packing`'s own `evaluator.py` and `initial_program.py`, unmodified, driven through
+`aidotnet-evolve run --openevolve-config` for three iterations against a loopback stub model. Three
+keys in a *copy* of its config are changed, all about not spending money or reaching the network -
+`llm.api_base`, the model names, and `diff_based_evolution` so the stub's whole-program answer is
+usable. The test asserts four evaluations (the seed plus three), at least one model call, and a
+**positive** best quality - because four evaluations would also be counted if the evaluator had
+failed on every candidate, since it returns `combined_score: 0.0` on error.
+
+It runs on Linux only, and that is upstream's constraint rather than a choice. Upstream's evaluator
+writes a wrapper script that embeds the program's absolute path into a single-quoted Python literal,
+so on Windows the path becomes an invalid escape - `SyntaxError: (unicode error) 'unicodeescape'
+codec can't decode bytes ... truncated \UXXXXXXXX escape` - and every candidate scores zero.
+Measured by running `examples/circle_packing/evaluator.py` directly on its own seed program;
+`online_judge_programming`, `k_module_problem` and `web_scraper_optillm` fail the same way, and
+`attention_optimization` needs `mlir-opt` on PATH.
+
+**One example of 21 has an end-to-end smoke.** The other eighteen that import are import-only so
+far, because each brings its own dependency set - numpy, scipy, torch, Apple MLX, dataset downloads,
+an `openevolve` package import inside the evaluator - and working through them is what remains of
+this criterion.
+
 ## The two that do not
 
 Neither is a defect in the importer, and both are refusals by name rather than silent acceptance:
