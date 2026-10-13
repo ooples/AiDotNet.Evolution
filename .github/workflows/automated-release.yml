@@ -69,6 +69,28 @@ jobs:
               if ($LASTEXITCODE -ne 0) { throw "Failed: $project $framework" }
             }
           }
+      # Last in this job, so the nested tooling checkout cannot leak into the test steps above.
+      - name: Check out the release gate from the workflow revision
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          ref: ${{ github.workflow_sha }}
+          path: .release-tooling
+          persist-credentials: false
+      - name: Enforce the declared release claim (US-12)
+        # A tag without release/claim.json makes no claim; 1.x needs the decisive v1-gate claim (#122).
+        env:
+          RELEASE_VERSION: ${{ steps.version.outputs.version }}
+        run: python3 .release-tooling/benchmarks/analysis/release_gate.py --release release --repository . --version "$RELEASE_VERSION" --output release-evidence.json
+      - name: Retain the release assessment and its complete bundle
+        if: always()
+        uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9 # v7.0.2
+        with:
+          name: release-evidence-${{ github.sha }}
+          path: |
+            release-evidence.json
+            release/**
+          if-no-files-found: warn
+          retention-days: 90
 
   legacy:
     name: Validate release on .NET Framework (net471, net462)
@@ -228,7 +250,15 @@ jobs:
         with:
           name: nuget-packages-${{ github.sha }}
           path: out
+      - uses: actions/download-artifact@9000827ccba6bdab643e8b6fd33ac0654aef8333 # v8.0.2
+        with:
+          name: release-evidence-${{ github.sha }}
+          path: evidence
       - name: Upload release assets
         env:
           GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
-        run: gh release upload "${{ inputs.tag }}" out/*.nupkg out/*.snupkg --clobber --repo "${{ github.repository }}"
+        run: |
+          set -euo pipefail
+          # The release report and the complete declared bundle are published beside the packages (US-12).
+          (cd evidence && zip -qr ../release-evidence-bundle.zip .)
+          gh release upload "${{ inputs.tag }}" out/*.nupkg out/*.snupkg evidence/release-evidence.json release-evidence-bundle.zip --clobber --repo "${{ github.repository }}"

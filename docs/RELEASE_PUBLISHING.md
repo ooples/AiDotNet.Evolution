@@ -26,6 +26,10 @@ tag predating those helpers can still be packaged. This does not move or rewrite
 the tag. Very old tags lacking the five projects or consumer APIs fail validation
 rather than substituting current product code.
 
+Before anything is packed, `validate` runs the US-12 release claim gate on the tag's `release/`.
+A 1.x version cannot publish without a passing `v1-gate` claim. The assessment and bundle are
+attached to the GitHub release. See [release evidence](RELEASE_EVIDENCE.md).
+
 Build/pack jobs have no publishing OIDC permission. Provenance remains in the
 separate attestation workflow; only the publishing job authenticates to NuGet.
 The NuGet policy must authorize repository `ooples/AiDotNet.Evolution`, workflow
