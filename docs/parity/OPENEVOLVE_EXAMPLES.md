@@ -87,7 +87,7 @@ cannot support the positive-quality assertion, so it is not smoked.
 | `attention_optimization` | n/a | no | `RuntimeError: Required tool not found: mlir-opt` |
 | `mlx_metal_kernel_opt` | n/a | no | needs Apple MLX (`No module named 'mlx'`) |
 | `sldbench` | n/a | no | needs HuggingFace `datasets` |
-| `tsp_tour_minimization` | n/a | no | needs `psutil` |
+| `tsp_tour_minimization` | n/a | no | its `initial_program` is a directory of per-problem programs, so there is no single seed; its evaluator also needs `psutil` |
 | `algotune` | n/a | no | no top-level evaluator; one per problem subdirectory |
 | `alphaevolve_math_problems` | n/a | no | same |
 | `llm_prompt_optimization` | n/a | no | no seed program; it evolves a prompt file |
