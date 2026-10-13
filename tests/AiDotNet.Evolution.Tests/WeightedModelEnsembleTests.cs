@@ -262,7 +262,7 @@ public sealed class WeightedModelEnsembleTests
 
         await ensemble.ProposeAsync(Context(new StableRandom(11), generation: 0));
 
-        var account = ensemble.Accounts.Single();
+        EvolutionModelAccount account = ensemble.Accounts.Single();
         Assert.Equal(1, account.Proposals);
         Assert.Equal(1, account.Failures);
     }
