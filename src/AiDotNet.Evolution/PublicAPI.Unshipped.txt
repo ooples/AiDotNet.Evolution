@@ -52,12 +52,20 @@ AiDotNet.Evolution.DiagonalCmaEmitter.StepSize.get -> double
 AiDotNet.Evolution.DiagonalCmaEmitter.Updates.get -> long
 AiDotNet.Evolution.DiagonalCmaEmitter.Variances.get -> System.Collections.Generic.IReadOnlyList<double>!
 AiDotNet.Evolution.DiagonalCmaEmitter.VersionHash.get -> string!
+AiDotNet.Evolution.DirectoryEvolutionArtifactStore
+AiDotNet.Evolution.DirectoryEvolutionArtifactStore.DirectoryEvolutionArtifactStore(string! directory, System.TimeSpan? retention = null) -> void
+AiDotNet.Evolution.DirectoryEvolutionArtifactStore.DirectoryPath.get -> string!
+AiDotNet.Evolution.DirectoryEvolutionArtifactStore.Prune(System.DateTimeOffset now) -> int
+AiDotNet.Evolution.DirectoryEvolutionArtifactStore.Put(byte[]! content) -> string!
+AiDotNet.Evolution.DirectoryEvolutionArtifactStore.TryRead(string! reference, out byte[]! content) -> bool
 AiDotNet.Evolution.DirectoryEvolutionCheckpointStore
 AiDotNet.Evolution.DirectoryEvolutionCheckpointStore.DirectoryEvolutionCheckpointStore(string! directory, AiDotNet.Evolution.EvolutionCheckpointRetentionOptions? retention = null, long maxCheckpointBytes = 67108864) -> void
 AiDotNet.Evolution.DirectoryEvolutionCheckpointStore.DirectoryPath.get -> string!
 AiDotNet.Evolution.DirectoryEvolutionCheckpointStore.ListCheckpoints(string! runId, int maximumCount = 4096) -> System.Collections.Generic.IReadOnlyList<AiDotNet.Evolution.EvolutionCheckpointDescriptor!>!
 AiDotNet.Evolution.DirectoryEvolutionCheckpointStore.LoadLatestAsync(string! runId, System.Threading.CancellationToken cancellationToken = default(System.Threading.CancellationToken)) -> System.Threading.Tasks.Task<AiDotNet.Evolution.EvolutionCheckpoint?>!
+AiDotNet.Evolution.DirectoryEvolutionCheckpointStore.OpenSegmentAsync(string! runId, long segmentId, System.Threading.CancellationToken cancellationToken = default(System.Threading.CancellationToken)) -> System.Threading.Tasks.Task<System.IO.Stream?>!
 AiDotNet.Evolution.DirectoryEvolutionCheckpointStore.SaveAsync(AiDotNet.Evolution.EvolutionCheckpoint! checkpoint, System.Threading.CancellationToken cancellationToken = default(System.Threading.CancellationToken)) -> System.Threading.Tasks.Task!
+AiDotNet.Evolution.DirectoryEvolutionCheckpointStore.WriteSegmentAsync(string! runId, long segmentId, System.Func<System.IO.Stream!, System.Threading.CancellationToken, System.Threading.Tasks.Task!>! write, System.Threading.CancellationToken cancellationToken = default(System.Threading.CancellationToken)) -> System.Threading.Tasks.Task!
 AiDotNet.Evolution.DirectoryEvolutionEvaluationStore
 AiDotNet.Evolution.DirectoryEvolutionEvaluationStore.DirectoryEvolutionEvaluationStore(string! directory, int maximumEntries = 4096) -> void
 AiDotNet.Evolution.DirectoryEvolutionEvaluationStore.DirectoryPath.get -> string!
@@ -88,6 +96,18 @@ AiDotNet.Evolution.DurableEvolutionWorkCoordinator.SearchContinuationGuarantee.g
 AiDotNet.Evolution.DurableEvolutionWorkCoordinator.SourceSessionId.get -> string?
 AiDotNet.Evolution.DurableEvolutionWorkCoordinator.SupportsExactSearchContinuation.get -> bool
 AiDotNet.Evolution.DurableEvolutionWorkCoordinator.WasRecovered.get -> bool
+AiDotNet.Evolution.EscalatingVariationOperator<TGenome>
+AiDotNet.Evolution.EscalatingVariationOperator<TGenome>.CaptureState() -> string!
+AiDotNet.Evolution.EscalatingVariationOperator<TGenome>.CurrentTier.get -> int
+AiDotNet.Evolution.EscalatingVariationOperator<TGenome>.EscalatingVariationOperator(System.Collections.Generic.IReadOnlyList<AiDotNet.Evolution.IVariationOperator<TGenome>!>! tiers, int failuresBeforeEscalation) -> void
+AiDotNet.Evolution.EscalatingVariationOperator<TGenome>.Escalations.get -> System.Collections.Generic.IReadOnlyList<AiDotNet.Evolution.EvolutionEscalation!>!
+AiDotNet.Evolution.EscalatingVariationOperator<TGenome>.Id.get -> string!
+AiDotNet.Evolution.EscalatingVariationOperator<TGenome>.Observe(AiDotNet.Evolution.EvolutionEvaluation! evaluation, AiDotNet.Evolution.EvolutionArchiveInsertionResult? insertionResult) -> void
+AiDotNet.Evolution.EscalatingVariationOperator<TGenome>.ProposeAsync(AiDotNet.Evolution.EvolutionVariationContext<TGenome>! context, System.Threading.CancellationToken cancellationToken = default(System.Threading.CancellationToken)) -> System.Threading.Tasks.ValueTask<TGenome>
+AiDotNet.Evolution.EscalatingVariationOperator<TGenome>.RestoreState(string! state) -> void
+AiDotNet.Evolution.EscalatingVariationOperator<TGenome>.TierProposals.get -> System.Collections.Generic.IReadOnlyList<long>!
+AiDotNet.Evolution.EscalatingVariationOperator<TGenome>.TierSuccesses.get -> System.Collections.Generic.IReadOnlyList<long>!
+AiDotNet.Evolution.EscalatingVariationOperator<TGenome>.VersionHash.get -> string!
 AiDotNet.Evolution.EvolutionArchiveEntry<TGenome>
 AiDotNet.Evolution.EvolutionArchiveEntry<TGenome>.Candidate.get -> AiDotNet.Evolution.EvolutionCandidate<TGenome>!
 AiDotNet.Evolution.EvolutionArchiveEntry<TGenome>.Cell.get -> AiDotNet.Evolution.EvolutionCellKey!
@@ -116,9 +136,12 @@ AiDotNet.Evolution.EvolutionArchiveSnapshot<TGenome>.TotalCells.get -> long
 AiDotNet.Evolution.EvolutionArchiveSnapshot<TGenome>.Version.get -> long
 AiDotNet.Evolution.EvolutionArtifact
 AiDotNet.Evolution.EvolutionArtifact.EvolutionArtifact(string! key, string! text, bool isTruncated = false, bool isRedacted = false) -> void
+AiDotNet.Evolution.EvolutionArtifact.GetContent() -> byte[]!
+AiDotNet.Evolution.EvolutionArtifact.IsBinary.get -> bool
 AiDotNet.Evolution.EvolutionArtifact.IsRedacted.get -> bool
 AiDotNet.Evolution.EvolutionArtifact.IsTruncated.get -> bool
 AiDotNet.Evolution.EvolutionArtifact.Key.get -> string!
+AiDotNet.Evolution.EvolutionArtifact.MediaType.get -> string?
 AiDotNet.Evolution.EvolutionArtifact.SizeBytes.get -> int
 AiDotNet.Evolution.EvolutionArtifact.Text.get -> string!
 AiDotNet.Evolution.EvolutionArtifactOptions
@@ -135,8 +158,12 @@ AiDotNet.Evolution.EvolutionArtifactOptions.MaxBytesPerEvaluation.get -> int
 AiDotNet.Evolution.EvolutionArtifactOptions.MaxBytesPerEvaluation.set -> void
 AiDotNet.Evolution.EvolutionArtifactOptions.MaxPendingCandidates.get -> int
 AiDotNet.Evolution.EvolutionArtifactOptions.MaxPendingCandidates.set -> void
+AiDotNet.Evolution.EvolutionArtifactOptions.MaxStoredBytesPerEvaluation.get -> long
+AiDotNet.Evolution.EvolutionArtifactOptions.MaxStoredBytesPerEvaluation.set -> void
 AiDotNet.Evolution.EvolutionArtifactOptions.SanitizeSecrets.get -> bool
 AiDotNet.Evolution.EvolutionArtifactOptions.SanitizeSecrets.set -> void
+AiDotNet.Evolution.EvolutionArtifactOptions.Store.get -> AiDotNet.Evolution.IEvolutionArtifactStore?
+AiDotNet.Evolution.EvolutionArtifactOptions.Store.set -> void
 AiDotNet.Evolution.EvolutionArtifactSanitizer
 AiDotNet.Evolution.EvolutionAskItem<TGenome>
 AiDotNet.Evolution.EvolutionAskItem<TGenome>.Candidate.get -> AiDotNet.Evolution.EvolutionCandidate<TGenome>!
@@ -182,8 +209,10 @@ AiDotNet.Evolution.EvolutionCheckpoint.Quality.get -> double?
 AiDotNet.Evolution.EvolutionCheckpoint.QualityDirection.get -> AiDotNet.Evolution.EvolutionOptimizationDirection
 AiDotNet.Evolution.EvolutionCheckpoint.RunId.get -> string!
 AiDotNet.Evolution.EvolutionCheckpoint.SchemaVersion.get -> int
+AiDotNet.Evolution.EvolutionCheckpoint.SegmentIds.get -> System.Collections.Generic.IReadOnlyList<long>!
 AiDotNet.Evolution.EvolutionCheckpoint.Sequence.get -> long
 AiDotNet.Evolution.EvolutionCheckpoint.Validate() -> void
+AiDotNet.Evolution.EvolutionCheckpoint.WithSegmentIds(System.Collections.Generic.IReadOnlyList<long>! segmentIds) -> AiDotNet.Evolution.EvolutionCheckpoint!
 AiDotNet.Evolution.EvolutionCheckpointContents<TGenome>
 AiDotNet.Evolution.EvolutionCheckpointContents<TGenome>.CompatibilityHash.get -> string!
 AiDotNet.Evolution.EvolutionCheckpointContents<TGenome>.DistinctCandidates.get -> System.Collections.Generic.IReadOnlyCollection<AiDotNet.Evolution.EvolutionCheckpointEntry<TGenome>!>!
@@ -216,6 +245,10 @@ AiDotNet.Evolution.EvolutionCheckpointEntrySource.GlobalElite = 1 -> AiDotNet.Ev
 AiDotNet.Evolution.EvolutionCheckpointEntrySource.InfeasibleExploration = 3 -> AiDotNet.Evolution.EvolutionCheckpointEntrySource
 AiDotNet.Evolution.EvolutionCheckpointEntrySource.IslandArchive = 0 -> AiDotNet.Evolution.EvolutionCheckpointEntrySource
 AiDotNet.Evolution.EvolutionCheckpointEntrySource.IslandHistory = 2 -> AiDotNet.Evolution.EvolutionCheckpointEntrySource
+AiDotNet.Evolution.EvolutionCheckpointFormat
+AiDotNet.Evolution.EvolutionCheckpointFormat.Auto = 0 -> AiDotNet.Evolution.EvolutionCheckpointFormat
+AiDotNet.Evolution.EvolutionCheckpointFormat.Inline = 1 -> AiDotNet.Evolution.EvolutionCheckpointFormat
+AiDotNet.Evolution.EvolutionCheckpointFormat.Segmented = 2 -> AiDotNet.Evolution.EvolutionCheckpointFormat
 AiDotNet.Evolution.EvolutionCheckpointRetentionOptions
 AiDotNet.Evolution.EvolutionCheckpointRetentionOptions.EvolutionCheckpointRetentionOptions() -> void
 AiDotNet.Evolution.EvolutionCheckpointRetentionOptions.KeepBest.get -> int
@@ -272,6 +305,7 @@ AiDotNet.Evolution.EvolutionDiagnostic.EvolutionDiagnostic(string! code, string!
 AiDotNet.Evolution.EvolutionDiagnostic.IsRedacted.get -> bool
 AiDotNet.Evolution.EvolutionDiagnostic.Message.get -> string!
 AiDotNet.Evolution.EvolutionDispatchMode
+AiDotNet.Evolution.EvolutionDispatchMode.Auto = 3 -> AiDotNet.Evolution.EvolutionDispatchMode
 AiDotNet.Evolution.EvolutionDispatchMode.Batch = 0 -> AiDotNet.Evolution.EvolutionDispatchMode
 AiDotNet.Evolution.EvolutionDispatchMode.Continuous = 1 -> AiDotNet.Evolution.EvolutionDispatchMode
 AiDotNet.Evolution.EvolutionDispatchMode.Pipeline = 2 -> AiDotNet.Evolution.EvolutionDispatchMode
@@ -342,11 +376,17 @@ AiDotNet.Evolution.EvolutionEngineOptions.Artifacts.get -> AiDotNet.Evolution.Ev
 AiDotNet.Evolution.EvolutionEngineOptions.Artifacts.set -> void
 AiDotNet.Evolution.EvolutionEngineOptions.Cascade.get -> AiDotNet.Evolution.EvolutionCascadeOptions!
 AiDotNet.Evolution.EvolutionEngineOptions.Cascade.set -> void
+AiDotNet.Evolution.EvolutionEngineOptions.CheckpointFormat.get -> AiDotNet.Evolution.EvolutionCheckpointFormat
+AiDotNet.Evolution.EvolutionEngineOptions.CheckpointFormat.set -> void
 AiDotNet.Evolution.EvolutionEngineOptions.CheckpointInterval.get -> int
 AiDotNet.Evolution.EvolutionEngineOptions.CheckpointInterval.set -> void
+AiDotNet.Evolution.EvolutionEngineOptions.CheckpointSegmentThreshold.get -> int
+AiDotNet.Evolution.EvolutionEngineOptions.CheckpointSegmentThreshold.set -> void
 AiDotNet.Evolution.EvolutionEngineOptions.Copy() -> AiDotNet.Evolution.EvolutionEngineOptions!
 AiDotNet.Evolution.EvolutionEngineOptions.DeduplicateFailedCandidates.get -> bool
 AiDotNet.Evolution.EvolutionEngineOptions.DeduplicateFailedCandidates.set -> void
+AiDotNet.Evolution.EvolutionEngineOptions.DeduplicationCapacity.get -> int
+AiDotNet.Evolution.EvolutionEngineOptions.DeduplicationCapacity.set -> void
 AiDotNet.Evolution.EvolutionEngineOptions.Dispatch.get -> AiDotNet.Evolution.EvolutionDispatchMode
 AiDotNet.Evolution.EvolutionEngineOptions.Dispatch.set -> void
 AiDotNet.Evolution.EvolutionEngineOptions.EarlyStopping.get -> AiDotNet.Evolution.EvolutionEarlyStoppingOptions!
@@ -432,6 +472,16 @@ AiDotNet.Evolution.EvolutionEngineOptions.TargetQuality.get -> double?
 AiDotNet.Evolution.EvolutionEngineOptions.TargetQuality.set -> void
 AiDotNet.Evolution.EvolutionEngineOptions.TimeLimit.get -> System.TimeSpan?
 AiDotNet.Evolution.EvolutionEngineOptions.TimeLimit.set -> void
+AiDotNet.Evolution.EvolutionEngineOptions.TimeProvider.get -> System.TimeProvider!
+AiDotNet.Evolution.EvolutionEngineOptions.TimeProvider.set -> void
+AiDotNet.Evolution.EvolutionEscalation
+AiDotNet.Evolution.EvolutionEscalation.ConsecutiveFailures.get -> int
+AiDotNet.Evolution.EvolutionEscalation.FromOperatorId.get -> string!
+AiDotNet.Evolution.EvolutionEscalation.FromTier.get -> int
+AiDotNet.Evolution.EvolutionEscalation.Generation.get -> long
+AiDotNet.Evolution.EvolutionEscalation.IncrementalCost.get -> AiDotNet.Evolution.EvolutionResources?
+AiDotNet.Evolution.EvolutionEscalation.ToOperatorId.get -> string!
+AiDotNet.Evolution.EvolutionEscalation.ToTier.get -> int
 AiDotNet.Evolution.EvolutionEvaluation
 AiDotNet.Evolution.EvolutionEvaluation.Artifacts.get -> System.Collections.Generic.IReadOnlyList<AiDotNet.Evolution.EvolutionArtifact!>!
 AiDotNet.Evolution.EvolutionEvaluation.CacheStatus.get -> AiDotNet.Evolution.EvolutionCacheStatus
@@ -655,6 +705,15 @@ AiDotNet.Evolution.EvolutionIncumbentChallenge<TGenome>
 AiDotNet.Evolution.EvolutionIncumbentChallenge<TGenome>.EvolutionIncumbentChallenge(string! searchVersion, string! confirmationVersion, AiDotNet.Evolution.EvolutionResourceLedger! ledger, int searchSamples, int confirmationSamples, int maximumChallenges, double minimumQuality, double maximumQuality, double minimumImprovement, decimal maximumCostPerSample, System.Func<TGenome, AiDotNet.Evolution.EvolutionReplicateContext!, System.Threading.CancellationToken, System.Threading.Tasks.ValueTask<AiDotNet.Evolution.EvolutionTaskResult!>>! search, System.Func<TGenome, AiDotNet.Evolution.EvolutionReplicateContext!, System.Threading.CancellationToken, System.Threading.Tasks.ValueTask<AiDotNet.Evolution.EvolutionTaskResult!>>! confirm, double confidence = 0.95, AiDotNet.Evolution.EvolutionOptimizationDirection direction = AiDotNet.Evolution.EvolutionOptimizationDirection.Maximize) -> void
 AiDotNet.Evolution.EvolutionIncumbentChallenge<TGenome>.RunAsync(int slot, AiDotNet.Evolution.EvolutionCanonicalGenome<TGenome>! candidate, AiDotNet.Evolution.EvolutionCanonicalGenome<TGenome>! incumbent, AiDotNet.Evolution.EvolutionEvaluationContext! context, System.Threading.CancellationToken cancellationToken = default(System.Threading.CancellationToken)) -> System.Threading.Tasks.ValueTask<AiDotNet.Evolution.EvolutionIncumbentChallengeReport!>
 AiDotNet.Evolution.EvolutionIncumbentChallenge<TGenome>.VersionHash.get -> string!
+AiDotNet.Evolution.EvolutionIncumbentChallengeOutcome
+AiDotNet.Evolution.EvolutionIncumbentChallengeOutcome.Canceled = 7 -> AiDotNet.Evolution.EvolutionIncumbentChallengeOutcome
+AiDotNet.Evolution.EvolutionIncumbentChallengeOutcome.CandidateConfirmationIncomplete = 5 -> AiDotNet.Evolution.EvolutionIncumbentChallengeOutcome
+AiDotNet.Evolution.EvolutionIncumbentChallengeOutcome.CandidateSearchIncomplete = 3 -> AiDotNet.Evolution.EvolutionIncumbentChallengeOutcome
+AiDotNet.Evolution.EvolutionIncumbentChallengeOutcome.ConfirmedImprovement = 0 -> AiDotNet.Evolution.EvolutionIncumbentChallengeOutcome
+AiDotNet.Evolution.EvolutionIncumbentChallengeOutcome.IncumbentConfirmationIncomplete = 6 -> AiDotNet.Evolution.EvolutionIncumbentChallengeOutcome
+AiDotNet.Evolution.EvolutionIncumbentChallengeOutcome.IncumbentSearchIncomplete = 4 -> AiDotNet.Evolution.EvolutionIncumbentChallengeOutcome
+AiDotNet.Evolution.EvolutionIncumbentChallengeOutcome.NotConfirmed = 1 -> AiDotNet.Evolution.EvolutionIncumbentChallengeOutcome
+AiDotNet.Evolution.EvolutionIncumbentChallengeOutcome.NotPromising = 2 -> AiDotNet.Evolution.EvolutionIncumbentChallengeOutcome
 AiDotNet.Evolution.EvolutionIncumbentChallengeReport
 AiDotNet.Evolution.EvolutionIncumbentChallengeReport.CandidateConfirmation.get -> AiDotNet.Evolution.EvolutionReplicationReport?
 AiDotNet.Evolution.EvolutionIncumbentChallengeReport.CandidateId.get -> string!
@@ -666,6 +725,7 @@ AiDotNet.Evolution.EvolutionIncumbentChallengeReport.IncumbentId.get -> string!
 AiDotNet.Evolution.EvolutionIncumbentChallengeReport.IncumbentSearch.get -> AiDotNet.Evolution.EvolutionReplicationReport?
 AiDotNet.Evolution.EvolutionIncumbentChallengeReport.IsConfirmed.get -> bool
 AiDotNet.Evolution.EvolutionIncumbentChallengeReport.LowerImprovementBound.get -> double?
+AiDotNet.Evolution.EvolutionIncumbentChallengeReport.Outcome.get -> AiDotNet.Evolution.EvolutionIncumbentChallengeOutcome
 AiDotNet.Evolution.EvolutionInfeasibleEntry<TGenome>
 AiDotNet.Evolution.EvolutionInfeasibleEntry<TGenome>.Entry.get -> AiDotNet.Evolution.EvolutionArchiveEntry<TGenome>!
 AiDotNet.Evolution.EvolutionInfeasibleEntry<TGenome>.EvolutionInfeasibleEntry(int island, AiDotNet.Evolution.EvolutionArchiveEntry<TGenome>! entry) -> void
@@ -733,8 +793,8 @@ AiDotNet.Evolution.EvolutionLineage
 AiDotNet.Evolution.EvolutionLineage.EvolutionLineage(System.Collections.Generic.IEnumerable<string!>? parentIds, System.Collections.Generic.IEnumerable<string!>? inspirationIds, string! variationOperatorId, string? refinerId, long generation, int island, ulong seedStream, int? migrationSourceIsland = null) -> void
 AiDotNet.Evolution.EvolutionLineage.Generation.get -> long
 AiDotNet.Evolution.EvolutionLineage.InspirationIds.get -> System.Collections.Generic.IReadOnlyList<string!>!
-AiDotNet.Evolution.EvolutionLineage.Island.get -> int
 AiDotNet.Evolution.EvolutionLineage.IsMigrant.get -> bool
+AiDotNet.Evolution.EvolutionLineage.Island.get -> int
 AiDotNet.Evolution.EvolutionLineage.MigrationSourceIsland.get -> int?
 AiDotNet.Evolution.EvolutionLineage.ParentIds.get -> System.Collections.Generic.IReadOnlyList<string!>!
 AiDotNet.Evolution.EvolutionLineage.RefinerId.get -> string?
@@ -777,6 +837,18 @@ AiDotNet.Evolution.EvolutionMigrationTopology.Star = 2 -> AiDotNet.Evolution.Evo
 AiDotNet.Evolution.EvolutionMigrationTrigger
 AiDotNet.Evolution.EvolutionMigrationTrigger.CommittedBatches = 0 -> AiDotNet.Evolution.EvolutionMigrationTrigger
 AiDotNet.Evolution.EvolutionMigrationTrigger.IslandGenerations = 1 -> AiDotNet.Evolution.EvolutionMigrationTrigger
+AiDotNet.Evolution.EvolutionModelAccount
+AiDotNet.Evolution.EvolutionModelAccount.Failures.get -> long
+AiDotNet.Evolution.EvolutionModelAccount.ModelId.get -> string!
+AiDotNet.Evolution.EvolutionModelAccount.Proposals.get -> long
+AiDotNet.Evolution.EvolutionModelDraw
+AiDotNet.Evolution.EvolutionModelDraw.Generation.get -> long
+AiDotNet.Evolution.EvolutionModelDraw.ModelId.get -> string!
+AiDotNet.Evolution.EvolutionModelDraw.ModelIndex.get -> int
+AiDotNet.Evolution.EvolutionModelWeight<TGenome>
+AiDotNet.Evolution.EvolutionModelWeight<TGenome>.EvolutionModelWeight(AiDotNet.Evolution.ICostedEvolutionProposalSource<TGenome>! source, double weight) -> void
+AiDotNet.Evolution.EvolutionModelWeight<TGenome>.Source.get -> AiDotNet.Evolution.ICostedEvolutionProposalSource<TGenome>!
+AiDotNet.Evolution.EvolutionModelWeight<TGenome>.Weight.get -> double
 AiDotNet.Evolution.EvolutionObjectiveDefinition
 AiDotNet.Evolution.EvolutionObjectiveDefinition.Direction.get -> AiDotNet.Evolution.EvolutionOptimizationDirection
 AiDotNet.Evolution.EvolutionObjectiveDefinition.EvolutionObjectiveDefinition(string! name, AiDotNet.Evolution.EvolutionOptimizationDirection direction, double minimum, double maximum, double resolution = 0) -> void
@@ -813,10 +885,13 @@ AiDotNet.Evolution.EvolutionOperatorRewardPolicy
 AiDotNet.Evolution.EvolutionOperatorRewardPolicy.CostBasis.get -> AiDotNet.Evolution.EvolutionOperatorCostBasis
 AiDotNet.Evolution.EvolutionOperatorRewardPolicy.CostUnitVersionHash.get -> string!
 AiDotNet.Evolution.EvolutionOperatorRewardPolicy.EvolutionOperatorRewardPolicy(AiDotNet.Evolution.EvolutionOperatorRewardKind kind, AiDotNet.Evolution.EvolutionOperatorCostBasis costBasis, string! costUnitVersionHash, double qualityScale = 1, double minimumCostUnits = 1) -> void
+AiDotNet.Evolution.EvolutionOperatorRewardPolicy.HalfLifeOutcomes.get -> int?
 AiDotNet.Evolution.EvolutionOperatorRewardPolicy.Kind.get -> AiDotNet.Evolution.EvolutionOperatorRewardKind
+AiDotNet.Evolution.EvolutionOperatorRewardPolicy.MaximumEstimateAge.get -> int?
 AiDotNet.Evolution.EvolutionOperatorRewardPolicy.MinimumCostUnits.get -> double
 AiDotNet.Evolution.EvolutionOperatorRewardPolicy.QualityScale.get -> double
 AiDotNet.Evolution.EvolutionOperatorRewardPolicy.VersionHash.get -> string!
+AiDotNet.Evolution.EvolutionOperatorRewardPolicy.WithEstimateAging(int maximumEstimateAge, int? halfLifeOutcomes = null) -> AiDotNet.Evolution.EvolutionOperatorRewardPolicy!
 AiDotNet.Evolution.EvolutionOperatorStatistics
 AiDotNet.Evolution.EvolutionOperatorStatistics.MeanReward.get -> double
 AiDotNet.Evolution.EvolutionOperatorStatistics.OperatorId.get -> string!
@@ -896,10 +971,10 @@ AiDotNet.Evolution.EvolutionPipelineOptions
 AiDotNet.Evolution.EvolutionPipelineOptions.EvaluationQueueCapacity.get -> int
 AiDotNet.Evolution.EvolutionPipelineOptions.EvaluationQueueCapacity.set -> void
 AiDotNet.Evolution.EvolutionPipelineOptions.EvolutionPipelineOptions() -> void
-AiDotNet.Evolution.EvolutionPipelineOptions.MaximumScheduleRecords.get -> int
-AiDotNet.Evolution.EvolutionPipelineOptions.MaximumScheduleRecords.set -> void
 AiDotNet.Evolution.EvolutionPipelineOptions.MaxProposalConcurrency.get -> int
 AiDotNet.Evolution.EvolutionPipelineOptions.MaxProposalConcurrency.set -> void
+AiDotNet.Evolution.EvolutionPipelineOptions.MaximumScheduleRecords.get -> int
+AiDotNet.Evolution.EvolutionPipelineOptions.MaximumScheduleRecords.set -> void
 AiDotNet.Evolution.EvolutionPipelineOptions.MinimumEvaluationStartInterval.get -> System.TimeSpan
 AiDotNet.Evolution.EvolutionPipelineOptions.MinimumEvaluationStartInterval.set -> void
 AiDotNet.Evolution.EvolutionPipelineOptions.MinimumProposalStartInterval.get -> System.TimeSpan
@@ -1121,10 +1196,6 @@ AiDotNet.Evolution.EvolutionResourceResult<T>.Actual.get -> AiDotNet.Evolution.E
 AiDotNet.Evolution.EvolutionResourceResult<T>.EvolutionResourceResult(T value, AiDotNet.Evolution.EvolutionResources! actual, AiDotNet.Evolution.EvolutionResourceOutcome outcome = AiDotNet.Evolution.EvolutionResourceOutcome.Completed) -> void
 AiDotNet.Evolution.EvolutionResourceResult<T>.Outcome.get -> AiDotNet.Evolution.EvolutionResourceOutcome
 AiDotNet.Evolution.EvolutionResourceResult<T>.Value.get -> T
-AiDotNet.Evolution.EvolutionResources
-AiDotNet.Evolution.EvolutionResources.Amounts.get -> System.Collections.Generic.IReadOnlyDictionary<string!, decimal>!
-AiDotNet.Evolution.EvolutionResources.EvolutionResources(System.Collections.Generic.IEnumerable<System.Collections.Generic.KeyValuePair<string!, decimal>>! amounts) -> void
-AiDotNet.Evolution.EvolutionResources.this[string! name].get -> decimal
 AiDotNet.Evolution.EvolutionResourceSnapshot
 AiDotNet.Evolution.EvolutionResourceSnapshot.Admitted.get -> long
 AiDotNet.Evolution.EvolutionResourceSnapshot.Denied.get -> long
@@ -1155,6 +1226,10 @@ AiDotNet.Evolution.EvolutionResourceStageSnapshot.Spent.get -> System.Collection
 AiDotNet.Evolution.EvolutionResourceStageSnapshot.Stage.get -> AiDotNet.Evolution.EvolutionResourceStage
 AiDotNet.Evolution.EvolutionResourceStageSnapshot.Unknown.get -> long
 AiDotNet.Evolution.EvolutionResourceWork
+AiDotNet.Evolution.EvolutionResources
+AiDotNet.Evolution.EvolutionResources.Amounts.get -> System.Collections.Generic.IReadOnlyDictionary<string!, decimal>!
+AiDotNet.Evolution.EvolutionResources.EvolutionResources(System.Collections.Generic.IEnumerable<System.Collections.Generic.KeyValuePair<string!, decimal>>! amounts) -> void
+AiDotNet.Evolution.EvolutionResources.this[string! name].get -> decimal
 AiDotNet.Evolution.EvolutionRetryStatuses
 AiDotNet.Evolution.EvolutionRetryStatuses.All = AiDotNet.Evolution.EvolutionRetryStatuses.Failed | AiDotNet.Evolution.EvolutionRetryStatuses.TimedOut | AiDotNet.Evolution.EvolutionRetryStatuses.Canceled -> AiDotNet.Evolution.EvolutionRetryStatuses
 AiDotNet.Evolution.EvolutionRetryStatuses.Canceled = 4 -> AiDotNet.Evolution.EvolutionRetryStatuses
@@ -1190,8 +1265,8 @@ AiDotNet.Evolution.EvolutionRunResult<TGenome>.EarlyStopping.get -> AiDotNet.Evo
 AiDotNet.Evolution.EvolutionRunResult<TGenome>.EvolutionRunResult(AiDotNet.Evolution.EvolutionStopReason stopReason, System.Collections.Generic.IReadOnlyList<AiDotNet.Evolution.IEvolutionArchiveView<TGenome>!>! islands, AiDotNet.Evolution.EvolutionRunCounters! counters, string! stateHash, System.Collections.Generic.IReadOnlyList<AiDotNet.Evolution.EvolutionEliteRecord<TGenome>!>? globalElites = null, System.Collections.Generic.IReadOnlyList<AiDotNet.Evolution.EvolutionIslandStatus!>? islandStatuses = null, System.Collections.Generic.IReadOnlyList<AiDotNet.Evolution.EvolutionDiagnostic!>? retainedFailures = null, System.Collections.Generic.IReadOnlyDictionary<string!, System.Collections.Generic.IReadOnlyList<AiDotNet.Evolution.EvolutionArtifact!>!>? pendingArtifacts = null, AiDotNet.Evolution.EvolutionEarlyStoppingReport? earlyStopping = null) -> void
 AiDotNet.Evolution.EvolutionRunResult<TGenome>.GlobalElites.get -> System.Collections.Generic.IReadOnlyList<AiDotNet.Evolution.EvolutionEliteRecord<TGenome>!>!
 AiDotNet.Evolution.EvolutionRunResult<TGenome>.InfeasibleExploration.get -> System.Collections.Generic.IReadOnlyList<AiDotNet.Evolution.EvolutionInfeasibleEntry<TGenome>!>?
-AiDotNet.Evolution.EvolutionRunResult<TGenome>.Islands.get -> System.Collections.Generic.IReadOnlyList<AiDotNet.Evolution.IEvolutionArchiveView<TGenome>!>!
 AiDotNet.Evolution.EvolutionRunResult<TGenome>.IslandStatuses.get -> System.Collections.Generic.IReadOnlyList<AiDotNet.Evolution.EvolutionIslandStatus!>!
+AiDotNet.Evolution.EvolutionRunResult<TGenome>.Islands.get -> System.Collections.Generic.IReadOnlyList<AiDotNet.Evolution.IEvolutionArchiveView<TGenome>!>!
 AiDotNet.Evolution.EvolutionRunResult<TGenome>.ParetoFront.get -> AiDotNet.Evolution.EvolutionParetoFront<TGenome>?
 AiDotNet.Evolution.EvolutionRunResult<TGenome>.PendingArtifacts.get -> System.Collections.Generic.IReadOnlyDictionary<string!, System.Collections.Generic.IReadOnlyList<AiDotNet.Evolution.EvolutionArtifact!>!>!
 AiDotNet.Evolution.EvolutionRunResult<TGenome>.RetainedFailures.get -> System.Collections.Generic.IReadOnlyList<AiDotNet.Evolution.EvolutionDiagnostic!>!
@@ -1460,6 +1535,7 @@ AiDotNet.Evolution.EvolutionTraceSummary.WorstQualityDelta.get -> double?
 AiDotNet.Evolution.EvolutionTraceSummary.WorstQualityDelta.init -> void
 AiDotNet.Evolution.EvolutionVariationContext<TGenome>
 AiDotNet.Evolution.EvolutionVariationContext<TGenome>.Archive.get -> AiDotNet.Evolution.IEvolutionArchiveView<TGenome>?
+AiDotNet.Evolution.EvolutionVariationContext<TGenome>.CommittedBefore.get -> long?
 AiDotNet.Evolution.EvolutionVariationContext<TGenome>.EvaluationId.get -> long?
 AiDotNet.Evolution.EvolutionVariationContext<TGenome>.EvolutionVariationContext(AiDotNet.Evolution.EvolutionArchiveEntry<TGenome>! parent, System.Collections.Generic.IReadOnlyList<AiDotNet.Evolution.EvolutionArchiveEntry<TGenome>!>! inspirations, AiDotNet.Evolution.StableRandom! random, long generation, int island, System.Collections.Generic.IReadOnlyList<AiDotNet.Evolution.EvolutionArtifact!>? parentArtifacts = null, AiDotNet.Evolution.IEvolutionArchiveView<TGenome>? archive = null) -> void
 AiDotNet.Evolution.EvolutionVariationContext<TGenome>.Generation.get -> long
@@ -1469,6 +1545,16 @@ AiDotNet.Evolution.EvolutionVariationContext<TGenome>.Parent.get -> AiDotNet.Evo
 AiDotNet.Evolution.EvolutionVariationContext<TGenome>.ParentArtifacts.get -> System.Collections.Generic.IReadOnlyList<AiDotNet.Evolution.EvolutionArtifact!>!
 AiDotNet.Evolution.EvolutionVariationContext<TGenome>.ProposalIdentity.get -> string?
 AiDotNet.Evolution.EvolutionVariationContext<TGenome>.Random.get -> AiDotNet.Evolution.StableRandom!
+AiDotNet.Evolution.EvolutionWeightedModelEnsemble<TGenome>
+AiDotNet.Evolution.EvolutionWeightedModelEnsemble<TGenome>.Accounts.get -> System.Collections.Generic.IReadOnlyList<AiDotNet.Evolution.EvolutionModelAccount!>!
+AiDotNet.Evolution.EvolutionWeightedModelEnsemble<TGenome>.CaptureState() -> string!
+AiDotNet.Evolution.EvolutionWeightedModelEnsemble<TGenome>.EvolutionWeightedModelEnsemble(string! id, System.Collections.Generic.IReadOnlyList<AiDotNet.Evolution.EvolutionModelWeight<TGenome>!>! models) -> void
+AiDotNet.Evolution.EvolutionWeightedModelEnsemble<TGenome>.Id.get -> string!
+AiDotNet.Evolution.EvolutionWeightedModelEnsemble<TGenome>.Observe(AiDotNet.Evolution.EvolutionEvaluation! evaluation, AiDotNet.Evolution.EvolutionArchiveInsertionResult? insertionResult) -> void
+AiDotNet.Evolution.EvolutionWeightedModelEnsemble<TGenome>.ProposeAsync(AiDotNet.Evolution.EvolutionVariationContext<TGenome>! context, System.Threading.CancellationToken cancellationToken = default(System.Threading.CancellationToken)) -> System.Threading.Tasks.ValueTask<AiDotNet.Evolution.EvolutionResourceResult<TGenome>!>
+AiDotNet.Evolution.EvolutionWeightedModelEnsemble<TGenome>.RestoreState(string! state) -> void
+AiDotNet.Evolution.EvolutionWeightedModelEnsemble<TGenome>.TryGetDraw(long generation, out AiDotNet.Evolution.EvolutionModelDraw? draw) -> bool
+AiDotNet.Evolution.EvolutionWeightedModelEnsemble<TGenome>.VersionHash.get -> string!
 AiDotNet.Evolution.EvolutionWorkCommitDisposition
 AiDotNet.Evolution.EvolutionWorkCommitDisposition.Accepted = 0 -> AiDotNet.Evolution.EvolutionWorkCommitDisposition
 AiDotNet.Evolution.EvolutionWorkCommitDisposition.BudgetViolation = 5 -> AiDotNet.Evolution.EvolutionWorkCommitDisposition
@@ -1482,15 +1568,8 @@ AiDotNet.Evolution.EvolutionWorkCoordinatorOptions.LeaseDuration.get -> System.T
 AiDotNet.Evolution.EvolutionWorkCoordinatorOptions.MaximumDeliveriesPerWork.get -> int
 AiDotNet.Evolution.EvolutionWorkCoordinatorOptions.MaximumPayloadBytes.get -> int
 AiDotNet.Evolution.EvolutionWorkCoordinatorOptions.MaximumStateBytes.get -> int
-AiDotNet.Evolution.EvolutionWorkCoordinatorOptions.MaximumWorkers.get -> int
 AiDotNet.Evolution.EvolutionWorkCoordinatorOptions.MaximumWorkItems.get -> int
-AiDotNet.Evolution.EvolutionWorkerProfile
-AiDotNet.Evolution.EvolutionWorkerProfile.Capacity.get -> AiDotNet.Evolution.EvolutionResources!
-AiDotNet.Evolution.EvolutionWorkerProfile.CompatibilityHash.get -> string!
-AiDotNet.Evolution.EvolutionWorkerProfile.EvolutionWorkerProfile(string! workerId, string! compatibilityHash, System.Collections.Generic.IEnumerable<string!>? tags = null, AiDotNet.Evolution.EvolutionResources? capacity = null, int maximumConcurrentWork = 1) -> void
-AiDotNet.Evolution.EvolutionWorkerProfile.MaximumConcurrentWork.get -> int
-AiDotNet.Evolution.EvolutionWorkerProfile.Tags.get -> System.Collections.Generic.IReadOnlyList<string!>!
-AiDotNet.Evolution.EvolutionWorkerProfile.WorkerId.get -> string!
+AiDotNet.Evolution.EvolutionWorkCoordinatorOptions.MaximumWorkers.get -> int
 AiDotNet.Evolution.EvolutionWorkHeartbeat
 AiDotNet.Evolution.EvolutionWorkHeartbeat.Canceled = 2 -> AiDotNet.Evolution.EvolutionWorkHeartbeat
 AiDotNet.Evolution.EvolutionWorkHeartbeat.Completed = 3 -> AiDotNet.Evolution.EvolutionWorkHeartbeat
@@ -1517,10 +1596,54 @@ AiDotNet.Evolution.EvolutionWorkProtocol.EvolutionWorkProtocol(AiDotNet.Evolutio
 AiDotNet.Evolution.EvolutionWorkProtocol.EvolutionWorkProtocol(System.Func<System.DateTimeOffset>? utcNow) -> void
 AiDotNet.Evolution.EvolutionWorkProtocol.IsClosed.get -> bool
 AiDotNet.Evolution.EvolutionWorkProtocol.ProcessJson(string! requestJson) -> string!
+AiDotNet.Evolution.EvolutionWorkRemoteClient
+AiDotNet.Evolution.EvolutionWorkRemoteClient.Dispose() -> void
+AiDotNet.Evolution.EvolutionWorkRemoteClient.SendAsync(string! requestJson, System.Threading.CancellationToken cancellationToken = default(System.Threading.CancellationToken)) -> System.Threading.Tasks.Task<string!>!
 AiDotNet.Evolution.EvolutionWorkRequirements
 AiDotNet.Evolution.EvolutionWorkRequirements.EvolutionWorkRequirements(System.Collections.Generic.IEnumerable<string!>? tags = null, AiDotNet.Evolution.EvolutionResources? minimumResources = null) -> void
 AiDotNet.Evolution.EvolutionWorkRequirements.MinimumResources.get -> AiDotNet.Evolution.EvolutionResources!
 AiDotNet.Evolution.EvolutionWorkRequirements.Tags.get -> System.Collections.Generic.IReadOnlyList<string!>!
+AiDotNet.Evolution.EvolutionWorkServer
+AiDotNet.Evolution.EvolutionWorkServer.CertificateFingerprint.get -> string!
+AiDotNet.Evolution.EvolutionWorkServer.Dispose() -> void
+AiDotNet.Evolution.EvolutionWorkServer.EvolutionWorkServer(AiDotNet.Evolution.DurableEvolutionWorkCoordinator! coordinator, System.Security.Cryptography.X509Certificates.X509Certificate2! certificate, string! workerToken, AiDotNet.Evolution.EvolutionWorkServerOptions? options = null) -> void
+AiDotNet.Evolution.EvolutionWorkServer.LocalEndPoint.get -> System.Net.IPEndPoint!
+AiDotNet.Evolution.EvolutionWorkServer.Start() -> void
+AiDotNet.Evolution.EvolutionWorkServerEvent
+AiDotNet.Evolution.EvolutionWorkServerEvent.EvolutionWorkServerEvent(AiDotNet.Evolution.EvolutionWorkServerEventKind kind, string! remoteEndPoint, System.Exception? exception = null) -> void
+AiDotNet.Evolution.EvolutionWorkServerEvent.Exception.get -> System.Exception?
+AiDotNet.Evolution.EvolutionWorkServerEvent.Kind.get -> AiDotNet.Evolution.EvolutionWorkServerEventKind
+AiDotNet.Evolution.EvolutionWorkServerEvent.RemoteEndPoint.get -> string!
+AiDotNet.Evolution.EvolutionWorkServerEventKind
+AiDotNet.Evolution.EvolutionWorkServerEventKind.Accepted = 1 -> AiDotNet.Evolution.EvolutionWorkServerEventKind
+AiDotNet.Evolution.EvolutionWorkServerEventKind.Authenticated = 2 -> AiDotNet.Evolution.EvolutionWorkServerEventKind
+AiDotNet.Evolution.EvolutionWorkServerEventKind.AuthenticationRefused = 3 -> AiDotNet.Evolution.EvolutionWorkServerEventKind
+AiDotNet.Evolution.EvolutionWorkServerEventKind.Closed = 7 -> AiDotNet.Evolution.EvolutionWorkServerEventKind
+AiDotNet.Evolution.EvolutionWorkServerEventKind.ConnectionLimitReached = 5 -> AiDotNet.Evolution.EvolutionWorkServerEventKind
+AiDotNet.Evolution.EvolutionWorkServerEventKind.Faulted = 6 -> AiDotNet.Evolution.EvolutionWorkServerEventKind
+AiDotNet.Evolution.EvolutionWorkServerEventKind.Listening = 0 -> AiDotNet.Evolution.EvolutionWorkServerEventKind
+AiDotNet.Evolution.EvolutionWorkServerEventKind.OperationRefused = 4 -> AiDotNet.Evolution.EvolutionWorkServerEventKind
+AiDotNet.Evolution.EvolutionWorkServerOptions
+AiDotNet.Evolution.EvolutionWorkServerOptions.BindAddress.get -> string!
+AiDotNet.Evolution.EvolutionWorkServerOptions.BindAddress.set -> void
+AiDotNet.Evolution.EvolutionWorkServerOptions.EvolutionWorkServerOptions() -> void
+AiDotNet.Evolution.EvolutionWorkServerOptions.HandshakeTimeout.get -> System.TimeSpan
+AiDotNet.Evolution.EvolutionWorkServerOptions.HandshakeTimeout.set -> void
+AiDotNet.Evolution.EvolutionWorkServerOptions.IdleTimeout.get -> System.TimeSpan
+AiDotNet.Evolution.EvolutionWorkServerOptions.IdleTimeout.set -> void
+AiDotNet.Evolution.EvolutionWorkServerOptions.MaximumConnections.get -> int
+AiDotNet.Evolution.EvolutionWorkServerOptions.MaximumConnections.set -> void
+AiDotNet.Evolution.EvolutionWorkServerOptions.OnEvent.get -> System.Action<AiDotNet.Evolution.EvolutionWorkServerEvent!>?
+AiDotNet.Evolution.EvolutionWorkServerOptions.OnEvent.set -> void
+AiDotNet.Evolution.EvolutionWorkServerOptions.Port.get -> int
+AiDotNet.Evolution.EvolutionWorkServerOptions.Port.set -> void
+AiDotNet.Evolution.EvolutionWorkerProfile
+AiDotNet.Evolution.EvolutionWorkerProfile.Capacity.get -> AiDotNet.Evolution.EvolutionResources!
+AiDotNet.Evolution.EvolutionWorkerProfile.CompatibilityHash.get -> string!
+AiDotNet.Evolution.EvolutionWorkerProfile.EvolutionWorkerProfile(string! workerId, string! compatibilityHash, System.Collections.Generic.IEnumerable<string!>? tags = null, AiDotNet.Evolution.EvolutionResources? capacity = null, int maximumConcurrentWork = 1) -> void
+AiDotNet.Evolution.EvolutionWorkerProfile.MaximumConcurrentWork.get -> int
+AiDotNet.Evolution.EvolutionWorkerProfile.Tags.get -> System.Collections.Generic.IReadOnlyList<string!>!
+AiDotNet.Evolution.EvolutionWorkerProfile.WorkerId.get -> string!
 AiDotNet.Evolution.ICandidateRefiner<TGenome>
 AiDotNet.Evolution.ICandidateRefiner<TGenome>.Id.get -> string!
 AiDotNet.Evolution.ICandidateRefiner<TGenome>.RefineAsync(TGenome genome, AiDotNet.Evolution.EvolutionRefinementContext! context, System.Threading.CancellationToken cancellationToken = default(System.Threading.CancellationToken)) -> System.Threading.Tasks.ValueTask<TGenome>
@@ -1562,6 +1685,12 @@ AiDotNet.Evolution.IEvolutionArchiveView<TGenome>.Direction.get -> AiDotNet.Evol
 AiDotNet.Evolution.IEvolutionArchiveView<TGenome>.Entries.get -> System.Collections.Generic.IReadOnlyList<AiDotNet.Evolution.EvolutionArchiveEntry<TGenome>!>!
 AiDotNet.Evolution.IEvolutionArchiveView<TGenome>.Get(AiDotNet.Evolution.EvolutionCellKey! cell) -> AiDotNet.Evolution.EvolutionArchiveEntry<TGenome>?
 AiDotNet.Evolution.IEvolutionArchiveView<TGenome>.Version.get -> long
+AiDotNet.Evolution.IEvolutionArtifactStore
+AiDotNet.Evolution.IEvolutionArtifactStore.Put(byte[]! content) -> string!
+AiDotNet.Evolution.IEvolutionArtifactStore.TryRead(string! reference, out byte[]! content) -> bool
+AiDotNet.Evolution.IEvolutionCheckpointSegmentStore
+AiDotNet.Evolution.IEvolutionCheckpointSegmentStore.OpenSegmentAsync(string! runId, long segmentId, System.Threading.CancellationToken cancellationToken = default(System.Threading.CancellationToken)) -> System.Threading.Tasks.Task<System.IO.Stream?>!
+AiDotNet.Evolution.IEvolutionCheckpointSegmentStore.WriteSegmentAsync(string! runId, long segmentId, System.Func<System.IO.Stream!, System.Threading.CancellationToken, System.Threading.Tasks.Task!>! write, System.Threading.CancellationToken cancellationToken = default(System.Threading.CancellationToken)) -> System.Threading.Tasks.Task!
 AiDotNet.Evolution.IEvolutionCheckpointStore
 AiDotNet.Evolution.IEvolutionCheckpointStore.LoadLatestAsync(string! runId, System.Threading.CancellationToken cancellationToken = default(System.Threading.CancellationToken)) -> System.Threading.Tasks.Task<AiDotNet.Evolution.EvolutionCheckpoint?>!
 AiDotNet.Evolution.IEvolutionCheckpointStore.SaveAsync(AiDotNet.Evolution.EvolutionCheckpoint! checkpoint, System.Threading.CancellationToken cancellationToken = default(System.Threading.CancellationToken)) -> System.Threading.Tasks.Task!
@@ -1576,6 +1705,8 @@ AiDotNet.Evolution.IEvolutionGenomeCodec<TGenome>.VersionHash.get -> string!
 AiDotNet.Evolution.IEvolutionIslandProposalScheduler
 AiDotNet.Evolution.IEvolutionIslandProposalScheduler.IslandCount.get -> int
 AiDotNet.Evolution.IEvolutionIslandProposalScheduler.SelectIsland(long evaluationId, AiDotNet.Evolution.StableRandom! random) -> int
+AiDotNet.Evolution.IEvolutionLatencyProfile
+AiDotNet.Evolution.IEvolutionLatencyProfile.IsLatencyBound.get -> bool
 AiDotNet.Evolution.IEvolutionObserver<TGenome>
 AiDotNet.Evolution.IEvolutionObserver<TGenome>.OnEventAsync(AiDotNet.Evolution.EvolutionEvent<TGenome>! evolutionEvent, System.Threading.CancellationToken cancellationToken = default(System.Threading.CancellationToken)) -> System.Threading.Tasks.ValueTask
 AiDotNet.Evolution.IEvolutionParetoArchiveView<TGenome>
@@ -1603,12 +1734,6 @@ AiDotNet.Evolution.IMigrationPolicy<TGenome>
 AiDotNet.Evolution.IMigrationPolicy<TGenome>.CreateMigrations(System.Collections.Generic.IReadOnlyList<AiDotNet.Evolution.IEvolutionArchiveView<TGenome>!>! islands, int migrantsPerIsland, AiDotNet.Evolution.StableRandom! random) -> System.Collections.Generic.IReadOnlyList<AiDotNet.Evolution.EvolutionMigration<TGenome>!>!
 AiDotNet.Evolution.IMigrationPolicy<TGenome>.Id.get -> string!
 AiDotNet.Evolution.IMigrationPolicy<TGenome>.VersionHash.get -> string!
-AiDotNet.Evolution.InMemoryEvolutionCheckpointStore
-AiDotNet.Evolution.InMemoryEvolutionCheckpointStore.Capacity.get -> int
-AiDotNet.Evolution.InMemoryEvolutionCheckpointStore.InMemoryEvolutionCheckpointStore(int capacity = 1024) -> void
-AiDotNet.Evolution.InMemoryEvolutionCheckpointStore.LoadLatestAsync(string! runId, System.Threading.CancellationToken cancellationToken = default(System.Threading.CancellationToken)) -> System.Threading.Tasks.Task<AiDotNet.Evolution.EvolutionCheckpoint?>!
-AiDotNet.Evolution.InMemoryEvolutionCheckpointStore.Remove(string! runId) -> bool
-AiDotNet.Evolution.InMemoryEvolutionCheckpointStore.SaveAsync(AiDotNet.Evolution.EvolutionCheckpoint! checkpoint, System.Threading.CancellationToken cancellationToken = default(System.Threading.CancellationToken)) -> System.Threading.Tasks.Task!
 AiDotNet.Evolution.IOutcomeAwareEvolutionSelectionPolicy<TGenome>
 AiDotNet.Evolution.IOutcomeAwareEvolutionSelectionPolicy<TGenome>.CaptureState() -> string!
 AiDotNet.Evolution.IOutcomeAwareEvolutionSelectionPolicy<TGenome>.Observe(AiDotNet.Evolution.EvolutionEvaluation! evaluation, AiDotNet.Evolution.EvolutionArchiveInsertionResult? insertionResult) -> void
@@ -1623,6 +1748,14 @@ AiDotNet.Evolution.IVariationOperator<TGenome>
 AiDotNet.Evolution.IVariationOperator<TGenome>.Id.get -> string!
 AiDotNet.Evolution.IVariationOperator<TGenome>.ProposeAsync(AiDotNet.Evolution.EvolutionVariationContext<TGenome>! context, System.Threading.CancellationToken cancellationToken = default(System.Threading.CancellationToken)) -> System.Threading.Tasks.ValueTask<TGenome>
 AiDotNet.Evolution.IVariationOperator<TGenome>.VersionHash.get -> string!
+AiDotNet.Evolution.InMemoryEvolutionCheckpointStore
+AiDotNet.Evolution.InMemoryEvolutionCheckpointStore.Capacity.get -> int
+AiDotNet.Evolution.InMemoryEvolutionCheckpointStore.InMemoryEvolutionCheckpointStore(int capacity = 1024) -> void
+AiDotNet.Evolution.InMemoryEvolutionCheckpointStore.LoadLatestAsync(string! runId, System.Threading.CancellationToken cancellationToken = default(System.Threading.CancellationToken)) -> System.Threading.Tasks.Task<AiDotNet.Evolution.EvolutionCheckpoint?>!
+AiDotNet.Evolution.InMemoryEvolutionCheckpointStore.OpenSegmentAsync(string! runId, long segmentId, System.Threading.CancellationToken cancellationToken = default(System.Threading.CancellationToken)) -> System.Threading.Tasks.Task<System.IO.Stream?>!
+AiDotNet.Evolution.InMemoryEvolutionCheckpointStore.Remove(string! runId) -> bool
+AiDotNet.Evolution.InMemoryEvolutionCheckpointStore.SaveAsync(AiDotNet.Evolution.EvolutionCheckpoint! checkpoint, System.Threading.CancellationToken cancellationToken = default(System.Threading.CancellationToken)) -> System.Threading.Tasks.Task!
+AiDotNet.Evolution.InMemoryEvolutionCheckpointStore.WriteSegmentAsync(string! runId, long segmentId, System.Func<System.IO.Stream!, System.Threading.CancellationToken, System.Threading.Tasks.Task!>! write, System.Threading.CancellationToken cancellationToken = default(System.Threading.CancellationToken)) -> System.Threading.Tasks.Task!
 AiDotNet.Evolution.JsonEvolutionCheckpointStore
 AiDotNet.Evolution.JsonEvolutionCheckpointStore.JsonEvolutionCheckpointStore(string! filePath, long maxCheckpointBytes = 67108864) -> void
 AiDotNet.Evolution.JsonEvolutionCheckpointStore.LoadLatestAsync(string! runId, System.Threading.CancellationToken cancellationToken = default(System.Threading.CancellationToken)) -> System.Threading.Tasks.Task<AiDotNet.Evolution.EvolutionCheckpoint?>!
@@ -1686,6 +1819,7 @@ AiDotNet.Evolution.ResourceMeteredEvolutionTask<TGenome>.EvaluateAsync(AiDotNet.
 AiDotNet.Evolution.ResourceMeteredEvolutionTask<TGenome>.EvaluateStageAsync(int stage, AiDotNet.Evolution.EvolutionCandidate<TGenome>! candidate, AiDotNet.Evolution.EvolutionEvaluationContext! context, System.Threading.CancellationToken cancellationToken = default(System.Threading.CancellationToken)) -> System.Threading.Tasks.ValueTask<AiDotNet.Evolution.EvolutionTaskResult!>
 AiDotNet.Evolution.ResourceMeteredEvolutionTask<TGenome>.EvaluatorVersionHash.get -> string!
 AiDotNet.Evolution.ResourceMeteredEvolutionTask<TGenome>.Id.get -> string!
+AiDotNet.Evolution.ResourceMeteredEvolutionTask<TGenome>.IsLatencyBound.get -> bool
 AiDotNet.Evolution.ResourceMeteredEvolutionTask<TGenome>.ResourceMeteredEvolutionTask(AiDotNet.Evolution.IEvolutionTask<TGenome>! inner, AiDotNet.Evolution.EvolutionResourceLedger! ledger, System.Collections.Generic.IEnumerable<decimal>! maximumStageCostUnits) -> void
 AiDotNet.Evolution.ResourceMeteredEvolutionTask<TGenome>.StageCount.get -> int
 AiDotNet.Evolution.ResourceMeteredEvolutionTask<TGenome>.VersionHash.get -> string!
@@ -1694,6 +1828,7 @@ AiDotNet.Evolution.ResourceMeteredVariationOperator<TGenome>.CaptureState() -> s
 AiDotNet.Evolution.ResourceMeteredVariationOperator<TGenome>.CostUnitVersionHash.get -> string!
 AiDotNet.Evolution.ResourceMeteredVariationOperator<TGenome>.GetProposalCost(long generation) -> AiDotNet.Evolution.EvolutionProposalCost!
 AiDotNet.Evolution.ResourceMeteredVariationOperator<TGenome>.Id.get -> string!
+AiDotNet.Evolution.ResourceMeteredVariationOperator<TGenome>.IsLatencyBound.get -> bool
 AiDotNet.Evolution.ResourceMeteredVariationOperator<TGenome>.Observe(AiDotNet.Evolution.EvolutionEvaluation! evaluation, AiDotNet.Evolution.EvolutionArchiveInsertionResult? insertionResult) -> void
 AiDotNet.Evolution.ResourceMeteredVariationOperator<TGenome>.ProposeAsync(AiDotNet.Evolution.EvolutionVariationContext<TGenome>! context, System.Threading.CancellationToken cancellationToken = default(System.Threading.CancellationToken)) -> System.Threading.Tasks.ValueTask<TGenome>
 AiDotNet.Evolution.ResourceMeteredVariationOperator<TGenome>.ResourceMeteredVariationOperator(AiDotNet.Evolution.ICostedEvolutionProposalSource<TGenome>! source, AiDotNet.Evolution.EvolutionResourceLedger! ledger, AiDotNet.Evolution.EvolutionResources! maximumProposalResources, string! costUnitVersionHash) -> void
@@ -1752,125 +1887,6 @@ AiDotNet.Evolution.UniformEvolutionSelectionPolicy<TGenome>.Id.get -> string!
 AiDotNet.Evolution.UniformEvolutionSelectionPolicy<TGenome>.Select(AiDotNet.Evolution.IEvolutionArchive<TGenome>! archive, AiDotNet.Evolution.StableRandom! random, int inspirationCount) -> AiDotNet.Evolution.EvolutionSelection<TGenome>?
 AiDotNet.Evolution.UniformEvolutionSelectionPolicy<TGenome>.UniformEvolutionSelectionPolicy() -> void
 AiDotNet.Evolution.UniformEvolutionSelectionPolicy<TGenome>.VersionHash.get -> string!
-const AiDotNet.Evolution.DirectoryEvolutionCheckpointStore.FileNameExtension = ".json" -> string!
-const AiDotNet.Evolution.DirectoryEvolutionCheckpointStore.FileNamePrefix = "checkpoint-" -> string!
-const AiDotNet.Evolution.EvolutionArtifact.MaximumKeyLength = 128 -> int
-const AiDotNet.Evolution.EvolutionArtifact.MaximumTextLength = 1048576 -> int
-const AiDotNet.Evolution.EvolutionCheckpoint.CurrentSchemaVersion = 1 -> int
-const AiDotNet.Evolution.EvolutionCollectionLimits.MaximumArchiveDimensions = 64 -> int
-const AiDotNet.Evolution.EvolutionCollectionLimits.MaximumArtifactBytes = 4194304 -> int
-const AiDotNet.Evolution.EvolutionCollectionLimits.MaximumArtifactBytesPerEvaluation = 16777216 -> int
-const AiDotNet.Evolution.EvolutionCollectionLimits.MaximumCascadeStages = 256 -> int
-const AiDotNet.Evolution.EvolutionCollectionLimits.MaximumCheckpointBytes = 268435456 -> long
-const AiDotNet.Evolution.EvolutionCollectionLimits.MaximumCheckpointFiles = 4096 -> int
-const AiDotNet.Evolution.EvolutionCollectionLimits.MaximumHashCharacters = 16777216 -> int
-const AiDotNet.Evolution.EvolutionCollectionLimits.MaximumHashComponents = 4096 -> int
-const AiDotNet.Evolution.EvolutionCollectionLimits.MaximumIslands = 1024 -> int
-const AiDotNet.Evolution.EvolutionCollectionLimits.MaximumLineageIdentities = 256 -> int
-const AiDotNet.Evolution.EvolutionCollectionLimits.MaximumMigrationTransfers = 65536 -> int
-const AiDotNet.Evolution.EvolutionCollectionLimits.MaximumParentQualityCacheEntries = 1000000 -> int
-const AiDotNet.Evolution.EvolutionCollectionLimits.MaximumPendingArtifactBytes = 268435456 -> long
-const AiDotNet.Evolution.EvolutionCollectionLimits.MaximumResultEntries = 1000000 -> int
-const AiDotNet.Evolution.EvolutionCollectionLimits.MaximumResultIslands = 1024 -> int
-const AiDotNet.Evolution.EvolutionCollectionLimits.MaximumTraceBytes = 1073741824 -> long
-const AiDotNet.Evolution.EvolutionCollectionLimits.MaximumTraceRecords = 1000000 -> int
-const AiDotNet.Evolution.EvolutionDiagnostic.MaximumDataEntries = 16 -> int
-const AiDotNet.Evolution.EvolutionDiagnostic.MaximumDataKeyLength = 64 -> int
-const AiDotNet.Evolution.EvolutionDiagnostic.MaximumDataValueLength = 256 -> int
-const AiDotNet.Evolution.EvolutionEvaluationCacheRecord.MaximumJsonBytes = 4194304 -> int
-const AiDotNet.Evolution.EvolutionMeasurementOrigin.MaximumJsonBytes = 524288 -> int
-const AiDotNet.Evolution.EvolutionMeasurementOrigin.MaximumSampleIds = 256 -> int
-const AiDotNet.Evolution.EvolutionOutputLayout.CheckpointsFolderName = "checkpoints" -> string!
-const AiDotNet.Evolution.EvolutionOutputLayout.TracesFolderName = "traces" -> string!
-const AiDotNet.Evolution.EvolutionPersistentEvaluationCache.StoreInvocationResource = "cache_store_invocations" -> string!
-const AiDotNet.Evolution.EvolutionRepertoire.MaximumEntries = 256 -> int
-const AiDotNet.Evolution.EvolutionRepertoire.MaximumJsonBytes = 8388608 -> int
-const AiDotNet.Evolution.EvolutionRepertoire.MaximumPayloadBytes = 65536 -> int
-const AiDotNet.Evolution.EvolutionRepertoire.MaximumTotalPayloadBytes = 2097152 -> int
-const AiDotNet.Evolution.EvolutionResources.MaximumAmount = 1000000000000000000 -> decimal
-const AiDotNet.Evolution.EvolutionSession<TGenome>.MaxBatchSize = 4096 -> int
-const AiDotNet.Evolution.EvolutionSession<TGenome>.MaxSeeds = 100000 -> int
-const AiDotNet.Evolution.EvolutionTaskResult.MaximumArtifacts = 64 -> int
-const AiDotNet.Evolution.EvolutionTaskResult.MaximumDiagnostics = 64 -> int
-const AiDotNet.Evolution.EvolutionTaskResult.MaximumNamedValues = 256 -> int
-const AiDotNet.Evolution.EvolutionTaskResult.MaximumVectorValues = 256 -> int
-const AiDotNet.Evolution.EvolutionTraceOptions.MaximumFlushEveryRecords = 100000 -> int
-const AiDotNet.Evolution.EvolutionTraceOptions.MaximumTrackedMetricCount = 4096 -> int
-const AiDotNet.Evolution.EvolutionTraceRecord.CurrentSchemaVersion = 1 -> int
-const AiDotNet.Evolution.EvolutionTraceRecord.MeasurementOriginSchemaVersion = 2 -> int
-const AiDotNet.Evolution.EvolutionTraceSummary.CurrentSchemaVersion = 1 -> int
-const AiDotNet.Evolution.EvolutionWorkProtocol.MaximumFrameBytes = 16777216 -> int
-const AiDotNet.Evolution.EvolutionWorkProtocol.Version = 1 -> int
-const AiDotNet.Evolution.StableRandom.AlgorithmId = "pcg-xsh-rr-32-v1" -> string!
-override AiDotNet.Evolution.EvolutionCellKey.Equals(object? obj) -> bool
-override AiDotNet.Evolution.EvolutionCellKey.GetHashCode() -> int
-override AiDotNet.Evolution.EvolutionCellKey.ToString() -> string!
-override AiDotNet.Evolution.EvolutionParameterValue.Equals(object? obj) -> bool
-override AiDotNet.Evolution.EvolutionParameterValue.GetHashCode() -> int
-override AiDotNet.Evolution.EvolutionParameterValue.ToString() -> string!
-override AiDotNet.Evolution.StableRandomState.Equals(object? obj) -> bool
-override AiDotNet.Evolution.StableRandomState.GetHashCode() -> int
-static AiDotNet.Evolution.DirectoryEvolutionCheckpointStore.FileNameFor(long sequence) -> string!
-static AiDotNet.Evolution.DirectoryEvolutionCheckpointStore.ForOutputDirectory(string! outputDirectory, string! runId, AiDotNet.Evolution.EvolutionCheckpointRetentionOptions? retention = null, long maxCheckpointBytes = 67108864) -> AiDotNet.Evolution.DirectoryEvolutionCheckpointStore!
-static AiDotNet.Evolution.EvolutionArchiveQuery.BestBy<TGenome>(this AiDotNet.Evolution.EvolutionRunResult<TGenome>! result, string! metric) -> AiDotNet.Evolution.EvolutionArchiveEntry<TGenome>?
-static AiDotNet.Evolution.EvolutionArchiveQuery.BestBy<TGenome>(this AiDotNet.Evolution.EvolutionRunResult<TGenome>! result, string! metric, AiDotNet.Evolution.EvolutionOptimizationDirection? direction) -> AiDotNet.Evolution.EvolutionArchiveEntry<TGenome>?
-static AiDotNet.Evolution.EvolutionArchiveQuery.BestBy<TGenome>(this AiDotNet.Evolution.IEvolutionArchiveView<TGenome>! archive, string! metric) -> AiDotNet.Evolution.EvolutionArchiveEntry<TGenome>?
-static AiDotNet.Evolution.EvolutionArchiveQuery.BestBy<TGenome>(this AiDotNet.Evolution.IEvolutionArchiveView<TGenome>! archive, string! metric, AiDotNet.Evolution.EvolutionOptimizationDirection? direction) -> AiDotNet.Evolution.EvolutionArchiveEntry<TGenome>?
-static AiDotNet.Evolution.EvolutionArchiveQuery.MetricNames<TGenome>(this AiDotNet.Evolution.EvolutionRunResult<TGenome>! result) -> System.Collections.Generic.IReadOnlyList<string!>!
-static AiDotNet.Evolution.EvolutionArchiveQuery.MetricNames<TGenome>(this AiDotNet.Evolution.IEvolutionArchiveView<TGenome>! archive) -> System.Collections.Generic.IReadOnlyList<string!>!
-static AiDotNet.Evolution.EvolutionArchiveQuery.TopBy<TGenome>(this AiDotNet.Evolution.EvolutionRunResult<TGenome>! result, string! metric, int count) -> System.Collections.Generic.IReadOnlyList<AiDotNet.Evolution.EvolutionArchiveEntry<TGenome>!>!
-static AiDotNet.Evolution.EvolutionArchiveQuery.TopBy<TGenome>(this AiDotNet.Evolution.EvolutionRunResult<TGenome>! result, string! metric, int count, AiDotNet.Evolution.EvolutionOptimizationDirection? direction) -> System.Collections.Generic.IReadOnlyList<AiDotNet.Evolution.EvolutionArchiveEntry<TGenome>!>!
-static AiDotNet.Evolution.EvolutionArchiveQuery.TopBy<TGenome>(this AiDotNet.Evolution.IEvolutionArchiveView<TGenome>! archive, string! metric, int count) -> System.Collections.Generic.IReadOnlyList<AiDotNet.Evolution.EvolutionArchiveEntry<TGenome>!>!
-static AiDotNet.Evolution.EvolutionArchiveQuery.TopBy<TGenome>(this AiDotNet.Evolution.IEvolutionArchiveView<TGenome>! archive, string! metric, int count, AiDotNet.Evolution.EvolutionOptimizationDirection? direction) -> System.Collections.Generic.IReadOnlyList<AiDotNet.Evolution.EvolutionArchiveEntry<TGenome>!>!
-static AiDotNet.Evolution.EvolutionArchiveQuery.WithMetric<TGenome>(this AiDotNet.Evolution.IEvolutionArchiveView<TGenome>! archive, string! metric) -> System.Collections.Generic.IReadOnlyList<AiDotNet.Evolution.EvolutionArchiveEntry<TGenome>!>!
-static AiDotNet.Evolution.EvolutionArtifactSanitizer.Sanitize(string! text) -> string!
-static AiDotNet.Evolution.EvolutionArtifactSanitizer.WouldRedact(string! text) -> bool
-static AiDotNet.Evolution.EvolutionCostedPortfolio.Create<TGenome>(System.Collections.Generic.IEnumerable<AiDotNet.Evolution.EvolutionCostedPortfolioArm<TGenome>!>! arms, AiDotNet.Evolution.EvolutionResourceLedger! ledger, AiDotNet.Evolution.EvolutionOperatorRewardPolicy! rewardPolicy, double explorationProbability = 0.1) -> AiDotNet.Evolution.AdaptiveVariationPortfolio<TGenome>!
-static AiDotNet.Evolution.EvolutionDescriptorCalibration.CalibrateAsync<TGenome>(AiDotNet.Evolution.IEvolutionTask<TGenome>! task, System.Collections.Generic.IReadOnlyList<TGenome>! seeds, System.Collections.Generic.IReadOnlyList<string!>? names = null, AiDotNet.Evolution.EvolutionDescriptorCalibrationOptions? options = null, ulong seed = 0, System.Threading.CancellationToken cancellationToken = default(System.Threading.CancellationToken)) -> System.Threading.Tasks.Task<System.Collections.Generic.IReadOnlyList<AiDotNet.Evolution.EvolutionDescriptorDefinition!>!>!
-static AiDotNet.Evolution.EvolutionDescriptorCalibration.FromObservations(System.Collections.Generic.IReadOnlyList<System.Collections.Generic.IReadOnlyDictionary<string!, double>!>! observations, System.Collections.Generic.IReadOnlyList<string!>? names = null, AiDotNet.Evolution.EvolutionDescriptorCalibrationOptions? options = null) -> System.Collections.Generic.IReadOnlyList<AiDotNet.Evolution.EvolutionDescriptorDefinition!>!
-static AiDotNet.Evolution.EvolutionDurableEvaluationPayload.FromJson(string! json) -> AiDotNet.Evolution.EvolutionDurableEvaluationPayload!
-static AiDotNet.Evolution.EvolutionEngine<TGenome>.ReadCheckpoint(AiDotNet.Evolution.EvolutionCheckpoint! checkpoint, AiDotNet.Evolution.IEvolutionGenomeCodec<TGenome>! genomeCodec) -> AiDotNet.Evolution.EvolutionCheckpointContents<TGenome>!
-static AiDotNet.Evolution.EvolutionEngineOptions.CreateOpenEvolveDefaults() -> AiDotNet.Evolution.EvolutionEngineOptions!
-static AiDotNet.Evolution.EvolutionEvaluationCacheKey.CreateAsync<TGenome>(AiDotNet.Evolution.EvolutionCanonicalGenome<TGenome>! candidate, AiDotNet.Evolution.IEvolutionTask<TGenome>! task, AiDotNet.Evolution.IEvolutionGenomeCodec<TGenome>! codec, AiDotNet.Evolution.EvolutionReuseScope! scope, string! measurementVersion, System.Threading.CancellationToken cancellationToken = default(System.Threading.CancellationToken)) -> System.Threading.Tasks.ValueTask<AiDotNet.Evolution.EvolutionEvaluationCacheKey!>
-static AiDotNet.Evolution.EvolutionEvaluationCacheRecord.FromJson(string! json) -> AiDotNet.Evolution.EvolutionEvaluationCacheRecord!
-static AiDotNet.Evolution.EvolutionFidelityCheckpoint.Parse(string! json) -> AiDotNet.Evolution.EvolutionFidelityCheckpoint!
-static AiDotNet.Evolution.EvolutionHash.Combine(System.Collections.Generic.IEnumerable<string!>! values) -> string!
-static AiDotNet.Evolution.EvolutionHash.Compute(string! value) -> string!
-static AiDotNet.Evolution.EvolutionHash.EncodeDouble(double value) -> string!
-static AiDotNet.Evolution.EvolutionMeasurementOrigin.FromJson(string! json) -> AiDotNet.Evolution.EvolutionMeasurementOrigin!
-static AiDotNet.Evolution.EvolutionOutputLayout.CreateStem(string! runId) -> string!
-static AiDotNet.Evolution.EvolutionOutputLayout.SummaryPathFor(string! tracePath) -> string!
-static AiDotNet.Evolution.EvolutionParameter.Categorical(string! name, System.Collections.Generic.IEnumerable<string!>! choices) -> AiDotNet.Evolution.EvolutionParameter!
-static AiDotNet.Evolution.EvolutionParameter.Enum<TEnum>(string! name) -> AiDotNet.Evolution.EvolutionParameter!
-static AiDotNet.Evolution.EvolutionParameter.Integer(string! name, int minimum, int maximum) -> AiDotNet.Evolution.EvolutionParameter!
-static AiDotNet.Evolution.EvolutionParameter.Logarithmic(string! name, double minimum, double maximum) -> AiDotNet.Evolution.EvolutionParameter!
-static AiDotNet.Evolution.EvolutionParameter.Real(string! name, double minimum, double maximum) -> AiDotNet.Evolution.EvolutionParameter!
-static AiDotNet.Evolution.EvolutionParameterValue.Categorical(string! value) -> AiDotNet.Evolution.EvolutionParameterValue!
-static AiDotNet.Evolution.EvolutionParameterValue.Numeric(double value) -> AiDotNet.Evolution.EvolutionParameterValue!
-static AiDotNet.Evolution.EvolutionRepertoire.ExportAsync<TGenome>(System.Collections.Generic.IEnumerable<TGenome>! genomes, AiDotNet.Evolution.IEvolutionTask<TGenome>! task, AiDotNet.Evolution.IEvolutionGenomeCodec<TGenome>! codec, AiDotNet.Evolution.EvolutionReuseScope! scope, AiDotNet.Evolution.EvolutionRepertoireProvenance! provenance, System.Threading.CancellationToken cancellationToken = default(System.Threading.CancellationToken)) -> System.Threading.Tasks.Task<AiDotNet.Evolution.EvolutionRepertoire!>!
-static AiDotNet.Evolution.EvolutionRepertoire.FromJson(string! json) -> AiDotNet.Evolution.EvolutionRepertoire!
-static AiDotNet.Evolution.EvolutionResourceBoundary.Capture(AiDotNet.Evolution.EvolutionResourceLedger! ledger, System.Func<string!>! captureEngine) -> AiDotNet.Evolution.EvolutionResourceBoundary!
-static AiDotNet.Evolution.EvolutionResourceBoundary.Deserialize(string! json, string! expectedChecksum) -> AiDotNet.Evolution.EvolutionResourceBoundary!
-static AiDotNet.Evolution.EvolutionResources.Empty.get -> AiDotNet.Evolution.EvolutionResources!
-static AiDotNet.Evolution.EvolutionResources.Of(string! name, decimal amount) -> AiDotNet.Evolution.EvolutionResources!
-static AiDotNet.Evolution.EvolutionResourceWork.RunAsync<T>(AiDotNet.Evolution.EvolutionResourceLedger! ledger, string! operationId, AiDotNet.Evolution.EvolutionResourceStage stage, AiDotNet.Evolution.EvolutionResources! estimated, AiDotNet.Evolution.EvolutionResources! maximum, System.Func<System.Threading.CancellationToken, System.Threading.Tasks.ValueTask<AiDotNet.Evolution.EvolutionResourceResult<T>!>>! work, int attempt = 1, System.Threading.CancellationToken cancellationToken = default(System.Threading.CancellationToken)) -> System.Threading.Tasks.ValueTask<T>
-static AiDotNet.Evolution.EvolutionSearchPresets.Create(AiDotNet.Evolution.EvolutionSearchSpace! space, AiDotNet.Evolution.EvolutionSearchPreset preset = AiDotNet.Evolution.EvolutionSearchPreset.Mutation, AiDotNet.Evolution.EvolutionOptimizationDirection? direction = null) -> AiDotNet.Evolution.IVariationOperator<AiDotNet.Evolution.EvolutionSearchGenome!>!
-static AiDotNet.Evolution.EvolutionSearchPresets.CreateAdaptiveMixed(AiDotNet.Evolution.EvolutionSearchSpace! space) -> AiDotNet.Evolution.AdaptiveVariationPortfolio<AiDotNet.Evolution.EvolutionSearchGenome!>!
-static AiDotNet.Evolution.EvolutionSearchPresets.CreateDiagonalCma(AiDotNet.Evolution.EvolutionSearchSpace! space, AiDotNet.Evolution.EvolutionOptimizationDirection direction = AiDotNet.Evolution.EvolutionOptimizationDirection.Maximize) -> AiDotNet.Evolution.DiagonalCmaEmitter!
-static AiDotNet.Evolution.EvolutionSearchPresets.CreateMutation(AiDotNet.Evolution.EvolutionSearchSpace! space) -> AiDotNet.Evolution.SearchSpaceMutation!
-static AiDotNet.Evolution.EvolutionSearchPresets.CreateUniformMixed(AiDotNet.Evolution.EvolutionSearchSpace! space) -> AiDotNet.Evolution.AdaptiveVariationPortfolio<AiDotNet.Evolution.EvolutionSearchGenome!>!
-static AiDotNet.Evolution.EvolutionTaskResult.Completed(double quality, System.Collections.Generic.IReadOnlyDictionary<string!, double>! descriptors, AiDotNet.Evolution.EvolutionOptimizationDirection direction = AiDotNet.Evolution.EvolutionOptimizationDirection.Maximize, double costUnits = 0) -> AiDotNet.Evolution.EvolutionTaskResult!
-static AiDotNet.Evolution.EvolutionTaskResult.Failed(string! code, string! message) -> AiDotNet.Evolution.EvolutionTaskResult!
-static AiDotNet.Evolution.EvolutionTraceFile.Read(string! path) -> AiDotNet.Evolution.EvolutionTraceReadResult!
-static AiDotNet.Evolution.EvolutionTraceFile.ReadAsync(string! path, System.Threading.CancellationToken cancellationToken = default(System.Threading.CancellationToken)) -> System.Threading.Tasks.Task<AiDotNet.Evolution.EvolutionTraceReadResult!>!
-static AiDotNet.Evolution.EvolutionTraceFile.ReadRecords(string! path) -> System.Collections.Generic.IEnumerable<AiDotNet.Evolution.EvolutionTraceRecord!>!
-static AiDotNet.Evolution.EvolutionTraceFile.ReadSummary(string! tracePath) -> AiDotNet.Evolution.EvolutionTraceSummary?
-static AiDotNet.Evolution.EvolutionTraceFile.Write(System.Collections.Generic.IEnumerable<AiDotNet.Evolution.EvolutionTraceRecord!>! records, string! path, AiDotNet.Evolution.EvolutionTraceFormat format = AiDotNet.Evolution.EvolutionTraceFormat.JsonLines, bool compress = false, AiDotNet.Evolution.EvolutionTraceSummary? summary = null) -> void
-static AiDotNet.Evolution.JsonEvolutionCheckpointStore.ForOutputDirectory(string! outputDirectory, string! runId, long maxCheckpointBytes = 67108864) -> AiDotNet.Evolution.JsonEvolutionCheckpointStore!
-static AiDotNet.Evolution.StableRandom.CreateStream(ulong rootSeed, ulong streamId) -> AiDotNet.Evolution.StableRandom!
-static AiDotNet.Evolution.StableRandom.Restore(AiDotNet.Evolution.StableRandomState state) -> AiDotNet.Evolution.StableRandom!
-static AiDotNet.Evolution.TopologyMigrationPolicy<TGenome>.DestinationsFor(AiDotNet.Evolution.EvolutionMigrationTopology topology, int source, int islandCount) -> System.Collections.Generic.IReadOnlyList<int>!
-static AiDotNet.Evolution.TopologyMigrationPolicy<TGenome>.ResolveMigrantCount(int eliteCount, int migrantsPerIsland, double migrationRate) -> int
 [AIDEVO001]AiDotNet.Evolution.EvolutionSurrogateObservation<TGenome>
 [AIDEVO001]AiDotNet.Evolution.EvolutionSurrogateObservation<TGenome>.Candidate.get -> AiDotNet.Evolution.EvolutionCanonicalGenome<TGenome>!
 [AIDEVO001]AiDotNet.Evolution.EvolutionSurrogateObservation<TGenome>.Evaluation.get -> AiDotNet.Evolution.EvolutionEvaluation!
@@ -2101,123 +2117,129 @@ static AiDotNet.Evolution.TopologyMigrationPolicy<TGenome>.ResolveMigrantCount(i
 [AIDEVO003]const AiDotNet.Evolution.CentroidArchiveDefinition.MaximumCoordinates = 1000000 -> int
 [AIDEVO003]static AiDotNet.Evolution.CentroidArchive<TGenome>.Project(AiDotNet.Evolution.IEvolutionArchiveView<TGenome>! source, AiDotNet.Evolution.CentroidArchiveDefinition! definition) -> AiDotNet.Evolution.CentroidArchive<TGenome>!
 [AIDEVO003]static AiDotNet.Evolution.CentroidArchive<TGenome>.ProjectWithReport(AiDotNet.Evolution.IEvolutionArchiveView<TGenome>! source, AiDotNet.Evolution.CentroidArchiveDefinition! definition) -> AiDotNet.Evolution.CentroidArchiveProjection<TGenome>!
-AiDotNet.Evolution.EscalatingVariationOperator<TGenome>
-AiDotNet.Evolution.EscalatingVariationOperator<TGenome>.CaptureState() -> string!
-AiDotNet.Evolution.EscalatingVariationOperator<TGenome>.CurrentTier.get -> int
-AiDotNet.Evolution.EscalatingVariationOperator<TGenome>.EscalatingVariationOperator(System.Collections.Generic.IReadOnlyList<AiDotNet.Evolution.IVariationOperator<TGenome>!>! tiers, int failuresBeforeEscalation) -> void
-AiDotNet.Evolution.EscalatingVariationOperator<TGenome>.Escalations.get -> System.Collections.Generic.IReadOnlyList<AiDotNet.Evolution.EvolutionEscalation!>!
-AiDotNet.Evolution.EscalatingVariationOperator<TGenome>.Id.get -> string!
-AiDotNet.Evolution.EscalatingVariationOperator<TGenome>.Observe(AiDotNet.Evolution.EvolutionEvaluation! evaluation, AiDotNet.Evolution.EvolutionArchiveInsertionResult? insertionResult) -> void
-AiDotNet.Evolution.EscalatingVariationOperator<TGenome>.ProposeAsync(AiDotNet.Evolution.EvolutionVariationContext<TGenome>! context, System.Threading.CancellationToken cancellationToken = default(System.Threading.CancellationToken)) -> System.Threading.Tasks.ValueTask<TGenome>
-AiDotNet.Evolution.EscalatingVariationOperator<TGenome>.RestoreState(string! state) -> void
-AiDotNet.Evolution.EscalatingVariationOperator<TGenome>.TierProposals.get -> System.Collections.Generic.IReadOnlyList<long>!
-AiDotNet.Evolution.EscalatingVariationOperator<TGenome>.TierSuccesses.get -> System.Collections.Generic.IReadOnlyList<long>!
-AiDotNet.Evolution.EscalatingVariationOperator<TGenome>.VersionHash.get -> string!
-AiDotNet.Evolution.EvolutionDispatchMode.Auto = 3 -> AiDotNet.Evolution.EvolutionDispatchMode
-AiDotNet.Evolution.EvolutionEscalation
-AiDotNet.Evolution.EvolutionEscalation.ConsecutiveFailures.get -> int
-AiDotNet.Evolution.EvolutionEscalation.FromOperatorId.get -> string!
-AiDotNet.Evolution.EvolutionEscalation.FromTier.get -> int
-AiDotNet.Evolution.EvolutionEscalation.Generation.get -> long
-AiDotNet.Evolution.EvolutionEscalation.IncrementalCost.get -> AiDotNet.Evolution.EvolutionResources?
-AiDotNet.Evolution.EvolutionEscalation.ToOperatorId.get -> string!
-AiDotNet.Evolution.EvolutionEscalation.ToTier.get -> int
-AiDotNet.Evolution.EvolutionOperatorRewardPolicy.HalfLifeOutcomes.get -> int?
-AiDotNet.Evolution.EvolutionOperatorRewardPolicy.MaximumEstimateAge.get -> int?
-AiDotNet.Evolution.EvolutionOperatorRewardPolicy.WithEstimateAging(int maximumEstimateAge, int? halfLifeOutcomes = null) -> AiDotNet.Evolution.EvolutionOperatorRewardPolicy!
-AiDotNet.Evolution.IEvolutionLatencyProfile
-AiDotNet.Evolution.IEvolutionLatencyProfile.IsLatencyBound.get -> bool
-AiDotNet.Evolution.ResourceMeteredEvolutionTask<TGenome>.IsLatencyBound.get -> bool
-AiDotNet.Evolution.ResourceMeteredVariationOperator<TGenome>.IsLatencyBound.get -> bool
-AiDotNet.Evolution.EvolutionVariationContext<TGenome>.CommittedBefore.get -> long?
-AiDotNet.Evolution.EvolutionEngineOptions.DeduplicationCapacity.get -> int
-AiDotNet.Evolution.EvolutionEngineOptions.DeduplicationCapacity.set -> void
-AiDotNet.Evolution.EvolutionEngineOptions.TimeProvider.get -> System.TimeProvider!
-AiDotNet.Evolution.EvolutionEngineOptions.TimeProvider.set -> void
-AiDotNet.Evolution.DirectoryEvolutionArtifactStore
-AiDotNet.Evolution.DirectoryEvolutionArtifactStore.DirectoryEvolutionArtifactStore(string! directory, System.TimeSpan? retention = null) -> void
-AiDotNet.Evolution.DirectoryEvolutionArtifactStore.DirectoryPath.get -> string!
-AiDotNet.Evolution.DirectoryEvolutionArtifactStore.Prune(System.DateTimeOffset now) -> int
-AiDotNet.Evolution.DirectoryEvolutionArtifactStore.Put(byte[]! content) -> string!
-AiDotNet.Evolution.DirectoryEvolutionArtifactStore.TryRead(string! reference, out byte[]! content) -> bool
-AiDotNet.Evolution.EvolutionArtifact.GetContent() -> byte[]!
-AiDotNet.Evolution.EvolutionArtifact.IsBinary.get -> bool
-AiDotNet.Evolution.EvolutionArtifact.MediaType.get -> string?
-AiDotNet.Evolution.EvolutionArtifactOptions.MaxStoredBytesPerEvaluation.get -> long
-AiDotNet.Evolution.EvolutionArtifactOptions.MaxStoredBytesPerEvaluation.set -> void
-AiDotNet.Evolution.EvolutionArtifactOptions.Store.get -> AiDotNet.Evolution.IEvolutionArtifactStore?
-AiDotNet.Evolution.EvolutionArtifactOptions.Store.set -> void
-AiDotNet.Evolution.IEvolutionArtifactStore
-AiDotNet.Evolution.IEvolutionArtifactStore.Put(byte[]! content) -> string!
-AiDotNet.Evolution.IEvolutionArtifactStore.TryRead(string! reference, out byte[]! content) -> bool
+const AiDotNet.Evolution.DirectoryEvolutionCheckpointStore.FileNameExtension = ".json" -> string!
+const AiDotNet.Evolution.DirectoryEvolutionCheckpointStore.FileNamePrefix = "checkpoint-" -> string!
+const AiDotNet.Evolution.DirectoryEvolutionCheckpointStore.SegmentDirectoryName = "segments" -> string!
 const AiDotNet.Evolution.EvolutionArtifact.MaximumContentBytes = 67108864 -> int
-static AiDotNet.Evolution.EvolutionArtifact.FromBytes(string! key, byte[]! content, string! mediaType) -> AiDotNet.Evolution.EvolutionArtifact!
+const AiDotNet.Evolution.EvolutionArtifact.MaximumKeyLength = 128 -> int
+const AiDotNet.Evolution.EvolutionArtifact.MaximumTextLength = 1048576 -> int
+const AiDotNet.Evolution.EvolutionCheckpoint.CurrentSchemaVersion = 1 -> int
+const AiDotNet.Evolution.EvolutionCheckpoint.MaximumSegmentCount = 4096 -> int
+const AiDotNet.Evolution.EvolutionCollectionLimits.MaximumArchiveDimensions = 64 -> int
+const AiDotNet.Evolution.EvolutionCollectionLimits.MaximumArtifactBytes = 4194304 -> int
+const AiDotNet.Evolution.EvolutionCollectionLimits.MaximumArtifactBytesPerEvaluation = 16777216 -> int
+const AiDotNet.Evolution.EvolutionCollectionLimits.MaximumCascadeStages = 256 -> int
+const AiDotNet.Evolution.EvolutionCollectionLimits.MaximumCheckpointBytes = 268435456 -> long
+const AiDotNet.Evolution.EvolutionCollectionLimits.MaximumCheckpointFiles = 4096 -> int
+const AiDotNet.Evolution.EvolutionCollectionLimits.MaximumHashCharacters = 16777216 -> int
+const AiDotNet.Evolution.EvolutionCollectionLimits.MaximumHashComponents = 4096 -> int
+const AiDotNet.Evolution.EvolutionCollectionLimits.MaximumIslands = 1024 -> int
+const AiDotNet.Evolution.EvolutionCollectionLimits.MaximumLineageIdentities = 256 -> int
+const AiDotNet.Evolution.EvolutionCollectionLimits.MaximumMigrationTransfers = 65536 -> int
+const AiDotNet.Evolution.EvolutionCollectionLimits.MaximumParentQualityCacheEntries = 1000000 -> int
+const AiDotNet.Evolution.EvolutionCollectionLimits.MaximumPendingArtifactBytes = 268435456 -> long
+const AiDotNet.Evolution.EvolutionCollectionLimits.MaximumResultEntries = 1000000 -> int
+const AiDotNet.Evolution.EvolutionCollectionLimits.MaximumResultIslands = 1024 -> int
+const AiDotNet.Evolution.EvolutionCollectionLimits.MaximumTraceBytes = 1073741824 -> long
+const AiDotNet.Evolution.EvolutionCollectionLimits.MaximumTraceRecords = 1000000 -> int
+const AiDotNet.Evolution.EvolutionDiagnostic.MaximumDataEntries = 16 -> int
+const AiDotNet.Evolution.EvolutionDiagnostic.MaximumDataKeyLength = 64 -> int
+const AiDotNet.Evolution.EvolutionDiagnostic.MaximumDataValueLength = 256 -> int
+const AiDotNet.Evolution.EvolutionEvaluationCacheRecord.MaximumJsonBytes = 4194304 -> int
+const AiDotNet.Evolution.EvolutionMeasurementOrigin.MaximumJsonBytes = 524288 -> int
+const AiDotNet.Evolution.EvolutionMeasurementOrigin.MaximumSampleIds = 256 -> int
+const AiDotNet.Evolution.EvolutionOutputLayout.CheckpointsFolderName = "checkpoints" -> string!
+const AiDotNet.Evolution.EvolutionOutputLayout.TracesFolderName = "traces" -> string!
+const AiDotNet.Evolution.EvolutionPersistentEvaluationCache.StoreInvocationResource = "cache_store_invocations" -> string!
+const AiDotNet.Evolution.EvolutionRepertoire.MaximumEntries = 256 -> int
+const AiDotNet.Evolution.EvolutionRepertoire.MaximumJsonBytes = 8388608 -> int
+const AiDotNet.Evolution.EvolutionRepertoire.MaximumPayloadBytes = 65536 -> int
+const AiDotNet.Evolution.EvolutionRepertoire.MaximumTotalPayloadBytes = 2097152 -> int
+const AiDotNet.Evolution.EvolutionResources.MaximumAmount = 1000000000000000000 -> decimal
+const AiDotNet.Evolution.EvolutionSession<TGenome>.MaxBatchSize = 4096 -> int
+const AiDotNet.Evolution.EvolutionSession<TGenome>.MaxSeeds = 100000 -> int
+const AiDotNet.Evolution.EvolutionTaskResult.MaximumArtifacts = 64 -> int
 const AiDotNet.Evolution.EvolutionTaskResult.MaximumBinaryContentBytes = 268435456 -> long
-AiDotNet.Evolution.EvolutionIncumbentChallengeOutcome
-AiDotNet.Evolution.EvolutionIncumbentChallengeOutcome.Canceled = 7 -> AiDotNet.Evolution.EvolutionIncumbentChallengeOutcome
-AiDotNet.Evolution.EvolutionIncumbentChallengeOutcome.CandidateConfirmationIncomplete = 5 -> AiDotNet.Evolution.EvolutionIncumbentChallengeOutcome
-AiDotNet.Evolution.EvolutionIncumbentChallengeOutcome.CandidateSearchIncomplete = 3 -> AiDotNet.Evolution.EvolutionIncumbentChallengeOutcome
-AiDotNet.Evolution.EvolutionIncumbentChallengeOutcome.ConfirmedImprovement = 0 -> AiDotNet.Evolution.EvolutionIncumbentChallengeOutcome
-AiDotNet.Evolution.EvolutionIncumbentChallengeOutcome.IncumbentConfirmationIncomplete = 6 -> AiDotNet.Evolution.EvolutionIncumbentChallengeOutcome
-AiDotNet.Evolution.EvolutionIncumbentChallengeOutcome.IncumbentSearchIncomplete = 4 -> AiDotNet.Evolution.EvolutionIncumbentChallengeOutcome
-AiDotNet.Evolution.EvolutionIncumbentChallengeOutcome.NotConfirmed = 1 -> AiDotNet.Evolution.EvolutionIncumbentChallengeOutcome
-AiDotNet.Evolution.EvolutionIncumbentChallengeOutcome.NotPromising = 2 -> AiDotNet.Evolution.EvolutionIncumbentChallengeOutcome
-AiDotNet.Evolution.EvolutionIncumbentChallengeReport.Outcome.get -> AiDotNet.Evolution.EvolutionIncumbentChallengeOutcome
-AiDotNet.Evolution.EvolutionWorkRemoteClient
-AiDotNet.Evolution.EvolutionWorkRemoteClient.Dispose() -> void
-AiDotNet.Evolution.EvolutionWorkRemoteClient.SendAsync(string! requestJson, System.Threading.CancellationToken cancellationToken = default(System.Threading.CancellationToken)) -> System.Threading.Tasks.Task<string!>!
-AiDotNet.Evolution.EvolutionWorkServer
-AiDotNet.Evolution.EvolutionWorkServer.CertificateFingerprint.get -> string!
-AiDotNet.Evolution.EvolutionWorkServer.Dispose() -> void
-AiDotNet.Evolution.EvolutionWorkServer.EvolutionWorkServer(AiDotNet.Evolution.DurableEvolutionWorkCoordinator! coordinator, System.Security.Cryptography.X509Certificates.X509Certificate2! certificate, string! workerToken, AiDotNet.Evolution.EvolutionWorkServerOptions? options = null) -> void
-AiDotNet.Evolution.EvolutionWorkServer.LocalEndPoint.get -> System.Net.IPEndPoint!
-AiDotNet.Evolution.EvolutionWorkServer.Start() -> void
-AiDotNet.Evolution.EvolutionWorkServerEvent
-AiDotNet.Evolution.EvolutionWorkServerEvent.EvolutionWorkServerEvent(AiDotNet.Evolution.EvolutionWorkServerEventKind kind, string! remoteEndPoint, System.Exception? exception = null) -> void
-AiDotNet.Evolution.EvolutionWorkServerEvent.Exception.get -> System.Exception?
-AiDotNet.Evolution.EvolutionWorkServerEvent.Kind.get -> AiDotNet.Evolution.EvolutionWorkServerEventKind
-AiDotNet.Evolution.EvolutionWorkServerEvent.RemoteEndPoint.get -> string!
-AiDotNet.Evolution.EvolutionWorkServerEventKind
-AiDotNet.Evolution.EvolutionWorkServerEventKind.Accepted = 1 -> AiDotNet.Evolution.EvolutionWorkServerEventKind
-AiDotNet.Evolution.EvolutionWorkServerEventKind.Authenticated = 2 -> AiDotNet.Evolution.EvolutionWorkServerEventKind
-AiDotNet.Evolution.EvolutionWorkServerEventKind.AuthenticationRefused = 3 -> AiDotNet.Evolution.EvolutionWorkServerEventKind
-AiDotNet.Evolution.EvolutionWorkServerEventKind.Closed = 7 -> AiDotNet.Evolution.EvolutionWorkServerEventKind
-AiDotNet.Evolution.EvolutionWorkServerEventKind.ConnectionLimitReached = 5 -> AiDotNet.Evolution.EvolutionWorkServerEventKind
-AiDotNet.Evolution.EvolutionWorkServerEventKind.Faulted = 6 -> AiDotNet.Evolution.EvolutionWorkServerEventKind
-AiDotNet.Evolution.EvolutionWorkServerEventKind.Listening = 0 -> AiDotNet.Evolution.EvolutionWorkServerEventKind
-AiDotNet.Evolution.EvolutionWorkServerEventKind.OperationRefused = 4 -> AiDotNet.Evolution.EvolutionWorkServerEventKind
-AiDotNet.Evolution.EvolutionWorkServerOptions
-AiDotNet.Evolution.EvolutionWorkServerOptions.BindAddress.get -> string!
-AiDotNet.Evolution.EvolutionWorkServerOptions.BindAddress.set -> void
-AiDotNet.Evolution.EvolutionWorkServerOptions.EvolutionWorkServerOptions() -> void
-AiDotNet.Evolution.EvolutionWorkServerOptions.HandshakeTimeout.get -> System.TimeSpan
-AiDotNet.Evolution.EvolutionWorkServerOptions.HandshakeTimeout.set -> void
-AiDotNet.Evolution.EvolutionWorkServerOptions.IdleTimeout.get -> System.TimeSpan
-AiDotNet.Evolution.EvolutionWorkServerOptions.IdleTimeout.set -> void
-AiDotNet.Evolution.EvolutionWorkServerOptions.MaximumConnections.get -> int
-AiDotNet.Evolution.EvolutionWorkServerOptions.MaximumConnections.set -> void
-AiDotNet.Evolution.EvolutionWorkServerOptions.OnEvent.get -> System.Action<AiDotNet.Evolution.EvolutionWorkServerEvent!>?
-AiDotNet.Evolution.EvolutionWorkServerOptions.OnEvent.set -> void
-AiDotNet.Evolution.EvolutionWorkServerOptions.Port.get -> int
-AiDotNet.Evolution.EvolutionWorkServerOptions.Port.set -> void
+const AiDotNet.Evolution.EvolutionTaskResult.MaximumDiagnostics = 64 -> int
+const AiDotNet.Evolution.EvolutionTaskResult.MaximumNamedValues = 256 -> int
+const AiDotNet.Evolution.EvolutionTaskResult.MaximumVectorValues = 256 -> int
+const AiDotNet.Evolution.EvolutionTraceOptions.MaximumFlushEveryRecords = 100000 -> int
+const AiDotNet.Evolution.EvolutionTraceOptions.MaximumTrackedMetricCount = 4096 -> int
+const AiDotNet.Evolution.EvolutionTraceRecord.CurrentSchemaVersion = 1 -> int
+const AiDotNet.Evolution.EvolutionTraceRecord.MeasurementOriginSchemaVersion = 2 -> int
+const AiDotNet.Evolution.EvolutionTraceSummary.CurrentSchemaVersion = 1 -> int
+const AiDotNet.Evolution.EvolutionWorkProtocol.MaximumFrameBytes = 16777216 -> int
+const AiDotNet.Evolution.EvolutionWorkProtocol.Version = 1 -> int
+const AiDotNet.Evolution.StableRandom.AlgorithmId = "pcg-xsh-rr-32-v1" -> string!
+override AiDotNet.Evolution.EvolutionCellKey.Equals(object? obj) -> bool
+override AiDotNet.Evolution.EvolutionCellKey.GetHashCode() -> int
+override AiDotNet.Evolution.EvolutionCellKey.ToString() -> string!
+override AiDotNet.Evolution.EvolutionParameterValue.Equals(object? obj) -> bool
+override AiDotNet.Evolution.EvolutionParameterValue.GetHashCode() -> int
+override AiDotNet.Evolution.EvolutionParameterValue.ToString() -> string!
+override AiDotNet.Evolution.StableRandomState.Equals(object? obj) -> bool
+override AiDotNet.Evolution.StableRandomState.GetHashCode() -> int
+static AiDotNet.Evolution.DirectoryEvolutionCheckpointStore.FileNameFor(long sequence) -> string!
+static AiDotNet.Evolution.DirectoryEvolutionCheckpointStore.ForOutputDirectory(string! outputDirectory, string! runId, AiDotNet.Evolution.EvolutionCheckpointRetentionOptions? retention = null, long maxCheckpointBytes = 67108864) -> AiDotNet.Evolution.DirectoryEvolutionCheckpointStore!
+static AiDotNet.Evolution.EvolutionArchiveQuery.BestBy<TGenome>(this AiDotNet.Evolution.EvolutionRunResult<TGenome>! result, string! metric) -> AiDotNet.Evolution.EvolutionArchiveEntry<TGenome>?
+static AiDotNet.Evolution.EvolutionArchiveQuery.BestBy<TGenome>(this AiDotNet.Evolution.EvolutionRunResult<TGenome>! result, string! metric, AiDotNet.Evolution.EvolutionOptimizationDirection? direction) -> AiDotNet.Evolution.EvolutionArchiveEntry<TGenome>?
+static AiDotNet.Evolution.EvolutionArchiveQuery.BestBy<TGenome>(this AiDotNet.Evolution.IEvolutionArchiveView<TGenome>! archive, string! metric) -> AiDotNet.Evolution.EvolutionArchiveEntry<TGenome>?
+static AiDotNet.Evolution.EvolutionArchiveQuery.BestBy<TGenome>(this AiDotNet.Evolution.IEvolutionArchiveView<TGenome>! archive, string! metric, AiDotNet.Evolution.EvolutionOptimizationDirection? direction) -> AiDotNet.Evolution.EvolutionArchiveEntry<TGenome>?
+static AiDotNet.Evolution.EvolutionArchiveQuery.MetricNames<TGenome>(this AiDotNet.Evolution.EvolutionRunResult<TGenome>! result) -> System.Collections.Generic.IReadOnlyList<string!>!
+static AiDotNet.Evolution.EvolutionArchiveQuery.MetricNames<TGenome>(this AiDotNet.Evolution.IEvolutionArchiveView<TGenome>! archive) -> System.Collections.Generic.IReadOnlyList<string!>!
+static AiDotNet.Evolution.EvolutionArchiveQuery.TopBy<TGenome>(this AiDotNet.Evolution.EvolutionRunResult<TGenome>! result, string! metric, int count) -> System.Collections.Generic.IReadOnlyList<AiDotNet.Evolution.EvolutionArchiveEntry<TGenome>!>!
+static AiDotNet.Evolution.EvolutionArchiveQuery.TopBy<TGenome>(this AiDotNet.Evolution.EvolutionRunResult<TGenome>! result, string! metric, int count, AiDotNet.Evolution.EvolutionOptimizationDirection? direction) -> System.Collections.Generic.IReadOnlyList<AiDotNet.Evolution.EvolutionArchiveEntry<TGenome>!>!
+static AiDotNet.Evolution.EvolutionArchiveQuery.TopBy<TGenome>(this AiDotNet.Evolution.IEvolutionArchiveView<TGenome>! archive, string! metric, int count) -> System.Collections.Generic.IReadOnlyList<AiDotNet.Evolution.EvolutionArchiveEntry<TGenome>!>!
+static AiDotNet.Evolution.EvolutionArchiveQuery.TopBy<TGenome>(this AiDotNet.Evolution.IEvolutionArchiveView<TGenome>! archive, string! metric, int count, AiDotNet.Evolution.EvolutionOptimizationDirection? direction) -> System.Collections.Generic.IReadOnlyList<AiDotNet.Evolution.EvolutionArchiveEntry<TGenome>!>!
+static AiDotNet.Evolution.EvolutionArchiveQuery.WithMetric<TGenome>(this AiDotNet.Evolution.IEvolutionArchiveView<TGenome>! archive, string! metric) -> System.Collections.Generic.IReadOnlyList<AiDotNet.Evolution.EvolutionArchiveEntry<TGenome>!>!
+static AiDotNet.Evolution.EvolutionArtifact.FromBytes(string! key, byte[]! content, string! mediaType) -> AiDotNet.Evolution.EvolutionArtifact!
+static AiDotNet.Evolution.EvolutionArtifactSanitizer.Sanitize(string! text) -> string!
+static AiDotNet.Evolution.EvolutionArtifactSanitizer.WouldRedact(string! text) -> bool
+static AiDotNet.Evolution.EvolutionCostedPortfolio.Create<TGenome>(System.Collections.Generic.IEnumerable<AiDotNet.Evolution.EvolutionCostedPortfolioArm<TGenome>!>! arms, AiDotNet.Evolution.EvolutionResourceLedger! ledger, AiDotNet.Evolution.EvolutionOperatorRewardPolicy! rewardPolicy, double explorationProbability = 0.1) -> AiDotNet.Evolution.AdaptiveVariationPortfolio<TGenome>!
+static AiDotNet.Evolution.EvolutionDescriptorCalibration.CalibrateAsync<TGenome>(AiDotNet.Evolution.IEvolutionTask<TGenome>! task, System.Collections.Generic.IReadOnlyList<TGenome>! seeds, System.Collections.Generic.IReadOnlyList<string!>? names = null, AiDotNet.Evolution.EvolutionDescriptorCalibrationOptions? options = null, ulong seed = 0, System.Threading.CancellationToken cancellationToken = default(System.Threading.CancellationToken)) -> System.Threading.Tasks.Task<System.Collections.Generic.IReadOnlyList<AiDotNet.Evolution.EvolutionDescriptorDefinition!>!>!
+static AiDotNet.Evolution.EvolutionDescriptorCalibration.FromObservations(System.Collections.Generic.IReadOnlyList<System.Collections.Generic.IReadOnlyDictionary<string!, double>!>! observations, System.Collections.Generic.IReadOnlyList<string!>? names = null, AiDotNet.Evolution.EvolutionDescriptorCalibrationOptions? options = null) -> System.Collections.Generic.IReadOnlyList<AiDotNet.Evolution.EvolutionDescriptorDefinition!>!
+static AiDotNet.Evolution.EvolutionDurableEvaluationPayload.FromJson(string! json) -> AiDotNet.Evolution.EvolutionDurableEvaluationPayload!
+static AiDotNet.Evolution.EvolutionEngine<TGenome>.ReadCheckpoint(AiDotNet.Evolution.EvolutionCheckpoint! checkpoint, AiDotNet.Evolution.IEvolutionGenomeCodec<TGenome>! genomeCodec) -> AiDotNet.Evolution.EvolutionCheckpointContents<TGenome>!
+static AiDotNet.Evolution.EvolutionEngineOptions.CreateOpenEvolveDefaults() -> AiDotNet.Evolution.EvolutionEngineOptions!
+static AiDotNet.Evolution.EvolutionEvaluationCacheKey.CreateAsync<TGenome>(AiDotNet.Evolution.EvolutionCanonicalGenome<TGenome>! candidate, AiDotNet.Evolution.IEvolutionTask<TGenome>! task, AiDotNet.Evolution.IEvolutionGenomeCodec<TGenome>! codec, AiDotNet.Evolution.EvolutionReuseScope! scope, string! measurementVersion, System.Threading.CancellationToken cancellationToken = default(System.Threading.CancellationToken)) -> System.Threading.Tasks.ValueTask<AiDotNet.Evolution.EvolutionEvaluationCacheKey!>
+static AiDotNet.Evolution.EvolutionEvaluationCacheRecord.FromJson(string! json) -> AiDotNet.Evolution.EvolutionEvaluationCacheRecord!
+static AiDotNet.Evolution.EvolutionFidelityCheckpoint.Parse(string! json) -> AiDotNet.Evolution.EvolutionFidelityCheckpoint!
+static AiDotNet.Evolution.EvolutionHash.Combine(System.Collections.Generic.IEnumerable<string!>! values) -> string!
+static AiDotNet.Evolution.EvolutionHash.Compute(string! value) -> string!
+static AiDotNet.Evolution.EvolutionHash.EncodeDouble(double value) -> string!
+static AiDotNet.Evolution.EvolutionMeasurementOrigin.FromJson(string! json) -> AiDotNet.Evolution.EvolutionMeasurementOrigin!
+static AiDotNet.Evolution.EvolutionOutputLayout.CreateStem(string! runId) -> string!
+static AiDotNet.Evolution.EvolutionOutputLayout.SummaryPathFor(string! tracePath) -> string!
+static AiDotNet.Evolution.EvolutionParameter.Categorical(string! name, System.Collections.Generic.IEnumerable<string!>! choices) -> AiDotNet.Evolution.EvolutionParameter!
+static AiDotNet.Evolution.EvolutionParameter.Enum<TEnum>(string! name) -> AiDotNet.Evolution.EvolutionParameter!
+static AiDotNet.Evolution.EvolutionParameter.Integer(string! name, int minimum, int maximum) -> AiDotNet.Evolution.EvolutionParameter!
+static AiDotNet.Evolution.EvolutionParameter.Logarithmic(string! name, double minimum, double maximum) -> AiDotNet.Evolution.EvolutionParameter!
+static AiDotNet.Evolution.EvolutionParameter.Real(string! name, double minimum, double maximum) -> AiDotNet.Evolution.EvolutionParameter!
+static AiDotNet.Evolution.EvolutionParameterValue.Categorical(string! value) -> AiDotNet.Evolution.EvolutionParameterValue!
+static AiDotNet.Evolution.EvolutionParameterValue.Numeric(double value) -> AiDotNet.Evolution.EvolutionParameterValue!
+static AiDotNet.Evolution.EvolutionRepertoire.ExportAsync<TGenome>(System.Collections.Generic.IEnumerable<TGenome>! genomes, AiDotNet.Evolution.IEvolutionTask<TGenome>! task, AiDotNet.Evolution.IEvolutionGenomeCodec<TGenome>! codec, AiDotNet.Evolution.EvolutionReuseScope! scope, AiDotNet.Evolution.EvolutionRepertoireProvenance! provenance, System.Threading.CancellationToken cancellationToken = default(System.Threading.CancellationToken)) -> System.Threading.Tasks.Task<AiDotNet.Evolution.EvolutionRepertoire!>!
+static AiDotNet.Evolution.EvolutionRepertoire.FromJson(string! json) -> AiDotNet.Evolution.EvolutionRepertoire!
+static AiDotNet.Evolution.EvolutionResourceBoundary.Capture(AiDotNet.Evolution.EvolutionResourceLedger! ledger, System.Func<string!>! captureEngine) -> AiDotNet.Evolution.EvolutionResourceBoundary!
+static AiDotNet.Evolution.EvolutionResourceBoundary.Deserialize(string! json, string! expectedChecksum) -> AiDotNet.Evolution.EvolutionResourceBoundary!
+static AiDotNet.Evolution.EvolutionResourceWork.RunAsync<T>(AiDotNet.Evolution.EvolutionResourceLedger! ledger, string! operationId, AiDotNet.Evolution.EvolutionResourceStage stage, AiDotNet.Evolution.EvolutionResources! estimated, AiDotNet.Evolution.EvolutionResources! maximum, System.Func<System.Threading.CancellationToken, System.Threading.Tasks.ValueTask<AiDotNet.Evolution.EvolutionResourceResult<T>!>>! work, int attempt = 1, System.Threading.CancellationToken cancellationToken = default(System.Threading.CancellationToken)) -> System.Threading.Tasks.ValueTask<T>
+static AiDotNet.Evolution.EvolutionResources.Empty.get -> AiDotNet.Evolution.EvolutionResources!
+static AiDotNet.Evolution.EvolutionResources.Of(string! name, decimal amount) -> AiDotNet.Evolution.EvolutionResources!
+static AiDotNet.Evolution.EvolutionSearchPresets.Create(AiDotNet.Evolution.EvolutionSearchSpace! space, AiDotNet.Evolution.EvolutionSearchPreset preset = AiDotNet.Evolution.EvolutionSearchPreset.Mutation, AiDotNet.Evolution.EvolutionOptimizationDirection? direction = null) -> AiDotNet.Evolution.IVariationOperator<AiDotNet.Evolution.EvolutionSearchGenome!>!
+static AiDotNet.Evolution.EvolutionSearchPresets.CreateAdaptiveMixed(AiDotNet.Evolution.EvolutionSearchSpace! space) -> AiDotNet.Evolution.AdaptiveVariationPortfolio<AiDotNet.Evolution.EvolutionSearchGenome!>!
+static AiDotNet.Evolution.EvolutionSearchPresets.CreateDiagonalCma(AiDotNet.Evolution.EvolutionSearchSpace! space, AiDotNet.Evolution.EvolutionOptimizationDirection direction = AiDotNet.Evolution.EvolutionOptimizationDirection.Maximize) -> AiDotNet.Evolution.DiagonalCmaEmitter!
+static AiDotNet.Evolution.EvolutionSearchPresets.CreateMutation(AiDotNet.Evolution.EvolutionSearchSpace! space) -> AiDotNet.Evolution.SearchSpaceMutation!
+static AiDotNet.Evolution.EvolutionSearchPresets.CreateUniformMixed(AiDotNet.Evolution.EvolutionSearchSpace! space) -> AiDotNet.Evolution.AdaptiveVariationPortfolio<AiDotNet.Evolution.EvolutionSearchGenome!>!
+static AiDotNet.Evolution.EvolutionTaskResult.Completed(double quality, System.Collections.Generic.IReadOnlyDictionary<string!, double>! descriptors, AiDotNet.Evolution.EvolutionOptimizationDirection direction = AiDotNet.Evolution.EvolutionOptimizationDirection.Maximize, double costUnits = 0) -> AiDotNet.Evolution.EvolutionTaskResult!
+static AiDotNet.Evolution.EvolutionTaskResult.Failed(string! code, string! message) -> AiDotNet.Evolution.EvolutionTaskResult!
+static AiDotNet.Evolution.EvolutionTraceFile.Read(string! path) -> AiDotNet.Evolution.EvolutionTraceReadResult!
+static AiDotNet.Evolution.EvolutionTraceFile.ReadAsync(string! path, System.Threading.CancellationToken cancellationToken = default(System.Threading.CancellationToken)) -> System.Threading.Tasks.Task<AiDotNet.Evolution.EvolutionTraceReadResult!>!
+static AiDotNet.Evolution.EvolutionTraceFile.ReadRecords(string! path) -> System.Collections.Generic.IEnumerable<AiDotNet.Evolution.EvolutionTraceRecord!>!
+static AiDotNet.Evolution.EvolutionTraceFile.ReadSummary(string! tracePath) -> AiDotNet.Evolution.EvolutionTraceSummary?
+static AiDotNet.Evolution.EvolutionTraceFile.Write(System.Collections.Generic.IEnumerable<AiDotNet.Evolution.EvolutionTraceRecord!>! records, string! path, AiDotNet.Evolution.EvolutionTraceFormat format = AiDotNet.Evolution.EvolutionTraceFormat.JsonLines, bool compress = false, AiDotNet.Evolution.EvolutionTraceSummary? summary = null) -> void
 static AiDotNet.Evolution.EvolutionWorkRemoteClient.ConnectAsync(string! host, int port, string! certificateFingerprint, string! workerToken, System.Threading.CancellationToken cancellationToken = default(System.Threading.CancellationToken)) -> System.Threading.Tasks.Task<AiDotNet.Evolution.EvolutionWorkRemoteClient!>!
 static AiDotNet.Evolution.EvolutionWorkServer.ComputeFingerprint(System.Security.Cryptography.X509Certificates.X509Certificate! certificate) -> string!
-AiDotNet.Evolution.EvolutionCheckpoint.WithSegmentIds(System.Collections.Generic.IReadOnlyList<long>! segmentIds) -> AiDotNet.Evolution.EvolutionCheckpoint!
-AiDotNet.Evolution.EvolutionCheckpoint.SegmentIds.get -> System.Collections.Generic.IReadOnlyList<long>!
-const AiDotNet.Evolution.EvolutionCheckpoint.MaximumSegmentCount = 4096 -> int
-AiDotNet.Evolution.IEvolutionCheckpointSegmentStore
-AiDotNet.Evolution.IEvolutionCheckpointSegmentStore.OpenSegmentAsync(string! runId, long segmentId, System.Threading.CancellationToken cancellationToken = default(System.Threading.CancellationToken)) -> System.Threading.Tasks.Task<System.IO.Stream?>!
-AiDotNet.Evolution.IEvolutionCheckpointSegmentStore.WriteSegmentAsync(string! runId, long segmentId, System.Func<System.IO.Stream!, System.Threading.CancellationToken, System.Threading.Tasks.Task!>! write, System.Threading.CancellationToken cancellationToken = default(System.Threading.CancellationToken)) -> System.Threading.Tasks.Task!
-AiDotNet.Evolution.InMemoryEvolutionCheckpointStore.OpenSegmentAsync(string! runId, long segmentId, System.Threading.CancellationToken cancellationToken = default(System.Threading.CancellationToken)) -> System.Threading.Tasks.Task<System.IO.Stream?>!
-AiDotNet.Evolution.InMemoryEvolutionCheckpointStore.WriteSegmentAsync(string! runId, long segmentId, System.Func<System.IO.Stream!, System.Threading.CancellationToken, System.Threading.Tasks.Task!>! write, System.Threading.CancellationToken cancellationToken = default(System.Threading.CancellationToken)) -> System.Threading.Tasks.Task!
-AiDotNet.Evolution.DirectoryEvolutionCheckpointStore.OpenSegmentAsync(string! runId, long segmentId, System.Threading.CancellationToken cancellationToken = default(System.Threading.CancellationToken)) -> System.Threading.Tasks.Task<System.IO.Stream?>!
-AiDotNet.Evolution.DirectoryEvolutionCheckpointStore.WriteSegmentAsync(string! runId, long segmentId, System.Func<System.IO.Stream!, System.Threading.CancellationToken, System.Threading.Tasks.Task!>! write, System.Threading.CancellationToken cancellationToken = default(System.Threading.CancellationToken)) -> System.Threading.Tasks.Task!
-const AiDotNet.Evolution.DirectoryEvolutionCheckpointStore.SegmentDirectoryName = "segments" -> string!
-AiDotNet.Evolution.EvolutionCheckpointFormat
-AiDotNet.Evolution.EvolutionCheckpointFormat.Auto = 0 -> AiDotNet.Evolution.EvolutionCheckpointFormat
-AiDotNet.Evolution.EvolutionCheckpointFormat.Inline = 1 -> AiDotNet.Evolution.EvolutionCheckpointFormat
-AiDotNet.Evolution.EvolutionCheckpointFormat.Segmented = 2 -> AiDotNet.Evolution.EvolutionCheckpointFormat
-AiDotNet.Evolution.EvolutionEngineOptions.CheckpointFormat.get -> AiDotNet.Evolution.EvolutionCheckpointFormat
-AiDotNet.Evolution.EvolutionEngineOptions.CheckpointFormat.set -> void
-AiDotNet.Evolution.EvolutionEngineOptions.CheckpointSegmentThreshold.get -> int
-AiDotNet.Evolution.EvolutionEngineOptions.CheckpointSegmentThreshold.set -> void
+static AiDotNet.Evolution.JsonEvolutionCheckpointStore.ForOutputDirectory(string! outputDirectory, string! runId, long maxCheckpointBytes = 67108864) -> AiDotNet.Evolution.JsonEvolutionCheckpointStore!
+static AiDotNet.Evolution.StableRandom.CreateStream(ulong rootSeed, ulong streamId) -> AiDotNet.Evolution.StableRandom!
+static AiDotNet.Evolution.StableRandom.Restore(AiDotNet.Evolution.StableRandomState state) -> AiDotNet.Evolution.StableRandom!
+static AiDotNet.Evolution.TopologyMigrationPolicy<TGenome>.DestinationsFor(AiDotNet.Evolution.EvolutionMigrationTopology topology, int source, int islandCount) -> System.Collections.Generic.IReadOnlyList<int>!
+static AiDotNet.Evolution.TopologyMigrationPolicy<TGenome>.ResolveMigrantCount(int eliteCount, int migrantsPerIsland, double migrationRate) -> int

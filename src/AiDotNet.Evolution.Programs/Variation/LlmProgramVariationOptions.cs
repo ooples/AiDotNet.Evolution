@@ -61,6 +61,19 @@ public sealed class LlmProgramVariationOptions
     /// <summary>Gets or sets a replacement system message, or <c>null</c> to use the built-in instructions.</summary>
     public string? SystemMessage { get; set; }
 
+    /// <summary>
+    /// Gets or sets a source asked for the system instruction once per proposal, so a run's
+    /// instructions can evolve (V1-53, #166).
+    /// </summary>
+    /// <remarks>
+    /// Null leaves <see cref="SystemMessage"/> in charge, which is the fixed-instruction behaviour,
+    /// and a source that returns null for one proposal does the same for that proposal. The source's
+    /// <see cref="IProgramInstructionSource.VersionHash"/> joins the operator's identity, because an
+    /// interface cannot be serialized into it and two operators differing only by their source must
+    /// not claim the same version.
+    /// </remarks>
+    public IProgramInstructionSource? InstructionSource { get; set; }
+
     /// <summary>Gets or sets the sampling temperature passed to the chat client, or <c>null</c> for its default.</summary>
     public double? Temperature { get; set; }
 
@@ -181,6 +194,9 @@ public sealed class LlmProgramVariationOptions
         MaxPreviousAttempts = MaxPreviousAttempts,
         MaxPromptProgramChars = MaxPromptProgramChars,
         SystemMessage = SystemMessage,
+        // Copied by reference deliberately: the source is a live collaborator the run credits as
+        // outcomes arrive, so a clone of it would stop learning the moment the options were copied.
+        InstructionSource = InstructionSource,
         Temperature = Temperature,
         ConcurrentProposals = ConcurrentProposals,
         Experience = Experience,

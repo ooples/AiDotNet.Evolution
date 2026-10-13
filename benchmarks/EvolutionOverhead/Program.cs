@@ -2,6 +2,22 @@ using System.Diagnostics;
 using System.Text.Json;
 using AiDotNet.Evolution;
 
+// V1-50 (#163): the ensemble's own per-proposal cost, measured against the same null models called
+// directly. A separate mode rather than a separate project, because it measures the same thing this
+// harness exists for and needs the same null-evaluator discipline.
+if (args.Length == 4 && args[0] == "ensemble")
+{
+    if (!int.TryParse(args[1], out int ensembleProposals) || !int.TryParse(args[2], out int ensembleModels) ||
+        !int.TryParse(args[3], out int ensembleRepeats) || ensembleProposals is < 64 or > 10_000_000 ||
+        ensembleModels is < 1 or > 64 || ensembleRepeats is < 1 or > 100)
+    {
+        Console.Error.WriteLine("Usage: EvolutionOverhead ensemble <proposals 64..1e7> <models 1..64> <repeats 1..100>");
+        return 2;
+    }
+
+    return EnsembleOverhead.Run(ensembleProposals, ensembleModels, ensembleRepeats);
+}
+
 // V1-30: one null-evaluator run per process. Usage: EvolutionOverhead <evaluations> <workers> <islands>
 if (args.Length != 3 || !int.TryParse(args[0], out int budget) || !int.TryParse(args[1], out int workers) ||
     !int.TryParse(args[2], out int islands) || budget is < 8 or > 1_000_000 || workers is < 1 or > 64 || islands is < 1 or > 64)

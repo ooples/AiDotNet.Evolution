@@ -368,6 +368,10 @@ public sealed class LlmProgramVariationOperator : ICheckpointableVariationOperat
         EvolutionEvaluation evaluation = context.Parent.Evaluation;
         var promptContext = new ProgramPromptContext(parent)
         {
+            // Asked once per proposal, on the engine's seeded stream, so the instruction replays
+            // with the run rather than drifting with wall-clock order.
+            SystemMessageOverride = _variationOptions.InstructionSource?.Select(
+                context.Random, context.Generation),
             Direction = evaluation.Direction,
             Inspirations = BuildInspirations(context, parent),
 
@@ -1208,6 +1212,7 @@ public sealed class LlmProgramVariationOperator : ICheckpointableVariationOperat
             variationOptions.MaxOutputTokens.HasValue ? variationOptions.MaxOutputTokens.Value.ToString(CultureInfo.InvariantCulture) : "provider-token-limit",
             variationOptions.MaxPromptProgramChars.ToString(CultureInfo.InvariantCulture),
             variationOptions.SystemMessage ?? string.Empty,
+            variationOptions.InstructionSource?.VersionHash ?? "fixed-instruction",
             variationOptions.ArtifactDiagnosticPrefix,
             variationOptions.Seed.HasValue
                 ? variationOptions.Seed.Value.ToString(CultureInfo.InvariantCulture)

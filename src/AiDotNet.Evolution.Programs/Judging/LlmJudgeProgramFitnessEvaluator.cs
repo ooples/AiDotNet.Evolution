@@ -106,9 +106,12 @@ public sealed class LlmJudgeProgramFitnessEvaluator : IProgramFitnessEvaluator
         if (!measured.Quality.HasValue) return measured;
 
         if ((_options.CombinedBlend < 1 && (measured.Quality.Value is < 0 or > 1))
-            || measured.Descriptors.Count + _fieldNames.Length + 1 > EvolutionTaskResult.MaximumNamedValues
+            || measured.Descriptors.Count + _fieldNames.Length + 2 > EvolutionTaskResult.MaximumNamedValues
             || (_options.RecordObjectives && measured.Objectives.Count + _fieldNames.Length > EvolutionTaskResult.MaximumVectorValues)
-            || _fieldNames.Append(LlmFeedbackOptions.AverageMetricSuffix).Any(n => measured.Descriptors.ContainsKey(_options.MetricPrefix + n)))
+            || _fieldNames
+                .Append(LlmFeedbackOptions.AverageMetricSuffix)
+                .Append(LlmFeedbackOptions.CostUnitsMetricSuffix)
+                .Any(n => measured.Descriptors.ContainsKey(_options.MetricPrefix + n)))
             return Refuse(measured, "llm_judge_incompatible_measurement",
                 "Blending requires normalized quality in [0,1], noncolliding names, and capacity for judge fields.");
 
@@ -419,6 +422,13 @@ public sealed class LlmJudgeProgramFitnessEvaluator : IProgramFitnessEvaluator
             }
 
             descriptors[_options.MetricPrefix + LlmFeedbackOptions.AverageMetricSuffix] = outcome.Average;
+
+            // The judge's own cost for THIS evaluation. CostUnits below carries measured + judge
+            // together because that total is what a budget honours; this descriptor is what lets a
+            // consumer split them without reconstructing the judge's share from a cumulative
+            // counter (#167).
+            descriptors[_options.MetricPrefix + LlmFeedbackOptions.CostUnitsMetricSuffix] =
+                outcome.Calls * _options.JudgeCallCostUnits;
         }
 
         var diagnostics = new List<EvolutionDiagnostic>(measured.Diagnostics);
