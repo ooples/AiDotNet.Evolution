@@ -29,6 +29,9 @@ public sealed class OpenEvolveExampleLedgerTests
     private const int ImportTarget = 18;
     private static readonly TimeSpan RegexTimeout = TimeSpan.FromSeconds(5);
 
+    /// <summary>The heading whose table is the import ledger.</summary>
+    private const string LedgerSectionHeading = "## The ledger";
+
     private static readonly Regex Row = new(
         @"^\| `(?<example>[^`]+)` \| (?<config>`[^`]+`|none) \| (?<imports>yes|no) \| (?<reason>.+) \|$",
         RegexOptions.None, RegexTimeout);
@@ -37,6 +40,8 @@ public sealed class OpenEvolveExampleLedgerTests
     [Fact]
     public void The_ledger_covers_every_example_and_meets_the_target()
     {
+        Assert.Contains(LedgerSectionHeading, File.ReadAllLines(LedgerPath()));
+
         LedgerRow[] rows = Ledger();
 
         Assert.Equal(ExpectedExamples, rows.Length);
@@ -184,11 +189,28 @@ public sealed class OpenEvolveExampleLedgerTests
         return candidates.FirstOrDefault() ?? config;
     }
 
+    /// <summary>The import ledger's rows, read from its own section only.</summary>
+    /// <remarks>
+    /// The document holds two tables of 21 rows each, and both start <c>| `example` |</c>. Matching
+    /// the row pattern over the whole file worked only because the second column differs - a
+    /// backticked path or <c>none</c> here, a bare score in the smoke table - so formatting a score
+    /// as <c>`0.992`</c> would have fed 42 rows to a test asserting 21. Reading between the
+    /// headings removes that coupling: the tables can now be formatted independently.
+    /// </remarks>
     private static LedgerRow[] Ledger()
     {
         var rows = new List<LedgerRow>();
+        bool inSection = false;
         foreach (string line in File.ReadAllLines(LedgerPath()))
         {
+            if (line.StartsWith("## ", StringComparison.Ordinal))
+            {
+                inSection = line.Equals(LedgerSectionHeading, StringComparison.Ordinal);
+                continue;
+            }
+
+            if (!inSection) continue;
+
             Match match = Row.Match(line);
             if (!match.Success) continue;
 
