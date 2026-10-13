@@ -98,6 +98,7 @@ public sealed class EvolutionWeightedModelEnsemble<TGenome> : ICostedEvolutionPr
     // proposal identity), which is also how AdaptiveVariationPortfolio routes its arms.
     private readonly Dictionary<long, int> _pending = new();
     private readonly object _gate = new();
+    private bool _notifying;
 
     /// <summary>Creates an ensemble over a weighted model set.</summary>
     /// <param name="id">The ensemble's own source id.</param>
@@ -141,6 +142,16 @@ public sealed class EvolutionWeightedModelEnsemble<TGenome> : ICostedEvolutionPr
         {
             running += _models[i].Weight;
             _cumulative[i] = running;
+        }
+
+        if (double.IsInfinity(running) || double.IsNaN(running))
+        {
+            // Two weights of double.MaxValue sum to infinity, and Draw would then compare an
+            // infinite point against finite cumulative bounds and pick the last model every time -
+            // silently ignoring the mixture it was configured with. Refuse the configuration.
+            throw new ArgumentOutOfRangeException(
+                nameof(models), running,
+                "The models' weights sum to a value that is not finite, so no draw could follow them.");
         }
 
         _total = running;
@@ -192,6 +203,11 @@ public sealed class EvolutionWeightedModelEnsemble<TGenome> : ICostedEvolutionPr
 
         int index = Draw(context.Random);
         var model = _models[index];
+
+        // Reserve the route BEFORE the child works. Reserving afterwards meant a child could finish
+        // successfully and then have its receipt discarded by the routing cap, which also charged
+        // the model a failure it did not cause.
+        Reserve(context.Generation, index);
         lock (_gate)
         {
             _proposals[index]++;
@@ -200,13 +216,36 @@ public sealed class EvolutionWeightedModelEnsemble<TGenome> : ICostedEvolutionPr
         try
         {
             var result = await model.Source.ProposeAsync(context, cancellationToken).ConfigureAwait(false);
-            Remember(context.Generation, index);
+
+            // A null result breaks the contract this interface declares, and it is also a failure of
+            // the model that produced it, so it is charged and refused rather than passed upward to
+            // fail somewhere that cannot name the model.
+            if (result is null)
+            {
+                // Thrown, not charged here: the catch below is the single place a failure is counted
+                // and the route released, so charging in both made one null result two failures.
+                throw new InvalidOperationException(
+                    "Model '" + model.Source.Id + "' returned no proposal result.");
+            }
+
+            // A child may report failure without throwing. The story charges a model that "fails or
+            // times out", which is about the outcome, not the mechanism.
+            if (result.Outcome == EvolutionResourceOutcome.Failed)
+            {
+                lock (_gate)
+                {
+                    _failures[index]++;
+                }
+            }
+
             return result;
         }
         catch (OperationCanceledException)
         {
             // A cancellation is the run stopping, not this model failing. Charging it would blame a
-            // model for the operator's decision, which is the undercount-in-reverse mistake.
+            // model for the operator's decision. The route is released so the generation can be
+            // proposed again after the cancellation.
+            Release(context.Generation);
             throw;
         }
         catch
@@ -214,6 +253,7 @@ public sealed class EvolutionWeightedModelEnsemble<TGenome> : ICostedEvolutionPr
             lock (_gate)
             {
                 _failures[index]++;
+                _pending.Remove(context.Generation);
             }
 
             throw;
@@ -225,22 +265,38 @@ public sealed class EvolutionWeightedModelEnsemble<TGenome> : ICostedEvolutionPr
     {
         if (evaluation is null) throw new ArgumentNullException(nameof(evaluation));
 
-        int index;
+        // The child is told INSIDE the gate that drops the route, so a concurrent CaptureState
+        // cannot catch a moment where the route is gone and the child has not learned - that
+        // checkpoint would lose the outcome entirely. The reentrancy guard turns a child that calls
+        // back into this ensemble into an error rather than a deadlock.
         lock (_gate)
         {
+            if (_notifying)
+            {
+                throw new InvalidOperationException(
+                    "A model observed an outcome while the ensemble was already delivering one.");
+            }
+
             // An unknown or repeated outcome is refused rather than ignored: teaching the wrong
             // child another model's result corrupts its learning silently, and broadcasting to all
             // of them is worse. AdaptiveVariationPortfolio refuses the same way.
-            if (!_pending.TryGetValue(evaluation.Lineage.Generation, out index))
+            if (!_pending.TryGetValue(evaluation.Lineage.Generation, out int index))
             {
                 throw new InvalidOperationException(
                     "The weighted model ensemble received an unknown or repeated outcome.");
             }
 
-            _pending.Remove(evaluation.Lineage.Generation);
+            _notifying = true;
+            try
+            {
+                _models[index].Source.Observe(evaluation, insertionResult);
+                _pending.Remove(evaluation.Lineage.Generation);
+            }
+            finally
+            {
+                _notifying = false;
+            }
         }
-
-        _models[index].Source.Observe(evaluation, insertionResult);
     }
 
     /// <inheritdoc/>
@@ -296,8 +352,23 @@ public sealed class EvolutionWeightedModelEnsemble<TGenome> : ICostedEvolutionPr
         {
             Array.Copy(document.Proposals, _proposals, _models.Length);
             Array.Copy(document.Failures, _failures, _models.Length);
+            if (document.Pending is null)
+            {
+                throw new InvalidOperationException(
+                    "The ensemble state has no pending table; an omitted table is not the same claim as "
+                    + "an empty one, and accepting it would silently discard every unrouted proposal.");
+            }
+
+            if (document.Pending.Length > MaximumTrackedProposals)
+            {
+                throw new InvalidOperationException(
+                    "The ensemble state carries " + document.Pending.Length.ToString(CultureInfo.InvariantCulture)
+                    + " pending proposals, beyond the " + MaximumTrackedProposals.ToString(CultureInfo.InvariantCulture)
+                    + " this ensemble will route.");
+            }
+
             _pending.Clear();
-            foreach (var entry in document.Pending ?? Array.Empty<PendingEntry>())
+            foreach (var entry in document.Pending)
             {
                 if (entry.Model < 0 || entry.Model >= _models.Length)
                 {
@@ -326,18 +397,37 @@ public sealed class EvolutionWeightedModelEnsemble<TGenome> : ICostedEvolutionPr
         return _cumulative.Length - 1;
     }
 
-    private void Remember(long generation, int index)
+    private void Reserve(long generation, int index)
     {
         lock (_gate)
         {
-            if (_pending.Count >= MaximumTrackedProposals && !_pending.ContainsKey(generation))
+            // A generation already awaiting an outcome must not be re-proposed: overwriting the
+            // route would send the first proposal's outcome to the second model and refuse the
+            // second's outcome as unknown.
+            if (_pending.ContainsKey(generation))
             {
                 throw new InvalidOperationException(
-                    $"More than {MaximumTrackedProposals} proposals are awaiting an outcome; the ensemble "
-                    + "will not grow its routing table without bound.");
+                    "Generation " + generation.ToString(CultureInfo.InvariantCulture)
+                    + " already has a proposal awaiting an outcome.");
+            }
+
+            if (_pending.Count >= MaximumTrackedProposals)
+            {
+                throw new InvalidOperationException(
+                    "More than " + MaximumTrackedProposals.ToString(CultureInfo.InvariantCulture)
+                    + " proposals are awaiting an outcome; the ensemble will not grow its routing "
+                    + "table without bound.");
             }
 
             _pending[generation] = index;
+        }
+    }
+
+    private void Release(long generation)
+    {
+        lock (_gate)
+        {
+            _pending.Remove(generation);
         }
     }
 

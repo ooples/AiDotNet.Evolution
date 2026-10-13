@@ -148,11 +148,19 @@ public sealed class WeightedModelEnsembleTests
             new[] { new EvolutionModelWeight<int>(left, 1.0), new EvolutionModelWeight<int>(right, 1.0) });
 
         var random = new StableRandom(seed: 99);
+        int beforeLeft = left.Proposed, beforeRight = right.Proposed;
         await ensemble.ProposeAsync(Context(random, generation: 7));
+
+        // Which source's own counter advanced is the model that produced this proposal. Asserting
+        // only that ONE outcome was delivered would pass even if every outcome went to `left`.
+        StubSource producer = left.Proposed > beforeLeft ? left : right;
+        StubSource other = ReferenceEquals(producer, left) ? right : left;
+        _ = beforeRight;
+
         ensemble.Observe(EvaluationForGeneration(7), EvolutionArchiveInsertionResult.Inserted);
 
-        int observed = left.Observed + right.Observed;
-        Assert.Equal(1, observed);
+        Assert.Equal(1, producer.Observed);
+        Assert.Equal(0, other.Observed);
     }
 
     /// <summary>
@@ -224,6 +232,107 @@ public sealed class WeightedModelEnsembleTests
             }));
     }
 
+    /// <summary>
+    /// Weights that sum past the double range are refused: a non-finite total would make the draw
+    /// compare an infinite point against finite bounds and pick the last model every time, silently
+    /// ignoring the configured mixture.
+    /// </summary>
+    [Fact]
+    public void Weights_that_do_not_sum_finitely_are_refused()
+    {
+        Assert.Throws<ArgumentOutOfRangeException>(() => new EvolutionWeightedModelEnsemble<int>(
+            "ensemble",
+            new[]
+            {
+                new EvolutionModelWeight<int>(new StubSource("huge-a"), double.MaxValue),
+                new EvolutionModelWeight<int>(new StubSource("huge-b"), double.MaxValue),
+            }));
+    }
+
+    /// <summary>
+    /// A model that reports failure without throwing is still charged: the story charges a model
+    /// that "fails or times out", which is about the outcome rather than the mechanism.
+    /// </summary>
+    [Fact]
+    public async Task A_failed_outcome_without_an_exception_is_still_charged()
+    {
+        var source = new StubSource("reports-failure") { Outcome = EvolutionResourceOutcome.Failed };
+        var ensemble = new EvolutionWeightedModelEnsemble<int>(
+            "ensemble", new[] { new EvolutionModelWeight<int>(source, 1.0) });
+
+        await ensemble.ProposeAsync(Context(new StableRandom(11), generation: 0));
+
+        var account = ensemble.Accounts.Single();
+        Assert.Equal(1, account.Proposals);
+        Assert.Equal(1, account.Failures);
+    }
+
+    /// <summary>
+    /// A null result breaks the interface's contract and is charged to the model that returned it,
+    /// rather than passed upward to fail somewhere that cannot name the model.
+    /// </summary>
+    [Fact]
+    public async Task A_null_result_is_charged_and_refused()
+    {
+        var source = new StubSource("returns-null") { ReturnNull = true };
+        var ensemble = new EvolutionWeightedModelEnsemble<int>(
+            "ensemble", new[] { new EvolutionModelWeight<int>(source, 1.0) });
+
+        await Assert.ThrowsAsync<InvalidOperationException>(
+            async () => await ensemble.ProposeAsync(Context(new StableRandom(12), generation: 0)));
+
+        Assert.Equal(1, ensemble.Accounts.Single().Failures);
+    }
+
+    /// <summary>
+    /// A generation that already has a proposal awaiting an outcome cannot be proposed again:
+    /// overwriting the route would send the first outcome to the second model.
+    /// </summary>
+    [Fact]
+    public async Task A_generation_cannot_hold_two_pending_proposals()
+    {
+        var ensemble = Build(("only", 1.0));
+        var random = new StableRandom(seed: 13);
+        await ensemble.ProposeAsync(Context(random, generation: 4));
+
+        await Assert.ThrowsAsync<InvalidOperationException>(
+            async () => await ensemble.ProposeAsync(Context(random, generation: 4)));
+    }
+
+    /// <summary>
+    /// A cancelled proposal releases its route, so the generation can be proposed again once the
+    /// run resumes.
+    /// </summary>
+    [Fact]
+    public async Task A_cancelled_proposal_releases_its_route()
+    {
+        var source = new StubSource("cancels") { Throw = new OperationCanceledException() };
+        var ensemble = new EvolutionWeightedModelEnsemble<int>(
+            "ensemble", new[] { new EvolutionModelWeight<int>(source, 1.0) });
+        var random = new StableRandom(seed: 14);
+
+        await Assert.ThrowsAsync<OperationCanceledException>(
+            async () => await ensemble.ProposeAsync(Context(random, generation: 2)));
+
+        source.Throw = null;
+        await ensemble.ProposeAsync(Context(random, generation: 2));
+        Assert.Equal(0, ensemble.Accounts.Single().Failures);
+    }
+
+    /// <summary>
+    /// A checkpoint whose pending table is missing is refused: an omitted table is not the same
+    /// claim as an empty one, and accepting it would discard every unrouted proposal in silence.
+    /// </summary>
+    [Fact]
+    public void A_state_without_a_pending_table_is_refused()
+    {
+        var ensemble = Build(("only", 1.0));
+        string state = ensemble.CaptureState();
+        string stripped = state.Replace("\"Pending\":[]", "\"Pending\":null");
+
+        Assert.Throws<InvalidOperationException>(() => ensemble.RestoreState(stripped));
+    }
+
     private static EvolutionWeightedModelEnsemble<int> Build(params (string Id, double Weight)[] models)
         => new(
             "ensemble",
@@ -285,6 +394,10 @@ public sealed class WeightedModelEnsembleTests
 
         public Exception? Throw { get; set; }
 
+        public EvolutionResourceOutcome Outcome { get; set; } = EvolutionResourceOutcome.Completed;
+
+        public bool ReturnNull { get; set; }
+
         public int Proposed { get; private set; }
 
         public int Observed { get; private set; }
@@ -294,8 +407,9 @@ public sealed class WeightedModelEnsembleTests
         {
             Proposed++;
             if (Throw is not null) throw Throw;
+            if (ReturnNull) return new ValueTask<EvolutionResourceResult<int>>((EvolutionResourceResult<int>)null!);
             return new ValueTask<EvolutionResourceResult<int>>(
-                new EvolutionResourceResult<int>(Proposed, EvolutionResources.Empty));
+                new EvolutionResourceResult<int>(Proposed, EvolutionResources.Empty, Outcome));
         }
 
         public void Observe(EvolutionEvaluation evaluation, EvolutionArchiveInsertionResult? insertionResult)
