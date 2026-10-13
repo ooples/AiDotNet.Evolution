@@ -424,6 +424,124 @@ public sealed class MetaPromptEvolutionTests
         Assert.Equal(1, evolver.ProposalCalls);
     }
 
+    /// <summary>
+    /// The wiring: an operator given the evolver as its instruction source sends the evolver's
+    /// instruction as the system message of the actual model request.
+    /// </summary>
+    /// <remarks>
+    /// Until this existed the evolver was a component nothing called, which is what review
+    /// correctly objected to. The seam is the per-proposal prompt context, not the operator's
+    /// options: those are derived once when the operator is built.
+    /// </remarks>
+    [Fact]
+    public async Task An_operator_sends_the_evolvers_instruction_as_the_system_message()
+    {
+        // One instruction in the archive, so which one is drawn is not in question: with several
+        // unscored entries the unscored-first rule picks among them at random, and this test is
+        // about the seam rather than about selection.
+        var evolver = new ProgramMetaPromptEvolver(new FakeChatClient(), Seed, Options());
+
+        var proposals = new FakeChatClient("```python\nX = 1\n```");
+        var programOptions = new ProgramProposalOptions { Language = ProgramLanguage.Python };
+        programOptions.Prompt.SystemMessage = "the fixed instruction nobody should see";
+        programOptions.Prompt.SystemMessageMode = ProgramPromptSystemMessageMode.Literal;
+
+        var operatorUnderTest = new LlmProgramVariationOperator(
+            proposals, programOptions, new LlmProgramVariationOptions
+            {
+                Mode = ProgramEvolutionMode.FullRewrite,
+                SystemMessage = "the fixed instruction nobody should see",
+                InstructionSource = evolver,
+            });
+
+        await operatorUnderTest.ProposeAsync(VariationContext(generation: 6));
+
+        IReadOnlyList<ProgramChatMessage> conversation = Assert.Single(proposals.Conversations);
+        ProgramChatMessage system = Assert.Single(
+            conversation.Where(m => m.Role == ProgramChatRole.System).ToArray());
+
+        // The evolver's instruction, not the configured one: the whole point of the seam.
+        Assert.Contains(Seed, system.Text, StringComparison.Ordinal);
+        Assert.DoesNotContain("nobody should see", system.Text, StringComparison.Ordinal);
+
+        // And the route was recorded, so the outcome can be credited to the instruction that wrote
+        // this proposal.
+        Assert.True(evolver.Abandon(6));
+    }
+
+    /// <summary>
+    /// With no source the configured message still governs, so the seam is additive rather than a
+    /// behaviour change for every existing caller.
+    /// </summary>
+    [Fact]
+    public async Task Without_a_source_the_configured_system_message_still_governs()
+    {
+        var proposals = new FakeChatClient("```python\nX = 1\n```");
+        var programOptions = new ProgramProposalOptions { Language = ProgramLanguage.Python };
+        programOptions.Prompt.SystemMessage = "the fixed instruction that should be used";
+        programOptions.Prompt.SystemMessageMode = ProgramPromptSystemMessageMode.Literal;
+
+        var operatorUnderTest = new LlmProgramVariationOperator(
+            proposals, programOptions, new LlmProgramVariationOptions
+            {
+                Mode = ProgramEvolutionMode.FullRewrite,
+                SystemMessage = "the fixed instruction that should be used",
+            });
+
+        await operatorUnderTest.ProposeAsync(VariationContext(generation: 6));
+
+        IReadOnlyList<ProgramChatMessage> conversation = Assert.Single(proposals.Conversations);
+        ProgramChatMessage system = Assert.Single(
+            conversation.Where(m => m.Role == ProgramChatRole.System).ToArray());
+        Assert.Contains("should be used", system.Text, StringComparison.Ordinal);
+    }
+
+    /// <summary>
+    /// An operator's identity covers its instruction source, so a checkpoint from a run with one
+    /// cannot be restored into a run with another - or with none.
+    /// </summary>
+    [Fact]
+    public void The_operators_identity_covers_its_instruction_source()
+    {
+        var programOptions = new ProgramProposalOptions { Language = ProgramLanguage.Python };
+        var evolver = new ProgramMetaPromptEvolver(new FakeChatClient(), Seed, Options());
+
+        string With(IProgramInstructionSource? source) => new LlmProgramVariationOperator(
+            new FakeChatClient(), programOptions, new LlmProgramVariationOptions
+            {
+                Mode = ProgramEvolutionMode.FullRewrite,
+                InstructionSource = source,
+            }).VersionHash;
+
+        Assert.NotEqual(With(null), With(evolver));
+
+        var otherSeed = new ProgramMetaPromptEvolver(
+            new FakeChatClient(), "A different starting instruction entirely.", Options());
+        Assert.NotEqual(With(evolver), With(otherSeed));
+    }
+
+    private static EvolutionVariationContext<ProgramGenome> VariationContext(long generation)
+    {
+        var genome = new ProgramGenome("X = 0\n", ProgramLanguage.Python);
+        var lineage = new EvolutionLineage(null, null, "meta", null, generation, 0, (ulong)generation);
+        // The archive entry requires the candidate's and the evaluation's identities to agree, so
+        // both use the parent's: this context describes the PARENT being proposed from, not the
+        // generation being proposed.
+        var evaluation = new EvolutionEvaluation(
+            0, "g0", EvolutionEvaluationStatus.Completed, 0.5,
+            EvolutionOptimizationDirection.Maximize, new Dictionary<string, double>(),
+            Array.Empty<double>(), Array.Empty<double>(),
+            new EvolutionEvaluationCost(TimeSpan.Zero, 1, 1), lineage,
+            EvolutionCacheStatus.Miss, Array.Empty<EvolutionDiagnostic>(), "task", "evaluator", "config");
+        var entry = new EvolutionArchiveEntry<ProgramGenome>(
+            new EvolutionCellKey(new[] { 0 }),
+            new EvolutionCandidate<ProgramGenome>(0, new EvolutionCanonicalGenome<ProgramGenome>(genome, "g0"), lineage),
+            evaluation);
+        return new EvolutionVariationContext<ProgramGenome>(
+            entry, Array.Empty<EvolutionArchiveEntry<ProgramGenome>>(),
+            new StableRandom(seed: 99), generation, island: 0);
+    }
+
     private static ProgramInstructionCandidate Single(ProgramMetaPromptEvolver evolver, string text)
     {
         ProgramInstructionCandidate[] matches = evolver.Archive

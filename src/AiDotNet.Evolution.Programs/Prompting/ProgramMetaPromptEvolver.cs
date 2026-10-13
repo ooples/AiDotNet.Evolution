@@ -34,7 +34,7 @@ namespace AiDotNet.Evolution.Programs;
 /// <see cref="ProposeAsync"/> is called.
 /// </para>
 /// </remarks>
-public sealed class ProgramMetaPromptEvolver
+public sealed class ProgramMetaPromptEvolver : IProgramInstructionSource
 {
     // Bumped when the checkpoint shape changes, so an older state is refused rather than misread.
     private const int StateSchemaVersion = 1;
@@ -77,6 +77,14 @@ public sealed class ProgramMetaPromptEvolver
         _seedId = Identify(seed);
         _archive.Add(new ProgramInstructionCandidate(_seedId, seed, parentId: null, generation: 0));
     }
+
+    /// <inheritdoc/>
+    /// <remarks>
+    /// Covers the settings, the seed instruction and the model, so an operator built with one
+    /// evolver cannot claim the identity of an operator built with another.
+    /// </remarks>
+    public string VersionHash => EvolutionHash.Combine(
+        new[] { "meta-prompt-v1", _options.Identity(), _seedId, _chatClient.ModelId });
 
     /// <summary>The archive, best mean quality first, with unscored instructions last.</summary>
     public IReadOnlyList<ProgramInstructionCandidate> Archive

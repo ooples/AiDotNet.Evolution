@@ -88,6 +88,17 @@ public sealed class ProgramPromptContext
     /// <summary>Gets or sets the parent's current change description, used in changes-description mode.</summary>
     public string? ChangesDescription { get; set; }
 
+    /// <summary>
+    /// Gets or sets the system instruction for this one proposal, overriding the configured message.
+    /// </summary>
+    /// <remarks>
+    /// <see cref="ProgramEvolutionPromptOptions.SystemMessage"/> is fixed when the builder is made,
+    /// which leaves no way for a run to evolve its own instructions. This is the per-proposal seam
+    /// meta-prompt evolution uses (V1-53, #166); null leaves the configured message in charge, and
+    /// the text is always taken literally rather than resolved as a template name.
+    /// </remarks>
+    public string? SystemMessageOverride { get; set; }
+
     /// <summary>Validates that the aligned feature lists agree and that no collection holds a null element.</summary>
     /// <exception cref="ArgumentException">
     /// A collection is <c>null</c> or holds a <c>null</c> element, a score is not finite, or

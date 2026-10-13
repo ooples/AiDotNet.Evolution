@@ -29,6 +29,33 @@ if (evolver.ShouldPropose(generation)) await evolver.ProposeAsync(generation, le
 
 Nothing is contacted unless `Enabled` is set and `ProposeAsync` is called.
 
+## Wiring it into a run
+
+`LlmProgramVariationOptions.InstructionSource` takes an `IProgramInstructionSource`, which the
+evolver implements. The operator asks it once per proposal, on the engine's seeded stream, and uses
+the answer as that proposal's system message:
+
+```csharp
+var variation = new LlmProgramVariationOperator(chatClient, programOptions, new LlmProgramVariationOptions
+{
+    Mode = ProgramEvolutionMode.FullRewrite,
+    InstructionSource = evolver            // null leaves SystemMessage in charge
+});
+```
+
+The seam is the per-proposal prompt context (`ProgramPromptContext.SystemMessageOverride`), not the
+operator's options: those are derived once when the operator is built, so an instruction set there
+could never change during a run. A source that returns null for a proposal leaves the configured
+`SystemMessage` in place for that proposal, so adding one changes nothing for existing callers.
+
+The source's `VersionHash` joins the operator's identity, because an interface-typed option cannot
+be serialised into it and two operators differing only by their instruction source must not claim
+the same version.
+
+**Crediting stays with the caller.** The operator supplies proposals and never sees outcomes, so
+whoever owns the run calls `Observe(generation, quality)` after each evaluation - and `Abandon` for a
+proposal that failed.
+
 ## What scores an instruction
 
 Only the programs it produced. `Observe` credits the instruction that wrote a proposal with that
