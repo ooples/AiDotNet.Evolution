@@ -1,0 +1,389 @@
+#nullable enable
+[AIDEVO005]AiDotNet.Evolution.Ptx.IPtxKernelReference
+[AIDEVO005]AiDotNet.Evolution.Ptx.IPtxKernelReference.Compute(AiDotNet.Evolution.Ptx.PtxReferenceInvocation! invocation) -> void
+[AIDEVO005]AiDotNet.Evolution.Ptx.IPtxKernelReference.Identity.get -> string!
+[AIDEVO005]AiDotNet.Evolution.Ptx.PtxBufferRole
+[AIDEVO005]AiDotNet.Evolution.Ptx.PtxBufferRole.Input = 0 -> AiDotNet.Evolution.Ptx.PtxBufferRole
+[AIDEVO005]AiDotNet.Evolution.Ptx.PtxBufferRole.InputOutput = 2 -> AiDotNet.Evolution.Ptx.PtxBufferRole
+[AIDEVO005]AiDotNet.Evolution.Ptx.PtxBufferRole.Output = 1 -> AiDotNet.Evolution.Ptx.PtxBufferRole
+[AIDEVO005]AiDotNet.Evolution.Ptx.PtxCaseOutcome
+[AIDEVO005]AiDotNet.Evolution.Ptx.PtxCaseOutcome.Compared.get -> long
+[AIDEVO005]AiDotNet.Evolution.Ptx.PtxCaseOutcome.Failure.get -> string?
+[AIDEVO005]AiDotNet.Evolution.Ptx.PtxCaseOutcome.MaxAbsoluteError.get -> double
+[AIDEVO005]AiDotNet.Evolution.Ptx.PtxCaseOutcome.MaxRelativeError.get -> double
+[AIDEVO005]AiDotNet.Evolution.Ptx.PtxCaseOutcome.Mismatches.get -> long
+[AIDEVO005]AiDotNet.Evolution.Ptx.PtxCaseOutcome.Passed.get -> bool
+[AIDEVO005]AiDotNet.Evolution.Ptx.PtxCaseOutcome.Shape.get -> AiDotNet.Evolution.Ptx.PtxShapeCase!
+[AIDEVO005]AiDotNet.Evolution.Ptx.PtxCaseOutcome.Unspecified.get -> long
+[AIDEVO005]AiDotNet.Evolution.Ptx.PtxCompilationResult
+[AIDEVO005]AiDotNet.Evolution.Ptx.PtxCompilationResult.Device.get -> AiDotNet.Evolution.Ptx.PtxDeviceInfo?
+[AIDEVO005]AiDotNet.Evolution.Ptx.PtxCompilationResult.Diagnostics.get -> System.Collections.Generic.IReadOnlyList<AiDotNet.Evolution.Programs.CompilationDiagnostic!>!
+[AIDEVO005]AiDotNet.Evolution.Ptx.PtxCompilationResult.ErrorLog.get -> string!
+[AIDEVO005]AiDotNet.Evolution.Ptx.PtxCompilationResult.InfoLog.get -> string!
+[AIDEVO005]AiDotNet.Evolution.Ptx.PtxCompilationResult.IsInfrastructureFailure.get -> bool
+[AIDEVO005]AiDotNet.Evolution.Ptx.PtxCompilationResult.Launch.get -> AiDotNet.Evolution.Ptx.PtxLaunchConfiguration!
+[AIDEVO005]AiDotNet.Evolution.Ptx.PtxCompilationResult.Resources.get -> AiDotNet.Evolution.Ptx.PtxKernelResources?
+[AIDEVO005]AiDotNet.Evolution.Ptx.PtxCompilationResult.Source.get -> string!
+[AIDEVO005]AiDotNet.Evolution.Ptx.PtxCompilationResult.Succeeded.get -> bool
+[AIDEVO005]AiDotNet.Evolution.Ptx.PtxCompilationResult.ToFeedback() -> string!
+[AIDEVO005]AiDotNet.Evolution.Ptx.PtxCorrectnessEvaluator
+[AIDEVO005]AiDotNet.Evolution.Ptx.PtxCorrectnessEvaluator.Evaluate(string! candidateSource, System.Threading.CancellationToken cancellationToken = default(System.Threading.CancellationToken)) -> AiDotNet.Evolution.Ptx.PtxCorrectnessReport!
+[AIDEVO005]AiDotNet.Evolution.Ptx.PtxCorrectnessEvaluator.PtxCorrectnessEvaluator(AiDotNet.Evolution.Ptx.PtxProgramCompiler! compiler, AiDotNet.Evolution.Ptx.IPtxKernelReference? reference, string? incumbentSource) -> void
+[AIDEVO005]AiDotNet.Evolution.Ptx.PtxCorrectnessEvaluator.ReferenceIdentity.get -> string!
+[AIDEVO005]AiDotNet.Evolution.Ptx.PtxCorrectnessReport
+[AIDEVO005]AiDotNet.Evolution.Ptx.PtxCorrectnessReport.Cases.get -> System.Collections.Generic.IReadOnlyList<AiDotNet.Evolution.Ptx.PtxCaseOutcome!>!
+[AIDEVO005]AiDotNet.Evolution.Ptx.PtxCorrectnessReport.Compilation.get -> AiDotNet.Evolution.Ptx.PtxCompilationResult?
+[AIDEVO005]AiDotNet.Evolution.Ptx.PtxCorrectnessReport.MaxAbsoluteError.get -> double
+[AIDEVO005]AiDotNet.Evolution.Ptx.PtxCorrectnessReport.MaxRelativeError.get -> double
+[AIDEVO005]AiDotNet.Evolution.Ptx.PtxCorrectnessReport.Message.get -> string!
+[AIDEVO005]AiDotNet.Evolution.Ptx.PtxCorrectnessReport.Passed.get -> bool
+[AIDEVO005]AiDotNet.Evolution.Ptx.PtxCorrectnessReport.ReferenceIdentity.get -> string!
+[AIDEVO005]AiDotNet.Evolution.Ptx.PtxCorrectnessReport.Verdict.get -> AiDotNet.Evolution.Ptx.PtxCorrectnessVerdict
+[AIDEVO005]AiDotNet.Evolution.Ptx.PtxCorrectnessVerdict
+[AIDEVO005]AiDotNet.Evolution.Ptx.PtxCorrectnessVerdict.CompileFailed = 1 -> AiDotNet.Evolution.Ptx.PtxCorrectnessVerdict
+[AIDEVO005]AiDotNet.Evolution.Ptx.PtxCorrectnessVerdict.LaunchFailed = 2 -> AiDotNet.Evolution.Ptx.PtxCorrectnessVerdict
+[AIDEVO005]AiDotNet.Evolution.Ptx.PtxCorrectnessVerdict.Mismatch = 4 -> AiDotNet.Evolution.Ptx.PtxCorrectnessVerdict
+[AIDEVO005]AiDotNet.Evolution.Ptx.PtxCorrectnessVerdict.OutOfBoundsWrite = 3 -> AiDotNet.Evolution.Ptx.PtxCorrectnessVerdict
+[AIDEVO005]AiDotNet.Evolution.Ptx.PtxCorrectnessVerdict.Passed = 0 -> AiDotNet.Evolution.Ptx.PtxCorrectnessVerdict
+[AIDEVO005]AiDotNet.Evolution.Ptx.PtxCorrectnessVerdict.ReferenceFailed = 5 -> AiDotNet.Evolution.Ptx.PtxCorrectnessVerdict
+[AIDEVO005]AiDotNet.Evolution.Ptx.PtxCorrectnessVerdict.Unavailable = 6 -> AiDotNet.Evolution.Ptx.PtxCorrectnessVerdict
+[AIDEVO005]AiDotNet.Evolution.Ptx.PtxDeviceInfo
+[AIDEVO005]AiDotNet.Evolution.Ptx.PtxDeviceInfo.DriverVersion.get -> int
+[AIDEVO005]AiDotNet.Evolution.Ptx.PtxDeviceInfo.Identity.get -> string!
+[AIDEVO005]AiDotNet.Evolution.Ptx.PtxDeviceInfo.MaxRegistersPerMultiprocessor.get -> int
+[AIDEVO005]AiDotNet.Evolution.Ptx.PtxDeviceInfo.MaxSharedMemoryPerBlockOptin.get -> int
+[AIDEVO005]AiDotNet.Evolution.Ptx.PtxDeviceInfo.MaxThreadsPerMultiprocessor.get -> int
+[AIDEVO005]AiDotNet.Evolution.Ptx.PtxDeviceInfo.MultiprocessorCount.get -> int
+[AIDEVO005]AiDotNet.Evolution.Ptx.PtxDeviceInfo.Name.get -> string!
+[AIDEVO005]AiDotNet.Evolution.Ptx.PtxDeviceInfo.Ordinal.get -> int
+[AIDEVO005]AiDotNet.Evolution.Ptx.PtxDeviceInfo.SmVersion.get -> int
+[AIDEVO005]AiDotNet.Evolution.Ptx.PtxDeviceInfo.TotalMemoryBytes.get -> long
+[AIDEVO005]AiDotNet.Evolution.Ptx.PtxDeviceProbe
+[AIDEVO005]AiDotNet.Evolution.Ptx.PtxDeviceProbe.Device.get -> AiDotNet.Evolution.Ptx.PtxDeviceInfo?
+[AIDEVO005]AiDotNet.Evolution.Ptx.PtxDeviceProbe.IsAvailable.get -> bool
+[AIDEVO005]AiDotNet.Evolution.Ptx.PtxDeviceProbe.Message.get -> string!
+[AIDEVO005]static AiDotNet.Evolution.Ptx.PtxDeviceProbe.Run(AiDotNet.Evolution.Ptx.PtxIsolationOptions? isolation = null, System.Threading.CancellationToken cancellationToken = default(System.Threading.CancellationToken)) -> AiDotNet.Evolution.Ptx.PtxDeviceProbe!
+[AIDEVO005]override AiDotNet.Evolution.Ptx.PtxDeviceProbe.ToString() -> string!
+[AIDEVO005]AiDotNet.Evolution.Ptx.PtxDistributionKind
+[AIDEVO005]AiDotNet.Evolution.Ptx.PtxDistributionKind.Constant = 2 -> AiDotNet.Evolution.Ptx.PtxDistributionKind
+[AIDEVO005]AiDotNet.Evolution.Ptx.PtxDistributionKind.Integers = 1 -> AiDotNet.Evolution.Ptx.PtxDistributionKind
+[AIDEVO005]AiDotNet.Evolution.Ptx.PtxDistributionKind.Uniform = 0 -> AiDotNet.Evolution.Ptx.PtxDistributionKind
+[AIDEVO005]AiDotNet.Evolution.Ptx.PtxElementType
+[AIDEVO005]AiDotNet.Evolution.Ptx.PtxElementType.Float16 = 2 -> AiDotNet.Evolution.Ptx.PtxElementType
+[AIDEVO005]AiDotNet.Evolution.Ptx.PtxElementType.Float32 = 0 -> AiDotNet.Evolution.Ptx.PtxElementType
+[AIDEVO005]AiDotNet.Evolution.Ptx.PtxElementType.Float64 = 1 -> AiDotNet.Evolution.Ptx.PtxElementType
+[AIDEVO005]AiDotNet.Evolution.Ptx.PtxElementType.Int32 = 3 -> AiDotNet.Evolution.Ptx.PtxElementType
+[AIDEVO005]AiDotNet.Evolution.Ptx.PtxElementType.Int64 = 5 -> AiDotNet.Evolution.Ptx.PtxElementType
+[AIDEVO005]AiDotNet.Evolution.Ptx.PtxElementType.UInt32 = 4 -> AiDotNet.Evolution.Ptx.PtxElementType
+[AIDEVO005]AiDotNet.Evolution.Ptx.PtxElementType.UInt8 = 6 -> AiDotNet.Evolution.Ptx.PtxElementType
+[AIDEVO005]AiDotNet.Evolution.Ptx.PtxExtent
+[AIDEVO005]const AiDotNet.Evolution.Ptx.PtxExtent.BlockX = "blockX" -> string!
+[AIDEVO005]const AiDotNet.Evolution.Ptx.PtxExtent.BlockY = "blockY" -> string!
+[AIDEVO005]const AiDotNet.Evolution.Ptx.PtxExtent.BlockZ = "blockZ" -> string!
+[AIDEVO005]AiDotNet.Evolution.Ptx.PtxExtent.CeilDiv(long value) -> AiDotNet.Evolution.Ptx.PtxExtent!
+[AIDEVO005]AiDotNet.Evolution.Ptx.PtxExtent.CeilDiv(string! symbol) -> AiDotNet.Evolution.Ptx.PtxExtent!
+[AIDEVO005]static AiDotNet.Evolution.Ptx.PtxExtent.Constant(long value) -> AiDotNet.Evolution.Ptx.PtxExtent!
+[AIDEVO005]AiDotNet.Evolution.Ptx.PtxExtent.Divisor.get -> long
+[AIDEVO005]AiDotNet.Evolution.Ptx.PtxExtent.DivisorFactors.get -> System.Collections.Generic.IReadOnlyList<string!>!
+[AIDEVO005]AiDotNet.Evolution.Ptx.PtxExtent.Equals(AiDotNet.Evolution.Ptx.PtxExtent? other) -> bool
+[AIDEVO005]override AiDotNet.Evolution.Ptx.PtxExtent.Equals(object? obj) -> bool
+[AIDEVO005]AiDotNet.Evolution.Ptx.PtxExtent.Evaluate(System.Collections.Generic.IReadOnlyDictionary<string!, long>! symbols) -> long
+[AIDEVO005]AiDotNet.Evolution.Ptx.PtxExtent.Factors.get -> System.Collections.Generic.IReadOnlyList<string!>!
+[AIDEVO005]override AiDotNet.Evolution.Ptx.PtxExtent.GetHashCode() -> int
+[AIDEVO005]AiDotNet.Evolution.Ptx.PtxExtent.Multiplier.get -> long
+[AIDEVO005]static AiDotNet.Evolution.Ptx.PtxExtent.Of(params string![]! symbols) -> AiDotNet.Evolution.Ptx.PtxExtent!
+[AIDEVO005]AiDotNet.Evolution.Ptx.PtxExtent.PtxExtent(System.Collections.Generic.IReadOnlyList<string!>? factors, long multiplier, System.Collections.Generic.IReadOnlyList<string!>? divisorFactors, long divisor) -> void
+[AIDEVO005]AiDotNet.Evolution.Ptx.PtxExtent.Times(long value) -> AiDotNet.Evolution.Ptx.PtxExtent!
+[AIDEVO005]override AiDotNet.Evolution.Ptx.PtxExtent.ToString() -> string!
+[AIDEVO005]AiDotNet.Evolution.Ptx.PtxIncumbentProfile
+[AIDEVO005]AiDotNet.Evolution.Ptx.PtxIncumbentProfile.Bottleneck.get -> string!
+[AIDEVO005]static AiDotNet.Evolution.Ptx.PtxIncumbentProfile.From(AiDotNet.Evolution.Ptx.PtxTimingStatistics! timing, AiDotNet.Evolution.Ptx.PtxKernelResources! resources, string? bottleneck = null) -> AiDotNet.Evolution.Ptx.PtxIncumbentProfile!
+[AIDEVO005]AiDotNet.Evolution.Ptx.PtxIncumbentProfile.IqrMilliseconds.get -> double
+[AIDEVO005]AiDotNet.Evolution.Ptx.PtxIncumbentProfile.LocalBytes.get -> int
+[AIDEVO005]AiDotNet.Evolution.Ptx.PtxIncumbentProfile.MedianMilliseconds.get -> double
+[AIDEVO005]AiDotNet.Evolution.Ptx.PtxIncumbentProfile.PtxIncumbentProfile(double medianMilliseconds, double iqrMilliseconds, int registers, int sharedBytes, int localBytes, string? bottleneck) -> void
+[AIDEVO005]AiDotNet.Evolution.Ptx.PtxIncumbentProfile.Registers.get -> int
+[AIDEVO005]AiDotNet.Evolution.Ptx.PtxIncumbentProfile.SharedBytes.get -> int
+[AIDEVO005]AiDotNet.Evolution.Ptx.PtxIsolationOptions
+[AIDEVO005]AiDotNet.Evolution.Ptx.PtxIsolationOptions.DeviceOrdinal.get -> int
+[AIDEVO005]AiDotNet.Evolution.Ptx.PtxIsolationOptions.DeviceOrdinal.set -> void
+[AIDEVO005]AiDotNet.Evolution.Ptx.PtxIsolationOptions.DotnetHostPath.get -> string?
+[AIDEVO005]AiDotNet.Evolution.Ptx.PtxIsolationOptions.DotnetHostPath.set -> void
+[AIDEVO005]AiDotNet.Evolution.Ptx.PtxIsolationOptions.MaxDeviceBytes.get -> long
+[AIDEVO005]AiDotNet.Evolution.Ptx.PtxIsolationOptions.MaxDeviceBytes.set -> void
+[AIDEVO005]AiDotNet.Evolution.Ptx.PtxIsolationOptions.MaxReadbackBytes.get -> long
+[AIDEVO005]AiDotNet.Evolution.Ptx.PtxIsolationOptions.MaxReadbackBytes.set -> void
+[AIDEVO005]AiDotNet.Evolution.Ptx.PtxIsolationOptions.MaxResponseBytes.get -> long
+[AIDEVO005]AiDotNet.Evolution.Ptx.PtxIsolationOptions.MaxResponseBytes.set -> void
+[AIDEVO005]AiDotNet.Evolution.Ptx.PtxIsolationOptions.PtxIsolationOptions() -> void
+[AIDEVO005]AiDotNet.Evolution.Ptx.PtxIsolationOptions.Timeout.get -> System.TimeSpan
+[AIDEVO005]AiDotNet.Evolution.Ptx.PtxIsolationOptions.Timeout.set -> void
+[AIDEVO005]AiDotNet.Evolution.Ptx.PtxIsolationOptions.WorkerDirectory.get -> string?
+[AIDEVO005]AiDotNet.Evolution.Ptx.PtxIsolationOptions.WorkerDirectory.set -> void
+[AIDEVO005]AiDotNet.Evolution.Ptx.PtxKernelArtifact
+[AIDEVO005]AiDotNet.Evolution.Ptx.PtxKernelArtifact.ArtifactId.get -> string!
+[AIDEVO005]AiDotNet.Evolution.Ptx.PtxKernelArtifact.CompilerFingerprint.get -> string!
+[AIDEVO005]AiDotNet.Evolution.Ptx.PtxKernelArtifact.ContractFingerprint.get -> string!
+[AIDEVO005]AiDotNet.Evolution.Ptx.PtxKernelArtifact.ContractName.get -> string!
+[AIDEVO005]AiDotNet.Evolution.Ptx.PtxKernelArtifact.CorrectnessCases.get -> int
+[AIDEVO005]static AiDotNet.Evolution.Ptx.PtxKernelArtifact.Create(AiDotNet.Evolution.Ptx.PtxProgramCompiler! compiler, AiDotNet.Evolution.Ptx.PtxCorrectnessReport! correctness, AiDotNet.Evolution.Ptx.PtxTimingReport! timing, string! incumbentSource, string! timingProtocol) -> AiDotNet.Evolution.Ptx.PtxKernelArtifact!
+[AIDEVO005]AiDotNet.Evolution.Ptx.PtxKernelArtifact.DeviceIdentity.get -> string!
+[AIDEVO005]AiDotNet.Evolution.Ptx.PtxKernelArtifact.EntryPoint.get -> string!
+[AIDEVO005]AiDotNet.Evolution.Ptx.PtxKernelArtifact.Evidence.get -> AiDotNet.Evolution.Ptx.PtxPairedTimingEvidence!
+[AIDEVO005]static AiDotNet.Evolution.Ptx.PtxKernelArtifact.FromBytes(byte[]! bytes) -> AiDotNet.Evolution.Ptx.PtxKernelArtifact!
+[AIDEVO005]AiDotNet.Evolution.Ptx.PtxKernelArtifact.IncumbentSha256.get -> string!
+[AIDEVO005]AiDotNet.Evolution.Ptx.PtxKernelArtifact.Launch.get -> AiDotNet.Evolution.Ptx.PtxLaunchConfiguration!
+[AIDEVO005]static AiDotNet.Evolution.Ptx.PtxKernelArtifact.Load(string! path) -> AiDotNet.Evolution.Ptx.PtxKernelArtifact!
+[AIDEVO005]AiDotNet.Evolution.Ptx.PtxKernelArtifact.MaxAbsoluteError.get -> double
+[AIDEVO005]AiDotNet.Evolution.Ptx.PtxKernelArtifact.MaxRelativeError.get -> double
+[AIDEVO005]AiDotNet.Evolution.Ptx.PtxKernelArtifact.Ptx.get -> string!
+[AIDEVO005]AiDotNet.Evolution.Ptx.PtxKernelArtifact.QualifiedForPromotion.get -> bool
+[AIDEVO005]AiDotNet.Evolution.Ptx.PtxKernelArtifact.ReferenceIdentity.get -> string!
+[AIDEVO005]AiDotNet.Evolution.Ptx.PtxKernelArtifact.Resources.get -> AiDotNet.Evolution.Ptx.PtxKernelResources!
+[AIDEVO005]AiDotNet.Evolution.Ptx.PtxKernelArtifact.Save(string! directory) -> string!
+[AIDEVO005]const AiDotNet.Evolution.Ptx.PtxKernelArtifact.SchemaVersion = 1 -> int
+[AIDEVO005]AiDotNet.Evolution.Ptx.PtxKernelArtifact.SmVersion.get -> int
+[AIDEVO005]AiDotNet.Evolution.Ptx.PtxKernelArtifact.TimingProtocol.get -> string!
+[AIDEVO005]AiDotNet.Evolution.Ptx.PtxKernelArtifact.ToBytes() -> byte[]!
+[AIDEVO005]AiDotNet.Evolution.Ptx.PtxKernelArtifact.ToConfiguration() -> AiDotNet.Evolution.Ptx.PtxKernelConfiguration!
+[AIDEVO005]AiDotNet.Evolution.Ptx.PtxKernelConfiguration
+[AIDEVO005]AiDotNet.Evolution.Ptx.PtxKernelConfiguration.BlockX.get -> int
+[AIDEVO005]AiDotNet.Evolution.Ptx.PtxKernelConfiguration.BlockY.get -> int
+[AIDEVO005]AiDotNet.Evolution.Ptx.PtxKernelConfiguration.BlockZ.get -> int
+[AIDEVO005]AiDotNet.Evolution.Ptx.PtxKernelConfiguration.ContractFingerprint.get -> string!
+[AIDEVO005]AiDotNet.Evolution.Ptx.PtxKernelConfiguration.EntryPoint.get -> string!
+[AIDEVO005]AiDotNet.Evolution.Ptx.PtxKernelConfiguration.Equals(AiDotNet.Evolution.Ptx.PtxKernelConfiguration? other) -> bool
+[AIDEVO005]override AiDotNet.Evolution.Ptx.PtxKernelConfiguration.Equals(object? obj) -> bool
+[AIDEVO005]override AiDotNet.Evolution.Ptx.PtxKernelConfiguration.GetHashCode() -> int
+[AIDEVO005]AiDotNet.Evolution.Ptx.PtxKernelConfiguration.Ptx.get -> string!
+[AIDEVO005]AiDotNet.Evolution.Ptx.PtxKernelConfiguration.PtxKernelConfiguration(string! ptx, string! entryPoint, int smVersion, int blockX, int blockY, int blockZ, string! contractFingerprint) -> void
+[AIDEVO005]AiDotNet.Evolution.Ptx.PtxKernelConfiguration.SmVersion.get -> int
+[AIDEVO005]AiDotNet.Evolution.Ptx.PtxKernelConfigurationCodec
+[AIDEVO005]AiDotNet.Evolution.Ptx.PtxKernelConfigurationCodec.Deserialize(string! payload) -> AiDotNet.Evolution.Ptx.PtxKernelConfiguration!
+[AIDEVO005]AiDotNet.Evolution.Ptx.PtxKernelConfigurationCodec.Id.get -> string!
+[AIDEVO005]AiDotNet.Evolution.Ptx.PtxKernelConfigurationCodec.PtxKernelConfigurationCodec() -> void
+[AIDEVO005]AiDotNet.Evolution.Ptx.PtxKernelConfigurationCodec.Serialize(AiDotNet.Evolution.Ptx.PtxKernelConfiguration! genome) -> string!
+[AIDEVO005]AiDotNet.Evolution.Ptx.PtxKernelConfigurationCodec.VersionHash.get -> string!
+[AIDEVO005]AiDotNet.Evolution.Ptx.PtxKernelContract
+[AIDEVO005]AiDotNet.Evolution.Ptx.PtxKernelContract.Description.get -> string!
+[AIDEVO005]AiDotNet.Evolution.Ptx.PtxKernelContract.EntryPoint.get -> string!
+[AIDEVO005]AiDotNet.Evolution.Ptx.PtxKernelContract.Fingerprint.get -> string!
+[AIDEVO005]static AiDotNet.Evolution.Ptx.PtxKernelContract.FromJson(string! json) -> AiDotNet.Evolution.Ptx.PtxKernelContract!
+[AIDEVO005]AiDotNet.Evolution.Ptx.PtxKernelContract.FuzzCases.get -> int
+[AIDEVO005]AiDotNet.Evolution.Ptx.PtxKernelContract.GetValidationCases() -> System.Collections.Generic.IReadOnlyList<AiDotNet.Evolution.Ptx.PtxShapeCase!>!
+[AIDEVO005]AiDotNet.Evolution.Ptx.PtxKernelContract.Launch.get -> AiDotNet.Evolution.Ptx.PtxLaunchConfiguration!
+[AIDEVO005]AiDotNet.Evolution.Ptx.PtxKernelContract.Name.get -> string!
+[AIDEVO005]AiDotNet.Evolution.Ptx.PtxKernelContract.Parameters.get -> System.Collections.Generic.IReadOnlyList<AiDotNet.Evolution.Ptx.PtxKernelParameter!>!
+[AIDEVO005]AiDotNet.Evolution.Ptx.PtxKernelContract.PtxKernelContract(string! name, string! entryPoint, string? description, AiDotNet.Evolution.Ptx.PtxTargetLimits! target, System.Collections.Generic.IReadOnlyList<AiDotNet.Evolution.Ptx.PtxKernelParameter!>! parameters, System.Collections.Generic.IReadOnlyList<AiDotNet.Evolution.Ptx.PtxShapeSymbol!>! symbols, AiDotNet.Evolution.Ptx.PtxLaunchConfiguration! launch, AiDotNet.Evolution.Ptx.PtxTolerance! tolerance, System.Collections.Generic.IReadOnlyDictionary<string!, long>! timingShape, System.Collections.Generic.IReadOnlyList<System.Collections.Generic.IReadOnlyDictionary<string!, long>!>? validationShapes, int fuzzCases, ulong seed) -> void
+[AIDEVO005]AiDotNet.Evolution.Ptx.PtxKernelContract.Seed.get -> ulong
+[AIDEVO005]AiDotNet.Evolution.Ptx.PtxKernelContract.Symbols.get -> System.Collections.Generic.IReadOnlyList<AiDotNet.Evolution.Ptx.PtxShapeSymbol!>!
+[AIDEVO005]AiDotNet.Evolution.Ptx.PtxKernelContract.Target.get -> AiDotNet.Evolution.Ptx.PtxTargetLimits!
+[AIDEVO005]AiDotNet.Evolution.Ptx.PtxKernelContract.TimingShape.get -> System.Collections.Generic.IReadOnlyDictionary<string!, long>!
+[AIDEVO005]AiDotNet.Evolution.Ptx.PtxKernelContract.ToJson() -> string!
+[AIDEVO005]AiDotNet.Evolution.Ptx.PtxKernelContract.Tolerance.get -> AiDotNet.Evolution.Ptx.PtxTolerance!
+[AIDEVO005]AiDotNet.Evolution.Ptx.PtxKernelContract.ValidationShapes.get -> System.Collections.Generic.IReadOnlyList<System.Collections.Generic.IReadOnlyDictionary<string!, long>!>!
+[AIDEVO005]AiDotNet.Evolution.Ptx.PtxKernelFitnessEvaluator
+[AIDEVO005]AiDotNet.Evolution.Ptx.PtxKernelFitnessEvaluator.EvaluateAsync(AiDotNet.Evolution.Programs.ProgramGenome! candidate, AiDotNet.Evolution.EvolutionEvaluationContext! context, System.Threading.CancellationToken cancellationToken = default(System.Threading.CancellationToken)) -> System.Threading.Tasks.ValueTask<AiDotNet.Evolution.EvolutionTaskResult!>
+[AIDEVO005]AiDotNet.Evolution.Ptx.PtxKernelFitnessEvaluator.Id.get -> string!
+[AIDEVO005]AiDotNet.Evolution.Ptx.PtxKernelFitnessEvaluator.PtxKernelFitnessEvaluator(AiDotNet.Evolution.Ptx.PtxCorrectnessEvaluator! correctness, AiDotNet.Evolution.Ptx.PtxTimingEvaluator! timing, string! incumbentSource) -> void
+[AIDEVO005]AiDotNet.Evolution.Ptx.PtxKernelFitnessEvaluator.VersionHash.get -> string!
+[AIDEVO005]AiDotNet.Evolution.Ptx.PtxKernelParameter
+[AIDEVO005]AiDotNet.Evolution.Ptx.PtxKernelParameter.Constant.get -> double?
+[AIDEVO005]AiDotNet.Evolution.Ptx.PtxKernelParameter.Distribution.get -> AiDotNet.Evolution.Ptx.PtxValueDistribution?
+[AIDEVO005]AiDotNet.Evolution.Ptx.PtxKernelParameter.ElementType.get -> AiDotNet.Evolution.Ptx.PtxElementType
+[AIDEVO005]static AiDotNet.Evolution.Ptx.PtxKernelParameter.InPlace(string! name, AiDotNet.Evolution.Ptx.PtxElementType elementType, AiDotNet.Evolution.Ptx.PtxExtent! length, AiDotNet.Evolution.Ptx.PtxValueDistribution? distribution = null, AiDotNet.Evolution.Ptx.PtxTolerance? tolerance = null) -> AiDotNet.Evolution.Ptx.PtxKernelParameter!
+[AIDEVO005]static AiDotNet.Evolution.Ptx.PtxKernelParameter.Input(string! name, AiDotNet.Evolution.Ptx.PtxElementType elementType, AiDotNet.Evolution.Ptx.PtxExtent! length, AiDotNet.Evolution.Ptx.PtxValueDistribution? distribution = null) -> AiDotNet.Evolution.Ptx.PtxKernelParameter!
+[AIDEVO005]AiDotNet.Evolution.Ptx.PtxKernelParameter.Kind.get -> AiDotNet.Evolution.Ptx.PtxParameterKind
+[AIDEVO005]AiDotNet.Evolution.Ptx.PtxKernelParameter.Length.get -> AiDotNet.Evolution.Ptx.PtxExtent?
+[AIDEVO005]AiDotNet.Evolution.Ptx.PtxKernelParameter.Name.get -> string!
+[AIDEVO005]static AiDotNet.Evolution.Ptx.PtxKernelParameter.Output(string! name, AiDotNet.Evolution.Ptx.PtxElementType elementType, AiDotNet.Evolution.Ptx.PtxExtent! length, AiDotNet.Evolution.Ptx.PtxTolerance? tolerance = null) -> AiDotNet.Evolution.Ptx.PtxKernelParameter!
+[AIDEVO005]AiDotNet.Evolution.Ptx.PtxKernelParameter.PtxKernelParameter(string! name, AiDotNet.Evolution.Ptx.PtxParameterKind kind, AiDotNet.Evolution.Ptx.PtxElementType elementType, AiDotNet.Evolution.Ptx.PtxBufferRole role, AiDotNet.Evolution.Ptx.PtxExtent? length, AiDotNet.Evolution.Ptx.PtxValueDistribution? distribution, AiDotNet.Evolution.Ptx.PtxTolerance? tolerance, AiDotNet.Evolution.Ptx.PtxExtent? value, double? constant) -> void
+[AIDEVO005]AiDotNet.Evolution.Ptx.PtxKernelParameter.Role.get -> AiDotNet.Evolution.Ptx.PtxBufferRole
+[AIDEVO005]static AiDotNet.Evolution.Ptx.PtxKernelParameter.Scalar(string! name, AiDotNet.Evolution.Ptx.PtxElementType elementType, AiDotNet.Evolution.Ptx.PtxExtent! value) -> AiDotNet.Evolution.Ptx.PtxKernelParameter!
+[AIDEVO005]static AiDotNet.Evolution.Ptx.PtxKernelParameter.ScalarConstant(string! name, AiDotNet.Evolution.Ptx.PtxElementType elementType, double value) -> AiDotNet.Evolution.Ptx.PtxKernelParameter!
+[AIDEVO005]AiDotNet.Evolution.Ptx.PtxKernelParameter.Tolerance.get -> AiDotNet.Evolution.Ptx.PtxTolerance?
+[AIDEVO005]AiDotNet.Evolution.Ptx.PtxKernelParameter.Value.get -> AiDotNet.Evolution.Ptx.PtxExtent?
+[AIDEVO005]AiDotNet.Evolution.Ptx.PtxKernelReference
+[AIDEVO005]static AiDotNet.Evolution.Ptx.PtxKernelReference.Create(string! identity, System.Action<AiDotNet.Evolution.Ptx.PtxReferenceInvocation!>! compute) -> AiDotNet.Evolution.Ptx.IPtxKernelReference!
+[AIDEVO005]AiDotNet.Evolution.Ptx.PtxKernelResources
+[AIDEVO005]AiDotNet.Evolution.Ptx.PtxKernelResources.CompileMilliseconds.get -> double
+[AIDEVO005]AiDotNet.Evolution.Ptx.PtxKernelResources.ConstantBytes.get -> int
+[AIDEVO005]AiDotNet.Evolution.Ptx.PtxKernelResources.DynamicSharedBytes.get -> int
+[AIDEVO005]AiDotNet.Evolution.Ptx.PtxKernelResources.LocalBytes.get -> int
+[AIDEVO005]AiDotNet.Evolution.Ptx.PtxKernelResources.MaxThreadsPerBlock.get -> int
+[AIDEVO005]AiDotNet.Evolution.Ptx.PtxKernelResources.PtxKernelResources(int registers, int staticSharedBytes, int dynamicSharedBytes, int localBytes, int constantBytes, int maxThreadsPerBlock, double compileMilliseconds) -> void
+[AIDEVO005]AiDotNet.Evolution.Ptx.PtxKernelResources.Registers.get -> int
+[AIDEVO005]AiDotNet.Evolution.Ptx.PtxKernelResources.StaticSharedBytes.get -> int
+[AIDEVO005]AiDotNet.Evolution.Ptx.PtxLaunchConfiguration
+[AIDEVO005]AiDotNet.Evolution.Ptx.PtxLaunchConfiguration.BlockX.get -> int
+[AIDEVO005]AiDotNet.Evolution.Ptx.PtxLaunchConfiguration.BlockY.get -> int
+[AIDEVO005]AiDotNet.Evolution.Ptx.PtxLaunchConfiguration.BlockZ.get -> int
+[AIDEVO005]AiDotNet.Evolution.Ptx.PtxLaunchConfiguration.DynamicSharedMemoryBytes.get -> AiDotNet.Evolution.Ptx.PtxExtent!
+[AIDEVO005]AiDotNet.Evolution.Ptx.PtxLaunchConfiguration.GridX.get -> AiDotNet.Evolution.Ptx.PtxExtent!
+[AIDEVO005]AiDotNet.Evolution.Ptx.PtxLaunchConfiguration.GridY.get -> AiDotNet.Evolution.Ptx.PtxExtent!
+[AIDEVO005]AiDotNet.Evolution.Ptx.PtxLaunchConfiguration.GridZ.get -> AiDotNet.Evolution.Ptx.PtxExtent!
+[AIDEVO005]AiDotNet.Evolution.Ptx.PtxLaunchConfiguration.PtxLaunchConfiguration(AiDotNet.Evolution.Ptx.PtxExtent! gridX, AiDotNet.Evolution.Ptx.PtxExtent? gridY, AiDotNet.Evolution.Ptx.PtxExtent? gridZ, int blockX, int blockY, int blockZ, AiDotNet.Evolution.Ptx.PtxExtent? dynamicSharedMemoryBytes) -> void
+[AIDEVO005]AiDotNet.Evolution.Ptx.PtxLaunchConfiguration.ThreadsPerBlock.get -> int
+[AIDEVO005]AiDotNet.Evolution.Ptx.PtxLaunchConfiguration.WithBlock(int blockX, int blockY, int blockZ) -> AiDotNet.Evolution.Ptx.PtxLaunchConfiguration!
+[AIDEVO005]AiDotNet.Evolution.Ptx.PtxPairedSample
+[AIDEVO005]AiDotNet.Evolution.Ptx.PtxPairedSample.CandidateMilliseconds.get -> double
+[AIDEVO005]AiDotNet.Evolution.Ptx.PtxPairedSample.Equals(AiDotNet.Evolution.Ptx.PtxPairedSample other) -> bool
+~[AIDEVO005]override AiDotNet.Evolution.Ptx.PtxPairedSample.Equals(object obj) -> bool
+[AIDEVO005]override AiDotNet.Evolution.Ptx.PtxPairedSample.GetHashCode() -> int
+[AIDEVO005]AiDotNet.Evolution.Ptx.PtxPairedSample.IncumbentMilliseconds.get -> double
+[AIDEVO005]static AiDotNet.Evolution.Ptx.PtxPairedSample.operator !=(AiDotNet.Evolution.Ptx.PtxPairedSample left, AiDotNet.Evolution.Ptx.PtxPairedSample right) -> bool
+[AIDEVO005]static AiDotNet.Evolution.Ptx.PtxPairedSample.operator ==(AiDotNet.Evolution.Ptx.PtxPairedSample left, AiDotNet.Evolution.Ptx.PtxPairedSample right) -> bool
+[AIDEVO005]AiDotNet.Evolution.Ptx.PtxPairedSample.PtxPairedSample() -> void
+[AIDEVO005]AiDotNet.Evolution.Ptx.PtxPairedSample.PtxPairedSample(double candidateMilliseconds, double incumbentMilliseconds) -> void
+[AIDEVO005]AiDotNet.Evolution.Ptx.PtxPairedSample.Speedup.get -> double
+~[AIDEVO005]override AiDotNet.Evolution.Ptx.PtxPairedSample.ToString() -> string
+[AIDEVO005]AiDotNet.Evolution.Ptx.PtxPairedTimingEvidence
+[AIDEVO005]AiDotNet.Evolution.Ptx.PtxPairedTimingEvidence.CalibratedNoiseRatio.get -> double
+[AIDEVO005]AiDotNet.Evolution.Ptx.PtxPairedTimingEvidence.CandidateTiming.get -> AiDotNet.Evolution.Ptx.PtxTimingStatistics!
+[AIDEVO005]AiDotNet.Evolution.Ptx.PtxPairedTimingEvidence.IncumbentTiming.get -> AiDotNet.Evolution.Ptx.PtxTimingStatistics!
+[AIDEVO005]AiDotNet.Evolution.Ptx.PtxPairedTimingEvidence.LowerSpeedupBound.get -> double
+[AIDEVO005]AiDotNet.Evolution.Ptx.PtxPairedTimingEvidence.MedianSpeedup.get -> double
+[AIDEVO005]const AiDotNet.Evolution.Ptx.PtxPairedTimingEvidence.MinimumSampleCount = 7 -> int
+[AIDEVO005]static AiDotNet.Evolution.Ptx.PtxPairedTimingEvidence.NoiseRatio(System.Collections.Generic.IEnumerable<AiDotNet.Evolution.Ptx.PtxPairedSample>! controls) -> double
+[AIDEVO005]AiDotNet.Evolution.Ptx.PtxPairedTimingEvidence.P95LatencyRatio.get -> double
+[AIDEVO005]AiDotNet.Evolution.Ptx.PtxPairedTimingEvidence.PtxPairedTimingEvidence(System.Collections.Generic.IReadOnlyList<AiDotNet.Evolution.Ptx.PtxPairedSample>! samples, double calibratedNoiseRatio) -> void
+[AIDEVO005]AiDotNet.Evolution.Ptx.PtxPairedTimingEvidence.QualifiesForPromotion(double minimumPromotionRatio, double maximumP95LatencyRatio) -> bool
+[AIDEVO005]AiDotNet.Evolution.Ptx.PtxPairedTimingEvidence.Samples.get -> System.Collections.Generic.IReadOnlyList<AiDotNet.Evolution.Ptx.PtxPairedSample>!
+[AIDEVO005]AiDotNet.Evolution.Ptx.PtxParameterKind
+[AIDEVO005]AiDotNet.Evolution.Ptx.PtxParameterKind.Buffer = 0 -> AiDotNet.Evolution.Ptx.PtxParameterKind
+[AIDEVO005]AiDotNet.Evolution.Ptx.PtxParameterKind.Scalar = 1 -> AiDotNet.Evolution.Ptx.PtxParameterKind
+[AIDEVO005]AiDotNet.Evolution.Ptx.PtxProgramCompiler
+[AIDEVO005]AiDotNet.Evolution.Ptx.PtxProgramCompiler.Apply(AiDotNet.Evolution.Programs.ProgramSnapshot! parent, AiDotNet.Evolution.Programs.PatchPlan! plan, System.Threading.CancellationToken cancellationToken = default(System.Threading.CancellationToken)) -> AiDotNet.Evolution.Programs.ProgramSnapshot!
+[AIDEVO005]AiDotNet.Evolution.Ptx.PtxProgramCompiler.Build(AiDotNet.Evolution.Programs.ProgramSnapshot! source, System.Threading.CancellationToken cancellationToken = default(System.Threading.CancellationToken)) -> AiDotNet.Evolution.Programs.ProgramBuild!
+[AIDEVO005]AiDotNet.Evolution.Ptx.PtxProgramCompiler.Catalog(AiDotNet.Evolution.Programs.ProgramSnapshot! source, System.Threading.CancellationToken cancellationToken = default(System.Threading.CancellationToken)) -> System.Collections.Generic.IReadOnlyList<AiDotNet.Evolution.Programs.EditTarget!>!
+[AIDEVO005]AiDotNet.Evolution.Ptx.PtxProgramCompiler.Compile(string! source, System.Threading.CancellationToken cancellationToken = default(System.Threading.CancellationToken)) -> AiDotNet.Evolution.Ptx.PtxCompilationResult!
+[AIDEVO005]AiDotNet.Evolution.Ptx.PtxProgramCompiler.Contract.get -> AiDotNet.Evolution.Ptx.PtxKernelContract!
+[AIDEVO005]const AiDotNet.Evolution.Ptx.PtxProgramCompiler.FileName = "kernel.ptx" -> string!
+[AIDEVO005]AiDotNet.Evolution.Ptx.PtxProgramCompiler.Fingerprint.get -> string!
+[AIDEVO005]AiDotNet.Evolution.Ptx.PtxProgramCompiler.PtxProgramCompiler(AiDotNet.Evolution.Ptx.PtxKernelContract! contract, AiDotNet.Evolution.Ptx.PtxIsolationOptions? isolation = null) -> void
+[AIDEVO005]AiDotNet.Evolution.Ptx.PtxProgramEvolutionOptions
+[AIDEVO005]AiDotNet.Evolution.Ptx.PtxProgramEvolutionOptions.AllowPatches.get -> bool
+[AIDEVO005]AiDotNet.Evolution.Ptx.PtxProgramEvolutionOptions.AllowPatches.set -> void
+[AIDEVO005]AiDotNet.Evolution.Ptx.PtxProgramEvolutionOptions.AllowRewrites.get -> bool
+[AIDEVO005]AiDotNet.Evolution.Ptx.PtxProgramEvolutionOptions.AllowRewrites.set -> void
+[AIDEVO005]AiDotNet.Evolution.Ptx.PtxProgramEvolutionOptions.AuditCostUnits.get -> decimal
+[AIDEVO005]AiDotNet.Evolution.Ptx.PtxProgramEvolutionOptions.AuditCostUnits.set -> void
+[AIDEVO005]AiDotNet.Evolution.Ptx.PtxProgramEvolutionOptions.AuditDirectory.get -> string!
+[AIDEVO005]AiDotNet.Evolution.Ptx.PtxProgramEvolutionOptions.AuditDirectory.set -> void
+[AIDEVO005]AiDotNet.Evolution.Ptx.PtxProgramEvolutionOptions.CompilationCostUnits.get -> decimal
+[AIDEVO005]AiDotNet.Evolution.Ptx.PtxProgramEvolutionOptions.CompilationCostUnits.set -> void
+[AIDEVO005]AiDotNet.Evolution.Ptx.PtxProgramEvolutionOptions.CostUnitVersionHash.get -> string!
+[AIDEVO005]AiDotNet.Evolution.Ptx.PtxProgramEvolutionOptions.CostUnitVersionHash.set -> void
+[AIDEVO005]AiDotNet.Evolution.Ptx.PtxProgramEvolutionOptions.Id.get -> string!
+[AIDEVO005]AiDotNet.Evolution.Ptx.PtxProgramEvolutionOptions.Id.set -> void
+[AIDEVO005]AiDotNet.Evolution.Ptx.PtxProgramEvolutionOptions.IncumbentProfile.get -> AiDotNet.Evolution.Ptx.PtxIncumbentProfile?
+[AIDEVO005]AiDotNet.Evolution.Ptx.PtxProgramEvolutionOptions.IncumbentProfile.set -> void
+[AIDEVO005]AiDotNet.Evolution.Ptx.PtxProgramEvolutionOptions.InputTokenCostUnits.get -> decimal
+[AIDEVO005]AiDotNet.Evolution.Ptx.PtxProgramEvolutionOptions.InputTokenCostUnits.set -> void
+[AIDEVO005]AiDotNet.Evolution.Ptx.PtxProgramEvolutionOptions.MaxEdits.get -> int
+[AIDEVO005]AiDotNet.Evolution.Ptx.PtxProgramEvolutionOptions.MaxEdits.set -> void
+[AIDEVO005]AiDotNet.Evolution.Ptx.PtxProgramEvolutionOptions.MaxInputTokens.get -> int
+[AIDEVO005]AiDotNet.Evolution.Ptx.PtxProgramEvolutionOptions.MaxInputTokens.set -> void
+[AIDEVO005]AiDotNet.Evolution.Ptx.PtxProgramEvolutionOptions.MaxOutputTokens.get -> int
+[AIDEVO005]AiDotNet.Evolution.Ptx.PtxProgramEvolutionOptions.MaxOutputTokens.set -> void
+[AIDEVO005]AiDotNet.Evolution.Ptx.PtxProgramEvolutionOptions.MaxRepairs.get -> int
+[AIDEVO005]AiDotNet.Evolution.Ptx.PtxProgramEvolutionOptions.MaxRepairs.set -> void
+[AIDEVO005]AiDotNet.Evolution.Ptx.PtxProgramEvolutionOptions.MaxResponseChars.get -> int
+[AIDEVO005]AiDotNet.Evolution.Ptx.PtxProgramEvolutionOptions.MaxResponseChars.set -> void
+[AIDEVO005]AiDotNet.Evolution.Ptx.PtxProgramEvolutionOptions.ModelCallCostUnits.get -> decimal
+[AIDEVO005]AiDotNet.Evolution.Ptx.PtxProgramEvolutionOptions.ModelCallCostUnits.set -> void
+[AIDEVO005]AiDotNet.Evolution.Ptx.PtxProgramEvolutionOptions.ModelVersionIdentity.get -> string!
+[AIDEVO005]AiDotNet.Evolution.Ptx.PtxProgramEvolutionOptions.ModelVersionIdentity.set -> void
+[AIDEVO005]AiDotNet.Evolution.Ptx.PtxProgramEvolutionOptions.OutputTokenCostUnits.get -> decimal
+[AIDEVO005]AiDotNet.Evolution.Ptx.PtxProgramEvolutionOptions.OutputTokenCostUnits.set -> void
+[AIDEVO005]AiDotNet.Evolution.Ptx.PtxProgramEvolutionOptions.ParseCostUnits.get -> decimal
+[AIDEVO005]AiDotNet.Evolution.Ptx.PtxProgramEvolutionOptions.ParseCostUnits.set -> void
+[AIDEVO005]AiDotNet.Evolution.Ptx.PtxProgramEvolutionOptions.PtxProgramEvolutionOptions() -> void
+[AIDEVO005]AiDotNet.Evolution.Ptx.PtxProgramEvolutionOptions.SetupCostUnits.get -> decimal
+[AIDEVO005]AiDotNet.Evolution.Ptx.PtxProgramEvolutionOptions.SetupCostUnits.set -> void
+[AIDEVO005]AiDotNet.Evolution.Ptx.PtxProgramEvolutionOptions.Temperature.get -> double
+[AIDEVO005]AiDotNet.Evolution.Ptx.PtxProgramEvolutionOptions.Temperature.set -> void
+[AIDEVO005]AiDotNet.Evolution.Ptx.PtxProgramVariation
+[AIDEVO005]static AiDotNet.Evolution.Ptx.PtxProgramVariation.Create(AiDotNet.Evolution.Programs.IProgramChatClient! client, AiDotNet.Evolution.Ptx.PtxProgramCompiler! compiler, AiDotNet.Evolution.Ptx.PtxProgramEvolutionOptions! options, AiDotNet.Evolution.Programs.ProgramEvolutionResourceOptions! resources) -> AiDotNet.Evolution.Programs.MeteredProgramVariationOperator!
+[AIDEVO005]AiDotNet.Evolution.Ptx.PtxReferenceInvocation
+[AIDEVO005]AiDotNet.Evolution.Ptx.PtxReferenceInvocation.Input<T>(string! name) -> System.ReadOnlySpan<T>
+[AIDEVO005]AiDotNet.Evolution.Ptx.PtxReferenceInvocation.Output<T>(string! name) -> System.Span<T>
+[AIDEVO005]AiDotNet.Evolution.Ptx.PtxReferenceInvocation.Scalar(string! name) -> double
+[AIDEVO005]AiDotNet.Evolution.Ptx.PtxReferenceInvocation.Shape.get -> AiDotNet.Evolution.Ptx.PtxShapeCase!
+[AIDEVO005]AiDotNet.Evolution.Ptx.PtxReferenceInvocation.Symbol(string! name) -> long
+[AIDEVO005]AiDotNet.Evolution.Ptx.PtxShapeCase
+[AIDEVO005]AiDotNet.Evolution.Ptx.PtxShapeCase.Label.get -> string!
+[AIDEVO005]AiDotNet.Evolution.Ptx.PtxShapeCase.PtxShapeCase(string! label, System.Collections.Generic.IReadOnlyDictionary<string!, long>! symbols) -> void
+[AIDEVO005]AiDotNet.Evolution.Ptx.PtxShapeCase.Symbols.get -> System.Collections.Generic.IReadOnlyDictionary<string!, long>!
+[AIDEVO005]override AiDotNet.Evolution.Ptx.PtxShapeCase.ToString() -> string!
+[AIDEVO005]AiDotNet.Evolution.Ptx.PtxShapeSymbol
+[AIDEVO005]AiDotNet.Evolution.Ptx.PtxShapeSymbol.Maximum.get -> long
+[AIDEVO005]AiDotNet.Evolution.Ptx.PtxShapeSymbol.Minimum.get -> long
+[AIDEVO005]AiDotNet.Evolution.Ptx.PtxShapeSymbol.Name.get -> string!
+[AIDEVO005]AiDotNet.Evolution.Ptx.PtxShapeSymbol.PtxShapeSymbol(string! name, long minimum, long maximum, System.Collections.Generic.IReadOnlyList<long>? tileSizes = null) -> void
+[AIDEVO005]AiDotNet.Evolution.Ptx.PtxShapeSymbol.TileSizes.get -> System.Collections.Generic.IReadOnlyList<long>!
+[AIDEVO005]AiDotNet.Evolution.Ptx.PtxTargetLimits
+[AIDEVO005]static AiDotNet.Evolution.Ptx.PtxTargetLimits.ForSm(int smVersion) -> AiDotNet.Evolution.Ptx.PtxTargetLimits!
+[AIDEVO005]AiDotNet.Evolution.Ptx.PtxTargetLimits.MaxLocalBytesPerThread.get -> int
+[AIDEVO005]AiDotNet.Evolution.Ptx.PtxTargetLimits.MaxRegistersPerThread.get -> int
+[AIDEVO005]AiDotNet.Evolution.Ptx.PtxTargetLimits.MaxSharedMemoryPerBlockBytes.get -> int
+[AIDEVO005]AiDotNet.Evolution.Ptx.PtxTargetLimits.MaxThreadsPerBlock.get -> int
+[AIDEVO005]AiDotNet.Evolution.Ptx.PtxTargetLimits.PtxTargetLimits(int smVersion, int maxRegistersPerThread, int maxSharedMemoryPerBlockBytes, int maxThreadsPerBlock, int maxLocalBytesPerThread) -> void
+[AIDEVO005]AiDotNet.Evolution.Ptx.PtxTargetLimits.SmVersion.get -> int
+[AIDEVO005]AiDotNet.Evolution.Ptx.PtxTargetLimits.TargetName.get -> string!
+[AIDEVO005]AiDotNet.Evolution.Ptx.PtxTimingEvaluator
+[AIDEVO005]AiDotNet.Evolution.Ptx.PtxTimingEvaluator.Identity.get -> string!
+[AIDEVO005]AiDotNet.Evolution.Ptx.PtxTimingEvaluator.Measure(string! candidateSource, string! incumbentSource, System.Threading.CancellationToken cancellationToken = default(System.Threading.CancellationToken)) -> AiDotNet.Evolution.Ptx.PtxTimingReport!
+[AIDEVO005]AiDotNet.Evolution.Ptx.PtxTimingEvaluator.PtxTimingEvaluator(AiDotNet.Evolution.Ptx.PtxProgramCompiler! compiler, AiDotNet.Evolution.Ptx.PtxTimingOptions? options = null) -> void
+[AIDEVO005]AiDotNet.Evolution.Ptx.PtxTimingOptions
+[AIDEVO005]AiDotNet.Evolution.Ptx.PtxTimingOptions.ControlPairs.get -> int
+[AIDEVO005]AiDotNet.Evolution.Ptx.PtxTimingOptions.ControlPairs.set -> void
+[AIDEVO005]AiDotNet.Evolution.Ptx.PtxTimingOptions.LaunchesPerSample.get -> int
+[AIDEVO005]AiDotNet.Evolution.Ptx.PtxTimingOptions.LaunchesPerSample.set -> void
+[AIDEVO005]AiDotNet.Evolution.Ptx.PtxTimingOptions.MachineLockName.get -> string?
+[AIDEVO005]AiDotNet.Evolution.Ptx.PtxTimingOptions.MachineLockName.set -> void
+[AIDEVO005]AiDotNet.Evolution.Ptx.PtxTimingOptions.MachineLockTimeout.get -> System.TimeSpan
+[AIDEVO005]AiDotNet.Evolution.Ptx.PtxTimingOptions.MachineLockTimeout.set -> void
+[AIDEVO005]AiDotNet.Evolution.Ptx.PtxTimingOptions.MaximumP95LatencyRatio.get -> double
+[AIDEVO005]AiDotNet.Evolution.Ptx.PtxTimingOptions.MaximumP95LatencyRatio.set -> void
+[AIDEVO005]AiDotNet.Evolution.Ptx.PtxTimingOptions.MinimumPromotionRatio.get -> double
+[AIDEVO005]AiDotNet.Evolution.Ptx.PtxTimingOptions.MinimumPromotionRatio.set -> void
+[AIDEVO005]AiDotNet.Evolution.Ptx.PtxTimingOptions.Pairs.get -> int
+[AIDEVO005]AiDotNet.Evolution.Ptx.PtxTimingOptions.Pairs.set -> void
+[AIDEVO005]AiDotNet.Evolution.Ptx.PtxTimingOptions.PtxTimingOptions() -> void
+[AIDEVO005]AiDotNet.Evolution.Ptx.PtxTimingOptions.Warmup.get -> int
+[AIDEVO005]AiDotNet.Evolution.Ptx.PtxTimingOptions.Warmup.set -> void
+[AIDEVO005]AiDotNet.Evolution.Ptx.PtxTimingReport
+[AIDEVO005]AiDotNet.Evolution.Ptx.PtxTimingReport.CandidateSha256.get -> string!
+[AIDEVO005]AiDotNet.Evolution.Ptx.PtxTimingReport.Completed.get -> bool
+[AIDEVO005]AiDotNet.Evolution.Ptx.PtxTimingReport.Device.get -> AiDotNet.Evolution.Ptx.PtxDeviceInfo?
+[AIDEVO005]AiDotNet.Evolution.Ptx.PtxTimingReport.Evidence.get -> AiDotNet.Evolution.Ptx.PtxPairedTimingEvidence?
+[AIDEVO005]AiDotNet.Evolution.Ptx.PtxTimingReport.IncumbentSha256.get -> string!
+[AIDEVO005]AiDotNet.Evolution.Ptx.PtxTimingReport.MachineLockWasAbandoned.get -> bool
+[AIDEVO005]AiDotNet.Evolution.Ptx.PtxTimingReport.Message.get -> string!
+[AIDEVO005]AiDotNet.Evolution.Ptx.PtxTimingReport.QualifiesForPromotion.get -> bool
+[AIDEVO005]AiDotNet.Evolution.Ptx.PtxTimingStatistics
+[AIDEVO005]static AiDotNet.Evolution.Ptx.PtxTimingStatistics.FromSamples(System.Collections.Generic.IEnumerable<double>! milliseconds) -> AiDotNet.Evolution.Ptx.PtxTimingStatistics!
+[AIDEVO005]AiDotNet.Evolution.Ptx.PtxTimingStatistics.Iqr.get -> double
+[AIDEVO005]AiDotNet.Evolution.Ptx.PtxTimingStatistics.Maximum.get -> double
+[AIDEVO005]AiDotNet.Evolution.Ptx.PtxTimingStatistics.Median.get -> double
+[AIDEVO005]AiDotNet.Evolution.Ptx.PtxTimingStatistics.Minimum.get -> double
+[AIDEVO005]const AiDotNet.Evolution.Ptx.PtxTimingStatistics.MinimumSampleCount = 3 -> int
+[AIDEVO005]AiDotNet.Evolution.Ptx.PtxTimingStatistics.P95.get -> double
+[AIDEVO005]AiDotNet.Evolution.Ptx.PtxTimingStatistics.Q1.get -> double
+[AIDEVO005]AiDotNet.Evolution.Ptx.PtxTimingStatistics.Q3.get -> double
+[AIDEVO005]AiDotNet.Evolution.Ptx.PtxTimingStatistics.SampleCount.get -> int
+[AIDEVO005]AiDotNet.Evolution.Ptx.PtxTimingStatistics.Samples.get -> System.Collections.Generic.IReadOnlyList<double>!
+[AIDEVO005]AiDotNet.Evolution.Ptx.PtxTolerance
+[AIDEVO005]AiDotNet.Evolution.Ptx.PtxTolerance.Absolute.get -> double
+[AIDEVO005]static AiDotNet.Evolution.Ptx.PtxTolerance.Exact.get -> AiDotNet.Evolution.Ptx.PtxTolerance!
+[AIDEVO005]AiDotNet.Evolution.Ptx.PtxTolerance.PtxTolerance(double absolute, double relative) -> void
+[AIDEVO005]AiDotNet.Evolution.Ptx.PtxTolerance.Relative.get -> double
+[AIDEVO005]AiDotNet.Evolution.Ptx.PtxValueDistribution
+[AIDEVO005]static AiDotNet.Evolution.Ptx.PtxValueDistribution.Constant(double value) -> AiDotNet.Evolution.Ptx.PtxValueDistribution!
+[AIDEVO005]static AiDotNet.Evolution.Ptx.PtxValueDistribution.Integers(long minimum, long maximum) -> AiDotNet.Evolution.Ptx.PtxValueDistribution!
+[AIDEVO005]AiDotNet.Evolution.Ptx.PtxValueDistribution.Kind.get -> AiDotNet.Evolution.Ptx.PtxDistributionKind
+[AIDEVO005]AiDotNet.Evolution.Ptx.PtxValueDistribution.Maximum.get -> double
+[AIDEVO005]AiDotNet.Evolution.Ptx.PtxValueDistribution.Minimum.get -> double
+[AIDEVO005]AiDotNet.Evolution.Ptx.PtxValueDistribution.PtxValueDistribution(AiDotNet.Evolution.Ptx.PtxDistributionKind kind, double minimum, double maximum) -> void
+[AIDEVO005]static AiDotNet.Evolution.Ptx.PtxValueDistribution.Uniform(double minimum, double maximum) -> AiDotNet.Evolution.Ptx.PtxValueDistribution!

@@ -6,6 +6,8 @@
 | `AIDEVO001` | Surrogates: the 9 surrogate types in core, plus all 4 of the Surrogates package | 13 |
 | `AIDEVO002` | Policy search, i.e. US-26 "evolution of search policies" (`Policies/`) | 18 |
 | `AIDEVO003` | Centroid archives | 4 |
+| `AIDEVO004` | Program experience memory (`AiDotNet.Evolution.Programs.Experience`) | 8 |
+| `AIDEVO005` | PTX kernel evolution: the whole `AiDotNet.Evolution.Ptx` package until its first release | 39 |
 
 Every other public type is **stable**. The owning assemblies, and the tests, examples and benchmark that deliberately
 exercise these surfaces, opt in with `NoWarn`; any other consumer gets a compile error. net471 uses an internal

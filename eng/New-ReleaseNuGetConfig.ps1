@@ -15,7 +15,7 @@ foreach ($source in @(@{ Key = 'release-local'; Value = $localSource }, @{ Key =
     $mapping = $config.CreateElement('packageSource')
     $mapping.SetAttribute('key', $source.Key)
     $patterns = if ($source.Key -eq 'release-local') {
-        @('AiDotNet.Evolution', 'AiDotNet.Evolution.Programs', 'AiDotNet.Evolution.CSharp',
+        @('AiDotNet.Evolution', 'AiDotNet.Evolution.Programs', 'AiDotNet.Evolution.CSharp', 'AiDotNet.Evolution.Ptx',
             'AiDotNet.Evolution.Deployment', 'AiDotNet.Evolution.Surrogates')
     } else { @('*') }
     foreach ($pattern in $patterns) {

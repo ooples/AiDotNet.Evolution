@@ -497,6 +497,50 @@ against the declared public API, so a type added, removed or reclassified withou
 | `AiDotNet.Evolution.Programs.WeightedEnsembleChatClient` | Stable | [PROGRAM_EVOLUTION.md](PROGRAM_EVOLUTION.md), [WeightedEnsembleChatClientTests](../tests/AiDotNet.Evolution.CSharp.Tests/ModelRuntime/WeightedEnsembleChatClientTests.cs) |
 | `AiDotNet.Evolution.Programs.WarmPythonExecutionEngine` | Stable | [PROGRAM_EVOLUTION.md](PROGRAM_EVOLUTION.md), [WarmPythonExecutionEngineTests](../tests/AiDotNet.Evolution.CSharp.Tests/Execution/WarmPythonExecutionEngineTests.cs) |
 
+## AiDotNet.Evolution.Ptx
+
+| Type | Class | Evidence |
+| --- | --- | --- |
+| `AiDotNet.Evolution.Ptx.IPtxKernelReference` | Experimental (AIDEVO005) | |
+| `AiDotNet.Evolution.Ptx.PtxBufferRole` | Experimental (AIDEVO005) | |
+| `AiDotNet.Evolution.Ptx.PtxCaseOutcome` | Experimental (AIDEVO005) | |
+| `AiDotNet.Evolution.Ptx.PtxCompilationResult` | Experimental (AIDEVO005) | |
+| `AiDotNet.Evolution.Ptx.PtxCorrectnessEvaluator` | Experimental (AIDEVO005) | |
+| `AiDotNet.Evolution.Ptx.PtxCorrectnessReport` | Experimental (AIDEVO005) | |
+| `AiDotNet.Evolution.Ptx.PtxCorrectnessVerdict` | Experimental (AIDEVO005) | |
+| `AiDotNet.Evolution.Ptx.PtxDeviceInfo` | Experimental (AIDEVO005) | |
+| `AiDotNet.Evolution.Ptx.PtxDeviceProbe` | Experimental (AIDEVO005) | |
+| `AiDotNet.Evolution.Ptx.PtxDistributionKind` | Experimental (AIDEVO005) | |
+| `AiDotNet.Evolution.Ptx.PtxElementType` | Experimental (AIDEVO005) | |
+| `AiDotNet.Evolution.Ptx.PtxExtent` | Experimental (AIDEVO005) | |
+| `AiDotNet.Evolution.Ptx.PtxIncumbentProfile` | Experimental (AIDEVO005) | |
+| `AiDotNet.Evolution.Ptx.PtxIsolationOptions` | Experimental (AIDEVO005) | |
+| `AiDotNet.Evolution.Ptx.PtxKernelArtifact` | Experimental (AIDEVO005) | |
+| `AiDotNet.Evolution.Ptx.PtxKernelConfiguration` | Experimental (AIDEVO005) | |
+| `AiDotNet.Evolution.Ptx.PtxKernelConfigurationCodec` | Experimental (AIDEVO005) | |
+| `AiDotNet.Evolution.Ptx.PtxKernelContract` | Experimental (AIDEVO005) | |
+| `AiDotNet.Evolution.Ptx.PtxKernelFitnessEvaluator` | Experimental (AIDEVO005) | |
+| `AiDotNet.Evolution.Ptx.PtxKernelParameter` | Experimental (AIDEVO005) | |
+| `AiDotNet.Evolution.Ptx.PtxKernelReference` | Experimental (AIDEVO005) | |
+| `AiDotNet.Evolution.Ptx.PtxKernelResources` | Experimental (AIDEVO005) | |
+| `AiDotNet.Evolution.Ptx.PtxLaunchConfiguration` | Experimental (AIDEVO005) | |
+| `AiDotNet.Evolution.Ptx.PtxPairedSample` | Experimental (AIDEVO005) | |
+| `AiDotNet.Evolution.Ptx.PtxPairedTimingEvidence` | Experimental (AIDEVO005) | |
+| `AiDotNet.Evolution.Ptx.PtxParameterKind` | Experimental (AIDEVO005) | |
+| `AiDotNet.Evolution.Ptx.PtxProgramCompiler` | Experimental (AIDEVO005) | |
+| `AiDotNet.Evolution.Ptx.PtxProgramEvolutionOptions` | Experimental (AIDEVO005) | |
+| `AiDotNet.Evolution.Ptx.PtxProgramVariation` | Experimental (AIDEVO005) | |
+| `AiDotNet.Evolution.Ptx.PtxReferenceInvocation` | Experimental (AIDEVO005) | |
+| `AiDotNet.Evolution.Ptx.PtxShapeCase` | Experimental (AIDEVO005) | |
+| `AiDotNet.Evolution.Ptx.PtxShapeSymbol` | Experimental (AIDEVO005) | |
+| `AiDotNet.Evolution.Ptx.PtxTargetLimits` | Experimental (AIDEVO005) | |
+| `AiDotNet.Evolution.Ptx.PtxTimingEvaluator` | Experimental (AIDEVO005) | |
+| `AiDotNet.Evolution.Ptx.PtxTimingOptions` | Experimental (AIDEVO005) | |
+| `AiDotNet.Evolution.Ptx.PtxTimingReport` | Experimental (AIDEVO005) | |
+| `AiDotNet.Evolution.Ptx.PtxTimingStatistics` | Experimental (AIDEVO005) | |
+| `AiDotNet.Evolution.Ptx.PtxTolerance` | Experimental (AIDEVO005) | |
+| `AiDotNet.Evolution.Ptx.PtxValueDistribution` | Experimental (AIDEVO005) | |
+
 ## AiDotNet.Evolution.Surrogates
 
 | Type | Class | Evidence |

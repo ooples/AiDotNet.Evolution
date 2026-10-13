@@ -88,6 +88,17 @@ jobs:
               -- DataCollectionRunSettings.DataCollectors.DataCollector.Configuration.Format=cobertura
             if ($LASTEXITCODE -ne 0) { throw "Standalone program migration tests failed on $framework." }
           }
+      # The PTX package's contract, compiler, correctness, timing, artifact and proposal logic runs offline against an
+      # in-process stand-in for the GPU worker, and its watchdog, refusal and probe tests start the real isolated worker.
+      # Tests that need an sm_75 device skip themselves here. No coverage collection: the ratchet counts its reports.
+      - name: Verify PTX kernel evolution contracts
+        shell: pwsh
+        run: |
+          foreach ($framework in 'net10.0', 'net8.0') {
+            dotnet test tests/AiDotNet.Evolution.Ptx.Tests/AiDotNet.Evolution.Ptx.Tests.csproj -c Release --no-restore `
+              --framework $framework --blame-hang --blame-hang-timeout 120s
+            if ($LASTEXITCODE -ne 0) { throw "PTX kernel evolution tests failed on $framework." }
+          }
       - name: Verify numeric quality harness contracts
         shell: pwsh
         env:

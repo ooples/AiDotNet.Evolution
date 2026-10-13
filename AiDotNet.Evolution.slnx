@@ -20,6 +20,8 @@
   </Folder>
   <Folder Name="/src/">
     <Project Path="src/AiDotNet.Evolution.Deployment/AiDotNet.Evolution.Deployment.csproj" />
+    <Project Path="src/AiDotNet.Evolution.Ptx.Worker/AiDotNet.Evolution.Ptx.Worker.csproj" />
+    <Project Path="src/AiDotNet.Evolution.Ptx/AiDotNet.Evolution.Ptx.csproj" />
     <Project Path="src/AiDotNet.Evolution.Sandbox.Guardian/AiDotNet.Evolution.Sandbox.Guardian.csproj" />
     <Project Path="src/AiDotNet.Evolution.Surrogates/AiDotNet.Evolution.Surrogates.csproj" />
     <Project Path="src/AiDotNet.Evolution.Programs/AiDotNet.Evolution.Programs.csproj" />
@@ -32,6 +34,7 @@
     <Project Path="tests/AiDotNet.Evolution.Deployment.Tests/AiDotNet.Evolution.Deployment.Tests.csproj" />
     <Project Path="tests/AiDotNet.Evolution.Performance.Tests/AiDotNet.Evolution.Performance.Tests.csproj" />
     <Project Path="tests/AiDotNet.Evolution.CSharp.Tests/AiDotNet.Evolution.CSharp.Tests.csproj" />
+    <Project Path="tests/AiDotNet.Evolution.Ptx.Tests/AiDotNet.Evolution.Ptx.Tests.csproj" />
     <Project Path="tests/AiDotNet.Evolution.Tests/AiDotNet.Evolution.Tests.csproj" />
   </Folder>
 </Solution>

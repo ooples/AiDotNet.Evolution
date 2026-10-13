@@ -1,0 +1,27 @@
+<Project Sdk="Microsoft.NET.Sdk">
+  <!--
+    The isolated PTX worker (#217): the only process that loads the CUDA driver. A candidate kernel that hangs or faults
+    takes down this child, never the host, and the host's watchdog kills it at its deadline. Embedded in
+    AiDotNet.Evolution.Ptx and written out at run time, like the sandbox guardian; it is not a package of its own.
+    The wire format and the seeded input generator are compiled from the library's Shared folder, so both sides of the
+    process boundary always agree.
+  -->
+  <PropertyGroup>
+    <OutputType>Exe</OutputType>
+    <!-- Embedded as its net8.0 build; net10.0 is built too so a solution-wide -f net10.0 build (SonarCloud) restores. -->
+    <TargetFrameworks>net8.0;net10.0</TargetFrameworks>
+    <!-- Runs on whatever runtime the host has, 8 or later. -->
+    <RollForward>Major</RollForward>
+    <ImplicitUsings>enable</ImplicitUsings>
+    <Nullable>enable</Nullable>
+    <TreatWarningsAsErrors>true</TreatWarningsAsErrors>
+    <UseAppHost>false</UseAppHost>
+    <IsPackable>false</IsPackable>
+    <InvariantGlobalization>true</InvariantGlobalization>
+    <UseSystemResourceKeys>true</UseSystemResourceKeys>
+    <SatelliteResourceLanguages>en</SatelliteResourceLanguages>
+  </PropertyGroup>
+  <ItemGroup>
+    <Compile Include="../AiDotNet.Evolution.Ptx/Shared/*.cs" Link="Shared/%(Filename)%(Extension)"/>
+  </ItemGroup>
+</Project>

@@ -1,0 +1,53 @@
+<Project Sdk="Microsoft.NET.Sdk">
+  <PropertyGroup>
+    <TargetFrameworks>net10.0;net8.0</TargetFrameworks>
+    <ImplicitUsings>enable</ImplicitUsings>
+    <Nullable>enable</Nullable>
+    <TreatWarningsAsErrors>true</TreatWarningsAsErrors>
+    <GenerateDocumentationFile>true</GenerateDocumentationFile>
+    <Version>0.2.0</Version>
+    <Description>Optional PTX kernel evolution for AiDotNet.Evolution: contract-driven JIT checks, seeded and shape-fuzzed correctness, paired CUDA-event timing in an isolated worker, and versioned winner artifacts.</Description>
+    <RepositoryUrl>https://github.com/ooples/AiDotNet.Evolution</RepositoryUrl>
+    <PackageLicenseFile>AIDOTNET-LICENSE.txt</PackageLicenseFile>
+    <PackageReadmeFile>README.md</PackageReadmeFile>
+    <!-- The whole package is experimental (AIDEVO005) until its first release; this assembly uses its own types. -->
+    <NoWarn>$(NoWarn);AIDEVO005</NoWarn>
+    <!-- A new package: there is no published baseline to validate against until its first release, so package
+         validation (and its PackageValidationBaselineVersion) is switched on with that release. -->
+    <EnablePackageValidation>false</EnablePackageValidation>
+  </PropertyGroup>
+  <ItemGroup>
+    <None Include="../AiDotNet.Evolution.Programs/AIDOTNET-LICENSE.txt" Pack="true" PackagePath="AIDOTNET-LICENSE.txt"/>
+    <None Include="../../LICENSE" Pack="true" PackagePath="APACHE-LICENSE.txt"/>
+    <None Include="../../docs/PTX_KERNEL_EVOLUTION.md" Pack="true" PackagePath="README.md"/>
+    <InternalsVisibleTo Include="AiDotNet.Evolution.Ptx.Tests"/>
+    <ProjectReference Include="../AiDotNet.Evolution.Programs/AiDotNet.Evolution.Programs.csproj"/>
+  </ItemGroup>
+  <!--
+    The isolated worker is embedded as its net8.0 build (RollForward=Major), like the Programs sandbox guardian: every
+    dll under lib/ would become a compile reference for consumers. The project reference only orders the build; the
+    target builds and embeds the worker explicitly, so a clean net10.0 build never embeds a file that does not exist yet.
+  -->
+  <ItemGroup>
+    <ProjectReference Include="../AiDotNet.Evolution.Ptx.Worker/AiDotNet.Evolution.Ptx.Worker.csproj"
+                      ReferenceOutputAssembly="false" Private="false"
+                      SetTargetFramework="TargetFramework=net8.0"/>
+  </ItemGroup>
+  <Target Name="EmbedPtxWorker" BeforeTargets="AssignTargetPaths" DependsOnTargets="ResolveProjectReferences">
+    <MSBuild Projects="../AiDotNet.Evolution.Ptx.Worker/AiDotNet.Evolution.Ptx.Worker.csproj"
+             Targets="Build" Properties="Configuration=$(Configuration);TargetFramework=net8.0">
+      <Output TaskParameter="TargetOutputs" ItemName="_PtxWorkerAssembly"/>
+    </MSBuild>
+    <ItemGroup>
+      <EmbeddedResource Include="@(_PtxWorkerAssembly)" LogicalName="AiDotNet.Evolution.Ptx.Worker.dll"/>
+      <EmbeddedResource Include="@(_PtxWorkerAssembly->'%(RootDir)%(Directory)%(Filename).runtimeconfig.json')"
+                        LogicalName="AiDotNet.Evolution.Ptx.Worker.runtimeconfig.json"/>
+    </ItemGroup>
+  </Target>
+  <!-- V1-11: the public API is declared (PublicAPI.*.txt) and every change to it must be too. -->
+  <ItemGroup>
+    <PackageReference Include="Microsoft.CodeAnalysis.PublicApiAnalyzers" Version="5.6.0" PrivateAssets="all"/>
+    <AdditionalFiles Include="PublicAPI.Shipped.txt"/>
+    <AdditionalFiles Include="PublicAPI.Unshipped.txt"/>
+  </ItemGroup>
+</Project>

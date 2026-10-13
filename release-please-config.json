@@ -34,6 +34,11 @@
         },
         {
           "type": "xml",
+          "path": "src/AiDotNet.Evolution.Ptx/AiDotNet.Evolution.Ptx.csproj",
+          "xpath": "//PropertyGroup/Version"
+        },
+        {
+          "type": "xml",
           "path": "src/AiDotNet.Evolution.Deployment/AiDotNet.Evolution.Deployment.csproj",
           "xpath": "//PropertyGroup/Version"
         },

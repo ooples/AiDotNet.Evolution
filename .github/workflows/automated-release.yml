@@ -63,7 +63,7 @@ jobs:
       - name: Test companion packages
         shell: pwsh
         run: |
-          foreach ($project in @('AiDotNet.Evolution.CSharp.Tests', 'AiDotNet.Evolution.Deployment.Tests')) {
+          foreach ($project in @('AiDotNet.Evolution.CSharp.Tests', 'AiDotNet.Evolution.Deployment.Tests', 'AiDotNet.Evolution.Ptx.Tests')) {
             foreach ($framework in @('net8.0', 'net10.0')) {
               dotnet test "tests/$project/$project.csproj" -c Release -f $framework --no-restore --verbosity minimal
               if ($LASTEXITCODE -ne 0) { throw "Failed: $project $framework" }
