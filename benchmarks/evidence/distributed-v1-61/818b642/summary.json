@@ -1,0 +1,46 @@
+{
+  "passed": true,
+  "checks": {
+    "state_hash_matches_single_host": {
+      "passed": true,
+      "single": "464c4c45e20122165008b1400616ebb7d9c9bea90c814b260642b321b9d0abb0",
+      "multi": "464c4c45e20122165008b1400616ebb7d9c9bea90c814b260642b321b9d0abb0"
+    },
+    "state_hash_independent_of_worker_count": {
+      "passed": true,
+      "one_worker": "4cfb9f694aae1274c32ae53470023723e68fd37361222cdccddc605b5c02cbd4",
+      "four_workers": "4cfb9f694aae1274c32ae53470023723e68fd37361222cdccddc605b5c02cbd4"
+    },
+    "exactly_once": {
+      "passed": true,
+      "asked": 31,
+      "delivered": 31,
+      "missing": 0,
+      "evaluations_with_an_accepted_commit": 31,
+      "evaluations_accepted_more_than_once": []
+    },
+    "killed_worker_lease_reissued": {
+      "passed": true,
+      "killed_worker_last_claim": {
+        "runId": "distributed-v1-61",
+        "evaluationId": "2",
+        "attempt": 1,
+        "leaseId": "21edd80c66e1446d8887e76db779ec69"
+      },
+      "final_commit": {
+        "evaluationId": 2,
+        "attempt": 1,
+        "leaseId": "6f8b2c4014824a2b9f70d32f730cdb42",
+        "provenance": "worker:w2"
+      }
+    },
+    "four_worker_scaling": {
+      "passed": true,
+      "one_worker_per_second": 0.9563309439791784,
+      "four_workers_per_second": 3.6371391500073353,
+      "ratio": 3.8032222766667316,
+      "target": 3.5,
+      "efficiency": 0.9508055691666829
+    }
+  }
+}
