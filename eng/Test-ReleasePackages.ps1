@@ -24,7 +24,7 @@ foreach ($id in $ids) {
         $metadata = $spec.package.metadata
         if ($metadata.id -cne $id -or $metadata.version -cne $ExpectedVersion) { throw "Invalid identity: $id" }
         $frameworks = @('net8.0', 'net10.0')
-        if ($id -in @('AiDotNet.Evolution', 'AiDotNet.Evolution.Surrogates')) { $frameworks += 'net471' }
+        if ($id -in @('AiDotNet.Evolution', 'AiDotNet.Evolution.Surrogates')) { $frameworks += 'net471', 'net462', 'netstandard2.0' }
         foreach ($framework in $frameworks) {
             $assembly = if ($tools.ContainsKey($id)) { "tools/$framework/any/$($tools[$id]).dll" } else { "lib/$framework/$id.dll" }
             if ($null -eq $archive.GetEntry($assembly)) { throw "Missing $framework assembly: $id" }
@@ -53,7 +53,12 @@ foreach ($id in $ids) {
                     }
                 }
                 foreach ($framework in $frameworks) {
-                    $nuspecFramework = if ($framework -eq 'net471') { '.NETFramework4.7.1' } else { $framework }
+                    $nuspecFramework = switch ($framework) {
+                        'net471' { '.NETFramework4.7.1' }
+                        'net462' { '.NETFramework4.6.2' }
+                        'netstandard2.0' { '.NETStandard2.0' }
+                        default { $framework }
+                    }
                     if ($nuspecFramework -notin @($groups.targetFramework)) {
                         throw "Missing dependency group: $id [$nuspecFramework]"
                     }

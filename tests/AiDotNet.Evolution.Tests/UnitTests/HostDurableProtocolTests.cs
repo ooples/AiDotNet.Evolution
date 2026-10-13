@@ -1,4 +1,4 @@
-#if !NET471
+#if !NETFRAMEWORK
 using System.Text.Json.Nodes;
 using Xunit;
 

@@ -1,4 +1,4 @@
-#if !NET471
+#if !NETFRAMEWORK
 using System.Runtime.CompilerServices;
 using AiDotNet.Evolution;
 using AiDotNet.Evolution.Host;

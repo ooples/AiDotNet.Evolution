@@ -2,7 +2,7 @@
   <PropertyGroup>
     <!-- Deliberately exercises experimental research surfaces (AIDEVO001-003). -->
     <NoWarn>$(NoWarn);AIDEVO001;AIDEVO002;AIDEVO003</NoWarn>
-    <TargetFrameworks>net10.0;net8.0;net471</TargetFrameworks>
+    <TargetFrameworks>net10.0;net8.0;net471;net462</TargetFrameworks>
     <ImplicitUsings>enable</ImplicitUsings>
     <Nullable>enable</Nullable>
     <LangVersion>latest</LangVersion>
@@ -34,10 +34,10 @@
 
   <!--
     The host is net8.0 only, so it is referenced only from the TFMs that can load it.
-    net471 runs the same suite minus the host tests rather than losing the whole target.
+    .NET Framework (net471, net462) runs the same suite minus the host tests rather than losing the whole target.
   -->
-  <ItemGroup Condition="'$(TargetFramework)' != 'net471'">
+  <ItemGroup Condition="'$([MSBuild]::GetTargetFrameworkIdentifier($(TargetFramework)))' != '.NETFramework'">
     <ProjectReference Include="..\..\src\AiDotNet.Evolution.Host\AiDotNet.Evolution.Host.csproj" />
-    <ProjectReference Include="..\..\src\AiDotNet.Evolution.Cli\AiDotNet.Evolution.Cli.csproj" Condition="'$(TargetFramework)' != 'net471'" />
+    <ProjectReference Include="..\..\src\AiDotNet.Evolution.Cli\AiDotNet.Evolution.Cli.csproj" />
   </ItemGroup>
 </Project>

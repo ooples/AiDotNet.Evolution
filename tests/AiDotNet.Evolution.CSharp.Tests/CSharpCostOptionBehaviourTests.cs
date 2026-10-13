@@ -9,6 +9,7 @@ namespace AiDotNet.Evolution.CSharp.Tests;
 /// Each price is raised on its own and the settled cost must rise by exactly that price times the work the
 /// ledger counted for it, so a price that is read but multiplied by the wrong counter fails here too.
 /// </summary>
+[Collection(nameof(WallClockCollection))]
 public sealed class CSharpCostOptionBehaviourTests
 {
     private static readonly string[] Counters =
@@ -51,28 +52,29 @@ public sealed class CSharpCostOptionBehaviourTests
         // Load and JIT the compiler first so the timed arms measure binding, not start-up.
         Assert.Equal(string.Empty, Attempt(30, depth: 1).Feedback);
 
-        // Calibrate to this host: deepen until an unbounded compile takes long enough to discriminate a one-second
-        // bound. Each level roughly doubles binding time, so the level that first passes the target stays well inside
-        // the thirty-second patient bound on a slow host, and a fast host simply goes deeper.
-        TimeSpan target = TimeSpan.FromSeconds(3);
-        int depth = FirstDepth;
-        CSharpPatchAttempt patient;
-        TimeSpan full;
-        while (true)
+        // Deepen under the one-second bound until a compile no longer fits it. Calibrating an unbounded compile first and
+        // then expecting the bounded one to time out at that depth is a wall-clock race: CI measured the calibration
+        // slowed past three seconds by tests running beside it, then the bounded compile finished inside one second
+        // once they were done. Each level roughly doubles binding time, so some level must exceed the bound, and every
+        // attempt on the way, finished or refused, must return within the bound plus scheduling slack.
+        TimeSpan slack = TimeSpan.FromSeconds(2);
+        for (int depth = FirstDepth; ; depth++)
         {
-            var timer = Stopwatch.StartNew();
-            patient = Attempt(30, depth);
-            full = timer.Elapsed;
-            Assert.DoesNotContain("timed out", patient.Feedback, StringComparison.Ordinal);
-            if (full > target) break;
-            Assert.True(depth < LastDepth, "Even depth " + depth + " compiled in " + full + "; the slow source no longer discriminates.");
-            depth++;
+            var bounded = Stopwatch.StartNew();
+            CSharpPatchAttempt limited = Attempt(1, depth);
+            TimeSpan elapsed = bounded.Elapsed;
+            Assert.True(elapsed < TimeSpan.FromSeconds(1) + slack,
+                "A compile bounded at one second returned after " + elapsed + " at depth " + depth);
+            if (limited.Feedback.Contains("timed out", StringComparison.Ordinal))
+            {
+                // The refusal must come from the bound, not from a source the compiler rejects: the same source compiles
+                // cleanly when it is given time.
+                Assert.Equal(string.Empty, Attempt(30, depth).Feedback);
+                return;
+            }
+            Assert.Equal(string.Empty, limited.Feedback);
+            Assert.True(depth < LastDepth, "Even depth " + depth + " compiled inside one second; the slow source no longer discriminates.");
         }
-
-        var bounded = Stopwatch.StartNew();
-        CSharpPatchAttempt limited = Attempt(1, depth);
-        Assert.Contains("timed out", limited.Feedback, StringComparison.Ordinal);
-        Assert.True(bounded.Elapsed < full, "Timed out after " + bounded.Elapsed + " but the full compile took " + full);
     }
 
     private const int FirstDepth = 8;

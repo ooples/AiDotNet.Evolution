@@ -34,7 +34,7 @@ jobs:
       - name: Verify fresh-process archive resource contracts
         shell: pwsh
         run: ./eng/Test-ArchiveResources.ps1 -SourceRevision '${{ github.sha }}'
-      - uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a # v7.0.1
+      - uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9 # v7.0.2
         if: always()
         with:
           name: archive-resource-contracts
@@ -237,7 +237,7 @@ jobs:
           ./eng/Test-Coverage.ps1 -CoverageFile coverage/merged/Cobertura.xml -BaselineFile coverage-baseline.json
       - name: Upload coverage and crash diagnostics
         if: always()
-        uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a # v7.0.1
+        uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9 # v7.0.2
         with:
           name: coverage-and-diagnostics
           path: |
@@ -301,7 +301,7 @@ jobs:
         run: ./eng/Test-RepresentativeSuite.ps1 -Python .local/suite-env/bin/python -Upstream .local/algotune-upstream -SourceRevision '${{ github.sha }}'
       - name: Retain failed and successful suite evidence
         if: always()
-        uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a # v7.0.1
+        uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9 # v7.0.2
         with:
           name: representative-suite-evidence
           path: TestResults/representative-suite/**
@@ -387,7 +387,7 @@ jobs:
           export EVOLUTION_SANDBOX_IMAGE="$image_id"
           export EVOLUTION_SANDBOX_EVIDENCE="$PWD/TestResults/program-isolation"
           .local/program-env/bin/python eng/run_required_tests.py benchmarks/external test_docker_sandbox.py 'test_warm*.py'
-      - uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a
+      - uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9
         if: always()
         with:
           name: program-comparison-contract
@@ -397,7 +397,7 @@ jobs:
           if-no-files-found: warn
 
   legacy:
-    name: Build and test net471
+    name: Build and test .NET Framework (net471, net462)
     if: "${{ !(github.event_name == 'push' && startsWith(github.event.head_commit.message, 'chore(main): release')) && !startsWith(github.head_ref, 'release-please--') }}"
     runs-on: windows-latest
     timeout-minutes: 25
@@ -410,6 +410,8 @@ jobs:
       - run: dotnet restore AiDotNet.Evolution.slnx
       - run: dotnet build tests/AiDotNet.Evolution.Tests/AiDotNet.Evolution.Tests.csproj --configuration Release --framework net471 --no-restore
       - run: dotnet test tests/AiDotNet.Evolution.Tests/AiDotNet.Evolution.Tests.csproj --configuration Release --framework net471 --no-build --verbosity normal --blame-hang --blame-hang-timeout 120s --blame-crash
+      - run: dotnet build tests/AiDotNet.Evolution.Tests/AiDotNet.Evolution.Tests.csproj --configuration Release --framework net462 --no-restore
+      - run: dotnet test tests/AiDotNet.Evolution.Tests/AiDotNet.Evolution.Tests.csproj --configuration Release --framework net462 --no-build --verbosity normal --blame-hang --blame-hang-timeout 120s --blame-crash
       # The sandbox's limits are enforced differently per OS (job object here, /proc on Linux), so its
       # enforcement tests run on Windows too, not only in the Linux test job.
       - name: Sandbox enforcement on Windows
@@ -444,7 +446,7 @@ jobs:
           $version = [string] $project.Project.PropertyGroup.Version
           if ([string]::IsNullOrWhiteSpace($version)) { throw 'The package project has no Version.' }
           ./eng/Test-Package.ps1 -PackagePath "artifacts/AiDotNet.Evolution.$version.nupkg" -ExpectedVersion $version
-      - uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a # v7.0.1
+      - uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9 # v7.0.2
         with:
           name: packages
           path: |
@@ -468,7 +470,7 @@ jobs:
         env:
           REUSE_SOURCE_REVISION: ${{ github.sha }}
         run: ./eng/Test-ReuseCampaign.ps1 -SourceRevision $env:REUSE_SOURCE_REVISION
-      - uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a # v7.0.1
+      - uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9 # v7.0.2
         if: always()
         with:
           name: noisy-reuse-evidence
