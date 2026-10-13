@@ -9,6 +9,7 @@
   "packages": {
     ".": {
       "package-name": "AiDotNet.Evolution",
+      "release-as": "0.3.0",
       "initial-version": "0.1.0-preview.1",
       "changelog-path": "CHANGELOG.md",
       "extra-files": [
