@@ -118,6 +118,38 @@ public sealed class EvolutionWorkServerTests : IDisposable
         return server;
     }
 
+    /// <summary>
+    /// Waits for the server to record <paramref name="kind"/>, then asserts it did.
+    /// </summary>
+    /// <remarks>
+    /// The server's callback runs on its own thread, so an event caused by a client-visible failure
+    /// can arrive after the client has already observed that failure. Polling makes the assertion
+    /// about whether the event happens rather than about which thread got there first, and the
+    /// failure message lists what was recorded instead so a real regression is still legible.
+    /// </remarks>
+    private static async Task WaitForEventAsync(
+        List<EvolutionWorkServerEvent> events, EvolutionWorkServerEventKind kind)
+    {
+        var deadline = DateTime.UtcNow + TimeSpan.FromSeconds(10);
+        while (DateTime.UtcNow < deadline)
+        {
+            lock (events)
+            {
+                if (events.Any(e => e.Kind == kind)) return;
+            }
+
+            await Task.Delay(25);
+        }
+
+        string observed;
+        lock (events)
+        {
+            observed = string.Join(", ", events.Select(e => e.Kind.ToString()));
+        }
+
+        Assert.Fail($"the server never recorded {kind} within 10 s; it recorded: {observed}");
+    }
+
     private static Task<EvolutionWorkRemoteClient> ConnectTo(EvolutionWorkServer server) =>
         EvolutionWorkRemoteClient.ConnectAsync("127.0.0.1", server.LocalEndPoint.Port, server.CertificateFingerprint, Token);
 
@@ -147,7 +179,10 @@ public sealed class EvolutionWorkServerTests : IDisposable
             using EvolutionWorkRemoteClient second = await ConnectTo(server);
             await second.SendAsync(Request("status").ToJsonString());
         });
-        lock (events) Assert.Contains(events, e => e.Kind == EvolutionWorkServerEventKind.ConnectionLimitReached);
+        // The client throws as soon as the server drops its connection, but the server records the
+        // refusal on its own thread, so asserting here immediately is a race: CI observed only
+        // Listening, Accepted and Authenticated and failed with "Filter not matched in collection".
+        await WaitForEventAsync(events, EvolutionWorkServerEventKind.ConnectionLimitReached);
         // The connection within the limit is unaffected.
         JsonObject reply = Assert.IsType<JsonObject>(JsonNode.Parse(await first.SendAsync(Request("status").ToJsonString())));
         Assert.True(reply["ok"]?.GetValue<bool>());
