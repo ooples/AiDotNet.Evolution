@@ -17,6 +17,7 @@ import { createInterface, type Interface } from 'node:readline';
 import { resolveHostBinary } from './binary.js';
 
 export * from './durable.js';
+export * from './referenceWorker.js';
 
 /**
  * One knob the search varies. Bounds, their difference, the resolved step, and

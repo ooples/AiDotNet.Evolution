@@ -86,7 +86,9 @@ def main(argv: list[str]) -> int:
     with open(output, "x", encoding="utf-8", newline="\n") as handle:
         handle.write(text)
     print(json.dumps({"dispositions": dispositions, "outcomes": [receipts[1]["outcome"], receipts[2]["outcome"]]}))
-    return 0 if dispositions == ["accepted", "accepted"] else 1
+    initial_score = evidence["receipts"]["1"]["payload"].get("metrics", {}).get("combined_score")
+    scored = receipts[1]["outcome"] == "completed" and isinstance(initial_score, float) and initial_score > 0
+    return 0 if dispositions == ["accepted", "accepted"] and scored else 1
 
 
 if __name__ == "__main__":

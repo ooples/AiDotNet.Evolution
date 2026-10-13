@@ -79,3 +79,7 @@ with DurableWorkClient(config, host_path="/path/to/aidotnet-evolution-host") as 
 Evaluators that import `openevolve.evaluation_result` need OpenEvolve installed, exactly as when OpenEvolve runs
 them. `benchmarks/external/run_upstream_evaluator_through_worker.py` checks an example's files against the pinned
 OpenEvolve commit, byte for byte, before running them. Cascade stages (`evaluate_stage1`, ...) are not invoked.
+
+`benchmarks/worker-overhead/measure_python.py` measures this worker's overhead per evaluation against the real host.
+The TypeScript binding ships the same worker (`serve`, `loadEvaluatorModule`, `engineProgramSource`,
+`rawProgramSource`), held to the same tests.
