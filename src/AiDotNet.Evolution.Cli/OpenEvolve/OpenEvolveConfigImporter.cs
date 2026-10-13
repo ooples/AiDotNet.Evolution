@@ -307,6 +307,20 @@ internal static class OpenEvolveConfigImporter
                           "equivalent and is dropped.");
                 continue;
             }
+
+            if (dimension == "score")
+            {
+                // OpenEvolve's "score" axis is the fitness itself, not a metric the evaluator
+                // reports. Carrying the name through would demand a metric literally called
+                // "score" on every completed evaluation - which the 16 alphaevolve_math_problems
+                // configs that declare this axis do not report, since their evaluators return
+                // combined_score - and the run would end with no candidates. Dropped by name, like
+                // 'diversity', rather than mapped to something it is not.
+                notes.Add("database.feature_dimensions: OpenEvolve's 'score' axis is the fitness itself rather than a "
+                          + "reported metric, and this archive has no quality axis to bin it on, so it is dropped. The "
+                          + "remaining dimensions still apply.");
+                continue;
+            }
             // OpenEvolve's "complexity" is program length; "score" is the fitness itself; others are evaluator metrics.
             string name = dimension switch { "complexity" => "length", _ => dimension };
             if (name != "length")

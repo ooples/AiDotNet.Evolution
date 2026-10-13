@@ -121,6 +121,38 @@ public sealed class OpenEvolveImportTests
     }
 
     /// <summary>
+    /// OpenEvolve's "score" feature dimension is the fitness, not a reported metric, so it is
+    /// dropped by name rather than demanded of the evaluator.
+    /// </summary>
+    /// <remarks>
+    /// The 16 configs under examples/alphaevolve_math_problems declare
+    /// <c>feature_dimensions: ["score", "complexity"]</c> while their evaluators report
+    /// <c>combined_score</c> and never <c>score</c>. Carrying the name through would have required a
+    /// metric called "score" on every completed evaluation, which no candidate could satisfy, so
+    /// every one of those runs would have ended with no candidates.
+    /// </remarks>
+    [Fact]
+    public void The_score_feature_dimension_is_dropped_rather_than_demanded()
+    {
+        using var directory = new TemporaryDirectory();
+        OpenEvolveImport imported = Import(directory, """
+            llm:
+              name: m
+            database:
+              feature_dimensions: ["score", "complexity"]
+            """);
+
+        // Only program length survives, and nothing asks the evaluator for a "score" metric.
+        RunMetricDescriptor descriptor = Assert.Single(imported.Run.Search.MetricDescriptors);
+        Assert.Equal("length", descriptor.Name);
+
+        string note = Assert.Single(
+            imported.Notes.Where(n => n.Contains("'score'", StringComparison.Ordinal)).ToArray());
+        Assert.Contains("fitness itself", note, StringComparison.Ordinal);
+        Assert.Contains("dropped", note, StringComparison.Ordinal);
+    }
+
+    /// <summary>
     /// Importing a feature dimension warns that the evaluator must report it every time.
     /// </summary>
     /// <remarks>
