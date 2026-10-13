@@ -54,6 +54,29 @@ public sealed class OpenEvolveExampleLedgerTests
             StringComparison.Ordinal);
     }
 
+    /// <summary>
+    /// The ledger's smoke headline matches the number of examples the smoke actually runs.
+    /// </summary>
+    /// <remarks>
+    /// The import headline has been guarded since this file was written; the smoke headline was
+    /// not, and it has already been wrong once in this PR's history - it said six while the test
+    /// ran six and three of them failed. Tying it to <c>OpenEvolveExampleSmokeTests.Examples</c>
+    /// means the document cannot claim coverage the suite does not have.
+    /// </remarks>
+    [Fact]
+    public void The_smoke_headline_matches_the_examples_the_smoke_runs()
+    {
+        int smoked = OpenEvolveExampleSmokeTests.Examples.Count();
+        string ledger = File.ReadAllText(LedgerPath());
+
+        string[] words = { "Zero", "One", "Two", "Three", "Four", "Five", "Six", "Seven", "Eight", "Nine", "Ten" };
+        string expected = "**" + (smoked < words.Length ? words[smoked] : smoked.ToString(
+            System.Globalization.CultureInfo.InvariantCulture)) + " of " + ExpectedExamples.ToString(
+            System.Globalization.CultureInfo.InvariantCulture) + " examples are smoked.**";
+
+        Assert.Contains(expected, ledger, StringComparison.Ordinal);
+    }
+
     /// <summary>Every row that does not import carries a reason, and no reason is a placeholder.</summary>
     [Fact]
     public void Every_example_that_does_not_import_has_a_tracked_reason()
