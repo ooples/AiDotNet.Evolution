@@ -142,6 +142,31 @@ of the three sessions it took here.
 `complexity` and `ssim`) and why the candidate ends up unplaceable rather than clamped into a bin.
 The two examples stay out of the smoke until that is fixed, rather than being asserted on.
 
+## Every feature dimension the corpus declares
+
+`database.feature_dimensions` is the key that cost the most to get right, so its coverage is a
+census rather than a sample. Every value declared anywhere under `examples/` at the pinned ref:
+
+| dimension | declarations | treatment |
+| --- | --- | --- |
+| `complexity` | 27 | mapped to `length`, which the engine always computes |
+| `score` | 17 | dropped with a note: it is the fitness itself, not a reported metric, and this archive has no quality axis |
+| `diversity` | 9 | dropped with a note: OpenEvolve's axis is population-relative and has no deterministic equivalent |
+| `combined_score` | 8 | passed through as an evaluator metric |
+| `prompt_length`, `reasoning_strategy` | 3 each | passed through as evaluator metrics |
+| `ssim`, `radius_variance`, `spatial_spread`, `performance_score`, `adaptability_score`, `outlier_robustness`, `execution_time` | 1 each | passed through as evaluator metrics |
+
+The two dropped axes are dropped **by name, with a note** — the same treatment the parity checklist
+requires for any key we do not support, rather than silent omission. Everything passed through is
+requested of the evaluator on every completed evaluation, which is what the import note warns about:
+an evaluator that reports its metric only on a success path will end the run with no candidates.
+
+`score` was the interesting one. The importer's own comment already said it was the fitness rather
+than a metric, while the code beside it passed the name through — so all 17 declarations would have
+demanded a metric literally called `score`, which none of those evaluators report. That was found by
+asking which real configs the new import note would fire on, not by reading the examples that had
+already failed.
+
 ## The two that do not
 
 Neither is a defect in the importer, and both are refusals by name rather than silent acceptance:
