@@ -8,6 +8,7 @@ on:
       - 'bindings/python/**'
       - 'bindings/c/**'
       - 'conformance/**'
+      - 'benchmarks/worker-overhead/**'
       - 'src/AiDotNet.Evolution.Native/**'
       - 'src/AiDotNet.Evolution.Host/**'
       - 'src/AiDotNet.Evolution/**'
@@ -19,6 +20,7 @@ on:
       - 'bindings/python/**'
       - 'bindings/c/**'
       - 'conformance/**'
+      - 'benchmarks/worker-overhead/**'
       - 'src/AiDotNet.Evolution.Native/**'
       - 'src/AiDotNet.Evolution.Host/**'
       - 'src/AiDotNet.Evolution/**'
@@ -139,6 +141,29 @@ jobs:
           $env:AIDOTNET_DURABLE_HOST_PATH = Join-Path $PWD "bindings/typescript/bin/${{ matrix.rid }}/aidotnet-evolution-host$suffix"
           & $python -W error::ResourceWarning -m unittest discover -s bindings/python/tests -v
           if ($LASTEXITCODE -ne 0) { exit $LASTEXITCODE }
+
+      # V1-25 (#119): worker overhead per evaluation, both reference workers against this platform's native host. The
+      # report separates the IPC round trip from the host's durable claim/commit writes; it is evidence, not a gate
+      # (the < 2 ms target is not met while every claim and commit rewrites and fsyncs the whole durable state).
+      - name: Measure reference-worker overhead per evaluation
+        if: matrix.node == '22'
+        shell: pwsh
+        run: |
+          $suffix = if ($IsWindows) { '.exe' } else { '' }
+          $hostPath = Join-Path $PWD "bindings/typescript/bin/${{ matrix.rid }}/aidotnet-evolution-host$suffix"
+          $out = 'TestResults/worker-overhead'
+          python benchmarks/worker-overhead/measure_python.py --host $hostPath --output "$out/${{ matrix.rid }}-python.json"
+          if ($LASTEXITCODE -ne 0) { exit $LASTEXITCODE }
+          node benchmarks/worker-overhead/measure_typescript.mjs --host $hostPath --output "$out/${{ matrix.rid }}-typescript.json"
+          if ($LASTEXITCODE -ne 0) { exit $LASTEXITCODE }
+
+      - uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9 # v7.0.2
+        if: matrix.node == '22'
+        with:
+          name: worker-overhead-${{ matrix.rid }}
+          path: TestResults/worker-overhead
+          if-no-files-found: error
+          retention-days: 30
 
       - name: Publish and test the durable C ABI
         if: matrix.node == '22'
