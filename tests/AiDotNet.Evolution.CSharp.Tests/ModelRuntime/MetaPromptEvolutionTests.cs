@@ -259,6 +259,149 @@ public sealed class MetaPromptEvolutionTests
             () => new ProgramMetaPromptEvolver(new FakeChatClient(), new string('c', 81), options));
     }
 
+    /// <summary>
+    /// A minimizing run credits the instruction whose programs measured LOWER. Without the
+    /// direction applied, the archive would order by raw quality and prefer the worst instruction,
+    /// while looking perfectly well ordered.
+    /// </summary>
+    [Fact]
+    public async Task A_minimizing_run_prefers_the_instruction_with_the_lower_measurements()
+    {
+        const string better = "Instruction A: the one whose programs measure lower.";
+        ProgramMetaPromptOptions options = Options(selection: ProgramInstructionSelection.Greedy);
+        options.Direction = EvolutionOptimizationDirection.Minimize;
+
+        var evolver = new ProgramMetaPromptEvolver(new FakeChatClient(better), Seed, options);
+        await evolver.ProposeAsync(generation: 5);
+
+        var random = new StableRandom(31);
+        for (int i = 0; i < 2; i++)
+        {
+            string text = evolver.Select(random, 300 + i);
+            // Lower is better here, so the good instruction gets the SMALLER number.
+            evolver.Observe(300 + i, quality: text == better ? 0.1 : 0.9);
+        }
+
+        for (int i = 0; i < 10; i++) Assert.Equal(better, evolver.Select(random, 400 + i));
+        Assert.True(Single(evolver, better).MeanQuality > Single(evolver, Seed).MeanQuality);
+    }
+
+    /// <summary>
+    /// A failed or abandoned proposal releases its route without crediting anything. The only way
+    /// out used to be calling Observe with a made-up quality, which puts a number the run never
+    /// measured into the archive's mean.
+    /// </summary>
+    [Fact]
+    public void An_abandoned_proposal_releases_its_route_without_a_score()
+    {
+        var evolver = new ProgramMetaPromptEvolver(new FakeChatClient(), Seed, Options());
+        evolver.Select(new StableRandom(32), generation: 3);
+
+        Assert.True(evolver.Abandon(3));
+        Assert.False(evolver.Abandon(3)); // nothing left to drop
+
+        ProgramInstructionCandidate candidate = Assert.Single(evolver.Archive);
+        Assert.Equal(1, candidate.Uses);   // it was asked, so the use stands
+        Assert.Equal(0, candidate.Scored); // but it earned no score
+        Assert.Equal(0.0, candidate.MeanQuality);
+
+        // And the generation is free again, which is what a resumed or retried proposal needs.
+        evolver.Select(new StableRandom(32), generation: 3);
+    }
+
+    /// <summary>
+    /// The state hash must separate two costs that differ below six decimal places. Normalizing a
+    /// decimal's scale is not the same as rounding it, and the first version of that fix rounded.
+    /// </summary>
+    [Fact]
+    public async Task The_state_hash_separates_costs_that_differ_in_tiny_amounts()
+    {
+        async Task<string> HashFor(decimal cost)
+        {
+            ProgramMetaPromptOptions options = Options(cost: cost);
+            var evolver = new ProgramMetaPromptEvolver(
+                new FakeChatClient("Instruction A: an answer long enough to be accepted."), Seed, options);
+            await evolver.ProposeAsync(generation: 5);
+            return evolver.StateHash;
+        }
+
+        // Same amount, different scale: these must hash the same.
+        Assert.Equal(await HashFor(3m), await HashFor(3.000m));
+
+        // Different amounts below six decimal places: these must not. A fixed-point "F6" format
+        // rounded both to 1.000000 and made this pair collide.
+        Assert.NotEqual(await HashFor(1.00000001m), await HashFor(1.00000002m));
+    }
+
+    /// <summary>
+    /// A checkpoint names the model that produced the archive, so restoring one model's instructions
+    /// under another is refused rather than replayed as though the model were the same.
+    /// </summary>
+    [Fact]
+    public async Task A_state_captured_against_another_model_is_refused()
+    {
+        var evolver = new ProgramMetaPromptEvolver(
+            new FakeChatClient("Instruction A: an answer long enough to be accepted."), Seed, Options());
+        await evolver.ProposeAsync(generation: 5);
+        string captured = evolver.CaptureState();
+
+        var sameModel = new ProgramMetaPromptEvolver(new FakeChatClient(), Seed, Options());
+        sameModel.RestoreState(captured); // the stub reports one model id, so this is the same model
+
+        var otherModel = new ProgramMetaPromptEvolver(new RenamedChatClient("other-model"), Seed, Options());
+        Assert.Throws<InvalidOperationException>(() => otherModel.RestoreState(captured));
+    }
+
+    /// <summary>
+    /// A quality total that would leave the double range is refused where it happens, rather than
+    /// turning every later mean and the next checkpoint into something unusable.
+    /// </summary>
+    [Fact]
+    public void A_quality_total_that_would_stop_being_finite_is_refused()
+    {
+        var evolver = new ProgramMetaPromptEvolver(new FakeChatClient(), Seed, Options());
+        var random = new StableRandom(33);
+
+        evolver.Select(random, generation: 1);
+        evolver.Observe(1, quality: double.MaxValue);
+        evolver.Select(random, generation: 2);
+
+        Assert.Throws<InvalidOperationException>(() => evolver.Observe(2, quality: double.MaxValue));
+        Assert.True(double.IsFinite(Assert.Single(evolver.Archive).MeanQuality));
+    }
+
+    /// <summary>
+    /// The meta level's own model call carries a seed, so a replay asks for the same instruction.
+    /// Selection already replays from the engine's stream; this was the one unseeded step.
+    /// </summary>
+    [Fact]
+    public async Task The_instruction_request_carries_a_seed()
+    {
+        var client = new FakeChatClient("Instruction A: an answer long enough to be accepted.");
+        var evolver = new ProgramMetaPromptEvolver(client, Seed, Options());
+
+        await evolver.ProposeAsync(generation: 7);
+        Assert.Equal(7, client.LastOptions?.Seed);
+
+        var explicitly = new FakeChatClient("Instruction B: another answer long enough to be accepted.");
+        var seeded = new ProgramMetaPromptEvolver(explicitly, Seed, Options());
+        await seeded.ProposeAsync(generation: 7, ledger: null, seed: 4242);
+        Assert.Equal(4242, explicitly.LastOptions?.Seed);
+    }
+
+    /// <summary>A chat client that reports a different model id, for the checkpoint identity test.</summary>
+    private sealed class RenamedChatClient : IProgramChatClient
+    {
+        public RenamedChatClient(string modelId) => ModelId = modelId;
+
+        public string ModelId { get; }
+
+        public Task<ProgramChatResponse> GetResponseAsync(
+            IReadOnlyList<ProgramChatMessage> messages, ProgramChatOptions? options = null,
+            CancellationToken cancellationToken = default) =>
+            Task.FromResult(new ProgramChatResponse(ProgramChatMessage.Assistant("unused"), null, ModelId));
+    }
+
     private static ProgramInstructionCandidate Single(ProgramMetaPromptEvolver evolver, string text)
     {
         ProgramInstructionCandidate[] matches = evolver.Archive

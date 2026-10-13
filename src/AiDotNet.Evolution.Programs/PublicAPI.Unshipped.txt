@@ -928,13 +928,14 @@ AiDotNet.Evolution.Programs.ProgramMeasurementObservation.SampleId.get -> string
 AiDotNet.Evolution.Programs.ProgramMeasurementObservation.Value.get -> double
 AiDotNet.Evolution.Programs.ProgramMeasurementStatistics
 AiDotNet.Evolution.Programs.ProgramMetaPromptEvolver
+AiDotNet.Evolution.Programs.ProgramMetaPromptEvolver.Abandon(long generation) -> bool
 AiDotNet.Evolution.Programs.ProgramMetaPromptEvolver.Archive.get -> System.Collections.Generic.IReadOnlyList<AiDotNet.Evolution.Programs.ProgramInstructionCandidate!>!
 AiDotNet.Evolution.Programs.ProgramMetaPromptEvolver.CaptureState() -> string!
 AiDotNet.Evolution.Programs.ProgramMetaPromptEvolver.Observe(long generation, double quality) -> void
 AiDotNet.Evolution.Programs.ProgramMetaPromptEvolver.ProgramMetaPromptEvolver(AiDotNet.Evolution.Programs.IProgramChatClient! chatClient, string! seedInstruction, AiDotNet.Evolution.Programs.ProgramMetaPromptOptions? options = null) -> void
 AiDotNet.Evolution.Programs.ProgramMetaPromptEvolver.ProposalCalls.get -> long
 AiDotNet.Evolution.Programs.ProgramMetaPromptEvolver.ProposalCostUnits.get -> decimal
-AiDotNet.Evolution.Programs.ProgramMetaPromptEvolver.ProposeAsync(long generation, AiDotNet.Evolution.EvolutionResourceLedger? ledger = null, System.Threading.CancellationToken cancellationToken = default(System.Threading.CancellationToken)) -> System.Threading.Tasks.Task<string?>!
+AiDotNet.Evolution.Programs.ProgramMetaPromptEvolver.ProposeAsync(long generation, AiDotNet.Evolution.EvolutionResourceLedger? ledger = null, int? seed = null, System.Threading.CancellationToken cancellationToken = default(System.Threading.CancellationToken)) -> System.Threading.Tasks.Task<string?>!
 AiDotNet.Evolution.Programs.ProgramMetaPromptEvolver.RefusedProposals.get -> long
 AiDotNet.Evolution.Programs.ProgramMetaPromptEvolver.RestoreState(string! state) -> void
 AiDotNet.Evolution.Programs.ProgramMetaPromptEvolver.Select(AiDotNet.Evolution.StableRandom! random, long generation) -> string!
@@ -943,6 +944,8 @@ AiDotNet.Evolution.Programs.ProgramMetaPromptEvolver.StateHash.get -> string!
 AiDotNet.Evolution.Programs.ProgramMetaPromptEvolver.WriteCostDescriptors(System.Collections.Generic.IDictionary<string!, double>! descriptors) -> void
 AiDotNet.Evolution.Programs.ProgramMetaPromptOptions
 AiDotNet.Evolution.Programs.ProgramMetaPromptOptions.Clone() -> AiDotNet.Evolution.Programs.ProgramMetaPromptOptions!
+AiDotNet.Evolution.Programs.ProgramMetaPromptOptions.Direction.get -> AiDotNet.Evolution.EvolutionOptimizationDirection
+AiDotNet.Evolution.Programs.ProgramMetaPromptOptions.Direction.set -> void
 AiDotNet.Evolution.Programs.ProgramMetaPromptOptions.Enabled.get -> bool
 AiDotNet.Evolution.Programs.ProgramMetaPromptOptions.Enabled.set -> void
 AiDotNet.Evolution.Programs.ProgramMetaPromptOptions.ExplorationProbability.get -> double

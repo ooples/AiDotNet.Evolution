@@ -35,6 +35,15 @@ public sealed class ProgramMetaPromptOptions
     /// <summary>Gets or sets how an instruction is chosen for a proposal.</summary>
     public ProgramInstructionSelection Selection { get; set; } = ProgramInstructionSelection.EpsilonGreedy;
 
+    /// <summary>Gets or sets which way the run's primary quality is better.</summary>
+    /// <remarks>
+    /// The archive orders instructions by mean quality on a "better is higher" scale, so a
+    /// minimizing run's measurements are inverted as they are observed. Leaving that to each caller
+    /// would make a minimizing run prefer the instruction that produced the worst programs, and
+    /// silently - the archive would look perfectly well ordered.
+    /// </remarks>
+    public EvolutionOptimizationDirection Direction { get; set; } = EvolutionOptimizationDirection.Maximize;
+
     /// <summary>Gets or sets the chance of ignoring the leader under <see cref="ProgramInstructionSelection.EpsilonGreedy"/>.</summary>
     public double ExplorationProbability { get; set; } = 0.2;
 
@@ -63,6 +72,8 @@ public sealed class ProgramMetaPromptOptions
                 "MaxArchiveSize must be between 2 and 256; one entry would leave nothing to select between.");
         if (!Enum.IsDefined(typeof(ProgramInstructionSelection), Selection))
             throw new ArgumentOutOfRangeException(nameof(Selection), Selection, "Unknown instruction selection.");
+        if (!Enum.IsDefined(typeof(EvolutionOptimizationDirection), Direction))
+            throw new ArgumentOutOfRangeException(nameof(Direction), Direction, "Unknown optimization direction.");
         if (double.IsNaN(ExplorationProbability) || ExplorationProbability < 0 || ExplorationProbability > 1)
             throw new ArgumentOutOfRangeException(nameof(ExplorationProbability), ExplorationProbability,
                 "ExplorationProbability must be between 0 and 1.");
@@ -83,6 +94,7 @@ public sealed class ProgramMetaPromptOptions
         ProposeEveryGenerations = ProposeEveryGenerations,
         MaxArchiveSize = MaxArchiveSize,
         Selection = Selection,
+        Direction = Direction,
         ExplorationProbability = ExplorationProbability,
         ProposalCostUnits = ProposalCostUnits,
         MaxInstructionChars = MaxInstructionChars,
@@ -96,8 +108,11 @@ public sealed class ProgramMetaPromptOptions
         ProposeEveryGenerations.ToString(CultureInfo.InvariantCulture),
         MaxArchiveSize.ToString(CultureInfo.InvariantCulture),
         ((int)Selection).ToString(CultureInfo.InvariantCulture),
+        ((int)Direction).ToString(CultureInfo.InvariantCulture),
         ExplorationProbability.ToString("R", CultureInfo.InvariantCulture),
-        ProposalCostUnits.ToString(CultureInfo.InvariantCulture),
+        // Scale-normalized: 1m and 1.000m are the same budget, so they must not produce two
+        // different identities and make a checkpoint from one refuse to restore under the other.
+        (ProposalCostUnits / 1.000000000000000000000000000m).ToString(CultureInfo.InvariantCulture),
         MaxInstructionChars.ToString(CultureInfo.InvariantCulture),
         MetricPrefix);
 }

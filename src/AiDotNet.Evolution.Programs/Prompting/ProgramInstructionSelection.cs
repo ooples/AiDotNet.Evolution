@@ -9,7 +9,9 @@ public enum ProgramInstructionSelection
     /// </summary>
     /// <remarks>
     /// An unscored instruction counts as unexplored and is tried before any scored one, so a freshly
-    /// proposed instruction cannot be starved by an incumbent that happens to lead early.
+    /// proposed instruction cannot be starved by an incumbent that happens to lead early. That rule
+    /// applies to this arm and to <see cref="Greedy"/>; <see cref="Uniform"/> does not need it,
+    /// because it already draws over the whole archive.
     /// </remarks>
     EpsilonGreedy,
 

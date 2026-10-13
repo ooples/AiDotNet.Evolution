@@ -156,6 +156,11 @@ public sealed class ProgramMetaPromptEvolver
     /// </remarks>
     public void Observe(long generation, double quality)
     {
+        // An instruction is credited on a "better is higher" scale, because that is what ordering
+        // the archive by MeanQuality requires. A minimizing run measures the opposite, so the
+        // direction is applied here rather than left to each caller to remember.
+        if (_options.Direction == EvolutionOptimizationDirection.Minimize) quality = -quality;
+
         if (double.IsNaN(quality) || double.IsInfinity(quality))
         {
             throw new ArgumentOutOfRangeException(nameof(quality), quality,
@@ -180,8 +185,37 @@ public sealed class ProgramMetaPromptEvolver
                 return;
             }
 
+            double accumulated = candidate.TotalQuality + quality;
+            if (double.IsNaN(accumulated) || double.IsInfinity(accumulated))
+            {
+                // A running total that leaves the double range makes this instruction's mean
+                // unusable and its checkpoint unrestorable, and the archive unorderable with it.
+                // Refusing names the cause where it happened rather than at the next capture.
+                throw new InvalidOperationException(
+                    "Instruction '" + candidate.Id + "' has accumulated a quality total that is no longer finite.");
+            }
+
             candidate.Scored++;
-            candidate.TotalQuality += quality;
+            candidate.TotalQuality = accumulated;
+        }
+    }
+
+    /// <summary>
+    /// Drops the route for <paramref name="generation"/> without crediting the instruction, for a
+    /// proposal that failed or was abandoned.
+    /// </summary>
+    /// <returns><see langword="true"/> if a route was dropped.</returns>
+    /// <remarks>
+    /// Without this the only way to clear a failed proposal's route was to call
+    /// <see cref="Observe"/> with a made-up quality, which would put a number the run never
+    /// measured into the archive's mean. The instruction keeps the use it was charged, because it
+    /// was asked; it simply earns no score.
+    /// </remarks>
+    public bool Abandon(long generation)
+    {
+        lock (_gate)
+        {
+            return _routes.Remove(generation);
         }
     }
 
@@ -195,9 +229,14 @@ public sealed class ProgramMetaPromptEvolver
     /// </summary>
     /// <param name="generation">The generation the new instruction enters the archive at.</param>
     /// <param name="ledger">The run's ledger; the call is charged to it when one is supplied.</param>
+    /// <param name="seed">
+    /// The provider seed for this request, so a replay asks for the same instruction. Derived from
+    /// <paramref name="generation"/> when omitted.
+    /// </param>
     /// <param name="cancellationToken">Cancellation, honoured by the provider.</param>
     public async Task<string?> ProposeAsync(
-        long generation, EvolutionResourceLedger? ledger = null, CancellationToken cancellationToken = default)
+        long generation, EvolutionResourceLedger? ledger = null, int? seed = null,
+        CancellationToken cancellationToken = default)
     {
         if (!_options.Enabled) throw new InvalidOperationException("Meta-prompt evolution is not enabled.");
         cancellationToken.ThrowIfCancellationRequested();
@@ -217,8 +256,17 @@ public sealed class ProgramMetaPromptEvolver
         ProgramChatResponse response;
         try
         {
+            // The request carries a seed so a replay asks for the same instruction. Selection
+            // already replays from the engine's stream; without this the meta level's own call was
+            // the one unseeded step, and a different answer there changes every later selection.
+            // Derived from the generation when the caller supplies none, so it is at least stable
+            // within a run rather than provider-default.
+            var options = new ProgramChatOptions
+            {
+                Seed = seed ?? unchecked((int)(generation & 0x7FFFFFFF)),
+            };
             response = await _chatClient.GetResponseAsync(
-                BuildRequest(), new ProgramChatOptions(), cancellationToken).ConfigureAwait(false);
+                BuildRequest(), options, cancellationToken).ConfigureAwait(false);
         }
         catch (OperationCanceledException)
         {
@@ -269,10 +317,14 @@ public sealed class ProgramMetaPromptEvolver
                     StateSchemaVersion.ToString(CultureInfo.InvariantCulture),
                     _options.Identity(),
                     _seedId,
+                    _chatClient.ModelId,
                     _proposalCalls.ToString(CultureInfo.InvariantCulture),
-                    // Normalized: a decimal round-trips through JSON with a different scale (3 comes
-                    // back as 3.0), and two states that charged the same amount must hash the same.
-                    _proposalCostUnits.ToString("F6", CultureInfo.InvariantCulture),
+                    // Scale-normalized, not rounded: a decimal round-trips through JSON with a
+                    // different scale (3 comes back as 3.0) and two states that charged the same
+                    // amount must hash the same - but "F6" also rounded, so two states that charged
+                    // DIFFERENT amounts could hash the same once they differed below six places.
+                    // Dividing by one normalizes the scale and keeps every digit.
+                    NormalizeScale(_proposalCostUnits).ToString(CultureInfo.InvariantCulture),
                     _refusedProposals.ToString(CultureInfo.InvariantCulture),
                 };
                 parts.AddRange(_archive.Select(candidate => candidate.Identity()));
@@ -293,6 +345,7 @@ public sealed class ProgramMetaPromptEvolver
             {
                 SchemaVersion = StateSchemaVersion,
                 OptionsIdentity = _options.Identity(),
+                ModelId = _chatClient.ModelId,
                 SeedId = _seedId,
                 ProposalCalls = _proposalCalls,
                 ProposalCostUnits = _proposalCostUnits,
@@ -341,6 +394,11 @@ public sealed class ProgramMetaPromptEvolver
             throw new InvalidOperationException("The meta-prompt state was captured under different settings.");
         if (!string.Equals(document.SeedId, _seedId, StringComparison.Ordinal))
             throw new InvalidOperationException("The meta-prompt state was captured from a different seed instruction.");
+
+        // The model is part of what produced the archive. Restoring one model's instructions under
+        // another and calling the run a replay would be a claim the state cannot support.
+        if (!string.Equals(document.ModelId, _chatClient.ModelId, StringComparison.Ordinal))
+            throw new InvalidOperationException("The meta-prompt state was captured against a different model.");
         if (document.Archive is null || document.Archive.Count == 0)
             throw new InvalidOperationException("The meta-prompt state carries no archive.");
         if (document.Archive.Count > _options.MaxArchiveSize)
@@ -422,6 +480,9 @@ public sealed class ProgramMetaPromptEvolver
     {
         if (_archive.Count == 1) return _archive[0];
 
+        // Uniform draws over the whole archive, so it reaches an unscored instruction as often as
+        // any other and does not need - or want - the unscored-first rule below: the point of this
+        // arm is that credit is ignored entirely.
         if (_options.Selection == ProgramInstructionSelection.Uniform)
             return _archive[random.NextInt(_archive.Count)];
 
@@ -517,10 +578,19 @@ public sealed class ProgramMetaPromptEvolver
 
     private static string Identify(string text) => EvolutionHash.Compute(text);
 
+    /// <summary>Strips a decimal's trailing-zero scale without rounding any digit away.</summary>
+    /// <remarks>
+    /// 3m and 3.0m are the same amount and must hash the same; 1.00000001m and 1.00000002m are not
+    /// and must not. Dividing by one collapses the scale and keeps all 28 significant digits, where
+    /// a fixed-point format would round the second pair together.
+    /// </remarks>
+    private static decimal NormalizeScale(decimal value) => value / 1.000000000000000000000000000m;
+
     private sealed class State
     {
         public int SchemaVersion { get; set; }
         public string? OptionsIdentity { get; set; }
+        public string? ModelId { get; set; }
         public string? SeedId { get; set; }
         public long ProposalCalls { get; set; }
         public decimal ProposalCostUnits { get; set; }
