@@ -50,27 +50,55 @@ is the one an example's own README points at. Examples carrying several (`algotu
 
 ## The smoke run
 
-`OpenEvolveExampleSmokeTests` takes the other half of the criterion for one example:
-`circle_packing`'s own `evaluator.py` and `initial_program.py`, unmodified, driven through
-`aidotnet-evolve run --openevolve-config` for three iterations against a loopback stub model. Three
-keys in a *copy* of its config are changed, all about not spending money or reaching the network -
-`llm.api_base`, the model names, and `diff_based_evolution` so the stub's whole-program answer is
-usable. The test asserts four evaluations (the seed plus three), at least one model call, and a
-**positive** best quality - because four evaluations would also be counted if the evaluator had
-failed on every candidate, since it returns `combined_score: 0.0` on error.
+`OpenEvolveExampleSmokeTests` takes the other half of the criterion: an example's own `evaluator.py`
+and `initial_program.*`, unmodified, driven through `aidotnet-evolve run --openevolve-config` for
+three iterations against a loopback stub model. Three keys in a *copy* of the config change, all
+about not spending money or reaching the network - `llm.api_base`, the model names, and
+`diff_based_evolution` so the stub's whole-program answer is usable.
+`benchmarks/external/test_openevolve_configs.py` treats an endpoint rewrite the same way, exempting
+`llm.api_base/api_key` from its verbatim check.
 
-It runs on Linux only, and that is upstream's constraint rather than a choice. Upstream's evaluator
-writes a wrapper script that embeds the program's absolute path into a single-quoted Python literal,
-so on Windows the path becomes an invalid escape - `SyntaxError: (unicode error) 'unicodeescape'
-codec can't decode bytes ... truncated \UXXXXXXXX escape` - and every candidate scores zero.
-Measured by running `examples/circle_packing/evaluator.py` directly on its own seed program;
-`online_judge_programming`, `k_module_problem` and `web_scraper_optillm` fail the same way, and
-`attention_optimization` needs `mlir-opt` on PATH.
+Each case asserts four evaluations (the seed plus three), at least one model call, and a
+**positive** best quality. The last one is what makes the test mean anything: these evaluators
+return a zero score on error, so four evaluations would also be counted by a run where upstream's
+code never executed.
 
-**One example of 21 has an end-to-end smoke.** The other eighteen that import are import-only so
-far, because each brings its own dependency set - numpy, scipy, torch, Apple MLX, dataset downloads,
-an `openevolve` package import inside the evaluator - and working through them is what remains of
-this criterion.
+**Six of 21 examples are smoked.** Which six was measured, not assumed, with
+`eng/probe-openevolve-examples.py`: it runs every example's evaluator directly on its own seed
+program in a Linux container carrying the dependency set the upstream-parity job installs (numpy,
+scipy, pyyaml, dacite, openai and the `openevolve` package). An example whose own seed scores zero
+cannot support the positive-quality assertion, so it is not smoked.
+
+| example | seed score | smoked | why not |
+| --- | --- | --- | --- |
+| `background_blur` | 0.992 | yes | |
+| `circle_packing` | 0.364 | yes | |
+| `circle_packing_with_artifacts` | 0.364 | yes | |
+| `claude_code_quickstart` | 1.424 | yes | |
+| `function_minimization` | 1.398 | yes | |
+| `signal_processing` | 0.420 | yes | |
+| `k_module_problem` | 0.0 | no | its own seed scores zero, so a positive-quality assertion cannot distinguish a working run from a broken one |
+| `online_judge_programming` | 0.0 | no | same, and its evaluator needs `requests` |
+| `web_scraper_optillm` | 0.0 | no | same |
+| `r_robust_regression` | 0.0 | no | same; its `evaluate` is a coroutine and needs R |
+| `rust_adaptive_sort` | 0.0 | no | same; needs a Rust toolchain to score above zero |
+| `lm_eval` | n/a | no | its evaluator is a stub returning `not_implemented` |
+| `arc_benchmark` | n/a | no | reads a dataset from the absolute path `/workspaces/ARC-Evolve/data/arc-prize-2025/...` |
+| `attention_optimization` | n/a | no | `RuntimeError: Required tool not found: mlir-opt` |
+| `mlx_metal_kernel_opt` | n/a | no | needs Apple MLX (`No module named 'mlx'`) |
+| `sldbench` | n/a | no | needs HuggingFace `datasets` |
+| `tsp_tour_minimization` | n/a | no | needs `psutil` |
+| `algotune` | n/a | no | no top-level evaluator; one per problem subdirectory |
+| `alphaevolve_math_problems` | n/a | no | same |
+| `llm_prompt_optimization` | n/a | no | no seed program; it evolves a prompt file |
+| `symbolic_regression` | n/a | no | no config and no seed program in the repository |
+
+The smoke runs on Linux only, and that is upstream's constraint rather than a choice: their
+evaluator writes a wrapper script that embeds the program's absolute path into a single-quoted
+Python literal, so on Windows the path becomes an invalid escape - `SyntaxError: (unicode error)
+'unicodeescape' codec can't decode bytes ... truncated \UXXXXXXXX escape` - and every candidate
+scores zero. Measured by running `examples/circle_packing/evaluator.py` directly on its own seed
+program on both platforms.
 
 ## The two that do not
 

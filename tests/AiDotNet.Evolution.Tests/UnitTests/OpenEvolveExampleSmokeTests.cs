@@ -38,13 +38,33 @@ namespace AiDotNet.Evolution.Tests;
 /// </remarks>
 public sealed class OpenEvolveExampleSmokeTests
 {
-    private const string Example = "circle_packing";
+    /// <summary>
+    /// The examples whose own seed program scores above zero under their own evaluator, with the
+    /// config each one ships, and the dependency set the upstream-parity job installs.
+    /// </summary>
+    /// <remarks>
+    /// Measured rather than assumed, by running each evaluator directly on its own seed program in
+    /// a Linux container with numpy, scipy, pyyaml, dacite, openai and the openevolve package:
+    /// background_blur 0.992, circle_packing 0.364, circle_packing_with_artifacts 0.364,
+    /// claude_code_quickstart 1.424, function_minimization 1.398, signal_processing 0.420.
+    /// docs/parity/OPENEVOLVE_EXAMPLES.md records the other fifteen and why each is not here.
+    /// </remarks>
+    public static TheoryData<string, string> Examples => new()
+    {
+        { "background_blur", "config.yaml" },
+        { "circle_packing", "config_phase_1.yaml" },
+        { "circle_packing_with_artifacts", "config.yaml" },
+        { "claude_code_quickstart", "config.yaml" },
+        { "function_minimization", "config.yaml" },
+        { "signal_processing", "config.yaml" },
+    };
 
     private static readonly string Python = Environment.GetEnvironmentVariable("EVOLUTION_PYTHON")
         ?? (OperatingSystem.IsWindows() ? "python" : "python3");
 
-    [Fact]
-    public void A_real_examples_evaluator_and_program_run_three_iterations()
+    [Theory]
+    [MemberData(nameof(Examples))]
+    public void A_real_examples_evaluator_and_program_run_three_iterations(string example, string configName)
     {
         string? checkout = Environment.GetEnvironmentVariable("EVOLUTION_OPENEVOLVE_CHECKOUT");
         if (string.IsNullOrEmpty(checkout))
@@ -67,10 +87,11 @@ public sealed class OpenEvolveExampleSmokeTests
             return;
         }
 
-        string source = Path.Combine(checkout, "examples", Example);
+        string source = Path.Combine(checkout, "examples", example);
         string evaluator = Path.Combine(source, "evaluator.py");
-        string program = Path.Combine(source, "initial_program.py");
-        string config = Path.Combine(source, "config_phase_1.yaml");
+        string program = Directory.EnumerateFiles(source, "initial_program.*").OrderBy(
+            path => path, StringComparer.Ordinal).FirstOrDefault() ?? Path.Combine(source, "initial_program.py");
+        string config = Path.Combine(source, configName);
         Assert.True(File.Exists(evaluator), "the example's evaluator is missing: " + evaluator);
         Assert.True(File.Exists(program), "the example's initial program is missing: " + program);
         Assert.True(File.Exists(config), "the example's config is missing: " + config);
@@ -103,7 +124,9 @@ public sealed class OpenEvolveExampleSmokeTests
             // upstream's evaluator really ran upstream's program.
             double best = result.RootElement.GetProperty("BestQuality").GetDouble();
             Assert.True(best > 0.0,
-                "every candidate scored zero, so the example's evaluator did not actually run: " + run.Output);
+                example + ": every candidate scored zero, so the example's evaluator did not actually "
+                + "run. Its seed scores above zero when run directly, so this is a regression in the "
+                + "run rather than a property of the example: " + run.Output);
             Assert.True(File.Exists(Path.Combine(output, "run.json")));
             Assert.True(File.Exists(Path.Combine(output, "openevolve-import.json")));
         }
