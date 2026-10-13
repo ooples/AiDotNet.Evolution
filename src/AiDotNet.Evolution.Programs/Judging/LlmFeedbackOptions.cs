@@ -38,9 +38,35 @@ public sealed class LlmFeedbackOptions
     }
 
     /// <summary>Multiplier for judge utility, between zero and one.</summary>
+    /// <remarks>
+    /// <para>
+    /// <b>The formula, end to end (V1-54, #167).</b> For criteria scores <c>s_1..s_n</c>, each in
+    /// [0, 1], as returned by the judge:
+    /// </para>
+    /// <code>
+    /// judgeUtility = (SUM over i of (s_i * Weight)) / n          // JudgeOutcome.FromScores
+    /// judgeQuality = direction == Minimize                        // a judge always scores "better
+    ///              ? 1 - judgeUtility                             // is higher", so minimizing
+    ///              : judgeUtility                                 // inverts it
+    /// quality      = (CombinedBlend * measuredQuality)            // what the evaluator measured
+    ///              + ((1 - CombinedBlend) * judgeQuality)         // what the judge thought
+    /// </code>
+    /// <para>
+    /// So <see cref="Weight"/> scales the judge's own utility and <see cref="CombinedBlend"/> is the
+    /// share of the final quality that stays with the measurement: at 1.0 the judge cannot move
+    /// fitness at all, and at 0.0 the measurement cannot. Note that the two compose multiplicatively
+    /// on the judge's side — a <see cref="Weight"/> of 0.5 with a <see cref="CombinedBlend"/> of 0.7
+    /// gives the judge <c>0.5 * 0.3</c> of the final quality's range.
+    /// </para>
+    /// <para>
+    /// The blend moves quality only. It never clears a constraint violation and never revives a
+    /// failed measurement, which is what keeps feedback from promoting an invalid candidate.
+    /// </para>
+    /// </remarks>
     public double Weight { get; set; } = 1.0;
 
     /// <summary>Gets or sets the share of the final quality that stays with the measured evaluator.</summary>
+    /// <remarks>The formula both knobs appear in is written out on <see cref="Weight"/>.</remarks>
     public double CombinedBlend { get; set; } = 0.7;
 
     /// <summary>Prefix for judge descriptors.</summary>

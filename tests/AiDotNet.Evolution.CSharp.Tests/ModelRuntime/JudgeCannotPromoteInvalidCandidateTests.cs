@@ -105,4 +105,75 @@ public sealed class JudgeCannotPromoteInvalidCandidateTests
         Assert.NotNull(result);
         Assert.Equal(EvolutionEvaluationStatus.Failed, result!.Status);
     }
+    /// <summary>
+    /// The documented formula, pinned numerically so the documentation on
+    /// <c>LlmFeedbackOptions.Weight</c> cannot drift away from the code (#167's first criterion).
+    /// </summary>
+    /// <remarks>
+    /// Two criteria scoring 1.0 and 0.5 with <c>Weight = 0.8</c> give
+    /// <c>judgeUtility = (1.0*0.8 + 0.5*0.8) / 2 = 0.6</c>. Maximizing, with
+    /// <c>CombinedBlend = 0.7</c> and a measured 0.5:
+    /// <c>0.7*0.5 + 0.3*0.6 = 0.53</c>.
+    /// </remarks>
+    [Fact]
+    public async Task The_documented_blend_formula_is_what_the_code_computes()
+    {
+        var feasible = Measured(0.5, EvolutionOptimizationDirection.Maximize);
+        var options = new LlmFeedbackOptions
+        {
+            Criteria = new[] { "a", "b" },
+            MaxJudgeRetries = 0,
+            Weight = 0.8,
+            CombinedBlend = 0.7,
+        };
+
+        var judge = new LlmJudgeProgramFitnessEvaluator(
+            new FakeChatClient("{\"a\":1.0,\"b\":0.5}"), feasible, options: options);
+
+        var result = await judge.EvaluateAsync(Candidate(), Context());
+
+        Assert.NotNull(result);
+        Assert.Equal(0.53, result!.Quality!.Value, 10);
+    }
+
+    /// <summary>
+    /// Minimizing inverts the judge's utility, because a judge always scores "better is higher".
+    /// </summary>
+    /// <remarks>
+    /// Same scores and knobs, minimizing: <c>judgeQuality = 1 - 0.6 = 0.4</c>, so
+    /// <c>0.7*0.5 + 0.3*0.4 = 0.47</c>.
+    /// </remarks>
+    [Fact]
+    public async Task Minimizing_inverts_the_judges_utility()
+    {
+        var feasible = Measured(0.5, EvolutionOptimizationDirection.Minimize);
+        var options = new LlmFeedbackOptions
+        {
+            Criteria = new[] { "a", "b" },
+            MaxJudgeRetries = 0,
+            Weight = 0.8,
+            CombinedBlend = 0.7,
+        };
+
+        var judge = new LlmJudgeProgramFitnessEvaluator(
+            new FakeChatClient("{\"a\":1.0,\"b\":0.5}"), feasible, options: options);
+
+        var result = await judge.EvaluateAsync(Candidate(), Context());
+
+        Assert.NotNull(result);
+        Assert.Equal(0.47, result!.Quality!.Value, 10);
+    }
+
+    private static IProgramFitnessEvaluator Measured(
+        double quality, EvolutionOptimizationDirection direction) =>
+        new DelegateProgramFitnessEvaluator((_, _, _) =>
+            new ValueTask<EvolutionTaskResult>(new EvolutionTaskResult(
+                EvolutionEvaluationStatus.Completed,
+                quality,
+                direction,
+                descriptors: new Dictionary<string, double>(),
+                objectives: Array.Empty<double>(),
+                constraintViolations: Array.Empty<double>(),
+                costUnits: 1)));
+
 }
