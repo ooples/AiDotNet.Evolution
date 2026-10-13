@@ -59,9 +59,11 @@ public sealed class OpenEvolveExampleSmokeTests
     /// </description></item>
     /// <item><description>
     /// <c>background_blur</c> and <c>circle_packing_with_artifacts</c> evaluate the seed and then
-    /// never ask the model at all. Both carry a per-model <c>api_base</c> inside a weighted
-    /// <c>llm.models</c> list, which the three that work do not; the cause is not yet established,
-    /// so they are left out rather than asserted on.
+    /// never ask the model at all, because that evaluation yields no quality: the run reports
+    /// <c>StopReason: NoCandidates</c> with one completed evaluation, a null best quality and zero
+    /// model calls, so nothing ever entered the archive to propose from. Both evaluators score
+    /// above zero when run directly from the example's own directory, so what differs is the
+    /// sandbox workspace rather than the evaluator.
     /// </description></item>
     /// </list>
     /// </remarks>
