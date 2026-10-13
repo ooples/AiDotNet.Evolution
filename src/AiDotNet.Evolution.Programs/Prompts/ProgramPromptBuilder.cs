@@ -219,6 +219,14 @@ public sealed class ProgramPromptBuilder
         values["feature_dimensions"] = DescribeFeatureDimensions(context);
 
         string system;
+        // An evolved instruction wins for this proposal only: the context is rebuilt each time, so
+        // nothing here persists into the next one. Taken literally, never as a template name - the
+        // text came from a model, and resolving it as a key would be a confusing way to fail.
+        if (context.SystemMessageOverride is { } evolved && evolved.Trim().Length > 0)
+        {
+            return evolved;
+        }
+
         if (_promptOptions.SystemMessage is { } configured && configured.Trim().Length > 0)
         {
             if (_promptOptions.SystemMessageMode == ProgramPromptSystemMessageMode.Literal)
