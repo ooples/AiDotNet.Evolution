@@ -101,6 +101,21 @@ Python literal, so on Windows the path becomes an invalid escape - `SyntaxError:
 scores zero. Measured by running `examples/circle_packing/evaluator.py` directly on its own seed
 program on both platforms.
 
+## The smoke covers the cascade path
+
+All three smoked examples import with cascade evaluation enabled and their own thresholds mapped —
+`circle_packing` 0.5/0.75, `function_minimization` 1.3, `signal_processing` 0.3/0.6 — and each
+evaluator defines `evaluate_stage1` and `evaluate_stage2`. So the smoke drives V1-56's cascade
+criterion against real upstream evaluators, not only against the synthetic config in
+`OpenEvolveImportTests`, which is where the stage ordering and threshold semantics are actually
+pinned by assertion.
+
+Stated precisely, because the distinction matters: the smoke asserts that such a run **completes**
+with a positive quality, not that stage two ran on a particular candidate. Counting stages would
+need an observable the run result does not currently expose; the synthetic test proves the stage
+semantics by side effect (`stage2-3`, `stage2-4` files) and that remains the evidence for the
+criterion itself.
+
 ## The feature-dimension gap
 
 `background_blur` and `circle_packing_with_artifacts` are not blocked by anything about their
