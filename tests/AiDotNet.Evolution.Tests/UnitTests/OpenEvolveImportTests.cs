@@ -121,6 +121,36 @@ public sealed class OpenEvolveImportTests
     }
 
     /// <summary>
+    /// Importing a feature dimension warns that the evaluator must report it every time.
+    /// </summary>
+    /// <remarks>
+    /// The warning is the cheap half of the fix below: a reader who sees it at import time does not
+    /// have to spend a run, and then an investigation, discovering that a declared dimension their
+    /// evaluator reports only on its success path ends the run with no candidates. OpenEvolve bins a
+    /// missing dimension instead of refusing it, so the difference is worth stating where the
+    /// mapping happens.
+    /// </remarks>
+    [Fact]
+    public void A_feature_dimension_warns_that_the_evaluator_must_report_it()
+    {
+        using var directory = new TemporaryDirectory();
+        OpenEvolveImport imported = Import(directory, """
+            llm:
+              name: m
+            database:
+              feature_dimensions: [complexity, ssim]
+            """);
+
+        // "complexity" is program length, which the engine always computes, so it needs no warning.
+        Assert.DoesNotContain(imported.Notes, note => note.Contains("'complexity'", StringComparison.Ordinal));
+
+        string warning = Assert.Single(
+            imported.Notes.Where(note => note.Contains("'ssim'", StringComparison.Ordinal)).ToArray());
+        Assert.Contains("every completed evaluation", warning, StringComparison.Ordinal);
+        Assert.Contains("no candidates", warning, StringComparison.Ordinal);
+    }
+
+    /// <summary>
     /// A run that produces no candidate reports why, rather than only that it produced none.
     /// </summary>
     /// <remarks>

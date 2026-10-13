@@ -307,10 +307,23 @@ internal static class OpenEvolveConfigImporter
                           "equivalent and is dropped.");
                 continue;
             }
+            // OpenEvolve's "complexity" is program length; "score" is the fitness itself; others are evaluator metrics.
+            string name = dimension switch { "complexity" => "length", _ => dimension };
+            if (name != "length")
+            {
+                // The engine will not file a program it cannot bin, so a dimension the evaluator
+                // omits on any completed evaluation ends the run with no candidates. OpenEvolve bins
+                // a missing dimension instead, so this is the one place a reader can be warned
+                // before spending a run finding out.
+                notes.Add("database.feature_dimensions: '" + dimension + "' becomes an archive descriptor, so the "
+                          + "evaluator must report '" + name + "' on every completed evaluation. An evaluation that "
+                          + "omits it cannot be placed in a cell, and a run whose first evaluation omits it ends with "
+                          + "no candidates. OpenEvolve bins a missing dimension rather than refusing it.");
+            }
+
             descriptors.Add(new RunMetricDescriptor
             {
-                // OpenEvolve's "complexity" is program length; "score" is the fitness itself; others are evaluator metrics.
-                Name = dimension switch { "complexity" => "length", _ => dimension },
+                Name = name,
                 Bins = Math.Max(1, count)
             });
         }
