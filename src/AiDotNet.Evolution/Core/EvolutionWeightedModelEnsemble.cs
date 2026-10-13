@@ -81,6 +81,18 @@ public sealed class EvolutionModelAccount
 /// that learns from outcomes (a bandit arm, an escalation ladder) must not be taught another
 /// model's result.
 /// </para>
+/// <para>
+/// <b>Precedence against the escalation ladder and the bandit portfolio.</b> They decide a
+/// different question and therefore nest rather than compete. This ensemble decides <i>which model
+/// writes a proposal</i>; <see cref="EscalatingVariationOperator{TGenome}"/> and
+/// <see cref="AdaptiveVariationPortfolio{TGenome}"/> decide <i>which operator is asked at all</i>,
+/// and both take operators (<c>IVariationOperator</c>) rather than proposal sources. So the stack
+/// is always ensemble inside <see cref="ResourceMeteredVariationOperator{TGenome}"/> inside a
+/// ladder tier or a portfolio arm — never the reverse, and never two of them choosing the same
+/// thing. A ladder that escalates moves to a different tier; the ensemble keeps drawing within
+/// whichever tier is asked. A portfolio that shifts its arm weights changes how often this ensemble
+/// is asked, not which model it then draws.
+/// </para>
 /// </remarks>
 public sealed class EvolutionWeightedModelEnsemble<TGenome> : ICostedEvolutionProposalSource<TGenome>
 {

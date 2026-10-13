@@ -333,6 +333,43 @@ public sealed class WeightedModelEnsembleTests
         Assert.Throws<InvalidOperationException>(() => ensemble.RestoreState(stripped));
     }
 
+    /// <summary>
+    /// The documented precedence, exercised: the ensemble nests inside the resource meter, which
+    /// nests inside the bandit portfolio. The portfolio decides whether this operator is asked; the
+    /// ensemble decides which model answers; and the outcome still reaches the model that produced
+    /// the proposal through both layers.
+    /// </summary>
+    [Fact]
+    public async Task The_ensemble_composes_under_the_meter_and_the_portfolio()
+    {
+        var left = new StubSource("left");
+        var right = new StubSource("right");
+        var ensemble = new EvolutionWeightedModelEnsemble<int>(
+            "ensemble",
+            new[] { new EvolutionModelWeight<int>(left, 1.0), new EvolutionModelWeight<int>(right, 1.0) });
+
+        var ledger = new EvolutionResourceLedger(
+            "ensemble-composition-test", EvolutionResources.Of("cost_units", 10_000m));
+        var metered = new ResourceMeteredVariationOperator<int>(
+            ensemble, ledger, EvolutionResources.Of("cost_units", 5m), "cost-units-v1");
+        var portfolio = new AdaptiveVariationPortfolio<int>(new[] { metered });
+
+        int beforeLeft = left.Proposed, beforeRight = right.Proposed;
+        await portfolio.ProposeAsync(Context(new StableRandom(seed: 2026), generation: 1));
+
+        StubSource producer = left.Proposed > beforeLeft ? left : right;
+        StubSource other = ReferenceEquals(producer, left) ? right : left;
+        _ = beforeRight;
+        Assert.Equal(1, producer.Proposed - (ReferenceEquals(producer, left) ? beforeLeft : beforeRight));
+
+        portfolio.Observe(EvaluationForGeneration(1), EvolutionArchiveInsertionResult.Inserted);
+
+        // Through the meter and the portfolio, the outcome still lands on the model that wrote the
+        // proposal - and only on it.
+        Assert.Equal(1, producer.Observed);
+        Assert.Equal(0, other.Observed);
+    }
+
     private static EvolutionWeightedModelEnsemble<int> Build(params (string Id, double Weight)[] models)
         => new(
             "ensemble",
@@ -408,8 +445,11 @@ public sealed class WeightedModelEnsembleTests
             Proposed++;
             if (Throw is not null) throw Throw;
             if (ReturnNull) return new ValueTask<EvolutionResourceResult<int>>((EvolutionResourceResult<int>)null!);
-            return new ValueTask<EvolutionResourceResult<int>>(
-                new EvolutionResourceResult<int>(Proposed, EvolutionResources.Empty, Outcome));
+            // An explicit cost_units receipt: ResourceMeteredVariationOperator refuses a proposal
+            // whose receipt omits the unit it meters, so a stub without one is not a well-formed
+            // costed source.
+            return new ValueTask<EvolutionResourceResult<int>>(new EvolutionResourceResult<int>(
+                Proposed, EvolutionResources.Of("cost_units", 2m), Outcome));
         }
 
         public void Observe(EvolutionEvaluation evaluation, EvolutionArchiveInsertionResult? insertionResult)
