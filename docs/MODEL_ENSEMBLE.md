@@ -42,6 +42,13 @@ wrote and how many `Failures` it was charged. A model is charged a failure when 
 it returns a `Failed` outcome without throwing; a cancellation is the run stopping rather than the
 model failing, so it is not charged and releases its route.
 
+`TryGetDraw(generation, out draw)` answers which model wrote one generation's proposal, as an
+`EvolutionModelDraw` carrying the model's id and its position in the configured order. The cost
+receipt is identified by the metered operator's operation id, which names the ensemble rather than
+the model it drew, so this is what attributes that charge. It is available from the draw until the
+outcome is observed — which is when a trace record for that evaluation is written — and it survives
+a checkpoint, so a resumed run can still charge the right model.
+
 `CaptureState` and `RestoreState` carry the per-model counters, the unrouted proposals and the
 children's own state, so a resumed run keeps both the attribution and the routing. A state whose
 pending table is absent, or that carries more unrouted proposals than the ensemble will route, is

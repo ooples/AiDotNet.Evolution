@@ -61,6 +61,36 @@ public sealed class EvolutionModelAccount
 }
 
 /// <summary>
+/// Which model an ensemble drew for one generation's proposal: the attribution that pairs with that
+/// proposal's cost receipt.
+/// </summary>
+/// <remarks>
+/// The cost receipt is identified by the metered operator's operation id, which names the
+/// <i>ensemble</i>, because that is the source the meter was given. This is what names the model
+/// inside it, so a run can attribute a charge without having to infer it from the mixture. It is
+/// available from the draw until the outcome is observed, which is when a trace record for that
+/// evaluation is written, and it survives a checkpoint.
+/// </remarks>
+public sealed class EvolutionModelDraw
+{
+    internal EvolutionModelDraw(long generation, int modelIndex, string modelId)
+    {
+        Generation = generation;
+        ModelIndex = modelIndex;
+        ModelId = modelId;
+    }
+
+    /// <summary>The generation whose proposal this draw produced.</summary>
+    public long Generation { get; }
+
+    /// <summary>The drawn model's position in the configured order.</summary>
+    public int ModelIndex { get; }
+
+    /// <summary>The drawn model's source id.</summary>
+    public string ModelId { get; }
+}
+
+/// <summary>
 /// Draws each proposal's model from a weighted set, using the run's own random stream so the choice
 /// replays exactly (V1-50, #163).
 /// </summary>
@@ -204,6 +234,30 @@ public sealed class EvolutionWeightedModelEnsemble<TGenome> : ICostedEvolutionPr
 
                 return accounts;
             }
+        }
+    }
+
+    /// <summary>
+    /// The model drawn for <paramref name="generation"/>, or <see langword="false"/> if that
+    /// generation has no proposal awaiting an outcome.
+    /// </summary>
+    /// <remarks>
+    /// Asking after the outcome has been observed returns <see langword="false"/> rather than a
+    /// stale answer: the route is dropped as the outcome is delivered, and reporting a model for a
+    /// generation the ensemble is no longer routing would be a guess.
+    /// </remarks>
+    public bool TryGetDraw(long generation, out EvolutionModelDraw? draw)
+    {
+        lock (_gate)
+        {
+            if (!_pending.TryGetValue(generation, out int index))
+            {
+                draw = null;
+                return false;
+            }
+
+            draw = new EvolutionModelDraw(generation, index, _models[index].Source.Id);
+            return true;
         }
     }
 

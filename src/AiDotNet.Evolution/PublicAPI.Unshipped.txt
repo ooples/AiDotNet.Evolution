@@ -841,6 +841,10 @@ AiDotNet.Evolution.EvolutionModelAccount
 AiDotNet.Evolution.EvolutionModelAccount.Failures.get -> long
 AiDotNet.Evolution.EvolutionModelAccount.ModelId.get -> string!
 AiDotNet.Evolution.EvolutionModelAccount.Proposals.get -> long
+AiDotNet.Evolution.EvolutionModelDraw
+AiDotNet.Evolution.EvolutionModelDraw.Generation.get -> long
+AiDotNet.Evolution.EvolutionModelDraw.ModelId.get -> string!
+AiDotNet.Evolution.EvolutionModelDraw.ModelIndex.get -> int
 AiDotNet.Evolution.EvolutionModelWeight<TGenome>
 AiDotNet.Evolution.EvolutionModelWeight<TGenome>.EvolutionModelWeight(AiDotNet.Evolution.ICostedEvolutionProposalSource<TGenome>! source, double weight) -> void
 AiDotNet.Evolution.EvolutionModelWeight<TGenome>.Source.get -> AiDotNet.Evolution.ICostedEvolutionProposalSource<TGenome>!
@@ -1549,6 +1553,7 @@ AiDotNet.Evolution.EvolutionWeightedModelEnsemble<TGenome>.Id.get -> string!
 AiDotNet.Evolution.EvolutionWeightedModelEnsemble<TGenome>.Observe(AiDotNet.Evolution.EvolutionEvaluation! evaluation, AiDotNet.Evolution.EvolutionArchiveInsertionResult? insertionResult) -> void
 AiDotNet.Evolution.EvolutionWeightedModelEnsemble<TGenome>.ProposeAsync(AiDotNet.Evolution.EvolutionVariationContext<TGenome>! context, System.Threading.CancellationToken cancellationToken = default(System.Threading.CancellationToken)) -> System.Threading.Tasks.ValueTask<AiDotNet.Evolution.EvolutionResourceResult<TGenome>!>
 AiDotNet.Evolution.EvolutionWeightedModelEnsemble<TGenome>.RestoreState(string! state) -> void
+AiDotNet.Evolution.EvolutionWeightedModelEnsemble<TGenome>.TryGetDraw(long generation, out AiDotNet.Evolution.EvolutionModelDraw? draw) -> bool
 AiDotNet.Evolution.EvolutionWeightedModelEnsemble<TGenome>.VersionHash.get -> string!
 AiDotNet.Evolution.EvolutionWorkCommitDisposition
 AiDotNet.Evolution.EvolutionWorkCommitDisposition.Accepted = 0 -> AiDotNet.Evolution.EvolutionWorkCommitDisposition

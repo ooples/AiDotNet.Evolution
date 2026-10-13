@@ -370,6 +370,55 @@ public sealed class WeightedModelEnsembleTests
         Assert.Equal(0, other.Observed);
     }
 
+    /// <summary>
+    /// The drawn model is attributable per generation, not only in the cumulative accounts: the
+    /// reported model is the one whose own proposal counter advanced.
+    /// </summary>
+    [Fact]
+    public async Task The_drawn_model_is_attributable_for_the_generation_it_proposed()
+    {
+        var left = new StubSource("left");
+        var right = new StubSource("right");
+        var ensemble = new EvolutionWeightedModelEnsemble<int>(
+            "ensemble",
+            new[] { new EvolutionModelWeight<int>(left, 1.0), new EvolutionModelWeight<int>(right, 1.0) });
+
+        Assert.False(ensemble.TryGetDraw(5, out EvolutionModelDraw? none));
+        Assert.Null(none);
+
+        await ensemble.ProposeAsync(Context(new StableRandom(seed: 77), generation: 5));
+
+        Assert.True(ensemble.TryGetDraw(5, out EvolutionModelDraw? draw));
+        Assert.NotNull(draw);
+        Assert.Equal(5, draw!.Generation);
+        StubSource producer = left.Proposed == 1 ? left : right;
+        Assert.Equal(producer.Id, draw.ModelId);
+        Assert.Equal(ReferenceEquals(producer, left) ? 0 : 1, draw.ModelIndex);
+
+        // Once the outcome is delivered the route is gone, and a stale answer would be a guess.
+        ensemble.Observe(EvaluationForGeneration(5), EvolutionArchiveInsertionResult.Inserted);
+        Assert.False(ensemble.TryGetDraw(5, out _));
+    }
+
+    /// <summary>
+    /// A proposal that is still awaiting its outcome when the run is checkpointed stays attributable
+    /// after the restore, so a resumed run can still charge the right model.
+    /// </summary>
+    [Fact]
+    public async Task A_restored_ensemble_still_attributes_its_unrouted_proposals()
+    {
+        var ensemble = Build(("only", 1.0));
+        await ensemble.ProposeAsync(Context(new StableRandom(seed: 78), generation: 9));
+        Assert.True(ensemble.TryGetDraw(9, out EvolutionModelDraw? before));
+
+        var restored = Build(("only", 1.0));
+        restored.RestoreState(ensemble.CaptureState());
+
+        Assert.True(restored.TryGetDraw(9, out EvolutionModelDraw? after));
+        Assert.Equal(before!.ModelId, after!.ModelId);
+        Assert.Equal(before.ModelIndex, after.ModelIndex);
+    }
+
     private static EvolutionWeightedModelEnsemble<int> Build(params (string Id, double Weight)[] models)
         => new(
             "ensemble",

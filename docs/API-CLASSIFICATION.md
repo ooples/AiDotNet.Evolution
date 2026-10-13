@@ -119,6 +119,7 @@ against the declared public API, so a type added, removed or reclassified withou
 | `AiDotNet.Evolution.EvolutionMigrationTopology` | Stable | [SELECTION_ISLANDS_AND_ARCHIVES.md](SELECTION_ISLANDS_AND_ARCHIVES.md), [EngineOptionBehaviourTests](../tests/AiDotNet.Evolution.Tests/UnitTests/EngineOptionBehaviourTests.cs) |
 | `AiDotNet.Evolution.EvolutionMigrationTrigger` | Stable | [SELECTION_ISLANDS_AND_ARCHIVES.md](SELECTION_ISLANDS_AND_ARCHIVES.md), [EvolutionCoreParityTests](../tests/AiDotNet.Evolution.Tests/UnitTests/EvolutionCoreParityTests.cs) |
 | `AiDotNet.Evolution.EvolutionModelAccount` | Stable | [MODEL_ENSEMBLE.md](MODEL_ENSEMBLE.md), [WeightedModelEnsembleTests](../tests/AiDotNet.Evolution.Tests/WeightedModelEnsembleTests.cs) |
+| `AiDotNet.Evolution.EvolutionModelDraw` | Stable | [MODEL_ENSEMBLE.md](MODEL_ENSEMBLE.md), [WeightedModelEnsembleTests](../tests/AiDotNet.Evolution.Tests/WeightedModelEnsembleTests.cs) |
 | `AiDotNet.Evolution.EvolutionModelWeight&lt;TGenome&gt;` | Stable | [MODEL_ENSEMBLE.md](MODEL_ENSEMBLE.md), [WeightedModelEnsembleTests](../tests/AiDotNet.Evolution.Tests/WeightedModelEnsembleTests.cs) |
 | `AiDotNet.Evolution.EvolutionObjectiveDefinition` | Stable | [PARETO_SEARCH.md](PARETO_SEARCH.md), [ParetoArchiveTests](../tests/AiDotNet.Evolution.Tests/UnitTests/ParetoArchiveTests.cs) |
 | `AiDotNet.Evolution.EvolutionOperatorCostBasis` | Stable | [OPERATOR_CREDIT.md](OPERATOR_CREDIT.md), [ProgramVariationPortfolioTests](../tests/AiDotNet.Evolution.CSharp.Tests/ProgramTypes/ProgramVariationPortfolioTests.cs) |
