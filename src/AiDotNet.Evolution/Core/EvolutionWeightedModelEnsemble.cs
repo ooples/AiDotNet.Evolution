@@ -1,0 +1,363 @@
+using System.Globalization;
+using System.Text.Json;
+
+namespace AiDotNet.Evolution;
+
+/// <summary>
+/// One model in a weighted ensemble: the proposal source that speaks to it, and the weight with
+/// which it is drawn.
+/// </summary>
+/// <typeparam name="TGenome">The genome type the source proposes.</typeparam>
+public sealed class EvolutionModelWeight<TGenome>
+{
+    /// <summary>Creates a weighted entry.</summary>
+    /// <param name="source">The proposal source for this model.</param>
+    /// <param name="weight">The draw weight. Strictly positive; weights need not sum to one.</param>
+    public EvolutionModelWeight(ICostedEvolutionProposalSource<TGenome> source, double weight)
+    {
+        Source = source ?? throw new ArgumentNullException(nameof(source));
+        if (double.IsNaN(weight) || double.IsInfinity(weight) || weight <= 0.0)
+        {
+            throw new ArgumentOutOfRangeException(
+                nameof(weight), weight, "A model's draw weight must be finite and strictly positive.");
+        }
+
+        Weight = weight;
+    }
+
+    /// <summary>The proposal source for this model.</summary>
+    public ICostedEvolutionProposalSource<TGenome> Source { get; }
+
+    /// <summary>The draw weight.</summary>
+    public double Weight { get; }
+}
+
+/// <summary>
+/// What an ensemble has charged to one model: proposals drawn, and failures it is accountable for.
+/// </summary>
+public sealed class EvolutionModelAccount
+{
+    internal EvolutionModelAccount(string modelId, long proposals, long failures)
+    {
+        ModelId = modelId;
+        Proposals = proposals;
+        Failures = failures;
+    }
+
+    /// <summary>The model's source id.</summary>
+    public string ModelId { get; }
+
+    /// <summary>How many proposals were drawn from this model.</summary>
+    public long Proposals { get; }
+
+    /// <summary>
+    /// How many of those proposals ended in a failure charged to this model.
+    /// </summary>
+    /// <remarks>
+    /// A failure is charged where it happened rather than to the ensemble, so a model that times
+    /// out or throws is visible as the cause instead of being averaged into the run's error rate.
+    /// </remarks>
+    public long Failures { get; }
+}
+
+/// <summary>
+/// Draws each proposal's model from a weighted set, using the run's own random stream so the choice
+/// replays exactly (V1-50, #163).
+/// </summary>
+/// <typeparam name="TGenome">The genome type.</typeparam>
+/// <remarks>
+/// <para>
+/// This is an <see cref="ICostedEvolutionProposalSource{TGenome}"/> itself, so it composes with the
+/// portfolio, the escalation ladder and the resource meter rather than sitting beside them: whatever
+/// accepts one source accepts an ensemble of them.
+/// </para>
+/// <para>
+/// The draw uses <see cref="EvolutionVariationContext{TGenome}.Random"/>, the engine's seeded
+/// stream, which is what makes replay determinism a property of the engine rather than of this
+/// class's own bookkeeping. Nothing here holds a private RNG.
+/// </para>
+/// <para>
+/// <see cref="Observe"/> is routed to the model that produced the proposal, not broadcast: a child
+/// that learns from outcomes (a bandit arm, an escalation ladder) must not be taught another
+/// model's result.
+/// </para>
+/// </remarks>
+public sealed class EvolutionWeightedModelEnsemble<TGenome> : ICostedEvolutionProposalSource<TGenome>
+{
+    private const int MaximumModels = 64;
+    private const int MaximumTrackedProposals = 65_536;
+
+    private readonly EvolutionModelWeight<TGenome>[] _models;
+    private readonly double[] _cumulative;
+    private readonly double _total;
+    private readonly long[] _proposals;
+    private readonly long[] _failures;
+
+    // Which model produced the proposal for a generation, so Observe reaches the right child. Keyed
+    // by generation because that is what an evaluation carries back (EvolutionEvaluation has no
+    // proposal identity), which is also how AdaptiveVariationPortfolio routes its arms.
+    private readonly Dictionary<long, int> _pending = new();
+    private readonly object _gate = new();
+
+    /// <summary>Creates an ensemble over a weighted model set.</summary>
+    /// <param name="id">The ensemble's own source id.</param>
+    /// <param name="models">The weighted models. At least one, at most 64, ids distinct.</param>
+    public EvolutionWeightedModelEnsemble(string id, IReadOnlyList<EvolutionModelWeight<TGenome>> models)
+    {
+        if (string.IsNullOrWhiteSpace(id)) throw new ArgumentException("An ensemble needs an id.", nameof(id));
+        if (models is null) throw new ArgumentNullException(nameof(models));
+        if (models.Count == 0)
+        {
+            throw new ArgumentException(
+                "A weighted ensemble needs at least one model; an empty set would have nothing to draw.",
+                nameof(models));
+        }
+
+        if (models.Count > MaximumModels)
+        {
+            throw new ArgumentOutOfRangeException(
+                nameof(models), models.Count, $"At most {MaximumModels} models may share one ensemble.");
+        }
+
+        _models = new EvolutionModelWeight<TGenome>[models.Count];
+        var seen = new HashSet<string>(StringComparer.Ordinal);
+        for (int i = 0; i < models.Count; i++)
+        {
+            var model = models[i] ?? throw new ArgumentException("A model entry was null.", nameof(models));
+            if (!seen.Add(model.Source.Id))
+            {
+                throw new ArgumentException(
+                    $"Two models share the source id '{model.Source.Id}'; per-model accounting could not tell them apart.",
+                    nameof(models));
+            }
+
+            _models[i] = model;
+        }
+
+        Id = id;
+        _cumulative = new double[_models.Length];
+        double running = 0.0;
+        for (int i = 0; i < _models.Length; i++)
+        {
+            running += _models[i].Weight;
+            _cumulative[i] = running;
+        }
+
+        _total = running;
+        _proposals = new long[_models.Length];
+        _failures = new long[_models.Length];
+
+        // The weights are part of the identity: changing one changes which proposals a replay draws,
+        // so a stored run must not be resumed against a different mixture under the same hash.
+        var parts = new List<string> { "weighted-model-ensemble-v1", id };
+        foreach (var model in _models)
+        {
+            parts.Add(model.Source.Id);
+            parts.Add(model.Source.VersionHash);
+            parts.Add(model.Weight.ToString("R", CultureInfo.InvariantCulture));
+        }
+
+        VersionHash = EvolutionHash.Combine(parts);
+    }
+
+    /// <inheritdoc/>
+    public string Id { get; }
+
+    /// <inheritdoc/>
+    public string VersionHash { get; }
+
+    /// <summary>What the ensemble has charged to each model, in the configured order.</summary>
+    public IReadOnlyList<EvolutionModelAccount> Accounts
+    {
+        get
+        {
+            lock (_gate)
+            {
+                var accounts = new EvolutionModelAccount[_models.Length];
+                for (int i = 0; i < _models.Length; i++)
+                {
+                    accounts[i] = new EvolutionModelAccount(_models[i].Source.Id, _proposals[i], _failures[i]);
+                }
+
+                return accounts;
+            }
+        }
+    }
+
+    /// <inheritdoc/>
+    public async ValueTask<EvolutionResourceResult<TGenome>> ProposeAsync(
+        EvolutionVariationContext<TGenome> context, CancellationToken cancellationToken = default)
+    {
+        if (context is null) throw new ArgumentNullException(nameof(context));
+
+        int index = Draw(context.Random);
+        var model = _models[index];
+        lock (_gate)
+        {
+            _proposals[index]++;
+        }
+
+        try
+        {
+            var result = await model.Source.ProposeAsync(context, cancellationToken).ConfigureAwait(false);
+            Remember(context.Generation, index);
+            return result;
+        }
+        catch (OperationCanceledException)
+        {
+            // A cancellation is the run stopping, not this model failing. Charging it would blame a
+            // model for the operator's decision, which is the undercount-in-reverse mistake.
+            throw;
+        }
+        catch
+        {
+            lock (_gate)
+            {
+                _failures[index]++;
+            }
+
+            throw;
+        }
+    }
+
+    /// <inheritdoc/>
+    public void Observe(EvolutionEvaluation evaluation, EvolutionArchiveInsertionResult? insertionResult)
+    {
+        if (evaluation is null) throw new ArgumentNullException(nameof(evaluation));
+
+        int index;
+        lock (_gate)
+        {
+            // An unknown or repeated outcome is refused rather than ignored: teaching the wrong
+            // child another model's result corrupts its learning silently, and broadcasting to all
+            // of them is worse. AdaptiveVariationPortfolio refuses the same way.
+            if (!_pending.TryGetValue(evaluation.Lineage.Generation, out index))
+            {
+                throw new InvalidOperationException(
+                    "The weighted model ensemble received an unknown or repeated outcome.");
+            }
+
+            _pending.Remove(evaluation.Lineage.Generation);
+        }
+
+        _models[index].Source.Observe(evaluation, insertionResult);
+    }
+
+    /// <inheritdoc/>
+    public string CaptureState()
+    {
+        lock (_gate)
+        {
+            var children = new string[_models.Length];
+            for (int i = 0; i < _models.Length; i++) children[i] = _models[i].Source.CaptureState();
+
+            var document = new EnsembleState
+            {
+                VersionHash = VersionHash,
+                Proposals = (long[])_proposals.Clone(),
+                Failures = (long[])_failures.Clone(),
+                Pending = _pending.OrderBy(pair => pair.Key).Select(pair => new PendingEntry
+                {
+                    Generation = pair.Key,
+                    Model = pair.Value,
+                }).ToArray(),
+                Children = children,
+            };
+
+            return JsonSerializer.Serialize(document, EnsembleStateJson.Options);
+        }
+    }
+
+    /// <inheritdoc/>
+    public void RestoreState(string state)
+    {
+        if (state is null) throw new ArgumentNullException(nameof(state));
+
+        var document = JsonSerializer.Deserialize<EnsembleState>(state, EnsembleStateJson.Options)
+            ?? throw new InvalidOperationException("The ensemble state did not deserialize.");
+
+        if (!string.Equals(document.VersionHash, VersionHash, StringComparison.Ordinal))
+        {
+            throw new InvalidOperationException(
+                "The ensemble state was captured from a different model mixture, so resuming it would "
+                + "replay draws that this ensemble cannot reproduce.");
+        }
+
+        if (document.Children is null || document.Children.Length != _models.Length
+            || document.Proposals is null || document.Proposals.Length != _models.Length
+            || document.Failures is null || document.Failures.Length != _models.Length)
+        {
+            throw new InvalidOperationException("The ensemble state does not match this ensemble's shape.");
+        }
+
+        for (int i = 0; i < _models.Length; i++) _models[i].Source.RestoreState(document.Children[i]);
+
+        lock (_gate)
+        {
+            Array.Copy(document.Proposals, _proposals, _models.Length);
+            Array.Copy(document.Failures, _failures, _models.Length);
+            _pending.Clear();
+            foreach (var entry in document.Pending ?? Array.Empty<PendingEntry>())
+            {
+                if (entry.Model < 0 || entry.Model >= _models.Length)
+                {
+                    throw new InvalidOperationException("The ensemble state references a model outside its set.");
+                }
+
+                _pending[entry.Generation] = entry.Model;
+            }
+        }
+    }
+
+    private int Draw(StableRandom random)
+    {
+        if (random is null) throw new ArgumentNullException(nameof(random));
+        if (_models.Length == 1) return 0;
+
+        // One draw per proposal from the engine's stream, so the sequence is a function of the run's
+        // seed alone. NextDouble is in [0, 1); scaling by the weight total keeps the comparison in
+        // the weights' own units rather than normalizing them into floating-point drift.
+        double point = random.NextDouble() * _total;
+        for (int i = 0; i < _cumulative.Length; i++)
+        {
+            if (point < _cumulative[i]) return i;
+        }
+
+        return _cumulative.Length - 1;
+    }
+
+    private void Remember(long generation, int index)
+    {
+        lock (_gate)
+        {
+            if (_pending.Count >= MaximumTrackedProposals && !_pending.ContainsKey(generation))
+            {
+                throw new InvalidOperationException(
+                    $"More than {MaximumTrackedProposals} proposals are awaiting an outcome; the ensemble "
+                    + "will not grow its routing table without bound.");
+            }
+
+            _pending[generation] = index;
+        }
+    }
+
+    private sealed class EnsembleState
+    {
+        public string? VersionHash { get; set; }
+        public long[]? Proposals { get; set; }
+        public long[]? Failures { get; set; }
+        public PendingEntry[]? Pending { get; set; }
+        public string[]? Children { get; set; }
+    }
+
+    private sealed class PendingEntry
+    {
+        public long Generation { get; set; }
+        public int Model { get; set; }
+    }
+
+    private static class EnsembleStateJson
+    {
+        internal static readonly JsonSerializerOptions Options = new() { WriteIndented = false };
+    }
+}
