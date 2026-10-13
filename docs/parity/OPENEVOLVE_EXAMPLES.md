@@ -63,20 +63,21 @@ Each case asserts four evaluations (the seed plus three), at least one model cal
 return a zero score on error, so four evaluations would also be counted by a run where upstream's
 code never executed.
 
-**Six of 21 examples are smoked.** Which six was measured, not assumed, with
+**Three of 21 examples are smoked.** Which ones was measured, not assumed, with
 `eng/probe-openevolve-examples.py`: it runs every example's evaluator directly on its own seed
 program in a Linux container carrying the dependency set the upstream-parity job installs (numpy,
 scipy, pyyaml, dacite, openai and the `openevolve` package). An example whose own seed scores zero
-cannot support the positive-quality assertion, so it is not smoked.
+cannot support the positive-quality assertion, so it is not smoked - and a positive seed score is
+necessary but not sufficient, as the three rows below the smoked ones show.
 
 | example | seed score | smoked | why not |
 | --- | --- | --- | --- |
-| `background_blur` | 0.992 | yes | |
 | `circle_packing` | 0.364 | yes | |
-| `circle_packing_with_artifacts` | 0.364 | yes | |
-| `claude_code_quickstart` | 1.424 | yes | |
 | `function_minimization` | 1.398 | yes | |
 | `signal_processing` | 0.420 | yes | |
+| `claude_code_quickstart` | 1.424 | no | sets `llm.provider: "claude_code"`, so proposals route to the Claude Code CLI rather than an HTTP endpoint and a loopback stub has nothing to answer: all nine attempts fail |
+| `background_blur` | 0.992 | no | evaluates the seed and then never asks the model; carries a per-model `api_base` inside a weighted `llm.models` list, which the three that work do not. Cause not yet established, so it is left out rather than asserted on |
+| `circle_packing_with_artifacts` | 0.364 | no | same as `background_blur` |
 | `k_module_problem` | 0.0 | no | its own seed scores zero, so a positive-quality assertion cannot distinguish a working run from a broken one |
 | `online_judge_programming` | 0.0 | no | same, and its evaluator needs `requests` |
 | `web_scraper_optillm` | 0.0 | no | same |
