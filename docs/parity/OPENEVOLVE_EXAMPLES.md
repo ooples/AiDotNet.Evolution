@@ -13,9 +13,10 @@ checkout rather than trusting the table.
 ## What "imports" means here, and what it does not
 
 It means the importer accepts the example's own config and produces a run file: every key it
-supports is mapped, and any key it does not support is refused by name. It does **not** mean a
-3-iteration search has been run end to end - that needs a model, and no model is contacted in CI.
-The remainder of #169's third criterion is the smoke run itself, which is still open.
+supports is mapped, and any key it does not support is refused by name. On its own it does **not**
+mean a 3-iteration search has been run end to end. That is the smoke run below, which covers three
+examples (`circle_packing`, `function_minimization`, `signal_processing`) against a loopback stub
+model; the other examples have import coverage only.
 
 The config chosen for each example is the shortest path among its `*.yaml` and `*.yml` files, which
 is the one an example's own README points at. Examples carrying several (`algotune`,
@@ -58,10 +59,12 @@ about not spending money or reaching the network - `llm.api_base`, the model nam
 `benchmarks/external/test_openevolve_configs.py` treats an endpoint rewrite the same way, exempting
 `llm.api_base/api_key` from its verbatim check.
 
-Each case asserts four evaluations (the seed plus three), at least one model call, and a
-**positive** best quality. The last one is what makes the test mean anything: these evaluators
-return a zero score on error, so four evaluations would also be counted by a run where upstream's
-code never executed.
+Each case asserts at least one evaluation, at least one model call, and a **positive** best
+quality. The last one is what makes the test mean anything: these evaluators return a zero score on
+error, so evaluations would also be counted by a run where upstream's code never executed. It shows
+that upstream's evaluator scored upstream's seed and that the model was asked; it does not show that
+a proposal was scored, because these examples validate a proposal first and refuse the stub's fixed
+answer.
 
 **Three of 21 examples are smoked.** Which ones was measured, not assumed, with
 `eng/probe-openevolve-examples.py`: it runs every example's evaluator directly on its own seed

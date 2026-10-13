@@ -158,6 +158,10 @@ internal static class OpenEvolveConfigImporter
                 CascadeThresholds = List(merged["evaluator.cascade_thresholds"]).Select(value => Number(value) ?? 0).ToList(),
                 FileSuffix = merged["file_suffix"] as string ?? ".py",
                 TimeoutSeconds = Math.Max(1, timeout),
+                // Every declared dimension, including the ones dropped from the archive above: the shim
+                // passes this list to the fitness fallback, and OpenEvolve's get_fitness_score excludes
+                // every listed feature dimension - 'score' too - from the average when combined_score is
+                // absent. Filtering 'score' here would score evaluations upstream scores as zero.
                 FeatureDimensions = List(merged["database.feature_dimensions"]).OfType<string>().ToList()
             }
         };
@@ -301,29 +305,28 @@ internal static class OpenEvolveConfigImporter
         {
             int count = (int)((bins is Dictionary<string, object?> perDimension && perDimension.TryGetValue(dimension, out object? own)
                 ? Integer(own) : Integer(bins)) ?? 10);
-            if (dimension == "diversity")
+            switch (Classify(dimension))
             {
-                notes.Add("database.feature_dimensions: OpenEvolve's population-relative 'diversity' axis has no deterministic " +
-                          "equivalent and is dropped.");
-                continue;
+                case ReservedDimension.Diversity:
+                    notes.Add("database.feature_dimensions: OpenEvolve's population-relative 'diversity' axis has no deterministic " +
+                              "equivalent and is dropped.");
+                    continue;
+                case ReservedDimension.Score:
+                    // OpenEvolve's "score" axis is the fitness itself, not a metric the evaluator
+                    // reports. Carrying the name through would demand a metric literally called
+                    // "score" on every completed evaluation - which the 16 alphaevolve_math_problems
+                    // configs that declare this axis do not report, since their evaluators return
+                    // combined_score - and the run would end with no candidates. Dropped by name, like
+                    // 'diversity', rather than mapped to something it is not.
+                    notes.Add("database.feature_dimensions: OpenEvolve's 'score' axis is the fitness itself rather than a "
+                              + "reported metric, and this archive has no quality axis to bin it on, so it is dropped. The "
+                              + "remaining dimensions still apply.");
+                    continue;
             }
-
-            if (dimension == "score")
-            {
-                // OpenEvolve's "score" axis is the fitness itself, not a metric the evaluator
-                // reports. Carrying the name through would demand a metric literally called
-                // "score" on every completed evaluation - which the 16 alphaevolve_math_problems
-                // configs that declare this axis do not report, since their evaluators return
-                // combined_score - and the run would end with no candidates. Dropped by name, like
-                // 'diversity', rather than mapped to something it is not.
-                notes.Add("database.feature_dimensions: OpenEvolve's 'score' axis is the fitness itself rather than a "
-                          + "reported metric, and this archive has no quality axis to bin it on, so it is dropped. The "
-                          + "remaining dimensions still apply.");
-                continue;
-            }
-            // OpenEvolve's "complexity" is program length; "score" is the fitness itself; others are evaluator metrics.
-            string name = dimension switch { "complexity" => "length", _ => dimension };
-            if (name != "length")
+            // OpenEvolve's "complexity" is program length; any other name is an evaluator metric.
+            bool complexity = Classify(dimension) == ReservedDimension.Complexity;
+            string name = complexity ? "length" : dimension;
+            if (!complexity)
             {
                 // The engine will not file a program it cannot bin, so a dimension the evaluator
                 // omits on any completed evaluation ends the run with no candidates. OpenEvolve bins
@@ -334,7 +337,6 @@ internal static class OpenEvolveConfigImporter
                           + "omits it cannot be placed in a cell, and a run whose first evaluation omits it ends with "
                           + "no candidates. OpenEvolve bins a missing dimension rather than refusing it.");
             }
-
             descriptors.Add(new RunMetricDescriptor
             {
                 Name = name,
@@ -343,6 +345,31 @@ internal static class OpenEvolveConfigImporter
         }
         return descriptors;
     }
+
+    /// <summary>The feature-dimension names OpenEvolve reserves; any other name is an evaluator metric.</summary>
+    private enum ReservedDimension
+    {
+        /// <summary>Not reserved: an evaluator metric of that name.</summary>
+        None,
+
+        /// <summary>"complexity": program length.</summary>
+        Complexity,
+
+        /// <summary>"diversity": population-relative, with no deterministic equivalent.</summary>
+        Diversity,
+
+        /// <summary>"score": the fitness itself.</summary>
+        Score,
+    }
+
+    // The one place OpenEvolve's reserved names are compared; everything downstream branches on the enum.
+    private static ReservedDimension Classify(string dimension) => dimension switch
+    {
+        "complexity" => ReservedDimension.Complexity,
+        "diversity" => ReservedDimension.Diversity,
+        "score" => ReservedDimension.Score,
+        _ => ReservedDimension.None,
+    };
 
     private static ModelProvider Provider(string? provider) => provider?.ToLowerInvariant() switch
     {
