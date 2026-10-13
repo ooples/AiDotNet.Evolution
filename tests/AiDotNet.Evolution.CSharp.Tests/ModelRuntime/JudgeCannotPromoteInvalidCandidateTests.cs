@@ -164,6 +164,38 @@ public sealed class JudgeCannotPromoteInvalidCandidateTests
         Assert.Equal(0.47, result!.Quality!.Value, 10);
     }
 
+    /// <summary>
+    /// The feedback cost is charged separately as well as totalled: CostUnits carries measured plus
+    /// judge because that is what a budget honours, and the judge's own share is a descriptor so a
+    /// consumer can split one evaluation without a cumulative counter (#167).
+    /// </summary>
+    [Fact]
+    public async Task The_judges_own_cost_is_reported_separately_from_the_measured_cost()
+    {
+        var feasible = Measured(0.5, EvolutionOptimizationDirection.Maximize);
+        var options = new LlmFeedbackOptions
+        {
+            Criteria = new[] { "a" },
+            MaxJudgeRetries = 0,
+            JudgeCallCostUnits = 3,
+        };
+
+        var judge = new LlmJudgeProgramFitnessEvaluator(
+            new FakeChatClient("{\"a\":1.0}"), feasible, options: options);
+
+        var result = await judge.EvaluateAsync(Candidate(), Context());
+
+        Assert.NotNull(result);
+        string key = options.MetricPrefix + LlmFeedbackOptions.CostUnitsMetricSuffix;
+        Assert.True(result!.Descriptors.ContainsKey(key), $"no {key} descriptor was reported.");
+
+        // One judge call at three units each, and the measured evaluator's one unit stays in the
+        // total, so the split is recoverable: total - judge = measured.
+        double judgeCost = result.Descriptors[key];
+        Assert.Equal(3.0, judgeCost, 10);
+        Assert.Equal(1.0, result.CostUnits - judgeCost, 10);
+    }
+
     private static IProgramFitnessEvaluator Measured(
         double quality, EvolutionOptimizationDirection direction) =>
         new DelegateProgramFitnessEvaluator((_, _, _) =>

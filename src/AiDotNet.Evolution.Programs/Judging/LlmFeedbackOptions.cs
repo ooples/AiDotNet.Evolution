@@ -19,6 +19,16 @@ public sealed class LlmFeedbackOptions
     /// <summary>The metric name holding the mean of the individual judge scores.</summary>
     public const string AverageMetricSuffix = "average";
 
+    /// <summary>The descriptor suffix carrying the judge's OWN cost units for one evaluation.</summary>
+    /// <remarks>
+    /// <see cref="EvolutionTaskResult.CostUnits"/> reports the measured evaluator's cost plus the
+    /// judge's, because that total is what a budget must honour. V1-54 (#167) also asks for the
+    /// feedback cost to be charged separately, and a cumulative <c>JudgeCalls</c> counter cannot
+    /// answer that for a single evaluation - so the judge's share is written here as
+    /// <c>{MetricPrefix}cost_units</c>, and the measured share is the difference.
+    /// </remarks>
+    public const string CostUnitsMetricSuffix = "cost_units";
+
     /// <summary>The JSON field the judge's written criticism is read from unless another is configured.</summary>
     public const string DefaultCritiqueField = "reasoning";
 
