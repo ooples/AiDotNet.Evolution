@@ -1,0 +1,371 @@
+using AiDotNet.Evolution;
+using AiDotNet.Evolution.Programs;
+using Xunit;
+
+namespace AiDotNet.Evolution.CSharp.Tests.ModelRuntime;
+
+/// <summary>
+/// Covers meta-prompt evolution (V1-53, #166): the system instructions evolve alongside the
+/// programs, scored only by the downstream quality of the programs written under them.
+/// </summary>
+/// <remarks>
+/// AlphaEvolve credits this component in its ablations and OpenEvolve 0.3.2 declares it while its
+/// own config comment says it is not implemented, so there is no upstream behaviour to match - the
+/// tests pin what the paper describes: proposal, downstream scoring, an archive with lineage,
+/// replay from the seed, exact restore, and a separately reported cost.
+/// </remarks>
+public sealed class MetaPromptEvolutionTests
+{
+    private const string Seed = "Improve the program. Keep it correct and short.";
+
+    private static ProgramMetaPromptOptions Options(
+        bool enabled = true,
+        ProgramInstructionSelection selection = ProgramInstructionSelection.EpsilonGreedy,
+        int archive = 8,
+        decimal cost = 1m) => new()
+        {
+            Enabled = enabled,
+            Selection = selection,
+            MaxArchiveSize = archive,
+            ProposalCostUnits = cost,
+            ProposeEveryGenerations = 5,
+        };
+
+    /// <summary>
+    /// The first criterion, end to end: an instruction is proposed, enters the archive with its
+    /// parent, and is scored by the quality of the program written under it.
+    /// </summary>
+    [Fact]
+    public async Task A_proposed_instruction_is_archived_with_lineage_and_scored_downstream()
+    {
+        const string improved = "Improve the program. Prefer a closed form over a loop, and say why in one line.";
+        var evolver = new ProgramMetaPromptEvolver(new FakeChatClient(improved), Seed, Options());
+
+        string? accepted = await evolver.ProposeAsync(generation: 5);
+
+        Assert.Equal(improved, accepted);
+        Assert.Equal(2, evolver.Archive.Count);
+
+        ProgramInstructionCandidate child = Single(evolver, improved);
+        ProgramInstructionCandidate seed = Single(evolver, Seed);
+        Assert.Null(seed.ParentId);
+        Assert.Equal(seed.Id, child.ParentId); // lineage: proposed from the archive's best, which is the seed
+        Assert.Equal(5, child.Generation);
+        Assert.Equal(0, child.Scored);
+
+        // Scored by the program it produced, not by anything the model said about it.
+        string selected = evolver.Select(new StableRandom(7), generation: 6);
+        Assert.Equal(improved, selected); // unscored is unexplored, so the new instruction goes first
+        evolver.Observe(generation: 6, quality: 0.8);
+
+        child = Single(evolver, improved);
+        Assert.Equal(1, child.Uses);
+        Assert.Equal(1, child.Scored);
+        Assert.Equal(0.8, child.MeanQuality, 10);
+        Assert.Equal(0.0, seed.MeanQuality); // never used, so still unscored rather than scored badly
+    }
+
+    /// <summary>
+    /// Replay: the same seed selects the same instructions in the same order, and a different seed
+    /// does not. The second half is the control — without it, an evolver that always returned the
+    /// same instruction would pass the determinism assertion.
+    /// </summary>
+    [Fact]
+    public async Task Selection_replays_from_the_seed_and_a_different_seed_diverges()
+    {
+        // A fresh evolver per sequence: observing a quality mutates the archive the next selection
+        // reads, so reusing one evolver would compare different starting states and prove nothing.
+        string[] first = await SequenceFrom(1234);
+        string[] again = await SequenceFrom(1234);
+        string[] other = await SequenceFrom(9876);
+
+        Assert.Equal(first, again);
+        Assert.NotEqual(first, other);
+
+        // The sequence has to contain more than one instruction, or equality would hold for an
+        // evolver that always returned the seed.
+        Assert.True(first.Distinct(StringComparer.Ordinal).Count() > 1,
+            "the replayed sequence selected only one instruction, so it cannot detect divergence");
+    }
+
+    private static async Task<string[]> SequenceFrom(ulong seed)
+    {
+        var evolver = new ProgramMetaPromptEvolver(
+            new FakeChatClient(
+                "Instruction A: prefer arithmetic to branching in the hot loop.",
+                "Instruction B: write the simplest version first, then optimise only the measured hot path."),
+            Seed, Options());
+
+        // Two instructions beyond the seed, so there is something to choose between.
+        await evolver.ProposeAsync(generation: 5);
+        await evolver.ProposeAsync(generation: 10);
+        Assert.Equal(3, evolver.Archive.Count);
+
+        var random = new StableRandom(seed);
+        var selected = new List<string>();
+        for (int i = 0; i < 40; i++)
+        {
+            long generation = 1_000 + i;
+            selected.Add(evolver.Select(random, generation));
+
+            // A fixed quality per instruction, so the archive's scores evolve identically for the
+            // same seed and the only thing that can differ is the draw.
+            evolver.Observe(generation, quality: selected[^1].Length / 100.0);
+        }
+
+        return selected.ToArray();
+    }
+
+    private static ProgramInstructionCandidate Single(ProgramMetaPromptEvolver evolver, string text)
+    {
+        ProgramInstructionCandidate[] matches = evolver.Archive
+            .Where(candidate => candidate.Text == text).ToArray();
+        return Assert.Single(matches);
+    }
+
+    private static string[] SequenceFrom(ProgramMetaPromptEvolver evolver, ulong seed)
+    {
+        // Each sequence uses its own generation window so the routing table never sees a repeat,
+        // and every selection is observed so the archive's scores advance the same way each time.
+        var random = new StableRandom(seed);
+        long baseGeneration = 1_000 + (long)(seed % 10) * 1_000;
+        var selected = new List<string>();
+        for (int i = 0; i < 40; i++)
+        {
+            long generation = baseGeneration + i;
+            selected.Add(evolver.Select(random, generation));
+            evolver.Observe(generation, quality: 0.5);
+        }
+
+        return selected.ToArray();
+    }
+
+    /// <summary>
+    /// The second criterion: a restored checkpoint is the same archive, by state-hash equality.
+    /// </summary>
+    [Fact]
+    public async Task A_restored_checkpoint_has_the_same_state_hash()
+    {
+        var evolver = new ProgramMetaPromptEvolver(
+            new FakeChatClient("Instruction A: hoist the invariant out of the loop before anything else."),
+            Seed, Options());
+        await evolver.ProposeAsync(generation: 5);
+        var random = new StableRandom(3);
+        evolver.Select(random, generation: 6);
+        evolver.Observe(generation: 6, quality: 0.6);
+        evolver.Select(random, generation: 7); // left outstanding on purpose: the route must survive too
+
+        string captured = evolver.CaptureState();
+        string hash = evolver.StateHash;
+
+        var restored = new ProgramMetaPromptEvolver(new FakeChatClient(), Seed, Options());
+        restored.RestoreState(captured);
+
+        Assert.Equal(hash, restored.StateHash);
+        Assert.Equal(evolver.Archive.Select(c => (c.Id, c.ParentId, c.Generation, c.Uses, c.Scored, c.MeanQuality)),
+            restored.Archive.Select(c => (c.Id, c.ParentId, c.Generation, c.Uses, c.Scored, c.MeanQuality)));
+
+        // The outstanding route survived, so the resumed run can still credit the right instruction.
+        restored.Observe(generation: 7, quality: 0.9);
+    }
+
+    /// <summary>
+    /// A state hash that cannot tell two different archives apart would make the test above
+    /// vacuous, so this is its negative control.
+    /// </summary>
+    [Fact]
+    public async Task The_state_hash_changes_when_the_archive_does()
+    {
+        var evolver = new ProgramMetaPromptEvolver(
+            new FakeChatClient("Instruction A: measure before changing anything in the inner loop."),
+            Seed, Options());
+        string before = evolver.StateHash;
+
+        await evolver.ProposeAsync(generation: 5);
+        string afterProposal = evolver.StateHash;
+        Assert.NotEqual(before, afterProposal);
+
+        evolver.Select(new StableRandom(4), generation: 6);
+        evolver.Observe(generation: 6, quality: 0.25);
+        Assert.NotEqual(afterProposal, evolver.StateHash);
+    }
+
+    /// <summary>
+    /// A checkpoint from different settings, a different seed instruction or with no archive is
+    /// refused: restoring it would replay a selection sequence the archive never produced.
+    /// </summary>
+    [Fact]
+    public async Task A_state_from_different_settings_or_another_seed_is_refused()
+    {
+        var evolver = new ProgramMetaPromptEvolver(
+            new FakeChatClient("Instruction A: prefer a table lookup where the domain is small."),
+            Seed, Options());
+        await evolver.ProposeAsync(generation: 5);
+        string captured = evolver.CaptureState();
+
+        var otherSettings = new ProgramMetaPromptEvolver(
+            new FakeChatClient(), Seed, Options(selection: ProgramInstructionSelection.Uniform));
+        Assert.Throws<InvalidOperationException>(() => otherSettings.RestoreState(captured));
+
+        var otherSeed = new ProgramMetaPromptEvolver(
+            new FakeChatClient(), "A different starting instruction entirely.", Options());
+        Assert.Throws<InvalidOperationException>(() => otherSeed.RestoreState(captured));
+
+        var sameSettings = new ProgramMetaPromptEvolver(new FakeChatClient(), Seed, Options());
+        Assert.Throws<InvalidOperationException>(
+            () => sameSettings.RestoreState(captured.Replace("\"Archive\":[", "\"Archive\":[],\"Ignored\":[")));
+    }
+
+    /// <summary>
+    /// The third criterion: the meta level's calls are charged to the run's ledger and reported as
+    /// their own line, not folded into the program proposals.
+    /// </summary>
+    [Fact]
+    public async Task The_meta_levels_cost_is_charged_to_the_ledger_and_reported_separately()
+    {
+        var ledger = new EvolutionResourceLedger(
+            "meta-prompt-cost-test", EvolutionResources.Of("cost_units", 100m));
+        var evolver = new ProgramMetaPromptEvolver(
+            new FakeChatClient("Instruction A: start from the failing case and generalise from it."),
+            Seed, Options(cost: 3m));
+
+        await evolver.ProposeAsync(generation: 5, ledger);
+
+        EvolutionResourceSnapshot snapshot = ledger.Snapshot();
+        Assert.Equal(3m, snapshot.Spent["cost_units"]);
+        Assert.Equal(1, evolver.ProposalCalls);
+        Assert.Equal(3m, evolver.ProposalCostUnits);
+
+        var descriptors = new Dictionary<string, double>();
+        evolver.WriteCostDescriptors(descriptors);
+        Assert.Equal(1.0, descriptors["meta_prompt_calls"]);
+        Assert.Equal(3.0, descriptors["meta_prompt_cost_units"]);
+        Assert.Equal(0.0, descriptors["meta_prompt_refused"]);
+        Assert.Equal(2.0, descriptors["meta_prompt_archive_size"]);
+    }
+
+    /// <summary>
+    /// A budget that cannot pay for the call refuses it before the model is contacted, so the meta
+    /// level cannot overspend a run's ledger.
+    /// </summary>
+    [Fact]
+    public async Task A_proposal_the_budget_cannot_pay_for_is_refused_before_the_call()
+    {
+        var ledger = new EvolutionResourceLedger(
+            "meta-prompt-budget-test", EvolutionResources.Of("cost_units", 2m));
+        var client = new FakeChatClient("Instruction A: this answer must never be requested.");
+        var evolver = new ProgramMetaPromptEvolver(client, Seed, Options(cost: 5m));
+
+        await Assert.ThrowsAsync<EvolutionResourceBudgetException>(
+            async () => await evolver.ProposeAsync(generation: 5, ledger));
+
+        Assert.Equal(0, client.Calls);
+        Assert.Equal(0, evolver.ProposalCalls);
+        Assert.Single(evolver.Archive);
+    }
+
+    /// <summary>
+    /// An answer that is not usable as an instruction is refused and counted, and the archive is
+    /// left alone. A model asked for instructions sometimes answers with a program; without this,
+    /// one bad reply would become the prompt for the rest of the run.
+    /// </summary>
+    [Fact]
+    public async Task An_unusable_answer_is_refused_and_counted()
+    {
+        var evolver = new ProgramMetaPromptEvolver(
+            new FakeChatClient(new string('x', 5_000), "short", Seed),
+            Seed, Options());
+
+        Assert.Null(await evolver.ProposeAsync(generation: 5));  // longer than MaxInstructionChars
+        Assert.Null(await evolver.ProposeAsync(generation: 10)); // too short to be instructions
+        Assert.Null(await evolver.ProposeAsync(generation: 15)); // the instruction already in the archive
+
+        Assert.Single(evolver.Archive);
+        Assert.Equal(3, evolver.ProposalCalls);
+        Assert.Equal(3, evolver.RefusedProposals);
+
+        var descriptors = new Dictionary<string, double>();
+        evolver.WriteCostDescriptors(descriptors);
+        Assert.Equal(3.0, descriptors["meta_prompt_refused"]); // a paid-for refusal is visible, not inferred
+    }
+
+    /// <summary>
+    /// An outcome for a generation the evolver did not route is refused rather than ignored:
+    /// crediting the wrong instruction silently inverts the signal the archive is built on.
+    /// </summary>
+    [Fact]
+    public void An_unknown_or_repeated_outcome_is_refused()
+    {
+        var evolver = new ProgramMetaPromptEvolver(new FakeChatClient(), Seed, Options());
+
+        Assert.Throws<InvalidOperationException>(() => evolver.Observe(generation: 1, quality: 0.5));
+
+        evolver.Select(new StableRandom(5), generation: 1);
+        evolver.Observe(generation: 1, quality: 0.5);
+        Assert.Throws<InvalidOperationException>(() => evolver.Observe(generation: 1, quality: 0.5));
+
+        // Re-selecting a generation still awaiting its outcome would credit the second instruction
+        // with the first one's result.
+        evolver.Select(new StableRandom(5), generation: 2);
+        Assert.Throws<InvalidOperationException>(() => evolver.Select(new StableRandom(5), generation: 2));
+
+        Assert.Throws<ArgumentOutOfRangeException>(() => evolver.Observe(generation: 2, quality: double.NaN));
+    }
+
+    /// <summary>
+    /// Greedy selection picks the best-scoring instruction once every instruction has been scored,
+    /// and uniform selection does not — the two control arms for the credit signal.
+    /// </summary>
+    [Fact]
+    public async Task Greedy_follows_the_score_and_uniform_ignores_it()
+    {
+        const string better = "Instruction A: inline the comparison and drop the allocation in the loop.";
+
+        ProgramMetaPromptEvolver greedy = await Scored(ProgramInstructionSelection.Greedy, better);
+        var random = new StableRandom(11);
+        for (int i = 0; i < 20; i++)
+        {
+            Assert.Equal(better, greedy.Select(random, 500 + i));
+        }
+
+        ProgramMetaPromptEvolver uniform = await Scored(ProgramInstructionSelection.Uniform, better);
+        var uniformRandom = new StableRandom(11);
+        var seen = new HashSet<string>(StringComparer.Ordinal);
+        for (int i = 0; i < 40; i++)
+        {
+            seen.Add(uniform.Select(uniformRandom, 500 + i));
+        }
+
+        Assert.Equal(2, seen.Count); // the worse instruction is still selected, because credit is ignored
+    }
+
+    private static async Task<ProgramMetaPromptEvolver> Scored(
+        ProgramInstructionSelection selection, string better)
+    {
+        var evolver = new ProgramMetaPromptEvolver(
+            new FakeChatClient(better), Seed, Options(selection: selection));
+        await evolver.ProposeAsync(generation: 5);
+
+        // Score both: the seed badly, the new instruction well. Until an instruction is scored it
+        // counts as unexplored and is selected first whatever the policy, so a test of the policy
+        // has to get past that first.
+        var random = new StableRandom(2);
+        for (int i = 0; i < 2; i++)
+        {
+            string text = evolver.Select(random, 100 + i);
+            evolver.Observe(100 + i, text == better ? 0.9 : 0.1);
+        }
+
+        foreach (ProgramInstructionCandidate candidate in evolver.Archive)
+        {
+            if (candidate.Scored != 0) continue;
+
+            // Whichever one the draws missed, score it directly so no instruction is left unexplored.
+            string text = evolver.Select(random, 200 + candidate.Generation);
+            evolver.Observe(200 + candidate.Generation, text == better ? 0.9 : 0.1);
+        }
+
+        Assert.All(evolver.Archive, candidate => Assert.True(candidate.Scored > 0));
+        return evolver;
+    }
+}
