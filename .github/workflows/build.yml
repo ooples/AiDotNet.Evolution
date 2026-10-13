@@ -380,6 +380,11 @@ jobs:
       - name: OpenEvolve example ledger and smoke against the pinned checkout
         # The ledger in docs/parity/OPENEVOLVE_EXAMPLES.md claims a per-example disposition. Here,
         # and only here, is a checkout to re-measure it against: elsewhere the test returns early.
+        # EVOLUTION_PYTHON must be the pinned venv, not the system python3: the CLI reads an
+        # OpenEvolve config the way OpenEvolve does, which needs PyYAML, and the examples' own
+        # evaluators need numpy and the openevolve package. The system interpreter has none of them.
+        env:
+          EVOLUTION_PYTHON: ${{ github.workspace }}/.local/program-env/bin/python
         run: dotnet test tests/AiDotNet.Evolution.Tests/AiDotNet.Evolution.Tests.csproj -c Release -f net10.0 --filter "FullyQualifiedName~OpenEvolveExample"
       - name: Validate actual container isolation and independent oracles
         run: |

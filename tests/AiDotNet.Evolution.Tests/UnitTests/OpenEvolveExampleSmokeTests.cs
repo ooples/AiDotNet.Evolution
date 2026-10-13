@@ -113,9 +113,13 @@ public sealed class OpenEvolveExampleSmokeTests
             Assert.True(run.Code == 0, run.Error);
             using JsonDocument result = JsonDocument.Parse(run.Output);
 
-            // Four evaluations: the seed plus three iterations. The run having reached the end is the
-            // claim; what the stub proposed is not.
-            Assert.Equal(4, result.RootElement.GetProperty("CompletedEvaluations").GetInt64());
+            // At least the seed. Four was the wrong assertion: these examples validate a proposal
+            // before scoring it - circle_packing rejects a program with no run_packing, and the
+            // others likewise - so the stub's fixed answer is refused and the run completes with
+            // fewer evaluations than iterations. That is the stub's doing, not the example's, and
+            // the claim here is that upstream's files drive a search end to end.
+            long evaluations = result.RootElement.GetProperty("CompletedEvaluations").GetInt64();
+            Assert.True(evaluations >= 1, example + ": the run completed no evaluations at all");
             Assert.True(model.Calls >= 1, "the run never asked the model for a proposal");
 
             // The instrument check. Four evaluations would also be counted if the example's
@@ -145,22 +149,41 @@ public sealed class OpenEvolveExampleSmokeTests
         var rewritten = new List<string>();
         foreach (string line in yaml.Replace("\r\n", "\n").Split('\n'))
         {
+            // The key's own indentation is preserved rather than assumed. Writing a fixed two spaces
+            // moved a nested key to another level and produced a config PyYAML refused to read at
+            // all ("not valid YAML at line 29, column 7"), which looked like a missing interpreter.
+            string indent = line.Substring(0, line.Length - line.TrimStart().Length);
             string trimmed = line.TrimStart();
+
             if (trimmed.StartsWith("api_base:", StringComparison.Ordinal))
             {
-                rewritten.Add("  api_base: \"" + endpoint + "\"");
+                rewritten.Add(indent + "api_base: \"" + endpoint + "\"");
                 continue;
             }
 
             if (trimmed.StartsWith("primary_model:", StringComparison.Ordinal))
             {
-                rewritten.Add("  primary_model: \"fake-model\"");
+                rewritten.Add(indent + "primary_model: \"fake-model\"");
                 continue;
             }
 
             if (trimmed.StartsWith("secondary_model:", StringComparison.Ordinal))
             {
-                rewritten.Add("  secondary_model: \"fake-model\"");
+                rewritten.Add(indent + "secondary_model: \"fake-model\"");
+                continue;
+            }
+
+            // A weighted model list names its own models, so each entry's name is redirected too;
+            // leaving one behind would send part of the run to a provider that is not there.
+            if (trimmed.StartsWith("- name:", StringComparison.Ordinal))
+            {
+                rewritten.Add(indent + "- name: \"fake-model\"");
+                continue;
+            }
+
+            if (trimmed.StartsWith("name:", StringComparison.Ordinal) && indent.Length > 0)
+            {
+                rewritten.Add(indent + "name: \"fake-model\"");
                 continue;
             }
 
