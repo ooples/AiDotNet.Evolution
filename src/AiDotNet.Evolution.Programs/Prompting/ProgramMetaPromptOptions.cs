@@ -50,6 +50,16 @@ public sealed class ProgramMetaPromptOptions
     /// <summary>Gets or sets the cost units charged to the run's ledger for one instruction proposal.</summary>
     public decimal ProposalCostUnits { get; set; } = 1m;
 
+    /// <summary>Gets or sets the ledger resource the proposal is charged against.</summary>
+    /// <remarks>
+    /// A ledger declares its own resource names, and nothing requires them to include
+    /// <c>cost_units</c>. Charging a hard-coded name against a ledger that declares another one
+    /// throws from the reservation before the model is contacted, which reads as a budget failure
+    /// rather than as a misconfiguration - so the name is a setting, defaulting to the conventional
+    /// <c>cost_units</c>.
+    /// </remarks>
+    public string ProposalResourceName { get; set; } = "cost_units";
+
     /// <summary>Gets or sets the longest instruction the evolver will accept from the model.</summary>
     /// <remarks>
     /// A model asked for instructions sometimes answers with a program instead. A bound keeps one
@@ -85,6 +95,9 @@ public sealed class ProgramMetaPromptOptions
                 "MaxInstructionChars must be between 64 and 100000.");
         if (string.IsNullOrWhiteSpace(MetricPrefix) || MetricPrefix.Length > 64)
             throw new ArgumentException("MetricPrefix must be nonempty and at most 64 characters.", nameof(MetricPrefix));
+        if (string.IsNullOrWhiteSpace(ProposalResourceName) || ProposalResourceName.Length > 64)
+            throw new ArgumentException(
+                "ProposalResourceName must be nonempty and at most 64 characters.", nameof(ProposalResourceName));
     }
 
     /// <summary>Returns an independent copy, so a caller cannot mutate settings a run is using.</summary>
@@ -97,6 +110,7 @@ public sealed class ProgramMetaPromptOptions
         Direction = Direction,
         ExplorationProbability = ExplorationProbability,
         ProposalCostUnits = ProposalCostUnits,
+        ProposalResourceName = ProposalResourceName,
         MaxInstructionChars = MaxInstructionChars,
         MetricPrefix = MetricPrefix,
     };
@@ -114,5 +128,6 @@ public sealed class ProgramMetaPromptOptions
         // different identities and make a checkpoint from one refuse to restore under the other.
         (ProposalCostUnits / 1.000000000000000000000000000m).ToString(CultureInfo.InvariantCulture),
         MaxInstructionChars.ToString(CultureInfo.InvariantCulture),
-        MetricPrefix);
+        MetricPrefix,
+        ProposalResourceName);
 }

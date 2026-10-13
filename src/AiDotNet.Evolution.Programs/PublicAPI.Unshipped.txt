@@ -959,6 +959,8 @@ AiDotNet.Evolution.Programs.ProgramMetaPromptOptions.MetricPrefix.set -> void
 AiDotNet.Evolution.Programs.ProgramMetaPromptOptions.ProgramMetaPromptOptions() -> void
 AiDotNet.Evolution.Programs.ProgramMetaPromptOptions.ProposalCostUnits.get -> decimal
 AiDotNet.Evolution.Programs.ProgramMetaPromptOptions.ProposalCostUnits.set -> void
+AiDotNet.Evolution.Programs.ProgramMetaPromptOptions.ProposalResourceName.get -> string!
+AiDotNet.Evolution.Programs.ProgramMetaPromptOptions.ProposalResourceName.set -> void
 AiDotNet.Evolution.Programs.ProgramMetaPromptOptions.ProposeEveryGenerations.get -> int
 AiDotNet.Evolution.Programs.ProgramMetaPromptOptions.ProposeEveryGenerations.set -> void
 AiDotNet.Evolution.Programs.ProgramMetaPromptOptions.Selection.get -> AiDotNet.Evolution.Programs.ProgramInstructionSelection

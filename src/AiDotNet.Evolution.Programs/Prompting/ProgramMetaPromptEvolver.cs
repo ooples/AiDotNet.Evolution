@@ -242,7 +242,8 @@ public sealed class ProgramMetaPromptEvolver
         cancellationToken.ThrowIfCancellationRequested();
 
         string operation = "meta-prompt/" + generation.ToString(CultureInfo.InvariantCulture);
-        EvolutionResources charge = EvolutionResources.Of("cost_units", _options.ProposalCostUnits);
+        EvolutionResources charge = EvolutionResources.Of(
+            _options.ProposalResourceName, _options.ProposalCostUnits);
         using EvolutionResourceReservation? reservation = ledger?.TryReserve(
             operation, EvolutionResourceStage.Proposal, charge, charge);
         if (ledger is not null && reservation is null) throw new EvolutionResourceBudgetException(operation);

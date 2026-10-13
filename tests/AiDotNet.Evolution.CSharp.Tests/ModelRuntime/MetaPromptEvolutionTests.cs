@@ -402,6 +402,28 @@ public sealed class MetaPromptEvolutionTests
             Task.FromResult(new ProgramChatResponse(ProgramChatMessage.Assistant("unused"), null, ModelId));
     }
 
+    /// <summary>
+    /// A ledger declares its own resource names, and nothing requires one of them to be
+    /// "cost_units". The proposal is charged against the configured name, so a run metering
+    /// something else is not refused by its own budget before the model is contacted.
+    /// </summary>
+    [Fact]
+    public async Task The_proposal_is_charged_against_the_configured_resource()
+    {
+        ProgramMetaPromptOptions options = Options(cost: 2m);
+        options.ProposalResourceName = "tokens";
+
+        var ledger = new EvolutionResourceLedger(
+            "meta-prompt-resource-test", EvolutionResources.Of("tokens", 50m));
+        var evolver = new ProgramMetaPromptEvolver(
+            new FakeChatClient("Instruction A: an answer long enough to be accepted."), Seed, options);
+
+        await evolver.ProposeAsync(generation: 5, ledger);
+
+        Assert.Equal(2m, ledger.Snapshot().Spent["tokens"]);
+        Assert.Equal(1, evolver.ProposalCalls);
+    }
+
     private static ProgramInstructionCandidate Single(ProgramMetaPromptEvolver evolver, string text)
     {
         ProgramInstructionCandidate[] matches = evolver.Archive
