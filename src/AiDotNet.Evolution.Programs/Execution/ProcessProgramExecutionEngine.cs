@@ -78,6 +78,22 @@ public sealed class ProcessProgramExecutionEngine : IProgramExecutionEngine, IPr
     private static readonly TimeSpan MaximumResourcePollInterval = TimeSpan.FromMilliseconds(200);
     // 128 + SIGXCPU: the kernel's CPU-time backstop ended the process.
     private const int ExitCodeCpuLimitSignal = 152;
+
+    // 128 + SIGKILL(9): the shell's report of a process the out-of-memory killer took.
+    private const int ExitCodeOutOfMemoryKill = 137;
+
+    // How each supported runtime reports a mapping the address-space backstop denied. Ordinal, and
+    // read only from standard error on a non-zero exit.
+    private static readonly string[] AllocationFailureSignatures =
+    {
+        "MemoryError",            // Python
+        "OutOfMemoryException",   // .NET
+        "std::bad_alloc",         // C++
+        "bad_alloc",              // C++ without the namespace
+        "Cannot allocate memory", // libc, surfaced by Rust and Go runtimes
+        "memory allocation of",   // Rust's abort message
+        "out of memory",          // Node and several runtimes, lowercase
+    };
     private const int ExitCodeQuotaExceeded = unchecked((int)0xC0000044); // STATUS_QUOTA_EXCEEDED
     // How long to wait after exit for a job to report it has no process left, which flushes its limit notifications.
     private static readonly TimeSpan JobNotificationGrace = TimeSpan.FromMilliseconds(250);
@@ -507,7 +523,10 @@ public sealed class ProcessProgramExecutionEngine : IProgramExecutionEngine, IPr
             ?? (LinuxHost && exitCode == ExitCodeCpuLimitSignal ? ProgramExecuteErrorCode.CpuTimeLimitExceeded : (ProgramExecuteErrorCode?)null)
             // The job ends a process past its CPU-time limit with STATUS_QUOTA_EXCEEDED. Its port notification can arrive
             // after the exit is observed (seen on GitHub's Windows runners), so the exit status settles it on its own.
-            ?? (job is not null && exitCode == ExitCodeQuotaExceeded ? ProgramExecuteErrorCode.CpuTimeLimitExceeded : (ProgramExecuteErrorCode?)null);
+            ?? (job is not null && exitCode == ExitCodeQuotaExceeded ? ProgramExecuteErrorCode.CpuTimeLimitExceeded : (ProgramExecuteErrorCode?)null)
+            // And the address-space backstop can deny a mapping outright, which the resident-memory
+            // sampler can never see.
+            ?? MemoryBackstopViolation(exitCode, capturedErr.Text);
         if (afterExit is not null)
         {
             return ResourceExceeded(language, compileOnly, afterExit.Value, exitCode, stdOutReader, stdErrReader);
@@ -815,6 +834,40 @@ public sealed class ProcessProgramExecutionEngine : IProgramExecutionEngine, IPr
         if (!LinuxHost || LinuxProcessTree.Measure(processId, includeRoot: !guarded) is not { } usage) return null;
         if (usage.ResidentBytes > _limits.GetMemoryLimitBytes()) return ProgramExecuteErrorCode.MemoryLimitExceeded;
         return usage.CpuTime >= _limits.GetCpuTimeLimit() ? ProgramExecuteErrorCode.CpuTimeLimitExceeded : null;
+    }
+
+    /// <summary>
+    /// Classifies a non-zero exit that the address-space backstop caused as the memory violation it
+    /// is, rather than as a generic execution failure.
+    /// </summary>
+    /// <remarks>
+    /// <para>
+    /// <see cref="ReadViolation"/> compares the tree's resident memory against the limit, which can
+    /// never see this case: the <c>ulimit -v</c> backstop sits at twice the limit and denies the
+    /// mapping outright, so a candidate asking for far more than the limit dies with its resident
+    /// memory still under it. The sampler is not racing - it is watching a number that never moves.
+    /// </para>
+    /// <para>
+    /// A denied mapping leaves no signal of its own beyond the child's report, so this reads the
+    /// child's standard error, and only on a non-zero exit with a memory limit configured. Standard
+    /// output is deliberately not read: a candidate that prints the word on success, or to its own
+    /// output on failure, must not be reported as having exhausted memory. A kill by signal 9 is
+    /// included because the kernel's out-of-memory killer leaves exactly that and nothing else.
+    /// </para>
+    /// </remarks>
+    private ProgramExecuteErrorCode? MemoryBackstopViolation(int exitCode, string standardError)
+    {
+        if (!LinuxHost || exitCode == 0 || _limits.GetMemoryLimitBytes() <= 0) return null;
+        if (exitCode == ExitCodeOutOfMemoryKill) return ProgramExecuteErrorCode.MemoryLimitExceeded;
+        if (string.IsNullOrEmpty(standardError)) return null;
+
+        foreach (string signature in AllocationFailureSignatures)
+        {
+            if (standardError.Contains(signature, StringComparison.Ordinal))
+                return ProgramExecuteErrorCode.MemoryLimitExceeded;
+        }
+
+        return null;
     }
 
     private ProgramExecuteResponse ResourceExceeded(

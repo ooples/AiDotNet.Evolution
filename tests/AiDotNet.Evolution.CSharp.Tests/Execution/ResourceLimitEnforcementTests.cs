@@ -105,6 +105,38 @@ public sealed class ResourceLimitEnforcementTests
         }
     });
 
+    /// <summary>
+    /// The control arm for classifying the address-space backstop's kill as a memory violation: an
+    /// ordinary failure must still be reported as one.
+    /// </summary>
+    /// <remarks>
+    /// The backstop denies a mapping outright, which leaves no signal but the child's own report, so
+    /// the engine reads standard error for an allocation failure. This pins the two ways that could
+    /// go wrong: an unrelated crash must not become a memory violation, and neither must a candidate
+    /// that merely prints the word - only a report on standard error counts, and only on a non-zero
+    /// exit.
+    /// </remarks>
+    [Fact]
+    public async Task An_ordinary_failure_is_not_reported_as_a_memory_violation()
+    {
+        ProgramExecuteResponse crashed = await Run(
+            "raise ValueError('not about memory')\n", limits => limits.MemoryLimitMb = 256);
+        Assert.False(crashed.Success);
+        Assert.Equal(ProgramExecuteErrorCode.ExecutionFailed, crashed.ErrorCode);
+
+        // The word on standard output, on a run that then fails for another reason.
+        ProgramExecuteResponse printed = await Run(
+            "print('MemoryError')\nraise ValueError('still not about memory')\n",
+            limits => limits.MemoryLimitMb = 256);
+        Assert.False(printed.Success);
+        Assert.Equal(ProgramExecuteErrorCode.ExecutionFailed, printed.ErrorCode);
+
+        // And a successful run that prints it is untouched.
+        ProgramExecuteResponse fine = await Run("print('MemoryError')\n", limits => limits.MemoryLimitMb = 256);
+        Assert.True(fine.Success, fine.Error);
+        Assert.Null(fine.ErrorCode);
+    }
+
     private static async Task<ProgramExecuteResponse> Run(string source, Action<ProgramSandboxLimitOptions> configure)
     {
         if (MissingInterpreter.Value is { } missing)
