@@ -43,7 +43,8 @@ def primary(result):
         result = result.metrics
     elif hasattr(result, "send") and hasattr(result, "throw"):
         import asyncio
-        result = asyncio.get_event_loop().run_until_complete(result)
+        # asyncio.run: get_event_loop() with no running loop is deprecated (3.12) and raises in 3.14.
+        result = asyncio.run(result)
         if hasattr(result, "metrics"):
             result = result.metrics
     if not isinstance(result, dict):

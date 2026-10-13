@@ -1,5 +1,6 @@
 #if NET8_0_OR_GREATER
 using System.Text.Json;
+using YamlDotNet.RepresentationModel;
 using AiDotNet.Evolution.Cli;
 using Xunit;
 
@@ -36,6 +37,9 @@ namespace AiDotNet.Evolution.Tests;
 /// would be measuring the stub.
 /// </para>
 /// </remarks>
+// The run sets OPENAI_API_KEY and calls Program.Main in this process, so it shares the console collection
+// with the other CLI tests rather than overlapping them.
+[Collection(ConsoleCollection.Name)]
 public sealed class OpenEvolveExampleSmokeTests
 {
     private static readonly string Python = Environment.GetEnvironmentVariable("EVOLUTION_PYTHON")
@@ -79,15 +83,22 @@ public sealed class OpenEvolveExampleSmokeTests
     public void A_real_examples_evaluator_and_program_run_three_iterations(string example, string configName)
     {
         string? checkout = Environment.GetEnvironmentVariable("EVOLUTION_OPENEVOLVE_CHECKOUT");
+        // The CI job that owns the checkout sets EVOLUTION_REQUIRE_OPENEVOLVE_SMOKE, so a lost or
+        // mistyped checkout fails there instead of passing with nothing run.
+        bool required = !string.IsNullOrEmpty(Environment.GetEnvironmentVariable("EVOLUTION_REQUIRE_OPENEVOLVE_SMOKE"));
         if (string.IsNullOrEmpty(checkout))
         {
+            Assert.False(required,
+                "EVOLUTION_REQUIRE_OPENEVOLVE_SMOKE is set but EVOLUTION_OPENEVOLVE_CHECKOUT is not, so the smoke did not run.");
             // No checkout, nothing to run. OpenEvolveExampleLedgerTests asserts the ledger's counts
-            // wherever this cannot run, so an early return here cannot hide a lost claim.
+            // wherever this cannot run.
             return;
         }
+        Assert.True(Directory.Exists(checkout), "EVOLUTION_OPENEVOLVE_CHECKOUT does not exist: " + checkout);
 
         if (OperatingSystem.IsWindows())
         {
+            Assert.False(required, "EVOLUTION_REQUIRE_OPENEVOLVE_SMOKE is set on Windows, where upstream's evaluator cannot run.");
             // Upstream's evaluator cannot run here, and the reason is upstream's: it writes a
             // wrapper script that embeds the program's absolute path into a single-quoted Python
             // literal, so a Windows path becomes an invalid escape -
@@ -134,15 +145,16 @@ public sealed class OpenEvolveExampleSmokeTests
             Assert.True(evaluations >= 1, example + ": the run completed no evaluations at all");
             Assert.True(model.Calls >= 1, "the run never asked the model for a proposal");
 
-            // The instrument check. Four evaluations would also be counted if the example's
-            // evaluator had failed on every candidate, because it returns combined_score 0.0 on
-            // error - so the seed's own score has to be positive for this to be evidence that
-            // upstream's evaluator really ran upstream's program.
+            // The instrument check, and its limit. The example's evaluator returns combined_score 0.0
+            // on error, so a positive best score shows that upstream's evaluator really ran upstream's
+            // seed program. The seed alone satisfies it: the run's result does not say whether a
+            // proposal was scored, and the stub's fixed answer is usually refused (see above), so this
+            // smoke claims the seed was evaluated and the model was asked - not that a proposal won.
             double best = result.RootElement.GetProperty("BestQuality").GetDouble();
             Assert.True(best > 0.0,
-                example + ": every candidate scored zero, so the example's evaluator did not actually "
-                + "run. Its seed scores above zero when run directly, so this is a regression in the "
-                + "run rather than a property of the example: " + run.Output);
+                example + ": the seed scored zero, so the example's evaluator did not actually run it. "
+                + "The seed scores above zero when run directly, so this is a regression in the run "
+                + "rather than a property of the example: " + run.Output);
             Assert.True(File.Exists(Path.Combine(output, "run.json")));
             Assert.True(File.Exists(Path.Combine(output, "openevolve-import.json")));
         }
@@ -153,59 +165,47 @@ public sealed class OpenEvolveExampleSmokeTests
     }
 
     /// <summary>
-    /// Rewrites only the three keys named in the class remarks, leaving every other line of the
-    /// example's config as upstream wrote it.
+    /// Rewrites only the three keys named in the class remarks - <c>llm.api_base</c>, every model name
+    /// under <c>llm</c>, and the top-level <c>diff_based_evolution</c> - and leaves every other key of
+    /// the example's config as upstream wrote it.
     /// </summary>
+    /// <remarks>
+    /// Edited as a YAML tree, not line by line: a line match also caught a <c>name:</c> under another
+    /// section, and could not tell a nested <c>diff_based_evolution</c> from the top-level key.
+    /// </remarks>
     private static string Redirect(string yaml, string endpoint)
     {
-        var rewritten = new List<string>();
-        foreach (string line in yaml.Replace("\r\n", "\n").Split('\n'))
+        var stream = new YamlStream();
+        stream.Load(new StringReader(yaml));
+        var root = (YamlMappingNode)stream.Documents[0].RootNode;
+        if (!root.Children.TryGetValue(new YamlScalarNode("llm"), out YamlNode? llmNode) || llmNode is not YamlMappingNode llm)
         {
-            // The key's own indentation is preserved rather than assumed. Writing a fixed two spaces
-            // moved a nested key to another level and produced a config PyYAML refused to read at
-            // all ("not valid YAML at line 29, column 7"), which looked like a missing interpreter.
-            string indent = line.Substring(0, line.Length - line.TrimStart().Length);
-            string trimmed = line.TrimStart();
-
-            if (trimmed.StartsWith("api_base:", StringComparison.Ordinal))
-            {
-                rewritten.Add(indent + "api_base: \"" + endpoint + "\"");
-                continue;
-            }
-
-            if (trimmed.StartsWith("primary_model:", StringComparison.Ordinal))
-            {
-                rewritten.Add(indent + "primary_model: \"fake-model\"");
-                continue;
-            }
-
-            if (trimmed.StartsWith("secondary_model:", StringComparison.Ordinal))
-            {
-                rewritten.Add(indent + "secondary_model: \"fake-model\"");
-                continue;
-            }
-
-            // A weighted model list names its own models, so each entry's name is redirected too;
-            // leaving one behind would send part of the run to a provider that is not there.
-            if (trimmed.StartsWith("- name:", StringComparison.Ordinal))
-            {
-                rewritten.Add(indent + "- name: \"fake-model\"");
-                continue;
-            }
-
-            if (trimmed.StartsWith("name:", StringComparison.Ordinal) && indent.Length > 0)
-            {
-                rewritten.Add(indent + "name: \"fake-model\"");
-                continue;
-            }
-
-            if (trimmed.StartsWith("diff_based_evolution:", StringComparison.Ordinal)) continue;
-
-            rewritten.Add(line);
+            throw new InvalidOperationException("The example's config has no llm section to redirect.");
         }
 
-        rewritten.Add("diff_based_evolution: false");
-        return string.Join("\n", rewritten);
-    }
-}
+        llm.Children[new YamlScalarNode("api_base")] = new YamlScalarNode(endpoint);
+        foreach (string key in new[] { "primary_model", "secondary_model" })
+        {
+            if (llm.Children.ContainsKey(new YamlScalarNode(key)))
+                llm.Children[new YamlScalarNode(key)] = new YamlScalarNode("fake-model");
+        }
+
+        // A weighted model list names its own models, so each entry's name is redirected too; leaving
+        // one behind would send part of the run to a provider that is not there.
+        foreach (string listKey in new[] { "models", "evaluator_models" })
+        {
+            if (!llm.Children.TryGetValue(new YamlScalarNode(listKey), out YamlNode? list) || list is not YamlSequenceNode models)
+                continue;
+            foreach (YamlNode entry in models)
+            {
+                if (entry is YamlMappingNode model && model.Children.ContainsKey(new YamlScalarNode("name")))
+                    model.Children[new YamlScalarNode("name")] = new YamlScalarNode("fake-model");
+            }
+        }
+
+        root.Children[new YamlScalarNode("diff_based_evolution")] = new YamlScalarNode("false");
+        using var writer = new StringWriter();
+        stream.Save(writer, assignAnchors: false);
+        return writer.ToString();
+    }}
 #endif

@@ -480,7 +480,9 @@ public sealed class OpenEvolveImportTests
             // And on stderr, where a reader looks first.
             Assert.Contains("the run produced no candidate", error, StringComparison.Ordinal);
             Assert.Contains("descriptor=ssim", error, StringComparison.Ordinal);
-            _ = code;
+            // A run that ends with no candidate still completes: it is not the all-model-calls-failed
+            // exit (ModelUnavailableExitCode), because the refusal comes before any proposal is asked for.
+            Assert.Equal(0, code);
         }
         finally
         {

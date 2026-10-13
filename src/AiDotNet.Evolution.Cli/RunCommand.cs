@@ -408,11 +408,13 @@ internal static class RunCommand
         if (best is null && result.RetainedFailures.Count > 0)
         {
             EvolutionDiagnostic first = result.RetainedFailures[0];
+            // Diagnostic text is producer-supplied: strip control characters (a newline would forge
+            // further log lines) and cap each value, so one diagnostic stays one bounded stderr line.
             string detail = first.IsRedacted || first.Data.Count == 0
                 ? string.Empty
-                : " (" + string.Join(", ", first.Data.Select(pair => pair.Key + "=" + pair.Value)) + ")";
+                : " (" + string.Join(", ", first.Data.Select(pair => ForStderr(pair.Key) + "=" + ForStderr(pair.Value))) + ")";
             error.WriteLine("error: the run produced no candidate. First retained failure ["
-                + first.Code + "]: " + (first.IsRedacted ? "<redacted>" : first.Message) + detail);
+                + ForStderr(first.Code) + "]: " + (first.IsRedacted ? "<redacted>" : ForStderr(first.Message)) + detail);
         }
 
         ProgramEvolutionLlmUsage usage = variation.GetUsage();
@@ -675,6 +677,21 @@ internal static class RunCommand
             if (!File.Exists(path)) return path;
         }
         throw new InvalidDataException(outputDirectory + " already holds 1000 trace sessions.");
+    }
+
+    private const int MaxStderrValueLength = 256;
+
+    // One bounded line for stderr: control characters become spaces and the text is capped.
+    internal static string ForStderr(string? text)
+    {
+        if (text is null || text.Length == 0) return string.Empty;
+        var clean = new StringBuilder(Math.Min(text.Length, MaxStderrValueLength + 1));
+        foreach (char c in text)
+        {
+            if (clean.Length == MaxStderrValueLength) return clean.Append('…').ToString();
+            clean.Append(char.IsControl(c) ? ' ' : c);
+        }
+        return clean.ToString();
     }
 
     internal static string Extension(ProgramLanguage language) => language switch
