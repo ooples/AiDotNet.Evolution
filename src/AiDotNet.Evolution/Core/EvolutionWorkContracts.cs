@@ -226,3 +226,19 @@ internal sealed class WorkerState
     public Dictionary<string, decimal> Capacity { get; set; } = new();
     public int MaximumConcurrentWork { get; set; }
 }
+
+/// <summary>One appended work-log record: what a single coordinator mutation changed (#119).</summary>
+/// <remarks>Work items and worker profiles are carried whole, so replay is an upsert by key and needs no knowledge of
+/// the operation that produced them. Ledger operations are carried in the same form the ledger snapshot stores, and
+/// <see cref="Settled"/> lists receipts in settlement order so the retained-receipt window replays exactly.
+/// Applying every record in order to the snapshot yields the state the old whole-state rewrite would have stored.</remarks>
+internal sealed class EvolutionWorkRecord
+{
+    public long LastUtcTicks { get; set; }
+    public string? SourceSessionId { get; set; }
+    public Dictionary<string, WorkItemState>? Work { get; set; }
+    public Dictionary<string, WorkerState>? Workers { get; set; }
+    public long Denied { get; set; }
+    public EvolutionResourceLedger.OperationState[]? Operations { get; set; }
+    public string[]? Settled { get; set; }
+}

@@ -131,13 +131,45 @@ outer journal checksum is valid.
 
 ## Storage boundary
 
-The store holds an exclusive `work.owner` handle. `work.current` contains a bounded UTF-8
-state with revision/length/checksum, written to a unique same-directory temporary file,
-flushed and atomically replaced. Resource and delivery state are one publication. An error
-around publication faults the live writer; dispose and reopen to discover which state won.
+The store holds an exclusive `work.owner` handle. It keeps two files:
+
+- `work.current` is a snapshot: a bounded UTF-8 state with revision/length/checksum, written
+  to a unique same-directory temporary file, flushed and atomically replaced.
+- `work.log` is an append-only record log. Each mutation (enqueue, claim, heartbeat renewal,
+  cancel, commit, session attach/acknowledgement) appends one checksummed record. The record
+  holds the work items, worker profiles and ledger operations that mutation changed. Its
+  size depends on that change, not on how much work is retained (#119).
+
+Resource and delivery changes from one mutation are one record. A call returns only after
+its record, and every earlier record, has been flushed to disk. Concurrent callers share a
+flush (group commit): the first waiter writes every buffered record with one write and one
+flush, and callers that arrive meanwhile are covered by the next flush. A read also waits
+until the state it read is on disk, so no caller is shown state that a crash could still
+erase. An error around a flush faults the live writer; dispose and reopen to discover which
+records won.
+
+Recovery reads the snapshot, then replays the log records newer than it, in order. The
+replayed state goes through the same validation as a snapshot. When the log reaches the
+larger of 1 MiB and the snapshot's size, the next mutation first folds it into a new
+snapshot and truncates the log. Rewriting therefore costs at most one snapshot byte per
+logged byte, and replay is bounded by about twice the state plus 1 MiB. A crash between
+the snapshot replace and the truncation leaves only records the snapshot already covers;
+recovery skips them.
+
+A process killed mid-write leaves a strict prefix of a batch. A trailing record with an
+incomplete header, or a valid header but missing bytes, was never flushed and so never
+acknowledged. Recovery truncates it. A complete record with a bad checksum, a damaged
+header, or a gap in sequence numbers is corruption and remains a hard failure.
+
+The owner marker records the store format: `AEVWORK1` for a snapshot-only store written
+before the log existed, `AEVWORK2` once a log may exist. An `AEVWORK1` store loads unchanged
+and is re-marked `AEVWORK2` before its first record is appended. Code that only knows
+`AEVWORK1` therefore refuses an upgraded store instead of reading the snapshot alone and
+silently losing acknowledged records. The state schema version below is a separate check.
+
 `HasTemporaryCleanupFailure` records a failure to remove that writer's unique temporary
-file without replacing the original publication exception. It is a per-instance diagnostic,
-not persisted state and not permission to delete current work or reset its budget.
+snapshot file without replacing the original publication exception. It is a per-instance
+diagnostic, not persisted state and not permission to delete current work or reset its budget.
 
 Missing, corrupt or incompatible current state is a hard failure. There is no newest-valid
 checkpoint fallback: an older snapshot could forget already dispatched work and charges.

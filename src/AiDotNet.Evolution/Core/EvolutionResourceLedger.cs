@@ -26,6 +26,7 @@ public sealed class EvolutionResourceLedger
     private long _denied;
     private long _unknown;
     private bool _maximumViolated;
+    private Savepoint? _savepoint;
 
     /// <summary>Creates a run-scoped ledger. All metered resource names must have explicit limits, including zero limits.</summary>
     public EvolutionResourceLedger(string runId, EvolutionResources limits, int retainedReceiptLimit = 1024,
@@ -80,6 +81,7 @@ public sealed class EvolutionResourceLedger
                 return null;
             }
             _operations.Add(operationId, new Operation(operationId, stage, attempt, estimated, maximum));
+            _savepoint?.Admitted.Add(operationId);
             StageTotals totals = StageFor(stage);
             totals.Admitted++;
             foreach (string key in Limits.Amounts.Keys) { _reserved[key] += maximum[key]; totals.Reserved[key] += maximum[key]; }
@@ -175,6 +177,11 @@ public sealed class EvolutionResourceLedger
             EvolutionResources charged = outcome == EvolutionResourceOutcome.Unknown ? operation.Maximum : actual;
             if (outcome == EvolutionResourceOutcome.Unknown && !onlyIfPending && !EqualAmounts(actual, operation.Maximum))
                 throw new ArgumentException("An unknown receipt must charge the reserved maximum.", nameof(actual));
+            if (_savepoint is { } savepoint)
+            {
+                savepoint.Receipts ??= _receipts.ToArray();
+                savepoint.Completed.Add(operationId);
+            }
             var receipt = new EvolutionResourceReceipt(operationId, operation.Stage, operation.Attempt,
                 operation.Estimated, operation.Maximum, charged, outcome);
             StageTotals totals = StageFor(operation.Stage);
@@ -211,21 +218,111 @@ public sealed class EvolutionResourceLedger
                 ConfigurationHash = ConfigurationHash,
                 Denied = _denied,
                 ReceiptOrder = _receipts.Select(receipt => receipt.OperationId).ToArray(),
-                Operations = _operations.Values.OrderBy(operation => operation.Id, StringComparer.Ordinal).Select(operation => new OperationState
-                {
-                    Id = operation.Id,
-                    Stage = operation.Stage,
-                    Attempt = operation.Attempt,
-                    Estimated = Copy(operation.Estimated.Amounts),
-                    Maximum = Copy(operation.Maximum.Amounts),
-                    Charged = operation.Receipt is { } receipt ? Copy(receipt.Charged.Amounts) : null,
-                    Outcome = operation.Receipt?.Outcome
-                }).ToArray()
+                Operations = _operations.Values.OrderBy(operation => operation.Id, StringComparer.Ordinal).Select(ToState).ToArray()
             };
             string json = JsonSerializer.Serialize(state, EvolutionWorkJsonContext.Default.ResourceLedgerState);
             if (json.Length > 64 * 1024 * 1024) throw new InvalidOperationException("Resource checkpoint exceeds 64 MiB.");
             return json;
         }
+    }
+
+    private static OperationState ToState(Operation operation) => new()
+    {
+        Id = operation.Id,
+        Stage = operation.Stage,
+        Attempt = operation.Attempt,
+        Estimated = Copy(operation.Estimated.Amounts),
+        Maximum = Copy(operation.Maximum.Amounts),
+        Charged = operation.Receipt is { } receipt ? Copy(receipt.Charged.Amounts) : null,
+        Outcome = operation.Receipt?.Outcome
+    };
+
+    /// <summary>The persisted form of one operation, exactly as <see cref="CaptureState"/> records it.</summary>
+    internal OperationState CaptureOperation(string operationId)
+    {
+        lock (_sync) return ToState(_operations[operationId]);
+    }
+
+    /// <summary>The denial counter, exactly as <see cref="CaptureState"/> records it.</summary>
+    internal long DeniedCount { get { lock (_sync) return _denied; } }
+
+    /// <summary>Starts recording changes so they can be undone exactly, decimal scale included.</summary>
+    /// <remarks>The durable work coordinator mutates its live ledger in place and must undo a mutation whose
+    /// publication is refused (for example by the state byte bound). Undoing by arithmetic would not restore a
+    /// decimal's scale (0 + 0.10 - 0.10 is 0.00, not 0), so the savepoint keeps the prior totals themselves.</remarks>
+    internal Savepoint BeginSavepoint()
+    {
+        lock (_sync)
+        {
+            if (_savepoint is not null) throw new InvalidOperationException("A ledger savepoint is already open.");
+            _savepoint = new Savepoint(this);
+            return _savepoint;
+        }
+    }
+
+    /// <summary>Keeps every change since <see cref="BeginSavepoint"/> and returns the operations they touched.</summary>
+    internal Savepoint EndSavepoint()
+    {
+        lock (_sync)
+        {
+            Savepoint savepoint = _savepoint ?? throw new InvalidOperationException("No ledger savepoint is open.");
+            _savepoint = null;
+            return savepoint;
+        }
+    }
+
+    /// <summary>Undoes every change since <see cref="BeginSavepoint"/>.</summary>
+    internal void RollbackSavepoint()
+    {
+        lock (_sync)
+        {
+            Savepoint savepoint = _savepoint ?? throw new InvalidOperationException("No ledger savepoint is open.");
+            _savepoint = null;
+            foreach (string id in savepoint.Completed)
+                if (_operations.TryGetValue(id, out Operation? operation)) operation.Receipt = null;
+            foreach (string id in savepoint.Admitted) _operations.Remove(id);
+            foreach (string key in Limits.Amounts.Keys) { _spent[key] = savepoint.Spent[key]; _reserved[key] = savepoint.Reserved[key]; }
+            foreach (EvolutionResourceStage stage in _stages.Keys.Where(stage => !savepoint.Stages.ContainsKey(stage)).ToArray())
+                _stages.Remove(stage);
+            foreach (KeyValuePair<EvolutionResourceStage, StageTotals> pair in savepoint.Stages)
+            {
+                StageTotals live = _stages[pair.Key];
+                foreach (string key in Limits.Amounts.Keys) { live.Spent[key] = pair.Value.Spent[key]; live.Reserved[key] = pair.Value.Reserved[key]; }
+                live.Admitted = pair.Value.Admitted; live.Settled = pair.Value.Settled; live.Unknown = pair.Value.Unknown;
+            }
+            if (savepoint.Receipts is not null)
+            {
+                _receipts.Clear();
+                foreach (EvolutionResourceReceipt receipt in savepoint.Receipts) _receipts.Enqueue(receipt);
+            }
+            _settled = savepoint.Settled; _denied = savepoint.Denied; _unknown = savepoint.Unknown;
+            _maximumViolated = savepoint.MaximumViolated;
+        }
+    }
+
+    /// <summary>Totals before a coordinator mutation, and the operations it admitted and settled, in order.</summary>
+    internal sealed class Savepoint
+    {
+        internal Savepoint(EvolutionResourceLedger ledger)
+        {
+            Spent = new Dictionary<string, decimal>(ledger._spent, StringComparer.Ordinal);
+            Reserved = new Dictionary<string, decimal>(ledger._reserved, StringComparer.Ordinal);
+            Stages = ledger._stages.ToDictionary(pair => pair.Key, pair => pair.Value.Clone());
+            Settled = ledger._settled; Denied = ledger._denied; Unknown = ledger._unknown; MaximumViolated = ledger._maximumViolated;
+        }
+
+        internal Dictionary<string, decimal> Spent { get; }
+        internal Dictionary<string, decimal> Reserved { get; }
+        internal Dictionary<EvolutionResourceStage, StageTotals> Stages { get; }
+        internal EvolutionResourceReceipt[]? Receipts { get; set; }
+        internal long Settled { get; }
+        internal long Denied { get; }
+        internal long Unknown { get; }
+        internal bool MaximumViolated { get; }
+        /// <summary>Operations admitted since the savepoint, in admission order.</summary>
+        internal List<string> Admitted { get; } = new();
+        /// <summary>Operations settled since the savepoint, in settlement (receipt) order.</summary>
+        internal List<string> Completed { get; } = new();
     }
 
     /// <summary>Transactionally restores into a fresh ledger with matching run/schema. Current caps remain authoritative.</summary>
@@ -307,13 +404,21 @@ public sealed class EvolutionResourceLedger
     /// the operation count -- measured at 10 ms per call at 50,000 operations, under this ledger's global lock,
     /// against 0.003 ms before the per-stage breakdown existed. They are therefore maintained as work is admitted
     /// and settled, which is the only place either can change.</summary>
-    private sealed class StageTotals
+    internal sealed class StageTotals
     {
         public Dictionary<string, decimal> Spent { get; } = new(StringComparer.Ordinal);
         public Dictionary<string, decimal> Reserved { get; } = new(StringComparer.Ordinal);
         public long Admitted;
         public long Settled;
         public long Unknown;
+
+        public StageTotals Clone()
+        {
+            var copy = new StageTotals { Admitted = Admitted, Settled = Settled, Unknown = Unknown };
+            foreach (KeyValuePair<string, decimal> pair in Spent) copy.Spent.Add(pair.Key, pair.Value);
+            foreach (KeyValuePair<string, decimal> pair in Reserved) copy.Reserved.Add(pair.Key, pair.Value);
+            return copy;
+        }
     }
 
     private StageTotals StageFor(EvolutionResourceStage stage)
