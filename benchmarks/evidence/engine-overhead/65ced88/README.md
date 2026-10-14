@@ -64,11 +64,29 @@ Peak working set is now flat in the worker count and **below the target at every
 
 ## Reproducing
 
-```
+The committed driver for the full head-to-head is
+[`benchmarks/external/run_overhead_head_to_head.py`](../../../external/run_overhead_head_to_head.py); it needs
+`--upstream <pinned OpenEvolve checkout>` because it measures both systems and bootstraps the paired ratio.
+This run did **not** use it: the pinned checkout on this machine could not import OpenEvolve
+(`ModuleNotFoundError: dacite`), and installing upstream's dependency set is a separate step. So our side was
+measured with the loop below, which is the same per-run command the driver issues for `aidotnet`, and the
+OpenEvolve column stayed carried. Re-running the driver once the checkout's dependencies are installed is
+what would replace the carried column with a paired measurement.
+
+```powershell
 dotnet build benchmarks/EvolutionOverhead/EvolutionOverhead.csproj -c Release -f net10.0
-# one run per (workers, repeat, n); n = 8000 and 16000, workers = 1 2 4 8 16, 9 repeats
-dotnet benchmarks/EvolutionOverhead/bin/Release/net10.0/EvolutionOverhead.dll 16000 16 1
+$dll = "benchmarks\EvolutionOverheadin\Release
+et10.0\EvolutionOverhead.dll"
+foreach ($w in 1,2,4,8,16) { foreach ($r in 0..8) { foreach ($n in 8000,16000) {
+  $j = dotnet $dll $n $w 1
+  if ($LASTEXITCODE -ne 0) { throw "run failed: workers=$w repeat=$r n=$n" }
+  ($j | ConvertFrom-Json) | ConvertTo-Json -Compress | Add-Content rows.jsonl
+} } }
 ```
 
 Each run prints one JSON object with `Evaluations` (completed, not requested), `Seconds`,
-`PeakWorkingSetBytes` and `AllocatedBytes`.
+`PeakWorkingSetBytes` and `AllocatedBytes`, and exits non-zero if the completed count falls short of the
+budget, which is what `evaluations_verified` in `head-to-head.json` records. The per-worker medians,
+the min-max ranges and the 10,000-draw percentile bootstrap of the timing median (seed 20261014) are then
+computed over the nine `(small, large)` pairs per worker count; `rows` in `head-to-head.json` carries every
+pair, so any reported figure can be recomputed from it without re-running anything.

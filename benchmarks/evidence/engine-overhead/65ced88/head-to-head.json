@@ -1,5 +1,9 @@
 {
  "story": "V1-70 #175 (our column re-measured at main 65ced88; rerun of the 5699058 run)",
+ "commit": "65ced88",
+ "build": "dotnet build benchmarks/EvolutionOverhead/EvolutionOverhead.csproj -c Release -f net10.0 (.NET SDK 10.0.402)",
+ "command": "per run: dotnet benchmarks/EvolutionOverhead/bin/Release/net10.0/EvolutionOverhead.dll <n> <workers> 1, looped over n in {8000,16000}, workers in {1,2,4,8,16} and 9 repeats; see the README for the loop verbatim",
+ "evaluations_verified": "every run exited 0, which the harness returns only when its completed evaluations reach the requested budget, and each row carries the completed count the run reported (rows[].small.Evaluations and rows[].large.Evaluations)",
  "supersedes": "../5699058/head-to-head.json (for the aidotnet column only)",
  "machine": "AMD Ryzen 9 3950X (16 cores / 32 threads), 64 GB RAM, Windows 11 Pro 10.0.26220, .NET SDK 10.0.402, Release",
  "method": "Timing: (T(2N)-T(N))/(completed evaluations in the 2N run minus the N run), which cancels startup. Allocation, two figures per repeat: whole-run is large.AllocatedBytes / large.Evaluations, and steady-state uses the same difference as the timing, (large.AllocatedBytes - small.AllocatedBytes) / (large.Evaluations - small.Evaluations). Fresh process per run, null variation and null evaluator in-process, islands=1. N=8000. 9 repeats per worker count. Each per-worker summary figure is the median of its 9 per-repeat values; the timing CI is a 10,000-draw percentile bootstrap of the timing median (seed 20261014).",
