@@ -55,7 +55,7 @@ the same version.
 **Crediting stays with the caller**, and `ProgramInstructionCreditObserver` is the caller you want
 unless you have a reason to write your own. The operator supplies proposals and never sees outcomes,
 so somebody has to call `Observe(generation, quality)` after each evaluation - and `Abandon` for a
-proposal whose outcome will never arrive. Without that, instructions are proposed, used and never
+proposal whose outcome will never arrive. Without that, instructions are proposed, used, and never
 judged: the archive's scores stay empty and selection has nothing to prefer, which makes the feature
 inert rather than broken.
 
@@ -70,10 +70,18 @@ var variation = new LlmProgramVariationOperator(chatClient, programOptions, new 
     Mode = ProgramEvolutionMode.FullRewrite,
     InstructionSource = credit
 });
-var engine = new EvolutionEngine<ProgramGenome>(task, variation, archiveFactory, options, observer: credit);
+
+// The engine takes one observer, so compose when you also want a trace:
+var engine = new EvolutionEngine<ProgramGenome>(task, variation, archiveFactory, options,
+    observer: new CompositeEvolutionObserver<ProgramGenome>(
+        new IEvolutionObserver<ProgramGenome>[] { tracer, credit }));
 ```
 
-Two of its behaviours are worth knowing, because the alternatives look equivalent:
+`CompositeEvolutionObserver<TGenome>` isolates one observer's failure from the other, matching the
+engine's own policy: a trace problem must not cost a credit. It refuses the same observer twice,
+because a repeated observer would double whatever it counts.
+
+Two behaviours of the credit observer are worth knowing, because the alternatives look equivalent:
 
 - It credits **only** generations it actually routed. The engine evaluates seed candidates that no
   proposal produced, and `Observe` refuses a generation it never routed, so "anything past generation

@@ -1,4 +1,5 @@
 #if NET8_0_OR_GREATER
+using System.Globalization;
 using System.Text.Json;
 using AiDotNet.Evolution.Cli;
 using AiDotNet.Evolution.Programs;
@@ -584,6 +585,80 @@ public sealed class OpenEvolveImportTests
         {
             Environment.SetEnvironmentVariable("OPENAI_API_KEY", previousKey);
         }
+    }
+
+    [Fact]
+    public void A_run_file_can_switch_on_instruction_evolution_and_the_instructions_reach_the_prompt()
+    {
+        // The feature shipped with no way to reach it: RunCommand had no run-file field, so meta-prompt
+        // evolution could not be switched on through `aidotnet-evolve run` at all. This drives the whole
+        // path - run file, evolver, credit observer, prompt - with a stub model and no spend.
+        using var directory = new TemporaryDirectory();
+        using var model = new CliRunTests.FakeChatModel();
+        File.WriteAllText(Path.Combine(directory.Path, "initial_program.py"), "X = 0\n");
+        File.WriteAllText(Path.Combine(directory.Path, "evaluator.py"),
+            "import json, sys\ndef evaluate(source):\n    return {\"quality\": 0.5}\nprint(json.dumps(evaluate(sys.stdin.read())))\n");
+        string output = Path.Combine(directory.Path, "out");
+        var run = new
+        {
+            schema = "aidotnet-evolve-run-v1",
+            runId = "meta-prompt-cli",
+            initialProgram = Path.Combine(directory.Path, "initial_program.py"),
+            evaluator = Path.Combine(directory.Path, "evaluator.py"),
+            output,
+            model = new { provider = "OpenAiCompatible", endpoint = model.Endpoint, name = "fake-model" },
+            budget = new { maxEvaluations = 3, seed = 7, parallelism = 1 },
+            metaPrompt = new { seedInstruction = "Keep the program short and correct.", proposeEveryGenerations = 1 }
+        };
+        string runFile = Path.Combine(directory.Path, "run.json");
+        File.WriteAllText(runFile, JsonSerializer.Serialize(run));
+
+        string? previousKey = Environment.GetEnvironmentVariable("OPENAI_API_KEY");
+        Environment.SetEnvironmentVariable("OPENAI_API_KEY", "unused-by-the-fake");
+        try
+        {
+            var (code, stdout, error) = CliRunTests.Run("run", runFile);
+
+            Assert.True(code == 0, error);
+            using JsonDocument result = JsonDocument.Parse(stdout);
+            Assert.True(result.RootElement.GetProperty("CompletedEvaluations").GetInt64() >= 1, stdout);
+            Assert.True(result.RootElement.GetProperty("ModelUsage").GetProperty("Proposals").GetInt64() >= 1, stdout);
+        }
+        finally
+        {
+            Environment.SetEnvironmentVariable("OPENAI_API_KEY", previousKey);
+        }
+    }
+
+    [Fact]
+    public void An_invalid_meta_prompt_section_is_refused_by_name_rather_than_ignored()
+    {
+        // Proves the section is parsed, mapped onto ProgramMetaPromptOptions and validated, rather than
+        // accepted and dropped: an unreadable value has to come back named. A run that merely completes
+        // cannot distinguish "the section was honoured" from "the section was ignored".
+        using var directory = new TemporaryDirectory();
+        File.WriteAllText(Path.Combine(directory.Path, "initial_program.py"), "X = 0\n");
+        File.WriteAllText(Path.Combine(directory.Path, "evaluator.py"),
+            "import json, sys\n"
+            + "print(json.dumps({\"quality\": 0.5}))  # evaluate\n");
+        var run = new
+        {
+            schema = "aidotnet-evolve-run-v1",
+            runId = "meta-prompt-invalid",
+            initialProgram = Path.Combine(directory.Path, "initial_program.py"),
+            evaluator = Path.Combine(directory.Path, "evaluator.py"),
+            output = Path.Combine(directory.Path, "out"),
+            model = new { provider = "OpenAiCompatible", endpoint = "http://127.0.0.1:1/v1", name = "fake-model" },
+            budget = new { maxEvaluations = 2, seed = 7, parallelism = 1 },
+            metaPrompt = new { seedInstruction = "Keep it short.", explorationProbability = 2.5 }
+        };
+        string runFile = Path.Combine(directory.Path, "run.json");
+        File.WriteAllText(runFile, JsonSerializer.Serialize(run));
+
+        var (code, _, error) = CliRunTests.Run("run", runFile);
+
+        Assert.NotEqual(0, code);
+        Assert.Contains("ExplorationProbability", error, StringComparison.Ordinal);
     }
 
     private static OpenEvolveImport Import(TemporaryDirectory directory, string yaml, string? python = null)

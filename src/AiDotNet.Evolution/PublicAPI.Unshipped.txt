@@ -28,6 +28,10 @@ AiDotNet.Evolution.AdaptiveVariationPortfolio<TGenome>.ProposeAsync(AiDotNet.Evo
 AiDotNet.Evolution.AdaptiveVariationPortfolio<TGenome>.RestoreState(string! state) -> void
 AiDotNet.Evolution.AdaptiveVariationPortfolio<TGenome>.Statistics.get -> System.Collections.Generic.IReadOnlyList<AiDotNet.Evolution.EvolutionOperatorStatistics!>!
 AiDotNet.Evolution.AdaptiveVariationPortfolio<TGenome>.VersionHash.get -> string!
+AiDotNet.Evolution.CompositeEvolutionObserver<TGenome>
+AiDotNet.Evolution.CompositeEvolutionObserver<TGenome>.CompositeEvolutionObserver(System.Collections.Generic.IEnumerable<AiDotNet.Evolution.IEvolutionObserver<TGenome>!>! observers) -> void
+AiDotNet.Evolution.CompositeEvolutionObserver<TGenome>.Count.get -> int
+AiDotNet.Evolution.CompositeEvolutionObserver<TGenome>.OnEventAsync(AiDotNet.Evolution.EvolutionEvent<TGenome>! evolutionEvent, System.Threading.CancellationToken cancellationToken = default(System.Threading.CancellationToken)) -> System.Threading.Tasks.ValueTask
 AiDotNet.Evolution.CuriosityEvolutionSelectionPolicy<TGenome>
 AiDotNet.Evolution.CuriosityEvolutionSelectionPolicy<TGenome>.CaptureState() -> string!
 AiDotNet.Evolution.CuriosityEvolutionSelectionPolicy<TGenome>.CuriosityEvolutionSelectionPolicy() -> void

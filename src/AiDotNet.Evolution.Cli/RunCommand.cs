@@ -43,6 +43,40 @@ internal sealed class RunFile
     public RunSearch Search { get; init; } = new();
     /// <summary>How an unmodified OpenEvolve evaluator is run; <c>null</c> when <see cref="Evaluator"/> follows this CLI's contract.</summary>
     public RunOpenEvolveEvaluator? OpenEvolveEvaluator { get; init; }
+    /// <summary>Evolving the system instruction alongside the programs (AlphaEvolve's meta-prompt component).</summary>
+    /// <remarks>
+    /// <c>null</c> keeps a fixed instruction, which is what OpenEvolve does: its <c>use_meta_prompting</c> and
+    /// <c>meta_prompt_weight</c> exist and its own config comment says "not implemented".
+    /// </remarks>
+    public RunMetaPrompt? MetaPrompt { get; init; }
+}
+
+/// <summary>Instruction evolution: candidate system instructions, scored by the programs they produce.</summary>
+/// <remarks>
+/// The instructions are credited from the run's own outcomes, so an instruction that produces programs which
+/// fail is scored as the worst outcome rather than left unscored. The archive, its lineage and the selection
+/// all restore from a checkpoint with the rest of the run.
+/// </remarks>
+internal sealed class RunMetaPrompt
+{
+    /// <summary>The instruction the run starts from; required, because an evolver needs something to vary.</summary>
+    public required string SeedInstruction { get; init; }
+    /// <summary>Generations between instruction proposals (OpenEvolve has no equivalent cadence key).</summary>
+    public int ProposeEveryGenerations { get; init; } = 25;
+    /// <summary>Instructions kept at once; the worst is evicted, never one awaiting an outcome.</summary>
+    public int MaxArchiveSize { get; init; } = 8;
+    /// <summary>How the next proposal's instruction is drawn from the archive.</summary>
+    public ProgramInstructionSelection Selection { get; init; } = ProgramInstructionSelection.EpsilonGreedy;
+    /// <summary>Chance of drawing an instruction other than the best one.</summary>
+    public double ExplorationProbability { get; init; } = 0.2;
+    /// <summary>Longest instruction accepted from the model.</summary>
+    public int MaxInstructionChars { get; init; } = 4_000;
+    /// <summary>Cost charged to the run's ledger per dispatched instruction proposal.</summary>
+    public decimal ProposalCostUnits { get; init; } = 1m;
+    /// <summary>Metric prefix for the instruction archive's cost descriptors.</summary>
+    public string MetricPrefix { get; init; } = "meta_prompt_";
+    /// <summary>The models that propose instructions; empty uses the proposal models.</summary>
+    public List<RunModel> Models { get; init; } = new();
 }
 
 /// <summary>Prompt settings mapped onto <see cref="ProgramEvolutionPromptOptions"/>; null leaves each at its default.</summary>
@@ -282,6 +316,31 @@ internal static class RunCommand
             MaxOutputTokens = run.Model.MaxOutputTokens
         };
         if (run.Search.TopPrograms is int topPrograms) variationOptions.MaxTopPrograms = topPrograms;
+        // Instruction evolution, when configured. The observer is both halves: the operator's instruction
+        // source and the engine's outcome listener, because an instruction can only be scored by what the
+        // programs it produced achieved - see ProgramInstructionCreditObserver.
+        ProgramInstructionCreditObserver? instructions = null;
+        if (run.MetaPrompt is { } meta)
+        {
+            IProgramChatClient instructionModel = meta.Models.Count == 0
+                ? CreateModels(new[] { run.Model }.Concat(run.AdditionalModels).ToList(), baseDirectory)
+                : CreateModels(meta.Models, baseDirectory);
+            var evolver = new ProgramMetaPromptEvolver(instructionModel, meta.SeedInstruction, new ProgramMetaPromptOptions
+            {
+                Enabled = true,
+                ProposeEveryGenerations = meta.ProposeEveryGenerations,
+                MaxArchiveSize = meta.MaxArchiveSize,
+                Selection = meta.Selection,
+                ExplorationProbability = meta.ExplorationProbability,
+                MaxInstructionChars = meta.MaxInstructionChars,
+                ProposalCostUnits = meta.ProposalCostUnits,
+                MetricPrefix = meta.MetricPrefix,
+                Direction = run.Direction
+            });
+            instructions = new ProgramInstructionCreditObserver(evolver);
+            variationOptions.InstructionSource = instructions;
+        }
+
         var variation = new LlmProgramVariationOperator(model, programOptions, variationOptions);
         // Program length stands for OpenEvolve's built-in "complexity" axis. Configured descriptors replace it, as
         // OpenEvolve's feature_dimensions replace its defaults; "length" among them keeps it.
@@ -367,7 +426,13 @@ internal static class RunCommand
         using (var tracer = new EvolutionTraceObserver<ProgramGenome>(new EvolutionTraceOptions { Enabled = true, Path = tracePath }, run.RunId, descriptors))
         {
             var engine = new EvolutionEngine<ProgramGenome>(task, variation, _ => new MapElitesArchive<ProgramGenome>(descriptors, capacity: capacity), options,
-                observer: tracer, checkpointStore: checkpoints, genomeCodec: codec);
+                // The engine takes one observer, and a judged run needs two: the trace writer, and the
+                // instruction credit that feeds outcomes back into the search. A composite isolates one
+                // observer's failure from the other rather than letting a trace problem cost a credit.
+                observer: instructions is null
+                    ? tracer
+                    : new CompositeEvolutionObserver<ProgramGenome>(new IEvolutionObserver<ProgramGenome>[] { tracer, instructions }),
+                checkpointStore: checkpoints, genomeCodec: codec);
             interrupt.Attach(engine.RequestStop);
             try
             {
