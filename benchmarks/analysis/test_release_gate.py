@@ -287,5 +287,25 @@ class ReleaseGateTests(unittest.TestCase):
             fixture.assess()
 
 
+class MainAlwaysWritesAnAssessmentTests(unittest.TestCase):
+    """An unexpected exception must still leave a parseable invalid-evidence assessment (#240 review)."""
+
+    def test_unexpected_exception_writes_invalid_evidence_and_exits_non_zero(self):
+        import sys
+        from unittest import mock
+
+        with tempfile.TemporaryDirectory() as temporary:
+            output = Path(temporary) / "release-evidence.json"
+            argv = ["release_gate.py", "--release", temporary, "--version", "0.4.0", "--output", str(output)]
+            with mock.patch.object(rg, "release", side_effect=OverflowError("int too large to convert to float")), \
+                    mock.patch.object(sys, "argv", argv), mock.patch("builtins.print"):
+                with self.assertRaises(SystemExit) as exit_:
+                    rg.main()
+            self.assertEqual(1, exit_.exception.code)
+            assessment = json.loads(output.read_text(encoding="utf-8"))
+            self.assertEqual("invalid-evidence", assessment["status"])
+            self.assertFalse(assessment["eligible"])
+            self.assertIn("OverflowError", assessment["error"])
+
 if __name__ == "__main__":
     unittest.main()

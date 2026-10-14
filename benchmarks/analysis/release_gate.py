@@ -304,7 +304,11 @@ def main():
     with args.output.open("x", encoding="utf-8", newline="\n") as output:
         try:
             assessment = release(args.release, args.repository, args.version)
-        except (ValueError, KeyError, TypeError, OSError) as error:
+        # ANY failure is an assessment, never an empty file: a crafted bundle can raise more than the expected four
+        # (OverflowError from a huge ratio, ZeroDivisionError from analyze), and an uncaught one left the published
+        # release-evidence.json empty. The gate still fails closed; now it also says why.
+        except Exception as error:  # noqa: BLE001 -- recorded in the assessment, and the exit code is non-zero
+
             assessment = dict(schema=ASSESSMENT_SCHEMA, version=args.version, eligible=False, status="invalid-evidence",
                               error=f"{type(error).__name__}: {error}")
         json.dump(assessment, output, indent=2, allow_nan=False)
