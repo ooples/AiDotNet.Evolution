@@ -79,6 +79,23 @@ internal sealed class RunLlmFeedback
     public double Weight { get; init; } = 0.1;
     /// <summary>The judging models (OpenEvolve's <c>llm.evaluator_models</c>); empty uses the proposal models.</summary>
     public List<RunModel> Models { get; init; } = new();
+    /// <summary>What the judge scores; empty keeps the default rubric.</summary>
+    /// <remarks>
+    /// <para>
+    /// The rubric is the lever that matters most, and it was not reachable from a run file. Measured on a
+    /// task where a program can score perfectly by storing the examples it was shown: under the default
+    /// rubric the gap between a documented lookup table and an honest attempt is 0.083, and under a rubric
+    /// with one criterion naming generality it is 0.310. The default rubric has no axis on which memorising
+    /// looks bad - `readability` scores 0.60 for both - so nothing in it can penalise the shape.
+    /// </para>
+    /// <para>
+    /// Each name becomes a JSON field the judge is asked to fill and a metric on the result, so names must
+    /// differ once lowercased and stripped. OpenEvolve has no equivalent key; its judge rubric is fixed.
+    /// </para>
+    /// </remarks>
+    public List<string> Criteria { get; init; } = new();
+    /// <summary>Prefix for the judge's metrics on each result; empty keeps the default.</summary>
+    public string? MetricPrefix { get; init; }
 }
 
 /// <summary>Search settings OpenEvolve exposes under <c>database</c>, <c>prompt</c> and the top level.</summary>
@@ -293,9 +310,16 @@ internal static class RunCommand
             ProgramEvolutionPromptOptions judgePrompt = programOptions.Prompt.Clone();
             if (judgePrompt.TaskDescription is null && programOptions.TaskDescription is { } judged && judged.Trim().Length > 0)
                 judgePrompt.TaskDescription = judged;
+            var feedbackOptions = new LlmFeedbackOptions { Enabled = true, Weight = feedback.Weight };
+            if (feedback.Criteria.Count > 0)
+            {
+                feedbackOptions.Criteria.Clear();
+                foreach (string criterion in feedback.Criteria) feedbackOptions.Criteria.Add(criterion);
+            }
+
+            if (feedback.MetricPrefix is { } prefix) feedbackOptions.MetricPrefix = prefix;
             fitness = new LlmJudgeProgramFitnessEvaluator(judge, fitness,
-                new ProgramPromptBuilder(judgePrompt, programOptions),
-                new LlmFeedbackOptions { Enabled = true, Weight = feedback.Weight });
+                new ProgramPromptBuilder(judgePrompt, programOptions), feedbackOptions);
         }
         var task = new ProgramEvolutionTask(fitness, new ProgramDescriptorSet(new[] { new ProgramLengthDescriptor() }), programOptions);
         var variationOptions = new LlmProgramVariationOptions
