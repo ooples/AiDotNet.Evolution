@@ -192,6 +192,29 @@ def parse_rubrics(entries):
     return rubrics
 
 
+def build_arms(weights, rubrics):
+    """The control arm plus one (name, weight, criteria) per weight x rubric, with distinct names.
+
+    The name is the row key AND the working directory, so two arms sharing one is not a cosmetic
+    collision: the second arm clears the first's directory, and ``by_pair[seed][arm] = row`` then
+    overwrites the first's row, so an arm that was run and paid for disappears from the analysis with
+    nothing in the output saying so. ``--weights 0.3,0.30`` is enough to cause it - both format as
+    ``0.3`` - and so is the same rubric name twice.
+    """
+    arms = [("off", None, None)]
+    for weight in weights:
+        for name, criteria in rubrics:
+            arms.append(("on-w%g%s" % (weight, ("-" + name) if name else ""), weight, criteria))
+    names = [arm for arm, _, _ in arms]
+    duplicates = sorted({name for name in names if names.count(name) > 1})
+    if duplicates:
+        raise SystemExit(
+            "arms would share the name(s) %s, so one arm's result would be scored as another's. Give each "
+            "weight and each rubric name once: --weights 0.3,0.30 collide because both format as 0.3."
+            % ", ".join(duplicates))
+    return arms
+
+
 def main(argv=None):
     parser = argparse.ArgumentParser(description=__doc__.splitlines()[0])
     parser.add_argument("--cli", required=True, help="the built aidotnet-evolve executable")

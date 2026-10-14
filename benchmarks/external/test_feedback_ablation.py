@@ -113,6 +113,28 @@ class TheArmsDifferInExactlyOneKey(unittest.TestCase):
             with self.assertRaises(SystemExit):
                 fa.parse_rubrics([bad])
 
+    def test_two_arms_cannot_share_a_name_because_the_name_is_the_row_key(self):
+        # The arm name is both the working directory and the key in by_pair, so a collision is not
+        # cosmetic: the second arm clears the first's directory and then overwrites its row, so an arm that
+        # was run and paid for vanishes from the analysis with nothing in the output saying so. Measured:
+        # two rows with one arm name reduce to one row, keeping the LAST.
+        rows = [{"seed": 0, "arm": "on-w0.3", "heldout_accuracy": 0.0},
+                {"seed": 0, "arm": "on-w0.3", "heldout_accuracy": 0.5}]
+        kept = {}
+        for row in rows:
+            kept.setdefault(row["seed"], {})[row["arm"]] = row
+        self.assertEqual(1, sum(len(arms) for arms in kept.values()))
+
+        # --weights 0.3,0.30: both format as 0.3 under %g.
+        with self.assertRaises(SystemExit):
+            fa.build_arms([0.3, 0.30], [("general", ["a"])])
+        # The same rubric name twice does it as well.
+        with self.assertRaises(SystemExit):
+            fa.build_arms([0.3], [("a", ["x"]), ("a", ["y"])])
+        # Distinct weights and names are untouched, control arm first.
+        self.assertEqual(["off", "on-w0.3-general", "on-w0.95-general"],
+                         [arm for arm, _, _ in fa.build_arms([0.3, 0.95], [("general", ["a"])])])
+
     def test_no_rubric_argument_keeps_the_single_shipped_arm(self):
         self.assertEqual([("", None)], fa.parse_rubrics([]))
         self.assertEqual([("", None)], fa.parse_rubrics(None))
