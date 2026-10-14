@@ -85,15 +85,20 @@ Two behaviours of the credit observer are worth knowing, because the alternative
 - It credits **only** generations it actually routed. The engine evaluates seed candidates that no
   proposal produced, and `Observe` refuses a generation it never routed, so "anything past generation
   zero" would throw on the seed's own evaluation.
-- A **failed** evaluation is credited rather than skipped, at a value that depends on the direction you
-  pass it. Skipping would let an instruction whose programs never parse keep a clean record and stay
-  selectable - but a fixed `0.0` would be worse when minimizing, because the evolver negates quality there
-  and `-0.0` beats every real positive cost. Maximizing credits `0.0`; minimizing credits the worst cost the
-  run has actually observed. **Pass the same direction as the evolver's options**, or a failure can outrank
-  a program that ran.
+- A **failed** evaluation earns no score. It releases its route and is counted in `FailedOutcomes`
+  instead, because any stand-in value competes with the real ones and whichever is chosen can beat a
+  measured outcome: `0.0` beats every positive cost when minimizing, where the evolver negates quality,
+  and beats every negative quality when maximizing. A stream of credits is never revised, so an early
+  stand-in stays in the mean for the rest of the run.
 
-If a run proposes instructions and `CreditedOutcomes` stays zero, the wiring is wrong rather than the
-feature ineffective - which is worth being able to tell apart.
+  Leaving it unscored is only safe because selection treats **untried**, not unscored, as unexplored: an
+  instruction whose outcomes all failed is not drawn ahead of every instruction that works, and it is the
+  first evicted when the archive is full. What it does **not** do is rank by failure rate - an instruction
+  that fails nine times in ten is ranked on the one measurement it has. `FailedOutcomes` is reported
+  because the archive cannot show it.
+
+If a run proposes instructions and both `CreditedOutcomes` and `FailedOutcomes` stay zero, the wiring is
+wrong rather than the feature ineffective - which is worth being able to tell apart.
 
 ## What scores an instruction
 

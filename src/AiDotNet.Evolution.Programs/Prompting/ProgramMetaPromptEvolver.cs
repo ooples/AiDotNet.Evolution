@@ -495,10 +495,12 @@ public sealed class ProgramMetaPromptEvolver : IProgramInstructionSource
         if (_options.Selection == ProgramInstructionSelection.Uniform)
             return _archive[random.NextInt(_archive.Count)];
 
-        // An unscored instruction is unexplored, not bad: a freshly proposed instruction is tried
-        // before any scored one, so an incumbent that leads early cannot starve it.
-        List<ProgramInstructionCandidate> unscored = _archive.Where(candidate => candidate.Scored == 0).ToList();
-        if (unscored.Count > 0) return unscored[random.NextInt(unscored.Count)];
+        // An untried instruction is unexplored, not bad: a freshly proposed instruction is tried before any
+        // scored one, so an incumbent that leads early cannot starve it. Untried rather than unscored,
+        // because an instruction whose outcomes all failed is scored by nothing and would otherwise stay
+        // "unexplored" for the rest of the run and be selected ahead of every instruction that works.
+        List<ProgramInstructionCandidate> untried = _archive.Where(candidate => candidate.Uses == 0).ToList();
+        if (untried.Count > 0) return untried[random.NextInt(untried.Count)];
 
         if (_options.Selection == ProgramInstructionSelection.EpsilonGreedy &&
             random.NextDouble() < _options.ExplorationProbability)
@@ -506,13 +508,18 @@ public sealed class ProgramMetaPromptEvolver : IProgramInstructionSource
             return _archive[random.NextInt(_archive.Count)];
         }
 
-        ProgramInstructionCandidate best = _archive[0];
+        // Only a scored instruction can be ranked. MeanQuality reports 0.0 for one that has none, which a
+        // minimizing run reads as better than every real cost, so an unscored candidate is skipped rather
+        // than compared. With nothing scored at all there is no basis to prefer any of them, and a uniform
+        // draw says so instead of letting that 0.0 decide.
+        ProgramInstructionCandidate? best = null;
         foreach (ProgramInstructionCandidate candidate in _archive)
         {
-            if (candidate.MeanQuality > best.MeanQuality) best = candidate;
+            if (candidate.Scored == 0) continue;
+            if (best is null || candidate.MeanQuality > best.MeanQuality) best = candidate;
         }
 
-        return best;
+        return best ?? _archive[random.NextInt(_archive.Count)];
     }
 
     private IReadOnlyList<ProgramChatMessage> BuildRequest()
@@ -570,14 +577,18 @@ public sealed class ProgramMetaPromptEvolver : IProgramInstructionSource
     private bool Evict()
     {
         // The seed instruction is never dropped, so a run can always fall back to what it started
-        // from. An unscored instruction is not dropped either: it has not had its chance yet.
-        // Nor is one that still owes an outcome: Select has already routed a generation to it, and
-        // dropping it would make Observe find no candidate and discard that generation's credit in
-        // silence. With nothing else eligible, Accept refuses the proposal instead.
+        // from. An untried instruction is not dropped either: it has not had its chance yet. Nor is
+        // one that still owes an outcome: Select has already routed a generation to it, and dropping
+        // it would make Observe find no candidate and discard that generation's credit in silence.
+        // With nothing else eligible, Accept refuses the proposal instead.
+        //
+        // A tried instruction that was never scored - every outcome it produced failed - is evicted
+        // first. It has had its chance and has no measured value to compare, so holding a slot for it
+        // would keep a known-bad instruction in the archive ahead of a scored one.
         ProgramInstructionCandidate? worst = _archive
-            .Where(candidate => candidate.Id != _seedId && candidate.Scored > 0
+            .Where(candidate => candidate.Id != _seedId && candidate.Uses > 0
                 && !_routes.ContainsValue(candidate.Id))
-            .OrderBy(candidate => candidate.MeanQuality)
+            .OrderBy(candidate => candidate.Scored == 0 ? double.NegativeInfinity : candidate.MeanQuality)
             .ThenBy(candidate => candidate.Generation)
             .FirstOrDefault();
         if (worst is null) return false;

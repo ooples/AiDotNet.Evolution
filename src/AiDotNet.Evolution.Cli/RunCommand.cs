@@ -54,9 +54,10 @@ internal sealed class RunFile
 
 /// <summary>Instruction evolution: candidate system instructions, scored by the programs they produce.</summary>
 /// <remarks>
-/// The instructions are credited from the run's own outcomes, so an instruction that produces programs which
-/// fail is scored as the worst outcome rather than left unscored. The archive, its lineage and the selection
-/// all restore from a checkpoint with the rest of the run.
+/// The instructions are credited from the run's own outcomes, and only from outcomes the run measured: a
+/// proposal whose evaluation failed releases its route and earns no score, so no number the run never
+/// measured enters the archive's mean. The archive is not checkpointed - see
+/// <see cref="RunMetaPrompt.SeedInstruction"/>.
 /// </remarks>
 internal sealed class RunMetaPrompt
 {
@@ -435,7 +436,7 @@ internal static class RunCommand
             // The run file therefore does not offer proposalCostUnits - a field that charged nothing would be
             // worse than its absence. The direction must match the evolver's, because it decides what a
             // failed evaluation is credited as.
-            instructions = new ProgramInstructionCreditObserver(evolver, null, run.Direction);
+            instructions = new ProgramInstructionCreditObserver(evolver);
             variationOptions.InstructionSource = instructions;
         }
 

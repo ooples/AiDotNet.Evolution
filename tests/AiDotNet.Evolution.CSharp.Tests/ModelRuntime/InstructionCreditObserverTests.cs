@@ -60,19 +60,57 @@ public sealed class InstructionCreditObserverTests
     }
 
     [Fact]
-    public async Task A_failed_evaluation_is_credited_as_the_worst_outcome_rather_than_skipped()
+    public async Task A_failed_evaluation_leaves_its_instruction_unscored_rather_than_scored_at_a_guess()
     {
-        // Skipping would let an instruction whose programs never parse keep a clean record and stay
-        // selectable. Asserted against a scored instruction, because "not scored" and "scored zero" differ.
+        // "Not scored" and "scored zero" differ, and the difference decides the run: whatever number a
+        // failure is credited with competes with the real ones, and 0.0 beats every negated cost when
+        // minimizing and every negative quality when maximizing. The instruction keeps the use it was
+        // charged - it was asked - and earns nothing.
         ProgramMetaPromptEvolver failing = Evolver();
         var observer = new ProgramInstructionCreditObserver(failing);
         observer.Select(new StableRandom(3), generation: 1);
 
         await observer.OnEventAsync(Evaluated(generation: 1, quality: null));
 
-        Assert.Equal(1, observer.CreditedOutcomes);
-        ProgramInstructionCandidate scored = Assert.Single(failing.Archive, candidate => candidate.Scored > 0);
-        Assert.Equal(0.0, scored.MeanQuality);
+        Assert.Equal(0, observer.CreditedOutcomes);
+        Assert.Equal(1, observer.FailedOutcomes);
+        Assert.All(failing.Archive, candidate => Assert.Equal(0, candidate.Scored));
+        // The seed is what was routed, and the cadence has already proposed a second instruction that has
+        // not been. The seed keeps the use and earns nothing.
+        ProgramInstructionCandidate seed = Assert.Single(failing.Archive, candidate => candidate.Generation == 0);
+        Assert.Equal(1L, seed.Uses);
+    }
+
+    [Fact]
+    public async Task An_instruction_whose_only_outcome_failed_is_not_selected_ahead_of_a_scored_one()
+    {
+        // The hazard of leaving a failure unscored: selection tries an unexplored instruction before any
+        // scored one, so an instruction scored by nothing would be drawn first for the rest of the run.
+        // Unexplored has to mean untried, not unscored.
+        var options = new ProgramMetaPromptOptions
+        {
+            Enabled = true,
+            ProposeEveryGenerations = 1,
+            MaxArchiveSize = 4,
+            Selection = ProgramInstructionSelection.EpsilonGreedy,
+            ExplorationProbability = 0.0
+        };
+        var evolver = new ProgramMetaPromptEvolver(
+            new FakeChatClient("Instruction A: a reply long enough to be accepted."), SeedInstruction, options);
+
+        // The seed is the only candidate, so it is drawn and scored well.
+        Assert.Equal(SeedInstruction, evolver.Select(new StableRandom(3), generation: 1));
+        evolver.Observe(generation: 1, quality: 0.9);
+
+        // A second instruction joins, is drawn as the untried one, and its outcome fails.
+        string? proposed = await evolver.ProposeAsync(generation: 2);
+        Assert.NotNull(proposed);
+        Assert.Equal(proposed, evolver.Select(new StableRandom(3), generation: 2));
+        Assert.True(evolver.Abandon(2));
+
+        // Nothing is untried now and exploration is off, so the draw is greedy - and the only instruction
+        // with a measured outcome is the seed.
+        Assert.Equal(SeedInstruction, evolver.Select(new StableRandom(3), generation: 3));
     }
 
     [Fact]
@@ -143,30 +181,37 @@ public sealed class InstructionCreditObserverTests
             .VersionHash);
     }
 
-    [Fact]
-    public async Task A_failed_evaluation_never_outranks_a_measured_one_when_minimizing()
+    [Theory]
+    // Minimizing: the evolver negates, so any stand-in a failure could be credited with competes with a
+    // negated cost. Maximizing with a negative quality: 0.0 is better than every outcome the run measured.
+    // Both orders, because a stream of credits is never revised - an early stand-in stays in the mean.
+    [InlineData(EvolutionOptimizationDirection.Minimize, 5.0, true)]
+    [InlineData(EvolutionOptimizationDirection.Minimize, 5.0, false)]
+    [InlineData(EvolutionOptimizationDirection.Maximize, -5.0, true)]
+    [InlineData(EvolutionOptimizationDirection.Maximize, -5.0, false)]
+    public async Task A_failed_evaluation_contributes_nothing_to_the_instructions_mean(
+        EvolutionOptimizationDirection direction, double measured, bool failureFirst)
     {
-        // The bug this test exists for: ProgramMetaPromptEvolver.Observe negates quality when minimizing, so
-        // crediting a plain 0.0 for a failure becomes -0.0 there - better than any real positive cost, which
-        // scores a broken instruction as the BEST one and makes it the most selectable. A failure is credited
-        // at the worst cost the run has actually observed instead.
         var evolver = new ProgramMetaPromptEvolver(
             new FakeChatClient("Instruction A: a reply long enough to be accepted."), SeedInstruction,
-            Options(proposeEvery: 100, direction: EvolutionOptimizationDirection.Minimize));
-        var observer = new ProgramInstructionCreditObserver(
-            evolver, null, EvolutionOptimizationDirection.Minimize);
+            Options(proposeEvery: 100, direction: direction));
+        var observer = new ProgramInstructionCreditObserver(evolver);
 
-        // A measured cost of 5.0 first, so the run has an observed worst case, then a failure.
-        observer.Select(new StableRandom(3), generation: 1);
-        await observer.OnEventAsync(Evaluated(generation: 1, quality: 5.0));
-        observer.Select(new StableRandom(3), generation: 2);
-        await observer.OnEventAsync(Evaluated(generation: 2, quality: null));
+        double?[] outcomes = failureFirst ? new double?[] { null, measured } : new double?[] { measured, null };
+        for (int index = 0; index < outcomes.Length; index++)
+        {
+            long generation = index + 1;
+            observer.Select(new StableRandom(3), generation);
+            await observer.OnEventAsync(Evaluated(generation, outcomes[index]));
+        }
 
-        Assert.Equal(2, observer.CreditedOutcomes);
-        // Minimizing: the evolver negates, so a credited 5.0 becomes -5.0. Both outcomes landed on the same
-        // instruction here, so its mean must be -5.0 - the failure was treated as 5.0, not as 0.0, which
-        // would have pulled the mean up to -2.5 and made a failing instruction look better.
+        Assert.Equal(1, observer.CreditedOutcomes);
+        Assert.Equal(1, observer.FailedOutcomes);
+        // One scored outcome, and the mean is exactly it: the failure released its route and put no number
+        // the run never measured into the archive. -5.0 either way - negated from 5.0 when minimizing, and
+        // the measured value itself when maximizing.
         ProgramInstructionCandidate scored = Assert.Single(evolver.Archive, candidate => candidate.Scored > 0);
+        Assert.Equal(1, scored.Scored);
         Assert.Equal(-5.0, scored.MeanQuality, 10);
     }
 
@@ -187,13 +232,6 @@ public sealed class InstructionCreditObserverTests
         Assert.Equal(1, observer.CreditedOutcomes);
         await observer.OnEventAsync(Evaluated(generation: 1, quality: 0.5));
         Assert.Equal(1, observer.CreditedOutcomes);
-    }
-
-    [Fact]
-    public void A_direction_that_is_not_defined_is_refused()
-    {
-        Assert.Throws<ArgumentOutOfRangeException>(() => new ProgramInstructionCreditObserver(
-            Evolver(), null, (EvolutionOptimizationDirection)99));
     }
 
     /// <summary>An <c>Evaluated</c> event for one generation, with the quality the engine would report.</summary>

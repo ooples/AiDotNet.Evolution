@@ -27,32 +27,19 @@ public sealed class ProgramInstructionCreditObserver : IProgramInstructionSource
 {
     private readonly ProgramMetaPromptEvolver _evolver;
     private readonly EvolutionResourceLedger? _ledger;
-    private readonly EvolutionOptimizationDirection _direction;
     private readonly System.Collections.Concurrent.ConcurrentDictionary<long, byte> _routed = new();
-    private double _worstObserved;
 
     /// <summary>Creates an observer that credits <paramref name="evolver"/> from the engine's outcomes.</summary>
     /// <param name="evolver">The evolver to route instructions from and credit outcomes to.</param>
     /// <param name="ledger">The run's ledger, charged for each instruction proposal; <c>null</c> to meter nothing.</param>
     /// <exception cref="ArgumentNullException"><paramref name="evolver"/> is <c>null</c>.</exception>
-    /// <param name="direction">
-    /// The run's direction, which <b>must match</b> the evolver's own. It decides what a failed evaluation is
-    /// credited as: the evolver negates quality when minimizing, so crediting a plain <c>0.0</c> there would
-    /// score a failure better than any real positive cost and make a broken instruction the most selectable
-    /// one. Supplied rather than read from the evolver, which does not expose it.
-    /// </param>
-    /// <exception cref="ArgumentOutOfRangeException"><paramref name="direction"/> is not a defined value.</exception>
     public ProgramInstructionCreditObserver(
         ProgramMetaPromptEvolver evolver,
-        EvolutionResourceLedger? ledger = null,
-        EvolutionOptimizationDirection direction = EvolutionOptimizationDirection.Maximize)
+        EvolutionResourceLedger? ledger = null)
     {
         ProgramGuard.NotNull(evolver);
-        if (!Enum.IsDefined(typeof(EvolutionOptimizationDirection), direction))
-            throw new ArgumentOutOfRangeException(nameof(direction), direction, "Value must be a defined direction.");
         _evolver = evolver;
         _ledger = ledger;
-        _direction = direction;
     }
 
     /// <summary>What a failed evaluation is credited as, so it never outranks a measured outcome.</summary>
@@ -61,9 +48,6 @@ public sealed class ProgramInstructionCreditObserver : IProgramInstructionSource
     /// actually observed, so a failure is never cheaper than a program that ran. A run whose first outcome is
     /// a failure has nothing observed yet, and <c>0.0</c> is then the only floor available.
     /// </remarks>
-    private double FailureQuality() =>
-        _direction == EvolutionOptimizationDirection.Minimize ? _worstObserved : 0.0;
-
     /// <summary>Gets how many instructions the evolver accepted while this observer was attached.</summary>
     public int AcceptedProposals { get; private set; }
 
@@ -73,6 +57,16 @@ public sealed class ProgramInstructionCreditObserver : IProgramInstructionSource
     /// ineffective, which is worth being able to tell apart.
     /// </remarks>
     public int CreditedOutcomes { get; private set; }
+
+    /// <summary>Routed outcomes that reported no quality, so the instruction earned no score.</summary>
+    /// <remarks>
+    /// Reported because the archive cannot show it: an instruction is ordered by the mean of what it did
+    /// score, so one that failed nine times out of ten is ranked on the one measurement it has. Only an
+    /// instruction that never scores at all sorts last. Ranking by failure rate would mean the archive
+    /// carrying failure counts through its checkpoint, which is a change to the evolver rather than to this
+    /// observer.
+    /// </remarks>
+    public int FailedOutcomes { get; private set; }
 
     /// <inheritdoc/>
     public string VersionHash => _evolver.VersionHash;
@@ -105,9 +99,20 @@ public sealed class ProgramInstructionCreditObserver : IProgramInstructionSource
             // A null quality is a failed evaluation, credited rather than skipped: an instruction whose
             // programs never parse would otherwise keep a clean record and stay selectable. The value depends
             // on the direction - see FailureQuality - because the evolver negates quality when minimizing.
-            if (evaluation.Quality is { } measured && measured > _worstObserved) _worstObserved = measured;
-            _evolver.Observe(generation, evaluation.Quality ?? FailureQuality());
-            CreditedOutcomes++;
+            if (evaluation.Quality is { } measured)
+            {
+                _evolver.Observe(generation, measured);
+                CreditedOutcomes++;
+            }
+            else
+            {
+                // No quality was measured, so there is nothing to credit. Releasing the route is what the
+                // evolver offers for exactly this case; any stand-in number is a score the run never
+                // measured, and whichever number is chosen can beat a real outcome - 0.0 beats every
+                // positive cost when minimizing, and beats every negative quality when maximizing.
+                _evolver.Abandon(generation);
+                FailedOutcomes++;
+            }
         }
 
         if (!_evolver.ShouldPropose(generation + 1)) return;

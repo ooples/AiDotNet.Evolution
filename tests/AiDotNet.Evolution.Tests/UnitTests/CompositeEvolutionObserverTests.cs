@@ -61,6 +61,23 @@ public sealed class CompositeEvolutionObserverTests
     }
 
     [Fact]
+    public async Task An_uncancelled_cancellation_exception_is_isolated_like_any_other_failure()
+    {
+        // The escape hatch is guarded by the token, not by the exception type: an observer that throws
+        // OperationCanceledException while nothing was cancelled has not been cancelled, it has failed. The
+        // run was never asked to stop, so the remaining observers must still see the event. Pinned because a
+        // refactor that dropped the "when" clause would start propagating this and the suite would not say so.
+        var failing = new Counting(new OperationCanceledException());
+        var later = new Counting();
+        var composite = new CompositeEvolutionObserver<int>(new IEvolutionObserver<int>[] { failing, later });
+
+        await composite.OnEventAsync(Event(1));
+
+        Assert.Equal(1, failing.Seen);
+        Assert.Equal(1, later.Seen);
+    }
+
+    [Fact]
     public async Task A_cancellation_mid_fan_out_stops_the_observers_after_it()
     {
         // The earlier test cancelled before the call, which only proves the exception escapes. This cancels
