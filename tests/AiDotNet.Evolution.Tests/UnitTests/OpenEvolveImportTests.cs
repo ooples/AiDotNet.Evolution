@@ -586,6 +586,46 @@ public sealed class OpenEvolveImportTests
         }
     }
 
+    [Theory]
+    [InlineData("Correctness", "correctness", "duplicate")]
+    [InlineData(" ", "", "blank")]
+    public void A_run_files_judge_rubric_is_parsed_and_validated_rather_than_ignored(
+        string first, string second, string why)
+    {
+        // The rubric was not reachable from a run file at all, and it is the lever that matters most:
+        // measured on a task where storing the shown examples scores perfectly, the gap between a documented
+        // lookup table and an honest attempt is 0.083 under the default rubric and 0.310 under one naming
+        // generality (benchmarks/external/judge_rubric_probe.py).
+        //
+        // Asserted through the refusal rather than through a completed run, deliberately. The judge's own
+        // metric names only become observable when a judge REPLY parses, and the loopback fake answers with
+        // a program; a run that merely completes therefore cannot tell an honoured rubric from an ignored
+        // one. An unusable rubric coming back named proves the list was parsed, carried into
+        // LlmFeedbackOptions and validated there.
+        using var directory = new TemporaryDirectory();
+        File.WriteAllText(Path.Combine(directory.Path, "initial_program.py"), "X = 0\n");
+        File.WriteAllText(Path.Combine(directory.Path, "evaluator.py"),
+            "import json, sys\n" + "print(json.dumps({\"quality\": 0.5}))  # evaluate\n");
+        var run = new
+        {
+            schema = "aidotnet-evolve-run-v1",
+            runId = "judge-rubric-" + why,
+            initialProgram = Path.Combine(directory.Path, "initial_program.py"),
+            evaluator = Path.Combine(directory.Path, "evaluator.py"),
+            output = Path.Combine(directory.Path, "out"),
+            model = new { provider = "OpenAiCompatible", endpoint = "http://127.0.0.1:1/v1", name = "fake-model" },
+            budget = new { maxEvaluations = 2, seed = 7, parallelism = 1 },
+            llmFeedback = new { weight = 0.3, criteria = new[] { first, second } }
+        };
+        string runFile = Path.Combine(directory.Path, "run.json");
+        File.WriteAllText(runFile, JsonSerializer.Serialize(run));
+
+        var (code, _, error) = CliRunTests.Run("run", runFile);
+
+        Assert.NotEqual(0, code);
+        Assert.Contains("Criteria", error, StringComparison.Ordinal);
+    }
+
     private static OpenEvolveImport Import(TemporaryDirectory directory, string yaml, string? python = null)
     {
         string config = Path.Combine(directory.Path, "config.yaml");
