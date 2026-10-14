@@ -79,6 +79,25 @@ internal sealed class RunLlmFeedback
     public double Weight { get; init; } = 0.1;
     /// <summary>The judging models (OpenEvolve's <c>llm.evaluator_models</c>); empty uses the proposal models.</summary>
     public List<RunModel> Models { get; init; } = new();
+    /// <summary>Share of the final quality that stays with the measurement; null keeps the default of 0.7.</summary>
+    /// <remarks>
+    /// <para>
+    /// This is the coefficient that decides whether the judge can change an outcome, and
+    /// <see cref="Weight"/> is not. The engine computes
+    /// <c>quality = combinedBlend * measured + (1 - combinedBlend) * (weight * judgeMean)</c>, so an honest
+    /// candidate overtakes one that scored well by gaming the evaluator only when
+    /// <c>(1 - combinedBlend) * weight * judgeGap &gt; combinedBlend * (1 - measuredOfTheHonestOne)</c>.
+    /// </para>
+    /// <para>
+    /// Measured on a task where a program can score perfectly by storing the examples it was shown: with a
+    /// judge gap of 0.29 and an honest candidate at 1 of 6, the left side reaches only 0.087 at
+    /// <c>weight = 1</c> against 0.583 on the right. Deciding that case needs <c>combinedBlend</c> below
+    /// about 0.26, and no value of <see cref="Weight"/> substitutes for it - which is why this is exposed
+    /// rather than left at its default.
+    /// </para>
+    /// <para>At 1.0 the judge cannot move fitness at all; at 0.0 the measurement cannot.</para>
+    /// </remarks>
+    public double? CombinedBlend { get; init; }
     /// <summary>What the judge scores; empty keeps the default rubric.</summary>
     /// <remarks>
     /// <para>
@@ -323,6 +342,7 @@ internal static class RunCommand
                 foreach (string criterion in feedback.Criteria) feedbackOptions.Criteria.Add(criterion);
             }
 
+            if (feedback.CombinedBlend is { } blend) feedbackOptions.CombinedBlend = blend;
             if (feedback.MetricPrefix is { } prefix)
             {
                 // Blank is refused, not defaulted: the judge's field names are ordinary words, so an
