@@ -1,0 +1,196 @@
+{
+  "Story": "V1-53 #166 criterion 4: meta-prompt evolution, paired dev-partition ablation",
+  "Design": "paired by engine seed; the arms differ only in the variation operator's instruction source",
+  "Endpoint": "heldout_accuracy, scored outside the evaluator by the task's own score_heldout.py",
+  "Model": {
+    "Provider": "ClaudeCode",
+    "Name": "sonnet"
+  },
+  "Budget": {
+    "Seeds": 6,
+    "EvaluationsPerArm": 5
+  },
+  "Rows": [
+    {
+      "Seed": 0,
+      "Arm": "Fixed",
+      "BestVisibleQuality": 1,
+      "HeldOutAccuracy": 1,
+      "CompletedEvaluations": 5,
+      "InstructionProposals": 0,
+      "CreditedOutcomes": 0,
+      "MetaCostUnits": 0,
+      "Seconds": 40.25,
+      "Failure": null,
+      "EndpointDetail": null
+    },
+    {
+      "Seed": 0,
+      "Arm": "Evolving",
+      "BestVisibleQuality": 1,
+      "HeldOutAccuracy": 0.01818181818181818,
+      "CompletedEvaluations": 5,
+      "InstructionProposals": 2,
+      "CreditedOutcomes": 4,
+      "MetaCostUnits": 2,
+      "Seconds": 88.41,
+      "Failure": null,
+      "EndpointDetail": null
+    },
+    {
+      "Seed": 1,
+      "Arm": "Fixed",
+      "BestVisibleQuality": 1,
+      "HeldOutAccuracy": 0,
+      "CompletedEvaluations": 5,
+      "InstructionProposals": 0,
+      "CreditedOutcomes": 0,
+      "MetaCostUnits": 0,
+      "Seconds": 46.27,
+      "Failure": null,
+      "EndpointDetail": null
+    },
+    {
+      "Seed": 1,
+      "Arm": "Evolving",
+      "BestVisibleQuality": 1,
+      "HeldOutAccuracy": 0.01818181818181818,
+      "CompletedEvaluations": 5,
+      "InstructionProposals": 2,
+      "CreditedOutcomes": 4,
+      "MetaCostUnits": 2,
+      "Seconds": 75.49,
+      "Failure": null,
+      "EndpointDetail": null
+    },
+    {
+      "Seed": 2,
+      "Arm": "Fixed",
+      "BestVisibleQuality": 1,
+      "HeldOutAccuracy": 0,
+      "CompletedEvaluations": 5,
+      "InstructionProposals": 0,
+      "CreditedOutcomes": 0,
+      "MetaCostUnits": 0,
+      "Seconds": 43.32,
+      "Failure": null,
+      "EndpointDetail": null
+    },
+    {
+      "Seed": 2,
+      "Arm": "Evolving",
+      "BestVisibleQuality": 1,
+      "HeldOutAccuracy": 0,
+      "CompletedEvaluations": 5,
+      "InstructionProposals": 2,
+      "CreditedOutcomes": 4,
+      "MetaCostUnits": 2,
+      "Seconds": 62.13,
+      "Failure": null,
+      "EndpointDetail": null
+    },
+    {
+      "Seed": 3,
+      "Arm": "Fixed",
+      "BestVisibleQuality": 1,
+      "HeldOutAccuracy": 0,
+      "CompletedEvaluations": 5,
+      "InstructionProposals": 0,
+      "CreditedOutcomes": 0,
+      "MetaCostUnits": 0,
+      "Seconds": 43.96,
+      "Failure": null,
+      "EndpointDetail": null
+    },
+    {
+      "Seed": 3,
+      "Arm": "Evolving",
+      "BestVisibleQuality": 1,
+      "HeldOutAccuracy": 0,
+      "CompletedEvaluations": 5,
+      "InstructionProposals": 2,
+      "CreditedOutcomes": 4,
+      "MetaCostUnits": 2,
+      "Seconds": 79.7,
+      "Failure": null,
+      "EndpointDetail": null
+    },
+    {
+      "Seed": 4,
+      "Arm": "Fixed",
+      "BestVisibleQuality": 0.16666666666666666,
+      "HeldOutAccuracy": 0,
+      "CompletedEvaluations": 5,
+      "InstructionProposals": 0,
+      "CreditedOutcomes": 0,
+      "MetaCostUnits": 0,
+      "Seconds": 94.28,
+      "Failure": null,
+      "EndpointDetail": null
+    },
+    {
+      "Seed": 4,
+      "Arm": "Evolving",
+      "BestVisibleQuality": 1,
+      "HeldOutAccuracy": 0,
+      "CompletedEvaluations": 5,
+      "InstructionProposals": 2,
+      "CreditedOutcomes": 4,
+      "MetaCostUnits": 2,
+      "Seconds": 84.2,
+      "Failure": null,
+      "EndpointDetail": null
+    },
+    {
+      "Seed": 5,
+      "Arm": "Fixed",
+      "BestVisibleQuality": 1,
+      "HeldOutAccuracy": 0,
+      "CompletedEvaluations": 5,
+      "InstructionProposals": 0,
+      "CreditedOutcomes": 0,
+      "MetaCostUnits": 0,
+      "Seconds": 40.18,
+      "Failure": null,
+      "EndpointDetail": null
+    },
+    {
+      "Seed": 5,
+      "Arm": "Evolving",
+      "BestVisibleQuality": 1,
+      "HeldOutAccuracy": 0,
+      "CompletedEvaluations": 5,
+      "InstructionProposals": 2,
+      "CreditedOutcomes": 4,
+      "MetaCostUnits": 2,
+      "Seconds": 79.41,
+      "Failure": null,
+      "EndpointDetail": null
+    }
+  ],
+  "Commit": "270ca44",
+  "Machine": "AMD Ryzen 9 3950X, 64 GB RAM, Windows 11 Pro 10.0.26220, .NET SDK 10.0.402 Release; Claude Code CLI 2.1.299, model sonnet, through the ClaudeCode provider",
+  "Summary": {
+    "Pairs": 6,
+    "MedianDifference": 0.0,
+    "MeanDifference": -0.1606060606060606,
+    "DifferenceCi95": [
+      -0.4909090909090909,
+      0.00909090909090909
+    ],
+    "Interval": "median of per-pair differences, 4000-draw seeded percentile bootstrap (seed 7)",
+    "PairsFavouringEvolving": 1,
+    "PairsFavouringFixed": 1,
+    "TiedPairs": 4,
+    "ArmsThatSolvedTheTask": {
+      "Fixed": 1,
+      "Evolving": 0
+    },
+    "ArmsThatProducedNoResult": 0,
+    "MetaCallShareOfEvolvingArm": "2 of 6 model calls (33%), against the issue's <= 10% token target",
+    "WallClockMedianSeconds": {
+      "Fixed": 44,
+      "Evolving": 80
+    }
+  }
+}
