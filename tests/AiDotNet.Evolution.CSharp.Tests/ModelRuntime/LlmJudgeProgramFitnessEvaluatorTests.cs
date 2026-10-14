@@ -50,13 +50,14 @@ public sealed class LlmJudgeProgramFitnessEvaluatorTests
 
     [Theory]
     // The two knobs compose multiplicatively on the judge's side, and the published measurements for #167
-    // are all derived by INVERTING that composition. The forward direction was already pinned, for one
-    // minimizing case at Weight = 0.8, by JudgeCannotPromoteInvalidCandidateTests.
-    // Minimizing_inverts_the_judges_utility. The inverse was not pinned anywhere, which is how a
-    // derivation that used Weight as the mixing coefficient - mine, and the numbers reported from it -
-    // survived to be published. Asserted here across coefficients and in both directions of the
-    // arithmetic, so a change to either side fails rather than silently invalidating numbers already in
-    // the evidence.
+    // are all derived by INVERTING that composition. The forward direction is already pinned in both
+    // run directions at Weight = 0.8, CombinedBlend = 0.7, by
+    // JudgeCannotPromoteInvalidCandidateTests.The_documented_blend_formula_is_what_the_code_computes and
+    // .Minimizing_inverts_the_judges_utility. Two things were pinned nowhere: the inverse the evidence
+    // derives every judge score with, and llm_average being the judge's utility with Weight already
+    // applied - which is the fact that decides whether the inverse divides by Weight. A derivation that
+    // used Weight as the mixing coefficient instead survived both existing tests, and numbers were
+    // reported from it. Asserted here across coefficient pairs and in both directions of the arithmetic.
     [InlineData(1.0, 0.7, 0.9, 0.6, 0.3)]
     [InlineData(0.5, 0.7, 0.9, 0.6, 0.3)]
     [InlineData(1.0, 0.2, 0.4, 0.4, 0.4)]
