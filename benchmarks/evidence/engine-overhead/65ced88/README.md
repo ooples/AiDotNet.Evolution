@@ -17,12 +17,17 @@ evaluations the two runs differ by, which cancels startup. `N = 8,000`. Nine rep
 per-worker figure is the median of the nine per-repeat values and the interval is a 10,000-draw percentile
 bootstrap of that median (seed 20261014).
 
+Allocation is reported two ways, because the difference that cancels startup for timing cancels it for
+allocation too: the table's column is the whole-run figure `AllocatedBytes / Evaluations` of the 16,000
+run (16,834 B/eval), and `head-to-head.json` also carries the steady-state figure from the same
+difference as the timing (16,810 B/eval). They agree to 0.15%, so nothing here turns on the choice.
+
 **No resample yielded a non-positive difference** at any worker count (`nonpositive_differences: 0` in every
 summary row), which is the condition the first acceptance criterion names.
 
 ## Results
 
-| workers | ours us/eval [95% CI] | ours peak MB (median) [min-max] | ours alloc B/eval |
+| workers | ours us/eval [95% CI] | ours peak MB (median) [min-max] | ours alloc B/eval (whole run) |
 | --- | --- | --- | --- |
 | 1 | 45.9 [41.7, 48.9] | 61.40 [61.14-61.57] | 16,834 |
 | 2 | 47.2 [45.9, 49.2] | 61.34 [61.16-61.53] | 16,834 |
@@ -38,7 +43,7 @@ Peak working set is now flat in the worker count and **below the target at every
 | metric | target | measured | status |
 | --- | --- | --- | --- |
 | our overhead per evaluation, 1-16 workers (N >= 8,000) | <= 100 us | 44.8-47.2 us | **met** |
-| ours / OpenEvolve, 95% CI upper bound, every worker count | <= 0.05 | <= 0.0082 at `5699058`; this run only lowers our numerator | **met at `5699058`** |
+| ours / OpenEvolve, 95% CI upper bound, every worker count | <= 0.05 | <= 0.0082, measured at `5699058` | **met at `5699058`**, not re-measured here |
 | our peak working set, 16 workers | <= 64 MB | **61.23 MB** (median of 9; worst repeat 61.73 MB) | **met** |
 
 ## What this run is not
@@ -47,7 +52,11 @@ Peak working set is now flat in the worker count and **below the target at every
   (OpenEvolve 0.3.2 `411fb59`, Python 3.13). The ratio target was already met there with a paired bootstrap
   interval; a ratio against a carried denominator is not a paired measurement, so `head-to-head.json` records
   it as `ratio_ours_over_theirs_carried_denominator` and does not restate the prior interval as if it were
-  re-measured. Our side only got faster, so the previously measured bound is not loosened by this run.
+  re-measured. Our median fell, so the bound is **expected** to hold, but that is an expectation and not a
+  result: the 0.0082 interval came from paired per-repeat ratios, and a numerator from a different run set
+  cannot establish where a new paired interval's upper bound would sit. Our per-repeat spread is also wider
+  here in relative terms (30.1-51.3 us at 16 workers against 56-70 us before), which is the reason not to
+  treat the old bound as carried forward.
 - **One workstation, not a fleet.** The same machine as `5699058`, which is what makes the two comparable;
   both are Windows, and the figures are machine-dependent.
 - **Nine repeats, one N.** `N = 8,000` with the `2N = 16,000` run supplying the peak, matching the earlier

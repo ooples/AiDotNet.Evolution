@@ -2,7 +2,7 @@
  "story": "V1-70 #175 (our column re-measured at main 65ced88; rerun of the 5699058 run)",
  "supersedes": "../5699058/head-to-head.json (for the aidotnet column only)",
  "machine": "AMD Ryzen 9 3950X (16 cores / 32 threads), 64 GB RAM, Windows 11 Pro 10.0.26220, .NET SDK 10.0.402, Release",
- "method": "(T(2N)-T(N))/(completed evaluations in the 2N run minus the N run), fresh process per run, null variation and null evaluator in-process, islands=1. N=8000. 9 repeats per worker count. Per-worker figure is the median of the 9 per-repeat values; CI is a 10,000-draw percentile bootstrap of that median (seed 20261014).",
+ "method": "Timing: (T(2N)-T(N))/(completed evaluations in the 2N run minus the N run), which cancels startup. Allocation, two figures per repeat: whole-run is large.AllocatedBytes / large.Evaluations, and steady-state uses the same difference as the timing, (large.AllocatedBytes - small.AllocatedBytes) / (large.Evaluations - small.Evaluations). Fresh process per run, null variation and null evaluator in-process, islands=1. N=8000. 9 repeats per worker count. Each per-worker summary figure is the median of its 9 per-repeat values; the timing CI is a 10,000-draw percentile bootstrap of the timing median (seed 20261014).",
  "repeats": 9,
  "sizes": {
   "aidotnet": 8000
@@ -27,7 +27,8 @@
     61.14453125,
     61.5703125
    ],
-   "aidotnet_allocated_bytes_per_eval": 16834.4775,
+   "aidotnet_allocated_bytes_per_eval_whole_run": 16834.4775,
+   "aidotnet_allocated_bytes_per_eval_steady_state": 16809.809,
    "nonpositive_differences": 0,
    "openevolve_us_per_eval_carried": 23076.3436666651,
    "openevolve_peak_mb_carried": 139.796875,
@@ -49,7 +50,8 @@
     61.15625,
     61.53125
    ],
-   "aidotnet_allocated_bytes_per_eval": 16834.4745,
+   "aidotnet_allocated_bytes_per_eval_whole_run": 16834.4745,
+   "aidotnet_allocated_bytes_per_eval_steady_state": 16809.809,
    "nonpositive_differences": 0,
    "openevolve_us_per_eval_carried": 15242.40366668285,
    "openevolve_peak_mb_carried": 204.125,
@@ -71,7 +73,8 @@
     60.96484375,
     62.22265625
    ],
-   "aidotnet_allocated_bytes_per_eval": 16834.4775,
+   "aidotnet_allocated_bytes_per_eval_whole_run": 16834.4775,
+   "aidotnet_allocated_bytes_per_eval_steady_state": 16809.837,
    "nonpositive_differences": 0,
    "openevolve_us_per_eval_carried": 10558.997000043746,
    "openevolve_peak_mb_carried": 333.39453125,
@@ -93,7 +96,8 @@
     61.01953125,
     61.3671875
    ],
-   "aidotnet_allocated_bytes_per_eval": 16834.4745,
+   "aidotnet_allocated_bytes_per_eval_whole_run": 16834.4745,
+   "aidotnet_allocated_bytes_per_eval_steady_state": 16809.806,
    "nonpositive_differences": 0,
    "openevolve_us_per_eval_carried": 8688.710333323494,
    "openevolve_peak_mb_carried": 589.1640625,
@@ -115,7 +119,8 @@
     61.05859375,
     61.7265625
    ],
-   "aidotnet_allocated_bytes_per_eval": 16834.4745,
+   "aidotnet_allocated_bytes_per_eval_whole_run": 16834.4745,
+   "aidotnet_allocated_bytes_per_eval_steady_state": 16809.809,
    "nonpositive_differences": 0,
    "openevolve_us_per_eval_carried": 8282.4950000213,
    "openevolve_peak_mb_carried": 1099.15234375,
