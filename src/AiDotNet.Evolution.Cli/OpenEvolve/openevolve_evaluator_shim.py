@@ -148,15 +148,21 @@ def main():
     os.dup2(2, 1)
     sys.stdout = sys.stderr
     handle, path = tempfile.mkstemp(suffix=config["file_suffix"], text=True)
+    # The path handed to the evaluator uses forward slashes. Several upstream evaluators generate a wrapper
+    # script and embed program_path in a single-quoted Python literal (examples/circle_packing is one), where a
+    # Windows separator reads as an escape: a path under C:\Users fails with "truncated \UXXXXXXXX escape"
+    # and every candidate scores zero. Forward slashes are accepted by every Windows path API and already are the
+    # separator on Linux, so this costs nothing there and keeps those evaluators unmodified here.
+    program_path = path.replace(os.sep, "/")
     try:
         with os.fdopen(handle, "w", encoding="utf-8") as candidate:
             candidate.write(source)
         module = _load_module(config["evaluator_path"])
         if config["cascade_evaluation"] and hasattr(module, "evaluate_stage1"):
-            metrics, artifacts = _cascade(module, path, config)
+            metrics, artifacts = _cascade(module, program_path, config)
         else:
             try:
-                metrics, artifacts = _as_result(_call(module.evaluate, path, config["timeout"]))
+                metrics, artifacts = _as_result(_call(module.evaluate, program_path, config["timeout"]))
             except TimeoutError:
                 metrics, artifacts = {"error": 0.0, "timeout": True}, {"timeout": True}
             except _StageError as error:
