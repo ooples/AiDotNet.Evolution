@@ -186,12 +186,23 @@ public sealed class LlmFeedbackOptions
         if (fields.Distinct(StringComparer.Ordinal).Count() != fields.Length || fields.Contains(AverageMetricSuffix)
             || fields.Contains(CritiqueField.Trim()))
             throw new ArgumentException("Criterion JSON names must be distinct and cannot collide with average or CritiqueField.", nameof(Criteria));
-        foreach (string field in fields.Append(AverageMetricSuffix))
+        // The prefix is checked first and on its own, against the shortest name it will ever carry, so a
+        // prefix problem is reported as one. Only then are the criteria checked, and a criterion that
+        // overflows is attributed to Criteria rather than to the field the caller did not set.
+        void Require(string name, string parameter)
         {
-            string name = MetricPrefix + field;
-            if (name.Length is < 1 or > 64 || name != name.Trim() || name.Any(char.IsControl))
-                throw new ArgumentException("Judge descriptor names must be bounded and canonical.", nameof(MetricPrefix));
+            if (name.Length is >= 1 and <= 64 && name == name.Trim() && !name.Any(char.IsControl)) return;
+            throw new ArgumentException(
+                "The judge descriptor name '" + name + "' is " + name.Length.ToString(CultureInfo.InvariantCulture)
+                + " characters; a descriptor name must be 1 to 64 characters, untrimmed and free of control "
+                + "characters. A criterion doubles as a metric name, so keep each criterion a short token and "
+                + "put any explanation in EvaluatorSystemMessage.",
+                parameter);
         }
+
+        Require(MetricPrefix + AverageMetricSuffix, nameof(MetricPrefix));
+        foreach (string field in fields) Require(MetricPrefix + field, nameof(Criteria));
+
         if (MaxCritiqueChars < 1 || MaxCritiqueChars > EvolutionArtifact.MaximumTextLength)
         {
             throw new ArgumentOutOfRangeException(nameof(MaxCritiqueChars), MaxCritiqueChars,

@@ -80,6 +80,35 @@ class TheArmsDifferInExactlyOneKey(unittest.TestCase):
             # Without this the prompt carries "[artifact content withheld]" and includeArtifacts is inert.
             self.assertTrue(run["search"]["retainArtifactText"])
 
+    def test_a_rubric_arm_sets_the_judges_criteria_and_an_unnamed_run_keeps_the_shipped_rubric(self):
+        # The rubric was measured as the lever that matters most, so it has to be variable per arm - and the
+        # default must stay exactly what it was before the option existed, or every earlier row becomes
+        # incomparable.
+        common = dict(evaluations=6, model="sonnet", executable="claude", budget_usd=None, time_limit=60)
+        plain = fa.run_file("o", 0, 0.3, arm="on-w0.3", criteria=None, **common)
+        self.assertNotIn("criteria", plain["llmFeedback"])
+
+        named = fa.run_file("o", 0, 0.3, arm="on-w0.3-general",
+                            criteria=["Correctness", "Generality"], **common)
+        self.assertEqual(["Correctness", "Generality"], named["llmFeedback"]["criteria"])
+
+        # The control arm has no llmFeedback at all, whatever the rubric arms do.
+        self.assertNotIn("llmFeedback", fa.run_file("o", 0, None, arm="off", criteria=["X"], **common))
+
+    def test_the_blend_is_what_an_arm_must_vary_to_give_the_judge_leverage(self):
+        # weight scales the judge's utility; combinedBlend is the mixing share and the only one that can let
+        # a judged score change an outcome. An arm that varies weight alone measures a mechanism with no
+        # leverage, so the driver has to be able to set this.
+        common = dict(evaluations=6, model="sonnet", executable="claude", budget_usd=None, time_limit=60)
+        default = fa.run_file("o", 0, 0.3, arm="on-w0.3", criteria=None, blend=None, **common)
+        self.assertNotIn("combinedBlend", default["llmFeedback"])
+
+        levered = fa.run_file("o", 0, 0.3, arm="on-w0.3", criteria=None, blend=0.2, **common)
+        self.assertEqual(0.2, levered["llmFeedback"]["combinedBlend"])
+
+        # And never on the control arm, which has no llmFeedback at all.
+        self.assertNotIn("llmFeedback", fa.run_file("o", 0, None, arm="off", criteria=None, blend=0.2, **common))
+
     def test_the_engine_seed_is_the_pairing_key(self):
         common = dict(evaluations=6, model="sonnet", executable="claude", budget_usd=None, time_limit=60)
         self.assertEqual(11, fa.run_file("o", 11, None, **common)["budget"]["seed"])
@@ -108,7 +137,7 @@ class ReportIsAKnownAnswer(unittest.TestCase):
 
     def report(self, rows, tmp, arm="on"):
         arguments = types.SimpleNamespace(output=str(tmp), draws=400, bootstrap_seed=7, seeds=len(rows) // 2,
-                                          evaluations=6, weights="0.3", model="sonnet", claude="claude")
+                                          evaluations=6, weights="0.3", blend=None, model="sonnet", claude="claude")
         fa.report(rows, arguments)
         document = json.loads(pathlib.Path(tmp).read_text(encoding="utf-8"))
         summary = dict(document["summary"]["arms"].get(arm, {}))
@@ -133,7 +162,7 @@ class ReportIsAKnownAnswer(unittest.TestCase):
         with tempfile.TemporaryDirectory() as directory:
             path = pathlib.Path(directory) / "r.json"
             fa.report(rows, types.SimpleNamespace(output=str(path), draws=400, bootstrap_seed=7, seeds=4,
-                                                  evaluations=5, weights="0.3,0.95", model="sonnet",
+                                                  evaluations=5, weights="0.3,0.95", blend=None, model="sonnet",
                                                   claude="claude"))
             arms = json.loads(path.read_text(encoding="utf-8"))["summary"]["arms"]
 
@@ -199,7 +228,7 @@ class ReportIsAKnownAnswer(unittest.TestCase):
         with tempfile.TemporaryDirectory() as directory:
             path = pathlib.Path(directory) / "r.json"
             fa.report([], types.SimpleNamespace(output=str(path), draws=400, bootstrap_seed=7, seeds=0,
-                                                evaluations=6, weights="0.3", model="sonnet", claude="claude"))
+                                                evaluations=6, weights="0.3", blend=None, model="sonnet", claude="claude"))
             document = json.loads(path.read_text(encoding="utf-8"))
         # No rows means no arms at all, rather than an arm reporting a fabricated interval.
         self.assertEqual({}, document["summary"]["arms"])
