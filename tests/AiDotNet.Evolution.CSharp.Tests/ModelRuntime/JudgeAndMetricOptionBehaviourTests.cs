@@ -193,6 +193,38 @@ public sealed class JudgeAndMetricOptionBehaviourTests
     }
 
     [Fact]
+    public void A_prefix_that_fits_average_but_not_the_cost_descriptor_is_refused()
+    {
+        // The validator checked the prefix against "average" (7 characters) and every criterion, but never
+        // against "cost_units" (10) - which the judge also emits. A 55-character prefix therefore passed
+        // validation and then produced a 65-character descriptor name, three over the bound this very
+        // validator enforces, so the overflow surfaced as a descriptor the archive refused rather than as a
+        // configuration refused here.
+        var options = new LlmFeedbackOptions { MetricPrefix = new string('p', 55) };
+        Assert.Equal(62, options.MetricPrefix.Length + LlmFeedbackOptions.AverageMetricSuffix.Length);
+        Assert.Equal(65, options.MetricPrefix.Length + LlmFeedbackOptions.CostUnitsMetricSuffix.Length);
+
+        ArgumentException error = Assert.Throws<ArgumentException>(() => options.Validate());
+
+        Assert.Equal(nameof(LlmFeedbackOptions.MetricPrefix), error.ParamName);
+    }
+
+    [Fact]
+    public void A_criterion_that_normalises_to_the_cost_descriptor_is_refused()
+    {
+        // The judge writes what the judging cost under this name. A criterion that lands on it would make
+        // one descriptor mean both a judged score and a cost, with whichever is written last winning.
+        var options = new LlmFeedbackOptions();
+        options.Criteria.Clear();
+        options.Criteria.Add("Cost Units");
+
+        ArgumentException error = Assert.Throws<ArgumentException>(() => options.Validate());
+
+        Assert.Equal(nameof(LlmFeedbackOptions.Criteria), error.ParamName);
+        Assert.Contains(LlmFeedbackOptions.CostUnitsMetricSuffix, error.Message, StringComparison.Ordinal);
+    }
+
+    [Fact]
     public void A_short_criterion_token_is_accepted_so_the_bound_is_not_the_whole_story()
     {
         var options = new LlmFeedbackOptions();

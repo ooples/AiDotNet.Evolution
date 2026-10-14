@@ -184,11 +184,22 @@ public sealed class LlmFeedbackOptions
             throw new ArgumentException("CritiqueField cannot name one of the judging criteria.", nameof(CritiqueField));
         var fields = Criteria.Select(Prompts.ProgramPromptBuilder.ToCriterionFieldName).ToArray();
         if (fields.Distinct(StringComparer.Ordinal).Count() != fields.Length || fields.Contains(AverageMetricSuffix)
-            || fields.Contains(CritiqueField.Trim()))
-            throw new ArgumentException("Criterion JSON names must be distinct and cannot collide with average or CritiqueField.", nameof(Criteria));
-        // The prefix is checked first and on its own, against the shortest name it will ever carry, so a
-        // prefix problem is reported as one. Only then are the criteria checked, and a criterion that
-        // overflows is attributed to Criteria rather than to the field the caller did not set.
+            || fields.Contains(CostUnitsMetricSuffix) || fields.Contains(CritiqueField.Trim()))
+        {
+            // CostUnitsMetricSuffix belongs here with the others: the judge writes its own cost under that
+            // name, so a criterion normalising to it would have one descriptor meaning both a judged score
+            // and what the judging cost, with whichever is written last winning silently.
+            throw new ArgumentException(
+                "Criterion JSON names must be distinct and cannot collide with '" + AverageMetricSuffix
+                + "', '" + CostUnitsMetricSuffix + "' or CritiqueField.", nameof(Criteria));
+        }
+        // The prefix is checked first and on its own, against the longest FIXED name it will ever carry, so
+        // a prefix problem is reported as one. Longest rather than shortest because both fixed descriptors
+        // are emitted: a prefix validated only against "average" can still overflow on "cost_units", which
+        // is three characters longer, and the overflow would then surface as a descriptor the archive
+        // refuses rather than as a configuration this surface rejected. Only then are the criteria checked,
+        // and a criterion that overflows is attributed to Criteria rather than to the field the caller did
+        // not set.
         void Require(string name, string parameter)
         {
             if (name.Length is >= 1 and <= 64 && name == name.Trim() && !name.Any(char.IsControl)) return;
@@ -200,7 +211,11 @@ public sealed class LlmFeedbackOptions
                 parameter);
         }
 
-        Require(MetricPrefix + AverageMetricSuffix, nameof(MetricPrefix));
+        Require(
+            MetricPrefix + (AverageMetricSuffix.Length >= CostUnitsMetricSuffix.Length
+                ? AverageMetricSuffix
+                : CostUnitsMetricSuffix),
+            nameof(MetricPrefix));
         foreach (string field in fields) Require(MetricPrefix + field, nameof(Criteria));
 
         if (MaxCritiqueChars < 1 || MaxCritiqueChars > EvolutionArtifact.MaximumTextLength)

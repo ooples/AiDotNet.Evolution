@@ -95,6 +95,30 @@ class TheArmsDifferInExactlyOneKey(unittest.TestCase):
         # The control arm has no llmFeedback at all, whatever the rubric arms do.
         self.assertNotIn("llmFeedback", fa.run_file("o", 0, None, arm="off", criteria=["X"], **common))
 
+    def test_a_named_rubric_arm_with_no_criteria_is_refused_rather_than_mislabelled(self):
+        # "--rubric general=" produced ("general", None), so run_file omitted criteria and the campaign
+        # measured the SHIPPED rubric while labelling every row "general". A result file carrying that
+        # label cannot be told apart from a real general-rubric run afterwards, which is why it is refused
+        # at parse time instead of reported later.
+        with self.assertRaises(SystemExit):
+            fa.parse_rubrics(["general="])
+        # The deliberate shorthand still works and still means the shipped rubric.
+        self.assertEqual([("default", None)], fa.parse_rubrics(["default="]))
+
+    def test_a_rubric_name_cannot_reach_outside_the_work_tree(self):
+        # The name becomes a directory under --work, so a separator or a traversal component puts an arm's
+        # run file and its scored output somewhere the campaign does not control - and a collision there
+        # scores one arm with another arm's winner.
+        for bad in ("a/b=x", "a" + chr(92) + "b=x", "..=x", ".=x"):
+            with self.assertRaises(SystemExit):
+                fa.parse_rubrics([bad])
+
+    def test_no_rubric_argument_keeps_the_single_shipped_arm(self):
+        self.assertEqual([("", None)], fa.parse_rubrics([]))
+        self.assertEqual([("", None)], fa.parse_rubrics(None))
+        self.assertEqual([("general", ["Correctness", "Generality"])],
+                         fa.parse_rubrics(["general=Correctness; Generality"]))
+
     def test_the_blend_is_what_an_arm_must_vary_to_give_the_judge_leverage(self):
         # weight scales the judge's utility; combinedBlend is the mixing share and the only one that can let
         # a judged score change an outcome. An arm that varies weight alone measures a mechanism with no

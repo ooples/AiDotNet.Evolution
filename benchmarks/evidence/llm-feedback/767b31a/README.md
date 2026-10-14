@@ -36,8 +36,11 @@ with the wrong blend model, and the inversion does not exist**: corrected, the f
 hybrid scores 0.5165 and its honest comparator 0.5166. The judge was not ranking the gamer above the honest
 attempt; it could not separate them.
 
-**The endpoint did not move.** Held-out accuracy stayed 0.0 in every arm (one 0.0182 accidental hit at
-seed 1 under the default rubric). Halving the judge's score for a gamer is not the same as changing which
+**The endpoint did not move.** Held-out accuracy is 0.0 in **every** row of `rubric-arms.json` - both
+rubrics, both weights, both seeds. The only non-zero figures anywhere are in `levered.json`, and both
+belong to the **control** arm: 0.0182 at seed 1 and 0.0364 at seed 2, each a single accidental agreement
+with the modular rule on 1 or 2 of 55 held-out points. No arm with feedback enabled ever scored above
+zero, which is why every paired difference below is at or under zero. Halving the judge's score for a gamer is not the same as changing which
 candidate wins, and the corrected flip condition says why:
 
 ```
@@ -46,7 +49,9 @@ candidate wins, and the corrected flip condition says why:
 
 At `CombinedBlend = 0.7`, `Weight = 0.3`, a gap near 0.29 and a seed at 1 of 6 visible, the left side is
 0.026 against 0.583 on the right. Not close - and `Weight = 1` would still leave 0.087 against 0.583.
-Deciding this needs **`CombinedBlend < 0.26`**, which the run file does not expose.
+Deciding this needs **`CombinedBlend < 0.26`**, which this PR adds to the run file as
+`llmFeedback.combinedBlend` - it was unreachable when the measurement was taken, and that unreachability
+was the finding.
 
 ## A constraint found by running it
 

@@ -162,6 +162,36 @@ def bootstrap_interval(differences, draws, rng):
     return [low, high]
 
 
+def parse_rubrics(entries):
+    """(name, criteria) per --rubric arm; [("", None)] when none are given, which is the shipped rubric.
+
+    Refuses two shapes that would corrupt the campaign rather than fail it:
+
+    * a named arm with no criteria, which would run the SHIPPED rubric under that name - the one
+      mislabelling no reader of the result file can detect afterwards. ``default=`` says so on purpose
+      and is allowed.
+    * a name carrying a path separator or a traversal component, because the name becomes a directory
+      under the work tree, and a collision there scores one arm with another arm's winner.
+    """
+    if not entries:
+        return [("", None)]
+    rubrics = []
+    for entry in entries:
+        name, _, criteria = entry.partition("=")
+        name = name.strip()
+        parsed = [c.strip() for c in criteria.split(";") if c.strip()]
+        if not parsed and name and name != "default":
+            raise SystemExit(
+                "--rubric %r names an arm but lists no criteria, so it would measure the shipped rubric "
+                "under that name. Write 'name=a;b;c', or 'default=' to mean the shipped rubric." % entry)
+        if name and (any(sep in name for sep in ("/", "\\")) or name in (".", "..")):
+            raise SystemExit(
+                "--rubric name %r cannot contain a path separator or be a traversal component: the name "
+                "becomes a directory under the work tree." % name)
+        rubrics.append((name, parsed or None))
+    return rubrics
+
+
 def main(argv=None):
     parser = argparse.ArgumentParser(description=__doc__.splitlines()[0])
     parser.add_argument("--cli", required=True, help="the built aidotnet-evolve executable")
@@ -192,12 +222,7 @@ def main(argv=None):
     weights = [float(value) for value in str(arguments.weights).split(",") if value.strip()]
     # A rubric arm is (name, criteria); with none given there is one unnamed arm using the shipped rubric,
     # which keeps the default behaviour identical to before this option existed.
-    rubrics = [("", None)]
-    if arguments.rubric:
-        rubrics = []
-        for entry in arguments.rubric:
-            name, _, criteria = entry.partition("=")
-            rubrics.append((name.strip(), [c.strip() for c in criteria.split(";") if c.strip()] or None))
+    rubrics = parse_rubrics(arguments.rubric)
     arms = [("off", None, None)] + [
         ("on-w%g%s" % (weight, ("-" + name) if name else ""), weight, criteria)
         for weight in weights for name, criteria in rubrics]
@@ -302,7 +327,12 @@ def report(rows, arguments):
                      % (arguments.draws, arguments.bootstrap_seed, arguments.seeds)),
         "model": {"provider": "ClaudeCode", "name": arguments.model, "executable": arguments.claude},
         "budget": {"seeds": arguments.seeds, "evaluations_per_arm": arguments.evaluations,
-                   "weights": arguments.weights, "combined_blend": arguments.blend},
+                   "weights": arguments.weights, "combined_blend": arguments.blend,
+                   # Recorded because an arm name does not carry its rubric: "on-w1-general" says which arm
+                   # it was, not what the judge was asked, so without this mapping a reader cannot
+                   # reconstruct the run file that produced these rows. null is the shipped rubric.
+                   "rubrics": {(name or "default"): criteria
+                               for name, criteria in parse_rubrics(getattr(arguments, "rubric", None))}},
         "summary": summary,
         "pairs": all_pairs,
         "rows": rows,

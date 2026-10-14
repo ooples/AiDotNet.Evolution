@@ -661,6 +661,88 @@ public sealed class OpenEvolveImportTests
     }
 
     [Theory]
+    // Every list in the run file deserializes over its initializer when the JSON says null, and the first
+    // read of .Count then threw NullReferenceException - a stack trace on the console where this surface
+    // promises a named refusal for every other bad value. Measured before the fix: "criteria": null crashed
+    // `run` at RunCommand.cs:339 with an unhandled exception.
+    [InlineData("additionalModels", "{ \"additionalModels\": null }")]
+    [InlineData("search.metricDescriptors", "{ \"search\": { \"metricDescriptors\": null } }")]
+    [InlineData("llmFeedback.criteria", "{ \"llmFeedback\": { \"weight\": 0.3, \"criteria\": null } }")]
+    [InlineData("llmFeedback.models", "{ \"llmFeedback\": { \"weight\": 0.3, \"models\": null } }")]
+    [InlineData("openEvolveEvaluator.pythonPath", "{ \"openEvolveEvaluator\": { \"pythonPath\": null } }")]
+    [InlineData("openEvolveEvaluator.cascadeThresholds", "{ \"openEvolveEvaluator\": { \"cascadeThresholds\": null } }")]
+    [InlineData("openEvolveEvaluator.featureDimensions", "{ \"openEvolveEvaluator\": { \"featureDimensions\": null } }")]
+    public void A_run_file_list_set_to_null_is_refused_by_name(string expected, string sectionJson)
+    {
+        string runFile = WriteRunWithSection(sectionJson);
+
+        var (code, _, error) = CliRunTests.Run("run", runFile);
+
+        Assert.NotEqual(0, code);
+        Assert.Contains(expected, error, StringComparison.Ordinal);
+        Assert.Contains("cannot be null", error, StringComparison.Ordinal);
+        // Preflight loads the same file, so the refusal has to reach it too - it did not before, because
+        // the crash happened in run setup, which preflight never enters.
+        var (preflightCode, _, preflightError) = CliRunTests.Run("preflight", runFile);
+        Assert.NotEqual(0, preflightCode);
+        Assert.Contains(expected, preflightError, StringComparison.Ordinal);
+    }
+
+    [Fact]
+    public void A_section_that_is_absent_entirely_is_not_mistaken_for_a_null_list()
+    {
+        // The guard has to distinguish "no llmFeedback section", which is legal and means not configured,
+        // from "llmFeedback present with criteria: null". Written after getting this wrong: section?.List
+        // is null in both cases, so the first attempt refused a run file that had configured nothing.
+        string runFile = WriteRunWithSection("{ }");
+
+        var (code, output, error) = CliRunTests.Run("preflight", runFile);
+
+        Assert.DoesNotContain("cannot be null", error, StringComparison.Ordinal);
+        Assert.DoesNotContain("cannot be null", output, StringComparison.Ordinal);
+        Assert.NotEqual(2, code); // 2 is the run-file refusal; reaching the evaluator at all is the point
+    }
+
+    /// <summary>A minimal valid run file with <paramref name="sectionJson"/>'s members merged in.</summary>
+    private static string WriteRunWithSection(string sectionJson)
+    {
+        var directory = new TemporaryDirectory();
+        File.WriteAllText(Path.Combine(directory.Path, "initial_program.py"), "X = 0\n");
+        File.WriteAllText(Path.Combine(directory.Path, "evaluator.py"), """
+            import json, sys
+            print(json.dumps({"quality": 0.5}))  # evaluate
+            """);
+        using JsonDocument section = JsonDocument.Parse(sectionJson);
+        var buffer = new System.IO.MemoryStream();
+        using (var writer = new Utf8JsonWriter(buffer))
+        {
+            writer.WriteStartObject();
+            writer.WriteString("schema", "aidotnet-evolve-run-v1");
+            writer.WriteString("runId", "null-list");
+            writer.WriteString("initialProgram", Path.Combine(directory.Path, "initial_program.py"));
+            writer.WriteString("evaluator", Path.Combine(directory.Path, "evaluator.py"));
+            writer.WriteString("output", Path.Combine(directory.Path, "out"));
+            writer.WritePropertyName("model");
+            writer.WriteStartObject();
+            writer.WriteString("provider", "OpenAiCompatible");
+            writer.WriteString("endpoint", "http://127.0.0.1:1/v1");
+            writer.WriteString("name", "fake-model");
+            writer.WriteEndObject();
+            writer.WritePropertyName("budget");
+            writer.WriteStartObject();
+            writer.WriteNumber("maxEvaluations", 2);
+            writer.WriteNumber("seed", 7);
+            writer.WriteNumber("parallelism", 1);
+            writer.WriteEndObject();
+            foreach (JsonProperty property in section.RootElement.EnumerateObject()) property.WriteTo(writer);
+            writer.WriteEndObject();
+        }
+        string path = Path.Combine(directory.Path, "run.json");
+        File.WriteAllBytes(path, buffer.ToArray());
+        return path;
+    }
+
+    [Theory]
     [InlineData(1.5)]
     [InlineData(-0.1)]
     public void An_out_of_range_judge_blend_is_refused_by_name(double blend)

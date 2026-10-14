@@ -690,6 +690,17 @@ internal static class RunCommand
         File.WriteAllText(probe, string.Empty);
         File.Delete(probe);
     }
+    /// <summary>
+    /// Refuses a run-file list set to an explicit <c>null</c>, by name. <c>null</c> for the whole section is
+    /// fine and means "not configured"; a section that is present with a null list is a typo worth naming,
+    /// because every caller of these lists reads <c>Count</c> without a guard.
+    /// </summary>
+    private static void RequireList<T>(List<T>? list, string jsonPath)
+    {
+        if (list is null)
+            throw new InvalidDataException(jsonPath + " cannot be null; omit the field to keep the default.");
+    }
+
     internal static RunFile Load(string path)
     {
         var info = new FileInfo(path);
@@ -702,6 +713,27 @@ internal static class RunCommand
         if (string.IsNullOrWhiteSpace(run.RunId)) throw new InvalidDataException("runId is required.");
         // System.Text.Json does not enforce non-nullable required members, so an explicit null arrives here.
         if (run.Model is null) throw new InvalidDataException("model is required.");
+        // The same gap applies to every collection in the file: an explicit null deserializes over the
+        // initializer, and the first thing that reads .Count throws NullReferenceException - a stack trace
+        // on the console instead of the named refusal this surface promises for every other bad value.
+        // Checked here because Load is the one seam run, resume and preflight all pass through.
+        // Each section is guarded before its lists are: `section?.List` cannot tell "the section is absent",
+        // which is legal and means not configured, from "the section is present with a null list", which is
+        // the typo being refused.
+        RequireList(run.AdditionalModels, "additionalModels");
+        if (run.Search is { } searchSection)
+            RequireList(searchSection.MetricDescriptors, "search.metricDescriptors");
+        if (run.LlmFeedback is { } feedbackSection)
+        {
+            RequireList(feedbackSection.Criteria, "llmFeedback.criteria");
+            RequireList(feedbackSection.Models, "llmFeedback.models");
+        }
+        if (run.OpenEvolveEvaluator is { } openEvolveSection)
+        {
+            RequireList(openEvolveSection.CascadeThresholds, "openEvolveEvaluator.cascadeThresholds");
+            RequireList(openEvolveSection.FeatureDimensions, "openEvolveEvaluator.featureDimensions");
+            RequireList(openEvolveSection.PythonPath, "openEvolveEvaluator.pythonPath");
+        }
         if (run.Budget is null) throw new InvalidDataException("budget is required.");
         if (run.Budget.MaxEvaluations < 1) throw new InvalidDataException("budget.maxEvaluations must be at least 1.");
         if (run.Budget.Parallelism < 1) throw new InvalidDataException("budget.parallelism must be at least 1.");
