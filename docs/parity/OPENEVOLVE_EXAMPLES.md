@@ -97,8 +97,8 @@ necessary but not sufficient, as the three rows below the smoked ones show.
 | `llm_prompt_optimization` | n/a | no | no seed program; it evolves a prompt file |
 | `symbolic_regression` | n/a | no | no config and no seed program in the repository |
 
-The smoke runs on Linux only, and that is upstream's constraint rather than a choice: their
-evaluator writes a wrapper script that embeds the program's absolute path into a single-quoted
+The smoke runs on Linux only, and that is upstream's constraint rather than a choice: *some* of
+their evaluators write a wrapper script that embeds the program's absolute path into a single-quoted
 Python literal, so on Windows the path becomes an invalid escape - `SyntaxError: (unicode error)
 'unicodeescape' codec can't decode bytes ... truncated \UXXXXXXXX escape` - and every candidate
 scores zero. Measured by running `examples/circle_packing/evaluator.py` directly on its own seed
@@ -125,6 +125,13 @@ aidotnet-evolve run --openevolve-config config.yaml initial_program.py evaluator
 ```
 
 Installing the package into the interpreter passed to `--python` works too and needs no option.
+
+**It is a property of those evaluators, not of the platform**, and the distinction matters for
+anyone wanting a real run without a container: the same shape defeats `online_judge_programming`,
+`k_module_problem` and `web_scraper_optillm`, but `examples/function_minimization/evaluator.py`
+runs correctly on Windows, scoring its own seed `combined_score` **1.4546** there (measured
+directly, with `openevolve` and `dacite` importable). The smoke is gated on Linux because one
+Theory covers every example and at least one of them needs it, not because every example does.
 
 ## The smoke covers the cascade path
 
