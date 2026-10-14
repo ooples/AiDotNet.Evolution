@@ -1,0 +1,88 @@
+name: Release evidence
+
+# US-12 (#30). Pull requests get only the fast, deterministic claim gate. The CPU-only
+# comparison runs on the weekly schedule or an explicit dispatch with bounded seeds and
+# budget. No job here calls a model, reads a secret, or starts a competitor campaign; the
+# paid decisive campaign (#122) runs on the campaign machine under its own launch confirmation.
+on:
+  merge_group:
+    types: [checks_requested]
+  pull_request:
+    branches: [main]
+  push:
+    branches: [main]
+  schedule:
+    - cron: '23 4 * * 1'
+  workflow_dispatch:
+    inputs:
+      seeds:
+        description: Paired seeds for the CPU-only comparison (2..16)
+        required: false
+        default: '8'
+      budget:
+        description: Evaluations per method, task and seed (32..256)
+        required: false
+        default: '128'
+
+permissions:
+  contents: read
+
+concurrency:
+  group: release-evidence-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  release-claim:
+    name: Release claim gate
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          # The gate checks that a claimed registration was committed before this revision.
+          fetch-depth: 0
+          persist-credentials: false
+      - name: Assess the declared claim for the version release-please will publish
+        run: |
+          set -euo pipefail
+          version="$(jq -r '."."' .release-please-manifest.json)"
+          python3 benchmarks/analysis/release_gate.py --release release --repository . --version "$version" --output release-evidence.json
+      - name: Retain the assessment and the complete declared bundle
+        if: always()
+        uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9 # v7.0.2
+        with:
+          name: release-claim-assessment
+          path: |
+            release-evidence.json
+            release/**
+          if-no-files-found: warn
+
+  bounded-comparison:
+    name: Bounded CPU comparison (scheduled or dispatched only)
+    if: github.event_name == 'schedule' || github.event_name == 'workflow_dispatch'
+    runs-on: ubuntu-latest
+    timeout-minutes: 30
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          persist-credentials: false
+      - uses: actions/setup-dotnet@a98b56852c35b8e3190ac28c8c2271da59106c68 # v6.0.0
+        with:
+          dotnet-version: '10.0.x'
+      - name: Install isolated baseline dependencies
+        run: |
+          python3 -m venv .local/comparison-env
+          .local/comparison-env/bin/python -m pip install -r benchmarks/external/requirements.txt
+      - name: Run the budgeted development comparison
+        shell: pwsh
+        env:
+          COMPARISON_SEEDS: ${{ inputs.seeds || '8' }}
+          COMPARISON_BUDGET: ${{ inputs.budget || '128' }}
+        run: ./eng/Run-BudgetedComparison.ps1 -Python .local/comparison-env/bin/python -Seeds $env:COMPARISON_SEEDS -Budget $env:COMPARISON_BUDGET
+      - name: Retain every run, including failures
+        if: always()
+        uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9 # v7.0.2
+        with:
+          name: bounded-cpu-comparison
+          path: TestResults/release-comparison/**
+          if-no-files-found: warn

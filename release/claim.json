@@ -1,0 +1,5 @@
+{
+  "schema": "evolution-release-claim-v2",
+  "claim": "none",
+  "reason": "Engineering release only. The decisive pre-registered campaign (#122) has not run, so this release makes no claim of exceeding OpenEvolve or matching AlphaEvolve."
+}
