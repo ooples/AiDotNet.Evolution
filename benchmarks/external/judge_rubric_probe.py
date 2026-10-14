@@ -55,16 +55,26 @@ def ask(program, criteria):
     return (sum(numbers) / len(numbers) if numbers else None), scores
 
 
-rows = []
-for rubric_name, criteria in (("default", DEFAULT_CRITERIA), ("names-generality", GENERALISATION_CRITERIA)):
-    for candidate_name, program in (("documented-table", GAMING), ("honest-but-wrong", HONEST)):
-        mean, scores = ask(program, criteria)
-        rows.append({"rubric": rubric_name, "candidate": candidate_name, "mean": mean,
-                     "scores": {k: v for k, v in scores.items() if k != "reasoning"}})
-        print(json.dumps(rows[-1]), flush=True)
+def main():
+    rows = []
+    for rubric_name, criteria in (("default", DEFAULT_CRITERIA),
+                                  ("names-generality", GENERALISATION_CRITERIA)):
+        for candidate_name, program in (("documented-table", GAMING), ("honest-but-wrong", HONEST)):
+            mean, scores = ask(program, criteria)
+            rows.append({"rubric": rubric_name, "candidate": candidate_name, "mean": mean,
+                         "scores": {k: v for k, v in scores.items() if k != "reasoning"}})
+            print(json.dumps(rows[-1]), flush=True)
 
-for rubric in ("default", "names-generality"):
-    pair = {r["candidate"]: r["mean"] for r in rows if r["rubric"] == rubric}
-    gap = (pair.get("honest-but-wrong") or 0) - (pair.get("documented-table") or 0)
-    print("%-18s table=%.3f honest=%.3f  honest-minus-table=%+.3f" % (
-        rubric, pair.get("documented-table") or 0, pair.get("honest-but-wrong") or 0, gap))
+    for rubric in ("default", "names-generality"):
+        pair = {r["candidate"]: r["mean"] for r in rows if r["rubric"] == rubric}
+        gap = (pair.get("honest-but-wrong") or 0) - (pair.get("documented-table") or 0)
+        print("%-18s table=%.3f honest=%.3f  honest-minus-table=%+.3f" % (
+            rubric, pair.get("documented-table") or 0, pair.get("honest-but-wrong") or 0, gap))
+    return 0
+
+
+# Guarded, so importing this module cannot run it. Without the guard the loops are module level and the
+# four model calls happen as a side effect of the import - a bill rather than a run, and it makes the
+# module untestable, because any test that imports it pays for it.
+if __name__ == "__main__":
+    raise SystemExit(main())
