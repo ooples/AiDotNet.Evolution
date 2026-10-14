@@ -138,6 +138,15 @@ internal sealed class RunOpenEvolveEvaluator
     public int TimeoutSeconds { get; init; } = 300;
     /// <summary>Metrics excluded from the fitness average, as OpenEvolve excludes its feature dimensions.</summary>
     public List<string> FeatureDimensions { get; init; } = new();
+
+    /// <summary>Directories added to the evaluator's module search path, relative to the run file.</summary>
+    /// <remarks>
+    /// An unmodified OpenEvolve evaluator may <c>import openevolve</c> - <c>circle_packing_with_artifacts</c>
+    /// imports <c>openevolve.evaluation_result</c> - and the evaluator runs in a sandbox that starts from an empty
+    /// environment, so it does not inherit the <c>PYTHONPATH</c> this process was launched with. Naming the upstream
+    /// checkout here is what makes that import resolve without installing the package into the interpreter.
+    /// </remarks>
+    public List<string> PythonPath { get; init; } = new();
 }
 
 /// <summary>How the CLI reaches the model (OpenEvolve's <c>provider</c> plus its manual mode).</summary>
@@ -242,7 +251,7 @@ internal static class RunCommand
         string tracePath = NextTracePath(outputDirectory);
         using var marker = RunMarker.Create(outputDirectory, run.RunId, tracePath);
 
-        using var execution = CreateExecution(run);
+        using var execution = CreateExecution(run, baseDirectory);
         IProgramChatClient model = CreateModels(new[] { run.Model }.Concat(run.AdditionalModels).ToList(), baseDirectory);
         using var ownedModel = model as IDisposable;
 
@@ -488,7 +497,7 @@ internal static class RunCommand
         ProbeWritable(outputDirectory);
 
         EvolutionTaskResult seed;
-        using (var execution = CreateExecution(run))
+        using (var execution = CreateExecution(run, baseDirectory))
         {
             var fitness = CreateFitness(run, execution, evaluator);
             seed = fitness.EvaluateAsync(new ProgramGenome(initial, run.Language),
@@ -514,7 +523,7 @@ internal static class RunCommand
     /// <summary>Returned when preflight finds the seed does not pass the evaluator.</summary>
     public const int PreflightFailedExitCode = 4;
 
-    private static ProcessProgramExecutionEngine CreateExecution(RunFile run)
+    internal static ProcessProgramExecutionEngine CreateExecution(RunFile run, string baseDirectory)
     {
         var sandbox = new ProgramSandboxOptions { RuntimeVersion = run.RuntimeVersion };
         sandbox.Limits.TimeLimitSeconds = run.Budget.EvaluationTimeLimitSeconds;
@@ -527,6 +536,14 @@ internal static class RunCommand
             sandbox.Limits.TimeLimitSeconds = Math.Max(sandbox.Limits.TimeLimitSeconds, stages * openEvolve.TimeoutSeconds + 10);
             if (openEvolve.Python is { } python)
                 sandbox.SetInterpreter(ProgramLanguage.Python, new ProgramInterpreterSpecification(python, "{source}"));
+            if (openEvolve.PythonPath.Count > 0)
+            {
+                // Declared rather than inherited: the sandbox clears the environment, so an evaluator that imports
+                // openevolve itself sees exactly the directories named in the run file and nothing else the host holds.
+                sandbox.DeclaredEnvironment["PYTHONPATH"] = string.Join(
+                    Path.PathSeparator.ToString(),
+                    openEvolve.PythonPath.Select(entry => Path.GetFullPath(Path.Combine(baseDirectory, entry))));
+            }
         }
         return new ProcessProgramExecutionEngine(sandbox);
     }

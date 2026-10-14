@@ -5,12 +5,39 @@ changes:
 
 ```text
 aidotnet-evolve run --openevolve-config config.yaml initial_program.py evaluator.py [--iterations N] [--output DIR] [--python EXE]
+                                                                                    [--python-path DIR]...
 ```
 
 The arguments mirror `openevolve-run.py`. The command translates the config into a normal run file
 (`<output>/run.json`) and writes a per-key report (`<output>/openevolve-import.json`). It then runs the task, which you
 can later continue with `aidotnet-evolve resume <output>/run.json`. The default output directory is
 `openevolve_output`.
+
+## An evaluator that imports a package: `--python-path`
+
+OpenEvolve runs your evaluator as a child of its own process, so the evaluator inherits whatever
+`PYTHONPATH` your shell exported - which is how an evaluator like
+`examples/circle_packing_with_artifacts/evaluator.py` can `import openevolve.evaluation_result`
+without the package being installed. Here the evaluator runs in a sandbox that **clears the
+environment** before every execution, so that no API key, token or connection string this process
+holds is visible to code it is evaluating. Nothing is inherited, including `PYTHONPATH`.
+
+Name the directories instead, once per directory:
+
+```text
+aidotnet-evolve run --openevolve-config config.yaml initial_program.py evaluator.py --python-path /path/to/openevolve --python-path /path/to/my-helpers
+```
+
+Paths are resolved relative to the config file, joined with the platform's path separator, and
+recorded in the generated `run.json` under `openEvolveEvaluator.pythonPath`, so
+`aidotnet-evolve resume` keeps them. Without the option an evaluator whose import fails reports
+`program_script_script_failed` on its first evaluation rather than scoring zero, which is the shape
+to look for if an unmodified upstream evaluator works under `openevolve-run.py` and not here. The
+alternative, installing the package into the interpreter you pass to `--python`, also works and
+needs no option.
+
+This is not an OpenEvolve config key; it has no upstream equivalent, because upstream has no
+environment boundary to declare across.
 
 ## How the config is read
 

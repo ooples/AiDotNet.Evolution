@@ -14,6 +14,7 @@ public static class Program
         Usage:
           aidotnet-evolve run     <run.json>
           aidotnet-evolve run --openevolve-config <config.yaml> <initial_program> <evaluator.py> [--iterations N] [--output DIR] [--python EXE]
+                                                                                              [--python-path DIR]...
           aidotnet-evolve resume  <run.json>
           aidotnet-evolve preflight <run.json>
           aidotnet-evolve inspect <trace>
@@ -75,6 +76,7 @@ public static class Program
         int? iterations = null;
         string output = "openevolve_output";
         string? python = null;
+        var pythonPath = new List<string>();
         for (int i = 0; i < rest.Length; i += 2)
         {
             if (i + 1 >= rest.Length) return Fail("error: " + rest[i] + " needs a value.");
@@ -89,11 +91,16 @@ public static class Program
                 case "--python":
                     python = rest[i + 1];
                     break;
+                // The evaluator runs with a cleared environment, so a directory it imports from has to be named
+                // rather than inherited from this shell. Repeat the option for each directory.
+                case "--python-path":
+                    pythonPath.Add(rest[i + 1]);
+                    break;
                 default:
                     return Fail("error: unknown or invalid option " + rest[i] + " " + rest[i + 1] + "." + Environment.NewLine + Usage);
             }
         }
-        OpenEvolveImport imported = OpenEvolveConfigImporter.Import(config, initial, evaluator, iterations, python);
+        OpenEvolveImport imported = OpenEvolveConfigImporter.Import(config, initial, evaluator, iterations, python, pythonPath);
         Directory.CreateDirectory(output);
         string runFile = Path.Combine(output, "run.json");
         File.WriteAllText(runFile, JsonSerializer.Serialize(imported.Run, RunCommand.RunFileJson));

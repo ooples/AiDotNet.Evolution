@@ -93,7 +93,10 @@ public sealed class WarmPythonExecutionEngine : IProgramExecutionEngine, IProgra
             _limits.MemoryLimitMb.ToString(CultureInfo.InvariantCulture), _limits.CpuLimit.ToString("R", CultureInfo.InvariantCulture),
             _limits.CpuTimeLimitSeconds?.ToString(CultureInfo.InvariantCulture) ?? "derived-cpu-time",
             _limits.MaxStdOutChars.ToString(CultureInfo.InvariantCulture), _limits.MaxStdErrChars.ToString(CultureInfo.InvariantCulture),
-            EvolutionHash.Compute(ReadScript())
+            EvolutionHash.Compute(ReadScript()),
+            // A declared module search path changes what a candidate can import, so it changes what a result means.
+            string.Join("\u001f", _options.DeclaredEnvironment.OrderBy(pair => pair.Key, StringComparer.Ordinal)
+                .Select(pair => pair.Key + "=" + pair.Value))
         });
     }
 
@@ -310,6 +313,12 @@ public sealed class WarmPythonExecutionEngine : IProgramExecutionEngine, IProgra
             start.Environment["HOME"] = _workspace;
             start.Environment["TMPDIR"] = _workspace;
             start.Environment["LANG"] = "C.UTF-8";
+        }
+
+        // Last, and only the caller's own written-down values; the reserved names above cannot be declared.
+        foreach (KeyValuePair<string, string> declared in _options.DeclaredEnvironment)
+        {
+            start.Environment[declared.Key] = declared.Value;
         }
 
         Process process = Process.Start(start) ?? throw new InvalidOperationException("The Python interpreter did not start.");

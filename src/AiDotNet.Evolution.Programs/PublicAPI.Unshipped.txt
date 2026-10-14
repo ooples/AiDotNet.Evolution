@@ -1165,6 +1165,7 @@ AiDotNet.Evolution.Programs.ProgramSandboxOptions
 AiDotNet.Evolution.Programs.ProgramSandboxOptions.AllowUnsafeInProcessExecution.get -> bool
 AiDotNet.Evolution.Programs.ProgramSandboxOptions.AllowUnsafeInProcessExecution.set -> void
 AiDotNet.Evolution.Programs.ProgramSandboxOptions.Clone() -> AiDotNet.Evolution.Programs.ProgramSandboxOptions!
+AiDotNet.Evolution.Programs.ProgramSandboxOptions.DeclaredEnvironment.get -> System.Collections.Generic.IDictionary<string!, string!>!
 AiDotNet.Evolution.Programs.ProgramSandboxOptions.Interpreters.get -> System.Collections.Generic.IDictionary<AiDotNet.Evolution.Programs.ProgramLanguage, AiDotNet.Evolution.Programs.ProgramInterpreterSpecification!>!
 AiDotNet.Evolution.Programs.ProgramSandboxOptions.Limits.get -> AiDotNet.Evolution.Programs.ProgramSandboxLimitOptions!
 AiDotNet.Evolution.Programs.ProgramSandboxOptions.Limits.set -> void
@@ -1827,6 +1828,7 @@ static AiDotNet.Evolution.Programs.ProgramLanguageDetector.TryGetLanguageForFenc
 static AiDotNet.Evolution.Programs.ProgramLanguageDetector.TryGetLanguageForFileExtension(string? extension, out AiDotNet.Evolution.Programs.ProgramLanguage language) -> bool
 static AiDotNet.Evolution.Programs.ProgramMeasurementStatistics.Calculate(System.Collections.Generic.IEnumerable<AiDotNet.Evolution.Programs.ProgramMeasurementObservation!>! observations) -> (double Mean, double StandardError)
 static AiDotNet.Evolution.Programs.ProgramSandboxOptions.CreateDefaultInterpreters() -> System.Collections.Generic.Dictionary<AiDotNet.Evolution.Programs.ProgramLanguage, AiDotNet.Evolution.Programs.ProgramInterpreterSpecification!>!
+static AiDotNet.Evolution.Programs.ProgramSandboxOptions.ReservedEnvironmentNames.get -> System.Collections.Generic.IReadOnlyCollection<string!>!
 static AiDotNet.Evolution.Programs.ProgramSnapshot.Digest(byte[]! value) -> string!
 static AiDotNet.Evolution.Programs.ProgramSnapshot.Digest(string! value) -> string!
 static AiDotNet.Evolution.Programs.ProgramTaskOptions.CopyMetricDescriptors(System.Collections.Generic.IList<string!>? descriptors) -> System.Collections.Generic.List<string!>!
