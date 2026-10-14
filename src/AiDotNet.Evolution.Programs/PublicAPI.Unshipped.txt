@@ -890,6 +890,14 @@ AiDotNet.Evolution.Programs.ProgramInstructionCandidate.ParentId.get -> string?
 AiDotNet.Evolution.Programs.ProgramInstructionCandidate.Scored.get -> long
 AiDotNet.Evolution.Programs.ProgramInstructionCandidate.Text.get -> string!
 AiDotNet.Evolution.Programs.ProgramInstructionCandidate.Uses.get -> long
+AiDotNet.Evolution.Programs.ProgramInstructionCreditObserver
+AiDotNet.Evolution.Programs.ProgramInstructionCreditObserver.Abandon(long generation) -> bool
+AiDotNet.Evolution.Programs.ProgramInstructionCreditObserver.AcceptedProposals.get -> int
+AiDotNet.Evolution.Programs.ProgramInstructionCreditObserver.CreditedOutcomes.get -> int
+AiDotNet.Evolution.Programs.ProgramInstructionCreditObserver.OnEventAsync(AiDotNet.Evolution.EvolutionEvent<AiDotNet.Evolution.Programs.ProgramGenome!>! evolutionEvent, System.Threading.CancellationToken cancellationToken = default(System.Threading.CancellationToken)) -> System.Threading.Tasks.ValueTask
+AiDotNet.Evolution.Programs.ProgramInstructionCreditObserver.ProgramInstructionCreditObserver(AiDotNet.Evolution.Programs.ProgramMetaPromptEvolver! evolver, AiDotNet.Evolution.EvolutionResourceLedger? ledger = null) -> void
+AiDotNet.Evolution.Programs.ProgramInstructionCreditObserver.Select(AiDotNet.Evolution.StableRandom! random, long generation) -> string?
+AiDotNet.Evolution.Programs.ProgramInstructionCreditObserver.VersionHash.get -> string!
 AiDotNet.Evolution.Programs.ProgramInstructionSelection
 AiDotNet.Evolution.Programs.ProgramInstructionSelection.EpsilonGreedy = 0 -> AiDotNet.Evolution.Programs.ProgramInstructionSelection
 AiDotNet.Evolution.Programs.ProgramInstructionSelection.Greedy = 1 -> AiDotNet.Evolution.Programs.ProgramInstructionSelection
