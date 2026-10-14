@@ -38,7 +38,7 @@ another session was building a solution with ~25 MSBuild workers throughout it.
 | 8 | 48.7 | 12,493 | 0.0039 [0.0023, 0.0061] | 61.39 | 601.2 |
 | 16 | 47.4 | 11,369 | 0.0042 [0.0037, 0.0046] | 61.21 | 1,121.3 |
 
-No resample produced a non-positive `T(2N) - T(N)` in any of the 90 rows.
+None of the 90 measurements produced a non-positive `T(2N) - T(N)` (the 4,000 draws per worker count are bootstrap resamples of those measurements, not measurements of their own).
 
 **Per-repeat spread, stated rather than smoothed:** ours ranges 42.5-95.0 us at 1 worker and
 18.0-79.3 us at 8, against medians of 46.4 and 48.7; theirs ranges 7,493-48,179 us at 1 worker. The
