@@ -523,6 +523,17 @@ internal static class RunCommand
                 : " (" + string.Join(", ", first.Data.Select(pair => ForStderr(pair.Key) + "=" + ForStderr(pair.Value))) + ")";
             error.WriteLine("error: the run produced no candidate. First retained failure ["
                 + ForStderr(first.Code) + "]: " + (first.IsRedacted ? "<redacted>" : ForStderr(first.Message)) + detail);
+            // A run that produced nothing is where FailureOutput earns its place, so the one thing worth
+            // saying here is how to make it carry something. Only when it is empty: with the flags already
+            // on, the output is in the report above and repeating the advice would be noise.
+            if (FailureOutputOf(result).Length == 0)
+            {
+                error.WriteLine("hint: set search.collectArtifacts and search.retainArtifactText in the run "
+                    + "file to have FailureOutput carry what the evaluator printed. The evaluator runs with a "
+                    + "cleared environment, so PYTHONPATH is not forwarded: a package it imports must be "
+                    + "installed into the interpreter passed to --python, or named in "
+                    + "openEvolveEvaluator.pythonPath.");
+            }
         }
 
         ProgramEvolutionLlmUsage usage = variation.GetUsage();
