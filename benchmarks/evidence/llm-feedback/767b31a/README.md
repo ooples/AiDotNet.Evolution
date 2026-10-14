@@ -8,31 +8,45 @@ the CLI, under the default rubric and under one naming generality. Raw rows: `ru
 ## Result
 
 Every arm's winner reached a perfect visible score by storing the examples, so the judge's own score is
-recoverable from the blend: `judge = (blended - (1 - w) * visible) / w` at `w = 0.3`, `visible = 1.0`.
+recoverable from the blend. The engine mixes with **`CombinedBlend`** (0.7 by default) and uses `Weight`
+only to scale the judge's utility, so the inversion is
+`judgeMean = (blended - CombinedBlend * visible) / ((1 - CombinedBlend) * Weight)` - not the
+`Weight`-as-mixing-coefficient form, which gives numbers that drift with the weight:
 
-| seed | rubric | blended quality | **implied judge score for the gaming winner** |
+| seed | rubric | blended quality | **judge mean for the gaming winner** |
 | --- | --- | --- | --- |
-| 0 | default (`Correctness`, `Efficiency`, `Readability`) | 0.7465 | **0.1550** |
-| 0 | `Correctness`, `Generality`, `Readability` | 0.7201 | **0.0670** |
-| 1 | default | 0.7465 | **0.1550** |
-| 1 | `Correctness`, `Generality`, `Readability` | 0.7255 | **0.0850** |
+| 0 | default (`Correctness`, `Efficiency`, `Readability`) | 0.7465 | **0.5167** |
+| 0 | `Correctness`, `Generality`, `Readability` | 0.7201 | **0.2233** |
+| 1 | default | 0.7465 | **0.5167** |
+| 1 | `Correctness`, `Generality`, `Readability` | 0.7255 | **0.2833** |
 
-Naming generality **roughly halves** the shipped judge's score for the gaming candidate, reproducibly
-across both seeds, and the default rubric's score is identical to four decimal places on both — so the
+Naming generality **more than halves** the shipped judge's score for the gaming candidate, reproducibly
+across both seeds, and the default rubric's figure is identical to four decimal places on both - so the
 difference is the rubric and not run-to-run noise.
 
-This agrees in direction with the prompt-shape probe (which measured a 3.7x wider honest-minus-table gap)
-and, unlike that probe, it is the judge the product actually ships.
+**It corroborates the prompt-shape probe to three decimals.** That probe scored the same documented table
+at **0.517** under the default rubric and **0.223** under the generality rubric, by asking the model
+directly rather than recovering anything from a blend. Here the shipped judge gives **0.5167** and
+**0.2233**. Two independent routes agreeing that closely is the strongest evidence in this directory that
+both are measuring what they claim.
 
-**Still not reconciled:** the in-run inversion. Here the gaming candidate scores 0.155 under the default
-rubric, not the 0.787-0.839 measured during the earlier ablation. The earlier figures came from runs whose
-winners carried different source text, so candidate content - not the rubric - is the remaining variable.
-That is recorded as open rather than explained away.
+An earlier version of this file recorded an unreconciled "in-run inversion" - the gaming candidate
+appearing to score 0.787-0.839 during the first ablation against 0.155 here. **Both figures were misderived
+with the wrong blend model, and the inversion does not exist**: corrected, the first ablation's documented
+hybrid scores 0.5165 and its honest comparator 0.5166. The judge was not ranking the gamer above the honest
+attempt; it could not separate them.
 
 **The endpoint did not move.** Held-out accuracy stayed 0.0 in every arm (one 0.0182 accidental hit at
 seed 1 under the default rubric). Halving the judge's score for a gamer is not the same as changing which
-candidate wins: at `w = 0.3` the visible-score gap still dominates, which is exactly what the merged
-evidence's flip-weight arithmetic predicts.
+candidate wins, and the corrected flip condition says why:
+
+```
+(1 - CombinedBlend) * Weight * (judge_honest - judge_gamer) > CombinedBlend * (1 - visible_honest)
+```
+
+At `CombinedBlend = 0.7`, `Weight = 0.3`, a gap near 0.29 and a seed at 1 of 6 visible, the left side is
+0.026 against 0.583 on the right. Not close - and `Weight = 1` would still leave 0.087 against 0.583.
+Deciding this needs **`CombinedBlend < 0.26`**, which the run file does not expose.
 
 ## A constraint found by running it
 
