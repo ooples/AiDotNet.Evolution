@@ -54,9 +54,16 @@ public static class ProfileRevision
             foreach (string argument in new[] { "status", "--porcelain", "--untracked-files=no" }) start.ArgumentList.Add(argument);
             using var git = Process.Start(start);
             if (git is null) return "unavailable";
-            string output = git.StandardOutput.ReadToEnd();
-            git.StandardError.ReadToEnd();
+            // Concurrently, not one after the other: reading stdout to the end first lets a chatty git -
+            // a repository with many warnings, a slow filesystem notice - fill the stderr pipe and block on
+            // its own write while this side is still blocked on stdout. Neither read returns, and the block
+            // happens before WaitForExit, so the 15 s bound never applies.
+            Task<string> pendingOutput = git.StandardOutput.ReadToEndAsync();
+            Task<string> pendingError = git.StandardError.ReadToEndAsync();
             if (!git.WaitForExit(15000)) { git.Kill(entireProcessTree: true); return "unavailable"; }
+            git.WaitForExit();
+            string output = pendingOutput.GetAwaiter().GetResult();
+            pendingError.GetAwaiter().GetResult();
             if (git.ExitCode != 0) return "unavailable";
             int changed = output.Split('\n', StringSplitOptions.RemoveEmptyEntries).Length;
             return changed == 0 ? "clean" : "modified-tracked-files=" + changed.ToString(CultureInfo.InvariantCulture);

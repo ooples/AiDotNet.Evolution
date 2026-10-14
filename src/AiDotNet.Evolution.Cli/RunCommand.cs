@@ -44,6 +44,47 @@ internal sealed class RunFile
     public RunSearch Search { get; init; } = new();
     /// <summary>How an unmodified OpenEvolve evaluator is run; <c>null</c> when <see cref="Evaluator"/> follows this CLI's contract.</summary>
     public RunOpenEvolveEvaluator? OpenEvolveEvaluator { get; init; }
+    /// <summary>Evolving the system instruction alongside the programs (AlphaEvolve's meta-prompt component).</summary>
+    /// <remarks>
+    /// <c>null</c> keeps a fixed instruction, which is what OpenEvolve does: its <c>use_meta_prompting</c> and
+    /// <c>meta_prompt_weight</c> exist and its own config comment says "not implemented".
+    /// </remarks>
+    public RunMetaPrompt? MetaPrompt { get; init; }
+}
+
+/// <summary>Instruction evolution: candidate system instructions, scored by the programs they produce.</summary>
+/// <remarks>
+/// The instructions are credited from the run's own outcomes, and only from outcomes the run measured: a
+/// proposal whose evaluation failed releases its route and earns no score, so no number the run never
+/// measured enters the archive's mean. The archive is not checkpointed - see
+/// <see cref="RunMetaPrompt.SeedInstruction"/>.
+/// </remarks>
+internal sealed class RunMetaPrompt
+{
+    /// <summary>The instruction the run starts from; required, because an evolver needs something to vary.</summary>
+    /// <remarks>
+    /// <b>A resumed run starts the instruction archive again from this seed.</b> The engine checkpoints the
+    /// variation operator's own state, not its instruction source, so a resume rebuilds the evolver and loses
+    /// the archive, its scores, its counters and any outstanding routes. A long run that is resumed therefore
+    /// re-explores instructions it had already scored. Persisting it needs the evolver's
+    /// <c>CaptureState</c>/<c>RestoreState</c> to join the checkpoint, which is a change to the engine's
+    /// checkpoint contract rather than to this file.
+    /// </remarks>
+    public required string SeedInstruction { get; init; }
+    /// <summary>Generations between instruction proposals (OpenEvolve has no equivalent cadence key).</summary>
+    public int ProposeEveryGenerations { get; init; } = 25;
+    /// <summary>Instructions kept at once; the worst is evicted, never one awaiting an outcome.</summary>
+    public int MaxArchiveSize { get; init; } = 8;
+    /// <summary>How the next proposal's instruction is drawn from the archive.</summary>
+    public ProgramInstructionSelection Selection { get; init; } = ProgramInstructionSelection.EpsilonGreedy;
+    /// <summary>Chance of drawing an instruction other than the best one.</summary>
+    public double ExplorationProbability { get; init; } = 0.2;
+    /// <summary>Longest instruction accepted from the model.</summary>
+    public int MaxInstructionChars { get; init; } = 4_000;
+    /// <summary>Metric prefix for the instruction archive's cost descriptors.</summary>
+    public string MetricPrefix { get; init; } = "meta_prompt_";
+    /// <summary>The models that propose instructions; empty uses the proposal models.</summary>
+    public List<RunModel> Models { get; init; } = new();
 }
 
 /// <summary>Prompt settings mapped onto <see cref="ProgramEvolutionPromptOptions"/>; null leaves each at its default.</summary>
@@ -371,6 +412,35 @@ internal static class RunCommand
             MaxOutputTokens = run.Model.MaxOutputTokens
         };
         if (run.Search.TopPrograms is int topPrograms) variationOptions.MaxTopPrograms = topPrograms;
+        // Instruction evolution, when configured. The observer is both halves: the operator's instruction
+        // source and the engine's outcome listener, because an instruction can only be scored by what the
+        // programs it produced achieved - see ProgramInstructionCreditObserver.
+        ProgramInstructionCreditObserver? instructions = null;
+        ProgramMetaPromptEvolver? instructionEvolver = null;
+        if (run.MetaPrompt is { } meta)
+        {
+            IProgramChatClient instructionModel = meta.Models.Count == 0
+                ? CreateModels(new[] { run.Model }.Concat(run.AdditionalModels).ToList(), baseDirectory)
+                : CreateModels(meta.Models, baseDirectory);
+            var evolver = new ProgramMetaPromptEvolver(instructionModel, meta.SeedInstruction, new ProgramMetaPromptOptions
+            {
+                Enabled = true,
+                ProposeEveryGenerations = meta.ProposeEveryGenerations,
+                MaxArchiveSize = meta.MaxArchiveSize,
+                Selection = meta.Selection,
+                ExplorationProbability = meta.ExplorationProbability,
+                MaxInstructionChars = meta.MaxInstructionChars,
+                MetricPrefix = meta.MetricPrefix,
+                Direction = run.Direction
+            });
+            // No ledger: this command does not build one, so instruction proposals are not metered here.
+            // The run file therefore does not offer proposalCostUnits - a field that charged nothing would be
+            // worse than its absence. The call counts are reported instead, under MetaPrompt below.
+            instructionEvolver = evolver;
+            instructions = new ProgramInstructionCreditObserver(evolver);
+            variationOptions.InstructionSource = instructions;
+        }
+
         var variation = new LlmProgramVariationOperator(model, programOptions, variationOptions);
         // Program length stands for OpenEvolve's built-in "complexity" axis. Configured descriptors replace it, as
         // OpenEvolve's feature_dimensions replace its defaults; "length" among them keeps it.
@@ -456,7 +526,13 @@ internal static class RunCommand
         using (var tracer = new EvolutionTraceObserver<ProgramGenome>(new EvolutionTraceOptions { Enabled = true, Path = tracePath }, run.RunId, descriptors))
         {
             var engine = new EvolutionEngine<ProgramGenome>(task, variation, _ => new MapElitesArchive<ProgramGenome>(descriptors, capacity: capacity), options,
-                observer: tracer, checkpointStore: checkpoints, genomeCodec: codec);
+                // The engine takes one observer, and a judged run needs two: the trace writer, and the
+                // instruction credit that feeds outcomes back into the search. A composite isolates one
+                // observer's failure from the other rather than letting a trace problem cost a credit.
+                observer: instructions is null
+                    ? tracer
+                    : new CompositeEvolutionObserver<ProgramGenome>(new IEvolutionObserver<ProgramGenome>[] { tracer, instructions }),
+                checkpointStore: checkpoints, genomeCodec: codec);
             interrupt.Attach(engine.RequestStop);
             try
             {
@@ -483,6 +559,22 @@ internal static class RunCommand
             Repertoire = repertoirePath,
             WarmStart = warmStart,
             ModelUsage = variation.GetUsage(),
+            // Instruction evolution calls the model on its own cadence, and those calls are not the
+            // variation operator's, so ModelUsage above does not include them: a run with metaPrompt
+            // configured would otherwise under-report what it spent. Null when metaPrompt is absent, so
+            // the field says which arm ran as well as what it cost.
+            MetaPrompt = instructionEvolver is null || instructions is null
+                ? null
+                : new
+                {
+                    instructionEvolver.ProposalCalls,
+                    instructionEvolver.RefusedProposals,
+                    instructions.AcceptedProposals,
+                    instructions.CreditedOutcomes,
+                    // Outcomes that reported no quality. An instruction earns nothing from one, so a run
+                    // whose programs mostly fail is one where the archive has little to rank on.
+                    instructions.FailedOutcomes
+                },
             // Why the run ended the way it did. The engine retains the failures it survived, and
             // without them a run whose every evaluation was refused reports only
             // StopReason: NoCandidates - true, and useless for finding out why. Redacted
@@ -734,6 +826,10 @@ internal static class RunCommand
             RequireList(openEvolveSection.FeatureDimensions, "openEvolveEvaluator.featureDimensions");
             RequireList(openEvolveSection.PythonPath, "openEvolveEvaluator.pythonPath");
         }
+        // metaPrompt is the one list this guard could not cover when it was written, because the
+        // section did not exist yet. Same hazard, same refusal.
+        if (run.MetaPrompt is { } metaPromptSection)
+            RequireList(metaPromptSection.Models, "metaPrompt.models");
         if (run.Budget is null) throw new InvalidDataException("budget is required.");
         if (run.Budget.MaxEvaluations < 1) throw new InvalidDataException("budget.maxEvaluations must be at least 1.");
         if (run.Budget.Parallelism < 1) throw new InvalidDataException("budget.parallelism must be at least 1.");

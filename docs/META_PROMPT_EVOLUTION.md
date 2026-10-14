@@ -52,9 +52,72 @@ The source's `VersionHash` joins the operator's identity, because an interface-t
 be serialised into it and two operators differing only by their instruction source must not claim
 the same version.
 
-**Crediting stays with the caller.** The operator supplies proposals and never sees outcomes, so
-whoever owns the run calls `Observe(generation, quality)` after each evaluation - and `Abandon` for a
-proposal that failed.
+**`ProgramInstructionCreditObserver` is the crediting path**, and writing your own is the exception. The operator supplies proposals and never sees outcomes,
+so somebody has to call `Observe(generation, quality)` after each evaluation - and `Abandon` for a
+proposal whose outcome will never arrive. Without that, instructions are proposed, used, and never
+judged: the archive's scores stay empty and selection has nothing to prefer, which makes the feature
+inert rather than broken.
+
+Hand the same instance to the operator **and** to the engine, because it is both halves - the source
+that records which generation got which instruction, and the observer that credits it when the
+outcome arrives:
+
+```csharp
+var credit = new ProgramInstructionCreditObserver(evolver, ledger);   // ledger may be null
+var variation = new LlmProgramVariationOperator(chatClient, programOptions, new LlmProgramVariationOptions
+{
+    Mode = ProgramEvolutionMode.FullRewrite,
+    InstructionSource = credit
+});
+
+// The engine takes one observer, so compose when you also want a trace:
+var engine = new EvolutionEngine<ProgramGenome>(task, variation, archiveFactory, options,
+    observer: new CompositeEvolutionObserver<ProgramGenome>(
+        new IEvolutionObserver<ProgramGenome>[] { tracer, credit }));
+```
+
+`CompositeEvolutionObserver<TGenome>` isolates one observer's failure from the other, matching the
+engine's own policy: a trace problem must not cost a credit. It refuses the same observer twice,
+because a repeated observer would double whatever it counts.
+
+Two behaviours of the credit observer are worth knowing, because the alternatives look equivalent:
+
+- It credits **only** generations it actually routed. The engine evaluates seed candidates that no
+  proposal produced, and `Observe` refuses a generation it never routed, so "anything past generation
+  zero" would throw on the seed's own evaluation.
+- A **failed** evaluation earns no score. It releases its route and is counted in `FailedOutcomes`
+  instead, because any stand-in value competes with the real ones and whichever is chosen can beat a
+  measured outcome: `0.0` beats every positive cost when minimizing, where the evolver negates quality,
+  and beats every negative quality when maximizing. A stream of credits is never revised, so an early
+  stand-in stays in the mean for the rest of the run.
+
+  Leaving it unscored is only safe because selection treats **untried**, not unscored, as unexplored: an
+  instruction whose outcomes all failed is not drawn ahead of every instruction that works, and it is the
+  first evicted when the archive is full. What it does **not** do is rank by failure rate - an instruction
+  that fails nine times in ten is ranked on the one measurement it has. `FailedOutcomes` is reported
+  because the archive cannot show it.
+
+If a run proposes instructions and both `CreditedOutcomes` and `FailedOutcomes` stay zero, the wiring is
+wrong rather than the feature ineffective - which is worth being able to tell apart.
+
+## What the CLI reports
+
+`aidotnet-evolve run` emits a `MetaPrompt` section, `null` when the run file has no `metaPrompt`, so the
+report says which arm ran as well as what it cost:
+
+```jsonc
+"MetaPrompt": {
+  "ProposalCalls": 3,        // model calls the evolver made on its own cadence
+  "RefusedProposals": 1,     // replies the evolver would not accept as an instruction
+  "AcceptedProposals": 2,
+  "CreditedOutcomes": 7,
+  "FailedOutcomes": 1
+}
+```
+
+`ModelUsage` counts the **variation operator's** calls only. Instruction evolution calls the model on its
+own cadence, and those calls are not the operator's, so without this section a run with `metaPrompt`
+configured under-reports what it spent.
 
 ## What scores an instruction
 
@@ -110,6 +173,13 @@ A refusal still costs a call and is still reported, because a run paying for ans
 should be able to see that rather than infer it from a flat archive.
 
 ## Checkpoints
+
+**Through the CLI, a resume starts the instruction archive over.** The engine checkpoints the
+variation operator's state, not its instruction source, so `aidotnet-evolve resume` rebuilds the
+evolver from `metaPrompt.seedInstruction` and loses the archive, its scores, its counters and any
+outstanding routes. The evolver's own `CaptureState`/`RestoreState` work and are tested - what is
+missing is their place in the engine's checkpoint, which is a change to that contract rather than to
+the CLI. Use the API directly if a resumed run must keep what its instructions learned.
 
 `CaptureState` carries the archive, the lineage, the counters and the outstanding routes, so a
 resumed run can still credit an instruction for a proposal that was in flight. `StateHash` hashes

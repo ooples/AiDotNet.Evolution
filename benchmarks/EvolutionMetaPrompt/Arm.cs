@@ -150,12 +150,24 @@ internal static class Arm
             RedirectStandardError = true,
             UseShellExecute = false
         }) ?? throw new IOException("the held-out scorer did not start");
-        string output = process.StandardOutput.ReadToEnd();
+        // Both pipes are drained concurrently, and that is load-bearing rather than tidy. Reading stdout to
+        // the end while stderr is redirected and never read lets a candidate that writes more than the
+        // stderr pipe buffer block on its own write - and the block happens HERE, before WaitForExit is
+        // reached, so the 120 s bound never applies and the campaign hangs instead of recording a timeout.
+        // Measured: a candidate writing 200 KB to stderr never exits and the stdout read never returns.
+        Task<string> pendingOutput = process.StandardOutput.ReadToEndAsync();
+        Task<string> pendingError = process.StandardError.ReadToEndAsync();
         if (!process.WaitForExit(120_000))
         {
             process.Kill(entireProcessTree: true);
             return (0.0, "the scorer did not finish within 120 s");
         }
+
+        // The no-argument overload after a successful timed wait: it is what guarantees the redirected
+        // streams have been drained before the text is read.
+        process.WaitForExit();
+        string output = pendingOutput.GetAwaiter().GetResult();
+        pendingError.GetAwaiter().GetResult();
 
         if (process.ExitCode != 0)
             return (0.0, "the scorer exited " + process.ExitCode.ToString(CultureInfo.InvariantCulture));
