@@ -792,5 +792,137 @@ public sealed class OpenEvolveImportTests
             if (Directory.Exists(Path.Combine(directory.FullName, "docs", "parity"))) return directory.FullName;
         throw new InvalidOperationException("Repository root not found above " + AppContext.BaseDirectory);
     }
+
+    [Fact]
+    public void A_run_file_can_switch_on_instruction_evolution_and_the_run_completes()
+    {
+        // The feature shipped with no way to reach it: RunCommand had no run-file field, so meta-prompt
+        // evolution could not be switched on through `aidotnet-evolve run` at all.
+        //
+        // Named for what it asserts, which is less than it once claimed: the run file is accepted and the
+        // run completes with a proposal. It does NOT prove the instruction reached the prompt or that any
+        // outcome was credited - the loopback fake counts only requests matching its own validity rules, so
+        // an assertion on its call count measured the harness rather than the product. The evidence for the
+        // instruction reaching the prompt is the recorded-prompt measurement in the PR, and the credit path
+        // is covered by InstructionCreditObserverTests.
+        using var directory = new TemporaryDirectory();
+        using var model = new CliRunTests.FakeChatModel();
+        File.WriteAllText(Path.Combine(directory.Path, "initial_program.py"), "X = 0\n");
+        File.WriteAllText(Path.Combine(directory.Path, "evaluator.py"),
+            "import json, sys\ndef evaluate(source):\n    return {\"quality\": 0.5}\nprint(json.dumps(evaluate(sys.stdin.read())))\n");
+        string output = Path.Combine(directory.Path, "out");
+        var run = new
+        {
+            schema = "aidotnet-evolve-run-v1",
+            runId = "meta-prompt-cli",
+            initialProgram = Path.Combine(directory.Path, "initial_program.py"),
+            evaluator = Path.Combine(directory.Path, "evaluator.py"),
+            output,
+            model = new { provider = "OpenAiCompatible", endpoint = model.Endpoint, name = "fake-model" },
+            budget = new { maxEvaluations = 3, seed = 7, parallelism = 1 },
+            metaPrompt = new { seedInstruction = "Keep the program short and correct.", proposeEveryGenerations = 1 }
+        };
+        string runFile = Path.Combine(directory.Path, "run.json");
+        File.WriteAllText(runFile, JsonSerializer.Serialize(run));
+
+        string? previousKey = Environment.GetEnvironmentVariable("OPENAI_API_KEY");
+        Environment.SetEnvironmentVariable("OPENAI_API_KEY", "unused-by-the-fake");
+        try
+        {
+            var (code, stdout, error) = CliRunTests.Run("run", runFile);
+
+            Assert.True(code == 0, error);
+            using JsonDocument result = JsonDocument.Parse(stdout);
+            Assert.True(result.RootElement.GetProperty("CompletedEvaluations").GetInt64() >= 1, stdout);
+            Assert.True(result.RootElement.GetProperty("ModelUsage").GetProperty("Proposals").GetInt64() >= 1, stdout);
+            // ModelUsage counts the variation operator's calls only, so a run with instruction evolution
+            // would under-report what it spent without this section. Asserted as present and shaped rather
+            // than at a value: what the loopback fake accepts as a valid instruction reply is a property of
+            // the harness, so a count here would measure that instead.
+            JsonElement meta = result.RootElement.GetProperty("MetaPrompt");
+            Assert.Equal(JsonValueKind.Object, meta.ValueKind);
+            foreach (string name in new[]
+                     {
+                         "ProposalCalls", "RefusedProposals", "AcceptedProposals", "CreditedOutcomes",
+                         "FailedOutcomes"
+                     })
+            {
+                Assert.True(meta.GetProperty(name).GetInt64() >= 0, name + " is missing or negative: " + stdout);
+            }
+        }
+        finally
+        {
+            Environment.SetEnvironmentVariable("OPENAI_API_KEY", previousKey);
+        }
+    }
+
+    [Fact]
+    public void A_meta_prompt_model_list_set_to_null_is_refused_by_name()
+    {
+        // Reproduced against the built CLI before the fix: "models": null crashed `run` with an unhandled
+        // NullReferenceException at the first read of .Count. Every run-file list has the same hazard -
+        // System.Text.Json deserializes the explicit null over the initializer - and #253 guards the ones
+        // that exist on its branch; metaPrompt is the one it could not reach.
+        using var directory = new TemporaryDirectory();
+        File.WriteAllText(Path.Combine(directory.Path, "initial_program.py"), "X = 0" + (char)10);
+        File.WriteAllText(Path.Combine(directory.Path, "evaluator.py"), """
+            import json, sys
+            print(json.dumps({"quality": 0.5}))  # evaluate
+            """);
+        var run = new
+        {
+            schema = "aidotnet-evolve-run-v1",
+            runId = "meta-null-models",
+            initialProgram = Path.Combine(directory.Path, "initial_program.py"),
+            evaluator = Path.Combine(directory.Path, "evaluator.py"),
+            output = Path.Combine(directory.Path, "out"),
+            model = new { provider = "OpenAiCompatible", endpoint = "http://127.0.0.1:1/v1", name = "fake-model" },
+            budget = new { maxEvaluations = 2, seed = 7, parallelism = 1 },
+            metaPrompt = new { seedInstruction = "Improve the program and keep it correct.", models = (object?)null }
+        };
+        string runFile = Path.Combine(directory.Path, "run.json");
+        File.WriteAllText(runFile, JsonSerializer.Serialize(run));
+
+        var (code, _, error) = CliRunTests.Run("run", runFile);
+        Assert.NotEqual(0, code);
+        Assert.Contains("metaPrompt.models", error, StringComparison.Ordinal);
+        Assert.Contains("cannot be null", error, StringComparison.Ordinal);
+
+        // Preflight reads the same file, and the old crash was in run setup, which preflight never enters.
+        var (preflightCode, _, preflightError) = CliRunTests.Run("preflight", runFile);
+        Assert.NotEqual(0, preflightCode);
+        Assert.Contains("metaPrompt.models", preflightError, StringComparison.Ordinal);
+    }
+
+    [Fact]
+    public void An_invalid_meta_prompt_section_is_refused_by_name_rather_than_ignored()
+    {
+        // Proves the section is parsed, mapped onto ProgramMetaPromptOptions and validated, rather than
+        // accepted and dropped: an unreadable value has to come back named. A run that merely completes
+        // cannot distinguish "the section was honoured" from "the section was ignored".
+        using var directory = new TemporaryDirectory();
+        File.WriteAllText(Path.Combine(directory.Path, "initial_program.py"), "X = 0\n");
+        File.WriteAllText(Path.Combine(directory.Path, "evaluator.py"),
+            "import json, sys\n"
+            + "print(json.dumps({\"quality\": 0.5}))  # evaluate\n");
+        var run = new
+        {
+            schema = "aidotnet-evolve-run-v1",
+            runId = "meta-prompt-invalid",
+            initialProgram = Path.Combine(directory.Path, "initial_program.py"),
+            evaluator = Path.Combine(directory.Path, "evaluator.py"),
+            output = Path.Combine(directory.Path, "out"),
+            model = new { provider = "OpenAiCompatible", endpoint = "http://127.0.0.1:1/v1", name = "fake-model" },
+            budget = new { maxEvaluations = 2, seed = 7, parallelism = 1 },
+            metaPrompt = new { seedInstruction = "Keep it short.", explorationProbability = 2.5 }
+        };
+        string runFile = Path.Combine(directory.Path, "run.json");
+        File.WriteAllText(runFile, JsonSerializer.Serialize(run));
+
+        var (code, _, error) = CliRunTests.Run("run", runFile);
+
+        Assert.NotEqual(0, code);
+        Assert.Contains("ExplorationProbability", error, StringComparison.Ordinal);
+    }
 }
 #endif
