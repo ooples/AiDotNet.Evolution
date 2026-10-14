@@ -30,6 +30,21 @@ public sealed class ProgramDescriptorPromotionTests
     }
 
     [Fact]
+    public async System.Threading.Tasks.Task Named_metrics_become_descriptors_under_proposal_options_too()
+    {
+        // Every test here used the base options, and the CLI uses the derived ProgramProposalOptions, whose
+        // hand-listed Clone override dropped MetricDescriptors. ProgramEvolutionTask snapshots its options
+        // through Clone, so the promotion list was empty by the first evaluation while the archive still
+        // demanded those coordinates: every candidate was refused with descriptor_missing and an OpenEvolve
+        // config declaring any non-reserved feature dimension ended with no candidates after one evaluation.
+        var options = new ProgramProposalOptions { MetricDescriptors = { "runtime_ms" } };
+        EvolutionTaskResult result = await Task(options, new Dictionary<string, double> { ["runtime_ms"] = 12.5, ["other"] = 3 })
+            .EvaluateAsync(Candidate(new ProgramGenome("x")), Context);
+        Assert.Equal(12.5, result.Descriptors["runtime_ms"]);
+        Assert.False(result.Descriptors.ContainsKey("other"));
+    }
+
+    [Fact]
     public async System.Threading.Tasks.Task An_evaluator_descriptor_of_the_same_name_wins()
     {
         var options = new ProgramTaskOptions { MetricDescriptors = { "runtime_ms" } };
