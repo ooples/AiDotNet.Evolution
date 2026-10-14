@@ -1,0 +1,42 @@
+{
+  "story": "V1-56/V1-57: claude_code_quickstart run unmodified through the CLI with the real Claude Code provider",
+  "commit": "767b31a",
+  "evaluations": [
+    {
+      "sequence": 1,
+      "status": "Completed",
+      "quality": 1.0567448019447394,
+      "metrics": {
+        "combined_score": 1.0567448019447394,
+        "distance_score": 0.6555061758304026,
+        "reliability_score": 1,
+        "runs_successfully": 1,
+        "value_score": 0.9679376310763241
+      }
+    },
+    {
+      "sequence": 6,
+      "status": "Completed",
+      "quality": 1.4836987593820865,
+      "metrics": {
+        "combined_score": 1.4836987593820865,
+        "distance_score": 0.9663051033399601,
+        "reliability_score": 1,
+        "runs_successfully": 1,
+        "value_score": 0.9984819505054724
+      }
+    },
+    {
+      "sequence": 8,
+      "status": "Completed",
+      "quality": 1.4956110271420124,
+      "metrics": {
+        "combined_score": 1.4956110271420124,
+        "distance_score": 0.990913381028658,
+        "reliability_score": 1,
+        "runs_successfully": 1,
+        "value_score": 0.9996000075721548
+      }
+    }
+  ]
+}

@@ -1,0 +1,127 @@
+{
+  "schema": "aidotnet-evolve-run-v1",
+  "runId": "openevolve-config",
+  "initialProgram": "C:\\Users\\cheat\\AppData\\Local\\Temp\\claude\\C--Users-cheat\\5e8549bf-c217-4e8f-9844-5a569ec73bd5\\scratchpad\\qs\\initial_program.py",
+  "evaluator": "C:\\Users\\cheat\\AppData\\Local\\Temp\\claude\\C--Users-cheat\\5e8549bf-c217-4e8f-9844-5a569ec73bd5\\scratchpad\\qs\\evaluator.py",
+  "model": {
+    "provider": "ClaudeCode",
+    "endpoint": "https://api.openai.com/v1",
+    "name": "sonnet",
+    "apiKeyEnvironmentVariable": null,
+    "temperature": 0.7,
+    "topP": null,
+    "reasoningEffort": null,
+    "maxOutputTokens": 16000,
+    "timeoutSeconds": 300,
+    "maxRetries": 3,
+    "retryDelaySeconds": 5,
+    "maxBudgetUsd": 1,
+    "claudeExecutable": null,
+    "manualQueue": null,
+    "manualTimeoutSeconds": 3600,
+    "weight": 0.8
+  },
+  "budget": {
+    "maxEvaluations": 3,
+    "seed": 42,
+    "parallelism": 3,
+    "evaluationTimeLimitSeconds": 60,
+    "maxProgramChars": 20000
+  },
+  "output": ".",
+  "language": "Python",
+  "evaluatorLanguage": "Python",
+  "direction": "Maximize",
+  "taskDescription": null,
+  "runtimeVersion": "aidotnet-evolve-local",
+  "warmStart": null,
+  "mode": "Diff",
+  "additionalModels": [
+    {
+      "provider": "ClaudeCode",
+      "endpoint": "https://api.openai.com/v1",
+      "name": "haiku",
+      "apiKeyEnvironmentVariable": null,
+      "temperature": 0.7,
+      "topP": null,
+      "reasoningEffort": null,
+      "maxOutputTokens": 8000,
+      "timeoutSeconds": 120,
+      "maxRetries": 3,
+      "retryDelaySeconds": 5,
+      "maxBudgetUsd": 0.5,
+      "claudeExecutable": null,
+      "manualQueue": null,
+      "manualTimeoutSeconds": 3600,
+      "weight": 0.2
+    }
+  ],
+  "prompt": {
+    "templateDirectory": null,
+    "systemMessage": "You are an expert programmer specializing in optimization algorithms. Your task is to improve a function minimization algorithm to find the global minimum of a complex function with many local minima. The function is f(x, y) = sin(x) * cos(y) \u002B sin(x*y) \u002B (x^2 \u002B y^2)/20. Focus on improving the search_algorithm function to reliably find the global minimum, escaping local minima that might trap simple algorithms.\n",
+    "systemMessageMode": "Literal",
+    "evaluatorSystemMessage": null,
+    "programsAsChangesDescription": false,
+    "initialChangesDescription": null,
+    "systemMessageChangesDescription": null,
+    "numTopPrograms": 3,
+    "numDiversePrograms": 2,
+    "includeArtifacts": true,
+    "maxArtifactBytes": 20480,
+    "artifactSecurityFilter": true,
+    "useTemplateStochasticity": true,
+    "templateVariations": null,
+    "suggestSimplificationAfterChars": 500,
+    "includeChangesUnderChars": 100,
+    "conciseImplementationMaxLines": 10,
+    "comprehensiveImplementationMinLines": 50
+  },
+  "llmFeedback": null,
+  "search": {
+    "islands": 3,
+    "migrationInterval": 50,
+    "migrationRate": 0.1,
+    "explorationRatio": 0.2,
+    "exploitationRatio": 0.7,
+    "eliteRatio": 0.10000000000000009,
+    "topPrograms": 3,
+    "topInspirations": 1,
+    "diversePrograms": 0,
+    "metricDescriptors": [
+      {
+        "name": "length",
+        "minimum": 0,
+        "maximum": 1,
+        "bins": 10
+      }
+    ],
+    "earlyStoppingPatience": null,
+    "earlyStoppingMinimumImprovement": 0.001,
+    "targetQuality": null,
+    "evaluationRetries": 3,
+    "evaluationMemoryLimitMb": 4096,
+    "includeArtifacts": true,
+    "maxArtifactBytes": 20480,
+    "collectArtifacts": true,
+    "retainArtifactText": false,
+    "archiveCapacity": 50,
+    "eliteArchiveSize": 20
+  },
+  "openEvolveEvaluator": {
+    "python": "C:\\Users\\cheat\\AppData\\Local\\Temp\\claude\\C--Users-cheat\\5e8549bf-c217-4e8f-9844-5a569ec73bd5\\scratchpad\\oe-venv\\Scripts\\python.exe",
+    "cascade": true,
+    "cascadeThresholds": [
+      1.3
+    ],
+    "fileSuffix": ".py",
+    "timeoutSeconds": 60,
+    "featureDimensions": [
+      "complexity",
+      "diversity"
+    ],
+    "pythonPath": [
+      "C:\\Users\\cheat\\AppData\\Local\\Temp\\claude\\C--Users-cheat\\5e8549bf-c217-4e8f-9844-5a569ec73bd5\\scratchpad\\upstream\\openevolve"
+    ]
+  },
+  "metaPrompt": null
+}
