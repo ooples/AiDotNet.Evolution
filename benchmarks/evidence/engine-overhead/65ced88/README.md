@@ -75,8 +75,7 @@ what would replace the carried column with a paired measurement.
 
 ```powershell
 dotnet build benchmarks/EvolutionOverhead/EvolutionOverhead.csproj -c Release -f net10.0
-$dll = "benchmarks\EvolutionOverheadin\Release
-et10.0\EvolutionOverhead.dll"
+$dll = "benchmarks\EvolutionOverhead\bin\Release\net10.0\EvolutionOverhead.dll"
 foreach ($w in 1,2,4,8,16) { foreach ($r in 0..8) { foreach ($n in 8000,16000) {
   $j = dotnet $dll $n $w 1
   if ($LASTEXITCODE -ne 0) { throw "run failed: workers=$w repeat=$r n=$n" }
