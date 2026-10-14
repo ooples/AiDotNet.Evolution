@@ -502,10 +502,11 @@ internal static class RunCommand
             // travels as an artifact, so without this a failing unmodified evaluator cannot be
             // diagnosed from the CLI at all. Empty unless search.collectArtifacts is on.
             //
-            // It is not a complete record of every failure. The engine delivers each note to the next
-            // proposal of its lineage and consumes it there, so what survives to the end of the run is
-            // what no proposal read. A run where nothing succeeds reports every failure, because no
-            // proposal was ever made from a lineage that had one; a run that recovers may report none.
+            // It is not a complete record of every failure: at most MaxReportedFailureOutputs entries, one
+            // per genome identity, and the engine consumes each note when it reaches the next proposal of
+            // its lineage - so what survives to the end of a run is what no proposal read. A run where
+            // nothing succeeds keeps its notes, because no proposal is ever made from a lineage that has
+            // one; a run that recovers may report none.
             FailureOutput = FailureOutputOf(result)
         }, Program.Json));
         if (best is not null)
@@ -528,11 +529,18 @@ internal static class RunCommand
             // on, the output is in the report above and repeating the advice would be noise.
             if (FailureOutputOf(result).Length == 0)
             {
-                error.WriteLine("hint: set search.collectArtifacts and search.retainArtifactText in the run "
-                    + "file to have FailureOutput carry what the evaluator printed. The evaluator runs with a "
-                    + "cleared environment, so PYTHONPATH is not forwarded: a package it imports must be "
-                    + "installed into the interpreter passed to --python, or named in "
-                    + "openEvolveEvaluator.pythonPath.");
+                // Advice only where it applies. With capture already on, telling the caller to switch on
+                // what they switched on is worse than silence: it implies they misconfigured the run when
+                // the evaluator simply printed nothing.
+                bool captureOn = run.Search.CollectArtifacts && run.Search.RetainArtifactText;
+                error.WriteLine(captureOn
+                    ? "hint: capture is on and the evaluator printed nothing before it failed, so there is "
+                      + "no output to show. Run it by hand with the interpreter you passed to --python."
+                    : "hint: set search.collectArtifacts and search.retainArtifactText in the run file to "
+                      + "have FailureOutput carry what the evaluator printed.");
+                error.WriteLine("hint: the evaluator runs with a cleared environment, so PYTHONPATH is not "
+                    + "forwarded: a package it imports must be installed into the interpreter passed to "
+                    + "--python, or named in openEvolveEvaluator.pythonPath.");
             }
         }
 

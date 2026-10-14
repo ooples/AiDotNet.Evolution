@@ -58,17 +58,29 @@ With `search.collectArtifacts` and `search.retainArtifactText` both on, the run 
 ]
 ```
 
-It is reported only for a run that had a failure-like evaluation, bounded to the first few entries, and
-newlines are replaced so one artifact cannot forge further lines. An evaluator that *ran* but printed
-something unparseable - a progress line before its JSON, a warning on stderr - attaches its output the
-same way, which is the case where the evaluator itself is the suspect and its output is the only evidence.
+It is reported only for a run that had a failure-like evaluation, and newlines are replaced so one
+artifact cannot forge further lines. An evaluator that *ran* but printed metrics the contract refuses
+attaches its output the same way - **malformed JSON, no JSON object at all, a non-finite quality, a
+`descriptors` value that is not an object** - which is the case where the evaluator itself is the suspect
+and its output is the only evidence.
 
-**It is not a complete record of every failure**, and the distinction matters when you are reading it.
-Each note is delivered to the next proposal of its own lineage - that is what `prompt.includeArtifacts`
-asks for - and consumed there, so what survives to the end of a run is what no proposal read. The case
-this exists for, a run where nothing succeeds, reports every failure, because no proposal was ever made
-from a lineage that had one. A run that fails early and then recovers may report none: the notes went into
-the prompts, which is where they were most useful.
+Note what is **not** such a case: a progress line before the JSON is accepted, because the parser takes
+the span between the first `{` and the last `}` rather than demanding pristine output, and a warning on
+stderr does not make a valid stdout fail. Both were measured, printing `{"quality": 0.5}` after each:
+`Completed`, quality `0.5`.
+
+**It is not a complete record of every failure.** Three bounds, all of which can hide one:
+
+* It carries at most **eight** artifacts, whatever the run produced.
+* The queue holds **one entry per genome**, so a later note replaces an earlier one under the same
+  identity.
+* Each note is delivered to the next proposal of its own lineage - what `prompt.includeArtifacts` asks for
+  - and consumed there, so what survives to the end of a run is what no proposal read.
+
+The case this exists for, a run where nothing succeeds, keeps its notes, because no proposal is ever made
+from a lineage that has one. A run that fails early and then recovers may report none: the notes went into
+the prompts, which is where they were most useful. Turning `search.includeArtifacts` off stops the
+delivery without stopping the record - the queue is storage, delivery is a separate decision.
 
 ## An evaluator that imports a package: `--python-path`
 

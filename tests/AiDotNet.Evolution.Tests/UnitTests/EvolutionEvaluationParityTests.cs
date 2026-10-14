@@ -408,6 +408,28 @@ public sealed class EvolutionEvaluationParityTests
     }
 
     [Fact]
+    public async Task TurningOffDeliveryToProposalsStillRecordsWhatAFailingEvaluatorPrinted()
+    {
+        // "Do not put evaluator output in prompts" must not also mean "do not record it". Queueing was
+        // gated on DeliverToNextProposal, so a caller who turned delivery off lost every record of a
+        // failure - and the CLI's FailureOutput, which reads this queue, reported nothing however many
+        // candidates had failed. Storage and delivery are now separate decisions.
+        var variation = new ArtifactRecordingVariation();
+        EvolutionEngineOptions options = Options(maxAttempts: 1, batchSize: 1);
+        options.Artifacts.Enabled = true;
+        options.Artifacts.DeliverToNextProposal = false;
+        EvolutionRunResult<TestGenome> result = await new EvolutionEngine<TestGenome>(
+            new AlwaysFailingArtifactTask(), variation, _ => TestArchive(), options).RunAsync(Seeds(1));
+
+        // Recorded...
+        Assert.NotEmpty(result.PendingArtifacts);
+        Assert.Contains(result.PendingArtifacts.Values.SelectMany(artifacts => artifacts),
+            artifact => artifact.Key == "stderr" && artifact.Text.Contains("failed", StringComparison.Ordinal));
+        // ...and still not delivered, which is what the caller actually asked for.
+        Assert.Empty(variation.Received);
+    }
+
+    [Fact]
     public async Task ArtifactsAreDisabledByDefaultAndStoreNoBytes()
     {
         var variation = new ArtifactRecordingVariation();
