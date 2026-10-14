@@ -361,6 +361,24 @@ public sealed class EvolutionEvaluationParityTests
     }
 
     [Fact]
+    public async Task TheFailureOutputOfARunWhereEveryCandidateFailsIsStillReachableFromTheResult()
+    {
+        // A run whose seed fails has no completed parent, so each failure's queue target is the candidate's own
+        // identity - the one the commit path forgets when a failed candidate may be retried. If the note is queued
+        // after that, nothing a caller can read holds the evaluator's output and the failure cannot be diagnosed.
+        EvolutionEngineOptions options = Options(maxAttempts: 1, batchSize: 1);
+        options.Artifacts.Enabled = true;
+        EvolutionRunResult<TestGenome> result = await new EvolutionEngine<TestGenome>(
+            new AlwaysFailingArtifactTask(), new SequentialVariation(), _ => TestArchive(), options)
+            .RunAsync(Seeds(1));
+
+        Assert.DoesNotContain(EvolutionEvaluationStatus.Completed, result.Counters.StatusCounts.Keys);
+        Assert.NotEmpty(result.PendingArtifacts);
+        Assert.Contains(result.PendingArtifacts.Values.SelectMany(artifacts => artifacts),
+            artifact => artifact.Key == "stderr" && artifact.Text.Contains("failed", StringComparison.Ordinal));
+    }
+
+    [Fact]
     public async Task ArtifactsAreDisabledByDefaultAndStoreNoBytes()
     {
         var variation = new ArtifactRecordingVariation();

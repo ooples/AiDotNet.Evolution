@@ -456,6 +456,29 @@ internal sealed class FailingChildArtifactTask : IEvolutionTask<TestGenome>
     }
 }
 
+internal sealed class AlwaysFailingArtifactTask : IEvolutionTask<TestGenome>
+{
+    public string Id => "always-failing-artifact";
+    public string VersionHash => "always-failing-artifact-task-v1";
+    public string EvaluatorVersionHash => "always-failing-artifact-evaluator-v1";
+
+    public ValueTask<EvolutionCanonicalGenome<TestGenome>> CanonicalizeAsync(TestGenome genome,
+        CancellationToken cancellationToken = default) =>
+        new(new EvolutionCanonicalGenome<TestGenome>(genome, genome.Value.ToString(CultureInfo.InvariantCulture)));
+
+    public ValueTask<EvolutionTaskResult> EvaluateAsync(EvolutionCandidate<TestGenome> candidate,
+        EvolutionEvaluationContext context, CancellationToken cancellationToken = default)
+    {
+        int value = candidate.CanonicalGenome.Genome.Value;
+        return new ValueTask<EvolutionTaskResult>(new EvolutionTaskResult(EvolutionEvaluationStatus.Failed,
+            diagnostics: new[] { new EvolutionDiagnostic("synthetic_failure", "every candidate failed") },
+            artifacts: new[]
+            {
+                new EvolutionArtifact("stderr", "candidate " + value.ToString(CultureInfo.InvariantCulture) + " failed")
+            }));
+    }
+}
+
 internal sealed class SequentialVariation : IVariationOperator<TestGenome>
 {
     private int _next = 1;

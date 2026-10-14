@@ -633,6 +633,11 @@ public sealed partial class EvolutionEngine<TGenome>
             EvolutionEvaluation evaluation = BuildEvaluation(item, result);
             IncrementStatus(evaluation.Status);
             EvolutionArchiveInsertionResult? insertion = null;
+            // Queued before the failure branch below, which forgets a failed candidate so an identical candidate may
+            // be retried. A failure's queue target is its parent, or its own identity when it has no parent - the seed
+            // of a run whose every candidate fails - and queueing after the removal would discard exactly the note
+            // that explains why the run produced nothing.
+            if (item.CacheStatus != EvolutionCacheStatus.Hit) QueueLineageArtifacts(item, evaluation);
             if (evaluation.Status == EvolutionEvaluationStatus.Completed)
             {
                 _completedEvaluations++;
@@ -651,7 +656,6 @@ public sealed partial class EvolutionEngine<TGenome>
             }
 
             RememberCommitted(item);
-            if (item.CacheStatus != EvolutionCacheStatus.Hit) QueueLineageArtifacts(item, evaluation);
 
             if (_selection is IOutcomeAwareEvolutionSelectionPolicy<TGenome> adaptiveSelection)
                 adaptiveSelection.Observe(evaluation, insertion);
