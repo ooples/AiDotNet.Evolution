@@ -833,7 +833,8 @@ internal static class RunCommand
     }
 
     // One failing evaluator can print a long traceback per attempt, and the whole report is one JSON object a
-    // caller parses. Bounded so a run with many failures reports the first few in full rather than megabytes.
+    // caller parses. Bounded so a run with many failures reports a few in full rather than megabytes, and the
+    // queue is ordered before the bound so which few is reproducible.
     private const int MaxReportedFailureOutputs = 8;
     private const int MaxStderrValueLength = 256;
 
@@ -847,7 +848,13 @@ internal static class RunCommand
     {
         if (!HadFailureLikeEvaluation(result.Counters.StatusCounts)) return Array.Empty<object>();
         var rows = new List<object>(MaxReportedFailureOutputs);
-        foreach (KeyValuePair<string, IReadOnlyList<EvolutionArtifact>> entry in result.PendingArtifacts)
+        // Ordered before the bound is applied. PendingArtifacts is a dictionary, and dictionary enumeration
+        // order is unspecified, so taking "the first few" straight from it would report an arbitrary subset
+        // that two runs over identical state need not agree on. Ordinal by identity is the only
+        // reproducible order available here; chronological would need the engine to expose its queue order,
+        // which is not part of the result contract.
+        foreach (KeyValuePair<string, IReadOnlyList<EvolutionArtifact>> entry in result.PendingArtifacts
+                     .OrderBy(entry => entry.Key, StringComparer.Ordinal))
         {
             foreach (EvolutionArtifact artifact in entry.Value)
             {
