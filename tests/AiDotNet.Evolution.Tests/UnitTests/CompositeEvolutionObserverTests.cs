@@ -60,6 +60,36 @@ public sealed class CompositeEvolutionObserverTests
     }
 
     [Fact]
+    public async Task A_cancellation_mid_fan_out_stops_the_observers_after_it()
+    {
+        // The earlier test cancelled before the call, which only proves the exception escapes. This cancels
+        // from INSIDE the first observer, so it also pins that later observers are skipped rather than
+        // notified after the run was asked to stop.
+        using var cancellation = new CancellationTokenSource();
+        var later = new Counting();
+        var cancelling = new Cancelling(cancellation);
+        var composite = new CompositeEvolutionObserver<int>(new IEvolutionObserver<int>[] { cancelling, later });
+
+        await Assert.ThrowsAsync<OperationCanceledException>(
+            () => composite.OnEventAsync(Event(1), cancellation.Token).AsTask());
+
+        Assert.Equal(1, cancelling.Seen);
+        Assert.Equal(0, later.Seen);
+    }
+
+    private sealed class Cancelling(CancellationTokenSource source) : IEvolutionObserver<int>
+    {
+        public int Seen;
+        public ValueTask OnEventAsync(EvolutionEvent<int> evolutionEvent, CancellationToken cancellationToken = default)
+        {
+            Seen++;
+            source.Cancel();
+            cancellationToken.ThrowIfCancellationRequested();
+            return default;
+        }
+    }
+
+    [Fact]
     public void An_empty_composite_is_allowed_and_a_null_or_repeated_observer_is_not()
     {
         var observer = new Counting();

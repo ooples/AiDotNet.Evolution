@@ -14,11 +14,14 @@ public sealed class InstructionCreditObserverTests
 {
     private const string SeedInstruction = "Improve the program. Keep it correct and short.";
 
-    private static ProgramMetaPromptOptions Options(int proposeEvery = 1) => new()
+    private static ProgramMetaPromptOptions Options(
+        int proposeEvery = 1,
+        EvolutionOptimizationDirection direction = EvolutionOptimizationDirection.Maximize) => new()
     {
         Enabled = true,
         ProposeEveryGenerations = proposeEvery,
-        MaxArchiveSize = 4
+        MaxArchiveSize = 4,
+        Direction = direction
     };
 
     private static ProgramMetaPromptEvolver Evolver(string answer = "Instruction A: a reply long enough to be accepted.")
@@ -138,6 +141,59 @@ public sealed class InstructionCreditObserverTests
         Assert.NotEqual(observer.VersionHash, new ProgramInstructionCreditObserver(
             new ProgramMetaPromptEvolver(new FakeChatClient(), "A different seed instruction entirely.", Options()))
             .VersionHash);
+    }
+
+    [Fact]
+    public async Task A_failed_evaluation_never_outranks_a_measured_one_when_minimizing()
+    {
+        // The bug this test exists for: ProgramMetaPromptEvolver.Observe negates quality when minimizing, so
+        // crediting a plain 0.0 for a failure becomes -0.0 there - better than any real positive cost, which
+        // scores a broken instruction as the BEST one and makes it the most selectable. A failure is credited
+        // at the worst cost the run has actually observed instead.
+        var evolver = new ProgramMetaPromptEvolver(
+            new FakeChatClient("Instruction A: a reply long enough to be accepted."), SeedInstruction,
+            Options(proposeEvery: 100, direction: EvolutionOptimizationDirection.Minimize));
+        var observer = new ProgramInstructionCreditObserver(
+            evolver, null, EvolutionOptimizationDirection.Minimize);
+
+        // A measured cost of 5.0 first, so the run has an observed worst case, then a failure.
+        observer.Select(new StableRandom(3), generation: 1);
+        await observer.OnEventAsync(Evaluated(generation: 1, quality: 5.0));
+        observer.Select(new StableRandom(3), generation: 2);
+        await observer.OnEventAsync(Evaluated(generation: 2, quality: null));
+
+        Assert.Equal(2, observer.CreditedOutcomes);
+        // Minimizing: the evolver negates, so a credited 5.0 becomes -5.0. Both outcomes landed on the same
+        // instruction here, so its mean must be -5.0 - the failure was treated as 5.0, not as 0.0, which
+        // would have pulled the mean up to -2.5 and made a failing instruction look better.
+        ProgramInstructionCandidate scored = Assert.Single(evolver.Archive, candidate => candidate.Scored > 0);
+        Assert.Equal(-5.0, scored.MeanQuality, 10);
+    }
+
+    [Fact]
+    public async Task A_route_the_evolver_refused_is_not_recorded()
+    {
+        // Select throws when a generation is already routed. Recording the route first would leave this
+        // observer holding one the evolver does not have, and the later outcome would then call Observe for
+        // an unrouted generation - throwing inside the engine's observer path.
+        ProgramMetaPromptEvolver evolver = Evolver();
+        var observer = new ProgramInstructionCreditObserver(evolver);
+        observer.Select(new StableRandom(3), generation: 1);
+
+        Assert.ThrowsAny<Exception>(() => observer.Select(new StableRandom(3), generation: 1));
+
+        // The first route still works, and the refused second call left nothing behind.
+        await observer.OnEventAsync(Evaluated(generation: 1, quality: 0.5));
+        Assert.Equal(1, observer.CreditedOutcomes);
+        await observer.OnEventAsync(Evaluated(generation: 1, quality: 0.5));
+        Assert.Equal(1, observer.CreditedOutcomes);
+    }
+
+    [Fact]
+    public void A_direction_that_is_not_defined_is_refused()
+    {
+        Assert.Throws<ArgumentOutOfRangeException>(() => new ProgramInstructionCreditObserver(
+            Evolver(), null, (EvolutionOptimizationDirection)99));
     }
 
     /// <summary>An <c>Evaluated</c> event for one generation, with the quality the engine would report.</summary>

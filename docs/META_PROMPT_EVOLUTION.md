@@ -52,8 +52,7 @@ The source's `VersionHash` joins the operator's identity, because an interface-t
 be serialised into it and two operators differing only by their instruction source must not claim
 the same version.
 
-**Crediting stays with the caller**, and `ProgramInstructionCreditObserver` is the caller you want
-unless you have a reason to write your own. The operator supplies proposals and never sees outcomes,
+**`ProgramInstructionCreditObserver` is the crediting path**, and writing your own is the exception. The operator supplies proposals and never sees outcomes,
 so somebody has to call `Observe(generation, quality)` after each evaluation - and `Abandon` for a
 proposal whose outcome will never arrive. Without that, instructions are proposed, used, and never
 judged: the archive's scores stay empty and selection has nothing to prefer, which makes the feature
@@ -86,8 +85,12 @@ Two behaviours of the credit observer are worth knowing, because the alternative
 - It credits **only** generations it actually routed. The engine evaluates seed candidates that no
   proposal produced, and `Observe` refuses a generation it never routed, so "anything past generation
   zero" would throw on the seed's own evaluation.
-- A **failed** evaluation is credited as the worst outcome rather than skipped. Skipping would let an
-  instruction whose programs never parse keep a clean record and stay selectable.
+- A **failed** evaluation is credited rather than skipped, at a value that depends on the direction you
+  pass it. Skipping would let an instruction whose programs never parse keep a clean record and stay
+  selectable - but a fixed `0.0` would be worse when minimizing, because the evolver negates quality there
+  and `-0.0` beats every real positive cost. Maximizing credits `0.0`; minimizing credits the worst cost the
+  run has actually observed. **Pass the same direction as the evolver's options**, or a failure can outrank
+  a program that ran.
 
 If a run proposes instructions and `CreditedOutcomes` stays zero, the wiring is wrong rather than the
 feature ineffective - which is worth being able to tell apart.

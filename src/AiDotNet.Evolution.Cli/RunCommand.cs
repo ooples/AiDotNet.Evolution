@@ -72,8 +72,6 @@ internal sealed class RunMetaPrompt
     public double ExplorationProbability { get; init; } = 0.2;
     /// <summary>Longest instruction accepted from the model.</summary>
     public int MaxInstructionChars { get; init; } = 4_000;
-    /// <summary>Cost charged to the run's ledger per dispatched instruction proposal.</summary>
-    public decimal ProposalCostUnits { get; init; } = 1m;
     /// <summary>Metric prefix for the instruction archive's cost descriptors.</summary>
     public string MetricPrefix { get; init; } = "meta_prompt_";
     /// <summary>The models that propose instructions; empty uses the proposal models.</summary>
@@ -422,11 +420,14 @@ internal static class RunCommand
                 Selection = meta.Selection,
                 ExplorationProbability = meta.ExplorationProbability,
                 MaxInstructionChars = meta.MaxInstructionChars,
-                ProposalCostUnits = meta.ProposalCostUnits,
                 MetricPrefix = meta.MetricPrefix,
                 Direction = run.Direction
             });
-            instructions = new ProgramInstructionCreditObserver(evolver);
+            // No ledger: this command does not build one, so instruction proposals are not metered here.
+            // The run file therefore does not offer proposalCostUnits - a field that charged nothing would be
+            // worse than its absence. The direction must match the evolver's, because it decides what a
+            // failed evaluation is credited as.
+            instructions = new ProgramInstructionCreditObserver(evolver, null, run.Direction);
             variationOptions.InstructionSource = instructions;
         }
 
