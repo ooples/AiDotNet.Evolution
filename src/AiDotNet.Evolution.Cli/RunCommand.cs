@@ -416,6 +416,7 @@ internal static class RunCommand
         // source and the engine's outcome listener, because an instruction can only be scored by what the
         // programs it produced achieved - see ProgramInstructionCreditObserver.
         ProgramInstructionCreditObserver? instructions = null;
+        ProgramMetaPromptEvolver? instructionEvolver = null;
         if (run.MetaPrompt is { } meta)
         {
             IProgramChatClient instructionModel = meta.Models.Count == 0
@@ -434,8 +435,8 @@ internal static class RunCommand
             });
             // No ledger: this command does not build one, so instruction proposals are not metered here.
             // The run file therefore does not offer proposalCostUnits - a field that charged nothing would be
-            // worse than its absence. The direction must match the evolver's, because it decides what a
-            // failed evaluation is credited as.
+            // worse than its absence. The call counts are reported instead, under MetaPrompt below.
+            instructionEvolver = evolver;
             instructions = new ProgramInstructionCreditObserver(evolver);
             variationOptions.InstructionSource = instructions;
         }
@@ -558,6 +559,22 @@ internal static class RunCommand
             Repertoire = repertoirePath,
             WarmStart = warmStart,
             ModelUsage = variation.GetUsage(),
+            // Instruction evolution calls the model on its own cadence, and those calls are not the
+            // variation operator's, so ModelUsage above does not include them: a run with metaPrompt
+            // configured would otherwise under-report what it spent. Null when metaPrompt is absent, so
+            // the field says which arm ran as well as what it cost.
+            MetaPrompt = instructionEvolver is null || instructions is null
+                ? null
+                : new
+                {
+                    instructionEvolver.ProposalCalls,
+                    instructionEvolver.RefusedProposals,
+                    instructions.AcceptedProposals,
+                    instructions.CreditedOutcomes,
+                    // Outcomes that reported no quality. An instruction earns nothing from one, so a run
+                    // whose programs mostly fail is one where the archive has little to rank on.
+                    instructions.FailedOutcomes
+                },
             // Why the run ended the way it did. The engine retains the failures it survived, and
             // without them a run whose every evaluation was refused reports only
             // StopReason: NoCandidates - true, and useless for finding out why. Redacted

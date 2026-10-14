@@ -100,6 +100,25 @@ Two behaviours of the credit observer are worth knowing, because the alternative
 If a run proposes instructions and both `CreditedOutcomes` and `FailedOutcomes` stay zero, the wiring is
 wrong rather than the feature ineffective - which is worth being able to tell apart.
 
+## What the CLI reports
+
+`aidotnet-evolve run` emits a `MetaPrompt` section, `null` when the run file has no `metaPrompt`, so the
+report says which arm ran as well as what it cost:
+
+```jsonc
+"MetaPrompt": {
+  "ProposalCalls": 3,        // model calls the evolver made on its own cadence
+  "RefusedProposals": 1,     // replies the evolver would not accept as an instruction
+  "AcceptedProposals": 2,
+  "CreditedOutcomes": 7,
+  "FailedOutcomes": 1
+}
+```
+
+`ModelUsage` counts the **variation operator's** calls only. Instruction evolution calls the model on its
+own cadence, and those calls are not the operator's, so without this section a run with `metaPrompt`
+configured under-reports what it spent.
+
 ## What scores an instruction
 
 Only the programs it produced. `Observe` credits the instruction that wrote a proposal with that
