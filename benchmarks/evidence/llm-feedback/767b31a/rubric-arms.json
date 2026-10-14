@@ -1,0 +1,164 @@
+{
+  "story": "V1-54 #167 criterion 4: LLM feedback as a weighted fitness signal, dev-partition ablation",
+  "design": "paired by engine seed; the arms differ only in the run file's llmFeedback key (absent vs weight in 0.3). Endpoint is accuracy on held-out inputs the evaluator never sees, scored after the run by feedback_ablation_task/score_heldout.py, because both arms can reach a perfect visible score either by recovering the rule or by memorising the six visible pairs and only the held-out set separates those.",
+  "interval": "median of per-pair differences with a 4000-draw seeded percentile bootstrap (seed 7). 2 pairs, and a near-bimodal endpoint, so a small true effect is not resolvable here; the discordant-pair counts are reported beside the interval.",
+  "model": {
+    "provider": "ClaudeCode",
+    "name": "sonnet",
+    "executable": "claude"
+  },
+  "budget": {
+    "seeds": 2,
+    "evaluations_per_arm": 5,
+    "weights": "0.3"
+  },
+  "summary": {
+    "arms": {
+      "on-w0.3-default": {
+        "pairs": 2,
+        "endpoint": "heldout_accuracy",
+        "weight": 0.3,
+        "off_median": 0.0,
+        "on_median": 0.0,
+        "median_difference": 0.0,
+        "mean_difference": 0.0,
+        "difference_ci95": [
+          0.0,
+          0.0
+        ],
+        "pairs_favouring_feedback": 0,
+        "pairs_favouring_no_feedback": 0,
+        "tied_pairs": 2
+      },
+      "on-w0.3-general": {
+        "pairs": 2,
+        "endpoint": "heldout_accuracy",
+        "weight": 0.3,
+        "off_median": 0.0,
+        "on_median": 0.0,
+        "median_difference": 0.0,
+        "mean_difference": 0.0,
+        "difference_ci95": [
+          0.0,
+          0.0
+        ],
+        "pairs_favouring_feedback": 0,
+        "pairs_favouring_no_feedback": 0,
+        "tied_pairs": 2
+      }
+    },
+    "arms_that_produced_no_result": 0
+  },
+  "pairs": {
+    "on-w0.3-default": [
+      {
+        "seed": 0,
+        "off": 0.0,
+        "on": 0.0,
+        "difference": 0.0,
+        "off_failure": null,
+        "on_failure": null
+      },
+      {
+        "seed": 1,
+        "off": 0.0,
+        "on": 0.0,
+        "difference": 0.0,
+        "off_failure": null,
+        "on_failure": null
+      }
+    ],
+    "on-w0.3-general": [
+      {
+        "seed": 0,
+        "off": 0.0,
+        "on": 0.0,
+        "difference": 0.0,
+        "off_failure": null,
+        "on_failure": null
+      },
+      {
+        "seed": 1,
+        "off": 0.0,
+        "on": 0.0,
+        "difference": 0.0,
+        "off_failure": null,
+        "on_failure": null
+      }
+    ]
+  },
+  "rows": [
+    {
+      "seed": 0,
+      "arm": "off",
+      "weight": null,
+      "seconds": 47.52,
+      "failure": null,
+      "visible_quality": 1,
+      "completed_evaluations": 5,
+      "model_calls": 4,
+      "heldout_accuracy": 0.0,
+      "endpoint_detail": null
+    },
+    {
+      "seed": 0,
+      "arm": "on-w0.3-default",
+      "weight": 0.3,
+      "seconds": 59.37,
+      "failure": null,
+      "visible_quality": 0.7464999999999999,
+      "completed_evaluations": 5,
+      "model_calls": 4,
+      "heldout_accuracy": 0.0,
+      "endpoint_detail": null
+    },
+    {
+      "seed": 0,
+      "arm": "on-w0.3-general",
+      "weight": 0.3,
+      "seconds": 57.85,
+      "failure": null,
+      "visible_quality": 0.7201,
+      "completed_evaluations": 5,
+      "model_calls": 4,
+      "heldout_accuracy": 0.0,
+      "endpoint_detail": null
+    },
+    {
+      "seed": 1,
+      "arm": "off",
+      "weight": null,
+      "seconds": 35.27,
+      "failure": null,
+      "visible_quality": 1,
+      "completed_evaluations": 5,
+      "model_calls": 4,
+      "heldout_accuracy": 0.0,
+      "endpoint_detail": null
+    },
+    {
+      "seed": 1,
+      "arm": "on-w0.3-default",
+      "weight": 0.3,
+      "seconds": 63.69,
+      "failure": null,
+      "visible_quality": 0.7464999999999999,
+      "completed_evaluations": 5,
+      "model_calls": 4,
+      "heldout_accuracy": 0.0,
+      "endpoint_detail": null
+    },
+    {
+      "seed": 1,
+      "arm": "on-w0.3-general",
+      "weight": 0.3,
+      "seconds": 61.25,
+      "failure": null,
+      "visible_quality": 0.7254999999999999,
+      "completed_evaluations": 5,
+      "model_calls": 4,
+      "heldout_accuracy": 0.0,
+      "endpoint_detail": null
+    }
+  ]
+}

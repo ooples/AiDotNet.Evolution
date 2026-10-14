@@ -48,6 +48,47 @@ public sealed class LlmJudgeProgramFitnessEvaluatorTests
         Assert.Equal(4, result.CostUnits);
     }
 
+    [Theory]
+    // The two knobs compose multiplicatively on the judge's side, and the published measurements for #167
+    // are all derived by INVERTING that composition. The forward direction is already pinned in both
+    // run directions at Weight = 0.8, CombinedBlend = 0.7, by
+    // JudgeCannotPromoteInvalidCandidateTests.The_documented_blend_formula_is_what_the_code_computes and
+    // .Minimizing_inverts_the_judges_utility. Two things were pinned nowhere: the inverse the evidence
+    // derives every judge score with, and llm_average being the judge's utility with Weight already
+    // applied - which is the fact that decides whether the inverse divides by Weight. A derivation that
+    // used Weight as the mixing coefficient instead survived both existing tests, and numbers were
+    // reported from it. Asserted here across coefficient pairs and in both directions of the arithmetic.
+    [InlineData(1.0, 0.7, 0.9, 0.6, 0.3)]
+    [InlineData(0.5, 0.7, 0.9, 0.6, 0.3)]
+    [InlineData(1.0, 0.2, 0.4, 0.4, 0.4)]
+    [InlineData(0.25, 0.9, 1.0, 0.0, 0.5)]
+    public async Task WeightAndBlendComposeMultiplicativelyAndTheInverseRecoversTheJudgeMean(
+        double weight, double combinedBlend, double first, double second, double third)
+    {
+        const double measured = 0.5;
+        var client = new FakeChatClient(JudgeAnswer(first, second, third));
+        var judge = new LlmJudgeProgramFitnessEvaluator(client, Measured(measured), null,
+            new LlmFeedbackOptions { Weight = weight, CombinedBlend = combinedBlend });
+
+        EvolutionTaskResult result = await judge.EvaluateAsync(Candidate(), Context());
+
+        // Forward, exactly as LlmFeedbackOptions.Weight documents it:
+        //   judgeUtility = (SUM s_i * Weight) / n;  quality = c * measured + (1 - c) * judgeUtility
+        double judgeMean = (first + second + third) / 3.0;
+        double expected = (combinedBlend * measured) + ((1.0 - combinedBlend) * (weight * judgeMean));
+        Assert.Equal(expected, result.Quality.GetValueOrDefault(), 10);
+
+        // llm_average is the judge's utility, Weight already applied - which is why the inverse has to
+        // divide by Weight to get back to the mean the judge actually returned.
+        Assert.Equal(weight * judgeMean, result.Descriptors["llm_average"], 10);
+
+        // The inverse the evidence uses. It needs both coefficients; dividing by either alone recovers the
+        // wrong number whenever the other is not 1.
+        double blended = result.Quality.GetValueOrDefault();
+        double recovered = (blended - (combinedBlend * measured)) / ((1.0 - combinedBlend) * weight);
+        Assert.Equal(judgeMean, recovered, 10);
+    }
+
     [Fact]
     public async Task TheBlendIsConfigurableRatherThanHardCoded()
     {

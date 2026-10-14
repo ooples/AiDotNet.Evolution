@@ -79,6 +79,48 @@ internal sealed class RunLlmFeedback
     public double Weight { get; init; } = 0.1;
     /// <summary>The judging models (OpenEvolve's <c>llm.evaluator_models</c>); empty uses the proposal models.</summary>
     public List<RunModel> Models { get; init; } = new();
+    /// <summary>Share of the final quality that stays with the measurement; null keeps the default of 0.7.</summary>
+    /// <remarks>
+    /// <para>
+    /// This is the coefficient that decides whether the judge can change an outcome, and
+    /// <see cref="Weight"/> is not. The engine computes
+    /// <c>quality = combinedBlend * measured + (1 - combinedBlend) * (weight * judgeMean)</c>, so an honest
+    /// candidate overtakes one that scored well by gaming the evaluator only when
+    /// <c>(1 - combinedBlend) * weight * judgeGap &gt; combinedBlend * (1 - measuredOfTheHonestOne)</c>.
+    /// </para>
+    /// <para>
+    /// Measured on a task where a program can score perfectly by storing the examples it was shown: with a
+    /// judge gap of 0.29 and an honest candidate at 1 of 6, the left side reaches only 0.087 at
+    /// <c>weight = 1</c> against 0.583 on the right. Deciding that case needs <c>combinedBlend</c> below
+    /// about 0.26, and no value of <see cref="Weight"/> substitutes for it - which is why this is exposed
+    /// rather than left at its default.
+    /// </para>
+    /// <para>At 1.0 the judge cannot move fitness at all; at 0.0 the measurement cannot.</para>
+    /// </remarks>
+    public double? CombinedBlend { get; init; }
+    /// <summary>What the judge scores; empty keeps the default rubric.</summary>
+    /// <remarks>
+    /// <para>
+    /// The rubric is the lever that matters most, and it was not reachable from a run file. Measured on a
+    /// task where a program can score perfectly by storing the examples it was shown: under the default
+    /// rubric the gap between a documented lookup table and an honest attempt is 0.083, and under a rubric
+    /// with one criterion naming generality it is 0.310. The default rubric has no axis on which memorising
+    /// looks bad - `readability` scores 0.60 for both - so nothing in it can penalise the shape.
+    /// </para>
+    /// <para>
+    /// Each name becomes a JSON field the judge is asked to fill and a metric on the result, so names must
+    /// differ once lowercased and stripped. OpenEvolve has no equivalent key; its judge rubric is fixed.
+    /// </para>
+    /// </remarks>
+    public List<string> Criteria { get; init; } = new();
+    /// <summary>Prefix for the judge's metrics on each result; omit the field to keep the default.</summary>
+    /// <remarks>
+    /// Omitting it keeps the default (<c>llm_</c>). An empty or blank value is <b>refused</b> rather than
+    /// read as "keep the default": the judge's field names are ordinary words - <c>correctness</c>,
+    /// <c>readability</c> - so an unprefixed judge metric is very likely to collide with one the evaluator
+    /// reports under the same name, and silently ignoring what a caller typed is worse than saying so.
+    /// </remarks>
+    public string? MetricPrefix { get; init; }
 }
 
 /// <summary>Search settings OpenEvolve exposes under <c>database</c>, <c>prompt</c> and the top level.</summary>
@@ -293,9 +335,31 @@ internal static class RunCommand
             ProgramEvolutionPromptOptions judgePrompt = programOptions.Prompt.Clone();
             if (judgePrompt.TaskDescription is null && programOptions.TaskDescription is { } judged && judged.Trim().Length > 0)
                 judgePrompt.TaskDescription = judged;
+            var feedbackOptions = new LlmFeedbackOptions { Enabled = true, Weight = feedback.Weight };
+            if (feedback.Criteria.Count > 0)
+            {
+                feedbackOptions.Criteria.Clear();
+                foreach (string criterion in feedback.Criteria) feedbackOptions.Criteria.Add(criterion);
+            }
+
+            if (feedback.CombinedBlend is { } blend) feedbackOptions.CombinedBlend = blend;
+            if (feedback.MetricPrefix is { } prefix)
+            {
+                // Blank is refused, not defaulted: the judge's field names are ordinary words, so an
+                // unprefixed judge metric collides with an evaluator metric of the same name, and a caller
+                // who typed "" meant something that cannot be honoured.
+                if (prefix.Trim().Length == 0)
+                {
+                    throw new InvalidDataException(
+                        "llmFeedback.metricPrefix cannot be empty or blank: the judge's metric names are "
+                        + "ordinary words, so an unprefixed judge metric would collide with an evaluator "
+                        + "metric of the same name. Omit the field to keep the default.");
+                }
+
+                feedbackOptions.MetricPrefix = prefix;
+            }
             fitness = new LlmJudgeProgramFitnessEvaluator(judge, fitness,
-                new ProgramPromptBuilder(judgePrompt, programOptions),
-                new LlmFeedbackOptions { Enabled = true, Weight = feedback.Weight });
+                new ProgramPromptBuilder(judgePrompt, programOptions), feedbackOptions);
         }
         var task = new ProgramEvolutionTask(fitness, new ProgramDescriptorSet(new[] { new ProgramLengthDescriptor() }), programOptions);
         var variationOptions = new LlmProgramVariationOptions
@@ -626,6 +690,17 @@ internal static class RunCommand
         File.WriteAllText(probe, string.Empty);
         File.Delete(probe);
     }
+    /// <summary>
+    /// Refuses a run-file list set to an explicit <c>null</c>, by name. <c>null</c> for the whole section is
+    /// fine and means "not configured"; a section that is present with a null list is a typo worth naming,
+    /// because every caller of these lists reads <c>Count</c> without a guard.
+    /// </summary>
+    private static void RequireList<T>(List<T>? list, string jsonPath)
+    {
+        if (list is null)
+            throw new InvalidDataException(jsonPath + " cannot be null; omit the field to keep the default.");
+    }
+
     internal static RunFile Load(string path)
     {
         var info = new FileInfo(path);
@@ -638,6 +713,27 @@ internal static class RunCommand
         if (string.IsNullOrWhiteSpace(run.RunId)) throw new InvalidDataException("runId is required.");
         // System.Text.Json does not enforce non-nullable required members, so an explicit null arrives here.
         if (run.Model is null) throw new InvalidDataException("model is required.");
+        // The same gap applies to every collection in the file: an explicit null deserializes over the
+        // initializer, and the first thing that reads .Count throws NullReferenceException - a stack trace
+        // on the console instead of the named refusal this surface promises for every other bad value.
+        // Checked here because Load is the one seam run, resume and preflight all pass through.
+        // Each section is guarded before its lists are: `section?.List` cannot tell "the section is absent",
+        // which is legal and means not configured, from "the section is present with a null list", which is
+        // the typo being refused.
+        RequireList(run.AdditionalModels, "additionalModels");
+        if (run.Search is { } searchSection)
+            RequireList(searchSection.MetricDescriptors, "search.metricDescriptors");
+        if (run.LlmFeedback is { } feedbackSection)
+        {
+            RequireList(feedbackSection.Criteria, "llmFeedback.criteria");
+            RequireList(feedbackSection.Models, "llmFeedback.models");
+        }
+        if (run.OpenEvolveEvaluator is { } openEvolveSection)
+        {
+            RequireList(openEvolveSection.CascadeThresholds, "openEvolveEvaluator.cascadeThresholds");
+            RequireList(openEvolveSection.FeatureDimensions, "openEvolveEvaluator.featureDimensions");
+            RequireList(openEvolveSection.PythonPath, "openEvolveEvaluator.pythonPath");
+        }
         if (run.Budget is null) throw new InvalidDataException("budget is required.");
         if (run.Budget.MaxEvaluations < 1) throw new InvalidDataException("budget.maxEvaluations must be at least 1.");
         if (run.Budget.Parallelism < 1) throw new InvalidDataException("budget.parallelism must be at least 1.");

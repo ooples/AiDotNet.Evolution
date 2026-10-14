@@ -586,6 +586,196 @@ public sealed class OpenEvolveImportTests
         }
     }
 
+    [Theory]
+    [InlineData("Correctness", "correctness", "duplicate")]
+    [InlineData(" ", "", "blank")]
+    public void A_run_files_judge_rubric_is_parsed_and_validated_rather_than_ignored(
+        string first, string second, string why)
+    {
+        // The rubric was not reachable from a run file at all, and it is the lever that matters most:
+        // measured on a task where storing the shown examples scores perfectly, the gap between a documented
+        // lookup table and an honest attempt is 0.083 under the default rubric and 0.310 under one naming
+        // generality (benchmarks/external/judge_rubric_probe.py).
+        //
+        // Asserted through the refusal rather than through a completed run, deliberately. The judge's own
+        // metric names only become observable when a judge REPLY parses, and the loopback fake answers with
+        // a program; a run that merely completes therefore cannot tell an honoured rubric from an ignored
+        // one. An unusable rubric coming back named proves the list was parsed, carried into
+        // LlmFeedbackOptions and validated there.
+        using var directory = new TemporaryDirectory();
+        File.WriteAllText(Path.Combine(directory.Path, "initial_program.py"), "X = 0\n");
+        File.WriteAllText(Path.Combine(directory.Path, "evaluator.py"),
+            "import json, sys\n" + "print(json.dumps({\"quality\": 0.5}))  # evaluate\n");
+        var run = new
+        {
+            schema = "aidotnet-evolve-run-v1",
+            runId = "judge-rubric-" + why,
+            initialProgram = Path.Combine(directory.Path, "initial_program.py"),
+            evaluator = Path.Combine(directory.Path, "evaluator.py"),
+            output = Path.Combine(directory.Path, "out"),
+            model = new { provider = "OpenAiCompatible", endpoint = "http://127.0.0.1:1/v1", name = "fake-model" },
+            budget = new { maxEvaluations = 2, seed = 7, parallelism = 1 },
+            llmFeedback = new { weight = 0.3, criteria = new[] { first, second } }
+        };
+        string runFile = Path.Combine(directory.Path, "run.json");
+        File.WriteAllText(runFile, JsonSerializer.Serialize(run));
+
+        var (code, _, error) = CliRunTests.Run("run", runFile);
+
+        Assert.NotEqual(0, code);
+        Assert.Contains("Criteria", error, StringComparison.Ordinal);
+    }
+
+    [Theory]
+    [InlineData("")]
+    [InlineData("   ")]
+    public void A_blank_judge_metric_prefix_is_refused_rather_than_read_as_the_default(string prefix)
+    {
+        // The doc said "empty keeps the default" while the code applied any non-null value, so "" stripped
+        // the prefix. That matters because the judge's field names are ordinary words - correctness,
+        // readability - so an unprefixed judge metric collides with an evaluator metric of the same name.
+        // Refused rather than defaulted: a caller who typed "" meant something that cannot be honoured.
+        using var directory = new TemporaryDirectory();
+        File.WriteAllText(Path.Combine(directory.Path, "initial_program.py"), "X = 0\n");
+        File.WriteAllText(Path.Combine(directory.Path, "evaluator.py"),
+            "import json, sys\n" + "print(json.dumps({\"quality\": 0.5}))  # evaluate\n");
+        var run = new
+        {
+            schema = "aidotnet-evolve-run-v1",
+            runId = "judge-prefix",
+            initialProgram = Path.Combine(directory.Path, "initial_program.py"),
+            evaluator = Path.Combine(directory.Path, "evaluator.py"),
+            output = Path.Combine(directory.Path, "out"),
+            model = new { provider = "OpenAiCompatible", endpoint = "http://127.0.0.1:1/v1", name = "fake-model" },
+            budget = new { maxEvaluations = 2, seed = 7, parallelism = 1 },
+            llmFeedback = new { weight = 0.3, metricPrefix = prefix }
+        };
+        string runFile = Path.Combine(directory.Path, "run.json");
+        File.WriteAllText(runFile, JsonSerializer.Serialize(run));
+
+        var (code, _, error) = CliRunTests.Run("run", runFile);
+
+        Assert.NotEqual(0, code);
+        Assert.Contains("metricPrefix", error, StringComparison.Ordinal);
+        Assert.Contains("collide", error, StringComparison.Ordinal);
+    }
+
+    [Theory]
+    // Every list in the run file deserializes over its initializer when the JSON says null, and the first
+    // read of .Count then threw NullReferenceException - a stack trace on the console where this surface
+    // promises a named refusal for every other bad value. Measured before the fix: "criteria": null crashed
+    // `run` at RunCommand.cs:339 with an unhandled exception.
+    [InlineData("additionalModels", "{ \"additionalModels\": null }")]
+    [InlineData("search.metricDescriptors", "{ \"search\": { \"metricDescriptors\": null } }")]
+    [InlineData("llmFeedback.criteria", "{ \"llmFeedback\": { \"weight\": 0.3, \"criteria\": null } }")]
+    [InlineData("llmFeedback.models", "{ \"llmFeedback\": { \"weight\": 0.3, \"models\": null } }")]
+    [InlineData("openEvolveEvaluator.pythonPath", "{ \"openEvolveEvaluator\": { \"pythonPath\": null } }")]
+    [InlineData("openEvolveEvaluator.cascadeThresholds", "{ \"openEvolveEvaluator\": { \"cascadeThresholds\": null } }")]
+    [InlineData("openEvolveEvaluator.featureDimensions", "{ \"openEvolveEvaluator\": { \"featureDimensions\": null } }")]
+    public void A_run_file_list_set_to_null_is_refused_by_name(string expected, string sectionJson)
+    {
+        string runFile = WriteRunWithSection(sectionJson);
+
+        var (code, _, error) = CliRunTests.Run("run", runFile);
+
+        Assert.NotEqual(0, code);
+        Assert.Contains(expected, error, StringComparison.Ordinal);
+        Assert.Contains("cannot be null", error, StringComparison.Ordinal);
+        // Preflight loads the same file, so the refusal has to reach it too - it did not before, because
+        // the crash happened in run setup, which preflight never enters.
+        var (preflightCode, _, preflightError) = CliRunTests.Run("preflight", runFile);
+        Assert.NotEqual(0, preflightCode);
+        Assert.Contains(expected, preflightError, StringComparison.Ordinal);
+    }
+
+    [Fact]
+    public void A_section_that_is_absent_entirely_is_not_mistaken_for_a_null_list()
+    {
+        // The guard has to distinguish "no llmFeedback section", which is legal and means not configured,
+        // from "llmFeedback present with criteria: null". Written after getting this wrong: section?.List
+        // is null in both cases, so the first attempt refused a run file that had configured nothing.
+        string runFile = WriteRunWithSection("{ }");
+
+        var (code, output, error) = CliRunTests.Run("preflight", runFile);
+
+        Assert.DoesNotContain("cannot be null", error, StringComparison.Ordinal);
+        Assert.DoesNotContain("cannot be null", output, StringComparison.Ordinal);
+        Assert.NotEqual(2, code); // 2 is the run-file refusal; reaching the evaluator at all is the point
+    }
+
+    /// <summary>A minimal valid run file with <paramref name="sectionJson"/>'s members merged in.</summary>
+    private static string WriteRunWithSection(string sectionJson)
+    {
+        var directory = new TemporaryDirectory();
+        File.WriteAllText(Path.Combine(directory.Path, "initial_program.py"), "X = 0\n");
+        File.WriteAllText(Path.Combine(directory.Path, "evaluator.py"), """
+            import json, sys
+            print(json.dumps({"quality": 0.5}))  # evaluate
+            """);
+        using JsonDocument section = JsonDocument.Parse(sectionJson);
+        var buffer = new System.IO.MemoryStream();
+        using (var writer = new Utf8JsonWriter(buffer))
+        {
+            writer.WriteStartObject();
+            writer.WriteString("schema", "aidotnet-evolve-run-v1");
+            writer.WriteString("runId", "null-list");
+            writer.WriteString("initialProgram", Path.Combine(directory.Path, "initial_program.py"));
+            writer.WriteString("evaluator", Path.Combine(directory.Path, "evaluator.py"));
+            writer.WriteString("output", Path.Combine(directory.Path, "out"));
+            writer.WritePropertyName("model");
+            writer.WriteStartObject();
+            writer.WriteString("provider", "OpenAiCompatible");
+            writer.WriteString("endpoint", "http://127.0.0.1:1/v1");
+            writer.WriteString("name", "fake-model");
+            writer.WriteEndObject();
+            writer.WritePropertyName("budget");
+            writer.WriteStartObject();
+            writer.WriteNumber("maxEvaluations", 2);
+            writer.WriteNumber("seed", 7);
+            writer.WriteNumber("parallelism", 1);
+            writer.WriteEndObject();
+            foreach (JsonProperty property in section.RootElement.EnumerateObject()) property.WriteTo(writer);
+            writer.WriteEndObject();
+        }
+        string path = Path.Combine(directory.Path, "run.json");
+        File.WriteAllBytes(path, buffer.ToArray());
+        return path;
+    }
+
+    [Theory]
+    [InlineData(1.5)]
+    [InlineData(-0.1)]
+    public void An_out_of_range_judge_blend_is_refused_by_name(double blend)
+    {
+        // combinedBlend is the coefficient that decides whether the judge can change an outcome - weight is
+        // not - so it has to be reachable from a run file and validated there. Measured: with a judge gap of
+        // 0.29 the flip condition reaches only 0.087 at weight = 1 against 0.583, and needs combinedBlend
+        // below about 0.26. Asserted through the refusal because that is the deterministic signal: a run
+        // that completes cannot distinguish an honoured blend from an ignored one.
+        using var directory = new TemporaryDirectory();
+        File.WriteAllText(Path.Combine(directory.Path, "initial_program.py"), "X = 0\n");
+        File.WriteAllText(Path.Combine(directory.Path, "evaluator.py"),
+            "import json, sys\n" + "print(json.dumps({\"quality\": 0.5}))  # evaluate\n");
+        var run = new
+        {
+            schema = "aidotnet-evolve-run-v1",
+            runId = "judge-blend",
+            initialProgram = Path.Combine(directory.Path, "initial_program.py"),
+            evaluator = Path.Combine(directory.Path, "evaluator.py"),
+            output = Path.Combine(directory.Path, "out"),
+            model = new { provider = "OpenAiCompatible", endpoint = "http://127.0.0.1:1/v1", name = "fake-model" },
+            budget = new { maxEvaluations = 2, seed = 7, parallelism = 1 },
+            llmFeedback = new { weight = 0.3, combinedBlend = blend }
+        };
+        string runFile = Path.Combine(directory.Path, "run.json");
+        File.WriteAllText(runFile, JsonSerializer.Serialize(run));
+
+        var (code, _, error) = CliRunTests.Run("run", runFile);
+
+        Assert.NotEqual(0, code);
+        Assert.Contains("CombinedBlend", error, StringComparison.Ordinal);
+    }
+
     private static OpenEvolveImport Import(TemporaryDirectory directory, string yaml, string? python = null)
     {
         string config = Path.Combine(directory.Path, "config.yaml");

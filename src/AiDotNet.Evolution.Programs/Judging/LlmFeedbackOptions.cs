@@ -184,14 +184,40 @@ public sealed class LlmFeedbackOptions
             throw new ArgumentException("CritiqueField cannot name one of the judging criteria.", nameof(CritiqueField));
         var fields = Criteria.Select(Prompts.ProgramPromptBuilder.ToCriterionFieldName).ToArray();
         if (fields.Distinct(StringComparer.Ordinal).Count() != fields.Length || fields.Contains(AverageMetricSuffix)
-            || fields.Contains(CritiqueField.Trim()))
-            throw new ArgumentException("Criterion JSON names must be distinct and cannot collide with average or CritiqueField.", nameof(Criteria));
-        foreach (string field in fields.Append(AverageMetricSuffix))
+            || fields.Contains(CostUnitsMetricSuffix) || fields.Contains(CritiqueField.Trim()))
         {
-            string name = MetricPrefix + field;
-            if (name.Length is < 1 or > 64 || name != name.Trim() || name.Any(char.IsControl))
-                throw new ArgumentException("Judge descriptor names must be bounded and canonical.", nameof(MetricPrefix));
+            // CostUnitsMetricSuffix belongs here with the others: the judge writes its own cost under that
+            // name, so a criterion normalising to it would have one descriptor meaning both a judged score
+            // and what the judging cost, with whichever is written last winning silently.
+            throw new ArgumentException(
+                "Criterion JSON names must be distinct and cannot collide with '" + AverageMetricSuffix
+                + "', '" + CostUnitsMetricSuffix + "' or CritiqueField.", nameof(Criteria));
         }
+        // The prefix is checked first and on its own, against the longest FIXED name it will ever carry, so
+        // a prefix problem is reported as one. Longest rather than shortest because both fixed descriptors
+        // are emitted: a prefix validated only against "average" can still overflow on "cost_units", which
+        // is three characters longer, and the overflow would then surface as a descriptor the archive
+        // refuses rather than as a configuration this surface rejected. Only then are the criteria checked,
+        // and a criterion that overflows is attributed to Criteria rather than to the field the caller did
+        // not set.
+        void Require(string name, string parameter)
+        {
+            if (name.Length is >= 1 and <= 64 && name == name.Trim() && !name.Any(char.IsControl)) return;
+            throw new ArgumentException(
+                "The judge descriptor name '" + name + "' is " + name.Length.ToString(CultureInfo.InvariantCulture)
+                + " characters; a descriptor name must be 1 to 64 characters, untrimmed and free of control "
+                + "characters. A criterion doubles as a metric name, so keep each criterion a short token and "
+                + "put any explanation in EvaluatorSystemMessage.",
+                parameter);
+        }
+
+        Require(
+            MetricPrefix + (AverageMetricSuffix.Length >= CostUnitsMetricSuffix.Length
+                ? AverageMetricSuffix
+                : CostUnitsMetricSuffix),
+            nameof(MetricPrefix));
+        foreach (string field in fields) Require(MetricPrefix + field, nameof(Criteria));
+
         if (MaxCritiqueChars < 1 || MaxCritiqueChars > EvolutionArtifact.MaximumTextLength)
         {
             throw new ArgumentOutOfRangeException(nameof(MaxCritiqueChars), MaxCritiqueChars,
