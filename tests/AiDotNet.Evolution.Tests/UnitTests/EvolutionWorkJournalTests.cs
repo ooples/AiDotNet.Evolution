@@ -107,7 +107,7 @@ public sealed class EvolutionWorkJournalTests
 
     // ---- Append-only log and group commit (#119) ----
 
-    private const int RecordHeaderBytes = 48;
+    private const int RecordHeaderBytes = 56; // magic 4, sequence 8, length 4, header hash 8, payload hash 32
 
     [Fact]
     public void AppendedRecordsBecomeDurableInOrderAndReplayAfterReopen()
@@ -309,11 +309,12 @@ public sealed class EvolutionWorkJournalTests
             Assert.Equal("state written by the whole-state rewrite", journal.Payload);
             Assert.Equal(7, journal.Revision);
             Assert.Empty(journal.RecoveredRecords);
-            // Upgraded before the first record can exist: code that reads only work.current must refuse this store.
-            Assert.Equal("AEVWORK2", Encoding.ASCII.GetString(File.ReadAllBytes(OwnerPath(directory))));
             Assert.Equal(8, journal.Append("first record"));
             journal.WaitDurable(8);
         }
+        // Upgraded before the first record could exist: code that reads only work.current must refuse this store.
+        // Read once the journal is closed: an open journal holds work.owner exclusively.
+        Assert.Equal("AEVWORK2", Encoding.ASCII.GetString(File.ReadAllBytes(OwnerPath(directory))));
         using (var reopened = new EvolutionWorkJournal(directory.Path, "unused", 4096))
         {
             Assert.Equal("state written by the whole-state rewrite", reopened.Payload);

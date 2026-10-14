@@ -238,7 +238,12 @@ public sealed class EvolutionDurableSessionBridgeTests
         using var fixture = new Fixture(); using var session = Session();
         using var guard = new CancellationTokenSource(TimeSpan.FromSeconds(20));
         var ask = Assert.Single(await session.AskAsync(1, guard.Token));
-        using (var coordinator = fixture.Open(session)) Bridge(session, coordinator).Enqueue(ask);
+        using (var coordinator = fixture.Open(session))
+        {
+            Bridge(session, coordinator).Enqueue(ask);
+            // The enqueue is a log record until compaction; fold it into work.current so the edit below has state to edit.
+            coordinator.CompactJournal();
+        }
         using (var journal = new EvolutionWorkJournal(fixture.DirectoryPath, "unused", 16 * 1024 * 1024))
         {
             JsonObject state = JsonNode.Parse(journal.Payload)!.AsObject();

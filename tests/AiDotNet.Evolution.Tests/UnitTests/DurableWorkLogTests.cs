@@ -9,7 +9,7 @@ namespace AiDotNet.Evolution.Tests;
 /// durability.</summary>
 public sealed class DurableWorkLogTests
 {
-    private const int RecordHeaderBytes = 48;
+    private const int RecordHeaderBytes = 56; // magic 4, sequence 8, length 4, header hash 8, payload hash 32
 
     [Fact]
     public void ReplayAndCompactionRebuildExactlyTheStateTheWholeStateRewriteStored()
@@ -61,9 +61,10 @@ public sealed class DurableWorkLogTests
         {
             Assert.True(upgraded.WasRecovered);
             Assert.Equal(expected, upgraded.CaptureDurableState());
-            Assert.Equal("AEVWORK2", Encoding.ASCII.GetString(File.ReadAllBytes(OwnerPath(fixture))));
             Assert.True(fixture.Enqueue(upgraded, 9));
         }
+        // Read once the store is closed: the open coordinator holds work.owner exclusively.
+        Assert.Equal("AEVWORK2", Encoding.ASCII.GetString(File.ReadAllBytes(OwnerPath(fixture))));
         using var reopened = fixture.Open(13);
         Assert.False(fixture.Enqueue(reopened, 9)); // the record appended after the upgrade survived
     }
