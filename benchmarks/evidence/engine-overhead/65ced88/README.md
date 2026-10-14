@@ -9,6 +9,10 @@ Produced by the committed driver,
 [`benchmarks/external/run_overhead_head_to_head.py`](../../../external/run_overhead_head_to_head.py),
 which measures **both** systems - the previous attempt at this rerun measured only ours and carried
 the OpenEvolve column forward, which review rightly refused as a basis for restating a paired bound.
+The driver now also **alternates which system runs first** (even repeats ours first, odd repeats
+theirs), so going first - and paying the cold page-cache and cold-JIT cost of it - is not a fixed
+property of one column. Every row records its order in `ran_first`, and each summary cell carries the
+split as `repeats_aidotnet_first` / `repeats_openevolve_first` (5/4 across 9 repeats).
 
 Machine: AMD Ryzen 9 3950X (16 cores / 32 threads), 64 GB RAM, Windows 11 Pro 10.0.26220, .NET SDK
 10.0.402 Release; OpenEvolve 0.3.2 (`411fb59`) on Python 3.13 in a venv carrying its `pyproject`
@@ -24,41 +28,56 @@ percentile bootstrap interval (seed 7). A non-positive difference or a hang is r
 averaged in.
 
 **The machine was quiet, and that is recorded rather than assumed.** The run is wrapped in a guard
-that requires three consecutive readings of peak total CPU under 20% before starting: 6.5%, 11.6% and
-6.1% before, 16.5% at the finish. An earlier attempt at this same measurement was discarded because
-another session was building a solution with ~25 MSBuild workers throughout it.
+that requires three consecutive readings of peak total CPU under 20% before starting: 16.6%, 8.8% and
+9.7% opened the gate, after it had reset six times over the preceding four minutes. The sample taken
+immediately after the driver exited read 40.2%, with the last OpenEvolve child processes still tearing
+down - that sample is after the final measurement, not during one. An earlier attempt at this same
+measurement was discarded because another session was building a solution with ~25 MSBuild workers
+throughout it.
 
 ## Results
 
 | workers | ours us/eval | OpenEvolve us/eval | ours / theirs [95% CI] | ours peak MB | OpenEvolve peak MB |
 | --- | --- | --- | --- | --- | --- |
-| 1 | 46.4 | 28,346 | 0.0016 [0.0015, 0.0024] | 61.48 | 142.5 |
-| 2 | 47.7 | 18,660 | 0.0026 [0.0025, 0.0028] | 61.39 | 208.8 |
-| 4 | 49.4 | 12,554 | 0.0039 [0.0030, 0.0047] | 61.39 | 340.1 |
-| 8 | 48.7 | 12,493 | 0.0039 [0.0023, 0.0061] | 61.39 | 601.2 |
-| 16 | 47.4 | 11,369 | 0.0042 [0.0037, 0.0046] | 61.21 | 1,121.3 |
+| 1 | 48.3 | 26,917 | 0.0018 [0.0016, 0.0021] | 61.34 | 142.7 |
+| 2 | 49.9 | 20,813 | 0.0024 [0.0022, 0.0028] | 61.38 | 208.6 |
+| 4 | 49.9 | 15,790 | 0.0033 [0.0020, 0.0097] | 62.12 | 340.2 |
+| 8 | 47.2 | 11,835 | 0.0039 [0.0033, 0.0046] | 61.46 | 601.7 |
+| 16 | 47.7 | 9,164 | 0.0049 [0.0039, 0.0058] | 61.46 | 1,121.4 |
 
-None of the 90 measurements produced a non-positive `T(2N) - T(N)` (the 4,000 draws per worker count are bootstrap resamples of those measurements, not measurements of their own).
+None of the 90 measurements produced a non-positive `T(2N) - T(N)`. The 4,000 draws per worker count
+are bootstrap resamples of those 9 paired measurements - resampling, not 4,000 further measurements,
+so the interval reports how far the median of 9 repeats could move, not a 4,000-run precision.
 
-**Per-repeat spread, stated rather than smoothed:** ours ranges 42.5-95.0 us at 1 worker and
-18.0-79.3 us at 8, against medians of 46.4 and 48.7; theirs ranges 7,493-48,179 us at 1 worker. The
-medians are what the targets are judged on, and the paired bootstrap is what the interval is built
-from, precisely because single repeats on a desktop swing this far.
+**Alternating the order did not move the verdict.** Against the fixed-order run it replaces, our
+medians shifted by under 3 us (46.4-49.4 -> 47.2-49.9) and the ratios by under 0.001 at every worker
+count; the direction is not consistent, so the order effect is below this machine's repeat-to-repeat
+noise rather than a correction in our favour. Their column moved further (9,164 vs 11,369 us at 16
+workers) while the ratio there still rose slightly, which is a reminder that the reported ratio is the
+median of per-repeat paired ratios and not the quotient of the two medians in the table.
 
-**One hang.** OpenEvolve deadlocked once (`n=600`, 16 workers, repeat 4); the driver killed it at
-180 s, recorded it under `hangs` and re-measured the cell. Its memory also grows with the pool:
-142 MB at one worker to 1.12 GB at sixteen, against our flat 61 MB.
+**Per-repeat spread, stated rather than smoothed:** ours ranges 43.6-66.4 us at 1 worker and
+27.2-177.7 us at 4, against medians of 48.3 and 49.9; theirs ranges 19,082-31,145 us at 1 worker and
+4,163-24,723 us at 4. Every per-system range is in the JSON as
+`summary[].aidotnet_us_per_eval_range` / `openevolve_us_per_eval_range`. That 4-worker spread is also
+why the widest interval is there: the medians are what the targets are judged on, and the paired
+bootstrap is what the interval is built from, precisely because single repeats on a desktop swing
+this far.
+
+**Two hangs.** OpenEvolve deadlocked twice (`n=600` at 8 workers, repeat 8; and at 16 workers,
+repeat 7); the driver killed each at 180 s, recorded them under `hangs` and re-measured the cell. Its
+memory also grows with the pool: 143 MB at one worker to 1.12 GB at sixteen, against our flat 61 MB.
 
 ## Targets
 
 | metric | target | measured | status |
 | --- | --- | --- | --- |
-| our overhead per evaluation, 1-16 workers (N >= 8,000) | <= 100 us | 46.4-49.4 us | **met** |
-| ours / OpenEvolve, 95% CI upper bound, every worker count | <= 0.05 | <= **0.0061** (worst, 8 workers) | **met, paired and measured** |
-| our peak working set, 16 workers | <= 64 MB | **61.21 MB** | **met** |
+| our overhead per evaluation, 1-16 workers (N >= 8,000) | <= 100 us | 47.2-49.9 us | **met** |
+| ours / OpenEvolve, 95% CI upper bound, every worker count | <= 0.05 | <= **0.0097** (worst, 4 workers) | **met, paired and measured** |
+| our peak working set, 16 workers | <= 64 MB | **61.46 MB** | **met** |
 
-Peak working set is flat across worker counts (61.21-61.48 MB), so the memory target is met at every
-count rather than only at the one the metric names.
+Peak working set is flat across worker counts (61.34-62.12 MB, the maximum at 4 workers rather than
+16), so the memory target is met at every count rather than only at the one the metric names.
 
 ## What this run is not
 
