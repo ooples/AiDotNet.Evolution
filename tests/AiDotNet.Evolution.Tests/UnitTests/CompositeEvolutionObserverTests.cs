@@ -52,7 +52,8 @@ public sealed class CompositeEvolutionObserverTests
     {
         // A cancelled run must stop rather than keep notifying, so this one exception is allowed out.
         using var cancellation = new CancellationTokenSource();
-        await cancellation.CancelAsync();
+        // Cancel(), not CancelAsync(): the latter is .NET 8+ and this assembly also targets net471/net462.
+        cancellation.Cancel();
         var observer = new Counting(new OperationCanceledException());
         var composite = new CompositeEvolutionObserver<int>(new IEvolutionObserver<int>[] { observer });
 
