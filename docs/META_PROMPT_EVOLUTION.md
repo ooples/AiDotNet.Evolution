@@ -150,6 +150,13 @@ should be able to see that rather than infer it from a flat archive.
 
 ## Checkpoints
 
+**Through the CLI, a resume starts the instruction archive over.** The engine checkpoints the
+variation operator's state, not its instruction source, so `aidotnet-evolve resume` rebuilds the
+evolver from `metaPrompt.seedInstruction` and loses the archive, its scores, its counters and any
+outstanding routes. The evolver's own `CaptureState`/`RestoreState` work and are tested - what is
+missing is their place in the engine's checkpoint, which is a change to that contract rather than to
+the CLI. Use the API directly if a resumed run must keep what its instructions learned.
+
 `CaptureState` carries the archive, the lineage, the counters and the outstanding routes, so a
 resumed run can still credit an instruction for a proposal that was in flight. `StateHash` hashes
 all of it for checkpoint equality.

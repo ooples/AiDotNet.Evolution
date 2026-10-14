@@ -61,6 +61,14 @@ internal sealed class RunFile
 internal sealed class RunMetaPrompt
 {
     /// <summary>The instruction the run starts from; required, because an evolver needs something to vary.</summary>
+    /// <remarks>
+    /// <b>A resumed run starts the instruction archive again from this seed.</b> The engine checkpoints the
+    /// variation operator's own state, not its instruction source, so a resume rebuilds the evolver and loses
+    /// the archive, its scores, its counters and any outstanding routes. A long run that is resumed therefore
+    /// re-explores instructions it had already scored. Persisting it needs the evolver's
+    /// <c>CaptureState</c>/<c>RestoreState</c> to join the checkpoint, which is a change to the engine's
+    /// checkpoint contract rather than to this file.
+    /// </remarks>
     public required string SeedInstruction { get; init; }
     /// <summary>Generations between instruction proposals (OpenEvolve has no equivalent cadence key).</summary>
     public int ProposeEveryGenerations { get; init; } = 25;
