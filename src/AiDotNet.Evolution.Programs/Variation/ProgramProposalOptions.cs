@@ -21,8 +21,7 @@ public sealed class ProgramProposalOptions : ProgramTaskOptions
         // Dropping this silently cost a run: the CLI adds every declared OpenEvolve feature dimension here,
         // ProgramEvolutionTask snapshots its options through Clone, and a lost list means the archive demands
         // a coordinate nobody promotes - every candidate is then refused with descriptor_missing.
-        MetricDescriptors = new List<string>(MetricDescriptors
-            ?? throw new ArgumentException("Metric descriptors cannot be null.", nameof(MetricDescriptors))),
+        MetricDescriptors = CopyMetricDescriptors(MetricDescriptors),
         TaskDescription = TaskDescription,
         Prompt = Prompt?.Clone() ?? throw new ArgumentException("Prompt options cannot be null.")
     };

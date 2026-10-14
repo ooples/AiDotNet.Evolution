@@ -166,7 +166,7 @@ public sealed class ProgramEvolutionTask : IEvolutionTask<ProgramGenome>, IEvolu
             // needs - which dimension was missing - while this carries it in the diagnostic's data.
             if (!result.Metrics.TryGetValue(name, out double value) || !double.IsFinite(value))
             {
-                return new EvolutionTaskResult(
+                var failed = new EvolutionTaskResult(
                     EvolutionEvaluationStatus.Failed,
                     costUnits: result.CostUnits,
                     diagnostics: new[]
@@ -179,6 +179,9 @@ public sealed class ProgramEvolutionTask : IEvolutionTask<ProgramGenome>, IEvolu
                     },
                     metrics: result.Metrics,
                     artifacts: result.Artifacts);
+                // A failed evaluation is still a measurement, and where it was measured is part of its provenance:
+                // dropping the origin here would make a refused result indistinguishable from a locally produced one.
+                return result.MeasurementOrigin is null ? failed : failed.WithMeasurementOrigin(result.MeasurementOrigin);
             }
 
             merged[name] = value;

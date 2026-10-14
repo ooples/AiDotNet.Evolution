@@ -1671,6 +1671,7 @@ const AiDotNet.Evolution.Programs.ProgramSandboxLimitOptions.MaxConcurrencyLimit
 const AiDotNet.Evolution.Programs.ProgramSandboxLimitOptions.MaxMemoryLimitMb = 1048576 -> int
 const AiDotNet.Evolution.Programs.ProgramSandboxLimitOptions.MaxTimeLimitSeconds = 86400 -> int
 const AiDotNet.Evolution.Programs.ProgramSnapshot.MaximumCharacters = 262144 -> int
+const AiDotNet.Evolution.Programs.ProgramTaskOptions.MaxMetricDescriptors = 4096 -> int
 const AiDotNet.Evolution.Programs.ProgramTokenComplexityDescriptor.DefaultName = "tokenComplexity" -> string!
 const AiDotNet.Evolution.Programs.Provenance.InMemoryProposalProvenanceSink.DefaultCapacity = 1024 -> int
 const AiDotNet.Evolution.Programs.Provenance.JsonLinesProposalProvenanceSink.DefaultBaseName = "provenance" -> string!
@@ -1828,6 +1829,7 @@ static AiDotNet.Evolution.Programs.ProgramMeasurementStatistics.Calculate(System
 static AiDotNet.Evolution.Programs.ProgramSandboxOptions.CreateDefaultInterpreters() -> System.Collections.Generic.Dictionary<AiDotNet.Evolution.Programs.ProgramLanguage, AiDotNet.Evolution.Programs.ProgramInterpreterSpecification!>!
 static AiDotNet.Evolution.Programs.ProgramSnapshot.Digest(byte[]! value) -> string!
 static AiDotNet.Evolution.Programs.ProgramSnapshot.Digest(string! value) -> string!
+static AiDotNet.Evolution.Programs.ProgramTaskOptions.CopyMetricDescriptors(System.Collections.Generic.IList<string!>? descriptors) -> System.Collections.Generic.List<string!>!
 static AiDotNet.Evolution.Programs.ProgramTokenComplexityDescriptor.CountTokens(string! source) -> int
 static AiDotNet.Evolution.Programs.Provenance.JsonLinesProposalProvenanceSink.EnumerateSegments(string! directoryPath, string? baseName = null) -> System.Collections.Generic.IReadOnlyList<string!>!
 static AiDotNet.Evolution.Programs.Provenance.ProposalProvenanceReader.BuildLineage(string! genomeId, System.Collections.Generic.IReadOnlyList<AiDotNet.Evolution.Programs.Provenance.ProposalProvenanceRecord!>! records) -> AiDotNet.Evolution.Programs.Provenance.ProposalProvenanceLineage!

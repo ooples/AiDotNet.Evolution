@@ -43,8 +43,11 @@ public sealed class ProposalOptionsCloneTests
     [Fact]
     public void Cloning_proposal_options_keeps_every_base_property()
     {
+        var ledger = new EvolutionResourceLedger("clone-test",
+            new EvolutionResources(new Dictionary<string, decimal> { ["cost_units"] = 10 }));
         var options = new ProgramProposalOptions
         {
+            ResourceAccounting = new ProgramEvolutionResourceOptions(ledger, 1, "cost-units-v1"),
             Language = ProgramLanguage.Python,
             EvolveBlockStartMarker = "# START",
             EvolveBlockEndMarker = "# END",
@@ -63,7 +66,11 @@ public sealed class ProposalOptionsCloneTests
         Assert.True(clone.EnforceEvolveBlocks);
         Assert.Equal(4321, clone.MaxProgramChars);
         Assert.Equal("<<<<<<< MINE", clone.Diff.SearchMarker);
-        Assert.Null(clone.ResourceAccounting);
+        // Asserted against a real ledger: Assert.Null here would also pass for a Clone that omitted the property,
+        // which is the exact defect this test exists to catch. The same instance, not a copy - the ledger is shared
+        // state that charges one budget, so a clone holding a duplicate would let two snapshots spend it twice.
+        Assert.Same(ledger, clone.ResourceAccounting?.Ledger);
+        Assert.Equal("cost-units-v1", clone.ResourceAccounting?.CostUnitVersionHash);
         Assert.Equal("pack circles", clone.TaskDescription);
         Assert.Equal(new[] { "radius_variance", "spatial_spread" }, clone.MetricDescriptors);
 
