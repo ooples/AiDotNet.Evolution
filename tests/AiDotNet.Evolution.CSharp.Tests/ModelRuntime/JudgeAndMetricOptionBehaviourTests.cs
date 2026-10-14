@@ -130,6 +130,36 @@ public sealed class JudgeAndMetricOptionBehaviourTests
         Assert.Equal(first, Hash(new ProgramEvolutionResourceOptions(ledger, 5, "cost-units-v1")));
     }
 
+    [Fact]
+    public async Task The_judge_is_told_what_the_program_is_for()
+    {
+        // It was not. The judge saw the program, the criteria and the response schema, and nothing about the
+        // task - so it could not distinguish solving from memorising, and the feedback story's "suspicion of
+        // test gaming" was unreachable rather than weak. Measured before the fix: a six-entry lookup table of
+        // the visible test pairs scored 0.160 against 0.185 for an honest-but-wrong formula.
+        const string Task = "Recover the hidden rule behind the examples, do not store their answers.";
+        var described = new FakeChatClient(Answer);
+        await new LlmJudgeProgramFitnessEvaluator(described, Measured(),
+                new ProgramPromptBuilder(new ProgramEvolutionPromptOptions { TaskDescription = Task }),
+                new LlmFeedbackOptions())
+            .EvaluateAsync(Candidate(), Context());
+
+        Assert.Contains(Task, AllText(described), StringComparison.Ordinal);
+        Assert.Contains("has not solved the task", AllText(described), StringComparison.Ordinal);
+    }
+
+    [Fact]
+    public async Task A_judge_with_no_task_description_renders_no_task_section()
+    {
+        // The inverted half: the section must disappear rather than leave an empty heading, which is how the
+        // proposal prompts already behave, so the two paths describe a task the same way or not at all.
+        var plain = new FakeChatClient(Answer);
+        await Judge(new LlmFeedbackOptions(), plain).EvaluateAsync(Candidate(), Context());
+
+        Assert.DoesNotContain("# Task Description", AllText(plain), StringComparison.Ordinal);
+        Assert.Contains("has not solved the task", AllText(plain), StringComparison.Ordinal);
+    }
+
     private static LlmJudgeProgramFitnessEvaluator Judge(LlmFeedbackOptions options, FakeChatClient? client = null) =>
         new(client ?? new FakeChatClient(Answer), Measured(), null, options);
 

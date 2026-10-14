@@ -4,6 +4,7 @@ using System.Text;
 using System.Text.Json;
 using System.Text.Json.Serialization;
 using AiDotNet.Evolution.Programs;
+using AiDotNet.Evolution.Prompts;
 
 namespace AiDotNet.Evolution.Cli;
 
@@ -285,7 +286,16 @@ internal static class RunCommand
             IProgramChatClient judge = feedback.Models.Count == 0
                 ? CreateModels(new[] { run.Model }.Concat(run.AdditionalModels).ToList(), baseDirectory)
                 : CreateModels(feedback.Models, baseDirectory);
-            fitness = new LlmJudgeProgramFitnessEvaluator(judge, fitness, null, new LlmFeedbackOptions { Enabled = true, Weight = feedback.Weight });
+            // The builder is supplied rather than left to default: a default one carries no prompt options, so
+            // the judge was asked "is this good code?" with no idea what the program was for. The task
+            // description is filled the same way the variation operator fills it (LlmProgramVariationOperator),
+            // so the judge and the proposer are told the same thing about the task.
+            ProgramEvolutionPromptOptions judgePrompt = programOptions.Prompt.Clone();
+            if (judgePrompt.TaskDescription is null && programOptions.TaskDescription is { } judged && judged.Trim().Length > 0)
+                judgePrompt.TaskDescription = judged;
+            fitness = new LlmJudgeProgramFitnessEvaluator(judge, fitness,
+                new ProgramPromptBuilder(judgePrompt, programOptions),
+                new LlmFeedbackOptions { Enabled = true, Weight = feedback.Weight });
         }
         var task = new ProgramEvolutionTask(fitness, new ProgramDescriptorSet(new[] { new ProgramLengthDescriptor() }), programOptions);
         var variationOptions = new LlmProgramVariationOptions

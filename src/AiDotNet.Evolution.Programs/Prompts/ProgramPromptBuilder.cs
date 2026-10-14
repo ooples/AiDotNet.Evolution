@@ -196,7 +196,13 @@ public sealed class ProgramPromptBuilder
             ["current_program"] = BoundProgram(program.Source),
             ["language"] = _fenceLabel,
             ["criteria"] = criteriaBuilder.ToString(),
-            ["response_schema"] = responseSchema ?? schemaBuilder.ToString()
+            ["response_schema"] = responseSchema ?? schemaBuilder.ToString(),
+            // The judge was shown the program, the criteria and the schema, and nothing about what the
+            // program is for. Measured consequence: it scored a six-entry lookup table of the visible test
+            // pairs 0.160 and an honest-but-wrong formula 0.185, so "suspicion of test gaming" - which the
+            // feedback story promises - was unreachable rather than merely weak. Empty when no description
+            // is configured, exactly as the proposal prompts render it.
+            ["task_description"] = DescribeTask()
         };
 
         AddCustomVariables(values);
