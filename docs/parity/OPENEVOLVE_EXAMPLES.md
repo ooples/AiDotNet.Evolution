@@ -76,9 +76,9 @@ necessary but not sufficient, as the three rows below the smoked ones show.
 | example | seed score | smoked | why not |
 | --- | --- | --- | --- |
 | `circle_packing` | 0.364 | yes | |
-| `function_minimization` | 1.398 | yes | |
+| `function_minimization` | 1.398 | yes | also run end to end against the real provider, 4 completed evaluations and `combined_score` 1.4221 at the seed to 1.4988 at best, with only `llm.provider` and the two model names changed - see [evidence](../../benchmarks/evidence/openevolve-examples/767b31a-function-minimization/README.md) |
 | `signal_processing` | 0.420 | yes | |
-| `claude_code_quickstart` | 1.424 | no | sets `llm.provider: "claude_code"`, so proposals route to the Claude Code CLI rather than an HTTP endpoint and a loopback stub has nothing to answer: all nine attempts fail |
+| `claude_code_quickstart` | 1.424 | no (stub) | sets `llm.provider: "claude_code"`, so proposals route to the Claude Code CLI rather than an HTTP endpoint and a loopback stub has nothing to answer. **It is not that the example fails:** with the real provider it runs unmodified and the search improves the program, 1.0567 -> 1.4837 -> 1.4956 over two proposals, with no config key rewritten - see [evidence](../../benchmarks/evidence/openevolve-examples/767b31a-claude-code-quickstart/README.md). It stays out of the smoke list because that list is stub-driven and CI spends nothing |
 | `background_blur` | 0.992 | yes | |
 | `circle_packing_with_artifacts` | 0.364 | yes | |
 | `k_module_problem` | 0.0 | no | its own seed scores zero, so a positive-quality assertion cannot distinguish a working run from a broken one |

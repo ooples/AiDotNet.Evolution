@@ -1,0 +1,54 @@
+{
+  "story": "V1-57 (#170): function_minimization run through the CLI with the real Claude Code provider",
+  "commit": "767b31a",
+  "evaluations": [
+    {
+      "sequence": 1,
+      "status": "Completed",
+      "quality": 1.422099463947774,
+      "metrics": {
+        "combined_score": 1.422099463947774,
+        "distance_score": 0.8704983522435495,
+        "reliability_score": 1,
+        "runs_successfully": 1,
+        "value_score": 0.9738336072509024
+      }
+    },
+    {
+      "sequence": 7,
+      "status": "Completed",
+      "quality": 1.3519899068187475,
+      "metrics": {
+        "combined_score": 1.3519899068187475,
+        "distance_score": 0.6928980703975577,
+        "reliability_score": 1,
+        "runs_successfully": 1,
+        "value_score": 0.9869143668531286
+      }
+    },
+    {
+      "sequence": 9,
+      "status": "Completed",
+      "quality": 1.4987873914811958,
+      "metrics": {
+        "combined_score": 1.4987873914811958,
+        "distance_score": 0.9978382086172431,
+        "reliability_score": 1,
+        "runs_successfully": 1,
+        "value_score": 0.9996802634712485
+      }
+    },
+    {
+      "sequence": 11,
+      "status": "Completed",
+      "quality": 1.497347595553013,
+      "metrics": {
+        "combined_score": 1.497347595553013,
+        "distance_score": 0.9946849825876851,
+        "reliability_score": 1,
+        "runs_successfully": 1,
+        "value_score": 0.9996524711847398
+      }
+    }
+  ]
+}
