@@ -70,3 +70,54 @@ python benchmarks/external/feedback_ablation.py --cli <aidotnet-evolve> `
   --output rubric-arms.json --work scratch --seeds 2 --evaluations 5 --weights 0.3 `
   --rubric "default=" --rubric "general=Correctness;Generality;Readability" --model sonnet
 ```
+
+
+## The decisive arm: give the judge the leverage and it still does not move
+
+Every measurement above runs the judge at `combinedBlend = 0.7`, where the flip condition cannot be met at
+any weight. With `combinedBlend` exposed (#253) that objection can be removed: this arm gives the judge
+**80% of fitness** (`combinedBlend = 0.2`), `weight = 1.0`, and the rubric that names generality. Raw rows:
+`levered.json`.
+
+| seed | arm | blended | recovered judge mean | held-out |
+| --- | --- | --- | --- | --- |
+| 0 | control | 1.000 | - | 0.0000 |
+| 0 | judged | 0.440 | 0.3000 | 0.0000 |
+| 1 | control | 1.000 | - | 0.0182 |
+| 1 | judged | 0.400 | 0.2500 | 0.0000 |
+| 2 | control | 1.000 | - | 0.0364 |
+| 2 | judged | 0.400 | 0.2500 | 0.0000 |
+
+Paired differences: **0.0000, -0.0182, -0.0364**. Every pair is at or below zero, and the judge's recovered
+scores (0.25-0.30) agree with the 0.22-0.28 measured at the default blend - so the judge is working, is
+being listened to, and the endpoint still does not move.
+
+**The reason is that feedback selects and does not create.** The judged arm's winner, with the judge holding
+four fifths of fitness and a rubric that explicitly penalises storing the shown answers:
+
+```python
+_KNOWN = {-4: 23, -1: 11, 2: 9, 5: 9, 9: 69, 13: 88}
+
+
+def solve(x):
+    if x in _KNOWN:
+        return _KNOWN[x]
+    return (x * x + 5) % 89
+```
+
+A lookup table with a fallback - the same shape as every other arm's winner. The proposer never wrote a
+generalising program, so there was none for the judge to prefer. Scoring memorisers harshly changes **which
+table wins**, not whether a correct program exists to win.
+
+## What #167's criterion 4 actually answers to
+
+On this task, LLM feedback does not move the primary endpoint at any setting. Not because the judge cannot
+tell the candidates apart - with a generality criterion it scores a memoriser 0.22-0.30 against about 0.52.
+Not because the weight is too low - it was given 80% of fitness. But because a selection mechanism cannot
+promote a program that was never proposed.
+
+Four defects were found and fixed on the way to that sentence, and each one was real: the judge was never
+told the task, it was defeated by a documented fallback, its rubric had no axis for memorisation, and the
+coefficient that decides whether it can act was unreachable. None of them was the binding constraint. The
+binding constraint is upstream, in what the proposer produces - which is where #166's meta-prompt work and
+the prompt itself matter, and where this measurement says to look next.
