@@ -14,6 +14,11 @@ namespace AiDotNet.Evolution.Programs;
 /// why the core library gains no Python, Node, Docker, or network dependency by shipping them.
 /// </para>
 /// <para>
+/// <see cref="DeclaredEnvironment"/> is the one way to add to the environment a candidate process sees. Engines
+/// start every child from an empty environment, so nothing the host holds leaks into evaluated code and nothing
+/// reaches it that the caller did not write down here.
+/// </para>
+/// <para>
 /// <see cref="Validate"/> refuses configurations that cannot be honoured, and refuses
 /// <see cref="ProgramSandboxMode.InProcessUnsafe"/> outright unless <see cref="AllowUnsafeInProcessExecution"/> has
 /// also been set, so a host cannot reach the unsafe mode by editing one field of a configuration file. The default
@@ -35,11 +40,13 @@ public sealed class ProgramSandboxOptions
     /// The default disables cross-instance cache/replay reuse by assigning each engine an independent identity.</remarks>
     public string RuntimeVersion { get; set; } = "local-runtime-unversioned";
     private readonly Dictionary<ProgramLanguage, ProgramInterpreterSpecification> _interpreters;
+    private readonly Dictionary<string, string> _declaredEnvironment;
 
     /// <summary>Initializes sandbox options with safe defaults and the built-in interpreter table.</summary>
     public ProgramSandboxOptions()
     {
         _interpreters = CreateDefaultInterpreters();
+        _declaredEnvironment = new Dictionary<string, string>(StringComparer.Ordinal);
     }
 
     /// <summary>Gets or sets the execution boundary used to run candidate programs.</summary>
@@ -54,6 +61,43 @@ public sealed class ProgramSandboxOptions
     /// a language the defaults do not cover; a language with no entry is refused rather than guessed at.
     /// </remarks>
     public IDictionary<ProgramLanguage, ProgramInterpreterSpecification> Interpreters => _interpreters;
+
+    /// <summary>Gets the environment variables handed to every candidate process, named and valued by the caller.</summary>
+    /// <remarks>
+    /// <para>
+    /// An engine starts each child from an empty environment so that no API key, token, or connection string the host
+    /// happens to hold is visible to code the host did not write, then adds back the few variables a process needs to
+    /// start. That is the right default and this does not weaken it: entries here are <b>values the caller wrote
+    /// down</b>, never names inherited from the host's own environment, so declaring <c>PYTHONPATH</c> exposes the
+    /// directories named here and nothing else. <see cref="Validate"/> refuses any name the engine sets itself, so a
+    /// declaration cannot quietly replace the pinned <c>PATH</c> or redirect the temporary directory away from the
+    /// per-execution workspace.
+    /// </para>
+    /// <para>
+    /// These entries change what a candidate can import, so they are part of each engine's
+    /// <see cref="AiDotNet.Evolution.IEvolutionTask{TGenome}.VersionHash"/>: a result produced with a module search
+    /// path is not interchangeable with one produced without it.
+    /// </para>
+    /// <para><b>For Beginners:</b> use this when the code being evaluated has to import a library that is not
+    /// installed where the interpreter would normally look - an OpenEvolve evaluator importing <c>openevolve</c>
+    /// itself, for instance. Put the directory in <c>PYTHONPATH</c> here rather than hoping the child inherits it,
+    /// because it will not.</para>
+    /// </remarks>
+    public IDictionary<string, string> DeclaredEnvironment => _declaredEnvironment;
+
+    /// <summary>The variable names an engine sets itself, which a declaration may not replace.</summary>
+    /// <remarks>
+    /// Each of these carries part of the boundary: <c>PATH</c> is pinned to the system directories, the temporary
+    /// and home directories point at the per-execution workspace that is deleted afterwards, and the rest fix the
+    /// child's encoding and keep it from writing bytecode next to the source. Overriding one would change what the
+    /// sandbox means while still looking like configuration, so it is refused by name.
+    /// </remarks>
+    public static IReadOnlyCollection<string> ReservedEnvironmentNames { get; } = new[]
+    {
+        "PATH", "PATHEXT", "SystemRoot", "windir", "ComSpec", "TEMP", "TMP", "HOME", "TMPDIR", "LANG",
+        "PYTHONIOENCODING", "PYTHONDONTWRITEBYTECODE", "DOTNET_CLI_TELEMETRY_OPTOUT", "DOTNET_NOLOGO",
+        "DOTNET_SKIP_FIRST_TIME_EXPERIENCE"
+    };
 
     /// <summary>Gets or sets the directory under which isolated workspaces are created, or <c>null</c> for the system temporary directory.</summary>
     /// <remarks>
@@ -143,6 +187,11 @@ public sealed class ProgramSandboxOptions
             clone._interpreters[entry.Key] = entry.Value;
         }
 
+        foreach (KeyValuePair<string, string> entry in _declaredEnvironment)
+        {
+            clone._declaredEnvironment[entry.Key] = entry.Value;
+        }
+
         return clone;
     }
 
@@ -151,8 +200,9 @@ public sealed class ProgramSandboxOptions
     /// <exception cref="ArgumentException">
     /// <see cref="Limits"/> is <c>null</c>, an interpreter entry is <c>null</c> or lacks the
     /// <see cref="ProgramInterpreterSpecification.SourcePlaceholder"/> token, <see cref="WorkingDirectory"/> is
-    /// white space, or <see cref="Mode"/> is <see cref="ProgramSandboxMode.InProcessUnsafe"/> without
-    /// <see cref="AllowUnsafeInProcessExecution"/>.
+    /// white space, <see cref="DeclaredEnvironment"/> carries an unusable name or a name the engine sets itself
+    /// (see <see cref="ReservedEnvironmentNames"/>), or <see cref="Mode"/> is
+    /// <see cref="ProgramSandboxMode.InProcessUnsafe"/> without <see cref="AllowUnsafeInProcessExecution"/>.
     /// </exception>
     public void Validate()
     {
@@ -169,6 +219,55 @@ public sealed class ProgramSandboxOptions
 
         if (Limits is null) throw new ArgumentException("Limits cannot be null.", nameof(Limits));
         Limits.Validate();
+
+        // Windows resolves a child's environment case-insensitively while POSIX does not, so two declarations
+        // differing only in case would be one variable there and two here. Refused rather than silently collapsed.
+        var seenIgnoringCase = new Dictionary<string, string>(StringComparer.OrdinalIgnoreCase);
+        foreach (KeyValuePair<string, string> entry in _declaredEnvironment)
+        {
+            if (string.IsNullOrWhiteSpace(entry.Key))
+                throw new ArgumentException("An environment variable name cannot be empty or white space.", nameof(DeclaredEnvironment));
+            if (entry.Key.IndexOf('=') >= 0 || entry.Key.IndexOf('\u0000') >= 0)
+            {
+                throw new ArgumentException(
+                    $"The environment variable name '{entry.Key}' cannot contain '=' or a null character.",
+                    nameof(DeclaredEnvironment));
+            }
+
+            if (entry.Value is null)
+            {
+                throw new ArgumentException(
+                    $"The environment variable '{entry.Key}' has no value; remove the entry instead of setting null.",
+                    nameof(DeclaredEnvironment));
+            }
+
+            if (entry.Value.IndexOf('\u0000') >= 0)
+            {
+                throw new ArgumentException(
+                    $"The value of the environment variable '{entry.Key}' cannot contain a null character.",
+                    nameof(DeclaredEnvironment));
+            }
+
+            foreach (string reserved in ReservedEnvironmentNames)
+            {
+                if (!string.Equals(entry.Key, reserved, StringComparison.OrdinalIgnoreCase)) continue;
+                throw new ArgumentException(
+                    $"'{reserved}' is set by the execution engine and carries part of the sandbox boundary, " +
+                    "so it cannot be declared here. Use Interpreters to change the command, or WorkingDirectory " +
+                    "to move the workspace.",
+                    nameof(DeclaredEnvironment));
+            }
+
+            if (seenIgnoringCase.TryGetValue(entry.Key, out string? alreadySeen))
+            {
+                throw new ArgumentException(
+                    $"'{entry.Key}' and '{alreadySeen}' differ only in case, which is one variable on Windows " +
+                    "and two elsewhere. Declare one of them.",
+                    nameof(DeclaredEnvironment));
+            }
+
+            seenIgnoringCase[entry.Key] = entry.Key;
+        }
 
         if (WorkingDirectory is not null && string.IsNullOrWhiteSpace(WorkingDirectory))
             throw new ArgumentException("WorkingDirectory cannot be white space; use null for the temporary directory.", nameof(WorkingDirectory));

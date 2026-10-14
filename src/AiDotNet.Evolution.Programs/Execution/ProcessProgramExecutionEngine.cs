@@ -166,7 +166,10 @@ public sealed class ProcessProgramExecutionEngine : IProgramExecutionEngine, IPr
             _options.RuntimeVersion == "local-runtime-unversioned" ? Guid.NewGuid().ToString("N") : "versioned",
             System.Text.Json.JsonSerializer.Serialize(_limits),
             System.Text.Json.JsonSerializer.Serialize(_options.Interpreters.OrderBy(pair => pair.Key)
-                .Select(pair => new { pair.Key, pair.Value.Executable, pair.Value.RunArgumentTemplate, pair.Value.CompileArgumentTemplate }))
+                .Select(pair => new { pair.Key, pair.Value.Executable, pair.Value.RunArgumentTemplate, pair.Value.CompileArgumentTemplate })),
+            // A declared module search path changes what a candidate can import, so it changes what a result means.
+            System.Text.Json.JsonSerializer.Serialize(_options.DeclaredEnvironment
+                .OrderBy(pair => pair.Key, StringComparer.Ordinal).Select(pair => new { pair.Key, pair.Value }))
         });
     }
 
@@ -728,6 +731,13 @@ public sealed class ProcessProgramExecutionEngine : IProgramExecutionEngine, IPr
         startInfo.Environment["DOTNET_CLI_TELEMETRY_OPTOUT"] = "1";
         startInfo.Environment["DOTNET_NOLOGO"] = "1";
         startInfo.Environment["DOTNET_SKIP_FIRST_TIME_EXPERIENCE"] = "1";
+
+        // Last, and only the caller's own written-down values: ProgramSandboxOptions.Validate refuses any name set
+        // above, so this adds to the environment the child sees without being able to replace the boundary itself.
+        foreach (KeyValuePair<string, string> declared in _options.DeclaredEnvironment)
+        {
+            startInfo.Environment[declared.Key] = declared.Value;
+        }
     }
 
     private static void AddIfPresent(ProcessStartInfo startInfo, string name, string? value)
