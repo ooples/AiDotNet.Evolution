@@ -50,6 +50,28 @@ class OracleTests(unittest.TestCase):
         for outputs in ([], [{}], [{"outputs": []}], [{"error": "shape"}], None):
             self.assertFalse(k.validate("rmsnorm", problems, outputs))
 
+    def test_the_oracle_accepts_nothing_wrong_by_its_own_tolerance(self):
+        # V1-11 (#29) names "oracle false-accept on seeded mutants" with a target of zero, and the other
+        # tests here check named wrong kernels rather than producing a count. This corrupts the
+        # reference's OWN outputs, so it measures validate_outputs rather than any candidate.
+        result = k.oracle_mutant_suite()
+        self.assertEqual(0, result["false_accepts"], result["detail"])
+        self.assertGreaterEqual(result["mutants"], 36)
+        # And the count is not produced by an oracle that refuses everything: a perturbation inside the
+        # tolerance must still be accepted.
+        self.assertEqual([], result["inside_tolerance_rejected"])
+
+    def test_a_mutant_must_be_wrong_by_the_oracles_rule_not_by_a_fraction_of_the_value(self):
+        # Why the suite scales its corruptions to atol + rtol*|v|. Softmax outputs are probabilities, so
+        # a 1% relative nudge of 0.0018 is 1.8e-5 against a tolerance of 2.0e-4 - an order of magnitude
+        # smaller. Measured: the first version of this suite reported six "false accepts" that were the
+        # oracle correctly accepting within-tolerance noise.
+        rows, cols = k.SHAPES["verify"]
+        x, params = k.inputs(k.np, "softmax", 0, rows, cols)
+        value = float(k.reference("softmax", x, params)[0][0])
+        tolerance = k.ATOL + k.RTOL * abs(value)
+        self.assertLess(0.01 * abs(value), tolerance)
+
     def test_seal(self):
         with tempfile.TemporaryDirectory() as directory:
             record = k.seal(directory)
