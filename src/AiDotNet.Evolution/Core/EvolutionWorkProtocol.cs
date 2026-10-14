@@ -39,41 +39,64 @@ public sealed partial class EvolutionWorkProtocol : IDisposable
 
     /// <summary>Processes one JSON object and returns one correlated response. The transport supplies framing and access control.</summary>
     /// <remarks>Commands are serialized. Failed commands return ok:false; publication or transport failure never authorizes retrying physical work.
-    /// After an uncertain storage failure, dispose the endpoint and reopen the original store. No old-state fallback is attempted.</remarks>
+    /// After an uncertain storage failure, dispose the endpoint and reopen the original store. No old-state fallback is attempted.
+    /// <para>A command takes effect in arrival order under the endpoint's lock, but its reply is returned only after the
+    /// coordinator's records up to the state it observed are durable. That wait happens outside the lock, so commands
+    /// arriving on other connections meanwhile share the same flush (group commit) instead of queueing behind it.</para></remarks>
     public string ProcessJson(string requestJson)
     {
+        long id = 0;
+        string reply;
+        DurableEvolutionWorkCoordinator.DurabilityScope durability;
         lock (_sync)
         {
-            long id = 0;
-            try
-            {
-                if (_closed) throw new ObjectDisposedException(nameof(EvolutionWorkProtocol));
-                EvolutionWorkValidation.Payload(requestJson, MaximumFrameBytes, nameof(requestJson));
-                using JsonDocument document = JsonDocument.Parse(requestJson);
-                JsonElement request = document.RootElement;
-                if (request.ValueKind == JsonValueKind.Object && request.TryGetProperty("id", out JsonElement rawId)
-                    && rawId.ValueKind == JsonValueKind.Number && rawId.TryGetInt64(out long candidate) && candidate >= 1 && candidate <= 9007199254740991)
-                    id = candidate;
-                if (id == 0) throw new ArgumentException("id must be a positive JavaScript-safe integer.");
-                if (Integer(request, "protocol") != Version) throw new ArgumentException("Unsupported durable worker protocol version.");
-                string op = Text(request, "op");
-                Operation operation = ParseOperation(op)
-                    ?? throw new ArgumentException("Unknown durable worker operation: " + op);
-                return Reply(id, writer => Dispatch(request, operation, writer));
-            }
-            // InvalidDataException is not an IOException: without it an incompatible reopen escaped ProcessJson and
-            // terminated the host instead of returning the protocol error (found by conformance/durable-v1).
-            catch (Exception ex) when (ex is ArgumentException or JsonException or IOException or InvalidDataException or
-                InvalidOperationException or OverflowException)
-            {
-                return Reply(id, writer =>
-                {
-                    writer.WriteString("error", BoundedError(ex));
-                    writer.WriteString("recovery", "reconcile-original-store; never assume an unacknowledged mutation failed");
-                }, ok: false);
-            }
+            using (durability = DurableEvolutionWorkCoordinator.DurabilityScope.Begin())
+                reply = ProcessLocked(requestJson, ref id);
+        }
+        try
+        {
+            durability.Wait();
+        }
+        // The command's effect may or may not have reached disk; the store is faulted and must be reopened.
+        catch (Exception ex) when (ex is IOException or InvalidOperationException or UnauthorizedAccessException)
+        {
+            return Failure(id, ex);
+        }
+        return reply;
+    }
+
+    private string ProcessLocked(string requestJson, ref long id)
+    {
+        try
+        {
+            if (_closed) throw new ObjectDisposedException(nameof(EvolutionWorkProtocol));
+            EvolutionWorkValidation.Payload(requestJson, MaximumFrameBytes, nameof(requestJson));
+            using JsonDocument document = JsonDocument.Parse(requestJson);
+            JsonElement request = document.RootElement;
+            if (request.ValueKind == JsonValueKind.Object && request.TryGetProperty("id", out JsonElement rawId)
+                && rawId.ValueKind == JsonValueKind.Number && rawId.TryGetInt64(out long candidate) && candidate >= 1 && candidate <= 9007199254740991)
+                id = candidate;
+            if (id == 0) throw new ArgumentException("id must be a positive JavaScript-safe integer.");
+            if (Integer(request, "protocol") != Version) throw new ArgumentException("Unsupported durable worker protocol version.");
+            string op = Text(request, "op");
+            Operation operation = ParseOperation(op)
+                ?? throw new ArgumentException("Unknown durable worker operation: " + op);
+            return Reply(id, writer => Dispatch(request, operation, writer));
+        }
+        // InvalidDataException is not an IOException: without it an incompatible reopen escaped ProcessJson and
+        // terminated the host instead of returning the protocol error (found by conformance/durable-v1).
+        catch (Exception ex) when (ex is ArgumentException or JsonException or IOException or InvalidDataException or
+            InvalidOperationException or OverflowException)
+        {
+            return Failure(id, ex);
         }
     }
+
+    private static string Failure(long id, Exception ex) => Reply(id, writer =>
+    {
+        writer.WriteString("error", BoundedError(ex));
+        writer.WriteString("recovery", "reconcile-original-store; never assume an unacknowledged mutation failed");
+    }, ok: false);
 
     /// <summary>Bounds error text so a protocol error can always be reported.</summary>
     /// <remarks>An exception message can embed caller-controlled text -- the unknown-operation message

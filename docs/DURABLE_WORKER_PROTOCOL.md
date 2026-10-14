@@ -138,6 +138,15 @@ Across leases of one work item, only the newest lease can be accepted; an earlie
 receipt still settles its own reservation and returns `stale`, so a late receipt never revives
 superseded work or rewrites an accepted result.
 
+**Acknowledgement means durable.** A successful reply is sent only after the command's
+effect, and every effect it could have observed, is flushed to the coordinator's store. An
+acknowledged `claim`, `heartbeat`, `cancel` or `commit` therefore survives a crash of the
+host. The endpoint waits for that flush after releasing its command lock, so commands from
+other connections can share one flush (group commit). They still take effect in arrival
+order. If the flush fails, the reply is an error: reopen the store and reconcile, as for any
+other storage failure. See the storage boundary in
+[durable accounting and engine bridge](DURABLE_EXTERNAL_WORK.md#storage-boundary).
+
 An accepted delivery result still requires the caller's pinned decoder and independent
 evaluation validation before archive admission. `status.searchState` is `not-owned` and
 `supportsExactSearchContinuation` is false. None of these responses claim a finished search,
