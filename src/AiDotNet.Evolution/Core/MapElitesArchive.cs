@@ -202,9 +202,18 @@ public sealed class MapElitesArchive<TGenome> :
     {
         Guard.NotNull(candidate);
         Guard.NotNull(evaluation);
+        // A declared constraint violation is refused here, as it is by CentroidArchive and routed to the
+        // infeasible pool by ParetoArchive. US-03 (#21) requires that a candidate whose outputs are wrong
+        // cannot become the winner whatever its scalar score, and the program path's gate for that is the
+        // CorrectnessGatedProgramFitnessEvaluator decorator, which turns a violation into Rejected. An
+        // evaluator that reports the violation without that decorator reached this archive as Completed,
+        // and - measured by MutantPromotionSuiteTests before this guard existed - won the run with a
+        // perfect quality. The archive that the CLI uses by default now holds the same invariant as its
+        // two siblings rather than relying on a decorator being wired.
         if (evaluation.Status != EvolutionEvaluationStatus.Completed || !evaluation.Quality.HasValue ||
             evaluation.Direction != Direction || candidate.EvaluationId != evaluation.EvaluationId ||
-            candidate.CanonicalGenome.Id != evaluation.GenomeId)
+            candidate.CanonicalGenome.Id != evaluation.GenomeId ||
+            evaluation.ConstraintViolations.Any(value => value > 0))
         {
             return Mutation(EvolutionArchiveInsertionResult.Rejected);
         }
