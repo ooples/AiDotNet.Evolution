@@ -161,8 +161,26 @@ public sealed class ProgramEvolutionTask : IEvolutionTask<ProgramGenome>, IEvolu
         foreach (string name in _options.MetricDescriptors)
         {
             // Refused rather than defaulted: a missing coordinate would silently file the program in cell zero.
+            // Reported as a failed evaluation rather than thrown: the engine turns a thrown exception into
+            // "evaluator_exception: Evaluator threw InvalidDataException", which loses the one thing a reader
+            // needs - which dimension was missing - while this carries it in the diagnostic's data.
             if (!result.Metrics.TryGetValue(name, out double value) || !double.IsFinite(value))
-                throw new InvalidDataException("Descriptor metric '" + name + "' is missing or not finite; the evaluator must report it for every completed evaluation.");
+            {
+                return new EvolutionTaskResult(
+                    EvolutionEvaluationStatus.Failed,
+                    costUnits: result.CostUnits,
+                    diagnostics: new[]
+                    {
+                        new EvolutionDiagnostic("descriptor_metric_missing",
+                            "A completed evaluation omitted a configured descriptor metric, or reported it as "
+                            + "non-finite; the evaluator must report it for every completed evaluation.",
+                            isRedacted: false,
+                            data: new Dictionary<string, string>(StringComparer.Ordinal) { ["descriptor"] = name })
+                    },
+                    metrics: result.Metrics,
+                    artifacts: result.Artifacts);
+            }
+
             merged[name] = value;
         }
         foreach (KeyValuePair<string, double> pair in result.Descriptors) merged[pair.Key] = pair.Value;

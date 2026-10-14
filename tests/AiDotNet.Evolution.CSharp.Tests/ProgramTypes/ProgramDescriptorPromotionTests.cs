@@ -56,10 +56,22 @@ public sealed class ProgramDescriptorPromotionTests
     [Fact]
     public async System.Threading.Tasks.Task A_missing_descriptor_metric_is_refused_not_defaulted()
     {
+        // Still refused, and the name is still reported - but as a failed evaluation rather than a thrown
+        // InvalidDataException. The engine converts a thrown exception into "evaluator_exception: Evaluator
+        // threw InvalidDataException", so the dimension's name did not survive the one path a reader reads.
         var options = new ProgramTaskOptions { MetricDescriptors = { "runtime_ms" } };
-        var error = await Assert.ThrowsAsync<InvalidDataException>(() =>
-            Task(options, new Dictionary<string, double>()).EvaluateAsync(Candidate(new ProgramGenome("x")), Context).AsTask());
-        Assert.Contains("runtime_ms", error.Message);
+        EvolutionTaskResult result = await Task(options, new Dictionary<string, double>())
+            .EvaluateAsync(Candidate(new ProgramGenome("x")), Context);
+
+        Assert.Equal(EvolutionEvaluationStatus.Failed, result.Status);
+        Assert.False(result.Descriptors.ContainsKey("runtime_ms"));
+        EvolutionDiagnostic diagnostic = Assert.Single(result.Diagnostics);
+        Assert.Equal("descriptor_metric_missing", diagnostic.Code);
+        Assert.Equal("runtime_ms", diagnostic.Data["descriptor"]);
+        Assert.False(diagnostic.IsRedacted);
+        // There is no companion test for a non-finite metric: EvolutionTaskResult.CopyNamedValues refuses
+        // one at construction ("Metric 'runtime_ms' must be finite"), so an evaluator cannot report it and
+        // the task's IsFinite check is defence in depth rather than a reachable branch.
     }
 
     [Fact]
