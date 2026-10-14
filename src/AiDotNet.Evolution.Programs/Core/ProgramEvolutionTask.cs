@@ -161,8 +161,29 @@ public sealed class ProgramEvolutionTask : IEvolutionTask<ProgramGenome>, IEvolu
         foreach (string name in _options.MetricDescriptors)
         {
             // Refused rather than defaulted: a missing coordinate would silently file the program in cell zero.
+            // Reported as a failed evaluation rather than thrown: the engine turns a thrown exception into
+            // "evaluator_exception: Evaluator threw InvalidDataException", which loses the one thing a reader
+            // needs - which dimension was missing - while this carries it in the diagnostic's data.
             if (!result.Metrics.TryGetValue(name, out double value) || !double.IsFinite(value))
-                throw new InvalidDataException("Descriptor metric '" + name + "' is missing or not finite; the evaluator must report it for every completed evaluation.");
+            {
+                var failed = new EvolutionTaskResult(
+                    EvolutionEvaluationStatus.Failed,
+                    costUnits: result.CostUnits,
+                    diagnostics: new[]
+                    {
+                        new EvolutionDiagnostic("descriptor_metric_missing",
+                            "A completed evaluation omitted a configured descriptor metric, or reported it as "
+                            + "non-finite; the evaluator must report it for every completed evaluation.",
+                            isRedacted: false,
+                            data: new Dictionary<string, string>(StringComparer.Ordinal) { ["descriptor"] = name })
+                    },
+                    metrics: result.Metrics,
+                    artifacts: result.Artifacts);
+                // A failed evaluation is still a measurement, and where it was measured is part of its provenance:
+                // dropping the origin here would make a refused result indistinguishable from a locally produced one.
+                return result.MeasurementOrigin is null ? failed : failed.WithMeasurementOrigin(result.MeasurementOrigin);
+            }
+
             merged[name] = value;
         }
         foreach (KeyValuePair<string, double> pair in result.Descriptors) merged[pair.Key] = pair.Value;

@@ -1,8 +1,18 @@
+using System.Globalization;
+
 namespace AiDotNet.Evolution.Programs;
 
 /// <summary>Compiler-neutral program bounds and edit rules, independent of model-builder configuration.</summary>
 public class ProgramTaskOptions
 {
+    /// <summary>The most metric names that may be promoted to archive descriptors.</summary>
+    /// <remarks>
+    /// Every name is copied into each options snapshot and becomes an archive coordinate, so an unbounded list is
+    /// memory spent before the first evaluation runs. The number matches the descriptor limit the distributed host
+    /// protocol accepts, so a configuration this surface allows is one a distributed run can also carry.
+    /// </remarks>
+    public const int MaxMetricDescriptors = 4096;
+
     /// <summary>Required candidate language; Generic allows any explicitly identified language.</summary>
     public ProgramLanguage Language { get; set; } = ProgramLanguage.Generic;
     /// <summary>Optional custom start marker, supplied together with the end marker.</summary>
@@ -46,8 +56,29 @@ public class ProgramTaskOptions
         MaxProgramChars = MaxProgramChars,
         Diff = Diff?.Clone() ?? throw new ArgumentException("Diff options cannot be null.", nameof(Diff)),
         ResourceAccounting = ResourceAccounting,
-        MetricDescriptors = new List<string>(MetricDescriptors ?? throw new ArgumentException("Metric descriptors cannot be null.", nameof(MetricDescriptors)))
+        MetricDescriptors = CopyMetricDescriptors(MetricDescriptors)
     };
+
+    /// <summary>Copies the descriptor list for a clone, refusing a null or oversized one before allocating.</summary>
+    /// <remarks>
+    /// Checked here rather than only in <see cref="Validate"/> because a task snapshots its options through
+    /// <see cref="Clone"/> and validates the snapshot afterwards, so a bound enforced only by validation would be
+    /// reached after the allocation it exists to prevent.
+    /// </remarks>
+    protected static List<string> CopyMetricDescriptors(IList<string>? descriptors)
+    {
+        if (descriptors is null)
+            throw new ArgumentException("Metric descriptors cannot be null.", nameof(MetricDescriptors));
+        if (descriptors.Count > MaxMetricDescriptors)
+            throw new ArgumentException(DescriptorCountMessage(descriptors.Count), nameof(MetricDescriptors));
+        return new List<string>(descriptors);
+    }
+
+    private static string DescriptorCountMessage(int count) =>
+        "MetricDescriptors declares " + count.ToString(CultureInfo.InvariantCulture) + " descriptors, more than the "
+        + MaxMetricDescriptors.ToString(CultureInfo.InvariantCulture) + " limit. Every name is copied into each "
+        + "options snapshot and becomes an archive coordinate, so an unbounded list is memory spent before the "
+        + "first evaluation runs.";
 
     /// <summary>Rejects invalid bounds, languages, and marker settings.</summary>
     public virtual void Validate()
@@ -61,8 +92,25 @@ public class ProgramTaskOptions
         if (MetricDescriptors is null) throw new ArgumentException("Metric descriptors cannot be null.", nameof(MetricDescriptors));
         if (MetricDescriptors.Any(string.IsNullOrWhiteSpace))
             throw new ArgumentException("Descriptor names must be non-blank.", nameof(MetricDescriptors));
+        if (MetricDescriptors.Count > MaxMetricDescriptors)
+            throw new ArgumentException(DescriptorCountMessage(MetricDescriptors.Count), nameof(MetricDescriptors));
+
         var names = new HashSet<string>(StringComparer.Ordinal);
         foreach (string name in MetricDescriptors)
+        {
+            // Bounded by the diagnostic that has to report it: when the evaluator omits the metric, the name travels
+            // in EvolutionDiagnostic.Data, which refuses a longer value - so a longer name would make the task throw
+            // on the one path that exists to report the name instead of returning it.
+            if (name.Length > EvolutionDiagnostic.MaximumDataValueLength)
+            {
+                throw new ArgumentException(
+                    "Descriptor name of " + name.Length.ToString(CultureInfo.InvariantCulture)
+                    + " characters exceeds the " + EvolutionDiagnostic.MaximumDataValueLength.ToString(CultureInfo.InvariantCulture)
+                    + " characters a diagnostic can carry, so a missing metric under this name could not be reported.",
+                    nameof(MetricDescriptors));
+            }
+
             if (!names.Add(name)) throw new ArgumentException("Descriptor name '" + name + "' is declared twice.", nameof(MetricDescriptors));
+        }
     }
 }

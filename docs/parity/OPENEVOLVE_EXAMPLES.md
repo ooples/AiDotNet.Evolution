@@ -66,7 +66,7 @@ that upstream's evaluator scored upstream's seed and that the model was asked; i
 a proposal was scored, because these examples validate a proposal first and refuse the stub's fixed
 answer.
 
-**Three of 21 examples are smoked.** Which ones was measured, not assumed, with
+**Five of 21 examples are smoked.** Which ones was measured, not assumed, with
 `eng/probe-openevolve-examples.py`: it runs every example's evaluator directly on its own seed
 program in a Linux container carrying the dependency set the upstream-parity job installs (numpy,
 scipy, pyyaml, dacite, openai and the `openevolve` package). An example whose own seed scores zero
@@ -79,8 +79,8 @@ necessary but not sufficient, as the three rows below the smoked ones show.
 | `function_minimization` | 1.398 | yes | |
 | `signal_processing` | 0.420 | yes | |
 | `claude_code_quickstart` | 1.424 | no | sets `llm.provider: "claude_code"`, so proposals route to the Claude Code CLI rather than an HTTP endpoint and a loopback stub has nothing to answer: all nine attempts fail |
-| `background_blur` | 0.992 | no | **its declared `database.feature_dimensions` empty the archive.** The run stops with `StopReason: NoCandidates` after one evaluation, a null best quality and zero model calls; removing only that key from the config copy makes the same example run and pass. See *The feature-dimension gap* below |
-| `circle_packing_with_artifacts` | 0.364 | no | same mechanism as `background_blur` |
+| `background_blur` | 0.992 | yes | |
+| `circle_packing_with_artifacts` | 0.364 | yes | |
 | `k_module_problem` | 0.0 | no | its own seed scores zero, so a positive-quality assertion cannot distinguish a working run from a broken one |
 | `online_judge_programming` | 0.0 | no | same, and its evaluator needs `requests` |
 | `web_scraper_optillm` | 0.0 | no | same |
@@ -106,10 +106,11 @@ program on both platforms.
 
 ## The smoke covers the cascade path
 
-All three smoked examples import with cascade evaluation enabled and their own thresholds mapped —
-`circle_packing` 0.5/0.75, `function_minimization` 1.3, `signal_processing` 0.3/0.6 — and each
-evaluator defines `evaluate_stage1` and `evaluate_stage2`. So the smoke drives V1-56's cascade
-criterion against real upstream evaluators, not only against the synthetic config in
+All five smoked examples import with cascade evaluation enabled and their own thresholds mapped —
+`circle_packing` 0.5/0.75, `function_minimization` 1.3, `signal_processing` 0.3/0.6,
+`background_blur` 0.5/0.5, `circle_packing_with_artifacts` 0.5/0.8 — and each evaluator defines
+`evaluate_stage1` and `evaluate_stage2`; `background_blur` defines a third. So the smoke drives
+V1-56's cascade criterion against real upstream evaluators, not only against the synthetic config in
 `OpenEvolveImportTests`, which is where the stage ordering and threshold semantics are actually
 pinned by assertion.
 
@@ -119,10 +120,13 @@ need an observable the run result does not currently expose; the synthetic test 
 semantics by side effect (`stage2-3`, `stage2-4` files) and that remains the evidence for the
 criterion itself.
 
-## The feature-dimension gap
+## The feature-dimension gap, and what it was hiding
 
-`background_blur` and `circle_packing_with_artifacts` are not blocked by anything about their
-models, their endpoints or their evaluators. They are blocked by `database.feature_dimensions`.
+**Closed.** Both examples now smoke. The section is kept because the two causes behind it are the
+kind that look identical from the outside, and only one was the one everybody suspected.
+
+`background_blur` and `circle_packing_with_artifacts` were not blocked by anything about their
+evaluators. They were blocked by `database.feature_dimensions`.
 
 Measured with a within-run control: the same example ran twice in one process against one build,
 once with its config as upstream ships it and once with only the `feature_dimensions` key removed.
@@ -141,9 +145,24 @@ The engine was holding the answer all along: it retains a `descriptor_missing` d
 data per retained failure) and stderr names the first one, so this diagnosis takes one run instead
 of the three sessions it took here.
 
-**Still open:** which of the declared dimensions does it (`background_blur` names
-`complexity` and `ssim`) and why the candidate ends up unplaceable rather than clamped into a bin.
-The two examples stay out of the smoke until that is fixed, rather than being asserted on.
+**The cause was ours and it was one line.** `ProgramProposalOptions.Clone()` hand-listed seven of
+its base's eight properties and omitted `MetricDescriptors`. `ProgramEvolutionTask` snapshots its
+options through `Clone`, so the CLI's promotion list - every declared OpenEvolve feature dimension -
+was empty before the first evaluation, while the archive still demanded those coordinates. Nothing
+was wrong with the dimension, the evaluator or the bin edges. The four tests covering descriptor
+promotion all used the base options type, which is why none of them caught it.
+
+**And it was hiding a second, unrelated cause in the harness.** With the clone fixed,
+`circle_packing_with_artifacts` smoked immediately; `background_blur` still failed, now with
+`all 9 model calls failed` and its seed scored - so the descriptor promotion was working and
+something else was wrong. The smoke rewrites `llm.api_base` to a loopback stub, but
+`OpenEvolveConfigImporter.ToModel` reads an entry's **own** `api_base` in preference to the
+section's, and `background_blur` is the one example in the corpus that sets it per model. Every call
+went to `openrouter.ai`. Redirecting per-model endpoints too makes it pass.
+
+Worth stating plainly because the first fix would otherwise have looked incomplete: one example
+proved the engine fix, the other needed the engine fix **and** a correct instrument, and a single
+run of the pair could not have told those apart.
 
 ## Every feature dimension the corpus declares
 

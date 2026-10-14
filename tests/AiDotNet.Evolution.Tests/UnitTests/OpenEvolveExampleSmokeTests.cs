@@ -26,9 +26,10 @@ namespace AiDotNet.Evolution.Tests;
 /// <para>
 /// <b>What is modified, and what is not.</b> The evaluator and the initial program are used exactly
 /// as upstream ships them. Three keys in a <i>copy</i> of the config are changed, and all three are
-/// about not spending money or reaching the network: <c>llm.api_base</c> points at a loopback stub,
-/// the model names become that stub's, and <c>diff_based_evolution</c> is false so the stub's whole
-/// program answer is usable. <c>benchmarks/external/test_openevolve_configs.py</c> treats an
+/// about not spending money or reaching the network: every <c>api_base</c> under <c>llm</c> - the
+/// section's own and any a model entry declares for itself - points at a loopback stub, the model
+/// names become that stub's, and <c>diff_based_evolution</c> is false so the stub's whole program
+/// answer is usable. <c>benchmarks/external/test_openevolve_configs.py</c> treats an
 /// endpoint rewrite the same way, exempting <c>llm.api_base/api_key</c> from its verbatim check.
 /// </para>
 /// <para>
@@ -76,6 +77,8 @@ public sealed class OpenEvolveExampleSmokeTests
         { "circle_packing", "config_phase_1.yaml" },
         { "function_minimization", "config.yaml" },
         { "signal_processing", "config.yaml" },
+        { "background_blur", "config.yaml" },
+        { "circle_packing_with_artifacts", "config.yaml" },
     };
 
     [Theory]
@@ -165,8 +168,9 @@ public sealed class OpenEvolveExampleSmokeTests
     }
 
     /// <summary>
-    /// Rewrites only the three keys named in the class remarks - <c>llm.api_base</c>, every model name
-    /// under <c>llm</c>, and the top-level <c>diff_based_evolution</c> - and leaves every other key of
+    /// Rewrites only the keys named in the class remarks - <c>llm.api_base</c> and any per-model
+    /// <c>api_base</c>, every model name under <c>llm</c>, and the top-level
+    /// <c>diff_based_evolution</c> - and leaves every other key of
     /// the example's config as upstream wrote it.
     /// </summary>
     /// <remarks>
@@ -191,15 +195,21 @@ public sealed class OpenEvolveExampleSmokeTests
         }
 
         // A weighted model list names its own models, so each entry's name is redirected too; leaving
-        // one behind would send part of the run to a provider that is not there.
+        // one behind would send part of the run to a provider that is not there. The same goes for an
+        // entry's own api_base, which the importer reads in preference to llm.api_base
+        // (OpenEvolveConfigImporter.ToModel): background_blur is the one example that sets it per model,
+        // and rewriting only llm.api_base sent all nine of its calls to openrouter.ai and failed them.
         foreach (string listKey in new[] { "models", "evaluator_models" })
         {
             if (!llm.Children.TryGetValue(new YamlScalarNode(listKey), out YamlNode? list) || list is not YamlSequenceNode models)
                 continue;
             foreach (YamlNode entry in models)
             {
-                if (entry is YamlMappingNode model && model.Children.ContainsKey(new YamlScalarNode("name")))
+                if (entry is not YamlMappingNode model) continue;
+                if (model.Children.ContainsKey(new YamlScalarNode("name")))
                     model.Children[new YamlScalarNode("name")] = new YamlScalarNode("fake-model");
+                if (model.Children.ContainsKey(new YamlScalarNode("api_base")))
+                    model.Children[new YamlScalarNode("api_base")] = new YamlScalarNode(endpoint);
             }
         }
 
