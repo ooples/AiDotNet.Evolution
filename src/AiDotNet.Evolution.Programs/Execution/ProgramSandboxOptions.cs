@@ -92,12 +92,17 @@ public sealed class ProgramSandboxOptions
     /// child's encoding and keep it from writing bytecode next to the source. Overriding one would change what the
     /// sandbox means while still looking like configuration, so it is refused by name.
     /// </remarks>
-    public static IReadOnlyCollection<string> ReservedEnvironmentNames { get; } = new[]
+    /// <para>
+    /// Wrapped rather than exposed as the array it is built from: an <c>IReadOnlyCollection</c> whose runtime type is
+    /// <c>string[]</c> can be cast back and written through, and emptying this list would silently turn every refusal
+    /// below into an accepted override of the boundary.
+    /// </para>
+    public static IReadOnlyCollection<string> ReservedEnvironmentNames { get; } = Array.AsReadOnly(new[]
     {
         "PATH", "PATHEXT", "SystemRoot", "windir", "ComSpec", "TEMP", "TMP", "HOME", "TMPDIR", "LANG",
         "PYTHONIOENCODING", "PYTHONDONTWRITEBYTECODE", "DOTNET_CLI_TELEMETRY_OPTOUT", "DOTNET_NOLOGO",
         "DOTNET_SKIP_FIRST_TIME_EXPERIENCE"
-    };
+    });
 
     /// <summary>Gets or sets the directory under which isolated workspaces are created, or <c>null</c> for the system temporary directory.</summary>
     /// <remarks>

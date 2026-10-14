@@ -146,6 +146,19 @@ public sealed class DeclaredSandboxEnvironmentTests
     }
 
     [Fact]
+    public void The_reserved_list_cannot_be_emptied_through_its_own_reference()
+    {
+        // An IReadOnlyCollection<string> whose runtime type is string[] can be cast back and written through, and an
+        // emptied list turns every refusal into an accepted override of the boundary. Asserting the type is the only
+        // way to catch that, because the refusals keep passing right up until someone writes the cast.
+        IReadOnlyCollection<string> reserved = ProgramSandboxOptions.ReservedEnvironmentNames;
+
+        Assert.IsNotType<string[]>(reserved);
+        Assert.False(reserved is ICollection<string> { IsReadOnly: false });
+        Assert.Contains("PATH", reserved);
+    }
+
+    [Fact]
     public void An_empty_value_is_accepted_because_an_empty_search_path_is_a_real_setting()
     {
         var options = new ProgramSandboxOptions();
