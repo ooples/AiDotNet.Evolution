@@ -52,9 +52,37 @@ The source's `VersionHash` joins the operator's identity, because an interface-t
 be serialised into it and two operators differing only by their instruction source must not claim
 the same version.
 
-**Crediting stays with the caller.** The operator supplies proposals and never sees outcomes, so
-whoever owns the run calls `Observe(generation, quality)` after each evaluation - and `Abandon` for a
-proposal that failed.
+**Crediting stays with the caller**, and `ProgramInstructionCreditObserver` is the caller you want
+unless you have a reason to write your own. The operator supplies proposals and never sees outcomes,
+so somebody has to call `Observe(generation, quality)` after each evaluation - and `Abandon` for a
+proposal whose outcome will never arrive. Without that, instructions are proposed, used and never
+judged: the archive's scores stay empty and selection has nothing to prefer, which makes the feature
+inert rather than broken.
+
+Hand the same instance to the operator **and** to the engine, because it is both halves - the source
+that records which generation got which instruction, and the observer that credits it when the
+outcome arrives:
+
+```csharp
+var credit = new ProgramInstructionCreditObserver(evolver, ledger);   // ledger may be null
+var variation = new LlmProgramVariationOperator(chatClient, programOptions, new LlmProgramVariationOptions
+{
+    Mode = ProgramEvolutionMode.FullRewrite,
+    InstructionSource = credit
+});
+var engine = new EvolutionEngine<ProgramGenome>(task, variation, archiveFactory, options, observer: credit);
+```
+
+Two of its behaviours are worth knowing, because the alternatives look equivalent:
+
+- It credits **only** generations it actually routed. The engine evaluates seed candidates that no
+  proposal produced, and `Observe` refuses a generation it never routed, so "anything past generation
+  zero" would throw on the seed's own evaluation.
+- A **failed** evaluation is credited as the worst outcome rather than skipped. Skipping would let an
+  instruction whose programs never parse keep a clean record and stay selectable.
+
+If a run proposes instructions and `CreditedOutcomes` stays zero, the wiring is wrong rather than the
+feature ineffective - which is worth being able to tell apart.
 
 ## What scores an instruction
 
