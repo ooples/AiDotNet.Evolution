@@ -350,6 +350,147 @@ public sealed class OpenEvolveImportTests
         }
     }
 
+    /// <summary>
+    /// Importing a feature dimension warns that the evaluator must report it every time.
+    /// </summary>
+    /// <remarks>
+    /// The warning is the cheap half of the fix below: a reader who sees it at import time does not
+    /// have to spend a run, and then an investigation, discovering that a declared dimension their
+    /// evaluator reports only on its success path ends the run with no candidates. Upstream refuses the
+    /// same configuration - its _calculate_feature_coords raises ValueError for a declared dimension that
+    /// is absent from the metrics and is not one of complexity, diversity or score - so what the note adds
+    /// is the warning at import time rather than a different outcome.
+    /// </remarks>
+    [Fact]
+    public void A_feature_dimension_warns_that_the_evaluator_must_report_it()
+    {
+        using var directory = new TemporaryDirectory();
+        OpenEvolveImport imported = Import(directory, """
+            llm:
+              name: m
+            database:
+              feature_dimensions: [complexity, ssim]
+            """);
+
+        // "complexity" is program length, which the engine always computes, so it needs no warning.
+        Assert.DoesNotContain(imported.Notes, note => note.Contains("'complexity'", StringComparison.Ordinal));
+
+        string warning = Assert.Single(
+            imported.Notes.Where(note => note.Contains("'ssim'", StringComparison.Ordinal)).ToArray());
+        Assert.Contains("every completed evaluation", warning, StringComparison.Ordinal);
+        Assert.Contains("no candidates", warning, StringComparison.Ordinal);
+    }
+
+
+    /// <summary>
+    /// OpenEvolve's "score" feature dimension is the fitness, not a reported metric, so it is
+    /// dropped by name rather than demanded of the evaluator.
+    /// </summary>
+    /// <remarks>
+    /// The 16 configs under examples/alphaevolve_math_problems declare
+    /// <c>feature_dimensions: ["score", "complexity"]</c> while their evaluators report
+    /// <c>combined_score</c> and never <c>score</c>. Carrying the name through would have required a
+    /// metric called "score" on every completed evaluation, which no candidate could satisfy, so
+    /// every one of those runs would have ended with no candidates.
+    /// </remarks>
+    [Fact]
+    public void The_score_feature_dimension_is_dropped_rather_than_demanded()
+    {
+        using var directory = new TemporaryDirectory();
+        OpenEvolveImport imported = Import(directory, """
+            llm:
+              name: m
+            database:
+              feature_dimensions: ["score", "complexity"]
+            """);
+
+        // Only program length survives, and nothing asks the evaluator for a "score" metric.
+        RunMetricDescriptor descriptor = Assert.Single(imported.Run.Search.MetricDescriptors);
+        Assert.Equal("length", descriptor.Name);
+
+        string note = Assert.Single(
+            imported.Notes.Where(n => n.Contains("'score'", StringComparison.Ordinal)).ToArray());
+        Assert.Contains("fitness itself", note, StringComparison.Ordinal);
+        Assert.Contains("dropped", note, StringComparison.Ordinal);
+    }
+
+
+    /// <summary>
+    /// A run that produces no candidate reports why, rather than only that it produced none.
+    /// </summary>
+    /// <remarks>
+    /// A declared <c>database.feature_dimensions</c> entry is requested of the evaluator on every
+    /// completed evaluation, and <c>ProgramEvolutionTask</c> refuses an evaluation that omits it
+    /// rather than filing the program in cell zero. That refusal is correct, but the run previously
+    /// surfaced only <c>StopReason: NoCandidates</c>, which is true and useless: the engine was
+    /// holding the diagnostic that explained it. Three investigation sessions on #169 went into
+    /// recovering by hand what this now prints.
+    /// </remarks>
+    [Fact]
+    public void A_run_that_produces_no_candidate_reports_the_reason()
+    {
+        using var directory = new TemporaryDirectory();
+        using var model = new CliRunTests.FakeChatModel();
+
+        // The evaluator reports a score but never the declared "ssim" dimension, which is the shape
+        // upstream's background_blur has on its failure path.
+        File.WriteAllText(Path.Combine(directory.Path, "initial_program.py"), "X = 0\n");
+        File.WriteAllText(Path.Combine(directory.Path, "evaluator.py"),
+            "def evaluate(path):\n    return {\"combined_score\": 0.5}\n");
+        File.WriteAllText(Path.Combine(directory.Path, "config.yaml"), $"""
+            max_iterations: 2
+            random_seed: 5
+            diff_based_evolution: false
+            llm:
+              api_base: {model.Endpoint}
+              models:
+                - name: fake-model
+              timeout: 20
+              retries: 0
+            database:
+              num_islands: 1
+              feature_dimensions:
+                - complexity
+                - ssim
+            evaluator:
+              timeout: 30
+            """);
+
+        string? previousKey = Environment.GetEnvironmentVariable("OPENAI_API_KEY");
+        Environment.SetEnvironmentVariable("OPENAI_API_KEY", "unused-by-the-fake");
+        try
+        {
+            string output = Path.Combine(directory.Path, "out");
+            var (code, stdout, error) = CliRunTests.Run(
+                "run", "--openevolve-config", Path.Combine(directory.Path, "config.yaml"),
+                Path.Combine(directory.Path, "initial_program.py"),
+                Path.Combine(directory.Path, "evaluator.py"),
+                "--output", output, "--python", Python);
+
+            using JsonDocument result = JsonDocument.Parse(stdout);
+            JsonElement failures = result.RootElement.GetProperty("Failures");
+
+            // The point of the change: the reason travels with the result.
+            Assert.True(failures.GetArrayLength() > 0,
+                "a run with no candidate reported no failures; stdout=" + stdout + " stderr=" + error);
+            // The message is deliberately generic; the descriptor's name is in Data, which is the
+            // part that tells a reader which dimension their evaluator has to report.
+            Assert.Equal("descriptor_missing", failures[0].GetProperty("Code").GetString());
+            Assert.Equal("ssim", failures[0].GetProperty("Data").GetProperty("descriptor").GetString());
+
+            // And on stderr, where a reader looks first.
+            Assert.Contains("the run produced no candidate", error, StringComparison.Ordinal);
+            Assert.Contains("descriptor=ssim", error, StringComparison.Ordinal);
+            // A run that ends with no candidate still completes: it is not the all-model-calls-failed
+            // exit (ModelUnavailableExitCode), because the refusal comes before any proposal is asked for.
+            Assert.Equal(0, code);
+        }
+        finally
+        {
+            Environment.SetEnvironmentVariable("OPENAI_API_KEY", previousKey);
+        }
+    }
+
     private static OpenEvolveImport Import(TemporaryDirectory directory, string yaml, string? python = null)
     {
         string config = Path.Combine(directory.Path, "config.yaml");

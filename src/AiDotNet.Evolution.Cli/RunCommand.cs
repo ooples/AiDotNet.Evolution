@@ -384,13 +384,39 @@ internal static class RunCommand
             Checkpoints = Path.Combine(outputDirectory, "checkpoints"),
             Repertoire = repertoirePath,
             WarmStart = warmStart,
-            ModelUsage = variation.GetUsage()
+            ModelUsage = variation.GetUsage(),
+            // Why the run ended the way it did. The engine retains the failures it survived, and
+            // without them a run whose every evaluation was refused reports only
+            // StopReason: NoCandidates - true, and useless for finding out why. Redacted
+            // diagnostics keep their code and say so rather than leaking their message.
+            Failures = result.RetainedFailures
+                .Select(diagnostic => new
+                {
+                    diagnostic.Code,
+                    Message = diagnostic.IsRedacted ? "<redacted>" : diagnostic.Message,
+                    // Data carries the actionable detail - for descriptor_missing it is the
+                    // descriptor's own name - and the message alone is deliberately generic.
+                    Data = diagnostic.IsRedacted ? null : diagnostic.Data,
+                })
+                .ToArray()
         }, Program.Json));
         if (best is not null)
         {
             string bestPath = Path.Combine(outputDirectory, "best" + Extension(run.Language));
             File.WriteAllText(bestPath, best.Candidate.CanonicalGenome.Genome.Source, new UTF8Encoding(false));
         }
+        if (best is null && result.RetainedFailures.Count > 0)
+        {
+            EvolutionDiagnostic first = result.RetainedFailures[0];
+            // Diagnostic text is producer-supplied: strip control characters (a newline would forge
+            // further log lines) and cap each value, so one diagnostic stays one bounded stderr line.
+            string detail = first.IsRedacted || first.Data.Count == 0
+                ? string.Empty
+                : " (" + string.Join(", ", first.Data.Select(pair => ForStderr(pair.Key) + "=" + ForStderr(pair.Value))) + ")";
+            error.WriteLine("error: the run produced no candidate. First retained failure ["
+                + ForStderr(first.Code) + "]: " + (first.IsRedacted ? "<redacted>" : ForStderr(first.Message)) + detail);
+        }
+
         ProgramEvolutionLlmUsage usage = variation.GetUsage();
         if (usage.ChatCalls > 0 && usage.ProviderErrors >= usage.ChatCalls)
         {
@@ -651,6 +677,21 @@ internal static class RunCommand
             if (!File.Exists(path)) return path;
         }
         throw new InvalidDataException(outputDirectory + " already holds 1000 trace sessions.");
+    }
+
+    private const int MaxStderrValueLength = 256;
+
+    // One bounded line for stderr: control characters become spaces and the text is capped.
+    internal static string ForStderr(string? text)
+    {
+        if (text is null || text.Length == 0) return string.Empty;
+        var clean = new StringBuilder(Math.Min(text.Length, MaxStderrValueLength + 1));
+        foreach (char c in text)
+        {
+            if (clean.Length == MaxStderrValueLength) return clean.Append('…').ToString();
+            clean.Append(char.IsControl(c) ? ' ' : c);
+        }
+        return clean.ToString();
     }
 
     internal static string Extension(ProgramLanguage language) => language switch

@@ -377,6 +377,25 @@ jobs:
           .local/program-env/bin/python -m unittest discover -s benchmarks/external -p test_openevolve_configs.py -v
           .local/program-env/bin/python -m unittest discover -s benchmarks/external -p test_campaign_runner.py -v
           .local/program-env/bin/python benchmarks/external/run_program_comparison.py --aidotnet benchmarks/EvolutionComparison/bin/Release/net10.0/EvolutionComparison.dll --upstream .local/openevolve-upstream --output TestResults/program-comparison
+      - name: OpenEvolve example ledger and smoke against the pinned checkout
+        # The ledger in docs/parity/OPENEVOLVE_EXAMPLES.md claims a per-example disposition. Here,
+        # and only here, is a checkout to re-measure it against: elsewhere the test returns early.
+        # EVOLUTION_PYTHON must be the pinned venv, not the system python3: the CLI reads an
+        # OpenEvolve config the way OpenEvolve does, which needs PyYAML, and the examples' own
+        # evaluators need numpy and the openevolve package. The system interpreter has none of them.
+        # EVOLUTION_REQUIRE_OPENEVOLVE_SMOKE turns the tests' no-checkout early return into a failure here, and
+        # the TRX count below fails the step if the filter selected fewer tests than the 4 ledger facts and
+        # 3 smoke cases (a rename can make it select none, and dotnet test can still exit 0).
+        env:
+          EVOLUTION_PYTHON: ${{ github.workspace }}/.local/program-env/bin/python
+          EVOLUTION_REQUIRE_OPENEVOLVE_SMOKE: '1'
+        run: |
+          dotnet test tests/AiDotNet.Evolution.Tests/AiDotNet.Evolution.Tests.csproj -c Release -f net10.0 \
+            --filter "FullyQualifiedName~OpenEvolveExample" \
+            --logger "trx;LogFileName=openevolve-examples.trx" --results-directory TestResults/openevolve-examples
+          executed="$(grep -o 'executed="[0-9]*"' TestResults/openevolve-examples/openevolve-examples.trx | head -1 | grep -o '[0-9]*')"
+          echo "OpenEvolve example tests executed: ${executed:-0}"
+          [ "${executed:-0}" -ge 7 ] || { echo "::error::expected at least 7 OpenEvolve example tests, ran ${executed:-0}"; exit 1; }
       # V1-25 (#119): a competitor's Python benchmark runs through the reference worker without source modification. The
       # script refuses unless evaluator.py and initial_program.py match the pinned OpenEvolve blobs byte for byte, then
       # serves them through the real durable host; it fails unless both leases are accepted and the unmodified initial
