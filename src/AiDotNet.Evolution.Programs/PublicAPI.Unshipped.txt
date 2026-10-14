@@ -15,6 +15,8 @@ AiDotNet.Evolution.Programs.ClaudeCodeChatClientOptions.MaxBudgetUsd.get -> deci
 AiDotNet.Evolution.Programs.ClaudeCodeChatClientOptions.MaxBudgetUsd.set -> void
 AiDotNet.Evolution.Programs.ClaudeCodeChatClientOptions.MaxRetries.get -> int
 AiDotNet.Evolution.Programs.ClaudeCodeChatClientOptions.MaxRetries.set -> void
+AiDotNet.Evolution.Programs.ClaudeCodeChatClientOptions.MaxTurns.get -> int
+AiDotNet.Evolution.Programs.ClaudeCodeChatClientOptions.MaxTurns.set -> void
 AiDotNet.Evolution.Programs.ClaudeCodeChatClientOptions.Model.get -> string!
 AiDotNet.Evolution.Programs.ClaudeCodeChatClientOptions.Model.set -> void
 AiDotNet.Evolution.Programs.ClaudeCodeChatClientOptions.RetryDelay.get -> System.TimeSpan

@@ -32,7 +32,7 @@ internal static class ProgramPromptDefaults
     private static readonly string[] TopProgramVariables = { "program_number", "score", "language", "program_snippet", "key_features" };
     private static readonly string[] InspirationsSectionVariables = { "inspiration_programs" };
     private static readonly string[] InspirationProgramVariables = { "program_number", "score", "program_type", "language", "program_snippet", "unique_features" };
-    private static readonly string[] EvaluationVariables = { "current_program", "language", "criteria", "response_schema" };
+    private static readonly string[] EvaluationVariables = { "current_program", "language", "criteria", "response_schema", "task_description" };
     private static readonly string[] ChangesWrapperVariables = { "system_message", "system_message_changes_description" };
     private static readonly string[] UserChangesWrapperVariables = { "user_message", "changes_description" };
 
@@ -365,6 +365,12 @@ internal static class ProgramPromptDefaults
     private const string EvaluationText = """
         Score the program below against each of these criteria, from 0.0 (worst) to 1.0 (best):
         {criteria}
+
+        {task_description}
+
+        Judge the program as a solution to that task, not as code in isolation. A program that
+        satisfies the examples it was shown by storing their answers has not solved the task, however
+        tidy it looks.
 
         Program under review:
         ```{language}

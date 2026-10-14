@@ -4,6 +4,7 @@ using System.Text;
 using System.Text.Json;
 using System.Text.Json.Serialization;
 using AiDotNet.Evolution.Programs;
+using AiDotNet.Evolution.Prompts;
 
 namespace AiDotNet.Evolution.Cli;
 
@@ -113,6 +114,21 @@ internal sealed class RunSearch
     public int? MaxArtifactBytes { get; init; }
     /// <summary>Whether evaluator artifacts are collected at all (OpenEvolve's <c>evaluator.enable_artifacts</c>).</summary>
     public bool CollectArtifacts { get; init; } = true;
+    /// <summary>Whether an artifact's own text reaches the prompt, rather than the placeholder.</summary>
+    /// <remarks>
+    /// <para>
+    /// Defaults to <c>false</c>, which is why a collected artifact appears in the prompt as
+    /// <c>artifact: [artifact content withheld]</c>: the text comes from a program the host did not write and
+    /// may carry private data, so disclosing it is an explicit decision rather than the default.
+    /// </para>
+    /// <para>
+    /// It is also the whole point of OpenEvolve's artifact feature - upstream puts the text in the next
+    /// prompt, which is how an evaluator explains a rejection to the model - so leaving it off makes
+    /// <c>prompt.include_artifacts</c> arrive with nothing behind it. Measured: with it off, an evaluator
+    /// reporting its own failing examples changed nothing about the next proposal.
+    /// </para>
+    /// </remarks>
+    public bool RetainArtifactText { get; init; }
     /// <summary>The most elites the archive holds (OpenEvolve's <c>database.population_size</c>); zero means the whole grid.</summary>
     public int ArchiveCapacity { get; init; }
     /// <summary>The global elite index size programs are drawn from (OpenEvolve's <c>database.archive_size</c>); zero for none.</summary>
@@ -270,7 +286,16 @@ internal static class RunCommand
             IProgramChatClient judge = feedback.Models.Count == 0
                 ? CreateModels(new[] { run.Model }.Concat(run.AdditionalModels).ToList(), baseDirectory)
                 : CreateModels(feedback.Models, baseDirectory);
-            fitness = new LlmJudgeProgramFitnessEvaluator(judge, fitness, null, new LlmFeedbackOptions { Enabled = true, Weight = feedback.Weight });
+            // The builder is supplied rather than left to default: a default one carries no prompt options, so
+            // the judge was asked "is this good code?" with no idea what the program was for. The task
+            // description is filled the same way the variation operator fills it (LlmProgramVariationOperator),
+            // so the judge and the proposer are told the same thing about the task.
+            ProgramEvolutionPromptOptions judgePrompt = programOptions.Prompt.Clone();
+            if (judgePrompt.TaskDescription is null && programOptions.TaskDescription is { } judged && judged.Trim().Length > 0)
+                judgePrompt.TaskDescription = judged;
+            fitness = new LlmJudgeProgramFitnessEvaluator(judge, fitness,
+                new ProgramPromptBuilder(judgePrompt, programOptions),
+                new LlmFeedbackOptions { Enabled = true, Weight = feedback.Weight });
         }
         var task = new ProgramEvolutionTask(fitness, new ProgramDescriptorSet(new[] { new ProgramLengthDescriptor() }), programOptions);
         var variationOptions = new LlmProgramVariationOptions
@@ -586,7 +611,12 @@ internal static class RunCommand
 
     private static ScriptProgramFitnessEvaluator CreateFitness(RunFile run, ProcessProgramExecutionEngine execution, string evaluator)
         => new(execution, evaluator,
-            new ScriptProgramEvaluationOptions { EvaluatorScriptLanguage = run.EvaluatorLanguage, Direction = run.Direction });
+            new ScriptProgramEvaluationOptions
+            {
+                EvaluatorScriptLanguage = run.EvaluatorLanguage,
+                Direction = run.Direction,
+                RetainArtifactText = run.Search.RetainArtifactText
+            });
 
     /// <summary>Proves the output directory accepts a write, so a run cannot fail at its first checkpoint.</summary>
     private static void ProbeWritable(string outputDirectory)

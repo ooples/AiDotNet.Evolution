@@ -1,0 +1,388 @@
+{
+  "story": "V1-54 #167 criterion 4: LLM feedback as a weighted fitness signal, dev-partition ablation",
+  "design": "paired by engine seed; the arms differ only in the run file's llmFeedback key (absent vs weight in 0.3,0.95). Endpoint is accuracy on held-out inputs the evaluator never sees, scored after the run by feedback_ablation_task/score_heldout.py, because both arms can reach a perfect visible score either by recovering the rule or by memorising the six visible pairs and only the held-out set separates those.",
+  "interval": "median of per-pair differences with a 4000-draw seeded percentile bootstrap (seed 7). 6 pairs, and a near-bimodal endpoint, so a small true effect is not resolvable here; the discordant-pair counts are reported beside the interval.",
+  "model": {
+    "provider": "ClaudeCode",
+    "name": "sonnet",
+    "executable": "claude"
+  },
+  "budget": {
+    "seeds": 6,
+    "evaluations_per_arm": 5,
+    "weights": "0.3,0.95"
+  },
+  "summary": {
+    "arms": {
+      "on-w0.3": {
+        "pairs": 6,
+        "endpoint": "heldout_accuracy",
+        "weight": 0.3,
+        "off_median": 0.0,
+        "on_median": 0.0,
+        "median_difference": 0.0,
+        "mean_difference": 0.0,
+        "difference_ci95": [
+          0.0,
+          0.0
+        ],
+        "pairs_favouring_feedback": 0,
+        "pairs_favouring_no_feedback": 0,
+        "tied_pairs": 6
+      },
+      "on-w0.95": {
+        "pairs": 6,
+        "endpoint": "heldout_accuracy",
+        "weight": 0.95,
+        "off_median": 0.0,
+        "on_median": 0.0,
+        "median_difference": 0.0,
+        "mean_difference": 0.0030303030303030303,
+        "difference_ci95": [
+          0.0,
+          0.00909090909090909
+        ],
+        "pairs_favouring_feedback": 1,
+        "pairs_favouring_no_feedback": 0,
+        "tied_pairs": 5
+      }
+    },
+    "arms_that_produced_no_result": 0
+  },
+  "pairs": {
+    "on-w0.3": [
+      {
+        "seed": 0,
+        "off": 0.0,
+        "on": 0.0,
+        "difference": 0.0,
+        "off_failure": null,
+        "on_failure": null
+      },
+      {
+        "seed": 1,
+        "off": 0.0,
+        "on": 0.0,
+        "difference": 0.0,
+        "off_failure": null,
+        "on_failure": null
+      },
+      {
+        "seed": 2,
+        "off": 0.0,
+        "on": 0.0,
+        "difference": 0.0,
+        "off_failure": null,
+        "on_failure": null
+      },
+      {
+        "seed": 3,
+        "off": 0.0,
+        "on": 0.0,
+        "difference": 0.0,
+        "off_failure": null,
+        "on_failure": null
+      },
+      {
+        "seed": 4,
+        "off": 0.0,
+        "on": 0.0,
+        "difference": 0.0,
+        "off_failure": null,
+        "on_failure": null
+      },
+      {
+        "seed": 5,
+        "off": 0.0,
+        "on": 0.0,
+        "difference": 0.0,
+        "off_failure": null,
+        "on_failure": null
+      }
+    ],
+    "on-w0.95": [
+      {
+        "seed": 0,
+        "off": 0.0,
+        "on": 0.01818181818181818,
+        "difference": 0.01818181818181818,
+        "off_failure": null,
+        "on_failure": null
+      },
+      {
+        "seed": 1,
+        "off": 0.0,
+        "on": 0.0,
+        "difference": 0.0,
+        "off_failure": null,
+        "on_failure": null
+      },
+      {
+        "seed": 2,
+        "off": 0.0,
+        "on": 0.0,
+        "difference": 0.0,
+        "off_failure": null,
+        "on_failure": null
+      },
+      {
+        "seed": 3,
+        "off": 0.0,
+        "on": 0.0,
+        "difference": 0.0,
+        "off_failure": null,
+        "on_failure": null
+      },
+      {
+        "seed": 4,
+        "off": 0.0,
+        "on": 0.0,
+        "difference": 0.0,
+        "off_failure": null,
+        "on_failure": null
+      },
+      {
+        "seed": 5,
+        "off": 0.0,
+        "on": 0.0,
+        "difference": 0.0,
+        "off_failure": null,
+        "on_failure": null
+      }
+    ]
+  },
+  "rows": [
+    {
+      "seed": 0,
+      "arm": "off",
+      "weight": null,
+      "seconds": 36.17,
+      "failure": null,
+      "visible_quality": 1,
+      "completed_evaluations": 5,
+      "model_calls": 4,
+      "heldout_accuracy": 0.0,
+      "endpoint_detail": null
+    },
+    {
+      "seed": 0,
+      "arm": "on-w0.3",
+      "weight": 0.3,
+      "seconds": 53.45,
+      "failure": null,
+      "visible_quality": 0.7464999999999999,
+      "completed_evaluations": 5,
+      "model_calls": 4,
+      "heldout_accuracy": 0.0,
+      "endpoint_detail": null
+    },
+    {
+      "seed": 0,
+      "arm": "on-w0.95",
+      "weight": 0.95,
+      "seconds": 64.28,
+      "failure": null,
+      "visible_quality": 0.8453499999999999,
+      "completed_evaluations": 5,
+      "model_calls": 4,
+      "heldout_accuracy": 0.01818181818181818,
+      "endpoint_detail": null
+    },
+    {
+      "seed": 1,
+      "arm": "off",
+      "weight": null,
+      "seconds": 38.96,
+      "failure": null,
+      "visible_quality": 1,
+      "completed_evaluations": 5,
+      "model_calls": 4,
+      "heldout_accuracy": 0.0,
+      "endpoint_detail": null
+    },
+    {
+      "seed": 1,
+      "arm": "on-w0.3",
+      "weight": 0.3,
+      "seconds": 64.33,
+      "failure": null,
+      "visible_quality": 0.742,
+      "completed_evaluations": 5,
+      "model_calls": 4,
+      "heldout_accuracy": 0.0,
+      "endpoint_detail": null
+    },
+    {
+      "seed": 1,
+      "arm": "on-w0.95",
+      "weight": 0.95,
+      "seconds": 60.33,
+      "failure": null,
+      "visible_quality": 0.83775,
+      "completed_evaluations": 5,
+      "model_calls": 4,
+      "heldout_accuracy": 0.0,
+      "endpoint_detail": null
+    },
+    {
+      "seed": 2,
+      "arm": "off",
+      "weight": null,
+      "seconds": 36.06,
+      "failure": null,
+      "visible_quality": 1,
+      "completed_evaluations": 5,
+      "model_calls": 4,
+      "heldout_accuracy": 0.0,
+      "endpoint_detail": null
+    },
+    {
+      "seed": 2,
+      "arm": "on-w0.3",
+      "weight": 0.3,
+      "seconds": 61.37,
+      "failure": null,
+      "visible_quality": 0.742,
+      "completed_evaluations": 5,
+      "model_calls": 4,
+      "heldout_accuracy": 0.0,
+      "endpoint_detail": null
+    },
+    {
+      "seed": 2,
+      "arm": "on-w0.95",
+      "weight": 0.95,
+      "seconds": 54.01,
+      "failure": null,
+      "visible_quality": 0.8424999999999999,
+      "completed_evaluations": 5,
+      "model_calls": 4,
+      "heldout_accuracy": 0.0,
+      "endpoint_detail": null
+    },
+    {
+      "seed": 3,
+      "arm": "off",
+      "weight": null,
+      "seconds": 35.93,
+      "failure": null,
+      "visible_quality": 1,
+      "completed_evaluations": 5,
+      "model_calls": 4,
+      "heldout_accuracy": 0.0,
+      "endpoint_detail": null
+    },
+    {
+      "seed": 3,
+      "arm": "on-w0.3",
+      "weight": 0.3,
+      "seconds": 62.39,
+      "failure": null,
+      "visible_quality": 0.7464999999999999,
+      "completed_evaluations": 5,
+      "model_calls": 4,
+      "heldout_accuracy": 0.0,
+      "endpoint_detail": null
+    },
+    {
+      "seed": 3,
+      "arm": "on-w0.95",
+      "weight": 0.95,
+      "seconds": 54.19,
+      "failure": null,
+      "visible_quality": 0.833,
+      "completed_evaluations": 5,
+      "model_calls": 4,
+      "heldout_accuracy": 0.0,
+      "endpoint_detail": null
+    },
+    {
+      "seed": 4,
+      "arm": "off",
+      "weight": null,
+      "seconds": 38.18,
+      "failure": null,
+      "visible_quality": 1,
+      "completed_evaluations": 5,
+      "model_calls": 4,
+      "heldout_accuracy": 0.0,
+      "endpoint_detail": null
+    },
+    {
+      "seed": 4,
+      "arm": "on-w0.3",
+      "weight": 0.3,
+      "seconds": 69.39,
+      "failure": null,
+      "visible_quality": 0.7434999999999999,
+      "completed_evaluations": 5,
+      "model_calls": 4,
+      "heldout_accuracy": 0.0,
+      "endpoint_detail": null
+    },
+    {
+      "seed": 4,
+      "arm": "on-w0.95",
+      "weight": 0.95,
+      "seconds": 51.83,
+      "failure": null,
+      "visible_quality": 0.83775,
+      "completed_evaluations": 5,
+      "model_calls": 4,
+      "heldout_accuracy": 0.0,
+      "endpoint_detail": null
+    },
+    {
+      "seed": 5,
+      "arm": "off",
+      "weight": null,
+      "seconds": 34.72,
+      "failure": null,
+      "visible_quality": 1,
+      "completed_evaluations": 5,
+      "model_calls": 4,
+      "heldout_accuracy": 0.0,
+      "endpoint_detail": null
+    },
+    {
+      "seed": 5,
+      "arm": "on-w0.3",
+      "weight": 0.3,
+      "seconds": 58.82,
+      "failure": null,
+      "visible_quality": 0.745,
+      "completed_evaluations": 5,
+      "model_calls": 4,
+      "heldout_accuracy": 0.0,
+      "endpoint_detail": null
+    },
+    {
+      "seed": 5,
+      "arm": "on-w0.95",
+      "weight": 0.95,
+      "seconds": 61.41,
+      "failure": null,
+      "visible_quality": 0.852,
+      "completed_evaluations": 5,
+      "model_calls": 4,
+      "heldout_accuracy": 0.0,
+      "endpoint_detail": null
+    }
+  ],
+  "commit": "270ca44",
+  "machine": "AMD Ryzen 9 3950X (16 cores / 32 threads), 64 GB RAM, Windows 11 Pro 10.0.26220, .NET SDK 10.0.402 Release; Claude Code CLI 2.1.299, model sonnet, via the ClaudeCode provider",
+  "cost_note": "Each isolated `claude -p` call pays a fresh ~31.6k-token cache creation, so cost is set by the call count rather than prompt size: 18 arms x 4 proposals + 12 judged arms x 5 judgements.",
+  "judge_scores_measured": {
+    "method": "judge = (blended - (1 - w) * visible) / w, with visible_correct from the trace metrics",
+    "bare_lookup_table": 0.07,
+    "honest_but_wrong_formula": [
+      0.155,
+      0.269
+    ],
+    "documented_table_with_fallback": [
+      0.787,
+      0.839
+    ],
+    "conclusion": "The judge scores the shape the search actually produces ABOVE the honest attempt, so no weight in [0, 1] reverses the ranking: blended fitness for the gamer stays 0.839-0.984 against 0.177-0.269 for the honest candidate across w from 0.1 to 1.0."
+  }
+}

@@ -20,6 +20,15 @@ public sealed class ClaudeCodeChatClientOptions
     public TimeSpan Timeout { get; set; } = TimeSpan.FromMinutes(5);
     /// <summary>Gets or sets how many times a failed or timed-out call is retried.</summary>
     public int MaxRetries { get; set; } = 3;
+
+    /// <summary>Turns the CLI may take before it stops without answering; 4 by default.</summary>
+    /// <remarks>
+    /// This was fixed at 1, which a current model trips by thinking: the CLI then returns
+    /// <c>subtype: error_max_turns</c> with no <c>result</c> at all, measured at 484 thinking tokens on a
+    /// six-line prompt. A reasoning turn is ordinary rather than exceptional, so one turn is not a safe
+    /// ceiling. Tool use is already prevented by <see cref="Isolate"/> rather than by this limit.
+    /// </remarks>
+    public int MaxTurns { get; set; } = 4;
     /// <summary>Gets or sets the delay before the first retry; each further retry doubles it.</summary>
     public TimeSpan RetryDelay { get; set; } = TimeSpan.FromSeconds(5);
     /// <summary>
@@ -37,6 +46,7 @@ public sealed class ClaudeCodeChatClientOptions
         if (MaxBudgetUsd is <= 0) throw new ArgumentOutOfRangeException(nameof(MaxBudgetUsd));
         if (Timeout <= TimeSpan.Zero) throw new ArgumentOutOfRangeException(nameof(Timeout));
         if (MaxRetries is < 0 or > 20) throw new ArgumentOutOfRangeException(nameof(MaxRetries));
+        if (MaxTurns is < 1 or > 50) throw new ArgumentOutOfRangeException(nameof(MaxTurns));
         if (RetryDelay < TimeSpan.Zero) throw new ArgumentOutOfRangeException(nameof(RetryDelay));
     }
 }
@@ -46,11 +56,18 @@ public sealed class ClaudeCodeChatClientOptions
 /// OpenEvolve's <c>claude_code</c> provider passes the prompt as a command-line argument (subject to OS length limits),
 /// keeps only the user turns, and runs with the user's full profile. This client sends the whole conversation on
 /// standard input, keeps every turn, reads token usage from the CLI's JSON result, and by default runs isolated
-/// (<see cref="ClaudeCodeChatClientOptions.Isolate"/>).
+/// (<see cref="ClaudeCodeChatClientOptions.Isolate"/>). A request for
+/// <see cref="ProgramChatResponseFormat.Json"/> is honoured by instruction, because the CLI has no flag for
+/// one; refusing it instead left the LLM judge unusable here at its own defaults.
 /// </remarks>
 public sealed class ClaudeCodeChatClient : IProgramChatClient
 {
     private const int MaxOutputBytes = 8 * 1024 * 1024;
+
+    /// <summary>Carries a JSON response-format request to a CLI that has no flag for one.</summary>
+    internal const string JsonOnlyInstruction =
+        "Reply with one JSON object and nothing else: no prose before or after it, and no code fence.";
+
     private static readonly string[] ScrubbedPrefixes = { "ANTHROPIC_", "CLAUDE_CODE_", "CLAUDECODE", "TOKEN_OPTIMIZER_" };
     private readonly ClaudeCodeChatClientOptions _options;
 
@@ -67,6 +84,7 @@ public sealed class ClaudeCodeChatClient : IProgramChatClient
             MaxBudgetUsd = options.MaxBudgetUsd,
             Timeout = options.Timeout,
             MaxRetries = options.MaxRetries,
+            MaxTurns = options.MaxTurns,
             RetryDelay = options.RetryDelay,
             Isolate = options.Isolate
         };
@@ -80,9 +98,18 @@ public sealed class ClaudeCodeChatClient : IProgramChatClient
         CancellationToken cancellationToken = default)
     {
         ProgramGuard.NotNull(messages);
-        if (options?.ResponseFormat is ProgramChatResponseFormat.Json)
-            throw new NotSupportedException("The Claude Code provider requests text responses only.");
         string system = string.Join("\n\n", messages.Where(m => m.Role == ProgramChatRole.System).Select(m => m.Text));
+        if (options?.ResponseFormat is ProgramChatResponseFormat.Json)
+        {
+            // The CLI has no response-format flag, so the request is honoured by instruction instead of
+            // refused. Throwing here made LLM feedback unusable with this provider at its own defaults:
+            // LlmFeedbackOptions.RequestJsonResponseFormat is true, so every judgement failed with
+            // "the request failed with NotSupportedException" while the evaluation completed on its base
+            // quality - a feedback signal silently absent rather than a configuration error.
+            // Not silently ignored either: the instruction goes into the prompt the model actually reads.
+            system = system.Length > 0 ? system + "\n\n" + JsonOnlyInstruction : JsonOnlyInstruction;
+        }
+
         string conversation = JsonSerializer.Serialize(messages.Where(m => m.Role != ProgramChatRole.System)
             .Select(m => new { role = m.Role.ToString().ToLowerInvariant(), content = m.Text }).ToArray());
         TimeSpan delay = _options.RetryDelay;
@@ -118,7 +145,8 @@ public sealed class ClaudeCodeChatClient : IProgramChatClient
                 StandardErrorEncoding = new UTF8Encoding(false)
             };
             foreach (string argument in _options.ExecutablePrefixArguments) start.ArgumentList.Add(argument);
-            foreach (string argument in new[] { "-p", "--output-format", "json", "--model", _options.Model, "--no-session-persistence", "--max-turns", "1" })
+            foreach (string argument in new[] { "-p", "--output-format", "json", "--model", _options.Model, "--no-session-persistence", "--max-turns",
+                _options.MaxTurns.ToString(CultureInfo.InvariantCulture) })
                 start.ArgumentList.Add(argument);
             if (system.Length > 0) { start.ArgumentList.Add("--system-prompt"); start.ArgumentList.Add(system); }
             if (_options.MaxBudgetUsd is { } budget) { start.ArgumentList.Add("--max-budget-usd"); start.ArgumentList.Add(budget.ToString(CultureInfo.InvariantCulture)); }
@@ -172,6 +200,20 @@ public sealed class ClaudeCodeChatClient : IProgramChatClient
         using (document)
         {
             JsonElement root = document.RootElement;
+            // Named separately from the generic failure, and deliberately NOT an InvalidDataException: the retry
+            // filter treats that as transient, so a turn limit - which is deterministic - was retried MaxRetries
+            // times, paying for every attempt before failing anyway. Each call costs the same whatever it returns.
+            if (root.ValueKind == JsonValueKind.Object && root.TryGetProperty("subtype", out JsonElement subtype) &&
+                subtype.ValueKind == JsonValueKind.String &&
+                string.Equals(subtype.GetString(), "error_max_turns", StringComparison.Ordinal))
+            {
+                throw new InvalidOperationException(
+                    "The Claude Code CLI stopped at its --max-turns limit of " +
+                    _options.MaxTurns.ToString(CultureInfo.InvariantCulture) +
+                    " without producing an answer, which a model does by spending a turn on reasoning. Raise " +
+                    "ClaudeCodeChatClientOptions.MaxTurns; retrying the same request cannot change the outcome.");
+            }
+
             if (root.ValueKind != JsonValueKind.Object || !root.TryGetProperty("result", out JsonElement result) || result.ValueKind != JsonValueKind.String ||
                 (root.TryGetProperty("is_error", out JsonElement error) && error.ValueKind == JsonValueKind.True))
                 throw new InvalidDataException("Claude Code reported an unsuccessful generation.");
