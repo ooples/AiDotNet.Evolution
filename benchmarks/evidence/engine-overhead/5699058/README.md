@@ -1,3 +1,5 @@
+> **Partly superseded** by [../65ced88/README.md](../65ced88/README.md): the aidotnet column was re-measured at `main` `65ced88`, where the 16-worker peak working set target is met. The OpenEvolve column and the paired ratio intervals here are still the measured ones.
+
 # V1-70 (#175): engine overhead, AiDotNet.Evolution vs pinned OpenEvolve (null evaluators)
 
 Supersedes `../46e1141/`. **Not a headline claim (R12):** a C# controller against a Python one is expected to win on overhead.
