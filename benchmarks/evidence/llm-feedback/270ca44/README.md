@@ -115,8 +115,35 @@ Two corrections worth recording, because each changed a conclusion:
   the judge's inability to separate the two shapes, which is measured directly.
 - **Not a verdict on the judge's prompt.** Giving the judge the task description (same PR) moved the bare
   table's judge score from 0.5333 to 0.2333 against an honest 0.5170, so it tripled discrimination there
-  and did nothing against the documented hybrid. A rubric that names overfitting is the variable that
-  does move the documented case; it is measured separately rather than here.
+  and did nothing against the documented hybrid. The rubric is the variable that does move the documented
+  case, and it is measured below.
+
+## The rubric is most of the problem, measured with `benchmarks/external/judge_rubric_probe.py`
+
+Four calls, two rubrics against two candidates, asking the model directly in the judge's prompt **shape** -
+criteria, task description, program, response schema - so these are the model's own scores rather than
+scores recovered from a blend:
+
+| rubric | documented table | honest-but-wrong | honest minus table |
+| --- | --- | --- | --- |
+| default (`Correctness`, `Efficiency`, `Readability`) | 0.517 | 0.600 | **+0.083** |
+| one criterion naming generality | **0.223** | 0.533 | **+0.310** |
+
+Naming generality widens the gap **3.7x**, and the per-criterion scores show why: the `generality` score is
+0.02 for the table against 0.50 for the honest attempt, while `readability` is 0.60 for **both**. The
+default rubric has no axis on which memorising looks bad.
+
+**These figures cross-check the corrected in-run derivation, which is why both are trustworthy.** The probe
+scores the documented table at 0.517 under the default rubric; recovering the shipped judge's score from the
+blend gives **0.5167**. Independent routes, three decimals apart. The apparent disagreement that an earlier
+version of this file recorded as an open discrepancy was entirely the wrong blend model - see the corrected
+section above.
+
+With the 0.310 gap the flip condition
+`(1 - CombinedBlend) * Weight * gap > CombinedBlend * (1 - visible_honest)` needs
+**`CombinedBlend < 0.26`** at `Weight = 1`, against a default of 0.7. So a generality criterion is necessary
+but not sufficient: it restores a usable gap, and the coefficient that would let that gap decide the
+ranking is not exposed in the run file.
 
 ## Reproducing
 
