@@ -11,7 +11,7 @@ import sys
 
 
 def hidden_rule(x):
-    return (x ** 3 + 7 * x) % 101
+    return ((x * x) ^ (x + 11)) % 89
 
 
 # Every integer in the range except the six the evaluator shows. A candidate that memorised those six
