@@ -626,6 +626,40 @@ public sealed class OpenEvolveImportTests
         Assert.Contains("Criteria", error, StringComparison.Ordinal);
     }
 
+    [Theory]
+    [InlineData("")]
+    [InlineData("   ")]
+    public void A_blank_judge_metric_prefix_is_refused_rather_than_read_as_the_default(string prefix)
+    {
+        // The doc said "empty keeps the default" while the code applied any non-null value, so "" stripped
+        // the prefix. That matters because the judge's field names are ordinary words - correctness,
+        // readability - so an unprefixed judge metric collides with an evaluator metric of the same name.
+        // Refused rather than defaulted: a caller who typed "" meant something that cannot be honoured.
+        using var directory = new TemporaryDirectory();
+        File.WriteAllText(Path.Combine(directory.Path, "initial_program.py"), "X = 0\n");
+        File.WriteAllText(Path.Combine(directory.Path, "evaluator.py"),
+            "import json, sys\n" + "print(json.dumps({\"quality\": 0.5}))  # evaluate\n");
+        var run = new
+        {
+            schema = "aidotnet-evolve-run-v1",
+            runId = "judge-prefix",
+            initialProgram = Path.Combine(directory.Path, "initial_program.py"),
+            evaluator = Path.Combine(directory.Path, "evaluator.py"),
+            output = Path.Combine(directory.Path, "out"),
+            model = new { provider = "OpenAiCompatible", endpoint = "http://127.0.0.1:1/v1", name = "fake-model" },
+            budget = new { maxEvaluations = 2, seed = 7, parallelism = 1 },
+            llmFeedback = new { weight = 0.3, metricPrefix = prefix }
+        };
+        string runFile = Path.Combine(directory.Path, "run.json");
+        File.WriteAllText(runFile, JsonSerializer.Serialize(run));
+
+        var (code, _, error) = CliRunTests.Run("run", runFile);
+
+        Assert.NotEqual(0, code);
+        Assert.Contains("metricPrefix", error, StringComparison.Ordinal);
+        Assert.Contains("collide", error, StringComparison.Ordinal);
+    }
+
     private static OpenEvolveImport Import(TemporaryDirectory directory, string yaml, string? python = null)
     {
         string config = Path.Combine(directory.Path, "config.yaml");
