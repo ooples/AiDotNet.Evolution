@@ -97,12 +97,18 @@ necessary but not sufficient, as the three rows below the smoked ones show.
 | `llm_prompt_optimization` | n/a | no | no seed program; it evolves a prompt file |
 | `symbolic_regression` | n/a | no | no config and no seed program in the repository |
 
-The smoke runs on Linux only, and that is upstream's constraint rather than a choice: their
-evaluator writes a wrapper script that embeds the program's absolute path into a single-quoted
-Python literal, so on Windows the path becomes an invalid escape - `SyntaxError: (unicode error)
-'unicodeescape' codec can't decode bytes ... truncated \UXXXXXXXX escape` - and every candidate
-scores zero. Measured by running `examples/circle_packing/evaluator.py` directly on its own seed
-program on both platforms.
+The smoke runs on Linux only. *Some* upstream evaluators write a wrapper script that embeds the
+program's absolute path into a single-quoted Python literal, so a Windows path becomes an invalid
+escape - `SyntaxError: (unicode error) 'unicodeescape' codec can't decode bytes ... truncated
+\UXXXXXXXX escape` - and every candidate scores zero. Measured by running
+`examples/circle_packing/evaluator.py` directly on its own seed program on both platforms.
+
+**Through this CLI that no longer happens**, because the shim now hands the evaluator a path whose
+separators are forward slashes: valid inside a single-quoted literal, accepted by every Windows path
+API, and already what the separator is on Linux, so it changes nothing there. See *The path the shim
+hands an evaluator* below. The smoke stays on Linux because one Theory covers every example and other
+examples need it - `rust_adaptive_sort` needs a Rust toolchain, `r_robust_regression` needs R - not
+because of the path.
 
 ## What `circle_packing_with_artifacts` needs that the others do not
 
@@ -125,6 +131,26 @@ aidotnet-evolve run --openevolve-config config.yaml initial_program.py evaluator
 ```
 
 Installing the package into the interpreter passed to `--python` works too and needs no option.
+
+**It is a property of those evaluators, not of the platform**, and the distinction matters for
+anyone wanting a real run without a container: run directly, the same shape defeats
+`online_judge_programming`, `k_module_problem` and `web_scraper_optillm`, while
+`examples/function_minimization/evaluator.py` runs correctly on Windows, scoring its own seed
+`combined_score` **1.4546** there (measured directly, with `openevolve` and `dacite` importable).
+
+## The path the shim hands an evaluator
+
+The shim gives `evaluate(program_path)` a path with forward slashes, not the platform separator. An
+evaluator that only opens the file cannot tell the difference; an evaluator that embeds the path in a
+generated script can, and that is the whole failure above.
+
+Measured on Windows, both ways, with an evaluator that reproduces the embedding shape:
+`combined_score` **1.0** with the replacement and **0.0** without it, the failure being the
+`SyntaxError` on the embedded path. The test asserts the contract directly - the path holds no
+separator a literal would reinterpret, and still opens - so on Linux it holds trivially and on
+Windows it is the real check. It is **not** a measurement of `circle_packing` itself through the CLI
+on Windows: that needs an upstream checkout plus `dacite` on the interpreter, and the number that run
+would report is the example's score rather than this contract.
 
 ## The smoke covers the cascade path
 

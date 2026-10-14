@@ -97,6 +97,33 @@ public sealed class CliRunTests
     }
 
     [Fact]
+    public void The_openevolve_shim_hands_the_evaluator_a_path_a_python_literal_can_hold()
+    {
+        // Several upstream evaluators generate a wrapper script and embed program_path in a single-quoted
+        // Python literal - examples/circle_packing is one. A Windows separator reads as an escape there, so the
+        // wrapper fails to parse and every candidate scores zero. The evaluator below asserts the contract the
+        // shim owes them: a path that holds no separator a literal would reinterpret, and that still opens.
+        using var directory = new TemporaryDirectory();
+        using var model = new FakeChatModel();
+        File.WriteAllText(Path.Combine(directory.Path, "initial.py"), "VALUE = 3");
+        File.WriteAllText(Path.Combine(directory.Path, "evaluator.py"), """
+            def evaluate(program_path):
+                with open(program_path, encoding="utf-8") as stream:
+                    source = stream.read()
+                embeddable = chr(92) not in program_path
+                return {"combined_score": 1.0 if embeddable and "VALUE" in source else 0.0}
+            """);
+        string runFile = WriteRun(directory.Path, model.Endpoint, maxEvaluations: 1,
+            extra: """, "openEvolveEvaluator": { "timeoutSeconds": 60 }""");
+
+        var (code, output, error) = Run("preflight", runFile);
+        Assert.True(code == 0, error);
+        using JsonDocument report = JsonDocument.Parse(output);
+        Assert.Equal("Completed", report.RootElement.GetProperty("SeedStatus").GetString());
+        Assert.Equal(1d, report.RootElement.GetProperty("SeedQuality").GetDouble());
+    }
+
+    [Fact]
     public void Preflight_scores_the_seed_exactly_as_run_would_and_never_calls_the_model()
     {
         using var directory = new TemporaryDirectory();
