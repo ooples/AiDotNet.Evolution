@@ -78,20 +78,22 @@ internal sealed class EvolutionWorkJournal : IDisposable
             }
             else
             {
+                long marker;
                 using (var reader = new BinaryReader(_owner, Encoding.UTF8, true))
-                {
-                    long marker = _owner.Length == 8 ? reader.ReadInt64() : 0;
-                    if (marker != Magic && marker != OwnerMagic) throw new InvalidDataException("Invalid work owner marker.");
-                    // An AEVWORK1 directory predates the log, so it cannot have one; a log next to it is foreign data.
-                    if (marker == Magic && File.Exists(log)) throw new InvalidDataException("A version-1 work store cannot contain a record log.");
-                }
+                    marker = _owner.Length == 8 ? reader.ReadInt64() : 0;
+                if (marker != Magic && marker != OwnerMagic) throw new InvalidDataException("Invalid work owner marker.");
+                // An AEVWORK1 directory predates the log, so it cannot hold records; a non-empty log next to it is
+                // foreign data. An empty one holds nothing to lose, so it is not a reason to refuse the store.
+                if (marker == Magic && File.Exists(log) && new FileInfo(log).Length > 0)
+                    throw new InvalidDataException("A version-1 work store cannot contain a record log.");
                 ReadCurrent();
+                // Upgrade the marker only after the old snapshot reads successfully, and before work.log can be
+                // created, so older code refuses the directory before it could miss a record, and a crash or I/O
+                // failure while the log is being opened leaves an AEVWORK2 store that simply reopens.
+                if (marker == Magic) WriteOwner(OwnerMagic);
                 opened = OpenLog(log);
                 _log = opened;
                 RecoveredRecords = ReadLog();
-                // Upgrade the marker only after the old store has been read successfully, and before any record can
-                // be appended, so older code refuses the directory from the first moment it could miss a record.
-                WriteOwner(OwnerMagic);
                 WasRecovered = true;
             }
         }

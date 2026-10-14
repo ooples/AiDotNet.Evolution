@@ -298,6 +298,22 @@ public sealed class EvolutionWorkJournalTests
     }
 
     [Fact]
+    public void InterruptedVersionOneUpgradeThatLeftAnEmptyLogStillOpens()
+    {
+        // An upgrade that stopped after creating work.log but before writing a record leaves an empty log; it holds
+        // nothing, so the store must reopen instead of being refused as foreign data.
+        using var directory = new WorkDirectory();
+        Directory.CreateDirectory(directory.Path);
+        WriteVersionOneStore(directory.Path, 7, "state written by the whole-state rewrite");
+        File.WriteAllBytes(LogPath(directory), Array.Empty<byte>());
+        using (var journal = new EvolutionWorkJournal(directory.Path, "must not overwrite", 4096))
+        {
+            Assert.Equal("state written by the whole-state rewrite", journal.Payload);
+            Assert.Empty(journal.RecoveredRecords);
+        }
+        Assert.Equal("AEVWORK2", Encoding.ASCII.GetString(File.ReadAllBytes(OwnerPath(directory))));
+    }
+    [Fact]
     public void VersionOneStoreLoadsAndIsMarkedSoOlderCodeRefusesIt()
     {
         using var directory = new WorkDirectory();
