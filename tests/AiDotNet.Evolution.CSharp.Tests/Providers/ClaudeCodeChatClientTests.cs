@@ -100,4 +100,38 @@ public sealed class ClaudeCodeChatClientTests : IDisposable
         File.Delete(Path.Combine(_directory, "count.txt"));
         await Assert.ThrowsAsync<IOException>(() => Client(isolate: true, failFirst: 5).GetResponseAsync(new[] { ProgramChatMessage.User("x") }));
     }
+
+    [Fact]
+    public async Task A_json_response_request_is_carried_as_an_instruction_rather_than_refused()
+    {
+        // This provider used to throw NotSupportedException for a JSON request, which made the LLM judge
+        // unusable with it at the judge's own defaults: LlmFeedbackOptions.RequestJsonResponseFormat is
+        // true, so every judgement failed while the evaluation completed on its base quality - the
+        // feedback signal was absent rather than the run being refused. The CLI has no response-format
+        // flag, so the request is carried into the prompt the model reads instead.
+        ProgramChatResponse response = await Client(isolate: true).GetResponseAsync(
+            new[] { ProgramChatMessage.System("be terse"), ProgramChatMessage.User("score it") },
+            new ProgramChatOptions { ResponseFormat = ProgramChatResponseFormat.Json });
+
+        Assert.Equal("print('hi')", response.Text);
+        JsonElement record = Record();
+        string[] args = record.GetProperty("args").EnumerateArray().Select(a => a.GetString() ?? "").ToArray();
+        string system = args[Array.IndexOf(args, "--system-prompt") + 1];
+        Assert.Contains("be terse", system, StringComparison.Ordinal);
+        Assert.Contains(ClaudeCodeChatClient.JsonOnlyInstruction, system, StringComparison.Ordinal);
+    }
+
+    [Fact]
+    public async Task A_text_response_request_carries_no_json_instruction()
+    {
+        // The inverted half: if the instruction were appended unconditionally, the test above would pass
+        // for a client that ignored the option entirely.
+        await Client(isolate: true).GetResponseAsync(
+            new[] { ProgramChatMessage.System("be terse"), ProgramChatMessage.User("write it") },
+            new ProgramChatOptions { ResponseFormat = ProgramChatResponseFormat.Text });
+
+        string[] args = Record().GetProperty("args").EnumerateArray().Select(a => a.GetString() ?? "").ToArray();
+        Assert.DoesNotContain(ClaudeCodeChatClient.JsonOnlyInstruction,
+            args[Array.IndexOf(args, "--system-prompt") + 1], StringComparison.Ordinal);
+    }
 }

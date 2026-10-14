@@ -59,6 +59,14 @@ def run_file(output, seed, feedback_weight, evaluations, model, executable, budg
             "it will be used on inputs well outside the range you are shown."
         ),
         "model": {"provider": "ClaudeCode", "name": model, "claudeExecutable": executable},
+        # Both arms, identically. The evaluator returns the visible pairs and the candidate's answers as
+        # artifacts; without them the proposer sees only a scalar and cannot induce the rule, and a dry
+        # run confirmed that - every proposal stayed at the seed's own 2 of 12 in both arms.
+        "prompt": {"includeArtifacts": True},
+        # retainArtifactText is what makes includeArtifacts mean anything: with it off the prompt carries
+        # "artifact: [artifact content withheld]" and the proposer sees no examples. Measured by recording
+        # the prompt with a stub executable rather than inferred from the option names.
+        "search": {"retainArtifactText": True},
         "budget": {
             "maxEvaluations": evaluations,
             "seed": seed,

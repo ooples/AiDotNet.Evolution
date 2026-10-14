@@ -65,6 +65,15 @@ class TheArmsDifferInExactlyOneKey(unittest.TestCase):
         self.assertNotIn("llmFeedback", off)
         self.assertEqual(off, on)
 
+    def test_both_arms_see_the_evaluator_artifacts(self):
+        # The proposer needs the visible pairs to induce anything; a dry run without them left every
+        # proposal at the seed's own score in both arms, which would have made the ablation measure noise.
+        for weight in (None, 0.3):
+            run = fa.run_file("o", 0, weight, 6, "sonnet", "claude", None, 60)
+            self.assertTrue(run["prompt"]["includeArtifacts"])
+            # Without this the prompt carries "[artifact content withheld]" and includeArtifacts is inert.
+            self.assertTrue(run["search"]["retainArtifactText"])
+
     def test_the_engine_seed_is_the_pairing_key(self):
         common = dict(evaluations=6, model="sonnet", executable="claude", budget_usd=None, time_limit=60)
         self.assertEqual(11, fa.run_file("o", 11, None, **common)["budget"]["seed"])

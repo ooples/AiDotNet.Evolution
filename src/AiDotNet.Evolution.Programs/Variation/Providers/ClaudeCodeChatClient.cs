@@ -46,11 +46,18 @@ public sealed class ClaudeCodeChatClientOptions
 /// OpenEvolve's <c>claude_code</c> provider passes the prompt as a command-line argument (subject to OS length limits),
 /// keeps only the user turns, and runs with the user's full profile. This client sends the whole conversation on
 /// standard input, keeps every turn, reads token usage from the CLI's JSON result, and by default runs isolated
-/// (<see cref="ClaudeCodeChatClientOptions.Isolate"/>).
+/// (<see cref="ClaudeCodeChatClientOptions.Isolate"/>). A request for
+/// <see cref="ProgramChatResponseFormat.Json"/> is honoured by instruction, because the CLI has no flag for
+/// one; refusing it instead left the LLM judge unusable here at its own defaults.
 /// </remarks>
 public sealed class ClaudeCodeChatClient : IProgramChatClient
 {
     private const int MaxOutputBytes = 8 * 1024 * 1024;
+
+    /// <summary>Carries a JSON response-format request to a CLI that has no flag for one.</summary>
+    internal const string JsonOnlyInstruction =
+        "Reply with one JSON object and nothing else: no prose before or after it, and no code fence.";
+
     private static readonly string[] ScrubbedPrefixes = { "ANTHROPIC_", "CLAUDE_CODE_", "CLAUDECODE", "TOKEN_OPTIMIZER_" };
     private readonly ClaudeCodeChatClientOptions _options;
 
@@ -80,9 +87,18 @@ public sealed class ClaudeCodeChatClient : IProgramChatClient
         CancellationToken cancellationToken = default)
     {
         ProgramGuard.NotNull(messages);
-        if (options?.ResponseFormat is ProgramChatResponseFormat.Json)
-            throw new NotSupportedException("The Claude Code provider requests text responses only.");
         string system = string.Join("\n\n", messages.Where(m => m.Role == ProgramChatRole.System).Select(m => m.Text));
+        if (options?.ResponseFormat is ProgramChatResponseFormat.Json)
+        {
+            // The CLI has no response-format flag, so the request is honoured by instruction instead of
+            // refused. Throwing here made LLM feedback unusable with this provider at its own defaults:
+            // LlmFeedbackOptions.RequestJsonResponseFormat is true, so every judgement failed with
+            // "the request failed with NotSupportedException" while the evaluation completed on its base
+            // quality - a feedback signal silently absent rather than a configuration error.
+            // Not silently ignored either: the instruction goes into the prompt the model actually reads.
+            system = system.Length > 0 ? system + "\n\n" + JsonOnlyInstruction : JsonOnlyInstruction;
+        }
+
         string conversation = JsonSerializer.Serialize(messages.Where(m => m.Role != ProgramChatRole.System)
             .Select(m => new { role = m.Role.ToString().ToLowerInvariant(), content = m.Text }).ToArray());
         TimeSpan delay = _options.RetryDelay;

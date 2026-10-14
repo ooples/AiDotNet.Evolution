@@ -37,12 +37,27 @@ def evaluate(source):
             if first_error is None:
                 first_error = type(error).__name__ + " at x=" + str(x) + ": " + str(error)[:200]
 
+    # The visible pairs and the candidate's answers go back as artifacts, which the prompt includes.
+    # Without them the proposer sees only a scalar and cannot induce the rule from anything, so both
+    # arms would be guessing functional forms blind and the ablation would measure noise rather than
+    # feedback. Measured: a dry run with no artifacts left every proposal at the seed's own 2 of 12.
+    # The held-out inputs are NOT here and are not in this process at all, so widening what the
+    # proposer sees does not widen what either arm can memorise its way to.
+    examples = []
+    for x, expected in VISIBLE:
+        try:
+            got = solve(x)
+        except Exception:
+            got = None
+        examples.append("solve(%d) -> %s, expected %d%s" % (x, got, expected, "" if got == expected else "  <-- WRONG"))
+
     result = {
         "quality": correct / len(VISIBLE),
         "metrics": {"compiled": 1.0, "has_solve": 1.0, "visible_correct": float(correct)},
+        "artifacts": {"visible_examples": "\n".join(examples)},
     }
     if first_error is not None:
-        result["artifacts"] = {"error": first_error}
+        result["artifacts"]["error"] = first_error
     return result
 
 
