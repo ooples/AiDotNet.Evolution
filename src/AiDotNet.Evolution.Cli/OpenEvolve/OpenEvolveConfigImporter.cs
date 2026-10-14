@@ -328,14 +328,17 @@ internal static class OpenEvolveConfigImporter
             string name = complexity ? "length" : dimension;
             if (!complexity)
             {
-                // The engine will not file a program it cannot bin, so a dimension the evaluator
-                // omits on any completed evaluation ends the run with no candidates. OpenEvolve bins
-                // a missing dimension instead, so this is the one place a reader can be warned
-                // before spending a run finding out.
+                // The engine will not file a program it cannot bin, so a dimension the evaluator omits on
+                // any completed evaluation ends the run with no candidates. Upstream refuses it too -
+                // database.py's _calculate_feature_coords raises ValueError for a declared dimension that is
+                // absent from the metrics and is not one of its three built-ins (complexity, diversity,
+                // score), which it computes itself - so the difference is not whether it is refused but how
+                // loudly. This is the one place a reader can be warned before spending a run finding out.
                 notes.Add("database.feature_dimensions: '" + dimension + "' becomes an archive descriptor, so the "
                           + "evaluator must report '" + name + "' on every completed evaluation. An evaluation that "
                           + "omits it cannot be placed in a cell, and a run whose first evaluation omits it ends with "
-                          + "no candidates. OpenEvolve bins a missing dimension rather than refusing it.");
+                          + "no candidates. OpenEvolve raises an error for the same configuration rather than "
+                          + "binning the candidate anyway.");
             }
             descriptors.Add(new RunMetricDescriptor
             {

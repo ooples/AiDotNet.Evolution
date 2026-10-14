@@ -356,9 +356,10 @@ public sealed class OpenEvolveImportTests
     /// <remarks>
     /// The warning is the cheap half of the fix below: a reader who sees it at import time does not
     /// have to spend a run, and then an investigation, discovering that a declared dimension their
-    /// evaluator reports only on its success path ends the run with no candidates. OpenEvolve bins a
-    /// missing dimension instead of refusing it, so the difference is worth stating where the
-    /// mapping happens.
+    /// evaluator reports only on its success path ends the run with no candidates. Upstream refuses the
+    /// same configuration - its _calculate_feature_coords raises ValueError for a declared dimension that
+    /// is absent from the metrics and is not one of complexity, diversity or score - so what the note adds
+    /// is the warning at import time rather than a different outcome.
     /// </remarks>
     [Fact]
     public void A_feature_dimension_warns_that_the_evaluator_must_report_it()
