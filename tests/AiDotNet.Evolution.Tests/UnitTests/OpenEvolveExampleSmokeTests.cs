@@ -207,5 +207,6 @@ public sealed class OpenEvolveExampleSmokeTests
         using var writer = new StringWriter();
         stream.Save(writer, assignAnchors: false);
         return writer.ToString();
-    }}
+    }
+}
 #endif

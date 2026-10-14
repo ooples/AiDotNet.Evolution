@@ -102,3 +102,6 @@ __pycache__/
 # Python binding build outputs (pip wheel)
 bindings/python/build/
 bindings/python/*.egg-info/
+
+# Reviewed release claims and evidence bundles (US-12) are source-controlled, unlike compiler Release output.
+!/release/

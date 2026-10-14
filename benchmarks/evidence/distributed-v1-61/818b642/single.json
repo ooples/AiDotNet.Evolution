@@ -1,0 +1,201 @@
+{
+  "stateHash": "464c4c45e20122165008b1400616ebb7d9c9bea90c814b260642b321b9d0abb0",
+  "evaluationsAsked": 31,
+  "resultsDelivered": 31,
+  "resultsMissing": 0,
+  "elapsedSeconds": 1.5049635,
+  "evaluationsPerSecond": 20.59850620961904,
+  "localWorkers": 1,
+  "workersAwaited": 1,
+  "evalMs": 0,
+  "bestQuality": 0.978,
+  "serverFaults": [],
+  "committed": [
+    {
+      "evaluationId": 0,
+      "attempt": 1,
+      "leaseId": "667bd7c2827741d18afeec0cf9ecd249",
+      "provenance": "worker:local-0"
+    },
+    {
+      "evaluationId": 1,
+      "attempt": 1,
+      "leaseId": "93fc0a7cb0894342aa71681f58da4478",
+      "provenance": "worker:local-0"
+    },
+    {
+      "evaluationId": 2,
+      "attempt": 1,
+      "leaseId": "96f6d624ad1e4a339983a0e3f3fd4099",
+      "provenance": "worker:local-0"
+    },
+    {
+      "evaluationId": 3,
+      "attempt": 1,
+      "leaseId": "6b9bf1a0a2b64826a509aa04bf019e36",
+      "provenance": "worker:local-0"
+    },
+    {
+      "evaluationId": 4,
+      "attempt": 1,
+      "leaseId": "d5f55963c4d0479e8b2a1e014e5067e2",
+      "provenance": "worker:local-0"
+    },
+    {
+      "evaluationId": 5,
+      "attempt": 1,
+      "leaseId": "5c1d410d76b6432b98749fc107b5a4d6",
+      "provenance": "worker:local-0"
+    },
+    {
+      "evaluationId": 6,
+      "attempt": 1,
+      "leaseId": "ded4a2e2f5bc4a94ac8879a232fb5f54",
+      "provenance": "worker:local-0"
+    },
+    {
+      "evaluationId": 7,
+      "attempt": 1,
+      "leaseId": "3415b2fe6bfa4b809e0d32bc052f2a0d",
+      "provenance": "worker:local-0"
+    },
+    {
+      "evaluationId": 8,
+      "attempt": 1,
+      "leaseId": "10c660e63c2f431f98290d04f99c2c1f",
+      "provenance": "worker:local-0"
+    },
+    {
+      "evaluationId": 9,
+      "attempt": 1,
+      "leaseId": "016bff0b2233424cb93b971b94bb5287",
+      "provenance": "worker:local-0"
+    },
+    {
+      "evaluationId": 10,
+      "attempt": 1,
+      "leaseId": "6a6c8a9a34d04a8e830f4b43abb846fe",
+      "provenance": "worker:local-0"
+    },
+    {
+      "evaluationId": 11,
+      "attempt": 1,
+      "leaseId": "8cfd1eaa65d54b4f9a614e7143915b7c",
+      "provenance": "worker:local-0"
+    },
+    {
+      "evaluationId": 12,
+      "attempt": 1,
+      "leaseId": "70e03fb932904fe58e6b32d0654a0075",
+      "provenance": "worker:local-0"
+    },
+    {
+      "evaluationId": 14,
+      "attempt": 1,
+      "leaseId": "305db24e2c9e47bbb5836e92fabf72b4",
+      "provenance": "worker:local-0"
+    },
+    {
+      "evaluationId": 16,
+      "attempt": 1,
+      "leaseId": "be9eec73d0214355abf931015eb5d778",
+      "provenance": "worker:local-0"
+    },
+    {
+      "evaluationId": 17,
+      "attempt": 1,
+      "leaseId": "8aba57b924304eddbcd362f867e42060",
+      "provenance": "worker:local-0"
+    },
+    {
+      "evaluationId": 18,
+      "attempt": 1,
+      "leaseId": "57d3b116d6aa47a4872b39e10c6d6137",
+      "provenance": "worker:local-0"
+    },
+    {
+      "evaluationId": 20,
+      "attempt": 1,
+      "leaseId": "d908de81238545dc84d7121b3344bb28",
+      "provenance": "worker:local-0"
+    },
+    {
+      "evaluationId": 21,
+      "attempt": 1,
+      "leaseId": "8a1839be0f7247d6b8616fbb100d3625",
+      "provenance": "worker:local-0"
+    },
+    {
+      "evaluationId": 22,
+      "attempt": 1,
+      "leaseId": "028f17f65da24731ab8187b1811bc146",
+      "provenance": "worker:local-0"
+    },
+    {
+      "evaluationId": 24,
+      "attempt": 1,
+      "leaseId": "40e956ed76204e098203718b88a14f47",
+      "provenance": "worker:local-0"
+    },
+    {
+      "evaluationId": 25,
+      "attempt": 1,
+      "leaseId": "88bc47b550ca4dcbb1a55da8d534f30c",
+      "provenance": "worker:local-0"
+    },
+    {
+      "evaluationId": 27,
+      "attempt": 1,
+      "leaseId": "204fdd980997444ba253458a33436fcf",
+      "provenance": "worker:local-0"
+    },
+    {
+      "evaluationId": 29,
+      "attempt": 1,
+      "leaseId": "7460070cea004244a0c3146ffabe6c68",
+      "provenance": "worker:local-0"
+    },
+    {
+      "evaluationId": 30,
+      "attempt": 1,
+      "leaseId": "c20c1d3cea854582bd1d8de9651c8dd7",
+      "provenance": "worker:local-0"
+    },
+    {
+      "evaluationId": 31,
+      "attempt": 1,
+      "leaseId": "967ed7e24dae43f2b097d7bebf2013c4",
+      "provenance": "worker:local-0"
+    },
+    {
+      "evaluationId": 32,
+      "attempt": 1,
+      "leaseId": "7ed6221e66654181889abf37248ef55a",
+      "provenance": "worker:local-0"
+    },
+    {
+      "evaluationId": 33,
+      "attempt": 1,
+      "leaseId": "eda18afd594a4e88a11977743007c292",
+      "provenance": "worker:local-0"
+    },
+    {
+      "evaluationId": 35,
+      "attempt": 1,
+      "leaseId": "aef82ff1dede4596915ace74a79414ca",
+      "provenance": "worker:local-0"
+    },
+    {
+      "evaluationId": 37,
+      "attempt": 1,
+      "leaseId": "925a643a19e64df3b2dad3617c9b177d",
+      "provenance": "worker:local-0"
+    },
+    {
+      "evaluationId": 39,
+      "attempt": 1,
+      "leaseId": "83a5444a97de489ab8ce5be387e3845d",
+      "provenance": "worker:local-0"
+    }
+  ]
+}

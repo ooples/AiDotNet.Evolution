@@ -67,8 +67,15 @@ class DurableTests(unittest.TestCase):
                 client.enqueue(JOB)
                 lease = client.claim(worker("one"))
                 os.kill(client.pid, signal.SIGTERM)
-                with self.assertRaises(DurableWorkError):
-                    client.status()
+
+                # SIGTERM is asynchronous, and the host may finish an in-flight request before it
+                # exits, so asserting on the very next call is a race: it held on Linux and failed
+                # on macOS arm64 with "DurableWorkError not raised". What the test is about is that
+                # a dead host cannot serve, so it waits for the host to be gone rather than for the
+                # signal to be instantaneous.
+                self.assertTrue(
+                    self._fails_once_dead(client),
+                    "the host kept answering after SIGTERM; it never died or never stopped serving")
             finally:
                 try:
                     client.close()
@@ -79,6 +86,18 @@ class DurableTests(unittest.TestCase):
                 self.assertEqual(lease["identity"], restored.unsettled("one")["lease"]["identity"])
                 self.assertIsNone(restored.claim(worker("one")))
                 self.assertEqual("accepted", restored.commit(receipt(lease)))
+
+    @staticmethod
+    def _fails_once_dead(client, timeout=30.0):
+        """True once a call to the killed host raises, within `timeout` seconds."""
+        deadline = time.monotonic() + timeout
+        while time.monotonic() < deadline:
+            try:
+                client.status()
+            except DurableWorkError:
+                return True
+            time.sleep(0.05)
+        return False
 
     def test_matching_cancel_and_stale_commit_keep_cost(self):
         with tempfile.TemporaryDirectory(prefix="evolution-py-cancel-") as directory:

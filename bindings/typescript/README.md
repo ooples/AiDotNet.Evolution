@@ -242,3 +242,31 @@ replies tear down the owned endpoint; they never trigger automatic physical retr
 receipt leaves its original reservation unresolved. `parseDurableEvaluationPayload` retains
 all UInt64 seed bits from an engine bridge. This is trusted local IPC, not a network service
 or an automatic search-fork controller. See [the complete wire and recovery contract](../../docs/DURABLE_WORKER_PROTOCOL.md).
+
+## Reference worker
+
+The TypeScript counterpart of the Python package's reference worker, with the same behaviour (and the same tests,
+run against the real host). `serve` claims leases until none is available (or `maxLeases`), evaluates each one and
+commits one receipt per lease. The receipt payload is the evaluator's result as sorted-key JSON. When unwrapping the
+payload, the evaluator, or serializing its result throws, the lease gets a `failed` receipt that carries only the
+error's type name. A commit error is thrown to the caller; `serve` never re-runs the evaluator to retry a commit.
+
+`loadEvaluatorModule` loads an unmodified JavaScript evaluator exporting `evaluate(programPath)`, the OpenEvolve
+contract: each candidate is written to its own temporary file and its path is passed in. `programFileEvaluator` wraps
+an evaluator function the same way. Both normalize a plain-object result (the metrics) and an `EvaluationResult`-like
+object (`metrics` and `artifacts`); non-finite numbers are recorded as `inf`, `-inf` or `nan` text, as Python's are.
+
+```typescript
+import { DurableWorkClient, loadEvaluatorModule, serve } from '@aidotnet/evolution';
+
+const evaluate = await loadEvaluatorModule('./evaluator.mjs', '.mjs');
+const work = await DurableWorkClient.open(config);
+try {
+  await serve(work, { workerId: 'worker-1', compatibilityHash: config.compatibilityHash }, evaluate,
+    { provenance: 'my-evaluator-v1', actual: { evaluations: '1' } });
+} finally { await work.close(); }
+```
+
+Leases enqueued by the engine bridge carry a versioned envelope, which `engineProgramSource` (the default
+`sourceFrom`) unwraps; pass `sourceFrom: rawProgramSource` for work enqueued as bare source.
+`benchmarks/worker-overhead/measure_typescript.mjs` measures this worker's overhead per evaluation.

@@ -1,0 +1,57 @@
+{
+  "definition": "serve(max_leases=1) wall time minus the evaluator's own time",
+  "evaluations": 950,
+  "evaluator": {
+    "count": 950,
+    "max_ms": 0.013708,
+    "mean_ms": 0.0015639863157894697,
+    "min_ms": 0.000958,
+    "p50_ms": 0.0015,
+    "p95_ms": 0.001834,
+    "p99_ms": 0.002292
+  },
+  "gate_p95_ms": null,
+  "ipc_round_trip": {
+    "count": 950,
+    "max_ms": 2.483041,
+    "mean_ms": 0.2214994315789474,
+    "min_ms": 0.164375,
+    "p50_ms": 0.213917,
+    "p95_ms": 0.25925,
+    "p99_ms": 0.346958
+  },
+  "machine": "arm64",
+  "overhead": {
+    "count": 950,
+    "max_ms": 270.264833,
+    "mean_ms": 28.613223116842093,
+    "min_ms": 13.332791,
+    "p50_ms": 27.903584,
+    "p95_ms": 44.7105,
+    "p99_ms": 51.351958
+  },
+  "overhead_first_tenth": {
+    "count": 95,
+    "max_ms": 18.925541,
+    "mean_ms": 15.875141199999995,
+    "min_ms": 13.332791,
+    "p50_ms": 15.743291,
+    "p95_ms": 18.360125,
+    "p99_ms": 18.925541
+  },
+  "overhead_last_tenth": {
+    "count": 95,
+    "max_ms": 64.7015,
+    "mean_ms": 39.964707936842125,
+    "min_ms": 31.507958,
+    "p50_ms": 38.713083,
+    "p95_ms": 50.832749,
+    "p99_ms": 64.7015
+  },
+  "platform": "macOS-14.8.9-arm64-arm-64bit",
+  "python": "3.10.11",
+  "schema": "aidotnet-worker-overhead-v1",
+  "settled": 1000,
+  "warmup": 50,
+  "worker": "python"
+}

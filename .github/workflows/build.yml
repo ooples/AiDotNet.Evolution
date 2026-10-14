@@ -396,6 +396,14 @@ jobs:
           executed="$(grep -o 'executed="[0-9]*"' TestResults/openevolve-examples/openevolve-examples.trx | head -1 | grep -o '[0-9]*')"
           echo "OpenEvolve example tests executed: ${executed:-0}"
           [ "${executed:-0}" -ge 7 ] || { echo "::error::expected at least 7 OpenEvolve example tests, ran ${executed:-0}"; exit 1; }
+      # V1-25 (#119): a competitor's Python benchmark runs through the reference worker without source modification. The
+      # script refuses unless evaluator.py and initial_program.py match the pinned OpenEvolve blobs byte for byte, then
+      # serves them through the real durable host; it fails unless both leases are accepted and the unmodified initial
+      # program is scored.
+      - name: Unmodified OpenEvolve evaluator through the Python reference worker
+        run: |
+          dotnet build src/AiDotNet.Evolution.Host/AiDotNet.Evolution.Host.csproj -c Release -f net10.0
+          .local/program-env/bin/python benchmarks/external/run_upstream_evaluator_through_worker.py .local/openevolve-upstream function_minimization src/AiDotNet.Evolution.Host/bin/Release/net10.0/aidotnet-evolution-host.dll TestResults/upstream-evaluator-worker/function_minimization.json
       - name: Validate actual container isolation and independent oracles
         run: |
           docker build --tag evolution-program-sandbox:ci --file benchmarks/external/sandbox/Dockerfile .
@@ -413,6 +421,7 @@ jobs:
           path: |
             TestResults/program-comparison
             TestResults/program-isolation
+            TestResults/upstream-evaluator-worker
           if-no-files-found: warn
 
   legacy:
