@@ -122,7 +122,11 @@ def main():
                             aidotnet_peak_mb=statistics.median(c["memory"] for c in cells[("aidotnet", workers)]) / 2**20,
                             openevolve_peak_mb=statistics.median(c["memory"] for c in cells[("openevolve", workers)]) / 2**20))
     result = dict(story="V1-70 #175 (rerun of V1-30 #120)", repeats=args.repeats, sizes=sizes,
-                  method="(T(2N)-T(N))/N, fresh processes, null LLM and evaluator; ratio = median of per-repeat paired ratios, 95% percentile bootstrap",
+                  method="(T(2N)-T(N)) divided by the evaluations the two runs actually completed, not by N: "
+                         "fresh process per run, null LLM and evaluator in-process. A non-positive difference or a "
+                         "hang is re-measured (three attempts), never averaged in. Per-system figures are medians "
+                         "of the per-repeat values; the ratio is the median of the per-repeat PAIRED ratios with a "
+                         "4000-draw percentile bootstrap interval, seeded 7.",
                   headline=False, note="A C# controller vs a Python one is expected to favour us (R12); not a headline claim.",
                   summary=summary, hangs=hangs, rows=rows)
     Path(args.output).write_text(json.dumps(result, indent=1) + "\n", encoding="utf-8")
