@@ -1,0 +1,76 @@
+{
+  "story": "V1-57 (#170): background_blur run through the CLI with the real Claude Code provider",
+  "upstream_ref": "411fb59c886c18704caaffb611e17cf9e7d824d2",
+  "aidotnet_commit": "b791d8b",
+  "anti_gaming": "upstream examples/background_blur/test_gaming.py, 5 of 5 pass against the winner",
+  "evaluations": [
+    {
+      "sequence": 1,
+      "status": "Completed",
+      "quality": 1.0191873069201218,
+      "combined_score": 1.0191873069201218,
+      "ssim": 1,
+      "worst_ssim": 1,
+      "ms_per_frame": 48.52231249969918,
+      "metrics": {
+        "combined_score": 1.0191873069201218,
+        "ms_per_frame": 48.52231249969918,
+        "speedup": 1.0191873069201218,
+        "ssim": 1,
+        "worst_region_ssim": 1,
+        "worst_ssim": 1
+      }
+    },
+    {
+      "sequence": 5,
+      "status": "Completed",
+      "quality": 23.20822267155712,
+      "combined_score": 23.20822267155712,
+      "ssim": 0.9999999999985707,
+      "worst_ssim": 0.9999999999984096,
+      "ms_per_frame": 2.0996750026824884,
+      "metrics": {
+        "combined_score": 23.20822267155712,
+        "ms_per_frame": 2.0996750026824884,
+        "speedup": 23.20822267155712,
+        "ssim": 0.9999999999985707,
+        "worst_region_ssim": 0.9999999999962513,
+        "worst_ssim": 0.9999999999984096
+      }
+    },
+    {
+      "sequence": 9,
+      "status": "Completed",
+      "quality": 23.31741665663783,
+      "combined_score": 23.31741665663783,
+      "ssim": 0.9999999999985668,
+      "worst_ssim": 0.9999999999984023,
+      "ms_per_frame": 2.0798374971491285,
+      "metrics": {
+        "combined_score": 23.31741665663783,
+        "ms_per_frame": 2.0798374971491285,
+        "speedup": 23.31741665663783,
+        "ssim": 0.9999999999985668,
+        "worst_region_ssim": 0.9999999999964739,
+        "worst_ssim": 0.9999999999984023
+      }
+    },
+    {
+      "sequence": 13,
+      "status": "Completed",
+      "quality": 12.736538479781032,
+      "combined_score": 12.736538479781032,
+      "ssim": 0.9996712685957632,
+      "worst_ssim": 0.9996408242968031,
+      "ms_per_frame": 3.8396500021917745,
+      "metrics": {
+        "combined_score": 12.736538479781032,
+        "ms_per_frame": 3.8396500021917745,
+        "speedup": 12.736538479781032,
+        "ssim": 0.9996712685957632,
+        "worst_region_ssim": 0.9986756180563918,
+        "worst_ssim": 0.9996408242968031
+      }
+    }
+  ]
+}
