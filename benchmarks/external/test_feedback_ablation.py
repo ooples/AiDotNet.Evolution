@@ -104,11 +104,46 @@ class ReportIsAKnownAnswer(unittest.TestCase):
                             "endpoint_detail": None})
         return out
 
-    def report(self, rows, tmp):
+    def report(self, rows, tmp, arm="on"):
         arguments = types.SimpleNamespace(output=str(tmp), draws=400, bootstrap_seed=7, seeds=len(rows) // 2,
-                                          evaluations=6, weight=0.3, model="sonnet", claude="claude")
+                                          evaluations=6, weights="0.3", model="sonnet", claude="claude")
         fa.report(rows, arguments)
-        return json.loads(pathlib.Path(tmp).read_text(encoding="utf-8"))["summary"]
+        document = json.loads(pathlib.Path(tmp).read_text(encoding="utf-8"))
+        summary = dict(document["summary"]["arms"].get(arm, {}))
+        summary["arms_that_produced_no_result"] = document["summary"]["arms_that_produced_no_result"]
+        return summary
+
+    def test_each_weight_gets_its_own_arm_and_its_own_summary(self):
+        # One weight cannot answer the question: the blend is linear, so whether feedback can change which
+        # candidate wins depends on whether the weight is above the point where the judge's gap overcomes the
+        # visible-score gap. Measured on this task, that point is w = 0.91, far above any shipped default.
+        import tempfile
+        rows = []
+        for seed in range(4):
+            rows.append({"seed": seed, "arm": "off", "weight": None, "heldout_accuracy": 0.0,
+                         "failure": None, "visible_quality": 1.0, "completed_evaluations": 5,
+                         "model_calls": 4, "seconds": 1.0, "endpoint_detail": None})
+            for arm, weight, endpoint in (("on-w0.3", 0.3, 0.0), ("on-w0.95", 0.95, 1.0)):
+                rows.append({"seed": seed, "arm": arm, "weight": weight, "heldout_accuracy": endpoint,
+                             "failure": None, "visible_quality": 1.0, "completed_evaluations": 5,
+                             "model_calls": 4, "seconds": 1.0, "endpoint_detail": None})
+
+        with tempfile.TemporaryDirectory() as directory:
+            path = pathlib.Path(directory) / "r.json"
+            fa.report(rows, types.SimpleNamespace(output=str(path), draws=400, bootstrap_seed=7, seeds=4,
+                                                  evaluations=5, weights="0.3,0.95", model="sonnet",
+                                                  claude="claude"))
+            arms = json.loads(path.read_text(encoding="utf-8"))["summary"]["arms"]
+
+        self.assertEqual(["on-w0.3", "on-w0.95"], sorted(arms))
+        self.assertEqual(0.3, arms["on-w0.3"]["weight"])
+        self.assertEqual(0.0, arms["on-w0.3"]["median_difference"])
+        self.assertEqual(0, arms["on-w0.3"]["pairs_favouring_feedback"])
+        self.assertEqual(1.0, arms["on-w0.95"]["median_difference"])
+        self.assertEqual(4, arms["on-w0.95"]["pairs_favouring_feedback"])
+        # Each weighted arm is paired against the SAME control, so the two differences are comparable.
+        self.assertEqual(4, arms["on-w0.3"]["pairs"])
+        self.assertEqual(4, arms["on-w0.95"]["pairs"])
 
     def test_a_known_split_reports_the_counts_and_a_median_it_implies(self):
         import tempfile
@@ -142,8 +177,8 @@ class ReportIsAKnownAnswer(unittest.TestCase):
         self.assertEqual(2, summary["pairs"])
         self.assertEqual(1, summary["arms_that_produced_no_result"])
         self.assertEqual(1, summary["pairs_favouring_no_feedback"])
-        self.assertEqual(-1.0, document["pairs"][0]["difference"])
-        self.assertIn("unavailable", document["pairs"][0]["on_failure"])
+        self.assertEqual(-1.0, document["pairs"]["on"][0]["difference"])
+        self.assertIn("unavailable", document["pairs"]["on"][0]["on_failure"])
 
     def test_an_interval_that_excludes_zero_is_only_reported_when_every_pair_agrees(self):
         import tempfile
@@ -160,10 +195,13 @@ class ReportIsAKnownAnswer(unittest.TestCase):
     def test_no_pairs_reports_nothing_rather_than_a_fabricated_interval(self):
         import tempfile
         with tempfile.TemporaryDirectory() as directory:
-            summary = self.report([], pathlib.Path(directory) / "r.json")
-        self.assertEqual(0, summary["pairs"])
-        self.assertIsNone(summary["median_difference"])
-        self.assertTrue(all(value != value for value in summary["difference_ci95"]))
+            path = pathlib.Path(directory) / "r.json"
+            fa.report([], types.SimpleNamespace(output=str(path), draws=400, bootstrap_seed=7, seeds=0,
+                                                evaluations=6, weights="0.3", model="sonnet", claude="claude"))
+            document = json.loads(path.read_text(encoding="utf-8"))
+        # No rows means no arms at all, rather than an arm reporting a fabricated interval.
+        self.assertEqual({}, document["summary"]["arms"])
+        self.assertEqual(0, document["summary"]["arms_that_produced_no_result"])
 
 
 if __name__ == "__main__":

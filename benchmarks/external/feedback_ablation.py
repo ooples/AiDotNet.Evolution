@@ -41,11 +41,11 @@ def repository_root():
     raise SystemExit("repository root not found above " + str(pathlib.Path(__file__).resolve()))
 
 
-def run_file(output, seed, feedback_weight, evaluations, model, executable, budget_usd, time_limit):
+def run_file(output, seed, feedback_weight, evaluations, model, executable, budget_usd, time_limit, arm=None):
     """The two arms differ in `llmFeedback` and nothing else; every other key is shared."""
     run = {
         "schema": "aidotnet-evolve-run-v1",
-        "runId": "feedback-ablation-s%d-%s" % (seed, "on" if feedback_weight is not None else "off"),
+        "runId": "feedback-ablation-s%d-%s" % (seed, arm or ("on" if feedback_weight is not None else "off")),
         "initialProgram": str(TASK / "initial_program.py"),
         "evaluator": str(TASK / "evaluator.py"),
         "output": str(output),
@@ -135,7 +135,7 @@ def main(argv=None):
     parser.add_argument("--work", required=True, help="scratch directory for the per-arm run outputs")
     parser.add_argument("--seeds", type=int, default=16)
     parser.add_argument("--evaluations", type=int, default=6, help="per arm, the seed included")
-    parser.add_argument("--weight", type=float, default=0.3, help="llmFeedback.weight for the on arm")
+    parser.add_argument("--weights", default="0.3", help="comma-separated llmFeedback.weight values; one arm each")
     parser.add_argument("--model", default="sonnet")
     parser.add_argument("--claude", default="claude")
     parser.add_argument("--max-budget-usd", type=float, default=None)
@@ -148,14 +148,19 @@ def main(argv=None):
 
     work = pathlib.Path(arguments.work)
     work.mkdir(parents=True, exist_ok=True)
+    # One control arm and one arm per weight. A single weight cannot answer the question the measurement
+    # raised: the blend is linear, so whether feedback can change which candidate wins depends on whether
+    # the weight is above the point where the judge's gap overcomes the visible-score gap.
+    weights = [float(value) for value in str(arguments.weights).split(",") if value.strip()]
+    arms = [("off", None)] + [("on-w%g" % weight, weight) for weight in weights]
     rows = []
     for seed in range(arguments.seeds):
-        for arm, weight in (("off", None), ("on", arguments.weight)):
+        for arm, weight in arms:
             results = work / ("s%d-%s" % (seed, arm))
             run_path = work / ("s%d-%s.run.json" % (seed, arm))
             run_path.write_text(json.dumps(run_file(
                 results, seed, weight, arguments.evaluations, arguments.model, arguments.claude,
-                arguments.max_budget_usd, arguments.time_limit), indent=2), encoding="utf-8")
+                arguments.max_budget_usd, arguments.time_limit, arm), indent=2), encoding="utf-8")
             result, elapsed, failure = evolve(arguments.cli, run_path, results, arguments.run_timeout)
             scored = endpoint(best_program(results), arguments.python)
             rows.append({
@@ -178,41 +183,50 @@ def report(rows, arguments):
     by_pair = {}
     for row in rows:
         by_pair.setdefault(row["seed"], {})[row["arm"]] = row
-
-    paired, differences = [], []
-    for seed in sorted(by_pair):
-        pair = by_pair[seed]
-        if "off" not in pair or "on" not in pair:
-            continue
-        # A failed arm keeps its seed in the denominator with a zero endpoint rather than being dropped:
-        # dropping it would let a crash in one arm improve that arm's mean.
-        difference = pair["on"]["heldout_accuracy"] - pair["off"]["heldout_accuracy"]
-        paired.append({
-            "seed": seed,
-            "off": pair["off"]["heldout_accuracy"],
-            "on": pair["on"]["heldout_accuracy"],
-            "difference": difference,
-            "off_failure": pair["off"]["failure"],
-            "on_failure": pair["on"]["failure"],
-        })
-        differences.append(difference)
+    treated = sorted({row["arm"] for row in rows if row["arm"] != "off"})
 
     rng = random.Random(arguments.bootstrap_seed)
-    wins = sum(1 for value in differences if value > 0)
-    losses = sum(1 for value in differences if value < 0)
+    summaries, all_pairs = {}, {}
+    for arm in treated:
+        paired, differences = [], []
+        for seed in sorted(by_pair):
+            pair = by_pair[seed]
+            if "off" not in pair or arm not in pair:
+                continue
+            # A failed arm keeps its seed in the denominator with a zero endpoint rather than being
+            # dropped: dropping it would let a crash in one arm improve that arm's figure.
+            difference = pair[arm]["heldout_accuracy"] - pair["off"]["heldout_accuracy"]
+            paired.append({
+                "seed": seed,
+                "off": pair["off"]["heldout_accuracy"],
+                "on": pair[arm]["heldout_accuracy"],
+                "difference": difference,
+                "off_failure": pair["off"]["failure"],
+                "on_failure": pair[arm]["failure"],
+            })
+            differences.append(difference)
+
+        wins = sum(1 for value in differences if value > 0)
+        losses = sum(1 for value in differences if value < 0)
+        summaries[arm] = {
+            "pairs": len(differences),
+            "endpoint": "heldout_accuracy",
+            "weight": next((row["weight"] for row in rows if row["arm"] == arm), None),
+            "off_median": statistics.median([p["off"] for p in paired]) if paired else None,
+            "on_median": statistics.median([p["on"] for p in paired]) if paired else None,
+            "median_difference": statistics.median(differences) if differences else None,
+            "mean_difference": statistics.fmean(differences) if differences else None,
+            "difference_ci95": bootstrap_interval(differences, arguments.draws, rng),
+            # The interval over a near-bimodal endpoint is carried by the discordant pairs; stated so a
+            # reader can see whether a conclusion rests on three pairs or on thirteen.
+            "pairs_favouring_feedback": wins,
+            "pairs_favouring_no_feedback": losses,
+            "tied_pairs": len(differences) - wins - losses,
+        }
+        all_pairs[arm] = paired
+
     summary = {
-        "pairs": len(differences),
-        "endpoint": "heldout_accuracy",
-        "off_median": statistics.median([p["off"] for p in paired]) if paired else None,
-        "on_median": statistics.median([p["on"] for p in paired]) if paired else None,
-        "median_difference": statistics.median(differences) if differences else None,
-        "mean_difference": statistics.fmean(differences) if differences else None,
-        "difference_ci95": bootstrap_interval(differences, arguments.draws, rng),
-        # The interval over a near-bimodal endpoint is carried by the discordant pairs; stated so a
-        # reader can see whether a conclusion rests on three pairs or on thirteen.
-        "pairs_favouring_feedback": wins,
-        "pairs_favouring_no_feedback": losses,
-        "tied_pairs": len(differences) - wins - losses,
+        "arms": summaries,
         "arms_that_produced_no_result": sum(1 for row in rows if row["failure"] is not None),
     }
 
@@ -220,20 +234,20 @@ def report(rows, arguments):
         "story": "V1-54 #167 criterion 4: LLM feedback as a weighted fitness signal, dev-partition ablation",
         "design": (
             "paired by engine seed; the arms differ only in the run file's llmFeedback key "
-            "(absent vs weight=%s). Endpoint is accuracy on held-out inputs the evaluator never sees, "
+            "(absent vs weight in %s). Endpoint is accuracy on held-out inputs the evaluator never sees, "
             "scored after the run by feedback_ablation_task/score_heldout.py, because both arms can "
             "reach a perfect visible score either by recovering the rule or by memorising the twelve "
-            "visible pairs and only the held-out set separates those." % arguments.weight
+            "visible pairs and only the held-out set separates those." % arguments.weights
         ),
         "interval": ("median of per-pair differences with a %d-draw seeded percentile bootstrap "
                      "(seed %d). %d pairs, and a near-bimodal endpoint, so a small true effect is not "
                      "resolvable here; the discordant-pair counts are reported beside the interval."
-                     % (arguments.draws, arguments.bootstrap_seed, len(differences))),
+                     % (arguments.draws, arguments.bootstrap_seed, arguments.seeds)),
         "model": {"provider": "ClaudeCode", "name": arguments.model, "executable": arguments.claude},
         "budget": {"seeds": arguments.seeds, "evaluations_per_arm": arguments.evaluations,
-                   "weight": arguments.weight},
+                   "weights": arguments.weights},
         "summary": summary,
-        "pairs": paired,
+        "pairs": all_pairs,
         "rows": rows,
     }
     pathlib.Path(arguments.output).write_text(json.dumps(document, indent=2) + "\n", encoding="utf-8")
