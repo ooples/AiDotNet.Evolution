@@ -28,7 +28,8 @@ internal static class OpenEvolveConfigImporter
         "_manual_queue_dir"
     };
 
-    public static OpenEvolveImport Import(string configPath, string initialProgram, string evaluator, int? iterations, string? python)
+    public static OpenEvolveImport Import(string configPath, string initialProgram, string evaluator, int? iterations,
+        string? python, IReadOnlyList<string>? pythonPath = null)
     {
         Dictionary<string, object?> config = Flatten(Load(configPath, python));
         Dictionary<string, object?> defaults = Defaults();
@@ -162,7 +163,11 @@ internal static class OpenEvolveConfigImporter
                 // passes this list to the fitness fallback, and OpenEvolve's get_fitness_score excludes
                 // every listed feature dimension - 'score' too - from the average when combined_score is
                 // absent. Filtering 'score' here would score evaluations upstream scores as zero.
-                FeatureDimensions = List(merged["database.feature_dimensions"]).OfType<string>().ToList()
+                FeatureDimensions = List(merged["database.feature_dimensions"]).OfType<string>().ToList(),
+                // Not an OpenEvolve config key: upstream relies on the evaluator inheriting the shell's PYTHONPATH,
+                // and the sandbox clears the environment instead, so the caller names the directories on the command
+                // line and they are recorded here so a resumed run keeps them.
+                PythonPath = pythonPath is null ? new List<string>() : pythonPath.ToList()
             }
         };
 

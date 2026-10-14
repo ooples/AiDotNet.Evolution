@@ -491,6 +491,90 @@ public sealed class OpenEvolveImportTests
         }
     }
 
+    [Fact]
+    public void An_evaluator_importing_its_own_package_needs_the_search_path_declared()
+    {
+        // circle_packing_with_artifacts imports openevolve.evaluation_result, and OpenEvolve relies on the evaluator
+        // inheriting the shell's PYTHONPATH. The sandbox clears the environment before every execution, so the import
+        // fails until the directory is named with --python-path. Both arms run here: without the option every
+        // evaluation fails on the import, with it the same unmodified evaluator scores.
+        using var directory = new TemporaryDirectory();
+        using var model = new CliRunTests.FakeChatModel(); // answers "X = n" for call n = 1, 2, ...
+        string modules = Path.Combine(directory.Path, "modules");
+        Directory.CreateDirectory(Path.Combine(modules, "upstream_package"));
+        File.WriteAllText(Path.Combine(modules, "upstream_package", "__init__.py"), "SCALE = 0.5\n");
+        File.WriteAllText(Path.Combine(directory.Path, "initial_program.py"), "X = 4\n");
+        File.WriteAllText(Path.Combine(directory.Path, "evaluator.py"), """
+            import re
+            from upstream_package import SCALE
+
+            def evaluate(path):
+                with open(path) as handle:
+                    x = int(re.search(r"X = (\d+)", handle.read()).group(1))
+                return {"combined_score": x * SCALE}
+            """);
+        File.WriteAllText(Path.Combine(directory.Path, "config.yaml"), $"""
+            max_iterations: 1
+            random_seed: 7
+            diff_based_evolution: false
+            llm:
+              api_base: {model.Endpoint}
+              models:
+                - name: fake-model
+              timeout: 20
+              retries: 0
+            database:
+              num_islands: 1
+            evaluator:
+              timeout: 30
+            """);
+
+        string[] baseArguments =
+        {
+            "run", "--openevolve-config", Path.Combine(directory.Path, "config.yaml"),
+            Path.Combine(directory.Path, "initial_program.py"), Path.Combine(directory.Path, "evaluator.py"),
+            "--python", Python
+        };
+
+        string? previousKey = Environment.GetEnvironmentVariable("OPENAI_API_KEY");
+        Environment.SetEnvironmentVariable("OPENAI_API_KEY", "unused-by-the-fake");
+        try
+        {
+            var (withoutCode, withoutStdout, withoutError) = CliRunTests.Run(
+                baseArguments.Concat(new[] { "--output", Path.Combine(directory.Path, "no-path") }).ToArray());
+            using JsonDocument refused = JsonDocument.Parse(withoutStdout);
+            JsonElement failures = refused.RootElement.GetProperty("Failures");
+            Assert.True(failures.GetArrayLength() > 0,
+                "the import was expected to fail; stdout=" + withoutStdout + " stderr=" + withoutError);
+            Assert.Contains("script_failed", failures[0].GetProperty("Code").GetString() ?? string.Empty,
+                StringComparison.Ordinal);
+            Assert.Equal(JsonValueKind.Null, refused.RootElement.GetProperty("BestQuality").ValueKind);
+
+            string output = Path.Combine(directory.Path, "with-path");
+            var (code, stdout, error) = CliRunTests.Run(
+                baseArguments.Concat(new[] { "--output", output, "--python-path", modules }).ToArray());
+
+            Assert.Equal(0, code);
+            using JsonDocument result = JsonDocument.Parse(stdout);
+            // The seed is X = 4 and the declared module supplies SCALE = 0.5, so a scored seed is 2.0. Reading the
+            // value rather than only the status is what proves the import resolved instead of being skipped.
+            Assert.Equal(2.0, result.RootElement.GetProperty("BestQuality").GetDouble(), 12);
+            Assert.True(result.RootElement.GetProperty("CompletedEvaluations").GetInt64() >= 1,
+                "no evaluation completed; stdout=" + stdout + " stderr=" + error);
+
+            // Recorded in the generated run file, so a resume keeps the path rather than failing on the first evaluation.
+            using JsonDocument runFile = JsonDocument.Parse(File.ReadAllText(Path.Combine(output, "run.json")));
+            Assert.Equal(
+                new[] { modules },
+                runFile.RootElement.GetProperty("openEvolveEvaluator").GetProperty("pythonPath")
+                    .EnumerateArray().Select(entry => entry.GetString()).ToArray());
+        }
+        finally
+        {
+            Environment.SetEnvironmentVariable("OPENAI_API_KEY", previousKey);
+        }
+    }
+
     private static OpenEvolveImport Import(TemporaryDirectory directory, string yaml, string? python = null)
     {
         string config = Path.Combine(directory.Path, "config.yaml");
