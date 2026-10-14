@@ -41,6 +41,28 @@ Measured rather than inferred, by recording the prompt the model actually receiv
 `retainArtifactText` off, an evaluator that reported its own failing examples changed nothing about
 the next proposal and every candidate stayed at the seed's own score.
 
+### Diagnosing an evaluator that fails
+
+The same two fields decide whether a failure can be diagnosed at all. Every diagnostic the script
+evaluator produces is redacted - the text is the evaluator's own, so it is treated as untrusted - which
+leaves the run report showing a code such as `program_script_script_failed` and nothing more. Which
+import, which line, which assertion only ever travels as an artifact.
+
+With `search.collectArtifacts` and `search.retainArtifactText` both on, the run report carries a
+`FailureOutput` array holding what the evaluator printed:
+
+```jsonc
+"FailureOutput": [
+  { "GenomeId": "bb5f3d1e...", "Key": "stderr", "Redacted": false,
+    "Text": "Traceback (most recent call last): ... ModuleNotFoundError: No module named 'openevolve'" }
+]
+```
+
+It is reported only for a run that had a failure-like evaluation, bounded to the first few entries, and
+newlines are replaced so one artifact cannot forge further lines. An evaluator that *ran* but printed
+something unparseable - a progress line before its JSON, a warning on stderr - attaches its output the
+same way, which is the case where the evaluator itself is the suspect and its output is the only evidence.
+
 ## An evaluator that imports a package: `--python-path`
 
 OpenEvolve runs your evaluator as a child of its own process, so the evaluator inherits whatever

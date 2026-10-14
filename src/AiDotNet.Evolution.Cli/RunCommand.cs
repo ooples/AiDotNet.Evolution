@@ -496,7 +496,12 @@ internal static class RunCommand
                     // descriptor's own name - and the message alone is deliberately generic.
                     Data = diagnostic.IsRedacted ? null : diagnostic.Data,
                 })
-                .ToArray()
+                .ToArray(),
+            // What the evaluator printed before it failed. A retained diagnostic carries a code and a
+            // generic message; the traceback that says which import or which line failed only ever
+            // travels as an artifact, so without this a failing unmodified evaluator cannot be
+            // diagnosed from the CLI at all. Empty unless search.collectArtifacts is on.
+            FailureOutput = FailureOutputOf(result)
         }, Program.Json));
         if (best is not null)
         {
@@ -822,9 +827,53 @@ internal static class RunCommand
         throw new InvalidDataException(outputDirectory + " already holds 1000 trace sessions.");
     }
 
+    // One failing evaluator can print a long traceback per attempt, and the whole report is one JSON object a
+    // caller parses. Bounded so a run with many failures reports the first few in full rather than megabytes.
+    private const int MaxReportedFailureOutputs = 8;
     private const int MaxStderrValueLength = 256;
 
     // One bounded line for stderr: control characters become spaces and the text is capped.
+    /// <summary>
+    /// The evaluator output still queued when the run ended, reported only for a run that had a failure-like
+    /// evaluation. The engine queues each note for the next proposal of its lineage and consumes it there, so what
+    /// remains is what no proposal ever read - which for a run whose candidates failed is every failure's output.
+    /// </summary>
+    private static object[] FailureOutputOf(EvolutionRunResult<ProgramGenome> result)
+    {
+        if (!HadFailureLikeEvaluation(result.Counters.StatusCounts)) return Array.Empty<object>();
+        var rows = new List<object>(MaxReportedFailureOutputs);
+        foreach (KeyValuePair<string, IReadOnlyList<EvolutionArtifact>> entry in result.PendingArtifacts)
+        {
+            foreach (EvolutionArtifact artifact in entry.Value)
+            {
+                if (rows.Count == MaxReportedFailureOutputs) return rows.ToArray();
+                rows.Add(new
+                {
+                    GenomeId = entry.Key,
+                    artifact.Key,
+                    // Redaction already happened in the engine; saying so beats printing the marker alone.
+                    Redacted = artifact.IsRedacted,
+                    artifact.Text
+                });
+            }
+        }
+        return rows.ToArray();
+    }
+
+    private static bool HadFailureLikeEvaluation(IReadOnlyDictionary<EvolutionEvaluationStatus, long> counts)
+    {
+        foreach (EvolutionEvaluationStatus status in new[]
+                 {
+                     EvolutionEvaluationStatus.Failed,
+                     EvolutionEvaluationStatus.TimedOut,
+                     EvolutionEvaluationStatus.Canceled
+                 })
+        {
+            if (counts.TryGetValue(status, out long count) && count > 0) return true;
+        }
+        return false;
+    }
+
     internal static string ForStderr(string? text)
     {
         if (text is null || text.Length == 0) return string.Empty;

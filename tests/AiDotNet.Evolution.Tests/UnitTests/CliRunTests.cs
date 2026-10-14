@@ -124,6 +124,36 @@ public sealed class CliRunTests
     }
 
     [Fact]
+    public void A_run_whose_evaluator_fails_reports_what_the_evaluator_printed()
+    {
+        // The retained diagnostic for a failed script carries a code and a generic message. Which import or
+        // which line failed only ever travels as an artifact, so a caller debugging an unmodified evaluator
+        // needs the printed output in the report itself.
+        using var directory = new TemporaryDirectory();
+        using var model = new FakeChatModel();
+        File.WriteAllText(Path.Combine(directory.Path, "initial.py"), "X = 0");
+        File.WriteAllText(Path.Combine(directory.Path, "evaluator.py"), """
+            import openevolve_missing_module
+
+
+            def evaluate(path):
+                return {'combined_score': 1.0}
+            """);
+        string runFile = WriteRun(directory.Path, model.Endpoint, maxEvaluations: 2,
+            extra: """, "search": { "collectArtifacts": true, "retainArtifactText": true }""");
+
+        var (code, output, error) = Run("run", runFile);
+        Assert.Equal(0, code); // the run did not fail; it produced no candidate, and says so on stderr
+        Assert.Contains("produced no candidate", error, StringComparison.Ordinal);
+        using JsonDocument report = JsonDocument.Parse(output);
+        JsonElement printed = report.RootElement.GetProperty("FailureOutput");
+        Assert.NotEqual(0, printed.GetArrayLength());
+        Assert.Contains(printed.EnumerateArray(), row =>
+            row.GetProperty("Key").GetString() == "stderr" &&
+            (row.GetProperty("Text").GetString() ?? string.Empty).Contains("openevolve_missing_module", StringComparison.Ordinal));
+    }
+
+    [Fact]
     public void Preflight_scores_the_seed_exactly_as_run_would_and_never_calls_the_model()
     {
         using var directory = new TemporaryDirectory();

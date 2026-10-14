@@ -101,6 +101,50 @@ public sealed class ScriptProgramFitnessEvaluatorTests
         Assert.Null(result.Quality);
     }
 
+    [Fact]
+    public async Task AScriptThatRanButPrintedUnusableMetricsStillAttachesWhatItPrinted()
+    {
+        // Every diagnostic this evaluator produces is redacted, so the code is all that reaches the caller and
+        // the code cannot say what the script actually printed. For a script that failed to start the output was
+        // already attached; a script that ran and printed something unparseable is the harder case to debug,
+        // because the evaluator is the suspect and its own output is the only evidence.
+        var options = new ScriptProgramEvaluationOptions { RetainArtifactText = true };
+        ScriptProgramFitnessEvaluator evaluator = Evaluator(_ => new ProgramExecuteResponse
+        {
+            Success = true,
+            Language = ProgramLanguage.Python,
+            ExitCode = 0,
+            StdOut = "Loading dataset...",
+            StdErr = "UserWarning: falling back to the slow path"
+        }, options);
+
+        EvolutionTaskResult result = await evaluator.EvaluateAsync(Genome(), Context);
+
+        Assert.Equal(EvolutionEvaluationStatus.Failed, result.Status);
+        Assert.Equal("program_script_invalid_metrics", Assert.Single(result.Diagnostics).Code);
+        Assert.Equal(new[] { "stdout", "stderr" }, result.Artifacts.Select(artifact => artifact.Key));
+        Assert.Contains("Loading dataset", result.Artifacts[0].Text, StringComparison.Ordinal);
+        Assert.Contains("slow path", result.Artifacts[1].Text, StringComparison.Ordinal);
+    }
+
+    [Fact]
+    public async Task TheOutputOfAScriptThatPrintedUnusableMetricsIsWithheldWithoutTheOptIn()
+    {
+        ScriptProgramFitnessEvaluator evaluator = Evaluator(_ => new ProgramExecuteResponse
+        {
+            Success = true,
+            Language = ProgramLanguage.Python,
+            ExitCode = 0,
+            StdOut = "Loading dataset...",
+            StdErr = "secret=hunter2"
+        });
+
+        EvolutionTaskResult result = await evaluator.EvaluateAsync(Genome(), Context);
+
+        Assert.Equal(EvolutionEvaluationStatus.Failed, result.Status);
+        Assert.Empty(result.Artifacts);
+    }
+
     [Theory]
     [InlineData("{\"quality\": null}")]
     [InlineData("{\"quality\": 1e999}")]
