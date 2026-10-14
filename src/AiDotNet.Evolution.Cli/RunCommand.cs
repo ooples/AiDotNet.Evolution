@@ -94,7 +94,13 @@ internal sealed class RunLlmFeedback
     /// </para>
     /// </remarks>
     public List<string> Criteria { get; init; } = new();
-    /// <summary>Prefix for the judge's metrics on each result; empty keeps the default.</summary>
+    /// <summary>Prefix for the judge's metrics on each result; omit the field to keep the default.</summary>
+    /// <remarks>
+    /// Omitting it keeps the default (<c>llm_</c>). An empty or blank value is <b>refused</b> rather than
+    /// read as "keep the default": the judge's field names are ordinary words - <c>correctness</c>,
+    /// <c>readability</c> - so an unprefixed judge metric is very likely to collide with one the evaluator
+    /// reports under the same name, and silently ignoring what a caller typed is worse than saying so.
+    /// </remarks>
     public string? MetricPrefix { get; init; }
 }
 
@@ -317,7 +323,21 @@ internal static class RunCommand
                 foreach (string criterion in feedback.Criteria) feedbackOptions.Criteria.Add(criterion);
             }
 
-            if (feedback.MetricPrefix is { } prefix) feedbackOptions.MetricPrefix = prefix;
+            if (feedback.MetricPrefix is { } prefix)
+            {
+                // Blank is refused, not defaulted: the judge's field names are ordinary words, so an
+                // unprefixed judge metric collides with an evaluator metric of the same name, and a caller
+                // who typed "" meant something that cannot be honoured.
+                if (prefix.Trim().Length == 0)
+                {
+                    throw new InvalidDataException(
+                        "llmFeedback.metricPrefix cannot be empty or blank: the judge's metric names are "
+                        + "ordinary words, so an unprefixed judge metric would collide with an evaluator "
+                        + "metric of the same name. Omit the field to keep the default.");
+                }
+
+                feedbackOptions.MetricPrefix = prefix;
+            }
             fitness = new LlmJudgeProgramFitnessEvaluator(judge, fitness,
                 new ProgramPromptBuilder(judgePrompt, programOptions), feedbackOptions);
         }
