@@ -475,7 +475,18 @@ public sealed class OpenEvolveImportTests
                 "a run with no candidate reported no failures; stdout=" + stdout + " stderr=" + error);
             // The message is deliberately generic; the descriptor's name is in Data, which is the
             // part that tells a reader which dimension their evaluator has to report.
-            Assert.Equal("descriptor_missing", failures[0].GetProperty("Code").GetString());
+            //
+            // The code moved from "descriptor_missing" to "descriptor_metric_missing", and that is the
+            // refusal arriving from a different component rather than a different outcome. When this
+            // test was written, ProgramProposalOptions.Clone dropped MetricDescriptors, so the task
+            // never demanded ssim at all and every candidate reached the archive without the
+            // coordinate: the engine refused it there, able to say only that a coordinate was absent.
+            // With the promotion list intact the task refuses first, and it is the component that knows
+            // *why* - the run declared ssim as a feature dimension and the evaluator did not report it
+            // as a metric. Same dimension, same Data["descriptor"], same no-candidate run; the reason
+            // is now attributed to the cause. The engine-level diagnostic is still reachable for an
+            // evaluator that reports descriptors directly, and EvolutionCoreParityTests covers it.
+            Assert.Equal("descriptor_metric_missing", failures[0].GetProperty("Code").GetString());
             Assert.Equal("ssim", failures[0].GetProperty("Data").GetProperty("descriptor").GetString());
 
             // And on stderr, where a reader looks first.
