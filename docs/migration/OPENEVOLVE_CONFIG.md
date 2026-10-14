@@ -63,6 +63,13 @@ newlines are replaced so one artifact cannot forge further lines. An evaluator t
 something unparseable - a progress line before its JSON, a warning on stderr - attaches its output the
 same way, which is the case where the evaluator itself is the suspect and its output is the only evidence.
 
+**It is not a complete record of every failure**, and the distinction matters when you are reading it.
+Each note is delivered to the next proposal of its own lineage - that is what `prompt.includeArtifacts`
+asks for - and consumed there, so what survives to the end of a run is what no proposal read. The case
+this exists for, a run where nothing succeeds, reports every failure, because no proposal was ever made
+from a lineage that had one. A run that fails early and then recovers may report none: the notes went into
+the prompts, which is where they were most useful.
+
 ## An evaluator that imports a package: `--python-path`
 
 OpenEvolve runs your evaluator as a child of its own process, so the evaluator inherits whatever

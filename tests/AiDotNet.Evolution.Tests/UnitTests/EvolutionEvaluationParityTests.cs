@@ -379,6 +379,35 @@ public sealed class EvolutionEvaluationParityTests
     }
 
     [Fact]
+    public async Task ADeliveredFailureNoteIsNoLongerPendingSoTheQueueIsNotAFailureLog()
+    {
+        // The pending queue is what no proposal read, not a record of every failure - which is what the
+        // CLI's FailureOutput reports, so the boundary is worth pinning rather than discovering. A note
+        // consumed by the next proposal of its lineage is gone from the queue, and the run where nothing
+        // succeeds is the one where every note survives because no proposal was ever made from a lineage
+        // that had one.
+        var variation = new ArtifactRecordingVariation();
+        EvolutionEngineOptions options = Options(maxAttempts: 3, batchSize: 1);
+        options.Artifacts.Enabled = true;
+        EvolutionRunResult<TestGenome> delivered = await new EvolutionEngine<TestGenome>(
+            new FailingChildArtifactTask(), variation, _ => TestArchive(), options).RunAsync(Seeds(1));
+
+        // Two failures, one note delivered into a later proposal, so one is left rather than two.
+        Assert.Equal(2, delivered.Counters.StatusCounts[EvolutionEvaluationStatus.Failed]);
+        Assert.Contains("stderr=child 2 failed", variation.Received);
+        Assert.Single(delivered.PendingArtifacts);
+
+        EvolutionEngineOptions failingOptions = Options(maxAttempts: 1, batchSize: 1);
+        failingOptions.Artifacts.Enabled = true;
+        EvolutionRunResult<TestGenome> nothingSucceeded = await new EvolutionEngine<TestGenome>(
+            new AlwaysFailingArtifactTask(), new SequentialVariation(), _ => TestArchive(),
+            failingOptions).RunAsync(Seeds(1));
+
+        Assert.DoesNotContain(EvolutionEvaluationStatus.Completed, nothingSucceeded.Counters.StatusCounts.Keys);
+        Assert.NotEmpty(nothingSucceeded.PendingArtifacts);
+    }
+
+    [Fact]
     public async Task ArtifactsAreDisabledByDefaultAndStoreNoBytes()
     {
         var variation = new ArtifactRecordingVariation();

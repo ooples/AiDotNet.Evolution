@@ -501,6 +501,11 @@ internal static class RunCommand
             // generic message; the traceback that says which import or which line failed only ever
             // travels as an artifact, so without this a failing unmodified evaluator cannot be
             // diagnosed from the CLI at all. Empty unless search.collectArtifacts is on.
+            //
+            // It is not a complete record of every failure. The engine delivers each note to the next
+            // proposal of its lineage and consumes it there, so what survives to the end of the run is
+            // what no proposal read. A run where nothing succeeds reports every failure, because no
+            // proposal was ever made from a lineage that had one; a run that recovers may report none.
             FailureOutput = FailureOutputOf(result)
         }, Program.Json));
         if (best is not null)
