@@ -2,10 +2,10 @@
 
 Design, in one paragraph. Each seed is run twice against the same task, the same budget and the same
 engine seed, once with `llmFeedback` absent and once with it enabled at a stated weight. The arms
-differ in exactly that key. The endpoint is NOT the evaluator's score: the evaluator shows twelve
+differ in exactly that key. The endpoint is NOT the evaluator's score: the evaluator shows six
 visible examples and the endpoint is accuracy on held-out inputs it never sees, scored afterwards by
 feedback_ablation_task/score_heldout.py. That is deliberate. Both arms can reach a perfect visible
-score, either by recovering the rule or by memorising the twelve pairs, and only the held-out set
+score, either by recovering the rule or by memorising the six pairs, and only the held-out set
 tells those apart - which is the property #167's story asks feedback to supply ("suspicion of test
 gaming"). A driver that reported the evaluator's own score would be unable to measure the thing.
 
@@ -26,6 +26,7 @@ import argparse
 import json
 import pathlib
 import random
+import shutil
 import statistics
 import subprocess
 import sys
@@ -61,7 +62,7 @@ def run_file(output, seed, feedback_weight, evaluations, model, executable, budg
         "model": {"provider": "ClaudeCode", "name": model, "claudeExecutable": executable},
         # Both arms, identically. The evaluator returns the visible pairs and the candidate's answers as
         # artifacts; without them the proposer sees only a scalar and cannot induce the rule, and a dry
-        # run confirmed that - every proposal stayed at the seed's own 2 of 12 in both arms.
+        # run confirmed that - every proposal stayed at the seed's own 1 of 6 in both arms.
         "prompt": {"includeArtifacts": True},
         # retainArtifactText is what makes includeArtifacts mean anything: with it off the prompt carries
         # "artifact: [artifact content withheld]" and the proposer sees no examples. Measured by recording
@@ -84,8 +85,13 @@ def run_file(output, seed, feedback_weight, evaluations, model, executable, budg
 def evolve(cli, run_path, results_directory, timeout):
     """Runs one arm and returns the CLI's result JSON, or a reason it produced none."""
     started = time.time()
-    finished = subprocess.run(
-        [str(cli), "run", str(run_path)], capture_output=True, text=True, timeout=timeout, check=False)
+    try:
+        finished = subprocess.run(
+            [str(cli), "run", str(run_path)], capture_output=True, text=True, timeout=timeout, check=False)
+    except subprocess.TimeoutExpired:
+        # Returned, not raised: an escaping exception would lose every row collected so far, and a failed
+        # arm is supposed to keep its seed in the denominator rather than remove the whole campaign.
+        return None, time.time() - started, "exceeded the %d s run timeout" % timeout
     elapsed = time.time() - started
     if finished.returncode != 0:
         return None, elapsed, "exit %d: %s" % (finished.returncode, finished.stderr.strip()[-400:])
@@ -101,17 +107,33 @@ def best_program(results_directory):
     return candidates[0] if candidates else None
 
 
-def endpoint(program_path, python):
-    """Accuracy on the held-out inputs, scored in a separate process that the search never ran."""
+def endpoint(program_path, python, timeout=120):
+    """Accuracy on the held-out inputs, scored in a separate process that the search never ran.
+
+    The candidate is code a model wrote, run on inputs the search never tried, so it may loop forever or
+    print. Both are handled here rather than allowed to end the campaign: an unbounded call would hang the
+    driver, and stray output would make json.loads raise after every row had already been paid for.
+    """
     if program_path is None:
         return {"heldout_accuracy": 0.0, "compiled": False, "detail": "the run produced no best program"}
-    finished = subprocess.run(
-        [python, str(TASK / "score_heldout.py"), str(program_path)],
-        capture_output=True, text=True, check=False)
+    try:
+        finished = subprocess.run(
+            [python, str(TASK / "score_heldout.py"), str(program_path)],
+            capture_output=True, text=True, timeout=timeout, check=False)
+    except subprocess.TimeoutExpired:
+        return {"heldout_accuracy": 0.0, "compiled": True,
+                "detail": "the candidate did not finish the held-out inputs within %d s" % timeout}
     if finished.returncode != 0:
         return {"heldout_accuracy": 0.0, "compiled": False, "detail": "scorer exit %d: %s" % (
             finished.returncode, finished.stderr.strip()[-300:])}
-    return json.loads(finished.stdout)
+    lines = [line for line in finished.stdout.splitlines() if line.strip()]
+    try:
+        # The last line: the scorer prints exactly one JSON object last, and a candidate that printed
+        # during import or inside solve would otherwise make this unparsable.
+        return json.loads(lines[-1]) if lines else {}
+    except (json.JSONDecodeError, IndexError):
+        return {"heldout_accuracy": 0.0, "compiled": True,
+                "detail": "the scorer's output was not parsable: " + finished.stdout.strip()[:200]}
 
 
 def bootstrap_interval(differences, draws, rng):
@@ -158,11 +180,19 @@ def main(argv=None):
         for arm, weight in arms:
             results = work / ("s%d-%s" % (seed, arm))
             run_path = work / ("s%d-%s.run.json" % (seed, arm))
+            # Cleared, not reused: a re-run arm that fails before writing best.* would otherwise have the
+            # PREVIOUS invocation's winner scored as this arm's endpoint - a fabricated measurement that
+            # looks like a result. The run also refuses an existing checkpoint, so a stale directory is
+            # not reusable anyway.
+            if results.exists():
+                shutil.rmtree(results)
             run_path.write_text(json.dumps(run_file(
                 results, seed, weight, arguments.evaluations, arguments.model, arguments.claude,
                 arguments.max_budget_usd, arguments.time_limit, arm), indent=2), encoding="utf-8")
             result, elapsed, failure = evolve(arguments.cli, run_path, results, arguments.run_timeout)
-            scored = endpoint(best_program(results), arguments.python)
+            # A failed arm takes a zero endpoint by contract rather than by scoring whatever is on disk.
+            scored = ({"heldout_accuracy": 0.0, "detail": "the arm produced no result: " + failure}
+                      if failure is not None else endpoint(best_program(results), arguments.python))
             rows.append({
                 "seed": seed,
                 "arm": arm,
@@ -236,7 +266,7 @@ def report(rows, arguments):
             "paired by engine seed; the arms differ only in the run file's llmFeedback key "
             "(absent vs weight in %s). Endpoint is accuracy on held-out inputs the evaluator never sees, "
             "scored after the run by feedback_ablation_task/score_heldout.py, because both arms can "
-            "reach a perfect visible score either by recovering the rule or by memorising the twelve "
+            "reach a perfect visible score either by recovering the rule or by memorising the six "
             "visible pairs and only the held-out set separates those." % arguments.weights
         ),
         "interval": ("median of per-pair differences with a %d-draw seeded percentile bootstrap "

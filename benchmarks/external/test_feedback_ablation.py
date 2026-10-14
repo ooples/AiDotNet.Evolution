@@ -1,9 +1,11 @@
 """Contracts for the V1-54 (#167) feedback ablation driver. No model calls and no CLI."""
 import json
 import pathlib
+import subprocess
 import sys
 import types
 import unittest
+import unittest.mock
 
 sys.path.insert(0, str(pathlib.Path(__file__).parent))
 sys.path.insert(0, str(pathlib.Path(__file__).parent / "feedback_ablation_task"))
@@ -202,6 +204,64 @@ class ReportIsAKnownAnswer(unittest.TestCase):
         # No rows means no arms at all, rather than an arm reporting a fabricated interval.
         self.assertEqual({}, document["summary"]["arms"])
         self.assertEqual(0, document["summary"]["arms_that_produced_no_result"])
+class TheDriverSurvivesWhatACandidateCanDo(unittest.TestCase):
+    """A candidate is code a model wrote, run on inputs the search never tried."""
+
+    LOOPS = """
+def solve(x):
+    while True:
+        pass
+"""
+
+    CHATTY = """
+print("loading")
+
+def solve(x):
+    print("solving", x)
+    return ((x * x) ^ (x + 11)) % 89
+"""
+
+    def write(self, directory, name, text):
+        path = pathlib.Path(directory) / name
+        path.write_text(text, encoding="utf-8")
+        return path
+
+    def test_a_candidate_that_never_finishes_scores_zero_instead_of_hanging_the_campaign(self):
+        import tempfile
+        with tempfile.TemporaryDirectory() as directory:
+            scored = fa.endpoint(self.write(directory, "loops.py", self.LOOPS), sys.executable, timeout=5)
+
+        self.assertEqual(0.0, scored["heldout_accuracy"])
+        self.assertIn("did not finish", scored["detail"])
+
+    def test_a_candidate_that_prints_does_not_make_the_result_unparsable(self):
+        # The scorer prints one JSON object last; a candidate printing at import time or inside solve
+        # would otherwise make json.loads raise after every row had already been paid for.
+        import tempfile
+        with tempfile.TemporaryDirectory() as directory:
+            scored = fa.endpoint(self.write(directory, "chatty.py", self.CHATTY), sys.executable, timeout=60)
+
+        self.assertEqual(1.0, scored["heldout_accuracy"])
+
+    def test_a_missing_best_program_is_a_zero_endpoint_not_a_crash(self):
+        scored = fa.endpoint(None, sys.executable)
+        self.assertEqual(0.0, scored["heldout_accuracy"])
+        self.assertFalse(scored["compiled"])
+
+    def test_an_arm_that_times_out_returns_a_failure_rather_than_ending_the_campaign(self):
+        # An escaping TimeoutExpired would lose every row collected so far, which is the opposite of the
+        # contract that a failed arm keeps its seed in the denominator. The timeout is injected rather
+        # than provoked, because what is under test is our handling of it, not the platform.
+        def raise_timeout(*_args, **kwargs):
+            raise subprocess.TimeoutExpired(cmd="aidotnet-evolve", timeout=kwargs.get("timeout", 0))
+
+        with unittest.mock.patch.object(fa.subprocess, "run", raise_timeout):
+            result, elapsed, failure = fa.evolve("cli", "run.json", "results", timeout=7)
+
+        self.assertIsNone(result)
+        self.assertIn("exceeded the 7 s run timeout", failure)
+        self.assertGreaterEqual(elapsed, 0)
+
 
 
 if __name__ == "__main__":

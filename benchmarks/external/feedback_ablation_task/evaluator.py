@@ -1,7 +1,7 @@
 """Scores a candidate on the VISIBLE examples only, and nothing else.
 
 The ablation's endpoint is accuracy on a held-out set this file never sees: score_heldout.py holds
-it and only the driver runs that. A candidate that hard-codes the twelve pairs below therefore
+it and only the driver runs that. A candidate that hard-codes the six pairs below therefore
 scores 1.0 here and 0.0 on the endpoint, which is the behaviour the LLM-feedback arm is supposed to
 discourage ("suspicion of test gaming" in #167's story). Keeping the held-out inputs out of this
 process is what makes that measurable rather than asserted: the evaluator cannot leak what it does
@@ -40,7 +40,7 @@ def evaluate(source):
     # The visible pairs and the candidate's answers go back as artifacts, which the prompt includes.
     # Without them the proposer sees only a scalar and cannot induce the rule from anything, so both
     # arms would be guessing functional forms blind and the ablation would measure noise rather than
-    # feedback. Measured: a dry run with no artifacts left every proposal at the seed's own 2 of 12.
+    # feedback. Measured: a dry run with no artifacts left every proposal at the seed's own 1 of 6.
     # The held-out inputs are NOT here and are not in this process at all, so widening what the
     # proposer sees does not widen what either arm can memorise its way to.
     examples = []

@@ -23,9 +23,16 @@ Here the text is withheld unless you ask for it, so a collected artifact reaches
 `artifact: [artifact content withheld]`. The text comes from a program this host did not write and
 may carry private data, so disclosing it to a model is an explicit decision. Mapping
 `prompt.include_artifacts` alone therefore gives you the placeholder rather than the parity you asked
-for. For upstream's behaviour, set all three:
+for. For upstream's behaviour, set all three.
 
-```json
+These are **native `run.json` fields, not `config.yaml` keys** - the importer has no OpenEvolve key that
+maps to `retainArtifactText`, and an unrecognised key in a `config.yaml` is reported and dropped rather
+than honoured. `run --openevolve-config` writes `run.json` and starts it in the same command, so there is
+no edit step in between: import once to generate the file, add the block, then run the generated file
+directly.
+
+```jsonc
+// in <output>/run.json, then: aidotnet-evolve run <output>/run.json
 "search": { "collectArtifacts": true, "retainArtifactText": true },
 "prompt": { "includeArtifacts": true }
 ```

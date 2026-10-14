@@ -1,7 +1,7 @@
 """The ablation's primary endpoint: accuracy on inputs the evaluator never shows.
 
 Run by the driver, never by the search. The inputs deliberately extend past the visible range in
-both directions, so a candidate that memorised the twelve visible pairs - or fitted a polynomial
+both directions, so a candidate that memorised the six visible pairs - or fitted a polynomial
 only where it was shown points - scores here exactly as badly as it deserves.
 
 Usage: score_heldout.py <candidate.py>   ->   one JSON object on standard output.
