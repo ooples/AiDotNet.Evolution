@@ -194,6 +194,70 @@ def validate_outputs(task, problem_list, outputs):
     return True
 
 
+def oracle_mutant_suite(tasks=None, seeds=(0, 1, 2)):
+    """False accepts of seeded mutants of the FP64 oracle's own correct outputs (target 0).
+
+    V1-11 (#29) names "oracle false-accept on seeded mutants" as a metric with a target of zero, and
+    the existing tests check named wrong kernels rather than producing a count. This corrupts the
+    reference's OWN outputs, so it measures the oracle - ``validate_outputs`` - rather than any
+    candidate or the initial program.
+
+    Both magnitudes are seeded on purpose. Gross corruptions alone cannot show the tolerance is tight;
+    a perturbation just inside it must be ACCEPTED, or the suite would pass by refusing everything, and
+    one just outside it must be refused. Returns the counts and every false accept it found.
+    """
+    tasks = sorted(TASKS) if tasks is None else list(tasks)
+    rows, cols = SHAPES["verify"]
+    checked = 0
+    false_accepts = []
+    inside_tolerance_rejected = []
+    for task in tasks:
+        problem_list = problems(task, seeds, mode="verify")
+        correct = []
+        for problem in problem_list:
+            values = []
+            for offset in range(problem["repeats"]):
+                x, params = inputs(np, task, problem["seed"] + offset, rows, cols)
+                values.append(reference(task, x, params).tolist())
+            correct.append(dict(outputs=values, kernel_seconds=0.001))
+        if not validate_outputs(task, problem_list, correct):
+            raise RuntimeError("the oracle rejected its own reference outputs for " + task)
+
+        # Outside tolerance, measured by the oracle's OWN rule rather than by a fraction of the value.
+        # A relative nudge is not a mutant: softmax outputs are probabilities, so 1% of 0.0018 is 1.8e-5
+        # against a tolerance of atol + rtol*|v| = 2.0e-4, and the oracle accepts it correctly. Scaling
+        # the nudge to the tolerance is what makes every seeded mutant actually wrong.
+        for kind, multiple in (("just-outside-tolerance", 1.5), ("ten-times-tolerance", 10.0),
+                               ("sign-flip", None)):
+            for index in range(len(correct)):
+                mutated = [dict(outputs=[[list(row) for row in value] for value in entry["outputs"]],
+                                kernel_seconds=entry["kernel_seconds"]) for entry in correct]
+                target = mutated[index]["outputs"][0]
+                value = target[0][0]
+                if multiple is None:
+                    # A sign flip has to clear the tolerance too, which it does not for a value already
+                    # inside atol - so it is pushed out by the tolerance as well.
+                    target[0][0] = -value - math.copysign(ATOL + RTOL * abs(value), value or 1.0)
+                else:
+                    target[0][0] = value + multiple * (ATOL + RTOL * abs(value))
+                checked += 1
+                if validate_outputs(task, problem_list, mutated):
+                    false_accepts.append(dict(task=task, kind=kind, problem=index))
+
+        # Inside tolerance: must be accepted, which is what keeps the counts above from being produced
+        # by an oracle that refuses everything.
+        mutated = [dict(outputs=[[list(row) for row in value] for value in entry["outputs"]],
+                        kernel_seconds=entry["kernel_seconds"]) for entry in correct]
+        target = mutated[0]["outputs"][0]
+        target[0][0] = target[0][0] + 0.1 * ATOL
+        if not validate_outputs(task, problem_list, mutated):
+            inside_tolerance_rejected.append(tasks[0])
+
+    return dict(tasks=tasks, seeds=list(seeds), mutants=checked, false_accepts=len(false_accepts),
+                detail=false_accepts, inside_tolerance_rejected=inside_tolerance_rejected,
+                rtol=RTOL, atol=ATOL)
+
+
 def seal(directory):
     reserved = set(DEV_SEEDS) | set(VALIDATION_SEEDS)
     test = {}
