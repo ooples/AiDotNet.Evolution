@@ -43,7 +43,7 @@ def repository_root():
 
 
 def run_file(output, seed, feedback_weight, evaluations, model, executable, budget_usd, time_limit,
-             arm=None, criteria=None):
+             arm=None, criteria=None, blend=None):
     """The two arms differ in `llmFeedback` and nothing else; every other key is shared."""
     run = {
         "schema": "aidotnet-evolve-run-v1",
@@ -85,6 +85,12 @@ def run_file(output, seed, feedback_weight, evaluations, model, executable, budg
         # varying the weight alone cannot show what the mechanism is capable of.
         if criteria:
             run["llmFeedback"]["criteria"] = list(criteria)
+        # combinedBlend, not weight, is what decides whether a judged score can change an outcome:
+        # (1 - blend) * weight * judgeGap > blend * (1 - measuredOfTheHonestOne). At the 0.7 default the
+        # left side cannot reach the right for any weight, so an arm that does not vary this is measuring a
+        # mechanism that has been given no leverage.
+        if blend is not None:
+            run["llmFeedback"]["combinedBlend"] = blend
     return run
 
 
@@ -166,6 +172,8 @@ def main(argv=None):
     parser.add_argument("--weights", default="0.3", help="comma-separated llmFeedback.weight values; one arm each")
     parser.add_argument("--rubric", action="append", default=None, metavar="NAME=CRITERION;CRITERION",
                         help="a named rubric arm, repeatable; each runs at every weight")
+    parser.add_argument("--blend", type=float, default=None,
+                        help="llmFeedback.combinedBlend for every judged arm; omitted keeps the engine default")
     parser.add_argument("--model", default="sonnet")
     parser.add_argument("--claude", default="claude")
     parser.add_argument("--max-budget-usd", type=float, default=None)
@@ -206,7 +214,8 @@ def main(argv=None):
                 shutil.rmtree(results)
             run_path.write_text(json.dumps(run_file(
                 results, seed, weight, arguments.evaluations, arguments.model, arguments.claude,
-                arguments.max_budget_usd, arguments.time_limit, arm, criteria), indent=2), encoding="utf-8")
+                arguments.max_budget_usd, arguments.time_limit, arm, criteria, arguments.blend),
+                indent=2), encoding="utf-8")
             result, elapsed, failure = evolve(arguments.cli, run_path, results, arguments.run_timeout)
             # A failed arm takes a zero endpoint by contract rather than by scoring whatever is on disk.
             scored = ({"heldout_accuracy": 0.0, "detail": "the arm produced no result: " + failure}
@@ -293,7 +302,7 @@ def report(rows, arguments):
                      % (arguments.draws, arguments.bootstrap_seed, arguments.seeds)),
         "model": {"provider": "ClaudeCode", "name": arguments.model, "executable": arguments.claude},
         "budget": {"seeds": arguments.seeds, "evaluations_per_arm": arguments.evaluations,
-                   "weights": arguments.weights},
+                   "weights": arguments.weights, "combined_blend": arguments.blend},
         "summary": summary,
         "pairs": all_pairs,
         "rows": rows,
