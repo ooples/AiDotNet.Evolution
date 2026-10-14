@@ -826,6 +826,10 @@ internal static class RunCommand
             RequireList(openEvolveSection.FeatureDimensions, "openEvolveEvaluator.featureDimensions");
             RequireList(openEvolveSection.PythonPath, "openEvolveEvaluator.pythonPath");
         }
+        // metaPrompt is the one list this guard could not cover when it was written, because the
+        // section did not exist yet. Same hazard, same refusal.
+        if (run.MetaPrompt is { } metaPromptSection)
+            RequireList(metaPromptSection.Models, "metaPrompt.models");
         if (run.Budget is null) throw new InvalidDataException("budget is required.");
         if (run.Budget.MaxEvaluations < 1) throw new InvalidDataException("budget.maxEvaluations must be at least 1.");
         if (run.Budget.Parallelism < 1) throw new InvalidDataException("budget.parallelism must be at least 1.");
