@@ -80,6 +80,21 @@ class TheArmsDifferInExactlyOneKey(unittest.TestCase):
             # Without this the prompt carries "[artifact content withheld]" and includeArtifacts is inert.
             self.assertTrue(run["search"]["retainArtifactText"])
 
+    def test_a_rubric_arm_sets_the_judges_criteria_and_an_unnamed_run_keeps_the_shipped_rubric(self):
+        # The rubric was measured as the lever that matters most, so it has to be variable per arm - and the
+        # default must stay exactly what it was before the option existed, or every earlier row becomes
+        # incomparable.
+        common = dict(evaluations=6, model="sonnet", executable="claude", budget_usd=None, time_limit=60)
+        plain = fa.run_file("o", 0, 0.3, arm="on-w0.3", criteria=None, **common)
+        self.assertNotIn("criteria", plain["llmFeedback"])
+
+        named = fa.run_file("o", 0, 0.3, arm="on-w0.3-general",
+                            criteria=["Correctness", "Generality"], **common)
+        self.assertEqual(["Correctness", "Generality"], named["llmFeedback"]["criteria"])
+
+        # The control arm has no llmFeedback at all, whatever the rubric arms do.
+        self.assertNotIn("llmFeedback", fa.run_file("o", 0, None, arm="off", criteria=["X"], **common))
+
     def test_the_engine_seed_is_the_pairing_key(self):
         common = dict(evaluations=6, model="sonnet", executable="claude", budget_usd=None, time_limit=60)
         self.assertEqual(11, fa.run_file("o", 11, None, **common)["budget"]["seed"])

@@ -160,6 +160,49 @@ public sealed class JudgeAndMetricOptionBehaviourTests
         Assert.Contains("has not solved the task", AllText(plain), StringComparison.Ordinal);
     }
 
+    [Fact]
+    public void A_descriptive_criterion_is_refused_against_Criteria_not_MetricPrefix()
+    {
+        // A criterion doubles as a metric name, so a descriptive one overflows the 64-character bound. That
+        // is a real constraint, but the old message said only "bounded and canonical" and blamed
+        // MetricPrefix - which sends a reader to the one field they did not set. Cost a campaign run to
+        // diagnose, hence the test.
+        var options = new LlmFeedbackOptions();
+        options.Criteria.Clear();
+        options.Criteria.Add("Correctness");
+        options.Criteria.Add("Generality: does this compute the rule, or reproduce the answers it was shown? "
+            + "A program that stores the example answers has not solved the task");
+
+        ArgumentException error = Assert.Throws<ArgumentException>(() => options.Validate());
+
+        Assert.Equal(nameof(LlmFeedbackOptions.Criteria), error.ParamName);
+        Assert.Contains("characters", error.Message, StringComparison.Ordinal);
+        Assert.Contains("EvaluatorSystemMessage", error.Message, StringComparison.Ordinal);
+    }
+
+    [Fact]
+    public void An_over_long_metric_prefix_is_still_attributed_to_the_prefix()
+    {
+        // The inverted half: when the prefix is what overflows, it must still be named - otherwise the fix
+        // above would just move the blame rather than place it.
+        var options = new LlmFeedbackOptions { MetricPrefix = new string('p', 64) };
+
+        ArgumentException error = Assert.Throws<ArgumentException>(() => options.Validate());
+
+        Assert.Equal(nameof(LlmFeedbackOptions.MetricPrefix), error.ParamName);
+    }
+
+    [Fact]
+    public void A_short_criterion_token_is_accepted_so_the_bound_is_not_the_whole_story()
+    {
+        var options = new LlmFeedbackOptions();
+        options.Criteria.Clear();
+        options.Criteria.Add("Correctness");
+        options.Criteria.Add("Generality");
+
+        options.Validate();
+    }
+
     private static LlmJudgeProgramFitnessEvaluator Judge(LlmFeedbackOptions options, FakeChatClient? client = null) =>
         new(client ?? new FakeChatClient(Answer), Measured(), null, options);
 
