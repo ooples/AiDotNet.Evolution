@@ -660,6 +660,40 @@ public sealed class OpenEvolveImportTests
         Assert.Contains("collide", error, StringComparison.Ordinal);
     }
 
+    [Theory]
+    [InlineData(1.5)]
+    [InlineData(-0.1)]
+    public void An_out_of_range_judge_blend_is_refused_by_name(double blend)
+    {
+        // combinedBlend is the coefficient that decides whether the judge can change an outcome - weight is
+        // not - so it has to be reachable from a run file and validated there. Measured: with a judge gap of
+        // 0.29 the flip condition reaches only 0.087 at weight = 1 against 0.583, and needs combinedBlend
+        // below about 0.26. Asserted through the refusal because that is the deterministic signal: a run
+        // that completes cannot distinguish an honoured blend from an ignored one.
+        using var directory = new TemporaryDirectory();
+        File.WriteAllText(Path.Combine(directory.Path, "initial_program.py"), "X = 0\n");
+        File.WriteAllText(Path.Combine(directory.Path, "evaluator.py"),
+            "import json, sys\n" + "print(json.dumps({\"quality\": 0.5}))  # evaluate\n");
+        var run = new
+        {
+            schema = "aidotnet-evolve-run-v1",
+            runId = "judge-blend",
+            initialProgram = Path.Combine(directory.Path, "initial_program.py"),
+            evaluator = Path.Combine(directory.Path, "evaluator.py"),
+            output = Path.Combine(directory.Path, "out"),
+            model = new { provider = "OpenAiCompatible", endpoint = "http://127.0.0.1:1/v1", name = "fake-model" },
+            budget = new { maxEvaluations = 2, seed = 7, parallelism = 1 },
+            llmFeedback = new { weight = 0.3, combinedBlend = blend }
+        };
+        string runFile = Path.Combine(directory.Path, "run.json");
+        File.WriteAllText(runFile, JsonSerializer.Serialize(run));
+
+        var (code, _, error) = CliRunTests.Run("run", runFile);
+
+        Assert.NotEqual(0, code);
+        Assert.Contains("CombinedBlend", error, StringComparison.Ordinal);
+    }
+
     private static OpenEvolveImport Import(TemporaryDirectory directory, string yaml, string? python = null)
     {
         string config = Path.Combine(directory.Path, "config.yaml");
