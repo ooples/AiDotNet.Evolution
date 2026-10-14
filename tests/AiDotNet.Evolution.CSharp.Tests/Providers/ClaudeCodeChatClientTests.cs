@@ -134,4 +134,54 @@ public sealed class ClaudeCodeChatClientTests : IDisposable
         Assert.DoesNotContain(ClaudeCodeChatClient.JsonOnlyInstruction,
             args[Array.IndexOf(args, "--system-prompt") + 1], StringComparison.Ordinal);
     }
+
+    [Fact]
+    public async Task A_turn_limit_is_reported_as_itself_and_not_retried()
+    {
+        // Measured against the real CLI: a six-line prompt spent 484 thinking tokens, the CLI returned
+        // subtype error_max_turns with no result field at all, and the client's generic
+        // InvalidDataException put that through the transient-retry path - so a deterministic limit cost
+        // MaxRetries+1 calls, each billed the same, before failing anyway.
+        string script = Path.Combine(_directory, "turns_stub.py");
+        File.WriteAllText(script, """
+            import json, os, sys
+            counter = sys.argv[1]
+            calls = int(open(counter).read()) if os.path.exists(counter) else 0
+            open(counter, "w").write(str(calls + 1))
+            sys.stdin.read()
+            print(json.dumps({"type": "result", "subtype": "error_max_turns", "is_error": True}))
+            """);
+        string counter = Path.Combine(_directory, "turns.txt");
+        var client = new ClaudeCodeChatClient(new ClaudeCodeChatClientOptions
+        {
+            Executable = Python,
+            ExecutablePrefixArguments = { script, counter },
+            Model = "sonnet",
+            MaxTurns = 3,
+            MaxRetries = 4,
+            RetryDelay = TimeSpan.Zero,
+            Timeout = TimeSpan.FromSeconds(60)
+        });
+
+        InvalidOperationException error = await Assert.ThrowsAsync<InvalidOperationException>(
+            () => client.GetResponseAsync(new[] { ProgramChatMessage.User("solve it") }));
+
+        Assert.Contains("--max-turns limit of 3", error.Message, StringComparison.Ordinal);
+        Assert.Contains("MaxTurns", error.Message, StringComparison.Ordinal);
+        // The point of the change: one call, not five.
+        Assert.Equal("1", File.ReadAllText(counter));
+    }
+
+    [Fact]
+    public async Task The_turn_limit_is_configurable_and_passed_to_the_cli()
+    {
+        await Client(isolate: true).GetResponseAsync(new[] { ProgramChatMessage.User("hello") });
+        string[] args = Record().GetProperty("args").EnumerateArray().Select(a => a.GetString() ?? "").ToArray();
+
+        // Default is above one, because a model spending a turn on reasoning is ordinary rather than an error.
+        Assert.Equal("4", args[Array.IndexOf(args, "--max-turns") + 1]);
+        Assert.Equal(4, new ClaudeCodeChatClientOptions().MaxTurns);
+        Assert.Throws<ArgumentOutOfRangeException>(() =>
+            new ClaudeCodeChatClient(new ClaudeCodeChatClientOptions { Model = "sonnet", MaxTurns = 0 }));
+    }
 }

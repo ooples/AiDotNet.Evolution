@@ -13,6 +13,27 @@ The arguments mirror `openevolve-run.py`. The command translates the config into
 can later continue with `aidotnet-evolve resume <output>/run.json`. The default output directory is
 `openevolve_output`.
 
+## Artifact text is withheld by default
+
+OpenEvolve's artifacts exist to be read by the model: upstream puts an artifact's text into the next
+prompt, which is how an evaluator explains a rejection - "frame 7 failed the SSIM gate" - instead of
+only lowering a number. `examples/circle_packing_with_artifacts` is named for the feature.
+
+Here the text is withheld unless you ask for it, so a collected artifact reaches the prompt as
+`artifact: [artifact content withheld]`. The text comes from a program this host did not write and
+may carry private data, so disclosing it to a model is an explicit decision. Mapping
+`prompt.include_artifacts` alone therefore gives you the placeholder rather than the parity you asked
+for. For upstream's behaviour, set all three:
+
+```json
+"search": { "collectArtifacts": true, "retainArtifactText": true },
+"prompt": { "includeArtifacts": true }
+```
+
+Measured rather than inferred, by recording the prompt the model actually received: with
+`retainArtifactText` off, an evaluator that reported its own failing examples changed nothing about
+the next proposal and every candidate stayed at the seed's own score.
+
 ## An evaluator that imports a package: `--python-path`
 
 OpenEvolve runs your evaluator as a child of its own process, so the evaluator inherits whatever
@@ -38,6 +59,7 @@ needs no option.
 
 This is not an OpenEvolve config key; it has no upstream equivalent, because upstream has no
 environment boundary to declare across.
+
 
 ## How the config is read
 
@@ -133,7 +155,7 @@ is refused rather than mixed into an ongoing run.
 | `prompt.template_variations` | Mapped | prompt.templateVariations |
 | `prompt.use_meta_prompting` | RefusedUnlessDefault | meta-prompting is not implemented in the CLI |
 | `prompt.meta_prompt_weight` | RefusedUnlessDefault | meta-prompting is not implemented in the CLI |
-| `prompt.include_artifacts` | Mapped | prompt.includeArtifacts and search.includeArtifacts |
+| `prompt.include_artifacts` | Mapped | prompt.includeArtifacts and search.includeArtifacts. **Also set `search.retainArtifactText: true`**, or the prompt carries `artifact: [artifact content withheld]` instead of the text - see *Artifact text is withheld by default* |
 | `prompt.max_artifact_bytes` | Mapped | prompt.maxArtifactBytes and search.maxArtifactBytes |
 | `prompt.artifact_security_filter` | Mapped | prompt.artifactSecurityFilter |
 | `prompt.suggest_simplification_after_chars` | Mapped | prompt.suggestSimplificationAfterChars |
@@ -177,7 +199,7 @@ is refused rather than mixed into an ongoing run.
 | `evaluator.distributed` | RefusedUnlessDefault | distributed evaluation is not configured through this importer |
 | `evaluator.use_llm_feedback` | Mapped | llmFeedback: a judge model's score blended into each fitness |
 | `evaluator.llm_feedback_weight` | Mapped | llmFeedback.weight |
-| `evaluator.enable_artifacts` | Mapped | artifacts are collected when true and ignored when false |
+| `evaluator.enable_artifacts` | Mapped | artifacts are collected when true and ignored when false. Collecting is not disclosing: see *Artifact text is withheld by default* |
 | `evaluator.max_artifact_storage` | NoEffect | artifact storage housekeeping only |
 | `evolution_trace.enabled` | NoEffect | ours always writes trace-NNN.jsonl under --output |
 | `evolution_trace.format` | NoEffect | ours always writes JSON lines |
