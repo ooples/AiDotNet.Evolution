@@ -1,6 +1,6 @@
 # V1-70 (#175): engine overhead, AiDotNet.Evolution vs pinned OpenEvolve (null evaluators)
 
-> **Partly superseded** by [../65ced88/README.md](../65ced88/README.md): the aidotnet column was re-measured at `main` `65ced88`, where the 16-worker peak working set target is met. The OpenEvolve column and the paired ratio intervals here are still the measured ones.
+> **Superseded** by [../65ced88/README.md](../65ced88/README.md): a full paired head-to-head at `main` `65ced88`, where all three targets are met, including the 16-worker peak working set this run left open.
 
 Supersedes `../46e1141/`. **Not a headline claim (R12):** a C# controller against a Python one is expected to win on overhead.
 
@@ -37,7 +37,7 @@ Per-repeat spread of our cost: 56-70 us at every worker count.
 | --- | --- | --- | --- |
 | our overhead per evaluation, 1-16 workers (N >= 8,000) | <= 100 us | 59.9-65.3 us | met |
 | ours / OpenEvolve, 95% CI upper bound, every worker count | <= 0.05 | <= 0.0082 | met |
-| our peak working set, 16 workers | <= 64 MB | 82.9 MB at `5699058`; 68.9 MB with the fix below; 64.1 MB with #197 as well | not yet met here (**superseded**: met at `65ced88`, 61.23 MB - see [../65ced88/](../65ced88/README.md)) |
+| our peak working set, 16 workers | <= 64 MB | 82.9 MB at `5699058`; 68.9 MB with the fix below; 64.1 MB with #197 as well | not met here (**superseded**: 61.21 MB at `65ced88` - see [../65ced88/](../65ced88/README.md)) |
 
 ## Peak memory
 

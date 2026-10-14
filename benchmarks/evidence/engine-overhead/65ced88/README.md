@@ -1,91 +1,85 @@
-# V1-70 (#175): engine overhead and peak working set at `65ced88`
+# V1-70 (#175): engine overhead, paired head-to-head at `65ced88`
 
-Supersedes the **aidotnet column** of [`../5699058/`](../5699058/README.md), which left one target open:
-peak working set at 16 workers was 64.1 MB against a 64 MB target, and that figure was taken with #197
-applied locally rather than merged. #197 (`9e27171`) and #200 (`65ef0d2`) are both on `main` now, so this
-is the figure the target asked for. **Not a headline claim (R12):** a C# controller against a Python one is
-expected to win on overhead. Raw rows: `head-to-head.json`.
+Supersedes [`../5699058/`](../5699058/README.md), which left one target open (peak working set at 16
+workers, 64.1 MB against a 64 MB target, measured with #197 applied locally rather than merged) and
+#197 (`9e27171`) and #200 (`65ef0d2`) are both on `main` now. **Not a headline claim (R12):** a C#
+controller against a Python one is expected to win on overhead. Raw rows: `head-to-head.json`.
 
-Measured at `main` `65ced88` on the same workstation as `5699058`: AMD Ryzen 9 3950X (16 cores / 32
-threads), 64 GB RAM, Windows 11 Pro 10.0.26220, .NET SDK 10.0.402, Release.
+Produced by the committed driver,
+[`benchmarks/external/run_overhead_head_to_head.py`](../../../external/run_overhead_head_to_head.py),
+which measures **both** systems - the previous attempt at this rerun measured only ours and carried
+the OpenEvolve column forward, which review rightly refused as a basis for restating a paired bound.
+
+Machine: AMD Ryzen 9 3950X (16 cores / 32 threads), 64 GB RAM, Windows 11 Pro 10.0.26220, .NET SDK
+10.0.402 Release; OpenEvolve 0.3.2 (`411fb59`) on Python 3.13 in a venv carrying its `pyproject`
+dependencies plus `psutil`.
 
 ## Method
 
-Unchanged from `5699058` for our side: a null variation and a null evaluator in-process, one run per fresh
-process, `islands=1`, steady-state cost per evaluation `(T(2N) - T(N))` divided by the **completed**
-evaluations the two runs differ by, which cancels startup. `N = 8,000`. Nine repeats per worker count; the
-per-worker figure is the median of the nine per-repeat values and the interval is a 10,000-draw percentile
-bootstrap of that median (seed 20261014).
+`--repeats 9 --workers 1,2,4,8,16 --ours-n 8000 --openevolve-n 300`. Steady-state cost per evaluation
+is `(T(2N) - T(N))` divided by the evaluations the two runs **actually completed**, which cancels
+startup; the driver refuses a cell whose completed difference falls below `n/2`. Each repeat runs the
+two systems back to back, so the ratio is the median of per-repeat **paired** ratios with a 4,000-draw
+percentile bootstrap interval (seed 7). A non-positive difference or a hang is re-measured, never
+averaged in.
 
-Allocation is reported two ways, because the difference that cancels startup for timing cancels it for
-allocation too: the table's column is the whole-run figure `AllocatedBytes / Evaluations` of the 16,000
-run (16,834 B/eval), and `head-to-head.json` also carries the steady-state figure from the same
-difference as the timing (16,810 B/eval). They agree to 0.15%, so nothing here turns on the choice.
-
-**No resample yielded a non-positive difference** at any worker count (`nonpositive_differences: 0` in every
-summary row), which is the condition the first acceptance criterion names.
+**The machine was quiet, and that is recorded rather than assumed.** The run is wrapped in a guard
+that requires three consecutive readings of peak total CPU under 20% before starting: 6.5%, 11.6% and
+6.1% before, 16.5% at the finish. An earlier attempt at this same measurement was discarded because
+another session was building a solution with ~25 MSBuild workers throughout it.
 
 ## Results
 
-| workers | ours us/eval [95% CI] | ours peak MB (median) [min-max] | ours alloc B/eval (whole run) |
-| --- | --- | --- | --- |
-| 1 | 45.9 [41.7, 48.9] | 61.40 [61.14-61.57] | 16,834 |
-| 2 | 47.2 [45.9, 49.2] | 61.34 [61.16-61.53] | 16,834 |
-| 4 | 46.2 [44.8, 50.6] | 61.34 [60.96-62.22] | 16,834 |
-| 8 | 47.1 [45.5, 51.9] | 61.32 [61.02-61.37] | 16,834 |
-| 16 | 44.8 [35.8, 46.6] | 61.23 [61.06-61.73] | 16,834 |
+| workers | ours us/eval | OpenEvolve us/eval | ours / theirs [95% CI] | ours peak MB | OpenEvolve peak MB |
+| --- | --- | --- | --- | --- | --- |
+| 1 | 46.4 | 28,346 | 0.0016 [0.0015, 0.0024] | 61.48 | 142.5 |
+| 2 | 47.7 | 18,660 | 0.0026 [0.0025, 0.0028] | 61.39 | 208.8 |
+| 4 | 49.4 | 12,554 | 0.0039 [0.0030, 0.0047] | 61.39 | 340.1 |
+| 8 | 48.7 | 12,493 | 0.0039 [0.0023, 0.0061] | 61.39 | 601.2 |
+| 16 | 47.4 | 11,369 | 0.0042 [0.0037, 0.0046] | 61.21 | 1,121.3 |
 
-Peak working set is now flat in the worker count and **below the target at every count**, not only at 16:
-61.2-61.4 MB against 82.7-82.9 MB at `5699058`. Per-evaluation cost fell from 59.9-65.3 us to 44.8-47.2 us.
+No resample produced a non-positive `T(2N) - T(N)` in any of the 90 rows.
+
+**Per-repeat spread, stated rather than smoothed:** ours ranges 42.5-95.0 us at 1 worker and
+18.0-79.3 us at 8, against medians of 46.4 and 48.7; theirs ranges 7,493-48,179 us at 1 worker. The
+medians are what the targets are judged on, and the paired bootstrap is what the interval is built
+from, precisely because single repeats on a desktop swing this far.
+
+**One hang.** OpenEvolve deadlocked once (`n=600`, 16 workers, repeat 4); the driver killed it at
+180 s, recorded it under `hangs` and re-measured the cell. Its memory also grows with the pool:
+142 MB at one worker to 1.12 GB at sixteen, against our flat 61 MB.
 
 ## Targets
 
 | metric | target | measured | status |
 | --- | --- | --- | --- |
-| our overhead per evaluation, 1-16 workers (N >= 8,000) | <= 100 us | 44.8-47.2 us | **met** |
-| ours / OpenEvolve, 95% CI upper bound, every worker count | <= 0.05 | <= 0.0082, measured at `5699058` | **met at `5699058`**, not re-measured here |
-| our peak working set, 16 workers | <= 64 MB | **61.23 MB** (median of 9; worst repeat 61.73 MB) | **met** |
+| our overhead per evaluation, 1-16 workers (N >= 8,000) | <= 100 us | 46.4-49.4 us | **met** |
+| ours / OpenEvolve, 95% CI upper bound, every worker count | <= 0.05 | <= **0.0061** (worst, 8 workers) | **met, paired and measured** |
+| our peak working set, 16 workers | <= 64 MB | **61.21 MB** | **met** |
+
+Peak working set is flat across worker counts (61.21-61.48 MB), so the memory target is met at every
+count rather than only at the one the metric names.
 
 ## What this run is not
 
-- **OpenEvolve was not re-run.** Its medians and peaks in `head-to-head.json` are carried from `5699058`
-  (OpenEvolve 0.3.2 `411fb59`, Python 3.13). The ratio target was already met there with a paired bootstrap
-  interval; a ratio against a carried denominator is not a paired measurement, so `head-to-head.json` records
-  it as `ratio_ours_over_theirs_carried_denominator` and does not restate the prior interval as if it were
-  re-measured. Our median fell, so the bound is **expected** to hold, but that is an expectation and not a
-  result: the 0.0082 interval came from paired per-repeat ratios, and a numerator from a different run set
-  cannot establish where a new paired interval's upper bound would sit. Our per-repeat spread is also wider
-  here in relative terms (30.1-51.3 us at 16 workers against 56-70 us before), which is the reason not to
-  treat the old bound as carried forward.
-- **One workstation, not a fleet.** The same machine as `5699058`, which is what makes the two comparable;
-  both are Windows, and the figures are machine-dependent.
-- **Nine repeats, one N.** `N = 8,000` with the `2N = 16,000` run supplying the peak, matching the earlier
-  protocol so the columns can be compared cell by cell.
+- **One workstation.** The same machine as `5699058`, which is what makes the two comparable; both
+  are Windows, and the figures are machine-dependent.
+- **Nine repeats at one N** (8,000 ours, 300 theirs, with the `2N` run supplying the peak), matching
+  the earlier protocol so the columns compare cell by cell.
+- **Not a quality claim.** Both systems run a null LLM and a null evaluator; this measures
+  orchestration cost, nothing about the programs either one would find.
 
 ## Reproducing
 
-The committed driver for the full head-to-head is
-[`benchmarks/external/run_overhead_head_to_head.py`](../../../external/run_overhead_head_to_head.py); it needs
-`--upstream <pinned OpenEvolve checkout>` because it measures both systems and bootstraps the paired ratio.
-This run did **not** use it: the pinned checkout on this machine could not import OpenEvolve
-(`ModuleNotFoundError: dacite`), and installing upstream's dependency set is a separate step. So our side was
-measured with the loop below, which is the same per-run command the driver issues for `aidotnet`, and the
-OpenEvolve column stayed carried. Re-running the driver once the checkout's dependencies are installed is
-what would replace the carried column with a paired measurement.
-
 ```powershell
 dotnet build benchmarks/EvolutionOverhead/EvolutionOverhead.csproj -c Release -f net10.0
-$dll = "benchmarks\EvolutionOverhead\bin\Release\net10.0\EvolutionOverhead.dll"
-foreach ($w in 1,2,4,8,16) { foreach ($r in 0..8) { foreach ($n in 8000,16000) {
-  $j = dotnet $dll $n $w 1
-  if ($LASTEXITCODE -ne 0) { throw "run failed: workers=$w repeat=$r n=$n" }
-  ($j | ConvertFrom-Json) | ConvertTo-Json -Compress | Add-Content rows.jsonl
-} } }
+python -m venv oe-venv
+./oe-venv/Scripts/python.exe -m pip install openai pyyaml numpy tqdm flask dacite psutil
+./oe-venv/Scripts/python.exe benchmarks/external/run_overhead_head_to_head.py `
+  --upstream <pinned openevolve checkout at 411fb59> --output head-to-head.json `
+  --repeats 9 --workers 1,2,4,8,16 --ours-n 8000 --openevolve-n 300
 ```
 
-Each run prints one JSON object with `Evaluations` (completed, not requested), `Seconds`,
-`PeakWorkingSetBytes` and `AllocatedBytes`, and exits non-zero if the completed count falls short of the
-budget, which is what `evaluations_verified` in `head-to-head.json` records. The per-worker medians,
-the min-max ranges and the 10,000-draw percentile bootstrap of the timing median (seed 20261014) are then
-computed over the nine `(small, large)` pairs per worker count; `rows` in `head-to-head.json` carries every
-pair, so any reported figure can be recomputed from it without re-running anything.
+The venv matters: a bare checkout fails at `import dacite` in `openevolve/config.py` before any
+timing happens. Run it on a quiet machine, and check `machine_was_quiet` in the JSON before trusting
+a timing column.
