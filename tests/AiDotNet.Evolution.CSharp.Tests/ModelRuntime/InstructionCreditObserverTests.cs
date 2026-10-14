@@ -17,12 +17,12 @@ public sealed class InstructionCreditObserverTests
     private static ProgramMetaPromptOptions Options(
         int proposeEvery = 1,
         EvolutionOptimizationDirection direction = EvolutionOptimizationDirection.Maximize) => new()
-    {
-        Enabled = true,
-        ProposeEveryGenerations = proposeEvery,
-        MaxArchiveSize = 4,
-        Direction = direction
-    };
+        {
+            Enabled = true,
+            ProposeEveryGenerations = proposeEvery,
+            MaxArchiveSize = 4,
+            Direction = direction
+        };
 
     private static ProgramMetaPromptEvolver Evolver(string answer = "Instruction A: a reply long enough to be accepted.")
         => new(new FakeChatClient(answer), SeedInstruction, Options());
