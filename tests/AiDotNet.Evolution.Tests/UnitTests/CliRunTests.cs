@@ -96,6 +96,35 @@ public sealed class CliRunTests
             Assert.NotEqual(JsonValueKind.Null, summary.RootElement.GetProperty("Best").ValueKind);
     }
 
+    [Theory]
+    // The hint is worth having only where it is actionable: a run that produced nothing and has no output
+    // to show. With the flags already on, the traceback is in the report and repeating the advice is noise.
+    [InlineData(false, true)]
+    [InlineData(true, false)]
+    public void The_hint_about_turning_artifacts_on_appears_only_when_there_is_no_output(
+        bool artifactsOn, bool expectHint)
+    {
+        using var directory = new TemporaryDirectory();
+        using var model = new FakeChatModel();
+        File.WriteAllText(Path.Combine(directory.Path, "initial.py"), "X = 0");
+        File.WriteAllText(Path.Combine(directory.Path, "evaluator.py"), """
+            import openevolve_missing_module
+
+
+            def evaluate(path):
+                return {"combined_score": 1.0}
+            """);
+        string flags = artifactsOn
+            ? """, "search": { "collectArtifacts": true, "retainArtifactText": true }"""
+            : """, "search": { "collectArtifacts": false }""";
+        string runFile = WriteRun(directory.Path, model.Endpoint, maxEvaluations: 1, extra: flags);
+
+        var (_, _, error) = Run("run", runFile);
+
+        Assert.Contains("produced no candidate", error, StringComparison.Ordinal);
+        Assert.Equal(expectHint, error.Contains("hint: set search.collectArtifacts", StringComparison.Ordinal));
+    }
+
     [Fact]
     public void The_openevolve_shim_hands_the_evaluator_a_path_a_python_literal_can_hold()
     {
@@ -121,6 +150,36 @@ public sealed class CliRunTests
         using JsonDocument report = JsonDocument.Parse(output);
         Assert.Equal("Completed", report.RootElement.GetProperty("SeedStatus").GetString());
         Assert.Equal(1d, report.RootElement.GetProperty("SeedQuality").GetDouble());
+    }
+
+    [Fact]
+    public void A_run_whose_evaluator_fails_reports_what_the_evaluator_printed()
+    {
+        // The retained diagnostic for a failed script carries a code and a generic message. Which import or
+        // which line failed only ever travels as an artifact, so a caller debugging an unmodified evaluator
+        // needs the printed output in the report itself.
+        using var directory = new TemporaryDirectory();
+        using var model = new FakeChatModel();
+        File.WriteAllText(Path.Combine(directory.Path, "initial.py"), "X = 0");
+        File.WriteAllText(Path.Combine(directory.Path, "evaluator.py"), """
+            import openevolve_missing_module
+
+
+            def evaluate(path):
+                return {'combined_score': 1.0}
+            """);
+        string runFile = WriteRun(directory.Path, model.Endpoint, maxEvaluations: 2,
+            extra: """, "search": { "collectArtifacts": true, "retainArtifactText": true }""");
+
+        var (code, output, error) = Run("run", runFile);
+        Assert.Equal(0, code); // the run did not fail; it produced no candidate, and says so on stderr
+        Assert.Contains("produced no candidate", error, StringComparison.Ordinal);
+        using JsonDocument report = JsonDocument.Parse(output);
+        JsonElement printed = report.RootElement.GetProperty("FailureOutput");
+        Assert.NotEqual(0, printed.GetArrayLength());
+        Assert.Contains(printed.EnumerateArray(), row =>
+            row.GetProperty("Key").GetString() == "stderr" &&
+            (row.GetProperty("Text").GetString() ?? string.Empty).Contains("openevolve_missing_module", StringComparison.Ordinal));
     }
 
     [Fact]

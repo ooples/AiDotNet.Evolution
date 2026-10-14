@@ -176,35 +176,28 @@ public sealed class ScriptProgramFitnessEvaluator : IProgramFitnessEvaluator, IE
             };
             if (!_options.RetainArtifactText)
                 return Failed(code, "The evaluator script did not complete; untrusted failure text was withheld.");
-            // Opted in: keep what the script printed before it failed or timed out (OpenEvolve's timeout artifacts), bounded
-            // and sanitized here, then bounded again by the engine's artifact options.
-            EvolutionTaskResult failed = Failed(code, "The evaluator script did not complete; its captured output is attached as artifacts.");
-            var output = new List<EvolutionArtifact>(2);
-            foreach ((string key, string? text) in new[] { ("stdout", response.StdOut), ("stderr", response.StdErr) })
-                if (!string.IsNullOrEmpty(text) && output.Count < _options.MaxArtifactCount)
-                    output.Add(new EvolutionArtifact(key, ProgramText.Sanitize(ProgramText.Bound(text, _options.MaxArtifactLength))));
-            return new EvolutionTaskResult(EvolutionEvaluationStatus.Failed, costUnits: failed.CostUnits,
-                diagnostics: failed.Diagnostics, artifacts: output);
+            return FailedWithOutput(code, "The evaluator script did not complete; its captured output is attached as artifacts.", response);
         }
 
         if (response.ExitCode != 0 || response.ErrorCode is not null and not ProgramExecuteErrorCode.None ||
             response.Language != _options.EvaluatorScriptLanguage || response.CompilationAttempted || response.StdOut is null)
-            return Failed("invalid_response", "The runner returned inconsistent execution evidence.");
+            return FailedWithOutput("invalid_response", "The runner returned inconsistent execution evidence.", response);
 
         if (response.StdOutTruncated)
         {
-            return Failed(
+            return FailedWithOutput(
                 "metrics_truncated",
-                "The evaluator script printed more than the sandbox output cap, so its metrics are incomplete.");
+                "The evaluator script printed more than the sandbox output cap, so its metrics are incomplete.",
+                response);
         }
 
         if (response.StdOut.Length > _options.MaxResponseChars)
-            return Failed("metrics_truncated", "The evaluator response exceeds its configured parsing bound.");
+            return FailedWithOutput("metrics_truncated", "The evaluator response exceeds its configured parsing bound.", response);
 
-        try { return Parse(response.StdOut); }
+        try { return WithPrintedOutput(Parse(response.StdOut), response); }
         catch (Exception exception) when (exception is ArgumentException or InvalidOperationException or OverflowException or FormatException)
         {
-            return Failed("invalid_metrics", "The reported metrics violate the configured scoring contract.");
+            return FailedWithOutput("invalid_metrics", "The reported metrics violate the configured scoring contract.", response);
         }
     }
 
@@ -493,6 +486,34 @@ public sealed class ScriptProgramFitnessEvaluator : IProgramFitnessEvaluator, IE
         EvolutionEvaluationStatus.Canceled,
         costUnits: dispatched,
         diagnostics: new[] { new EvolutionDiagnostic("program_script_canceled", "Evaluation was canceled.") });
+
+    /// <summary>
+    /// A failure that carries what the script printed. Every diagnostic this evaluator produces is redacted - the
+    /// text is producer-supplied - so the code alone reaches the caller, and the code cannot say which import or
+    /// which line failed. The output is bounded and sanitized here and bounded again by the engine's artifact
+    /// options; it is withheld entirely unless <see cref="ScriptProgramEvaluationOptions.RetainArtifactText"/> is set,
+    /// because it is untrusted text.
+    /// </summary>
+    private EvolutionTaskResult FailedWithOutput(string code, string detail, ProgramExecuteResponse response) =>
+        WithPrintedOutput(Failed(code, detail), response);
+
+    /// <summary>
+    /// Attaches the script's printed output to a failure that carries none. Parsing reports its own failures from
+    /// deep inside the metric contract and cannot see the response, so the attachment happens here rather than at
+    /// each of the fifteen places that produce one.
+    /// </summary>
+    private EvolutionTaskResult WithPrintedOutput(EvolutionTaskResult result, ProgramExecuteResponse response)
+    {
+        if (result.Status != EvolutionEvaluationStatus.Failed || result.Artifacts.Count > 0) return result;
+        if (!_options.RetainArtifactText) return result;
+        var output = new List<EvolutionArtifact>(2);
+        foreach ((string key, string? text) in new[] { ("stdout", response.StdOut), ("stderr", response.StdErr) })
+            if (!string.IsNullOrEmpty(text) && output.Count < _options.MaxArtifactCount)
+                output.Add(new EvolutionArtifact(key, ProgramText.Sanitize(ProgramText.Bound(text, _options.MaxArtifactLength))));
+        if (output.Count == 0) return result;
+        return new EvolutionTaskResult(EvolutionEvaluationStatus.Failed, costUnits: result.CostUnits,
+            diagnostics: result.Diagnostics, artifacts: output);
+    }
 
     private static EvolutionTaskResult Failed(string code, string detail) => new(
         EvolutionEvaluationStatus.Failed,

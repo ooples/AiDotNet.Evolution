@@ -588,7 +588,18 @@ internal static class RunCommand
                     // descriptor's own name - and the message alone is deliberately generic.
                     Data = diagnostic.IsRedacted ? null : diagnostic.Data,
                 })
-                .ToArray()
+                .ToArray(),
+            // What the evaluator printed before it failed. A retained diagnostic carries a code and a
+            // generic message; the traceback that says which import or which line failed only ever
+            // travels as an artifact, so without this a failing unmodified evaluator cannot be
+            // diagnosed from the CLI at all. Empty unless search.collectArtifacts is on.
+            //
+            // It is not a complete record of every failure: at most MaxReportedFailureOutputs entries, one
+            // per genome identity, and the engine consumes each note when it reaches the next proposal of
+            // its lineage - so what survives to the end of a run is what no proposal read. A run where
+            // nothing succeeds keeps its notes, because no proposal is ever made from a lineage that has
+            // one; a run that recovers may report none.
+            FailureOutput = FailureOutputOf(result)
         }, Program.Json));
         if (best is not null)
         {
@@ -605,6 +616,24 @@ internal static class RunCommand
                 : " (" + string.Join(", ", first.Data.Select(pair => ForStderr(pair.Key) + "=" + ForStderr(pair.Value))) + ")";
             error.WriteLine("error: the run produced no candidate. First retained failure ["
                 + ForStderr(first.Code) + "]: " + (first.IsRedacted ? "<redacted>" : ForStderr(first.Message)) + detail);
+            // A run that produced nothing is where FailureOutput earns its place, so the one thing worth
+            // saying here is how to make it carry something. Only when it is empty: with the flags already
+            // on, the output is in the report above and repeating the advice would be noise.
+            if (FailureOutputOf(result).Length == 0)
+            {
+                // Advice only where it applies. With capture already on, telling the caller to switch on
+                // what they switched on is worse than silence: it implies they misconfigured the run when
+                // the evaluator simply printed nothing.
+                bool captureOn = run.Search.CollectArtifacts && run.Search.RetainArtifactText;
+                error.WriteLine(captureOn
+                    ? "hint: capture is on and the evaluator printed nothing before it failed, so there is "
+                      + "no output to show. Run it by hand with the interpreter you passed to --python."
+                    : "hint: set search.collectArtifacts and search.retainArtifactText in the run file to "
+                      + "have FailureOutput carry what the evaluator printed.");
+                error.WriteLine("hint: the evaluator runs with a cleared environment, so PYTHONPATH is not "
+                    + "forwarded: a package it imports must be installed into the interpreter passed to "
+                    + "--python, or named in openEvolveEvaluator.pythonPath.");
+            }
         }
 
         ProgramEvolutionLlmUsage usage = variation.GetUsage();
@@ -918,9 +947,60 @@ internal static class RunCommand
         throw new InvalidDataException(outputDirectory + " already holds 1000 trace sessions.");
     }
 
+    // One failing evaluator can print a long traceback per attempt, and the whole report is one JSON object a
+    // caller parses. Bounded so a run with many failures reports a few in full rather than megabytes, and the
+    // queue is ordered before the bound so which few is reproducible.
+    private const int MaxReportedFailureOutputs = 8;
     private const int MaxStderrValueLength = 256;
 
     // One bounded line for stderr: control characters become spaces and the text is capped.
+    /// <summary>
+    /// The evaluator output still queued when the run ended, reported only for a run that had a failure-like
+    /// evaluation. The engine queues each note for the next proposal of its lineage and consumes it there, so what
+    /// remains is what no proposal ever read - which for a run whose candidates failed is every failure's output.
+    /// </summary>
+    private static object[] FailureOutputOf(EvolutionRunResult<ProgramGenome> result)
+    {
+        if (!HadFailureLikeEvaluation(result.Counters.StatusCounts)) return Array.Empty<object>();
+        var rows = new List<object>(MaxReportedFailureOutputs);
+        // Ordered before the bound is applied. PendingArtifacts is a dictionary, and dictionary enumeration
+        // order is unspecified, so taking "the first few" straight from it would report an arbitrary subset
+        // that two runs over identical state need not agree on. Ordinal by identity is the only
+        // reproducible order available here; chronological would need the engine to expose its queue order,
+        // which is not part of the result contract.
+        foreach (KeyValuePair<string, IReadOnlyList<EvolutionArtifact>> entry in result.PendingArtifacts
+                     .OrderBy(entry => entry.Key, StringComparer.Ordinal))
+        {
+            foreach (EvolutionArtifact artifact in entry.Value)
+            {
+                if (rows.Count == MaxReportedFailureOutputs) return rows.ToArray();
+                rows.Add(new
+                {
+                    GenomeId = entry.Key,
+                    artifact.Key,
+                    // Redaction already happened in the engine; saying so beats printing the marker alone.
+                    Redacted = artifact.IsRedacted,
+                    artifact.Text
+                });
+            }
+        }
+        return rows.ToArray();
+    }
+
+    private static bool HadFailureLikeEvaluation(IReadOnlyDictionary<EvolutionEvaluationStatus, long> counts)
+    {
+        foreach (EvolutionEvaluationStatus status in new[]
+                 {
+                     EvolutionEvaluationStatus.Failed,
+                     EvolutionEvaluationStatus.TimedOut,
+                     EvolutionEvaluationStatus.Canceled
+                 })
+        {
+            if (counts.TryGetValue(status, out long count) && count > 0) return true;
+        }
+        return false;
+    }
+
     internal static string ForStderr(string? text)
     {
         if (text is null || text.Length == 0) return string.Empty;

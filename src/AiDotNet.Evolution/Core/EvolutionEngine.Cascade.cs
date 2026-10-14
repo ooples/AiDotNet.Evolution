@@ -273,7 +273,12 @@ public sealed partial class EvolutionEngine<TGenome>
     /// <summary>Stores artifacts against a genome identity, evicting the oldest entry when the queue is full.</summary>
     private void QueueArtifactsForDelivery(string genomeId, IReadOnlyList<EvolutionArtifact> artifacts)
     {
-        if (!_options.Artifacts.Enabled || !_options.Artifacts.DeliverToNextProposal || artifacts.Count == 0) return;
+        // Not gated on DeliverToNextProposal. Queueing is storage; delivery is a separate decision taken in
+        // ConsumeArtifacts. Gating here coupled the two, so a caller that turned delivery off - "do not put
+        // evaluator output in prompts" - also lost every record of what a failing evaluator printed, which
+        // is the one thing EvolutionRunResult.PendingArtifacts exists to carry. The queue stays bounded by
+        // MaxPendingCandidates either way.
+        if (!_options.Artifacts.Enabled || artifacts.Count == 0) return;
         if (!_pendingArtifacts.ContainsKey(genomeId)) _pendingArtifactOrder.Add(genomeId);
         _pendingArtifacts[genomeId] = artifacts.ToArray();
         while (_pendingArtifactOrder.Count > _options.Artifacts.MaxPendingCandidates)
@@ -285,8 +290,14 @@ public sealed partial class EvolutionEngine<TGenome>
     }
 
     /// <summary>Removes and returns the artifacts queued for a genome, so each note informs exactly one proposal.</summary>
+    /// <remarks>
+    /// Where <see cref="EvolutionArtifactOptions.DeliverToNextProposal"/> is honoured. With delivery off the
+    /// note is neither returned nor removed: it stays queued so the run result can still report it, which is
+    /// what keeps "do not put evaluator output in prompts" from also meaning "do not record it".
+    /// </remarks>
     private IReadOnlyList<EvolutionArtifact> ConsumeArtifacts(string genomeId)
     {
+        if (!_options.Artifacts.DeliverToNextProposal) return Array.Empty<EvolutionArtifact>();
         if (!_pendingArtifacts.TryGetValue(genomeId, out EvolutionArtifact[]? artifacts))
             return Array.Empty<EvolutionArtifact>();
         _pendingArtifacts.Remove(genomeId);
