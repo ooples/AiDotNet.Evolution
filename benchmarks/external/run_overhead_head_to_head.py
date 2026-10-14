@@ -82,7 +82,13 @@ def main():
     rows, cells, hangs = [], {}, []
     for workers in [int(w) for w in args.workers.split(",")]:
         for repeat in range(args.repeats):
-            for system, n in sizes.items():  # alternate systems within a repeat, fresh processes each time
+            # Alternate which system runs first. The comment here used to claim an alternation the loop did
+            # not perform - sizes.items() is insertion-ordered, so AiDotNet always went first - which let
+            # host cache, clock and thermal state ride along with the pairing. Each row records the order it
+            # ran under, so the balance is checkable rather than asserted.
+            ordered = list(sizes.items()) if repeat % 2 == 0 else list(reversed(list(sizes.items())))
+            first = ordered[0][0]
+            for system, n in ordered:  # fresh processes each time
                 for attempt in range(3):
                     try:
                         small, large = once(system, n, workers, args.upstream), once(system, 2 * n, workers, args.upstream)
@@ -100,8 +106,8 @@ def main():
                         break
                 else:
                     raise RuntimeError(f"{system} w={workers} could not be measured in three attempts (hung, or a non-positive difference; raise N)")
-                rows.append(dict(system=system, workers=workers, repeat=repeat, n=n, small=small, large=large,
-                                 per_eval_seconds=per_eval))
+                rows.append(dict(system=system, workers=workers, repeat=repeat, n=n, ran_first=first,
+                                 small=small, large=large, per_eval_seconds=per_eval))
                 cells.setdefault((system, workers), []).append(dict(per_eval=per_eval, memory=large["PeakWorkingSetBytes"]))
     rng = random.Random(7)
     summary = []
@@ -119,10 +125,22 @@ def main():
                             openevolve_us_per_eval=statistics.median(theirs) * 1e6,
                             ratio_ours_over_theirs=statistics.median(paired),
                             ratio_ci95=[ratios[int(0.025 * len(ratios))], ratios[int(0.975 * len(ratios)) - 1]],
+                            repeats_aidotnet_first=sum(1 for r in rows
+                                                       if r["workers"] == workers and r["system"] == "aidotnet"
+                                                       and r["ran_first"] == "aidotnet"),
+                            repeats_openevolve_first=sum(1 for r in rows
+                                                         if r["workers"] == workers and r["system"] == "aidotnet"
+                                                         and r["ran_first"] == "openevolve"),
                             aidotnet_peak_mb=statistics.median(c["memory"] for c in cells[("aidotnet", workers)]) / 2**20,
                             openevolve_peak_mb=statistics.median(c["memory"] for c in cells[("openevolve", workers)]) / 2**20))
     result = dict(story="V1-70 #175 (rerun of V1-30 #120)", repeats=args.repeats, sizes=sizes,
-                  method="(T(2N)-T(N))/N, fresh processes, null LLM and evaluator; ratio = median of per-repeat paired ratios, 95% percentile bootstrap",
+                  method="(T(2N)-T(N)) divided by the evaluations the two runs actually completed, not by N: "
+                         "fresh process per run, null LLM and evaluator in-process. A non-positive difference or a "
+                         "hang is re-measured (three attempts), never averaged in. Per-system figures are medians "
+                         "of the per-repeat values; the ratio is the median of the per-repeat PAIRED ratios with a "
+                         "4000-draw percentile bootstrap interval, seeded 7. Which system runs first alternates by repeat "
+                         "parity and each row records it in ran_first, so an execution-order effect cannot hide "
+                         "inside the pairing.",
                   headline=False, note="A C# controller vs a Python one is expected to favour us (R12); not a headline claim.",
                   summary=summary, hangs=hangs, rows=rows)
     Path(args.output).write_text(json.dumps(result, indent=1) + "\n", encoding="utf-8")

@@ -1,5 +1,7 @@
 # V1-70 (#175): engine overhead, AiDotNet.Evolution vs pinned OpenEvolve (null evaluators)
 
+> **Superseded** by [../65ced88/README.md](../65ced88/README.md): a full paired head-to-head at `main` `65ced88`, where all three targets are met, including the 16-worker peak working set this run left open.
+
 Supersedes `../46e1141/`. **Not a headline claim (R12):** a C# controller against a Python one is expected to win on overhead.
 
 Measured at main `5699058` on one workstation: AMD Ryzen 9 3950X (16 cores), 64 GB RAM, Windows 11, .NET 10 Release,
@@ -35,7 +37,7 @@ Per-repeat spread of our cost: 56-70 us at every worker count.
 | --- | --- | --- | --- |
 | our overhead per evaluation, 1-16 workers (N >= 8,000) | <= 100 us | 59.9-65.3 us | met |
 | ours / OpenEvolve, 95% CI upper bound, every worker count | <= 0.05 | <= 0.0082 | met |
-| our peak working set, 16 workers | <= 64 MB | 82.9 MB at `5699058`; 68.9 MB with the fix below; 64.1 MB with #197 as well | not yet met |
+| our peak working set, 16 workers | <= 64 MB | 82.9 MB at `5699058`; 68.9 MB with the fix below; 64.1 MB with #197 as well | not met here (**superseded**: 61.21 MB at `65ced88` - see [../65ced88/](../65ced88/README.md)) |
 
 ## Peak memory
 
