@@ -103,12 +103,26 @@ escape - `SyntaxError: (unicode error) 'unicodeescape' codec can't decode bytes 
 \UXXXXXXXX escape` - and every candidate scores zero. Measured by running
 `examples/circle_packing/evaluator.py` directly on its own seed program on both platforms.
 
-**Through this CLI that no longer happens**, because the shim now hands the evaluator a path whose
-separators are forward slashes: valid inside a single-quoted literal, accepted by every Windows path
-API, and already what the separator is on Linux, so it changes nothing there. See *The path the shim
-hands an evaluator* below. The smoke stays on Linux because one Theory covers every example and other
-examples need it - `rust_adaptive_sort` needs a Rust toolchain, `r_robust_regression` needs R - not
-because of the path.
+**Through this CLI the path *we* supply is no longer the problem**, because the shim hands the evaluator
+a path whose separators are forward slashes: valid inside a single-quoted literal, accepted by every
+Windows path API, and already what the separator is on Linux, so it changes nothing there. See *The path
+the shim hands an evaluator* below.
+
+**That is not the whole story for `circle_packing`, and an earlier version of this section overclaimed.**
+Its evaluator embeds **two** paths in single-quoted literals: `program_path` at `evaluator.py:99`, which
+the shim now makes safe, and **its own** `NamedTemporaryFile` path at lines 123 and 131
+(`open('{temp_file.name}.results', 'wb')`). The second is created inside the evaluator from the system
+temp directory, so nothing this CLI passes can influence it. Measured on Windows at the pinned ref,
+through the CLI with the real provider: 4 completed evaluations, **every one `combined_score: 0`,
+`validity: 0`**, including upstream's own seed - and running the evaluator directly reproduces the same
+`truncated \UXXXXXXXX escape`, this time on `C:\Users\...\tmpXXXXXXXX.py.results`.
+
+The evaluator reports that as a completed evaluation scoring zero rather than as a failure, which is why
+a run looks healthy - no retained failures, four completed evaluations - while measuring nothing.
+
+The smoke stays on Linux because one Theory covers every example, because `rust_adaptive_sort` needs a
+Rust toolchain and `r_robust_regression` needs R, **and** because `circle_packing` remains zero-scoring on
+Windows for the reason above.
 
 ## What `circle_packing_with_artifacts` needs that the others do not
 
