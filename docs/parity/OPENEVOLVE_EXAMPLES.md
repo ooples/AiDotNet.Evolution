@@ -104,6 +104,28 @@ Python literal, so on Windows the path becomes an invalid escape - `SyntaxError:
 scores zero. Measured by running `examples/circle_packing/evaluator.py` directly on its own seed
 program on both platforms.
 
+## What `circle_packing_with_artifacts` needs that the others do not
+
+It smokes, and it is the one smoked example whose evaluator imports **upstream's own package**:
+`from openevolve.evaluation_result import EvaluationResult`, which in turn imports `dacite`. On a bare
+checkout that fails before any scoring happens, so the dependency is part of the example rather than an
+accident of our harness - the CI job installs the package, which is why the smoke passes there.
+
+Measured in a Linux container with `PYTHONPATH` at the pinned checkout and `dacite` installed: the seed
+evaluates and reports **both** declared feature dimensions - `radius_variance` 0.0266, `spatial_spread`
+0.2381, `combined_score` 0.3642, matching the seed score in the table above. So "the evaluator omits a
+declared dimension" never described this example; the archive was demanding coordinates nobody promoted,
+which is the clone defect fixed in #243.
+
+For a run of your own, the sandbox clears the child environment and does not inherit `PYTHONPATH`, so name
+the checkout explicitly (added in #245):
+
+```text
+aidotnet-evolve run --openevolve-config config.yaml initial_program.py evaluator.py --python-path /path/to/openevolve
+```
+
+Installing the package into the interpreter passed to `--python` works too and needs no option.
+
 ## The smoke covers the cascade path
 
 All five smoked examples import with cascade evaluation enabled and their own thresholds mapped —
