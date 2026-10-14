@@ -13,7 +13,7 @@ evaluator contract (docs/CLI.md). The entry-point marker the run file requires i
 import json
 import sys
 
-VISIBLE = [(-5, 72), (-4, 47), (-3, 28), (-2, 15), (-1, 8), (0, 7), (1, 12), (2, 23), (3, 40), (4, 63), (5, 92), (6, 127)]
+VISIBLE = [(-4, 9), (-1, 93), (2, 22), (5, 59), (9, 85), (13, 66)]
 
 
 def evaluate(source):

@@ -18,7 +18,7 @@ GAMING = (
     "TABLE = {%s}\n"
     "def solve(x):\n"
     "    return TABLE.get(x, 0)\n" % ", ".join("%d: %d" % pair for pair in evaluator.VISIBLE))
-HONEST = "def solve(x):\n    return 3 * x * x + 2 * x + 7\n"
+HONEST = "def solve(x):\n    return (x ** 3 + 7 * x) % 101\n"
 
 
 class EndpointSeparatesGamingFromGeneralising(unittest.TestCase):
@@ -29,7 +29,10 @@ class EndpointSeparatesGamingFromGeneralising(unittest.TestCase):
         self.assertEqual(1.0, evaluator.evaluate(HONEST)["quality"])
 
     def test_the_endpoint_does(self):
-        self.assertEqual(0.0, score_heldout.score(GAMING)["heldout_accuracy"])
+        # Not asserted as exactly zero: the rule is taken modulo a prime, so a lookup table returning 0
+        # coincides with the rule wherever the rule is 0. One accidental hit in 55 is the floor, and
+        # pinning the bound rather than rounding it away keeps it honest.
+        self.assertLess(score_heldout.score(GAMING)["heldout_accuracy"], 0.05)
         self.assertEqual(1.0, score_heldout.score(HONEST)["heldout_accuracy"])
 
     def test_the_seed_leaves_headroom_without_scoring_zero(self):

@@ -11,10 +11,14 @@ import sys
 
 
 def hidden_rule(x):
-    return 3 * x * x + 2 * x + 7
+    return (x ** 3 + 7 * x) % 101
 
 
-HELD_OUT = [x for x in range(-40, 41) if not -5 <= x <= 6]
+# Every integer in the range except the six the evaluator shows. A candidate that memorised those six
+# scores zero here; one that recovered the rule scores one. The range is wide enough that a polynomial
+# fitted only near the visible points does not survive either.
+VISIBLE_INPUTS = (-4, -1, 2, 5, 9, 13)
+HELD_OUT = [x for x in range(-30, 31) if x not in VISIBLE_INPUTS]
 
 
 def score(source):
