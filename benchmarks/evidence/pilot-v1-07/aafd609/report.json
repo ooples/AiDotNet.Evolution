@@ -1,0 +1,49 @@
+{
+ "Schema": "evolution-campaign-report-v1",
+ "Campaign": "v1-07-pilot-rational_gain",
+ "RegistrationSha256": "abb44f490d868ca74e8f2e07096bde93bfe5058832f4c8d9d759ebbe4ba33929",
+ "RawSha256": "6b56760fcb4e3bd0aa4896d700e7baf76fd0b7fc63009a915f5ea79943d9a24c",
+ "FamilywiseAlpha": 0.05,
+ "Endpoints": [
+  {
+   "Family": "rational_gain",
+   "Config": "recommended",
+   "Metric": "nmse",
+   "Direction": "minimize",
+   "N": 6,
+   "MeanDifference": 0.33265074344296136,
+   "Interval95": [
+    -0.10200597788313837,
+    0.7215800645053836
+   ],
+   "OneSidedP": 0.08891108891108891,
+   "Failures": {
+    "aidotnet": 0,
+    "openevolve-recommended": 0
+   },
+   "HolmAdjustedP": 0.17782217782217782,
+   "Superior": false
+  },
+  {
+   "Family": "rational_gain",
+   "Config": "matched",
+   "Metric": "nmse",
+   "Direction": "minimize",
+   "N": 6,
+   "MeanDifference": 0.026001523364407683,
+   "Interval95": [
+    -0.1812572694723065,
+    0.2278408687386717
+   ],
+   "OneSidedP": 0.4115884115884116,
+   "Failures": {
+    "aidotnet": 0,
+    "openevolve-matched": 0
+   },
+   "HolmAdjustedP": 0.4115884115884116,
+   "Superior": false
+  }
+ ],
+ "OpenEvolveGate": false,
+ "IntervalNote": "Interval95 is descriptive and unadjusted; the decision is Holm on one-sided bootstrap p"
+}

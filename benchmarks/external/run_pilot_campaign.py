@@ -48,7 +48,12 @@ MODEL = "sonnet"
 # this many of the broker's tokens. It is here so the two ceilings can be checked against each other
 # rather than set independently: a token ceiling that binds before the call ceiling does not refuse a
 # call, it shortens the search, and the row still reads as a completed cell.
-TOKENS_PER_CALL = 40_000
+# Measured over the 180 calls of the first real campaign: 478,903 broker tokens, **2,661 per
+# call**. The 40,000 this started at came from a full interactive session's cache-creation cost
+# and overestimated an isolated `claude -p` call by ~15x, which made the projection print 7.2M
+# tokens for a campaign that spent 479k. Kept well above the measurement, because the ceiling
+# this sizes must bind after the call ceiling rather than before it.
+TOKENS_PER_CALL = 8_000
 
 
 STUB_DIFF = "\n".join(["<<<<<<< SEARCH", "def predict(*xs):", "    return 0.0", "=======",

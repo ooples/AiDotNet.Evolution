@@ -107,8 +107,12 @@ class BudgetConsistencyTests(unittest.TestCase):
         # The trap this closes: a token cap that binds first does not refuse a call, it shortens the
         # search, and the row still reads as a completed cell. The first version of this script
         # defaulted to 30 calls and 400,000 tokens, which would have stopped every cell at about 10.
+        # The inconsistent pair is derived from TOKENS_PER_CALL rather than written down, because the
+        # constant moved once already - measured at 2,661 per call over the first real campaign.
+        calls = 30
         with tempfile.TemporaryDirectory() as directory:
-            code, _ = invoke(Path(directory) / "campaign", "--model-calls", "30", "--model-tokens", "400000")
+            code, _ = invoke(Path(directory) / "campaign", "--model-calls", str(calls),
+                             "--model-tokens", str(calls * runner.TOKENS_PER_CALL - 1))
             self.assertIsInstance(code, str)
             self.assertIn("token ceiling would bind", code)
 

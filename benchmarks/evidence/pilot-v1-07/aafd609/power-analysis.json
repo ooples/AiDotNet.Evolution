@@ -1,0 +1,39 @@
+{
+ "Schema": "evolution-power-analysis-v1",
+ "RegistrationSha256": "abb44f490d868ca74e8f2e07096bde93bfe5058832f4c8d9d759ebbe4ba33929",
+ "TargetHalfWidth": 0.05,
+ "Confidence": 0.95,
+ "Endpoints": [
+  {
+   "Family": "rational_gain",
+   "Config": "recommended",
+   "PilotN": 6,
+   "MeanDifference": 0.33265074344296136,
+   "StandardDeviation": 0.5778168370196944,
+   "ObservedHalfWidth": 0.411793021194261,
+   "TargetHalfWidth": 0.05,
+   "ScaledRequiredN": 407,
+   "NormalRequiredN": 514,
+   "RequiredN": 514,
+   "Agreement": 1.2628992628992628,
+   "Degenerate": false,
+   "PilotAlreadyMeetsTarget": false
+  },
+  {
+   "Family": "rational_gain",
+   "Config": "matched",
+   "PilotN": 6,
+   "MeanDifference": 0.026001523364407683,
+   "StandardDeviation": 0.27212717388695307,
+   "ObservedHalfWidth": 0.2045490691054891,
+   "TargetHalfWidth": 0.05,
+   "ScaledRequiredN": 101,
+   "NormalRequiredN": 114,
+   "RequiredN": 114,
+   "Agreement": 1.1287128712871286,
+   "Degenerate": false,
+   "PilotAlreadyMeetsTarget": false
+  }
+ ],
+ "RequiredN": 514
+}
