@@ -1,0 +1,16 @@
+{
+  "story": "US-25 (#43): no promoted winner regresses the incumbent",
+  "what": "EvolutionDeploymentLifecycle.PromoteAsync over a candidate-quality sweep against one incumbent",
+  "incumbent_quality": 1,
+  "candidates": 7,
+  "promoted": 0,
+  "rows": [
+    { "candidate_quality": 0.999, "outcome": "InsufficientImprovement", "activated": false },
+    { "candidate_quality": 0.95, "outcome": "InsufficientImprovement", "activated": false },
+    { "candidate_quality": 0.9, "outcome": "InsufficientImprovement", "activated": false },
+    { "candidate_quality": 0.75, "outcome": "InsufficientImprovement", "activated": false },
+    { "candidate_quality": 0.5, "outcome": "InsufficientImprovement", "activated": false },
+    { "candidate_quality": 0.25, "outcome": "InsufficientImprovement", "activated": false },
+    { "candidate_quality": 0, "outcome": "InsufficientImprovement", "activated": false }
+  ]
+}
