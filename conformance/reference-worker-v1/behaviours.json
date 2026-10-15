@@ -1,0 +1,51 @@
+{
+  "schema": "evolution-reference-worker-behaviours-v1",
+  "why": "The durable protocol itself is pinned by conformance/durable-v1/scenarios.json, which every endpoint and client runs. These are the behaviours of the *reference worker* that sits above it - envelope handling, metric normalisation, receipt canonicalisation, lease discipline - which each binding implements in its own language and therefore cannot share a test for. Listing them here is what makes parity checkable: each binding's suite claims an id per test and fails when an id it does not cover appears, so a behaviour added to one binding cannot be quietly missing from the other.",
+  "behaviours": [
+    {
+      "id": "engine-envelope-yields-genome-source",
+      "behaviour": "An engine envelope payload yields the genome source for the evaluator; a raw payload passes through unchanged.",
+      "why": "A binding that mishandles the envelope evaluates the wrong text and still reports a completed receipt."
+    },
+    {
+      "id": "non-scalar-and-non-finite-metrics-are-text",
+      "behaviour": "A metric that is not a finite scalar (an array, a NaN or infinity, an out-of-range integer) is recorded as text, never turned into a failure.",
+      "why": "Recording it as a failure throws away a real evaluation; emitting it as a JSON number produces a receipt the other binding cannot read."
+    },
+    {
+      "id": "receipt-payload-is-canonical-json",
+      "behaviour": "A receipt payload is sorted-key JSON with no non-finite numbers, so two workers' receipts for the same evaluation compare as bytes.",
+      "why": "Byte-comparable receipts are what let a campaign reconcile two workers; key order alone would break that."
+    },
+    {
+      "id": "one-commit-per-lease-and-failures-are-receipts",
+      "behaviour": "Every claimed lease is committed exactly once, and an evaluator that raises becomes a failed receipt rather than a crashed worker.",
+      "why": "A lease committed twice or not at all strands work the host is still waiting on."
+    },
+    {
+      "id": "result-objects-keep-metrics-and-artifacts",
+      "behaviour": "An evaluation-result object (not a plain mapping) keeps its metrics and artifacts, and the lease limit bounds the serve loop.",
+      "why": "Upstream evaluators return result objects; dropping their artifacts loses the evidence a run is judged on."
+    },
+    {
+      "id": "evaluator-without-evaluate-is-refused-at-load",
+      "behaviour": "An evaluator module with no `evaluate` is refused when it is loaded, before any lease is claimed.",
+      "why": "Refusing at the first lease instead would claim work the worker can never commit."
+    },
+    {
+      "id": "unparseable-envelope-and-empty-result-are-failed-receipts",
+      "behaviour": "An envelope that will not parse, and an evaluator that returns nothing, each produce a failed receipt.",
+      "why": "Both are the worker's fault to report, not the host's to time out."
+    },
+    {
+      "id": "commit-failure-is-propagated-not-retried",
+      "behaviour": "A commit the host refuses is propagated; the worker never re-runs the evaluator to retry it.",
+      "why": "Re-running charges the evaluation twice and can change the answer a receipt already claimed."
+    },
+    {
+      "id": "engine-bridge-lease-is-evaluated-as-its-genome-source",
+      "behaviour": "A lease enqueued by the engine bridge is evaluated as its genome source, end to end against the real host.",
+      "why": "This is the only case that proves the binding and the host agree about what a lease contains."
+    }
+  ]
+}

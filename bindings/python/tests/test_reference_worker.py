@@ -1,4 +1,13 @@
-"""The reference worker serving OpenEvolve-contract evaluators (evaluate(program_path)) against the real host."""
+"""The reference worker serving OpenEvolve-contract evaluators (evaluate(program_path)) against the real host.
+
+Each test claims a behaviour id from `conformance/reference-worker-v1/behaviours.json`, and
+`BehaviourCoverageTests` fails when a declared behaviour has no test here. The TypeScript suite
+claims from the same file, so a behaviour added to one binding cannot be quietly missing from the
+other: adding it to the manifest fails the binding that does not cover it. The protocol itself is
+pinned separately, by `conformance/durable-v1/scenarios.json`, which both clients and the C# host
+run; these are the behaviours above the protocol, which each binding implements in its own language
+and so cannot share a test for.
+"""
 import json
 import os
 from pathlib import Path
@@ -14,6 +23,23 @@ from aidotnet_evolution import DurableWorkClient, engine_program_source, load_op
 from aidotnet_evolution.reference_worker import _normalize
 
 ROOT = Path(__file__).resolve().parents[3]
+BEHAVIOURS = json.loads((ROOT / "conformance/reference-worker-v1/behaviours.json").read_text(encoding="utf-8"))
+COVERAGE = {}
+
+
+def covers(behaviour):
+    """Claims a manifest behaviour for one test. Recorded at import, so a skipped suite still ratchets."""
+    declared = {entry["id"] for entry in BEHAVIOURS["behaviours"]}
+
+    def claim(method):
+        if behaviour not in declared:
+            raise KeyError("No such reference-worker behaviour: " + behaviour)
+        COVERAGE.setdefault(behaviour, []).append(method.__name__)
+        return method
+
+    return claim
+
+
 DLL = os.environ.get("AIDOTNET_DURABLE_HOST_DLL") or str(ROOT / "src/AiDotNet.Evolution.Host/bin/Release/net10.0/aidotnet-evolution-host.dll")
 HOST = os.environ.get("AIDOTNET_DURABLE_HOST_PATH")
 TRANSPORT = {"host_path": HOST} if HOST else {"host_path": "dotnet", "host_args": [DLL]}
@@ -50,12 +76,14 @@ def envelope(evaluation_id, source):
 
 
 class PayloadTests(unittest.TestCase):
+    @covers("engine-envelope-yields-genome-source")
     def test_the_engine_envelope_yields_the_genome_source_and_raw_payloads_pass_through(self):
         self.assertEqual("def run():\n    return 1\n", engine_program_source(envelope("1", "def run():\n    return 1\n")))
         self.assertEqual("x = 1\n", raw_program_source("x = 1\n"))
         with self.assertRaises(Exception):
             engine_program_source("x = 1\n")
 
+    @covers("non-scalar-and-non-finite-metrics-are-text")
     def test_array_metrics_and_artifacts_are_recorded_not_turned_into_failures(self):
         try:
             import numpy
@@ -87,6 +115,7 @@ class ReferenceWorkerTests(unittest.TestCase):
         path.write_text(text, encoding="utf-8")
         return load_openevolve_evaluator(path)
 
+    @covers("one-commit-per-lease-and-failures-are-receipts")
     def test_every_lease_is_committed_once_and_failures_are_receipts_not_crashes(self):
         evaluate = self.evaluator(DICT_EVALUATOR)
         with DurableWorkClient(self.config, **TRANSPORT) as work:
@@ -101,6 +130,7 @@ class ReferenceWorkerTests(unittest.TestCase):
             self.assertEqual("failed", failed["outcome"])
             self.assertEqual({"error": "ValueError"}, json.loads(failed["payload"]))
 
+    @covers("result-objects-keep-metrics-and-artifacts")
     def test_evaluation_result_objects_keep_metrics_and_artifacts_and_max_leases_bounds_the_loop(self):
         evaluate = self.evaluator(RESULT_EVALUATOR)
         with DurableWorkClient(self.config, **TRANSPORT) as work:
@@ -112,11 +142,13 @@ class ReferenceWorkerTests(unittest.TestCase):
             self.assertEqual({"stderr": "none"}, receipt["artifacts"])
             self.assertIsNone(work.result("2", 1))
 
+    @covers("evaluator-without-evaluate-is-refused-at-load")
     def test_an_evaluator_without_evaluate_is_refused_at_load(self):
         with self.assertRaises(AttributeError):
             self.evaluator("def score(path):\n    return {}\n")
 
 
+    @covers("receipt-payload-is-canonical-json")
     def test_receipt_payloads_are_sorted_key_json_and_a_non_finite_metric_becomes_text(self):
         """The TypeScript binding asserts both of these; Python relied on them untested.
 
@@ -143,6 +175,7 @@ class ReferenceWorkerTests(unittest.TestCase):
             # Sorted keys all the way down, so two workers' receipts compare as bytes.
             self.assertLess(receipt["payload"].index('"a"'), receipt["payload"].index('"b"'))
 
+    @covers("unparseable-envelope-and-empty-result-are-failed-receipts")
     def test_an_unparseable_envelope_and_an_evaluator_returning_nothing_become_failed_receipts(self):
         """Both are failed receipts in the TypeScript binding; only the first was here.
 
@@ -160,6 +193,7 @@ class ReferenceWorkerTests(unittest.TestCase):
             self.assertEqual("failed", second["outcome"], "an evaluator returning nothing")
             self.assertEqual({"error": "TypeError"}, json.loads(second["payload"]))
 
+    @covers("commit-failure-is-propagated-not-retried")
     def test_a_commit_that_fails_is_propagated_never_retried_by_re_running_the_evaluator(self):
         """The docstring on `serve` claims this; the TypeScript binding asserted it and this did not."""
         calls = []
@@ -175,12 +209,46 @@ class ReferenceWorkerTests(unittest.TestCase):
                 serve(work, self.worker, evaluate, provenance="closed-v1", actual={"cost": "1"})
         self.assertEqual(1, len(calls), "the evaluator ran more than once for one lease")
 
+    @covers("engine-bridge-lease-is-evaluated-as-its-genome-source")
     def test_leases_enqueued_by_the_engine_bridge_are_evaluated_as_their_genome_source(self):
         evaluate = self.evaluator(DICT_EVALUATOR)
         with DurableWorkClient(self.config, **TRANSPORT) as work:
             self.assertTrue(work.enqueue(dict(job("1", ""), payload=envelope("1", "def run():\n    return 4\n"))))
             self.assertEqual(["accepted"], serve(work, self.worker, evaluate, provenance="engine-v1", actual={"cost": "1"}))
             self.assertEqual(4.0, json.loads(work.result("1", 1)["payload"])["metrics"]["combined_score"])
+
+
+
+
+class BehaviourCoverageTests(unittest.TestCase):
+    """The parity ratchet. Not skipped with the host: a missing behaviour is a gap without one."""
+
+    def test_every_declared_behaviour_is_covered_by_a_test_here(self):
+        declared = {entry["id"] for entry in BEHAVIOURS["behaviours"]}
+        missing = sorted(declared - set(COVERAGE))
+        self.assertEqual([], missing, "declared reference-worker behaviours with no Python test: " + str(missing))
+
+    def test_each_claim_names_a_test_that_exists(self):
+        suites = (PayloadTests, ReferenceWorkerTests)
+        for behaviour, methods in sorted(COVERAGE.items()):
+            for method in methods:
+                with self.subTest(behaviour=behaviour, method=method):
+                    self.assertTrue(any(hasattr(suite, method) for suite in suites),
+                                    method + " claims " + behaviour + " but no suite defines it")
+
+    def test_a_claim_on_an_undeclared_behaviour_is_refused(self):
+        # Otherwise a typo in an id would read as coverage of something nobody declared.
+        with self.assertRaises(KeyError):
+            covers("no-such-behaviour")(lambda self: None)
+
+    def test_the_manifest_entries_are_distinct_and_say_why_each_matters(self):
+        entries = BEHAVIOURS["behaviours"]
+        identifiers = [entry["id"] for entry in entries]
+        self.assertEqual(sorted(set(identifiers)), sorted(identifiers), "behaviour ids must be distinct")
+        for entry in entries:
+            with self.subTest(behaviour=entry["id"]):
+                self.assertTrue(entry["behaviour"].strip() and entry["why"].strip(),
+                                "a behaviour nobody can say the cost of cannot be checked for parity")
 
 
 if __name__ == "__main__":
