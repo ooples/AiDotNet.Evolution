@@ -79,11 +79,18 @@ def seal(rows):
     return hashlib.sha256(json.dumps(payload, separators=(",", ":")).encode()).hexdigest()
 
 
-def build(task, seed, train=60, validation=20, test=40):
+def build(task, seed, train=60, validation=20, test=400):
     """Returns a split whose test rows are drawn from a different seed and sealed by hash.
 
     The test seed is offset by a prime rather than being `seed + 1`, because consecutive seeds of
     the same generator are a common way to accidentally share a grid between train and test.
+
+    **Why the held-out split is ten times the training split.** At 40 test rows the floor's test NMSE
+    on `damped_oscillator` swung 1.133 across eight seeds - larger than the ~0.3 of headroom the task
+    has, so no comparison on it could have meant anything. The spread is mostly sampling noise in the
+    held-out draw, and it collapses with size: 1.133 at 40 rows, 0.305 at 120, 0.183 at 400, 0.166 at
+    1200. 400 is where it flattens. What is left after that is the searcher's own seed-to-seed
+    variation, which more seeds address and a bigger test split does not.
     """
     if task not in TASKS: raise KeyError("Unknown task: " + task)
     if min(train, validation, test) < 4: raise ValueError("Each split needs at least 4 rows.")

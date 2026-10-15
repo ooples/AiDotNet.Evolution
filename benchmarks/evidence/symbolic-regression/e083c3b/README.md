@@ -8,28 +8,43 @@ The ground truth lives in the family module, so *"a perfect candidate exists"* i
 and demonstrates nothing. What is shown here is that a deliberately weak search finds candidates
 materially better than the seed **while never seeing the test split** - and how much room it leaves.
 
-| task | gap closed on test (3 dev seeds) | test NMSE spread over 8 seeds | reading |
-| --- | --- | ---: | --- |
-| `rational_gain` | **+0.902 to +0.938** | **0.093** | the floor already solves it; nothing left to compete over |
-| `damped_oscillator` | **+0.292 to +0.484** | **0.875** | headroom, but **smaller than its own seed noise** |
-| `two_variable_ratio` | **-0.025 to -0.000** | 0.294 | the floor cannot touch it at all |
+| task | gap closed on test (3 dev seeds) | test NMSE spread over 8 seeds | effect / spread |
+| --- | --- | ---: | ---: |
+| `rational_gain` | **+0.899 to +0.947** | 0.049 | the floor already solves it; nothing left to win |
+| `damped_oscillator` | **+0.292 to +0.322** | **0.124** | **~2.4x - the task to compete on** |
+| `two_variable_ratio` | -0.006 to -0.000 | 0.112 | the floor cannot touch it at all |
 
 `gap_closed` is `1 - found_test_nmse / baseline_test_nmse`, where the baseline predicts the training
 mean and so scores NMSE 1.0 by construction. The spread column is the same floor across **8
-consecutive seeds**, one arm against itself.
+consecutive seeds**, one arm against itself: a between-arm difference smaller than it is seed noise,
+not a result.
 
-**No task here is ready to carry a comparison at three seeds, and the noise column is why.** An
-earlier version of this card named `damped_oscillator` as the task to compete on, from the headroom
-column alone. The sweep retracts that: its test NMSE runs **0.460 to 1.335** across eight seeds, so a
-0.3 difference between two arms on that task is about half its own seed noise, and at three seeds
-would be indistinguishable from the draw. `rational_gain` is the only tight one (0.093) and it has
-almost nothing left to win. The family therefore needs more seeds per task, or a tighter searcher,
-before a result on it means anything - which is a finding about this instrument, not about any
-searcher.
+## The held-out split had to be ten times the training split, and that was measured
 
-This is a measurement, not a pre-registration input: it is one arm against itself, and an arm that
-calls a model may be noisier still. The sample count for any real campaign comes from V1-40's power
-analysis (#121).
+An earlier revision of this card used 40 held-out rows and nominated `damped_oscillator` from the
+headroom column alone. An eight-seed sweep retracted that: its test NMSE swung **1.133**, far larger
+than the ~0.3 of headroom the task has, so no comparison on it could have meant anything.
+
+The cause was sampling noise in the held-out draw, not the task, and it collapses with size - same
+floor, same seeds, budget 4000:
+
+| held-out rows | `damped_oscillator` | `rational_gain` | `two_variable_ratio` |
+| ---: | ---: | ---: | ---: |
+| 40 | 1.133 | 0.155 | 0.294 |
+| 120 | 0.305 | 0.119 | 0.104 |
+| **400** | **0.183** | 0.145 | 0.112 |
+| 1200 | 0.166 | 0.134 | 0.170 |
+
+400 is where it flattens, so `build` defaults there. What remains after that is the **searcher's own**
+seed-to-seed variation - `rational_gain` barely moves across the sweep, because its residual spread was
+never sampling noise - and that is what more seeds address, not a bigger test split.
+
+With the split at 400 the nomination holds with a margin: `damped_oscillator`'s effect is about 2.4x
+its spread, where before it was about half.
+
+This is still a measurement, not a pre-registration input: one arm against itself, an arm that calls a
+model may be noisier, and the sample count for any real campaign comes from V1-40's power analysis
+(#121).
 
 ## Why the searcher is deliberately bad
 
@@ -44,8 +59,7 @@ measuring the floor rather than a difference between searchers, which is the sam
 already solves, from the other side.
 
 So the floor orders the tasks by distance - `rational_gain`, then `damped_oscillator`, then
-`two_variable_ratio` - but ordering is not readiness: see the noise column above, which is why no task
-is nominated here.
+`two_variable_ratio` - and the noise column decides which of them that ordering can be trusted on.
 
 ## How the held-out number is kept held out
 
