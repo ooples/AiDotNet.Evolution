@@ -20,15 +20,27 @@
     },
     {
       "Name": "algotune-family",
-      "Readmes": [],
+      "Readmes": [
+        {
+          "Path": "algotune-family/README.md",
+          "Class": "RawAlongside",
+          "ArtifactCount": 2
+        }
+      ],
       "ArtifactCount": 2,
-      "Undocumented": true
+      "Undocumented": false
     },
     {
       "Name": "alphaevolve-math",
-      "Readmes": [],
+      "Readmes": [
+        {
+          "Path": "alphaevolve-math/README.md",
+          "Class": "RawAlongside",
+          "ArtifactCount": 1
+        }
+      ],
       "ArtifactCount": 1,
-      "Undocumented": true
+      "Undocumented": false
     },
     {
       "Name": "archive-resources",
@@ -44,9 +56,15 @@
     },
     {
       "Name": "campaign-registration",
-      "Readmes": [],
+      "Readmes": [
+        {
+          "Path": "campaign-registration/README.md",
+          "Class": "RawAlongside",
+          "ArtifactCount": 4
+        }
+      ],
       "ArtifactCount": 4,
-      "Undocumented": true
+      "Undocumented": false
     },
     {
       "Name": "checkpoint",
@@ -62,9 +80,15 @@
     },
     {
       "Name": "claude-transport",
-      "Readmes": [],
+      "Readmes": [
+        {
+          "Path": "claude-transport/README.md",
+          "Class": "RawAlongside",
+          "ArtifactCount": 2
+        }
+      ],
       "ArtifactCount": 2,
-      "Undocumented": true
+      "Undocumented": false
     },
     {
       "Name": "distributed-v1-61",
@@ -160,9 +184,15 @@
     },
     {
       "Name": "kernel-family",
-      "Readmes": [],
+      "Readmes": [
+        {
+          "Path": "kernel-family/README.md",
+          "Class": "RawAlongside",
+          "ArtifactCount": 1
+        }
+      ],
       "ArtifactCount": 1,
-      "Undocumented": true
+      "Undocumented": false
     },
     {
       "Name": "latency",
@@ -241,9 +271,15 @@
     },
     {
       "Name": "openevolve-shim",
-      "Readmes": [],
+      "Readmes": [
+        {
+          "Path": "openevolve-shim/README.md",
+          "Class": "RawAlongside",
+          "ArtifactCount": 5
+        }
+      ],
       "ArtifactCount": 5,
-      "Undocumented": true
+      "Undocumented": false
     },
     {
       "Name": "pareto",
@@ -392,9 +428,15 @@
     },
     {
       "Name": "upstream-evaluator-worker",
-      "Readmes": [],
+      "Readmes": [
+        {
+          "Path": "upstream-evaluator-worker/README.md",
+          "Class": "RawAlongside",
+          "ArtifactCount": 2
+        }
+      ],
       "ArtifactCount": 2,
-      "Undocumented": true
+      "Undocumented": false
     },
     {
       "Name": "worker-overhead",
@@ -416,12 +458,12 @@
   ],
   "Totals": {
     "Families": 32,
-    "Readmes": 39,
+    "Readmes": 46,
     "Generated": 1,
-    "RawAlongside": 36,
+    "RawAlongside": 43,
     "Unsupported": 2,
-    "Undocumented": 7
+    "Undocumented": 0
   },
   "Story": "US-04 (#22): how much committed evidence can be checked against raw data",
-  "MeasuredAtUtc": "2026-10-15T02:12:18.4196142Z"
+  "MeasuredAtUtc": "2026-10-15T02:20:29.1256036Z"
 }

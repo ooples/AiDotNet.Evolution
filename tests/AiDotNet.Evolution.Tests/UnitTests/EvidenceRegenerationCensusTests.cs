@@ -44,7 +44,7 @@ public sealed class EvidenceRegenerationCensusTests
     // moving one the wrong way has to fail, which is the only reason these are literals.
     private const int MinimumGenerated = 1;
     private const int MaximumUnsupported = 2;
-    private const int MaximumUndocumentedFamilies = 7;
+    private const int MaximumUndocumentedFamilies = 0;
 
     [Fact]
     public void Every_evidence_readme_is_classified_by_the_committed_census()
