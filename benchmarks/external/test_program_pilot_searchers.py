@@ -13,7 +13,6 @@ being wrong:
   executor sees the exception, so the spend rides on the exception.
 """
 import json
-import os
 import subprocess
 import sys
 import tempfile
@@ -26,6 +25,7 @@ sys.path.insert(0, str(ROOT))
 
 import pilot_searchers  # noqa: E402
 
+NL = chr(10)
 CELL = {"Cell": "c", "Family": "rational_gain", "Arm": "aidotnet", "Seed": 4242, "Block": 0, "Position": 0}
 
 # Writes the adapter's own result file, then charges the broker as a real run would have.
@@ -252,19 +252,14 @@ class OurArmTests(unittest.TestCase):
 class OpenEvolveArmTests(unittest.TestCase):
     """The OpenEvolve arms, driven through a stand-in adapter that really runs as a subprocess."""
 
-    def run_arm(self, directory, broker, *, mode="recommended", extra=(), iterations=2):
+    def run_arm(self, directory, broker, *, mode="recommended", iterations=2, adapter_source=FAKE_ADAPTER):
         root = task(directory)
         adapter = Path(directory) / "fake_adapter.py"
-        adapter.write_text(FAKE_ADAPTER, encoding="utf-8")
+        adapter.write_text(adapter_source, encoding="utf-8")
         search = pilot_searchers.openevolve(adapter, "upstream", root, session_of(broker), mode=mode,
                                             model="sonnet", iterations=iterations)
         cell_directory = Path(directory) / "cell"
-        if extra:
-            os.environ["EVOLUTION_FAKE_ADAPTER_EXTRA"] = " ".join(extra)
-        try:
-            return search(CELL, cell_directory, False), cell_directory
-        finally:
-            os.environ.pop("EVOLUTION_FAKE_ADAPTER_EXTRA", None)
+        return search(CELL, cell_directory, False), cell_directory
 
     def test_the_adapters_required_config_record_is_built_for_this_cells_seed(self):
         """The blocker a dry run hit: a native mode refuses to run without --config-record.
@@ -311,15 +306,61 @@ class OpenEvolveArmTests(unittest.TestCase):
 
     def test_a_run_that_produced_no_candidate_is_a_failure_carrying_its_spend(self):
         with tempfile.TemporaryDirectory() as directory:
-            root = task(directory)
-            adapter = Path(directory) / "fake_adapter.py"
-            adapter.write_text(FAKE_ADAPTER.replace('"--produce-nothing" in sys.argv', "True"), encoding="utf-8")
-            search = pilot_searchers.openevolve(adapter, "upstream", root, session_of(FakeBroker(calls=5)),
-                                                mode="recommended", model="sonnet", iterations=2)
             with self.assertRaises(pilot_searchers.SearchFailed) as raised:
-                search(CELL, Path(directory) / "cell", False)
+                self.run_arm(directory, FakeBroker(calls=5),
+                             adapter_source=FAKE_ADAPTER.replace('"--produce-nothing" in sys.argv', "True"))
             self.assertEqual(5, raised.exception.accounting["model_calls"],
                              "an empty run still spent, and an unreported spend understates the bill")
+
+    def test_an_unreadable_adapter_result_is_a_failure_carrying_its_spend(self):
+        # Exit 0 with no readable result is still a cell that spent; the bill outlives the file.
+        broken = ("import sys" + NL + "from pathlib import Path" + NL
+                  + "arguments = dict(zip(sys.argv[1::2], sys.argv[2::2]))" + NL
+                  + "output = Path(arguments['--output'])" + NL
+                  + "output.mkdir(parents=True, exist_ok=True)" + NL
+                  + "(output / 'adapter-result.json').write_text('{not json', encoding='utf-8')" + NL)
+        for source in ("import sys" + NL + "sys.exit(0)" + NL, broken):
+            with self.subTest(source=source[:24]), tempfile.TemporaryDirectory() as directory:
+                with self.assertRaises(pilot_searchers.SearchFailed) as raised:
+                    self.run_arm(directory, FakeBroker(calls=3), adapter_source=source)
+                self.assertEqual(3, raised.exception.accounting["model_calls"])
+
+    def test_an_arm_that_ran_to_its_wall_limit_still_reports_its_spend(self):
+        # The most expensive way to fail: losing this spend understates the bill by the most.
+        for arm in ("ours", "openevolve"):
+            with self.subTest(arm=arm), tempfile.TemporaryDirectory() as directory:
+                root = task(directory)
+                broker = FakeBroker(calls=7, tokens=2100)
+                genuine = subprocess.run
+
+                def timing_out(command, **kwargs):
+                    raise subprocess.TimeoutExpired(command, kwargs.get("timeout", 0))
+
+                try:
+                    subprocess.run = timing_out
+                    if arm == "ours":
+                        search = pilot_searchers.ours("aidotnet-evolve", root, sys.executable,
+                                                      iterations=1, session=session_of(broker))
+                    else:
+                        search = pilot_searchers.openevolve("adapter.py", "upstream", root,
+                                                            session_of(broker), mode="recommended",
+                                                            model="sonnet", iterations=1)
+                    with self.assertRaises(pilot_searchers.SearchFailed) as raised:
+                        search(CELL, Path(directory) / "cell", False)
+                finally:
+                    subprocess.run = genuine
+                self.assertEqual(7, raised.exception.accounting["model_calls"])
+                self.assertEqual(2100, raised.exception.accounting["model_tokens"])
+
+    def test_a_task_declaring_a_model_with_no_tier_is_refused_at_construction(self):
+        with tempfile.TemporaryDirectory() as directory:
+            root = task(directory, config='llm:' + NL + '  models:' + NL + '    - name: "llama-3"' + NL
+                                          + '      weight: 1.0' + NL + 'prompt:' + NL
+                                          + '  system_message: "improve it"' + NL)
+            with self.assertRaises(ValueError) as raised:
+                pilot_searchers.openevolve("adapter.py", "upstream", root, session_of(FakeBroker()),
+                                           mode="matched", model="m", iterations=1)
+            self.assertIn("llama-3", str(raised.exception), "the message has to name the model")
 
 
 if __name__ == "__main__":

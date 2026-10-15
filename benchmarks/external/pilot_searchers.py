@@ -137,11 +137,18 @@ def ours(cli, task_directory, python_executable, *, iterations, session, timeout
                 encoding="utf-8", newline="\n")
             environment = dict(_environment(broker),
                                OPENAI_API_BASE=broker.endpoint + "/v1", OPENAI_API_KEY=broker.capability)
-            completed = subprocess.run(
-                [*[str(part) for part in prefix], "run", "--openevolve-config", str(config), str(initial),
-                 str(evaluator), "--iterations", str(iterations), "--output", str(output),
-                 "--python", python_executable],
-                capture_output=True, text=True, timeout=timeout, env=environment, cwd=str(directory))
+            try:
+                completed = subprocess.run(
+                    [*[str(part) for part in prefix], "run", "--openevolve-config", str(config), str(initial),
+                     str(evaluator), "--iterations", str(iterations), "--output", str(output),
+                     "--python", python_executable],
+                    capture_output=True, text=True, timeout=timeout, env=environment, cwd=str(directory),
+                    check=False)
+            except subprocess.TimeoutExpired as error:
+                # Running to the wall limit is the most expensive way to fail, so losing the spend
+                # here would understate the bill by the most.
+                raise SearchFailed("the CLI did not finish within %ss" % timeout,
+                                   dict(_spend(broker), broker_closed=broker.closed)) from error
             accounting = dict(_spend(broker), broker_closed=broker.closed)
         _refuse_if_closed(accounting)
         if completed.returncode != 0:
@@ -201,6 +208,10 @@ def openevolve(adapter, upstream, task_directory, session, *, mode, model, itera
     if mode == "matched":
         # Our arm's features, but this task's models and this task's prompt: a difference between
         # the two OpenEvolve arms is then the config shape alone.
+        unmapped = sorted(entry["name"] for entry in declared["llm"]["models"]
+                          if entry["name"] not in openevolve_configs.TIERS)
+        if unmapped:
+            raise ValueError("The task declares models with no Claude tier: " + ", ".join(unmapped))
         models = {openevolve_configs.TIERS[entry["name"]]: float(entry["weight"])
                   for entry in declared["llm"]["models"]}
         system_message = declared["prompt"]["system_message"]
@@ -225,20 +236,32 @@ def openevolve(adapter, upstream, task_directory, session, *, mode, model, itera
         if resume:
             command.append("--resume")
         with session(cell) as broker:
-            completed = subprocess.run(command, capture_output=True, text=True, timeout=timeout,
-                                       env=_environment(broker), cwd=str(directory))
+            try:
+                completed = subprocess.run(command, capture_output=True, text=True, timeout=timeout,
+                                           env=_environment(broker), cwd=str(directory), check=False)
+            except subprocess.TimeoutExpired as error:
+                raise SearchFailed("the adapter did not finish within %ss" % timeout,
+                                   dict(_spend(broker), broker_closed=broker.closed)) from error
             accounting = dict(_spend(broker), broker_closed=broker.closed)
         _refuse_if_closed(accounting)
         if completed.returncode != 0:
             raise SearchFailed("the adapter exited " + str(completed.returncode) + ": "
                                + completed.stderr[-400:], accounting)
-        result = json.loads((output / "adapter-result.json").read_text(encoding="utf-8"))
-        best = result.get("best")
-        if not best or not best.get("code"):
+        try:
+            result = json.loads((output / "adapter-result.json").read_text(encoding="utf-8"))
+            best = result.get("best") or {}
+            code, metrics = best.get("code"), best.get("metrics")
+            changes, differences = result["changes"], result["differences"]
+        except (OSError, ValueError, KeyError) as error:
+            # Exit 0 with no readable result is still a cell that spent, and the spend
+            # outlives the unreadable file.
+            raise SearchFailed("the adapter left no readable result: " + type(error).__name__
+                               + ": " + str(error)[:200], accounting) from error
+        if not code:
             raise SearchFailed("the OpenEvolve run produced no best program", accounting)
         program = directory / "candidate.py"
-        program.write_text(best["code"], encoding="utf-8", newline="\n")
-        return {"program": str(program), "best_metrics": best.get("metrics"), "mode": mode,
-                "changes": result["changes"], "differences": result["differences"], **accounting}
+        program.write_text(code, encoding="utf-8", newline="\n")
+        return {"program": str(program), "best_metrics": metrics, "mode": mode,
+                "changes": changes, "differences": differences, **accounting}
 
     return search
