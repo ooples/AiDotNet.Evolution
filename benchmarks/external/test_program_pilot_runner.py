@@ -31,7 +31,7 @@ def invoke(root, *extra):
     argv = ["run_pilot_campaign.py", "--root", str(root), "--cli", "aidotnet-evolve",
             "--upstream", str(root), "--holdout-seed", str(HOLDOUT), "--task", TASK,
             "--seed-count", "6", "--iterations", "1", "--model-calls", "4",
-            "--model-tokens", "5000", "--wall-seconds", "600", "--stub", *extra]
+            "--model-tokens", "200000", "--wall-seconds", "600", "--stub", *extra]
     saved, output = sys.argv, io.StringIO()
     try:
         sys.argv = argv
@@ -98,6 +98,26 @@ class GateTests(unittest.TestCase):
             code, _ = invoke(root)
             self.assertIsInstance(code, str)
             self.assertIn("holds no frozen registration", code)
+
+
+class BudgetConsistencyTests(unittest.TestCase):
+    """The two ceilings have to be set against each other, not independently."""
+
+    def test_a_token_ceiling_below_the_call_ceiling_is_refused(self):
+        # The trap this closes: a token cap that binds first does not refuse a call, it shortens the
+        # search, and the row still reads as a completed cell. The first version of this script
+        # defaulted to 30 calls and 400,000 tokens, which would have stopped every cell at about 10.
+        with tempfile.TemporaryDirectory() as directory:
+            code, _ = invoke(Path(directory) / "campaign", "--model-calls", "30", "--model-tokens", "400000")
+            self.assertIsInstance(code, str)
+            self.assertIn("token ceiling would bind", code)
+
+    def test_the_defaults_leave_the_call_ceiling_binding(self):
+        # Read from the parser itself, so a default cannot be asserted from memory.
+        defaults = {action.dest: action.default for action in runner.build_parser()._actions}
+        self.assertGreaterEqual(defaults["model_tokens"], defaults["model_calls"] * runner.TOKENS_PER_CALL)
+        self.assertEqual(10, defaults["model_calls"],
+                         "18 cells x 10 calls is what the authorised envelope buys at this account's rate")
 
 
 class StubProviderTests(unittest.TestCase):

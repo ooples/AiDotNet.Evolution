@@ -43,6 +43,12 @@ CANARIES = HERE / "claude_canary.json"
 # The one model name all three arms send: our arm reads it from the task config verbatim, and
 # openevolve_configs.TIERS maps it to itself, so the account sees one model rather than two.
 MODEL = "sonnet"
+# Measured on this account: a `claude -p` call carries ~31.6k cache-creation tokens whatever the
+# prompt, and `cost_units` sums input, cache-creation, cache-read and output - so a call costs about
+# this many of the broker's tokens. It is here so the two ceilings can be checked against each other
+# rather than set independently: a token ceiling that binds before the call ceiling does not refuse a
+# call, it shortens the search, and the row still reads as a completed cell.
+TOKENS_PER_CALL = 40_000
 
 
 STUB_DIFF = "\n".join(["<<<<<<< SEARCH", "def predict(*xs):", "    return 0.0", "=======",
@@ -116,11 +122,14 @@ def describe(projection, arguments):
         % (projection["MaxModelCalls"], projection["MaxModelTokens"], projection["MaxWallSeconds"]),
         "per cell             %d calls over %d iterations, which is the broker's own limit"
         % (arguments.model_calls, arguments.iterations),
+        "rough cost           ~%d tokens if every call is served, at ~%dk per call"
+        % (projection["MaxModelCalls"] * TOKENS_PER_CALL, TOKENS_PER_CALL // 1000),
         "ProjectionSha256     " + projection["ProjectionSha256"],
     ]
 
 
-def main():
+def build_parser():
+    """The entry point's parser, exposed so a test can read a default rather than restate it."""
     parser = argparse.ArgumentParser(description=__doc__.splitlines()[0])
     parser.add_argument("--task", default="rational_gain", help="a symbolic_regression_family task")
     parser.add_argument("--root", required=True, help="output directory; must not already exist")
@@ -133,16 +142,28 @@ def main():
                         help="the endpoint's seed; never reaches a search process")
     parser.add_argument("--seed-count", type=int, default=6, help="a multiple of 6 keeps positions balanced")
     parser.add_argument("--iterations", type=int, default=10)
-    parser.add_argument("--model-calls", type=int, default=30, help="per cell; the broker's ceiling")
-    parser.add_argument("--model-tokens", type=int, default=400_000, help="per cell")
+    # 10 x 18 cells = 180 calls, which is what the authorised envelope buys at this account's rate.
+    parser.add_argument("--model-calls", type=int, default=10, help="per cell; the broker's ceiling")
+    parser.add_argument("--model-tokens", type=int, default=600_000,
+                        help="per cell; must leave the call ceiling binding first")
     parser.add_argument("--wall-seconds", type=int, default=1800, help="per cell")
     parser.add_argument("--cell-timeout", type=int, default=1800)
     parser.add_argument("--confirm", help="the printed ProjectionSha256; without it nothing runs")
     parser.add_argument("--stub", action="store_true", help="rehearse the whole path for no spend")
+    return parser
+
+
+def main():
+    parser = build_parser()
     arguments = parser.parse_args()
     if not arguments.stub and not arguments.executable:
         parser.error("--executable is required unless --stub is given")
 
+    budget_tokens = arguments.model_calls * TOKENS_PER_CALL
+    if arguments.model_tokens < budget_tokens:
+        raise SystemExit("--model-tokens %d is below %d calls x ~%d tokens: the token ceiling would bind "
+                         "first and silently shorten every cell instead of refusing a call"
+                         % (arguments.model_tokens, arguments.model_calls, TOKENS_PER_CALL))
     root = Path(arguments.root)
     registration_path = root / "registration" / "registration.json"
     if registration_path.exists():
@@ -175,10 +196,11 @@ def main():
     if arguments.stub:
         provider = stub_provider(calls)
     else:
-        # Enough headroom for the whole campaign plus the canary calls, since one transport serves
-        # every cell; the per-cell ceiling is the broker's, not this one.
+        # The campaign's own ceiling plus the canaries: one warm call and one verify per model, and
+        # one model. A looser number here would make the transport's cap - the last backstop against
+        # a runaway, since the broker's is per cell - stop meaning anything.
         models, canaries = transport(arguments.executable, evidence / "transport",
-                                     projection["MaxModelCalls"] + 2 * arguments.seed_count * 3 + 8,
+                                     projection["MaxModelCalls"] + 4,
                                      timeout=min(arguments.wall_seconds, 900))
         provider = models.generate
         print("canaries             " + json.dumps(canaries))
