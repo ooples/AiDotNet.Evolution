@@ -120,6 +120,13 @@ through the CLI with the real provider: 4 completed evaluations, **every one `co
 The evaluator reports that as a completed evaluation scoring zero rather than as a failure, which is why
 a run looks healthy - no retained failures, four completed evaluations - while measuring nothing.
 
+**`circle_packing_with_artifacts` is the same**, measured the same way: its evaluator carries six
+occurrences of the `NamedTemporaryFile`-in-a-literal shape, and on Windows its seed reports
+`combined_score` 0.0 with `validity` 0.0 and the same `truncated \UXXXXXXXX escape`. So of the five smoked
+examples, **two smoke on Linux only for a reason inside the evaluator** rather than anything about this
+CLI, and `background_blur` was chosen for the real-provider run precisely because it has none of that
+shape.
+
 The smoke stays on Linux because one Theory covers every example, because `rust_adaptive_sort` needs a
 Rust toolchain and `r_robust_regression` needs R, **and** because `circle_packing` remains zero-scoring on
 Windows for the reason above.
