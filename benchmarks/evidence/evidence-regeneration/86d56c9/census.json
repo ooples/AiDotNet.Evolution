@@ -1,0 +1,481 @@
+{
+  "Root": "benchmarks/evidence",
+  "Families": [
+    {
+      "Name": "adaptive-islands",
+      "Readmes": [
+        {
+          "Path": "adaptive-islands/cfebe58/README.md",
+          "Class": "RawAlongside",
+          "ArtifactCount": 3
+        },
+        {
+          "Path": "adaptive-islands/README.md",
+          "Class": "RawAlongside",
+          "ArtifactCount": 6
+        }
+      ],
+      "ArtifactCount": 6,
+      "Undocumented": false
+    },
+    {
+      "Name": "algotune-family",
+      "Readmes": [
+        {
+          "Path": "algotune-family/README.md",
+          "Class": "RawAlongside",
+          "ArtifactCount": 2
+        }
+      ],
+      "ArtifactCount": 2,
+      "Undocumented": false
+    },
+    {
+      "Name": "alphaevolve-math",
+      "Readmes": [
+        {
+          "Path": "alphaevolve-math/README.md",
+          "Class": "RawAlongside",
+          "ArtifactCount": 1
+        }
+      ],
+      "ArtifactCount": 1,
+      "Undocumented": false
+    },
+    {
+      "Name": "archive-resources",
+      "Readmes": [
+        {
+          "Path": "archive-resources/f990516/README.md",
+          "Class": "RawAlongside",
+          "ArtifactCount": 3
+        }
+      ],
+      "ArtifactCount": 3,
+      "Undocumented": false
+    },
+    {
+      "Name": "campaign-registration",
+      "Readmes": [
+        {
+          "Path": "campaign-registration/README.md",
+          "Class": "RawAlongside",
+          "ArtifactCount": 4
+        }
+      ],
+      "ArtifactCount": 4,
+      "Undocumented": false
+    },
+    {
+      "Name": "checkpoint",
+      "Readmes": [
+        {
+          "Path": "checkpoint/README.md",
+          "Class": "RawAlongside",
+          "ArtifactCount": 1
+        }
+      ],
+      "ArtifactCount": 1,
+      "Undocumented": false
+    },
+    {
+      "Name": "claude-transport",
+      "Readmes": [
+        {
+          "Path": "claude-transport/README.md",
+          "Class": "Generated",
+          "ArtifactCount": 2
+        }
+      ],
+      "ArtifactCount": 2,
+      "Undocumented": false
+    },
+    {
+      "Name": "distributed-v1-61",
+      "Readmes": [
+        {
+          "Path": "distributed-v1-61/818b642/README.md",
+          "Class": "RawAlongside",
+          "ArtifactCount": 7
+        }
+      ],
+      "ArtifactCount": 7,
+      "Undocumented": false
+    },
+    {
+      "Name": "engine-overhead",
+      "Readmes": [
+        {
+          "Path": "engine-overhead/46e1141/README.md",
+          "Class": "RawAlongside",
+          "ArtifactCount": 1
+        },
+        {
+          "Path": "engine-overhead/5699058/README.md",
+          "Class": "RawAlongside",
+          "ArtifactCount": 1
+        },
+        {
+          "Path": "engine-overhead/65ced88/README.md",
+          "Class": "RawAlongside",
+          "ArtifactCount": 1
+        }
+      ],
+      "ArtifactCount": 3,
+      "Undocumented": false
+    },
+    {
+      "Name": "ensemble-overhead",
+      "Readmes": [
+        {
+          "Path": "ensemble-overhead/34c117c/README.md",
+          "Class": "RawAlongside",
+          "ArtifactCount": 3
+        }
+      ],
+      "ArtifactCount": 3,
+      "Undocumented": false
+    },
+    {
+      "Name": "evidence-regeneration",
+      "Readmes": [
+        {
+          "Path": "evidence-regeneration/86d56c9/README.md",
+          "Class": "Generated",
+          "ArtifactCount": 1
+        }
+      ],
+      "ArtifactCount": 1,
+      "Undocumented": false
+    },
+    {
+      "Name": "external-work",
+      "Readmes": [
+        {
+          "Path": "external-work/75fd8be/README.md",
+          "Class": "RawAlongside",
+          "ArtifactCount": 1
+        },
+        {
+          "Path": "external-work/8aaef1e/README.md",
+          "Class": "RawAlongside",
+          "ArtifactCount": 2
+        }
+      ],
+      "ArtifactCount": 3,
+      "Undocumented": false
+    },
+    {
+      "Name": "fidelity",
+      "Readmes": [
+        {
+          "Path": "fidelity/85960cd/README.md",
+          "Class": "RawAlongside",
+          "ArtifactCount": 5
+        },
+        {
+          "Path": "fidelity/ac36140/README.md",
+          "Class": "RawAlongside",
+          "ArtifactCount": 5
+        }
+      ],
+      "ArtifactCount": 10,
+      "Undocumented": false
+    },
+    {
+      "Name": "kernel-family",
+      "Readmes": [
+        {
+          "Path": "kernel-family/README.md",
+          "Class": "RawAlongside",
+          "ArtifactCount": 1
+        }
+      ],
+      "ArtifactCount": 1,
+      "Undocumented": false
+    },
+    {
+      "Name": "latency",
+      "Readmes": [
+        {
+          "Path": "latency/4c31b32/README.md",
+          "Class": "RawAlongside",
+          "ArtifactCount": 2
+        }
+      ],
+      "ArtifactCount": 2,
+      "Undocumented": false
+    },
+    {
+      "Name": "llm-feedback",
+      "Readmes": [
+        {
+          "Path": "llm-feedback/270ca44/README.md",
+          "Class": "RawAlongside",
+          "ArtifactCount": 1
+        },
+        {
+          "Path": "llm-feedback/767b31a/README.md",
+          "Class": "RawAlongside",
+          "ArtifactCount": 2
+        }
+      ],
+      "ArtifactCount": 3,
+      "Undocumented": false
+    },
+    {
+      "Name": "meta-prompt",
+      "Readmes": [
+        {
+          "Path": "meta-prompt/270ca44/README.md",
+          "Class": "RawAlongside",
+          "ArtifactCount": 1
+        }
+      ],
+      "ArtifactCount": 1,
+      "Undocumented": false
+    },
+    {
+      "Name": "noisy-reuse",
+      "Readmes": [
+        {
+          "Path": "noisy-reuse/3c0a680/README.md",
+          "Class": "RawAlongside",
+          "ArtifactCount": 6
+        }
+      ],
+      "ArtifactCount": 6,
+      "Undocumented": false
+    },
+    {
+      "Name": "openevolve-examples",
+      "Readmes": [
+        {
+          "Path": "openevolve-examples/767b31a-claude-code-quickstart/README.md",
+          "Class": "RawAlongside",
+          "ArtifactCount": 2
+        },
+        {
+          "Path": "openevolve-examples/767b31a-function-minimization/README.md",
+          "Class": "RawAlongside",
+          "ArtifactCount": 2
+        },
+        {
+          "Path": "openevolve-examples/e6abeea/README.md",
+          "Class": "RawAlongside",
+          "ArtifactCount": 1
+        }
+      ],
+      "ArtifactCount": 5,
+      "Undocumented": false
+    },
+    {
+      "Name": "openevolve-shim",
+      "Readmes": [
+        {
+          "Path": "openevolve-shim/README.md",
+          "Class": "Generated",
+          "ArtifactCount": 5
+        }
+      ],
+      "ArtifactCount": 5,
+      "Undocumented": false
+    },
+    {
+      "Name": "pareto",
+      "Readmes": [
+        {
+          "Path": "pareto/README.md",
+          "Class": "RawAlongside",
+          "ArtifactCount": 5
+        },
+        {
+          "Path": "pareto/us09-current-stack/README.md",
+          "Class": "RawAlongside",
+          "ArtifactCount": 3
+        }
+      ],
+      "ArtifactCount": 5,
+      "Undocumented": false
+    },
+    {
+      "Name": "performance",
+      "Readmes": [
+        {
+          "Path": "performance/README.md",
+          "Class": "Generated",
+          "ArtifactCount": 9
+        },
+        {
+          "Path": "performance/us10-integration/README.md",
+          "Class": "RawAlongside",
+          "ArtifactCount": 5
+        }
+      ],
+      "ArtifactCount": 9,
+      "Undocumented": false
+    },
+    {
+      "Name": "pipeline",
+      "Readmes": [
+        {
+          "Path": "pipeline/9c3441d/README.md",
+          "Class": "RawAlongside",
+          "ArtifactCount": 4
+        }
+      ],
+      "ArtifactCount": 4,
+      "Undocumented": false
+    },
+    {
+      "Name": "population-scaling",
+      "Readmes": [
+        {
+          "Path": "population-scaling/47899db/README.md",
+          "Class": "RawAlongside",
+          "ArtifactCount": 1
+        }
+      ],
+      "ArtifactCount": 1,
+      "Undocumented": false
+    },
+    {
+      "Name": "proposer-ceiling",
+      "Readmes": [
+        {
+          "Path": "proposer-ceiling/767b31a/README.md",
+          "Class": "Unsupported",
+          "ArtifactCount": 0
+        }
+      ],
+      "ArtifactCount": 0,
+      "Undocumented": false
+    },
+    {
+      "Name": "readme-walkthrough",
+      "Readmes": [
+        {
+          "Path": "readme-walkthrough/86d56c9/README.md",
+          "Class": "RawAlongside",
+          "ArtifactCount": 1
+        }
+      ],
+      "ArtifactCount": 1,
+      "Undocumented": false
+    },
+    {
+      "Name": "robustness",
+      "Readmes": [
+        {
+          "Path": "robustness/c30c875/README.md",
+          "Class": "RawAlongside",
+          "ArtifactCount": 3
+        }
+      ],
+      "ArtifactCount": 3,
+      "Undocumented": false
+    },
+    {
+      "Name": "sandbox-overhead",
+      "Readmes": [
+        {
+          "Path": "sandbox-overhead/ca96524/README.md",
+          "Class": "RawAlongside",
+          "ArtifactCount": 2
+        }
+      ],
+      "ArtifactCount": 4,
+      "Undocumented": false
+    },
+    {
+      "Name": "soak",
+      "Readmes": [
+        {
+          "Path": "soak/README.md",
+          "Class": "RawAlongside",
+          "ArtifactCount": 13
+        },
+        {
+          "Path": "soak/segmented-a1d5d2f/README.md",
+          "Class": "RawAlongside",
+          "ArtifactCount": 9
+        }
+      ],
+      "ArtifactCount": 13,
+      "Undocumented": false
+    },
+    {
+      "Name": "story-checkbox-audit",
+      "Readmes": [
+        {
+          "Path": "story-checkbox-audit/b791d8b/README.md",
+          "Class": "RawAlongside",
+          "ArtifactCount": 1
+        },
+        {
+          "Path": "story-checkbox-audit/ca96524/README.md",
+          "Class": "RawAlongside",
+          "ArtifactCount": 1
+        }
+      ],
+      "ArtifactCount": 2,
+      "Undocumented": false
+    },
+    {
+      "Name": "surrogates",
+      "Readmes": [
+        {
+          "Path": "surrogates/7ce6f9a/README.md",
+          "Class": "RawAlongside",
+          "ArtifactCount": 3
+        },
+        {
+          "Path": "surrogates/c770896/README.md",
+          "Class": "RawAlongside",
+          "ArtifactCount": 3
+        }
+      ],
+      "ArtifactCount": 6,
+      "Undocumented": false
+    },
+    {
+      "Name": "upstream-evaluator-worker",
+      "Readmes": [
+        {
+          "Path": "upstream-evaluator-worker/README.md",
+          "Class": "RawAlongside",
+          "ArtifactCount": 2
+        }
+      ],
+      "ArtifactCount": 2,
+      "Undocumented": false
+    },
+    {
+      "Name": "worker-overhead",
+      "Readmes": [
+        {
+          "Path": "worker-overhead/3f73e03-ci/README.md",
+          "Class": "RawAlongside",
+          "ArtifactCount": 6
+        },
+        {
+          "Path": "worker-overhead/a8a20f0-local/README.md",
+          "Class": "RawAlongside",
+          "ArtifactCount": 2
+        }
+      ],
+      "ArtifactCount": 8,
+      "Undocumented": false
+    }
+  ],
+  "Totals": {
+    "Families": 33,
+    "Readmes": 47,
+    "Generated": 4,
+    "RawAlongside": 42,
+    "Unsupported": 1,
+    "Undocumented": 0
+  },
+  "Story": "US-04 (#22): how much committed evidence can be checked against raw data",
+  "MeasuredAtUtc": "2026-10-15T02:59:40.7654575Z"
+}
