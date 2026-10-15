@@ -61,6 +61,22 @@ already solves, from the other side.
 So the floor orders the tasks by distance - `rational_gain`, then `damped_oscillator`, then
 `two_variable_ratio` - and the noise column decides which of them that ordering can be trusted on.
 
+## `two_variable_ratio` is dead for this basis, and that is a paired decision
+
+The floor scores **1.000 to 1.112** on it - at or slightly worse than predicting the mean - because its
+truth needs a product of two variables and the basis has only single-variable functions. A task where
+both arms score 1.0 orders nothing, so as it stands this one cannot contribute to a comparison.
+
+Probed, **not changed**: adding a single product term `c * x_i * x_j` to the sampler takes the floor to
+**0.104 to 0.481** on the same eight seeds, a headroom of **+0.724** - but with a spread of **0.377**,
+about half that headroom, so the task would arrive about as resolvable as `damped_oscillator` rather
+than cleanly better.
+
+That is left as a measurement because the basis and the task set are one decision, not two: enriching
+the floor makes this task usable and simultaneously raises the bar a real searcher has to clear, and
+`rational_gain` is already solved at the current strength. Whoever pre-registers the campaign should
+pick both together.
+
 ## How the held-out number is kept held out
 
 Selection uses train and validation only. The test split is scored **once**, at the end, through
