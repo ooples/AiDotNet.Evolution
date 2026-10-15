@@ -103,6 +103,30 @@ class DriverTests(unittest.TestCase):
         for line in campaign.report_lines(report):
             self.assertIn("failures=", line, "a report that hides failures is not a pilot report")
 
+    def test_a_winning_arm_is_reported_as_winning(self):
+        """The positive control, which this suite did not have.
+
+        `test_a_losing_arm_is_reported_as_losing` asserts `[False, False]` and the shape test asserts
+        only the shape, so `Superior` hardcoded to `False` - or a bootstrap oriented the wrong way -
+        passed both. Then the pilot could only ever say "no", and a campaign that cannot say "yes"
+        is not a measurement. Rigged in our favour: ours returns the ground truth, both OpenEvolve
+        arms return the constant predictor, over six paired seeds.
+        """
+        with tempfile.TemporaryDirectory() as directory:
+            root = Path(directory)
+            frozen, path, projection = campaign.freeze(declared(), root / "registration")
+            _, report = campaign.run(frozen, path, projection, root / "state", TASK,
+                                     arms(TRUTH, CONSTANT), holdout_seed=918273,
+                                     confirm=projection["ProjectionSha256"], log=lambda *args: None)
+        self.assertEqual([True, True], [endpoint["Superior"] for endpoint in report["Endpoints"]],
+                         "a verdict machine that cannot report a win cannot report a result")
+        for endpoint in report["Endpoints"]:
+            with self.subTest(config=endpoint["Config"]):
+                self.assertGreater(endpoint["MeanDifference"], 0.5,
+                                   "the truth beats a constant predictor by most of the endpoint's range")
+                self.assertLessEqual(endpoint["OneSidedP"], frozen["Spec"]["FamilywiseAlpha"],
+                                     "six paired seeds of a large consistent difference must reject")
+
     def test_a_losing_arm_is_reported_as_losing(self):
         # Rigged the other way, so "superior" cannot be hardcoded to our arm.
         with tempfile.TemporaryDirectory() as directory:
