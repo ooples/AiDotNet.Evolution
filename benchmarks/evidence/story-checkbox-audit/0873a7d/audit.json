@@ -1,0 +1,147 @@
+{
+  "Repository": "ooples/AiDotNet.Evolution",
+  "MeasuredAtUtc": "2026-10-15T18:19:54.8151911Z",
+  "Issues": [
+    {
+      "Number": 21,
+      "State": "OPEN",
+      "Title": "[US-03] Prevent invalid improvements from winning",
+      "Unchecked": 2,
+      "Checked": 9,
+      "DependencyRefs": [],
+      "ClosedWithUnticked": false
+    },
+    {
+      "Number": 22,
+      "State": "OPEN",
+      "Title": "[US-04] Turn traces into trustworthy experiment reports",
+      "Unchecked": 3,
+      "Checked": 11,
+      "DependencyRefs": [
+        108
+      ],
+      "ClosedWithUnticked": false
+    },
+    {
+      "Number": 24,
+      "State": "OPEN",
+      "Title": "[US-06] Handle noisy measurements and expensive evaluation",
+      "Unchecked": 3,
+      "Checked": 10,
+      "DependencyRefs": [
+        108
+      ],
+      "ClosedWithUnticked": false
+    },
+    {
+      "Number": 29,
+      "State": "OPEN",
+      "Title": "[US-11] Demonstrate value in consumer workloads",
+      "Unchecked": 12,
+      "Checked": 3,
+      "DependencyRefs": [
+        108,
+        262,
+        122
+      ],
+      "ClosedWithUnticked": false
+    },
+    {
+      "Number": 30,
+      "State": "OPEN",
+      "Title": "[US-12] Gate releases on demonstrated improvement",
+      "Unchecked": 12,
+      "Checked": 2,
+      "DependencyRefs": [
+        108
+      ],
+      "ClosedWithUnticked": false
+    },
+    {
+      "Number": 35,
+      "State": "OPEN",
+      "Title": "[US-17] Build a compiler-guided program improvement loop",
+      "Unchecked": 6,
+      "Checked": 7,
+      "DependencyRefs": [
+        108
+      ],
+      "ClosedWithUnticked": false
+    },
+    {
+      "Number": 36,
+      "State": "OPEN",
+      "Title": "[US-18] Reuse experience and detect meaningful novelty",
+      "Unchecked": 6,
+      "Checked": 7,
+      "DependencyRefs": [
+        108
+      ],
+      "ClosedWithUnticked": false
+    },
+    {
+      "Number": 37,
+      "State": "OPEN",
+      "Title": "[US-19] Route models and prompts by measured return",
+      "Unchecked": 2,
+      "Checked": 11,
+      "DependencyRefs": [],
+      "ClosedWithUnticked": false
+    },
+    {
+      "Number": 38,
+      "State": "OPEN",
+      "Title": "[US-20] Overlap proposal generation and evaluation",
+      "Unchecked": 1,
+      "Checked": 8,
+      "DependencyRefs": [
+        59,
+        163,
+        166,
+        167,
+        169
+      ],
+      "ClosedWithUnticked": false
+    },
+    {
+      "Number": 41,
+      "State": "OPEN",
+      "Title": "[US-23] Warm-start compatible searches and reuse evaluations",
+      "Unchecked": 8,
+      "Checked": 4,
+      "DependencyRefs": [
+        108,
+        42,
+        22,
+        24
+      ],
+      "ClosedWithUnticked": false
+    },
+    {
+      "Number": 42,
+      "State": "OPEN",
+      "Title": "[US-24] Provide a practical run and inspection experience",
+      "Unchecked": 4,
+      "Checked": 10,
+      "DependencyRefs": [
+        108
+      ],
+      "ClosedWithUnticked": false
+    },
+    {
+      "Number": 43,
+      "State": "OPEN",
+      "Title": "[US-25] Promote validated results and retune when conditions change",
+      "Unchecked": 7,
+      "Checked": 7,
+      "DependencyRefs": [
+        108
+      ],
+      "ClosedWithUnticked": false
+    }
+  ],
+  "TotalUnchecked": 66.0,
+  "TotalChecked": 89.0,
+  "ClosedWithUntickedCount": 0,
+  "ClosedWithUnticked": []
+}
