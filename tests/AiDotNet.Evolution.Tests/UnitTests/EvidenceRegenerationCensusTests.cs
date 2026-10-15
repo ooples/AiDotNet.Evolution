@@ -42,7 +42,7 @@ public sealed class EvidenceRegenerationCensusTests
 
     // Measured at main 86d56c9. Raising Generated or lowering either of the others is the work;
     // moving one the wrong way has to fail, which is the only reason these are literals.
-    private const int MinimumGenerated = 1;
+    private const int MinimumGenerated = 2;
     private const int MaximumUnsupported = 1;
     private const int MaximumUndocumentedFamilies = 0;
 
@@ -75,6 +75,42 @@ public sealed class EvidenceRegenerationCensusTests
         Assert.True(undocumented <= MaximumUndocumentedFamilies,
             $"{undocumented} families have no README, above the recorded {MaximumUndocumentedFamilies}: " +
             string.Join(", ", UndocumentedFamilies(EvidenceRoot())));
+    }
+
+    [Fact]
+    public void The_censuss_own_published_block_regenerates_from_the_committed_census()
+    {
+        // The census family is Generated, so it owes the same property the performance family owes:
+        // the block it publishes must come out of census.json and not out of someone's edit. This
+        // renders independently of eng/Measure-EvidenceRegeneration.ps1 -RenderTables, so the two
+        // disagreeing is a failure here rather than a silently regenerated README.
+        string readme = Path.Combine(CensusDirectory(), "README.md");
+        string text = File.ReadAllText(readme).Replace("\r\n", "\n");
+        int begin = text.IndexOf(BeginMarker, StringComparison.Ordinal);
+        int end = text.IndexOf(EndMarker, StringComparison.Ordinal);
+        Assert.True(begin >= 0 && end > begin, "The census README has no generated-table block.");
+
+        string published = text.Substring(begin + BeginMarker.Length, end - begin - BeginMarker.Length).Trim();
+        Assert.Equal(RenderCensusTables(), published);
+    }
+
+    private static string RenderCensusTables()
+    {
+        using var document = JsonDocument.Parse(File.ReadAllBytes(Path.Combine(CensusDirectory(), "census.json")));
+        JsonElement totals = document.RootElement.GetProperty("Totals");
+        var rows = new (string Label, string Field)[]
+        {
+            ("`Generated` READMEs", "Generated"),
+            ("`RawAlongside` READMEs", "RawAlongside"),
+            ("`Unsupported` READMEs", "Unsupported"),
+            ("READMEs in total", "Readmes"),
+            ("families", "Families"),
+            ("families with no README", "Undocumented"),
+        };
+        var lines = new List<string> { "| measure | count |", "| --- | ---: |" };
+        foreach ((string label, string field) in rows)
+            lines.Add($"| {label} | {totals.GetProperty(field).GetInt32()} |");
+        return string.Join("\n", lines);
     }
 
     [Fact]
@@ -154,12 +190,7 @@ public sealed class EvidenceRegenerationCensusTests
 
     private static Dictionary<string, EvidenceReadmeClass> ReadCommittedCensus()
     {
-        string directory = Path.Combine(EvidenceRoot(), "evidence-regeneration");
-        string[] revisions = Directory.GetDirectories(directory);
-        // Exactly one, the same rule eng/Test-EvidenceTables.ps1 applies to its summaries: two
-        // censuses would let the test pick whichever one happened to agree with the tree.
-        Assert.Single(revisions);
-        using var document = JsonDocument.Parse(File.ReadAllBytes(Path.Combine(revisions[0], "census.json")));
+        using var document = JsonDocument.Parse(File.ReadAllBytes(Path.Combine(CensusDirectory(), "census.json")));
         var classified = new Dictionary<string, EvidenceReadmeClass>(StringComparer.Ordinal);
         foreach (JsonElement family in document.RootElement.GetProperty("Families").EnumerateArray())
             foreach (JsonElement readme in family.GetProperty("Readmes").EnumerateArray())
@@ -170,6 +201,15 @@ public sealed class EvidenceRegenerationCensusTests
     }
 
     private static string EvidenceRoot() => Path.Combine(RepositoryRoot(), "benchmarks", "evidence");
+
+    private static string CensusDirectory()
+    {
+        string[] revisions = Directory.GetDirectories(Path.Combine(EvidenceRoot(), "evidence-regeneration"));
+        // Exactly one, the same rule eng/Test-EvidenceTables.ps1 applies to its summaries: two
+        // censuses would let a test pick whichever one happened to agree with the tree.
+        Assert.Single(revisions);
+        return revisions[0];
+    }
 
     private static string RepositoryRoot()
     {

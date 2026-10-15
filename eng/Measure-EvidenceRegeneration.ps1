@@ -30,7 +30,12 @@
 param(
     [Parameter(ParameterSetName = 'Measure')] [string] $EvidenceRoot = 'benchmarks/evidence',
     [Parameter(ParameterSetName = 'Measure')] [string] $OutputFile,
-    [Parameter(Mandatory, ParameterSetName = 'SelfTest')] [switch] $SelfTest
+    [Parameter(Mandatory, ParameterSetName = 'SelfTest')] [switch] $SelfTest,
+
+    # Renders the committed census as the markdown block its README publishes, and measures nothing.
+    # The same shape as the profiler's --evidence-tables, so this family regenerates the way the
+    # performance family does rather than inventing a second mechanism.
+    [Parameter(Mandatory, ParameterSetName = 'Render')] [string] $RenderTables
 )
 
 Set-StrictMode -Version Latest
@@ -157,7 +162,26 @@ function Test-EvidenceCensus {
     }
 }
 
+function Format-CensusTables {
+    [CmdletBinding()]
+    param([Parameter(Mandatory)] [string] $CensusPath)
+
+    $census = Get-Content -LiteralPath $CensusPath -Raw -Encoding utf8 | ConvertFrom-Json
+    $totals = $census.Totals
+    # Counts only. The prose that explains each class is editorial and stays outside the block, so
+    # nothing here can be regenerated differently from how it was written.
+    $lines = @('', '| measure | count |', '| --- | ---: |')
+    foreach ($pair in @(@('`Generated` READMEs', $totals.Generated), @('`RawAlongside` READMEs', $totals.RawAlongside),
+                        @('`Unsupported` READMEs', $totals.Unsupported), @('READMEs in total', $totals.Readmes),
+                        @('families', $totals.Families), @('families with no README', $totals.Undocumented))) {
+        $lines += ('| {0} | {1} |' -f $pair[0], $pair[1])
+    }
+    $lines += ''
+    $lines -join "`n"
+}
+
 if ($SelfTest) { Test-EvidenceCensus; return }
+if ($RenderTables) { Write-Output (Format-CensusTables -CensusPath $RenderTables); return }
 
 $repository = Split-Path -Parent $PSScriptRoot
 $resolved = if ([System.IO.Path]::IsPathRooted($EvidenceRoot)) { $EvidenceRoot } else { Join-Path $repository $EvidenceRoot }

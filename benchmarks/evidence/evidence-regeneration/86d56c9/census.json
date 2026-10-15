@@ -141,7 +141,7 @@
       "Readmes": [
         {
           "Path": "evidence-regeneration/86d56c9/README.md",
-          "Class": "RawAlongside",
+          "Class": "Generated",
           "ArtifactCount": 1
         }
       ],
@@ -459,11 +459,11 @@
   "Totals": {
     "Families": 32,
     "Readmes": 46,
-    "Generated": 1,
-    "RawAlongside": 44,
+    "Generated": 2,
+    "RawAlongside": 43,
     "Unsupported": 1,
     "Undocumented": 0
   },
   "Story": "US-04 (#22): how much committed evidence can be checked against raw data",
-  "MeasuredAtUtc": "2026-10-15T02:26:23.1162255Z"
+  "MeasuredAtUtc": "2026-10-15T02:31:33.7277244Z"
 }
