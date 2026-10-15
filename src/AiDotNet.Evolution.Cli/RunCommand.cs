@@ -238,6 +238,23 @@ internal sealed class RunOpenEvolveEvaluator
     /// <summary>Metrics excluded from the fitness average, as OpenEvolve excludes its feature dimensions.</summary>
     public List<string> FeatureDimensions { get; init; } = new();
 
+    /// <summary>The metric to use as fitness, for an evaluator whose headline is not <c>combined_score</c>.</summary>
+    /// <remarks>
+    /// <para>
+    /// OpenEvolve's rule is <c>combined_score</c> when the evaluator reports one, and otherwise the mean of
+    /// the non-feature metrics. That mean can move opposite to the evaluator's own objective: measured on
+    /// <c>examples/signal_processing</c>, whose headline is named <c>composite_score</c>, the mean rose from
+    /// 13.73 to 16.51 while <c>composite_score</c> fell from 0.4200 to 0.3959, because two of its nine
+    /// metrics count slope changes and false reversals where higher is worse.
+    /// </para>
+    /// <para>
+    /// Naming the metric here fixes that without touching the example: the evaluator, its config and its
+    /// seed program stay exactly as upstream ships them. <c>null</c> keeps OpenEvolve's rule, so parity is
+    /// the default and this is opt-in.
+    /// </para>
+    /// </remarks>
+    public string? FitnessMetric { get; init; }
+
     /// <summary>Directories added to the evaluator's module search path, relative to the run file.</summary>
     /// <remarks>
     /// An unmodified OpenEvolve evaluator may <c>import openevolve</c> - <c>circle_packing_with_artifacts</c>
@@ -522,6 +539,13 @@ internal static class RunCommand
         // OpenEvolve's population_size bounds the whole database; a bound at or above the grid is just the grid.
         long grid = descriptors.Aggregate(1L, (cells, descriptor) => cells * descriptor.BinCount);
         int capacity = run.Search.ArchiveCapacity > 0 && run.Search.ArchiveCapacity < grid ? run.Search.ArchiveCapacity : 0;
+        // What the reported quality actually is. An OpenEvolve evaluator that reports combined_score has
+        // its own objective optimised; one that does not has fitness computed as the mean of its remaining
+        // metrics, upstream's rule and ours. Measured on examples/signal_processing: that mean rose from
+        // 13.73 to 16.51 while the example's own composite_score FELL from 0.4200 to 0.3959, because two of
+        // its nine metrics count slope changes and false reversals, where higher is worse. A reader of
+        // BestQuality cannot tell those two cases apart, so the report now says which one it is.
+        var fitnessBasis = new FitnessBasisObserver();
         EvolutionRunResult<ProgramGenome> result;
         using (var tracer = new EvolutionTraceObserver<ProgramGenome>(new EvolutionTraceOptions { Enabled = true, Path = tracePath }, run.RunId, descriptors))
         {
@@ -529,9 +553,9 @@ internal static class RunCommand
                 // The engine takes one observer, and a judged run needs two: the trace writer, and the
                 // instruction credit that feeds outcomes back into the search. A composite isolates one
                 // observer's failure from the other rather than letting a trace problem cost a credit.
-                observer: instructions is null
-                    ? tracer
-                    : new CompositeEvolutionObserver<ProgramGenome>(new IEvolutionObserver<ProgramGenome>[] { tracer, instructions }),
+                observer: new CompositeEvolutionObserver<ProgramGenome>(instructions is null
+                    ? new IEvolutionObserver<ProgramGenome>[] { tracer, fitnessBasis }
+                    : new IEvolutionObserver<ProgramGenome>[] { tracer, instructions, fitnessBasis }),
                 checkpointStore: checkpoints, genomeCodec: codec);
             interrupt.Attach(engine.RequestStop);
             try
@@ -554,6 +578,7 @@ internal static class RunCommand
             StopReason = result.StopReason.ToString(),
             result.Counters.CompletedEvaluations,
             BestQuality = best?.Evaluation.Quality,
+            Fitness = fitnessBasis.Report(),
             Trace = tracePath,
             Checkpoints = Path.Combine(outputDirectory, "checkpoints"),
             Repertoire = repertoirePath,
@@ -606,6 +631,22 @@ internal static class RunCommand
             string bestPath = Path.Combine(outputDirectory, "best" + Extension(run.Language));
             File.WriteAllText(bestPath, best.Candidate.CanonicalGenome.Genome.Source, new UTF8Encoding(false));
         }
+        // A run whose every candidate scored zero, including the seed. "Produced no candidate" does not
+        // cover it - there IS a best entry, it is just worthless - so without this the run reports a best
+        // quality of 0, no failures, and looks healthy. Measured on examples/circle_packing, whose
+        // evaluator embeds a Windows temp path in a single-quoted Python literal: four completed
+        // evaluations, every one combined_score 0 and validity 0, nothing said the numbers were
+        // meaningless. A notice rather than an error, because a task whose baseline is genuinely zero is
+        // legitimate and this surface cannot tell the two apart.
+        if (best is { } winner && winner.Evaluation.Quality is 0 && result.Counters.CompletedEvaluations > 1
+            && result.Islands.SelectMany(island => island.Entries)
+                .All(entry => entry.Evaluation.Quality is 0 or null))
+        {
+            error.WriteLine("note: every completed evaluation scored 0, the seed included, so this run "
+                + "cannot distinguish an improvement from an evaluator that reports nothing useful. Score "
+                + "the seed by hand before trusting the archive.");
+        }
+
         if (best is null && result.RetainedFailures.Count > 0)
         {
             EvolutionDiagnostic first = result.RetainedFailures[0];
@@ -715,6 +756,14 @@ internal static class RunCommand
         }
 
         bool passed = seed.Status == EvolutionEvaluationStatus.Completed && seed.Quality is not null;
+        // A seed that completes but scores zero passes - the evaluator ran, and a task whose baseline is
+        // genuinely zero is legitimate - but it is worth saying out loud, because the run that follows
+        // cannot tell an improvement from a broken evaluator. This repository already treats that state as
+        // disqualifying elsewhere: docs/parity/OPENEVOLVE_EXAMPLES.md excludes five examples because "its
+        // own seed scores zero, so a positive-quality assertion cannot distinguish a working run from a
+        // broken one". Measured on examples/circle_packing, whose evaluator embeds a Windows temp path in a
+        // single-quoted Python literal: every evaluation completes with combined_score 0 and validity 0,
+        // the run reports no failures, and nothing says the numbers are meaningless.
         output.WriteLine(JsonSerializer.Serialize(new
         {
             RunId = run.RunId,
@@ -724,6 +773,13 @@ internal static class RunCommand
             Output = outputDirectory,
             SeedStatus = seed.Status.ToString(),
             SeedQuality = seed.Quality,
+            // Reported in the object a caller parses rather than on stderr, because preflight's contract is
+            // one JSON object. Null unless it applies.
+            SeedNotice = passed && seed.Quality is 0
+                ? "the seed scored 0, so a run from here cannot distinguish an improvement from an "
+                  + "evaluator that reports nothing useful. Check the seed's own metrics before spending a "
+                  + "budget on it."
+                : null,
             SeedDiagnostics = seed.Diagnostics,
             ModelCalls = 0
         }, Program.Json));
@@ -999,6 +1055,60 @@ internal static class RunCommand
             if (counts.TryGetValue(status, out long count) && count > 0) return true;
         }
         return false;
+    }
+
+    /// <summary>
+    /// Records what the run's quality numbers mean: the evaluator's own <c>combined_score</c>, or a mean
+    /// over the metrics it did report.
+    /// </summary>
+    /// <remarks>
+    /// Taken from the first completed evaluation, because the metric names an evaluator reports are a
+    /// property of the evaluator rather than of a candidate. A later evaluation reporting different names
+    /// would be a different question, and one this field does not claim to answer.
+    /// </remarks>
+    private sealed class FitnessBasisObserver : IEvolutionObserver<ProgramGenome>
+    {
+        private const string CombinedScore = "combined_score";
+        private string[]? _metricNames;
+        private bool _hasCombinedScore;
+
+        public ValueTask OnEventAsync(EvolutionEvent<ProgramGenome> evolutionEvent,
+            CancellationToken cancellationToken = default)
+        {
+            if (_metricNames is not null || evolutionEvent.Kind != EvolutionEventKind.Evaluated) return default;
+            if (evolutionEvent.Evaluation is not { } evaluation
+                || evaluation.Status != EvolutionEvaluationStatus.Completed
+                || evaluation.Metrics.Count == 0)
+            {
+                return default;
+            }
+
+            _hasCombinedScore = evaluation.Metrics.ContainsKey(CombinedScore);
+            _metricNames = evaluation.Metrics.Keys.OrderBy(name => name, StringComparer.Ordinal).ToArray();
+            return default;
+        }
+
+        public object? Report()
+        {
+            if (_metricNames is null) return null;
+            if (_hasCombinedScore)
+            {
+                return new
+                {
+                    Rule = CombinedScore,
+                    Note = "the evaluator reported combined_score, so quality is its own objective.",
+                };
+            }
+
+            return new
+            {
+                Rule = "mean-of-reported-metrics",
+                Metrics = _metricNames,
+                Note = "the evaluator reported no combined_score, so quality is the mean of these metrics - "
+                    + "upstream's rule and ours. A metric where higher is worse pulls it the wrong way, so a "
+                    + "rising quality does not by itself mean the evaluator's own score improved.",
+            };
+        }
     }
 
     internal static string ForStderr(string? text)

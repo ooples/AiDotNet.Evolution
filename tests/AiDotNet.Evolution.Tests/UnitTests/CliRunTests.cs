@@ -182,6 +182,128 @@ public sealed class CliRunTests
             (row.GetProperty("Text").GetString() ?? string.Empty).Contains("openevolve_missing_module", StringComparison.Ordinal));
     }
 
+    [Theory]
+    // Measured on examples/signal_processing: the mean rose 13.73 -> 16.51 while the example own
+    // composite_score FELL 0.4200 -> 0.3959, because two of its nine metrics count slope changes and
+    // false reversals, where higher is worse. A reader of BestQuality cannot tell that case from an
+    // evaluator whose own objective improved, so the report has to say which rule produced the number.
+    [InlineData(true, "combined_score")]
+    [InlineData(false, "mean-of-reported-metrics")]
+    public void The_report_says_whether_quality_is_the_evaluators_own_score_or_a_mean(
+        bool reportsCombinedScore, string expectedRule)
+    {
+        using var directory = new TemporaryDirectory();
+        using var model = new FakeChatModel();
+        File.WriteAllText(Path.Combine(directory.Path, "initial.py"), "X = 1");
+        string metrics = reportsCombinedScore
+            ? @"{""combined_score"": 0.75}"
+            : @"{""composite_score"": 0.42, ""slope_changes"": 66.0}";
+        File.WriteAllText(Path.Combine(directory.Path, "evaluator.py"),
+            "def evaluate(path):" + (char)10 + "    return " + metrics + (char)10);
+        string runFile = WriteRun(directory.Path, model.Endpoint, maxEvaluations: 1,
+            extra: """, "openEvolveEvaluator": { "timeoutSeconds": 60 }""");
+
+        var (code, output, error) = Run("run", runFile);
+        Assert.True(code == 0, error);
+        using JsonDocument report = JsonDocument.Parse(output);
+        JsonElement fitness = report.RootElement.GetProperty("Fitness");
+        Assert.Equal(expectedRule, fitness.GetProperty("Rule").GetString());
+        if (reportsCombinedScore) return;
+        // The mean case names what fed it, so a quality that rose for the wrong reason can be read back.
+        Assert.Equal(new[] { "composite_score", "slope_changes" },
+            fitness.GetProperty("Metrics").EnumerateArray().Select(item => item.GetString()));
+    }
+
+    [Theory]
+    // This repository already treats a zero-scoring seed as disqualifying: the OpenEvolve ledger excludes
+    // five examples because "its own seed scores zero, so a positive-quality assertion cannot distinguish
+    // a working run from a broken one". Preflight passed such a seed silently. Measured on
+    // examples/circle_packing, whose evaluator embeds a Windows temp path in a single-quoted Python
+    // literal: every evaluation completes with combined_score 0, the run reports no failures, and nothing
+    // says the numbers are meaningless. It still passes - the evaluator ran, and a genuinely zero baseline
+    // is legitimate - but it says so now.
+    [InlineData("0.0", true)]
+    [InlineData("0.5", false)]
+    public void Preflight_says_when_the_seed_scored_zero(string seedScore, bool expectNotice)
+    {
+        using var directory = new TemporaryDirectory();
+        using var model = new FakeChatModel();
+        File.WriteAllText(Path.Combine(directory.Path, "initial.py"), "X = 1");
+        File.WriteAllText(Path.Combine(directory.Path, "evaluator.py"),
+            @"def evaluate(path):" + (char)10 + @"    return {""combined_score"": "
+                + seedScore + "}" + (char)10);
+        string runFile = WriteRun(directory.Path, model.Endpoint, maxEvaluations: 1,
+            extra: """, "openEvolveEvaluator": { "timeoutSeconds": 60 }""");
+
+        var (code, output, error) = Run("preflight", runFile);
+
+        Assert.True(code == 0, error);   // a zero seed still passes: the evaluator ran
+        using JsonDocument report = JsonDocument.Parse(output);
+        Assert.True(report.RootElement.GetProperty("Passed").GetBoolean());
+        JsonElement notice = report.RootElement.GetProperty("SeedNotice");
+        Assert.Equal(expectNotice ? JsonValueKind.String : JsonValueKind.Null, notice.ValueKind);
+        if (expectNotice) Assert.Contains("cannot distinguish an improvement", notice.GetString()!,
+            StringComparison.Ordinal);
+    }
+
+    [Theory]
+    // "Produced no candidate" does not cover this: there IS a best entry, it is just worthless, so the
+    // run reports a best quality of 0, no failures, and looks healthy. Measured on
+    // examples/circle_packing, whose evaluator embeds a Windows temp path in a single-quoted Python
+    // literal: four completed evaluations, every one combined_score 0 and validity 0, and nothing said
+    // the numbers were meaningless.
+    [InlineData("0.0", true)]
+    [InlineData("0.5", false)]
+    public void A_run_where_everything_scored_zero_says_so(string score, bool expectNotice)
+    {
+        using var directory = new TemporaryDirectory();
+        using var model = new FakeChatModel();
+        File.WriteAllText(Path.Combine(directory.Path, "initial.py"), "X = 1");
+        File.WriteAllText(Path.Combine(directory.Path, "evaluator.py"),
+            @"def evaluate(path):" + (char)10 + @"    return {""combined_score"": "
+                + score + "}" + (char)10);
+        string runFile = WriteRun(directory.Path, model.Endpoint, maxEvaluations: 3,
+            extra: """, "openEvolveEvaluator": { "timeoutSeconds": 60 }""");
+
+        var (code, _, error) = Run("run", runFile);
+
+        Assert.Equal(0, code);   // a run that scores zero throughout is not a failed run
+        Assert.Equal(expectNotice,
+            error.Contains("every completed evaluation scored 0", StringComparison.Ordinal));
+    }
+
+    [Theory]
+    // OpenEvolve prefers combined_score and otherwise averages the non-feature metrics, and that mean can
+    // move opposite to the evaluator own objective: measured on examples/signal_processing, whose headline
+    // is named composite_score, the mean rose 13.73 -> 16.51 while composite_score fell 0.4200 -> 0.3959.
+    // Naming the metric fixes that without touching the example. Absent, OpenEvolve rule stands, so
+    // parity is the default. A name the evaluator never reported falls through to that rule rather than
+    // scoring the candidate zero, because a typo in a run file should not look like a bad program.
+    [InlineData(null, 33.21)]
+    [InlineData("composite_score", 0.42)]
+    [InlineData("no_such_metric", 33.21)]
+    public void The_fitness_metric_can_be_named_without_touching_the_example(string? metric, double expected)
+    {
+        using var directory = new TemporaryDirectory();
+        using var model = new FakeChatModel();
+        File.WriteAllText(Path.Combine(directory.Path, "initial.py"), "X = 1");
+        File.WriteAllText(Path.Combine(directory.Path, "evaluator.py"), """
+            def evaluate(path):
+                return {"composite_score": 0.42, "slope_changes": 66.0}
+            """);
+        string chosen = metric is null
+            ? string.Empty
+            : ", \"fitnessMetric\": \"" + metric + "\"";
+        string runFile = WriteRun(directory.Path, model.Endpoint, maxEvaluations: 1,
+            extra: ", \"openEvolveEvaluator\": { \"timeoutSeconds\": 60" + chosen + " }");
+
+        var (code, output, error) = Run("preflight", runFile);
+
+        Assert.True(code == 0, error);
+        using JsonDocument report = JsonDocument.Parse(output);
+        Assert.Equal(expected, report.RootElement.GetProperty("SeedQuality").GetDouble(), 2);
+    }
+
     [Fact]
     public void Preflight_scores_the_seed_exactly_as_run_would_and_never_calls_the_model()
     {
