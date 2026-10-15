@@ -8,8 +8,9 @@ none of it is optional:
 - `campaign_runner.project` prints the budget ceiling and `run` refuses to launch unless the
   projection's own digest is handed back, so a campaign cannot start without someone having read what
   it may spend.
-- The broker is opened **once for the whole campaign**, because the arms share one subscription
-  account and its counters are what the OpenEvolve arms are billed by.
+- The broker is opened **once per cell**, with the frozen `Budget` as its ceiling, so the registered
+  budget is what actually stops a cell rather than a number in a file. A broker cannot be wider than
+  a cell anyway - see `pilot_broker.session`.
 - `campaign_registration.analyze` turns the rows into per-endpoint statistics; this never computes a
   verdict of its own.
 
@@ -26,6 +27,7 @@ sys.path.insert(0, str(Path(__file__).resolve().parent))
 sys.path.insert(0, str(Path(__file__).resolve().parents[1] / "analysis"))
 import campaign_registration as registration  # noqa: E402
 import campaign_runner as runner  # noqa: E402
+import pilot_broker  # noqa: E402
 import pilot_cells  # noqa: E402
 
 
@@ -62,6 +64,22 @@ def freeze(declared, directory):
     directory = Path(directory)
     frozen = registration.register(declared, directory)
     return frozen, directory / "registration.json", runner.project(frozen)
+
+
+def cell_broker(frozen, provider, task, initial, **options):
+    """The per-cell broker, with the frozen registration's own budget as its ceiling.
+
+    The budget is registered per cell (`Budget.ModelCalls`, which `project` multiplies out over the
+    schedule), and this is where it becomes enforcement: the broker refuses the call after the last
+    one the campaign declared, so an arm cannot overspend its cell even if its own stopping rule
+    would let it. `evaluations` is the same ceiling plus two, because an arm evaluates the seed
+    before it proposes anything and may evaluate once more than it proposed; a tighter cap would
+    silently leave a candidate unscored rather than refusing a call.
+    """
+    budget = frozen["Spec"]["Budget"]
+    return pilot_broker.session(provider, task, model_calls=budget["ModelCalls"],
+                                evaluations=budget["ModelCalls"] + 2, seconds=budget["WallSeconds"],
+                                initial=initial, model_tokens=budget["ModelTokens"], **options)
 
 
 def run(frozen, registration_path, projection, state, task, searchers, *, holdout_seed, confirm, log=print):

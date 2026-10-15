@@ -15,8 +15,13 @@ checkpoint_interval: 5
 log_level: INFO
 
 llm:
+  # The alias, not a dated provider name: the shim's transport is keyed by model name, and
+  # `openevolve_configs.TIERS` maps a provider name to an alias - so a dated name here would reach
+  # the account under one name from our arm and another from the OpenEvolve arms, as two transports
+  # with two canary baselines. One name is one metered model for all three arms. The import treats
+  # it as OpenAI-compatible either way (a provider is only ever read from llm.provider).
   models:
-    - name: "claude-sonnet-4-5"
+    - name: "sonnet"
       weight: 1.0
   temperature: 0.7
   max_tokens: 4096

@@ -39,6 +39,29 @@ def declared():
 
 
 class DriverTests(unittest.TestCase):
+    def test_the_registered_budget_is_what_stops_a_cell(self):
+        """`Budget.ModelCalls` has to be enforcement, not a number in a file.
+
+        The broker is what can enforce it, so `cell_broker` builds each cell's broker from the
+        frozen registration: the call after the last declared one is refused, whatever the arm's own
+        stopping rule would have done. The evaluation ceiling is deliberately two above the call
+        ceiling - a cell evaluates the seed before it proposes anything - because a tighter cap
+        would leave a candidate unscored instead of refusing a call.
+        """
+        with tempfile.TemporaryDirectory() as directory:
+            frozen, _, _ = campaign.freeze(
+                campaign.spec(TASK, seed_count=6, model="sonnet", model_calls=2, model_tokens=500,
+                              wall_seconds=60), Path(directory) / "registration")
+            session = campaign.cell_broker(frozen, lambda s, m, model=None: ("answer", 1), TASK, CONSTANT)
+            with session({"Family": TASK, "Seed": frozen["Seeds"][0]}) as broker:
+                self.assertEqual({"model": 2, "evaluate": 4}, broker.limits)
+                broker.dispatch("evaluate", {"code": CONSTANT})
+                for _ in range(2):
+                    broker.dispatch("model", {"system": "s", "messages": []})
+                with self.assertRaises(ValueError):
+                    broker.dispatch("model", {"system": "s", "messages": []})
+            self.assertFalse(broker.closed, "spending the declared budget is not a failure")
+
     def test_the_spec_field_set_is_closed(self):
         # register refuses any extra key, which is how an undeclared knob cannot ride along into a
         # frozen registration. Found by trying to carry `Iterations` in the spec.

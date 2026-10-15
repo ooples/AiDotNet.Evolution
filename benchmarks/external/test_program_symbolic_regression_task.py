@@ -110,7 +110,16 @@ class PilotTaskTests(unittest.TestCase):
         self.assertFalse(config["evaluator"]["cascade_evaluation"], "the pilot scores one stage, not a cascade")
         # llm.models, not primary_model: the shape #267's stalling-config notice was written for.
         self.assertIn("models", config["llm"])
-        self.assertEqual(["claude-sonnet-4-5"], [model["name"] for model in config["llm"]["models"]])
+        names = [model["name"] for model in config["llm"]["models"]]
+        self.assertEqual(["sonnet"], names)
+        # The requirement behind that name: our arm sends it verbatim while the OpenEvolve arms send
+        # whatever TIERS maps it to, and the shim keys a transport (and its canary baseline) by name
+        # - so a name that is not already its own alias would reach one account as two models.
+        import openevolve_configs
+        self.assertEqual(names, [openevolve_configs.TIERS[name] for name in names])
+        self.assertIsNone(config["llm"].get("api_base"),
+                          "an api_base here would send our arm somewhere the broker does not meter")
+        self.assertEqual(0, config["llm"]["retries"], "a retry is a call the broker never admitted")
 
 
 if __name__ == "__main__":
