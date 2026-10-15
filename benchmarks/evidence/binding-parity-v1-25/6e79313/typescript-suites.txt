@@ -1,0 +1,112 @@
+TAP version 13
+# Subtest: conformance: lifecycle
+ok 1 - conformance: lifecycle
+  ---
+  duration_ms: 290.6301
+  type: 'test'
+  ...
+# Subtest: conformance: conflicting-work-is-rejected
+ok 2 - conformance: conflicting-work-is-rejected
+  ---
+  duration_ms: 244.1211
+  type: 'test'
+  ...
+# Subtest: conformance: canceled-work-is-not-claimable
+ok 3 - conformance: canceled-work-is-not-claimable
+  ---
+  duration_ms: 250.6891
+  type: 'test'
+  ...
+# Subtest: conformance: a-foreign-worker-cannot-commit
+ok 4 - conformance: a-foreign-worker-cannot-commit
+  ---
+  duration_ms: 255.3166
+  type: 'test'
+  ...
+# Subtest: conformance: unavailable-is-never-completion
+ok 5 - conformance: unavailable-is-never-completion
+  ---
+  duration_ms: 236.699
+  type: 'test'
+  ...
+# Subtest: conformance: reopen-recovers-and-a-mismatch-is-refused
+ok 6 - conformance: reopen-recovers-and-a-mismatch-is-refused
+  ---
+  duration_ms: 667.5526
+  type: 'test'
+  ...
+# Subtest: the engine envelope yields the genome source and raw payloads pass through
+ok 7 - the engine envelope yields the genome source and raw payloads pass through
+  ---
+  duration_ms: 1.3242
+  type: 'test'
+  ...
+# Subtest: non-scalar and non-finite metrics are recorded as text, not turned into failures
+ok 8 - non-scalar and non-finite metrics are recorded as text, not turned into failures
+  ---
+  duration_ms: 1.2348
+  type: 'test'
+  ...
+# Subtest: receipt payloads are sorted-key JSON and a non-finite number is refused, as Python json.dumps does
+ok 9 - receipt payloads are sorted-key JSON and a non-finite number is refused, as Python json.dumps does
+  ---
+  duration_ms: 0.4023
+  type: 'test'
+  ...
+# Subtest: every lease is committed once and failures are receipts, not crashes
+ok 10 - every lease is committed once and failures are receipts, not crashes
+  ---
+  duration_ms: 304.6542
+  type: 'test'
+  ...
+# Subtest: evaluation result objects keep metrics and artifacts and maxLeases bounds the loop
+ok 11 - evaluation result objects keep metrics and artifacts and maxLeases bounds the loop
+  ---
+  duration_ms: 276.088
+  type: 'test'
+  ...
+# Subtest: an evaluator module without evaluate is refused at load
+ok 12 - an evaluator module without evaluate is refused at load
+  ---
+  duration_ms: 4.7326
+  type: 'test'
+  ...
+# Subtest: leases enqueued by the engine bridge are evaluated as their genome source
+ok 13 - leases enqueued by the engine bridge are evaluated as their genome source
+  ---
+  duration_ms: 272.503
+  type: 'test'
+  ...
+# Subtest: an unparseable envelope and an evaluator returning no JSON become failed receipts
+ok 14 - an unparseable envelope and an evaluator returning no JSON become failed receipts
+  ---
+  duration_ms: 276.3477
+  type: 'test'
+  ...
+# Subtest: a commit that fails is propagated, never retried by re-running the evaluator
+ok 15 - a commit that fails is propagated, never retried by re-running the evaluator
+  ---
+  duration_ms: 261.6706
+  type: 'test'
+  ...
+# Subtest: a claim on an undeclared behaviour is refused
+ok 16 - a claim on an undeclared behaviour is refused
+  ---
+  duration_ms: 0.4388
+  type: 'test'
+  ...
+# Subtest: every declared reference-worker behaviour is covered by a test here
+ok 17 - every declared reference-worker behaviour is covered by a test here
+  ---
+  duration_ms: 0.1685
+  type: 'test'
+  ...
+1..17
+# tests 17
+# suites 0
+# pass 17
+# fail 0
+# cancelled 0
+# skipped 0
+# todo 0
+# duration_ms 2147.8881

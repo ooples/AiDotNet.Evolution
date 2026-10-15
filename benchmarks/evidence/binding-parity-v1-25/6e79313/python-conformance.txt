@@ -1,0 +1,6 @@
+test_every_shared_scenario (test_conformance.ConformanceTests.test_every_shared_scenario) ... ok
+
+----------------------------------------------------------------------
+Ran 1 test in 2.019s
+
+OK

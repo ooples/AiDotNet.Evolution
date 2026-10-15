@@ -1,0 +1,83 @@
+{
+ "story": "V1-25 (#119): Python reference worker and TypeScript binding parity",
+ "commit": "6e79313",
+ "platform": "Windows-11-10.0.26220-SP0",
+ "python": "3.13.14",
+ "node": "v25.6.0",
+ "protocol_conformance": {
+  "shared_file": "conformance/durable-v1/scenarios.json",
+  "scenarios": 6,
+  "scenario_names": [
+   "lifecycle",
+   "conflicting-work-is-rejected",
+   "canceled-work-is-not-claimable",
+   "a-foreign-worker-cannot-commit",
+   "unavailable-is-never-completion",
+   "reopen-recovers-and-a-mismatch-is-refused"
+  ],
+  "python": {
+   "tests": 1,
+   "passed": true,
+   "detail": null
+  },
+  "typescript_conformance_and_reference_worker": {
+   "tests": 17,
+   "pass": 17,
+   "fail": 0
+  },
+  "csharp": "DurableConformanceTests: one xUnit case per scenario, run by the Linux test job in CI"
+ },
+ "reference_worker_parity": {
+  "shared_file": "conformance/reference-worker-v1/behaviours.json",
+  "behaviours": 9,
+  "behaviour_ids": [
+   "engine-envelope-yields-genome-source",
+   "non-scalar-and-non-finite-metrics-are-text",
+   "receipt-payload-is-canonical-json",
+   "one-commit-per-lease-and-failures-are-receipts",
+   "result-objects-keep-metrics-and-artifacts",
+   "evaluator-without-evaluate-is-refused-at-load",
+   "unparseable-envelope-and-empty-result-are-failed-receipts",
+   "commit-failure-is-propagated-not-retried",
+   "engine-bridge-lease-is-evaluated-as-its-genome-source"
+  ],
+  "python": {
+   "tests": 13,
+   "passed": true,
+   "detail": null
+  },
+  "ratchet_probe": {
+   "what": "a tenth behaviour added to the manifest, covered by no test in either binding",
+   "python": {
+    "tests": 13,
+    "passed": false,
+    "detail": "failures=1"
+   },
+   "typescript": {
+    "tests": 11,
+    "pass": 10,
+    "fail": 1
+   }
+  }
+ },
+ "unmodified_competitor_evaluator": {
+  "example": "function_minimization",
+  "openevolve_commit": "411fb59c886c18704caaffb611e17cf9e7d824d2",
+  "unmodified_blobs": {
+   "examples/function_minimization/evaluator.py": "f16318125b56073905d10e24143c17286c0963b9",
+   "examples/function_minimization/initial_program.py": "670c02cc459be42f66a2a92fd0e6a33037220671"
+  },
+  "dispositions": [
+   "accepted",
+   "accepted"
+  ],
+  "receipt_outcomes": {
+   "1": "completed",
+   "2": "completed"
+  },
+  "host_admitted": "2",
+  "host_settled": "2",
+  "host_denied": "0",
+  "limitations": "One unmodified initial program and one broken program; the example's stochastic metrics vary run to run. The upstream evaluator scores a broken program 0 with an error artifact instead of raising, so that receipt is completed, as in OpenEvolve. Only evaluate(program_path) is served; cascade stages are not invoked. The home directory is redacted to ~ in tracebacks."
+ }
+}
