@@ -64,9 +64,9 @@
       "budget": 20000,
       "expression": "-1*exp(-t) + 1*1/(1+t^2) + 0.5*1/(1+t^2)",
       "selection_nmse": 0.657464149213127,
-      "baseline_test_nmse": 1.0000000000000002,
+      "baseline_test_nmse": 1.0005291634498434,
       "found_test_nmse": 0.6779096849168819,
-      "gap_closed": 0.32209031508311825,
+      "gap_closed": 0.32244885038689275,
       "test_seal": "59e62136063bd3a36c113ad5e04c4071fd18a2b28f5dc53b40b3b0127b51d28d"
     },
     {
@@ -75,9 +75,9 @@
       "budget": 20000,
       "expression": "2*1/(1+t^2) + 0.3*exp(-t) + -2*exp(-t)",
       "selection_nmse": 0.6070676823113492,
-      "baseline_test_nmse": 1.0000000000000002,
+      "baseline_test_nmse": 1.0043455757742292,
       "found_test_nmse": 0.6943964085352675,
-      "gap_closed": 0.3056035914647326,
+      "gap_closed": 0.3086080874105791,
       "test_seal": "1b1e320d697f4bde22b906820d9852f99c27d8e4cb95fcab680c43d30ddfd0a2"
     },
     {
@@ -86,9 +86,9 @@
       "budget": 20000,
       "expression": "0.3*exp(-t) + 0.3*1/(1+t^2)",
       "selection_nmse": 0.7433368655755972,
-      "baseline_test_nmse": 0.9999999999999989,
+      "baseline_test_nmse": 1.0114985755796513,
       "found_test_nmse": 0.7078275272629538,
-      "gap_closed": 0.2921724727370454,
+      "gap_closed": 0.3002189579383986,
       "test_seal": "f44060b7ab39f5eb38b95441792b59eba339f8fd8408b90df3d1a5b74a085947"
     },
     {
@@ -97,9 +97,9 @@
       "budget": 20000,
       "expression": "0.5*1/(1+x^2) + 1*sin(x)",
       "selection_nmse": 0.055597144459823306,
-      "baseline_test_nmse": 1.0000000000000002,
+      "baseline_test_nmse": 1.007306079218696,
       "found_test_nmse": 0.06824852432702148,
-      "gap_closed": 0.9317514756729786,
+      "gap_closed": 0.9322464881975521,
       "test_seal": "4506dfe535fdf19cd0247b3a240277d83706f028a967d44da6a2faa5b75dd93b"
     },
     {
@@ -108,9 +108,9 @@
       "budget": 20000,
       "expression": "1*1 + 0.3*1 + 1*sin(x) + -1",
       "selection_nmse": 0.09477483630824322,
-      "baseline_test_nmse": 0.9999999999999993,
+      "baseline_test_nmse": 1.0040528343451511,
       "found_test_nmse": 0.1014671710325863,
-      "gap_closed": 0.8985328289674136,
+      "gap_closed": 0.8989423986848623,
       "test_seal": "bc9c91fba7f8eebe968bd9477765fc2bba477ad1cd79cef4a6b30b04f19b556c"
     },
     {
@@ -119,9 +119,9 @@
       "budget": 20000,
       "expression": "0.3*sin(x) + 0.5*1/(1+x^2) + 1*sin(x)",
       "selection_nmse": 0.052018440299326424,
-      "baseline_test_nmse": 1.0,
+      "baseline_test_nmse": 1.0249126222305511,
       "found_test_nmse": 0.052822581121308616,
-      "gap_closed": 0.9471774188786913,
+      "gap_closed": 0.9484613810235364,
       "test_seal": "5f105f9f2c1197048a860fdcd8b732b06b867e9df477d9a97ca92a6c4bf31ae1"
     },
     {
@@ -130,9 +130,9 @@
       "budget": 20000,
       "expression": "-1*1 + 1",
       "selection_nmse": 1.033982065885878,
-      "baseline_test_nmse": 1.0,
+      "baseline_test_nmse": 1.0488237760974979,
       "found_test_nmse": 1.0057162530381383,
-      "gap_closed": -0.005716253038138275,
+      "gap_closed": 0.041100825555038134,
       "test_seal": "5552dd27434c0735882293582191bae33cb3dfb4c90e65ef24807aa34934e487"
     },
     {
@@ -141,9 +141,9 @@
       "budget": 20000,
       "expression": "1*1 + -1",
       "selection_nmse": 1.018863742380728,
-      "baseline_test_nmse": 0.9999999999999998,
+      "baseline_test_nmse": 1.0044668238338164,
       "found_test_nmse": 1.0002026990718154,
-      "gap_closed": -0.0002026990718155819,
+      "gap_closed": 0.004245162369550304,
       "test_seal": "72a21c8056f05993a72e00074c04df1792eb1dfcb076acbec515a76860fd1b53"
     },
     {
@@ -152,9 +152,9 @@
       "budget": 20000,
       "expression": "0.5*1 + -0.5",
       "selection_nmse": 1.043482987571792,
-      "baseline_test_nmse": 1.0000000000000002,
+      "baseline_test_nmse": 1.0020613779867644,
       "found_test_nmse": 1.0013700035994029,
-      "gap_closed": -0.0013700035994026472,
+      "gap_closed": 0.0006899521352180527,
       "test_seal": "3cbaf77968ef48bff67134c472cdd4a0e19712d5329cfd50f78f1ecdad74e625"
     }
   ]

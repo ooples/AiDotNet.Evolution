@@ -148,7 +148,12 @@ def nmse(predict, rows):
         except Exception:  # noqa: BLE001 - a candidate that raises scores worst, it does not abort the run
             return math.inf
         if not math.isfinite(prediction): return math.inf
-        total += (prediction - y) ** 2
+        # error * error, never error ** 2: a finite but huge prediction such as 1e200 raises
+        # OverflowError on exponentiation, which would escape and abort the run, where
+        # multiplication saturates to inf and lets the candidate score worst instead.
+        error = prediction - y
+        total += error * error
+        if not math.isfinite(total): return math.inf
     return (total / len(rows)) / variance
 
 

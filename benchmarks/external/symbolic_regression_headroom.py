@@ -62,6 +62,17 @@ def _predict(terms, offset):
     return predict
 
 
+def _mean(rows):
+    return sum(y for _, y in rows) / len(rows)
+
+
+def _constant(value):
+    """A predictor bound to `value` now, so a loop variable cannot leak into it later (ruff B023)."""
+    def predict(*_):
+        return value
+    return predict
+
+
 def search(task, seed, budget):
     """Returns the best candidate by train+validation NMSE. Never reads the test split."""
     split = family.build(task, seed)
@@ -98,10 +109,11 @@ def main():
     for task in family.TASKS:
         for seed in family.DEV_SEEDS:
             split, best = search(task, seed, arguments.budget)
-            targets = [y for _, y in split["test"]]
-            mean = sum(targets) / len(targets)
-            # The seed any searcher has to beat: predict the training mean. Scored the same way.
-            baseline = family.score(lambda *_: mean, split)
+            # The seed any searcher has to beat: predict the TRAINING mean, scored the same way.
+            # Taking the mean from the held-out rows instead would make baseline_test_nmse exactly 1
+            # by construction - it is the definition of this NMSE's denominator - and every
+            # gap_closed below would be measured against a baseline that had seen the test split.
+            baseline = family.score(_constant(_mean(split["train"])), split)
             found = family.score(_predict(best[1], best[2]), split)
             rows.append({
                 "task": task, "seed": seed, "budget": arguments.budget,

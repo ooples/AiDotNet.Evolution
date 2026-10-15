@@ -10,12 +10,17 @@ materially better than the seed **while never seeing the test split** - and how 
 
 | task | gap closed on test (3 dev seeds) | test NMSE spread over 8 seeds | effect / spread |
 | --- | --- | ---: | ---: |
-| `rational_gain` | **+0.899 to +0.947** | 0.049 | the floor already solves it; nothing left to win |
-| `damped_oscillator` | **+0.292 to +0.322** | **0.124** | **~2.4x - the task to compete on** |
-| `two_variable_ratio` | -0.006 to -0.000 | 0.112 | the floor cannot touch it at all |
+| `rational_gain` | **+0.899 to +0.948** | 0.049 | the floor already solves it; nothing left to win |
+| `damped_oscillator` | **+0.300 to +0.322** | **0.124** | **~2.4x - the task to compete on** |
+| `two_variable_ratio` | +0.001 to +0.041 | 0.112 | the floor cannot touch it at all |
 
-`gap_closed` is `1 - found_test_nmse / baseline_test_nmse`, where the baseline predicts the training
-mean and so scores NMSE 1.0 by construction. The spread column is the same floor across **8
+`gap_closed` is `1 - found_test_nmse / baseline_test_nmse`, where the baseline predicts the
+**training** mean. Review caught this card taking that mean from the held-out rows instead, which made
+`baseline_test_nmse` exactly 1.0 for every row - it is the definition of this NMSE's denominator - so
+every gap was measured against a baseline that had seen the test split. Corrected, the baselines run
+**1.000529 to 1.048824** and the readings above move very little, because the two means are close for
+tasks sampled from one distribution; the one visible change is `two_variable_ratio` crossing from
+marginally negative to marginally positive. The spread column is the same floor across **8
 consecutive seeds**, one arm against itself: a between-arm difference smaller than it is seed noise,
 not a result.
 

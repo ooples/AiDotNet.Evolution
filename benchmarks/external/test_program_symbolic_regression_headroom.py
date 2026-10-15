@@ -13,14 +13,45 @@ BUDGET = 4000
 
 class HeadroomProbeTests(unittest.TestCase):
     def test_selection_cannot_see_the_test_split(self):
-        # Tampering with the held-out rows before the search must not change what it picks. If
-        # selection ever read them, this would be the test that caught it.
-        split, best = headroom.search("rational_gain", family.DEV_SEEDS[0], BUDGET)
+        """Tampering with the held-out rows must not change what the search picks.
+
+        An earlier version of this test mutated a split it built itself, while `search` called
+        `family.build` again and never saw the mutation - so it would have passed even if selection
+        read the held-out rows. The tampered split is now injected into the search, which is the
+        only arrangement in which the assertion means anything.
+        """
+        _, best = headroom.search("rational_gain", family.DEV_SEEDS[0], BUDGET)
         self.assertIsNotNone(best)
-        original = family.build("rational_gain", family.DEV_SEEDS[0])
-        original["test"] = [(xs, y + 100.0) for xs, y in original["test"]]
-        _, again = headroom.search("rational_gain", family.DEV_SEEDS[0], BUDGET)
+
+        tampered = family.build("rational_gain", family.DEV_SEEDS[0])
+        tampered["test"] = [(xs, y + 100.0) for xs, y in tampered["test"]]
+        genuine = headroom.family.build
+        try:
+            headroom.family.build = lambda *args, **kwargs: tampered
+            _, again = headroom.search("rational_gain", family.DEV_SEEDS[0], BUDGET)
+        finally:
+            headroom.family.build = genuine
         self.assertEqual(best[1:], again[1:], "the chosen candidate moved when only test rows changed")
+
+    def test_the_isolation_test_would_notice_a_searcher_that_peeked(self):
+        """A positive control for the test above: a selection that reads test rows must be caught.
+
+        Without this, the injection could be wired up wrongly - patching the wrong name, say - and
+        the isolation assertion would be vacuous again in a way that still passes.
+        """
+        tampered = family.build("damped_oscillator", family.DEV_SEEDS[0])
+        tampered["test"] = [(xs, y + 100.0) for xs, y in tampered["test"]]
+        genuine = headroom.family.build
+        seen = []
+        try:
+            headroom.family.build = lambda *args, **kwargs: tampered
+            # Stand in for a peeking searcher: score on the rows the real one never touches.
+            split = headroom.family.build("damped_oscillator", family.DEV_SEEDS[0])
+            seen.append(family.nmse(lambda *_: 0.0, split["test"]))
+        finally:
+            headroom.family.build = genuine
+        clean = family.nmse(lambda *_: 0.0, family.build("damped_oscillator", family.DEV_SEEDS[0])["test"])
+        self.assertNotAlmostEqual(seen[0], clean, msg="the injected split did not reach the caller")
 
     def test_the_floor_is_weak_on_a_task_its_basis_cannot_express(self):
         # two_variable_ratio needs a product of two variables; the basis has only single-variable

@@ -72,6 +72,9 @@ class SymbolicRegressionFamilyTests(unittest.TestCase):
         self.assertEqual(math.inf, family.nmse(raises, split["test"]))
         self.assertEqual(math.inf, family.nmse(lambda *_: float("nan"), split["test"]))
         self.assertEqual(math.inf, family.nmse(lambda *_: float("inf"), split["test"]))
+        # Finite but huge: math.isfinite passes, and (prediction - y) ** 2 would raise
+        # OverflowError and abort the run instead of scoring this candidate worst.
+        self.assertEqual(math.inf, family.nmse(lambda *_: 1e200, split["test"]))
 
     def test_a_split_is_deterministic_and_its_seal_survives_json(self):
         import json
