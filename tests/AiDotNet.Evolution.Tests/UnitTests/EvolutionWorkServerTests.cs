@@ -219,8 +219,30 @@ public sealed class EvolutionWorkServerTests : IDisposable
         using EvolutionWorkRemoteClient worker = await ConnectTo(server);
         JsonObject first = Assert.IsType<JsonObject>(JsonNode.Parse(await worker.SendAsync(Request("status").ToJsonString())));
         Assert.True(first["ok"]?.GetValue<bool>());
-        await Task.Delay(TimeSpan.FromSeconds(2));
-        await Assert.ThrowsAnyAsync<Exception>(() => worker.SendAsync(Request("status").ToJsonString()));
+
+        // Poll until the connection is gone rather than probing once after a fixed wait. The idle
+        // sweep is a background timer, and on a loaded runner it can miss any particular window:
+        // this failed in CI twice as "Assert.ThrowsAny() Failure: No exception was thrown" after a
+        // 2 s delay against a 300 ms timeout, while passing locally in isolation every time.
+        //
+        // The property is unchanged and still required - a quiet authenticated connection must be
+        // closed - but it is now "within 30 seconds" instead of "by the 2-second mark", so a
+        // starved sweep is late rather than a failure, and a sweep that never fires still fails.
+        Exception? closed = null;
+        for (int attempt = 0; attempt < 60 && closed is null; attempt++)
+        {
+            await Task.Delay(TimeSpan.FromMilliseconds(500));
+            try
+            {
+                await worker.SendAsync(Request("status").ToJsonString());
+            }
+            catch (Exception exception)
+            {
+                closed = exception;
+            }
+        }
+
+        Assert.NotNull(closed);
     }
 
     private Task<EvolutionWorkRemoteClient> Connect() =>
