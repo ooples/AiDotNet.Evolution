@@ -1,0 +1,35 @@
+{
+  "story": "V1-74 (#179), re-measured for US-04 (#22)",
+  "what": "benchmarks/EvolutionCheckpoint at current main, so the card has committed raw output instead of transcribed numbers",
+  "commit": "86d56c9",
+  "runtime": ".NET 10.0.12",
+  "os": "Microsoft Windows 10.0.26220",
+  "configuration": "Release, net10.0",
+  "harness": "4 KB Python programs, one per archive cell, 16 checkpoints over the run, DirectoryEvolutionCheckpointStore; write latency is SaveAsync alone, resume is a fresh engine restoring the final checkpoint",
+  "rows": [
+    {
+      "Elites": 1000,
+      "Checkpoints": 16,
+      "WriteP50Ms": 79.8417,
+      "WriteP95Ms": 158.4831,
+      "FinalWriteMs": 158.4831,
+      "FinalCheckpointBytes": 4387450,
+      "BytesPerElite": 4387.45,
+      "ResumeMs": 545.9335,
+      "ResumedStateMatches": true
+    },
+    {
+      "Elites": 10000,
+      "Checkpoints": 16,
+      "WriteP50Ms": 1000.4889,
+      "WriteP95Ms": 2959.362,
+      "FinalWriteMs": 2959.362,
+      "FinalCheckpointBytes": 46262658,
+      "BytesPerElite": 4626.2658,
+      "ResumeMs": 5287.7092,
+      "ResumedStateMatches": true
+    }
+  ],
+  "reading": "Both after-rows reproduce: p50 79.8 ms and p95 158.5 ms at 1,000 elites, 1,000.5 ms and 2,959.4 ms at 10,000, resume 545.9 ms and 5,287.7 ms, and ResumedStateMatches true in both. The checkpoint is smaller than the 5699058 card recorded - 4,387 and 4,626 bytes per elite against 5,028 and 5,105 - so the byte figures are not reproductions and are stated as a change, not a match.",
+  "not_remeasured": "The before-rows (1,000 elites at 329/925 ms, and 10,000 failing to write) are from 5699058 without its fix. Reproducing them needs that commit reverted, which this run does not do, so they remain historical."
+}

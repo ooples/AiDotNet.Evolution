@@ -43,7 +43,7 @@ public sealed class EvidenceRegenerationCensusTests
     // Measured at main 86d56c9. Raising Generated or lowering either of the others is the work;
     // moving one the wrong way has to fail, which is the only reason these are literals.
     private const int MinimumGenerated = 1;
-    private const int MaximumUnsupported = 2;
+    private const int MaximumUnsupported = 1;
     private const int MaximumUndocumentedFamilies = 0;
 
     [Fact]

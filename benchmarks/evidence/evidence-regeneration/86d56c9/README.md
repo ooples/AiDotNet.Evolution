@@ -11,25 +11,29 @@ honest qualifier and the useless one, because nothing said how much was left out
 | class | READMEs | what a reader can do |
 | --- | ---: | --- |
 | `Generated` | **1 of 46** | a script re-renders the tables from a committed summary, and drift fails a build |
-| `RawAlongside` | 43 | check the claims by hand against evidence committed at or beneath the README |
-| `Unsupported` | **2** | nothing: the numbers exist nowhere else in the repository |
+| `RawAlongside` | 44 | check the claims by hand against evidence committed at or beneath the README |
+| `Unsupported` | **1** | nothing: the numbers exist nowhere else in the repository |
 
 Families with **no README anywhere beneath them: 0 of 32.** The first run of this census found **7**;
 each now has one, written from its own committed JSON, and every figure in those seven was checked back
 against the data rather than transcribed.
 
-## The two unsupported READMEs
+## The unsupported READMEs: two found, one cleared
 
-- [`checkpoint/README.md`](../../checkpoint/README.md) - cites a 250 ms p95 write bound and an elite count
-  at which checkpointing fails, from a `benchmarks/EvolutionCheckpoint` run whose output was never
-  committed.
-- [`proposer-ceiling/767b31a/README.md`](../../proposer-ceiling/767b31a/README.md) - tabulates five model
-  answers and concludes *"about one call in five"*. The driver
-  (`benchmarks/external/proposer_ceiling_probe.py`) is committed; its five replies are not, so the row that
-  decides the conclusion cannot be re-read.
+- [`checkpoint/README.md`](../../checkpoint/README.md) - **cleared.** It transcribed write and resume
+  latencies from a `benchmarks/EvolutionCheckpoint` run whose output was never committed. The benchmark is
+  CPU-only, so its two *after* rows were simply re-run at this commit and the raw output committed beside
+  the card. The latencies reproduce; the byte figures do not (4,387 and 4,626 bytes per elite against
+  5,028 and 5,105), and that disagreement is now recorded instead of being invisible. Its *before* rows
+  stay historical: they are `5699058` without its fix and need that commit reverted.
+- [`proposer-ceiling/767b31a/README.md`](../../proposer-ceiling/767b31a/README.md) - **still
+  unsupported.** It tabulates five model answers and concludes *"about one call in five"*. The driver
+  (`benchmarks/external/proposer_ceiling_probe.py`) is committed; its five replies are not, so the row the
+  conclusion rests on cannot be re-read. Recovering it means paying for five model calls, which is not a
+  free re-run, so it is left measured rather than fixed.
 
-Both are summaries of real runs. Neither is re-checkable, which is the distinction US-04 exists to make,
-and both were written by this project rather than inherited.
+Both were written by this project rather than inherited, which is why neither was defensible as
+*"inherited evidence we cannot reproduce"*.
 
 ## The seven that were undocumented
 
@@ -58,5 +62,5 @@ is not a met target.
 ./eng/Measure-EvidenceRegeneration.ps1 -OutputFile census.json
 ```
 
-The census includes itself: this directory is one of the 32 families and one of the 43 `RawAlongside`
+The census includes itself: this directory is one of the 32 families and one of the 44 `RawAlongside`
 READMEs, so the output is a fixed point rather than a reading taken from outside the tree.

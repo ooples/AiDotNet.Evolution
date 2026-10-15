@@ -71,11 +71,11 @@
       "Readmes": [
         {
           "Path": "checkpoint/README.md",
-          "Class": "Unsupported",
-          "ArtifactCount": 0
+          "Class": "RawAlongside",
+          "ArtifactCount": 1
         }
       ],
-      "ArtifactCount": 0,
+      "ArtifactCount": 1,
       "Undocumented": false
     },
     {
@@ -460,10 +460,10 @@
     "Families": 32,
     "Readmes": 46,
     "Generated": 1,
-    "RawAlongside": 43,
-    "Unsupported": 2,
+    "RawAlongside": 44,
+    "Unsupported": 1,
     "Undocumented": 0
   },
   "Story": "US-04 (#22): how much committed evidence can be checked against raw data",
-  "MeasuredAtUtc": "2026-10-15T02:20:29.1256036Z"
+  "MeasuredAtUtc": "2026-10-15T02:26:23.1162255Z"
 }
