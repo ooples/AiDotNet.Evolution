@@ -39,6 +39,12 @@ def _usage(summary):
 def ours(cli, task_directory, python_executable, *, iterations, endpoint=None, timeout=1800):
     """Returns a searcher that runs our CLI over the task's unmodified OpenEvolve config.
 
+    `cli` is a command prefix, not just an executable: a string for an installed
+    `aidotnet-evolve`, or a sequence like `["dotnet", "<path>/aidotnet-evolve.dll"]` for a locally
+    built one. A dry run caught this - passing `"dotnet"` alone produced `dotnet run ...`, which the
+    SDK read as its own `run` command and answered "Couldn't find a project to run", and CI builds the
+    dll rather than installing the tool.
+
     `endpoint`, when given, replaces the config's `api_base` so a test can point the arm at a
     loopback stub and exercise the whole path without spending anything.
     """
@@ -52,6 +58,9 @@ def ours(cli, task_directory, python_executable, *, iterations, endpoint=None, t
 
     def search(cell, directory, resume):
         directory = Path(directory)
+        # campaign_runner creates the cell directory before calling, but a searcher called directly
+        # should not depend on that; a test found this by invoking one outside the runner.
+        directory.mkdir(parents=True, exist_ok=True)
         output = directory / "out"
         config = directory / "config.yaml"
         text = config_source.read_text(encoding="utf-8")
@@ -64,9 +73,11 @@ def ours(cli, task_directory, python_executable, *, iterations, endpoint=None, t
                            EVOLUTION_SR_SEED=str(cell["Seed"]))
         if resume and output.exists():
             shutil.rmtree(output)  # a resumed cell re-runs: the engine owns its own resume, not this
+        prefix = [cli] if isinstance(cli, (str, Path)) else list(cli)
         completed = subprocess.run(
-            [cli, "run", "--openevolve-config", str(config), str(initial), str(evaluator),
-             "--iterations", str(iterations), "--output", str(output), "--python", python_executable],
+            [*[str(part) for part in prefix], "run", "--openevolve-config", str(config), str(initial),
+             str(evaluator), "--iterations", str(iterations), "--output", str(output),
+             "--python", python_executable],
             capture_output=True, text=True, timeout=timeout, env=environment, cwd=str(directory))
         if completed.returncode != 0:
             raise RuntimeError("the CLI exited " + str(completed.returncode) + ": " + completed.stderr[-400:])
@@ -109,6 +120,7 @@ def openevolve(adapter, upstream, task_directory, broker, *, mode, model, iterat
 
     def search(cell, directory, resume):
         directory = Path(directory)
+        directory.mkdir(parents=True, exist_ok=True)
         output = directory / "out"
         before_calls, before_tokens = spend()
         command = [sys.executable, str(adapter), "--upstream", str(upstream), "--initial", str(initial),

@@ -60,6 +60,40 @@ class UsageAccountingTests(unittest.TestCase):
             self.assertTrue(callable(pilot_searchers.ours("aidotnet-evolve", directory, sys.executable,
                                                           iterations=1)))
 
+class CommandPrefixTests(unittest.TestCase):
+    def test_the_cli_may_be_a_command_prefix_not_only_an_executable(self):
+        """A dry run caught this: `cli="dotnet"` became `dotnet run ...` and the SDK answered
+        "Couldn't find a project to run". CI builds the dll rather than installing the tool, so a
+        sequence prefix has to work."""
+        import subprocess
+        import tempfile
+        captured = {}
+
+        def fake_run(command, **kwargs):
+            captured["command"] = command
+            raise AssertionError("stop before the subprocess")
+
+        with tempfile.TemporaryDirectory() as directory:
+            root = Path(directory)
+            (root / "config.yaml").write_text("max_iterations: 1\n", encoding="utf-8")
+            (root / "evaluator.py").write_text("def evaluate(p):\n    return {}\n", encoding="utf-8")
+            (root / "initial_program.py").write_text("def predict(*xs):\n    return 0.0\n", encoding="utf-8")
+            cell = {"Family": "damped_oscillator", "Arm": "aidotnet", "Seed": 5000}
+            genuine = subprocess.run
+            try:
+                subprocess.run = fake_run
+                for cli, expected in (("aidotnet-evolve", ["aidotnet-evolve", "run"]),
+                                       (["dotnet", "x/aidotnet-evolve.dll"],
+                                        ["dotnet", "x/aidotnet-evolve.dll", "run"])):
+                    with self.subTest(cli=cli):
+                        search = pilot_searchers.ours(cli, root, sys.executable, iterations=1)
+                        with self.assertRaises(AssertionError):
+                            search(cell, root / "cell", False)
+                        self.assertEqual(expected, captured["command"][:len(expected)])
+            finally:
+                subprocess.run = genuine
+
+
 class FakeBroker:
     """Stands in for ProgramBroker's counters: cumulative, shared across arms and cells."""
 
