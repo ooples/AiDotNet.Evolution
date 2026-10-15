@@ -22,6 +22,13 @@ param(
 
     [Parameter(ParameterSetName = 'Measure')] [string] $OutputFile,
 
+    # Also measure the two generic delivery boxes every story carries - "merged PR", "hosted CI green
+    # on the merged head" and "CodeRabbit review confirmed present" - which are otherwise answered by
+    # hand annotation. Each issue's closing pull requests are read from
+    # closedByPullRequestsReferences, then each one's reviews are counted by author and its merge
+    # commit's check runs by conclusion. Costs a few API calls per issue, so it is opt-in.
+    [Parameter(ParameterSetName = 'Measure')] [switch] $WithDelivery,
+
     [Parameter(Mandatory, ParameterSetName = 'SelfTest')] [switch] $SelfTest
 )
 
@@ -94,6 +101,73 @@ if ($SelfTest) {
     return
 }
 
+function Measure-Delivery {
+    <#
+    .SYNOPSIS
+        Closing pull requests for one issue, with each one's review authors and merged-head checks.
+    .DESCRIPTION
+        Answers the delivery boxes from the repository rather than from an annotation. Two findings
+        this exists to keep measurable: CodeRabbit's free tier passes a PR's checks while posting no
+        review at all (#238, #293, #294-#296), and before #299 every merge to main cancelled the
+        previous merge's run, so "hosted CI green on the merged head" was unobtainable rather than
+        unmet - the merge commit's checks show which of the two a box is.
+
+        Measured on three stories when this was written, and the three answers were all different:
+        #167's closing PR #253 has 12 CodeRabbit reviews (so its review box is met, where the issue
+        says "partially") with 3 cancelled merged-head checks; #169's #258 the same shape; #181's
+        #229 has 13 green merged-head checks and no CodeRabbit review at all, only Copilot's.
+
+        A caveat the data carries: closedByPullRequestsReferences can include a release pull request
+        that merely mentions the issue (#228 appears under #169), so a reader weighs the PR that did
+        the work rather than counting rows.
+    #>
+    param([int] $Number, [string] $Repository)
+
+    $owner, $name = $Repository.Split('/')
+    $query = @"
+{ repository(owner: "$owner", name: "$name") { issue(number: $Number) {
+    closedByPullRequestsReferences(first: 10, includeClosedPrs: true) { nodes {
+        number state mergeCommit { oid }
+        reviews(first: 50) { nodes { author { login } state } } } } } } }
+"@
+    $json = gh api graphql -f query=$query 2>$null
+    if ($LASTEXITCODE -ne 0 -or [string]::IsNullOrWhiteSpace($json)) {
+        throw "Could not read closing pull requests for issue $Number."
+    }
+
+    $pulls = [System.Collections.Generic.List[object]]::new()
+    foreach ($pull in ($json | ConvertFrom-Json).data.repository.issue.closedByPullRequestsReferences.nodes) {
+        $authors = @{}
+        foreach ($review in $pull.reviews.nodes) {
+            $login = [string] $review.author.login
+            if ($login) { $authors[$login] = 1 + ([int] $authors[$login]) }
+        }
+        $checks = $null
+        if ($pull.mergeCommit -and $pull.mergeCommit.oid) {
+            $runs = gh api ("repos/$Repository/commits/" + $pull.mergeCommit.oid + "/check-runs?per_page=100") 2>$null
+            if ($LASTEXITCODE -eq 0 -and -not [string]::IsNullOrWhiteSpace($runs)) {
+                $conclusions = @{}
+                foreach ($run in ($runs | ConvertFrom-Json).check_runs) {
+                    $key = if ($run.conclusion) { [string] $run.conclusion } else { [string] $run.status }
+                    $conclusions[$key] = 1 + ([int] $conclusions[$key])
+                }
+                $checks = [pscustomobject] $conclusions
+            }
+        }
+        $pulls.Add([pscustomobject]@{
+            Number          = $pull.number
+            State           = $pull.state
+            MergeCommit     = if ($pull.mergeCommit) { $pull.mergeCommit.oid } else { $null }
+            ReviewsByAuthor = [pscustomobject] $authors
+            # A review by anything other than the author of the pull request; the box asks for a
+            # review, and a green check is not one.
+            ReviewCount     = ($pull.reviews.nodes | Measure-Object).Count
+            MergedHeadChecks = $checks
+        })
+    }
+    return $pulls.ToArray()
+}
+
 $rows = [System.Collections.Generic.List[object]]::new()
 foreach ($number in $Issues) {
     $json = gh issue view $number --repo $Repository --json number,state,title,body 2>$null
@@ -112,6 +186,7 @@ foreach ($number in $Issues) {
         DependencyRefs  = $counts.DependencyRefs
         # The state the audit exists to remove: closed, yet its own criteria are unticked.
         ClosedWithUnticked = ($issue.state -eq 'CLOSED' -and $counts.Unchecked -gt 0)
+        Delivery        = if ($WithDelivery) { Measure-Delivery -Number $issue.number -Repository $Repository } else { $null }
     })
 }
 
