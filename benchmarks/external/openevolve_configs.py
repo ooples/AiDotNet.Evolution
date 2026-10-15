@@ -25,8 +25,7 @@ TIERS = {
     "gpt-4.1-nano": "haiku", "qwen/qwen3-8b": "haiku",
     "google/gemini-2.5-pro": "opus", "gemini-3-pro-preview": "opus",
     "gpt-4": "opus", "gpt-4o": "opus", "o3": "opus", "deepseek-reasoner": "opus",
-    "claude-sonnet-4-5-20250929": "sonnet", "claude-sonnet-4-5": "sonnet",
-    "sonnet": "sonnet", "haiku": "haiku", "opus": "opus",
+    "claude-sonnet-4-5-20250929": "sonnet", "sonnet": "sonnet", "haiku": "haiku", "opus": "opus",
 }
 
 # (path, value, reason). Applied identically to both configs.
