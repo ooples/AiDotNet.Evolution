@@ -1,5 +1,7 @@
 #if NET8_0_OR_GREATER
+using System.Globalization;
 using System.Text.Json;
+using System.Text.RegularExpressions;
 using Xunit;
 
 namespace AiDotNet.Evolution.Tests;
@@ -39,10 +41,12 @@ public sealed class EvidenceRegenerationCensusTests
     /// <summary>The marker pair <c>eng/Test-EvidenceTables.ps1</c> compares against.</summary>
     private const string BeginMarker = "<!-- BEGIN GENERATED TABLES -->";
     private const string EndMarker = "<!-- END GENERATED TABLES -->";
+    private const string CRLF = "\r\n";
+    private const string LF = "\n";
 
     // Measured at main 86d56c9. Raising Generated or lowering either of the others is the work;
     // moving one the wrong way has to fail, which is the only reason these are literals.
-    private const int MinimumGenerated = 2;
+    private const int MinimumGenerated = 4;
     private const int MaximumUnsupported = 1;
     private const int MaximumUndocumentedFamilies = 0;
 
@@ -112,6 +116,75 @@ public sealed class EvidenceRegenerationCensusTests
             lines.Add($"| {label} | {totals.GetProperty(field).GetInt32()} |");
         return string.Join("\n", lines);
     }
+
+    [Fact]
+    public void Every_card_target_block_regenerates_from_the_card_it_names()
+    {
+        // Each of these READMEs names the card its block came from, in the command it tells a reader
+        // to run. The card path is taken from that line rather than from a list here, so a README
+        // that documents the wrong card fails instead of being checked against the right one.
+        var pattern = new Regex(@"-CardPath ([^\s`]+)", RegexOptions.None, TimeSpan.FromSeconds(1));
+        int checked_ = 0;
+        foreach (string readme in Directory.EnumerateFiles(EvidenceRoot(), "README.md", SearchOption.AllDirectories))
+        {
+            string text = File.ReadAllText(readme).Replace(CRLF, LF);
+            Match match = pattern.Match(text);
+            if (!match.Success) continue;
+
+            int begin = text.IndexOf(BeginMarker, StringComparison.Ordinal);
+            int end = text.IndexOf(EndMarker, StringComparison.Ordinal);
+            Assert.True(begin >= 0 && end > begin, readme + " names a card but has no generated block.");
+
+            string directory = Path.GetDirectoryName(readme) ?? throw new InvalidOperationException(readme);
+            string card = Path.Combine(directory, match.Groups[1].Value.Replace('/', Path.DirectorySeparatorChar));
+            Assert.True(File.Exists(card), "The card " + card + " named by " + readme + " does not exist.");
+
+            string published = text.Substring(begin + BeginMarker.Length, end - begin - BeginMarker.Length).Trim();
+            Assert.Equal(RenderCardTargets(card), published);
+            checked_++;
+        }
+
+        // Without this the test passes on a tree where every block was deleted.
+        Assert.True(checked_ >= 2, $"Expected at least two card-target blocks, found {checked_}.");
+    }
+
+    private static string RenderCardTargets(string cardPath)
+    {
+        using var document = JsonDocument.Parse(File.ReadAllBytes(cardPath));
+        JsonElement targets = document.RootElement.GetProperty("targets");
+        var lines = new List<string> { "| field | target | measured | met |", "| --- | --- | ---: | --- |" };
+        foreach (JsonProperty target in targets.EnumerateObject())
+        {
+            Assert.True(document.RootElement.TryGetProperty(target.Name, out JsonElement measured),
+                cardPath + " declares a target for " + target.Name + " but carries no such field.");
+            bool met = Satisfies(target.Value, measured);
+            lines.Add($"| `{target.Name}` | {Text(target.Value)} | {Text(measured)} | {(met ? "yes" : "**no**")} |");
+        }
+        return string.Join(LF, lines);
+    }
+
+    private static bool Satisfies(JsonElement target, JsonElement measured)
+    {
+        if (target.ValueKind != JsonValueKind.String) return measured.GetDouble() == target.GetDouble();
+        string text = target.GetString() ?? string.Empty;
+        var bound = new Regex(@"^\s*(<=|<)\s*(-?[0-9]+(\.[0-9]+)?)\s*$", RegexOptions.None, TimeSpan.FromSeconds(1))
+            .Match(text);
+        Assert.True(bound.Success, "Cannot interpret the target '" + text + "'.");
+        double limit = double.Parse(bound.Groups[2].Value, CultureInfo.InvariantCulture);
+        return bound.Groups[1].Value == "<" ? measured.GetDouble() < limit : measured.GetDouble() <= limit;
+    }
+
+    // 'R' round-trips a double to the text the JSON held, which is how the PowerShell renderer
+    // formats it, so the two can be compared without a tolerance.
+    private static string Text(JsonElement value) => value.ValueKind switch
+    {
+        JsonValueKind.String => value.GetString() ?? string.Empty,
+        JsonValueKind.True => "true",
+        JsonValueKind.False => "false",
+        _ => value.TryGetInt64(out long whole)
+            ? whole.ToString(CultureInfo.InvariantCulture)
+            : value.GetDouble().ToString("R", CultureInfo.InvariantCulture),
+    };
 
     [Fact]
     public void The_classifier_finds_one_of_every_class_in_an_authored_tree()

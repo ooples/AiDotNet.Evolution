@@ -83,7 +83,7 @@
       "Readmes": [
         {
           "Path": "claude-transport/README.md",
-          "Class": "RawAlongside",
+          "Class": "Generated",
           "ArtifactCount": 2
         }
       ],
@@ -274,7 +274,7 @@
       "Readmes": [
         {
           "Path": "openevolve-shim/README.md",
-          "Class": "RawAlongside",
+          "Class": "Generated",
           "ArtifactCount": 5
         }
       ],
@@ -459,11 +459,11 @@
   "Totals": {
     "Families": 32,
     "Readmes": 46,
-    "Generated": 2,
-    "RawAlongside": 43,
+    "Generated": 4,
+    "RawAlongside": 41,
     "Unsupported": 1,
     "Undocumented": 0
   },
   "Story": "US-04 (#22): how much committed evidence can be checked against raw data",
-  "MeasuredAtUtc": "2026-10-15T02:31:33.7277244Z"
+  "MeasuredAtUtc": "2026-10-15T02:56:45.2107885Z"
 }

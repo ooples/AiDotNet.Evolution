@@ -15,14 +15,19 @@ the two configurations can be compared row by row.
 `shim-latency.json`, **600 samples** at a 16,140-byte request over a persistent HTTP/1.1 keep-alive
 connection (connect counted once per broker):
 
-| target | measured |
-| --- | --- |
-| `shim_ms_p95 < 5` | **0.818 ms** (p50 0.484 ms, max 21.81 ms) |
-| `unrecorded_prompts = 0` | **0** - 600 chats received, 600 recorded |
+Rendered from the card's own `targets` field by
+`./eng/Render-CardTargets.ps1 -CardPath b8d5f9a/shim-latency.json`, not typed:
 
-`passed: true`. The raw samples are in `shim-latency-raw.json.gz`, so the percentiles can be
-recomputed rather than trusted; the max being 27x the p95 is why the gate is stated on p95 and the
-raw file is kept.
+<!-- BEGIN GENERATED TABLES -->
+| field | target | measured | met |
+| --- | --- | ---: | --- |
+| `shim_ms_p95` | < 5 | 0.818000000435859 | yes |
+| `unrecorded_prompts` | 0 | 0 | yes |
+<!-- END GENERATED TABLES -->
+
+`passed: true`, with p50 **0.484 ms**, max **21.81 ms**, and 600 chats received against 600 recorded.
+The raw samples are in `shim-latency-raw.json.gz`, so the percentiles can be recomputed rather than
+trusted; the max being 27x the p95 is why the gate is stated on p95 and the raw file is kept.
 
 The `unrecorded_prompts` count is the load-bearing one. A shim fast because it dropped work would
 report a good p95; 600 received against 600 recorded is what rules that out.

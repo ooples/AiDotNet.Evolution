@@ -8,14 +8,21 @@ The 0 is real: [`eng/Test-EvidenceTables.ps1`](../../../../eng/Test-EvidenceTabl
 published performance tables from `b6303d6-summary.json` and CI fails on any drift. *Partial* was the
 honest qualifier and the useless one, because nothing said how much was left out. This is that number.
 
-The second `Generated` README is this one. The census now publishes its own counts through the same
-marker pair, rendered by `-RenderTables` from `census.json`, so the instrument satisfies the property it
-measures rather than only reporting on everyone else's.
+The second `Generated` README is this one. The census publishes its own counts through the same marker
+pair, rendered by `-RenderTables` from `census.json`, so the instrument satisfies the property it measures
+rather than only reporting on everyone else's.
+
+The third and fourth are `claude-transport` and `openevolve-shim`. Both cards already declared a `targets`
+object naming fields they also carry, so the target-against-measured table a reader wants was fully
+determined by the JSON and was being typed anyway.
+[`eng/Render-CardTargets.ps1`](../../../../eng/Render-CardTargets.ps1) renders it, including the met
+verdict, and refuses a target it cannot interpret rather than printing a blank one. Any other card that
+declares `targets` can have the same block for the cost of two marker lines.
 
 | class | READMEs | what a reader can do |
 | --- | ---: | --- |
-| `Generated` | **2 of 46** | a script re-renders the tables from a committed summary, and drift fails a build |
-| `RawAlongside` | 43 | check the claims by hand against evidence committed at or beneath the README |
+| `Generated` | **4 of 46** | a script re-renders the tables from a committed summary, and drift fails a build |
+| `RawAlongside` | 41 | check the claims by hand against evidence committed at or beneath the README |
 | `Unsupported` | **1** | nothing: the numbers exist nowhere else in the repository |
 
 The same counts, rendered from `census.json` rather than typed, by
@@ -24,8 +31,8 @@ The same counts, rendered from `census.json` rather than typed, by
 <!-- BEGIN GENERATED TABLES -->
 | measure | count |
 | --- | ---: |
-| `Generated` READMEs | 2 |
-| `RawAlongside` READMEs | 43 |
+| `Generated` READMEs | 4 |
+| `RawAlongside` READMEs | 41 |
 | `Unsupported` READMEs | 1 |
 | READMEs in total | 46 |
 | families | 32 |
@@ -72,7 +79,7 @@ whose claims *can* be checked, never claims that *have been*. No count is repeat
 one that changes with every new family drifts here without failing anything: the test compares only the
 generated block.
 
-It also does not tick US-04's box. 2 of 46 is a measured value for the metric, and a metric reading 2 of 46
+It also does not tick US-04's box. 4 of 46 is a measured value for the metric, and a metric reading 4 of 46
 is not a met target.
 
 ## Reproducing
