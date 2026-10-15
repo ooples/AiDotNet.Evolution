@@ -26,6 +26,46 @@ class ProgramProfileTests(unittest.TestCase):
                                  evidence_class="contract-only",evaluator_manifest={"identity":"fixture"},**kwargs)
                 self.assertFalse(root.exists())
 
+    def test_a_declared_track_panel_is_the_panel_that_runs(self):
+        """The arm that was missing: the old tests only checked that a bad panel is refused.
+
+        `tracks` was validated and then overwritten by the full six-track list, so a caller asking
+        for one track ran six - six times the model calls it budgeted. Measured before the fix:
+        `runs` was 6 for this exact call. `run_warm_study` passes `tracks=row["tracks"]` and was
+        affected in production.
+
+        No host and no model: an empty file satisfies the binary hash, and the generate/evaluate
+        callbacks are stubs, so this asserts the panel without paying for a campaign.
+        """
+        for panel in ([("controlled", "aidotnet")],
+                      [("native-bounded", "openevolve"), ("controlled", "one-shot")]):
+            with self.subTest(panel=panel), tempfile.TemporaryDirectory() as directory:
+                root = Path(directory)
+                dll = root / "fake.dll"
+                dll.write_bytes(b"")
+                report = run_campaign(root / "run", str(dll), str(root), "x = 1\n", "task", "fixture",
+                                      lambda *args, **kwargs: ("", {}),
+                                      lambda *args, **kwargs: {"combined_score": 1.0},
+                                      iterations=1, tracks=panel, evidence_class="contract-only",
+                                      evaluator_manifest={"identity": "fixture"})
+                self.assertEqual([tuple(track) for track in panel], [tuple(t) for t in report["schedule"]])
+                self.assertEqual(len(panel), len(report["runs"]),
+                                 "a declared panel of %d ran %d tracks" % (len(panel), len(report["runs"])))
+
+    def test_no_declaration_still_runs_the_whole_panel(self):
+        """The other direction, so the fix cannot be read as "tracks shrinks the default"."""
+        with tempfile.TemporaryDirectory() as directory:
+            root = Path(directory)
+            dll = root / "fake.dll"
+            dll.write_bytes(b"")
+            report = run_campaign(root / "run", str(dll), str(root), "x = 1\n", "task", "fixture",
+                                  lambda *args, **kwargs: ("", {}),
+                                  lambda *args, **kwargs: {"combined_score": 1.0},
+                                  iterations=1, evidence_class="contract-only",
+                                  evaluator_manifest={"identity": "fixture"})
+            self.assertEqual(6, len(report["schedule"]))
+            self.assertEqual(6, len(report["runs"]))
+
     @unittest.skipUnless(os.environ.get("EVOLUTION_PROFILE_DLL") and os.environ.get("EVOLUTION_PROFILE_UPSTREAM"), "Requires built host and pinned OpenEvolve")
     def test_best_profile_actual_controllers_exploit_after_first_improvement(self):
         with tempfile.TemporaryDirectory() as directory:
