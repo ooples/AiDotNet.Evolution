@@ -116,6 +116,27 @@ class HostTests(unittest.TestCase):
             server.server_close()
             worker.join(timeout=5)
 
+    @staticmethod
+    def evidence(report, records):
+        """Everything the host and the broker already know, for a failure message.
+
+        A bare "2 != 1" cannot distinguish a proposal that never reached the model from one
+        whose evaluation was retried, and both are consistent with a clean exit. The run is
+        bounded - three evaluations, two proposals - so printing all of it costs nothing and
+        a single CI failure becomes evidence instead of a reason to re-run the job.
+        """
+        engine = report.get("engine", {})
+        return json.dumps({
+            "stop_reason": engine.get("StopReason"),
+            "counters": engine.get("Counters"),
+            "usage": report.get("usage"),
+            "evaluation_statuses": [evaluation.get("Status") for evaluation in report.get("evaluations", [])],
+            "evaluation_qualities": [evaluation.get("Quality") for evaluation in report.get("evaluations", [])],
+            "recorded_attempts": report.get("attempts"),
+            "broker_request_order": [path for path, _ in records],
+            "proposed_programs": [payload.get("code") for path, payload in records if path == "/evaluate"],
+        }, indent=2, sort_keys=True, default=str)
+
     def test_controlled_and_native_tracks_use_the_real_model_runtime(self):
         for mode in ("controlled", "native-bounded"):
             with self.subTest(mode=mode):
@@ -123,10 +144,17 @@ class HostTests(unittest.TestCase):
                 self.assertEqual(0, run.returncode, run.stderr)
                 report = json.loads(text)
                 self.assertEqual(mode, report["mode"])
-                self.assertEqual(3, len(report["evaluations"]))
-                self.assertEqual(2, report["usage"]["ChatCalls"])
-                self.assertEqual(2, sum(path == "/model" for path, _ in records))
-                self.assertEqual(3, sum(path == "/evaluate" for path, _ in records))
+                # These four have been seen to fail in CI and never locally - once as
+                # "2 != 1" on ChatCalls, with the host exiting 0 and three evaluations
+                # recorded. The assertions are unchanged; what was missing was any way to
+                # tell which of the explanations it was, so each now carries the engine's
+                # stop reason and counters, every evaluation's status, the proposal
+                # attempts the operator recorded, and the broker's request order.
+                evidence = self.evidence(report, records)
+                self.assertEqual(3, len(report["evaluations"]), evidence)
+                self.assertEqual(2, report["usage"]["ChatCalls"], evidence)
+                self.assertEqual(2, sum(path == "/model" for path, _ in records), evidence)
+                self.assertEqual(3, sum(path == "/evaluate" for path, _ in records), evidence)
                 self.assertIn("AiDotNet.Evolution.Programs.dll", report["artifacts"])
                 self.assertNotIn("AiDotNet.dll", report["artifacts"])
                 model = next(payload for path, payload in records if path == "/model")
