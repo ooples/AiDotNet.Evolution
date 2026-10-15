@@ -182,6 +182,38 @@ public sealed class CliRunTests
             (row.GetProperty("Text").GetString() ?? string.Empty).Contains("openevolve_missing_module", StringComparison.Ordinal));
     }
 
+    [Theory]
+    // This repository already treats a zero-scoring seed as disqualifying: the OpenEvolve ledger excludes
+    // five examples because "its own seed scores zero, so a positive-quality assertion cannot distinguish
+    // a working run from a broken one". Preflight passed such a seed silently. Measured on
+    // examples/circle_packing, whose evaluator embeds a Windows temp path in a single-quoted Python
+    // literal: every evaluation completes with combined_score 0, the run reports no failures, and nothing
+    // says the numbers are meaningless. It still passes - the evaluator ran, and a genuinely zero baseline
+    // is legitimate - but it says so now.
+    [InlineData("0.0", true)]
+    [InlineData("0.5", false)]
+    public void Preflight_says_when_the_seed_scored_zero(string seedScore, bool expectNotice)
+    {
+        using var directory = new TemporaryDirectory();
+        using var model = new FakeChatModel();
+        File.WriteAllText(Path.Combine(directory.Path, "initial.py"), "X = 1");
+        File.WriteAllText(Path.Combine(directory.Path, "evaluator.py"),
+            @"def evaluate(path):" + (char)10 + @"    return {""combined_score"": "
+                + seedScore + "}" + (char)10);
+        string runFile = WriteRun(directory.Path, model.Endpoint, maxEvaluations: 1,
+            extra: """, "openEvolveEvaluator": { "timeoutSeconds": 60 }""");
+
+        var (code, output, error) = Run("preflight", runFile);
+
+        Assert.True(code == 0, error);   // a zero seed still passes: the evaluator ran
+        using JsonDocument report = JsonDocument.Parse(output);
+        Assert.True(report.RootElement.GetProperty("Passed").GetBoolean());
+        JsonElement notice = report.RootElement.GetProperty("SeedNotice");
+        Assert.Equal(expectNotice ? JsonValueKind.String : JsonValueKind.Null, notice.ValueKind);
+        if (expectNotice) Assert.Contains("cannot distinguish an improvement", notice.GetString()!,
+            StringComparison.Ordinal);
+    }
+
     [Fact]
     public void Preflight_scores_the_seed_exactly_as_run_would_and_never_calls_the_model()
     {

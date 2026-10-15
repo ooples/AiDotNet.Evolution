@@ -715,6 +715,14 @@ internal static class RunCommand
         }
 
         bool passed = seed.Status == EvolutionEvaluationStatus.Completed && seed.Quality is not null;
+        // A seed that completes but scores zero passes - the evaluator ran, and a task whose baseline is
+        // genuinely zero is legitimate - but it is worth saying out loud, because the run that follows
+        // cannot tell an improvement from a broken evaluator. This repository already treats that state as
+        // disqualifying elsewhere: docs/parity/OPENEVOLVE_EXAMPLES.md excludes five examples because "its
+        // own seed scores zero, so a positive-quality assertion cannot distinguish a working run from a
+        // broken one". Measured on examples/circle_packing, whose evaluator embeds a Windows temp path in a
+        // single-quoted Python literal: every evaluation completes with combined_score 0 and validity 0,
+        // the run reports no failures, and nothing says the numbers are meaningless.
         output.WriteLine(JsonSerializer.Serialize(new
         {
             RunId = run.RunId,
@@ -724,6 +732,13 @@ internal static class RunCommand
             Output = outputDirectory,
             SeedStatus = seed.Status.ToString(),
             SeedQuality = seed.Quality,
+            // Reported in the object a caller parses rather than on stderr, because preflight's contract is
+            // one JSON object. Null unless it applies.
+            SeedNotice = passed && seed.Quality is 0
+                ? "the seed scored 0, so a run from here cannot distinguish an improvement from an "
+                  + "evaluator that reports nothing useful. Check the seed's own metrics before spending a "
+                  + "budget on it."
+                : null,
             SeedDiagnostics = seed.Diagnostics,
             ModelCalls = 0
         }, Program.Json));
