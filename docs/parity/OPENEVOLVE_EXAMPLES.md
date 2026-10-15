@@ -152,12 +152,49 @@ and confirmed by it.
 `claude_code_quickstart` scores 1.3905 under preflight, because what stops it smoking is the provider
 rather than the evaluator.
 
-## What `circle_packing_with_artifacts` needs that the others do not
+## The command for a real run
 
-It smokes, and it is the one smoked example whose evaluator imports **upstream's own package**:
-`from openevolve.evaluation_result import EvaluationResult`, which in turn imports `dacite`. On a bare
-checkout that fails before any scoring happens, so the dependency is part of the example rather than an
-accident of our harness - the CI job installs the package, which is why the smoke passes there.
+The other half of V1-57's smoke criterion: a documented command per example, for the **14 of 21**
+that ship a config, an evaluator and a seed program. The other seven have no command because they have
+no runnable triple - each one's reason is in the smoke table above, and
+`Every_runnable_example_documents_its_real_run_command` refuses a row for an example that has no
+triple in the pinned checkout as firmly as it refuses a missing one.
+
+Paths are relative to the OpenEvolve checkout. `--python-path <checkout>` appears exactly where the
+example's own evaluator imports `openevolve` - measured, not assumed, because the sandbox clears the
+child environment and does not inherit `PYTHONPATH`; installing the package into the interpreter given
+to `--python` works instead and needs no option.
+
+| example | command | needs the checkout importable | notes |
+| --- | --- | :-: | --- |
+| `arc_benchmark` | `aidotnet-evolve run --openevolve-config examples/arc_benchmark/config.yaml examples/arc_benchmark/initial_program.py examples/arc_benchmark/evaluator.py --python-path <checkout>` | yes | reads its dataset from the absolute path `/workspaces/ARC-Evolve/data/arc-prize-2025/...`, so it completes at 0 without it |
+| `attention_optimization` | `aidotnet-evolve run --openevolve-config examples/attention_optimization/config.yaml examples/attention_optimization/initial_program.py examples/attention_optimization/evaluator.py` | no | `RuntimeError: Required tool not found: mlir-opt` |
+| `background_blur` | `aidotnet-evolve run --openevolve-config examples/background_blur/config.yaml examples/background_blur/initial_program.py examples/background_blur/evaluator.py --python-path <checkout>` | yes | - |
+| `circle_packing` | `aidotnet-evolve run --openevolve-config examples/circle_packing/config_phase_1.yaml examples/circle_packing/initial_program.py examples/circle_packing/evaluator.py` | no | Linux: its evaluator embeds its own `NamedTemporaryFile` path in a single-quoted literal, so every candidate scores 0 on Windows |
+| `circle_packing_with_artifacts` | `aidotnet-evolve run --openevolve-config examples/circle_packing_with_artifacts/config.yaml examples/circle_packing_with_artifacts/initial_program.py examples/circle_packing_with_artifacts/evaluator.py --python-path <checkout>` | yes | Linux, for the same embedded-path reason |
+| `claude_code_quickstart` | `aidotnet-evolve run --openevolve-config examples/claude_code_quickstart/config.yaml examples/claude_code_quickstart/initial_program.py examples/claude_code_quickstart/evaluator.py --python-path <checkout>` | yes | routes to the Claude Code CLI rather than an HTTP endpoint, so no loopback stub can serve it |
+| `function_minimization` | `aidotnet-evolve run --openevolve-config examples/function_minimization/config.yaml examples/function_minimization/initial_program.py examples/function_minimization/evaluator.py --python-path <checkout>` | yes | - |
+| `k_module_problem` | `aidotnet-evolve run --openevolve-config examples/k_module_problem/config.yaml examples/k_module_problem/initial_program.py examples/k_module_problem/evaluator.py` | no | its own seed scores 0, so the run cannot tell a win from a broken evaluator |
+| `mlx_metal_kernel_opt` | `aidotnet-evolve run --openevolve-config examples/mlx_metal_kernel_opt/config.yaml examples/mlx_metal_kernel_opt/initial_program.py examples/mlx_metal_kernel_opt/evaluator.py` | no | needs Apple MLX (`No module named 'mlx'`) |
+| `online_judge_programming` | `aidotnet-evolve run --openevolve-config examples/online_judge_programming/config.yaml examples/online_judge_programming/initial_program.py examples/online_judge_programming/evaluator.py` | no | needs `requests`; its own seed scores 0 |
+| `r_robust_regression` | `aidotnet-evolve run --openevolve-config examples/r_robust_regression/config.yaml examples/r_robust_regression/initial_program.r examples/r_robust_regression/evaluator.py --python-path <checkout>` | yes | needs R on the PATH; its `evaluate` is a coroutine |
+| `rust_adaptive_sort` | `aidotnet-evolve run --openevolve-config examples/rust_adaptive_sort/config.yaml examples/rust_adaptive_sort/initial_program.rs examples/rust_adaptive_sort/evaluator.py --python-path <checkout>` | yes | needs a Rust toolchain |
+| `signal_processing` | `aidotnet-evolve run --openevolve-config examples/signal_processing/config.yaml examples/signal_processing/initial_program.py examples/signal_processing/evaluator.py` | no | - |
+| `web_scraper_optillm` | `aidotnet-evolve run --openevolve-config examples/web_scraper_optillm/config.yaml examples/web_scraper_optillm/initial_program.py examples/web_scraper_optillm/evaluator.py` | no | its own seed scores 0 |
+
+Nothing here is a claim that the run *succeeds*: four of these have committed real-run evidence
+(`claude_code_quickstart`, `function_minimization`, `signal_processing`, `background_blur`) and the
+notes say what defeats the rest. The command is what to type; the smoke table is what to expect.
+## Which examples need upstream's own package importable
+
+**Three of the five smoked examples** import it, not one, which an earlier version of this section got
+wrong: `function_minimization` (`evaluator.py:11`), `background_blur` (`:54`) and
+`circle_packing_with_artifacts` (`:18`) each do `from openevolve.evaluation_result import EvaluationResult`,
+which in turn imports `dacite`. `circle_packing` and `signal_processing` do not. On a bare checkout the
+import fails before any scoring happens, so the dependency is part of those examples rather than an
+accident of our harness - the CI job installs the package, which is why the smoke passes there. The
+measurement is in the run-command table below, and `Every_example_needing_upstream_declares_it` re-takes
+it against the pinned checkout rather than trusting this paragraph.
 
 Measured in a Linux container with `PYTHONPATH` at the pinned checkout and `dacite` installed: the seed
 evaluates and reports **both** declared feature dimensions - `radius_variance` 0.0266, `spatial_spread`
