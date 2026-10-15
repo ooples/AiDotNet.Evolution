@@ -139,6 +139,18 @@ class PilotCellTests(unittest.TestCase):
         self.assertEqual("failed", outcome["Status"])
         self.assertEqual("ValueError", outcome["Reason"], "family.score must refuse an unsealed split")
 
+    def test_the_registered_partition_seal_is_the_one_the_endpoint_is_scored_against(self):
+        """A pre-registered hash is only a commitment if it is the hash of the rows that get scored.
+
+        Nothing downstream recomputes `TestPartitionHashes`, so a placeholder there would commit to
+        nothing. `holdout_seal` is what a registration should carry, and it must match the seal
+        `score_held_out` checks before it will report a number.
+        """
+        seal = pilot_cells.holdout_seal(TASK, 918273)
+        self.assertEqual(family.holdout(TASK, 918273)["test_seal"], seal)
+        self.assertNotEqual(seal, pilot_cells.holdout_seal(TASK, 918274), "a seed change must move the seal")
+        self.assertNotEqual(seal, pilot_cells.holdout_seal("damped_oscillator", 918273))
+
     def test_an_undeclared_arm_is_refused_rather_than_failed(self):
         # A missing arm is a campaign that was not configured. Returning "failed" would let the
         # analysis substitute a failure value and report a result for an arm that never ran.

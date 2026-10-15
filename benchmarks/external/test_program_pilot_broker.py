@@ -12,7 +12,7 @@ ROOT = Path(__file__).resolve().parent
 sys.path.insert(0, str(ROOT))
 
 import pilot_broker  # noqa: E402
-from program_broker import ProgramBroker  # noqa: E402
+from program_broker import COST_METRICS, ProgramBroker  # noqa: E402
 import symbolic_regression_family as family  # noqa: E402
 
 TASK = "rational_gain"
@@ -47,6 +47,30 @@ class ModelCallbackTests(unittest.TestCase):
             with self.subTest(expected=expected.__name__):
                 with self.assertRaises(expected):
                     pilot_broker.model_callback(provider)("sys", [])
+
+    def test_a_provider_already_in_the_brokers_shape_is_passed_through_intact(self):
+        """The real transport answers in that shape, and two of its fields are only there.
+
+        `claude_transport.generate_metered` reports `throttle_seconds` and `rate_limit_events`,
+        which the broker records apart from search work - provider backoff is the provider's queue,
+        not the search's. Rebuilding the reply from its text and cost would drop both and swap the
+        transport's own metric for this module's default.
+        """
+        measured = {"text": "answer", "cost_units": 12, "cost_metric": "reported_input_plus_output_tokens",
+                    "throttle_seconds": 4.5, "rate_limit_events": 2}
+        reply = pilot_broker.model_callback(lambda system, messages, model=None: dict(measured))("sys", [])
+        self.assertEqual(measured, reply)
+
+    def test_a_mapping_reply_is_held_to_the_same_rules(self):
+        for measured, expected in (
+            ({"text": "ok", "cost_units": 1, "cost_metric": "tokens"}, ValueError),       # undeclared metric
+            ({"text": "ok", "cost_units": 1}, ValueError),                                 # no metric at all
+            ({"text": None, "cost_units": 1, "cost_metric": COST_METRICS[0]}, TypeError),  # no text
+            ({"text": "ok", "cost_units": 1.5, "cost_metric": COST_METRICS[0]}, TypeError),
+        ):
+            with self.subTest(measured=measured):
+                with self.assertRaises(expected):
+                    pilot_broker.model_callback(lambda system, messages, model=None: dict(measured))("sys", [])
 
     def test_a_model_name_is_passed_through_when_the_broker_supplies_one(self):
         seen = {}

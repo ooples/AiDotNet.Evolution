@@ -58,6 +58,17 @@ def score_held_out(task, holdout_seed, program_path):
     return family.nmse(predict, split["test"])
 
 
+def holdout_seal(task, holdout_seed):
+    """The sealed test partition's SHA-256, for the registration to commit to before launch.
+
+    `campaign_registration` takes `TestPartitionHashes` on trust - nothing downstream recomputes it -
+    so a placeholder there buys nothing: the commitment is only worth something if it is the hash of
+    the rows the endpoint will actually be scored on. This is the one place that knows both, and the
+    hash reveals nothing about the rows.
+    """
+    return family.holdout(task, holdout_seed)["test_seal"]
+
+
 def executor(task, searchers, *, holdout_seed):
     """Returns an `execute_cell` for one family, dispatching on the cell's arm.
 

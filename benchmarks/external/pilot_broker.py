@@ -42,20 +42,36 @@ def model_callback(provider, *, cost_metric=COST_METRICS[1]):
     (`program_broker.py:299-302`) rather than assuming one - two providers that both say "tokens"
     can differ by whether cache reads are in the number. The default is the subscription CLI's
     metric, which includes cache reads; a provider that reports input+output only must say so.
+
+    **A provider that already answers in the broker's shape is passed through, not rebuilt.**
+    `claude_transport.ClaudeTransport.generate_metered` returns its own `cost_metric` and also
+    `throttle_seconds` and `rate_limit_events`, which the broker records apart from search work;
+    re-deriving a reply from its text and cost would silently drop the backoff accounting and
+    substitute this module's metric for the transport's own. So a mapping reply is validated
+    against the same rules and handed on intact.
     """
     if cost_metric not in COST_METRICS:
         raise ValueError("cost_metric must be one of %s, not %r" % (COST_METRICS, cost_metric))
 
     def generate(system, messages, model=None):
-        text, cost_units = provider(system, messages) if model is None else provider(system, messages, model)
-        if not isinstance(text, str):
+        measured = provider(system, messages) if model is None else provider(system, messages, model)
+        if isinstance(measured, dict):
+            reply = dict(measured)
+            if reply.get("cost_metric") not in COST_METRICS:
+                raise ValueError("the provider's cost_metric is not one the broker accepts: "
+                                 + repr(reply.get("cost_metric")))
+        else:
+            text, cost_units = measured
+            reply = {"text": text, "cost_units": cost_units, "cost_metric": cost_metric}
+        if not isinstance(reply.get("text"), str):
             raise TypeError("the provider returned no text")
-        encoded = text.encode()
+        encoded = reply["text"].encode()
         if len(encoded) > MAX_TEXT_BYTES:
             raise ValueError("the provider returned %d bytes, over the broker's 64 KiB limit" % len(encoded))
-        if type(cost_units) is not int or cost_units < 0:
-            raise TypeError("cost_units must be a non-negative int, not " + type(cost_units).__name__)
-        return {"text": text, "cost_units": cost_units, "cost_metric": cost_metric}
+        if type(reply.get("cost_units")) is not int or reply["cost_units"] < 0:
+            raise TypeError("cost_units must be a non-negative int, not "
+                            + type(reply.get("cost_units")).__name__)
+        return reply
 
     return generate
 
