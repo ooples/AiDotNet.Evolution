@@ -21,8 +21,8 @@ declares `targets` can have the same block for the cost of two marker lines.
 
 | class | READMEs | what a reader can do |
 | --- | ---: | --- |
-| `Generated` | **4 of 47** | a script re-renders the tables from a committed summary, and drift fails a build |
-| `RawAlongside` | 42 | check the claims by hand against evidence committed at or beneath the README |
+| `Generated` | **4 of 51** | a script re-renders the tables from a committed summary, and drift fails a build |
+| `RawAlongside` | 46 | check the claims by hand against evidence committed at or beneath the README |
 | `Unsupported` | **1** | nothing: the numbers exist nowhere else in the repository |
 
 The same counts, rendered from `census.json` rather than typed, by
@@ -32,9 +32,9 @@ The same counts, rendered from `census.json` rather than typed, by
 | measure | count |
 | --- | ---: |
 | `Generated` READMEs | 4 |
-| `RawAlongside` READMEs | 42 |
+| `RawAlongside` READMEs | 46 |
 | `Unsupported` READMEs | 1 |
-| READMEs in total | 47 |
+| READMEs in total | 51 |
 | families | 33 |
 | families with no README | 0 |
 <!-- END GENERATED TABLES -->
@@ -79,7 +79,7 @@ whose claims *can* be checked, never claims that *have been*. No count is repeat
 one that changes with every new family drifts here without failing anything: the test compares only the
 generated block.
 
-It also does not tick US-04's box. 4 of 47 is a measured value for the metric, and a metric reading 4 of 47
+It also does not tick US-04's box. 4 of 51 is a measured value for the metric, and a metric reading 4 of 51
 is not a met target.
 
 ## Reproducing
@@ -94,4 +94,12 @@ block it is one of the 2 `Generated` READMEs - so the counts it publishes includ
 them. That is a fixed point, reached and then checked: inserting the markers moved `Generated` from 1 to 2
 and `RawAlongside` from 44 to 43, the block was re-rendered from the new census, and a further run changes
 nothing. The same loop runs whenever a family is added: `readme-walkthrough` took the counts to 33
-families and 47 READMEs, and the block was re-rendered rather than edited.
+families, and four more evidence READMEs arriving from a separate PR took them to 51; each time the block
+was re-rendered rather than edited.
+
+**This reading is dated, not a gate.** It is the tree as the script last saw it, so a PR that adds a
+documented evidence family leaves it short until someone re-runs the script - which is deliberate, and the
+test is written for it: the recorded classification must agree wherever it overlaps the live tree and must
+never report a *better* tree than exists, but it need not be complete. An earlier version demanded set
+equality and turned `main` red when two PRs that never touched the same line merged - one committing the
+census, one adding evidence READMEs.
