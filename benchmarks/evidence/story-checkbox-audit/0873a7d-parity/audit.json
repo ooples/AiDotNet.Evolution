@@ -1,0 +1,254 @@
+{
+  "Repository": "ooples/AiDotNet.Evolution",
+  "MeasuredAtUtc": "2026-10-15T19:17:34.0735606Z",
+  "Issues": [
+    {
+      "Number": 163,
+      "State": "CLOSED",
+      "Title": "[V1-50] Weighted multi-model LLM ensemble with a separate evaluator model set",
+      "Unchecked": 1,
+      "Checked": 10,
+      "DependencyRefs": [
+        231
+      ],
+      "ClosedWithUnticked": true
+    },
+    {
+      "Number": 164,
+      "State": "CLOSED",
+      "Title": "[V1-51] Model provider parity: OpenAI-compatible, Claude Code CLI, custom client, manual mode",
+      "Unchecked": 11,
+      "Checked": 0,
+      "DependencyRefs": [],
+      "ClosedWithUnticked": true
+    },
+    {
+      "Number": 165,
+      "State": "CLOSED",
+      "Title": "[V1-52] Prompt context parity: history, top and diverse programs, artifacts, and wired experience memory",
+      "Unchecked": 11,
+      "Checked": 0,
+      "DependencyRefs": [],
+      "ClosedWithUnticked": true
+    },
+    {
+      "Number": 166,
+      "State": "CLOSED",
+      "Title": "[V1-53] Meta-prompt evolution (AlphaEvolve component; declared but unimplemented in OpenEvolve)",
+      "Unchecked": 1,
+      "Checked": 9,
+      "DependencyRefs": [
+        233
+      ],
+      "ClosedWithUnticked": true
+    },
+    {
+      "Number": 167,
+      "State": "CLOSED",
+      "Title": "[V1-54] LLM feedback as a weighted fitness signal",
+      "Unchecked": 3,
+      "Checked": 7,
+      "DependencyRefs": [
+        253,
+        246,
+        246
+      ],
+      "ClosedWithUnticked": true
+    },
+    {
+      "Number": 168,
+      "State": "CLOSED",
+      "Title": "[V1-55] Quality-diversity archive parity: built-in and custom descriptors without drift or NaN capture",
+      "Unchecked": 11,
+      "Checked": 0,
+      "DependencyRefs": [],
+      "ClosedWithUnticked": true
+    },
+    {
+      "Number": 169,
+      "State": "CLOSED",
+      "Title": "[V1-56] Run unmodified OpenEvolve evaluators and configs through the CLI",
+      "Unchecked": 2,
+      "Checked": 12,
+      "DependencyRefs": [],
+      "ClosedWithUnticked": true
+    },
+    {
+      "Number": 170,
+      "State": "OPEN",
+      "Title": "[V1-57] End-to-end example catalogue at OpenEvolve parity",
+      "Unchecked": 9,
+      "Checked": 0,
+      "DependencyRefs": [
+        296,
+        108
+      ],
+      "ClosedWithUnticked": false
+    },
+    {
+      "Number": 171,
+      "State": "CLOSED",
+      "Title": "[V1-58] Evaluator artifact channel parity",
+      "Unchecked": 10,
+      "Checked": 0,
+      "DependencyRefs": [],
+      "ClosedWithUnticked": true
+    },
+    {
+      "Number": 172,
+      "State": "CLOSED",
+      "Title": "[V1-59] Trace export and live visualisation parity",
+      "Unchecked": 9,
+      "Checked": 0,
+      "DependencyRefs": [],
+      "ClosedWithUnticked": true
+    },
+    {
+      "Number": 173,
+      "State": "CLOSED",
+      "Title": "[V1-60] Stopping, iteration and code-size controls at OpenEvolve parity",
+      "Unchecked": 9,
+      "Checked": 0,
+      "DependencyRefs": [],
+      "ClosedWithUnticked": true
+    },
+    {
+      "Number": 174,
+      "State": "OPEN",
+      "Title": "[V1-61] Enforced resource limits and multi-host distributed evaluation, proven",
+      "Unchecked": 2,
+      "Checked": 8,
+      "DependencyRefs": [
+        235,
+        238,
+        174
+      ],
+      "ClosedWithUnticked": false
+    },
+    {
+      "Number": 175,
+      "State": "CLOSED",
+      "Title": "[V1-70] Engine overhead: regenerate the head-to-head with valid intervals and meet targets",
+      "Unchecked": 9,
+      "Checked": 0,
+      "DependencyRefs": [],
+      "ClosedWithUnticked": true
+    },
+    {
+      "Number": 176,
+      "State": "CLOSED",
+      "Title": "[V1-71] Cut per-evaluation allocation on the identity path",
+      "Unchecked": 9,
+      "Checked": 0,
+      "DependencyRefs": [],
+      "ClosedWithUnticked": true
+    },
+    {
+      "Number": 177,
+      "State": "CLOSED",
+      "Title": "[V1-72] Population-size scaling benchmark",
+      "Unchecked": 9,
+      "Checked": 0,
+      "DependencyRefs": [],
+      "ClosedWithUnticked": true
+    },
+    {
+      "Number": 178,
+      "State": "CLOSED",
+      "Title": "[V1-73] Long-run soak: memory, handles and resume fidelity over 200,000 evaluations",
+      "Unchecked": 9,
+      "Checked": 0,
+      "DependencyRefs": [],
+      "ClosedWithUnticked": true
+    },
+    {
+      "Number": 179,
+      "State": "CLOSED",
+      "Title": "[V1-74] Checkpoint write and resume latency targets",
+      "Unchecked": 9,
+      "Checked": 0,
+      "DependencyRefs": [],
+      "ClosedWithUnticked": true
+    },
+    {
+      "Number": 180,
+      "State": "CLOSED",
+      "Title": "[V1-75] Latency-bound throughput: keep the model busy",
+      "Unchecked": 9,
+      "Checked": 0,
+      "DependencyRefs": [],
+      "ClosedWithUnticked": true
+    },
+    {
+      "Number": 181,
+      "State": "CLOSED",
+      "Title": "[V1-76] Sandbox overhead per evaluation",
+      "Unchecked": 8,
+      "Checked": 0,
+      "DependencyRefs": [],
+      "ClosedWithUnticked": true
+    },
+    {
+      "Number": 182,
+      "State": "CLOSED",
+      "Title": "[V1-80] Clock seam: make every timing-dependent test deterministic",
+      "Unchecked": 9,
+      "Checked": 0,
+      "DependencyRefs": [],
+      "ClosedWithUnticked": true
+    },
+    {
+      "Number": 183,
+      "State": "CLOSED",
+      "Title": "[V1-81] Merge safety: merge queue and repository-wide coverage",
+      "Unchecked": 9,
+      "Checked": 0,
+      "DependencyRefs": [],
+      "ClosedWithUnticked": true
+    },
+    {
+      "Number": 184,
+      "State": "CLOSED",
+      "Title": "[V1-82] v1 API surface triage",
+      "Unchecked": 9,
+      "Checked": 0,
+      "DependencyRefs": [],
+      "ClosedWithUnticked": true
+    },
+    {
+      "Number": 185,
+      "State": "CLOSED",
+      "Title": "[V1-83] Robustness suite against OpenEvolve's defect classes",
+      "Unchecked": 8,
+      "Checked": 0,
+      "DependencyRefs": [],
+      "ClosedWithUnticked": true
+    }
+  ],
+  "TotalUnchecked": 176.0,
+  "TotalChecked": 46.0,
+  "ClosedWithUntickedCount": 21,
+  "ClosedWithUnticked": [
+    163,
+    164,
+    165,
+    166,
+    167,
+    168,
+    169,
+    171,
+    172,
+    173,
+    175,
+    176,
+    177,
+    178,
+    179,
+    180,
+    181,
+    182,
+    183,
+    184,
+    185
+  ]
+}
