@@ -14,9 +14,13 @@ release revision plus a complete result bundle. The gate then re-derives every n
   Nothing here re-tests with another method.
 - EQUAL SEARCH COST. Every row must report model calls and tokens within the shared registered
   budget, so no arm won by spending more.
-- PRACTICAL EFFECT (#30). A family whose endpoint is a runtime `speedup` must also show a
-  geometric-mean speedup of at least 1.10x over OpenEvolve's resulting programs, per config;
-  a failed run has no speedup and so cannot satisfy it.
+- PRACTICAL EFFECT (#30). A family whose endpoint is a runtime `speedup` must show three things
+  per config, because the criterion names three: a geometric-mean speedup of at least 1.10x over
+  OpenEvolve's resulting programs, a 95% lower bound on that mean above 1.0 so the effect is not
+  noise, and no paired seed below MAXIMUM_SEED_REGRESSION so the mean is not hiding a collapse. A
+  failed run has no speedup and so cannot satisfy any of them. The bound comes from resampling the
+  per-seed log ratios with the registration's own bootstrap settings, so it is pre-registered rather
+  than chosen here. The limit's grain is the paired seed, which is the finest `raw.json` has.
 - SCOPE (#30). A claim is limited to the families it names, each of which must be supported.
   Every family, supported or not, stays in the assessment. A 1.x version requires the decisive
   `v1-gate` claim: every family x config superior, every speedup floor met, and AlphaEvolve's
@@ -32,9 +36,11 @@ import hashlib
 import json
 import math
 from pathlib import Path
+import random
 import re
 import subprocess
 
+from analyze import percentile
 from campaign_registration import CONFIGS, OURS, SCHEMA as REGISTRATION_SCHEMA, analyze, published_gate, render, validate
 from design import digest
 
@@ -42,6 +48,13 @@ CLAIM_SCHEMA = "evolution-release-claim-v2"
 BUNDLE_SCHEMA = "evolution-release-bundle-v2"
 ASSESSMENT_SCHEMA = "evolution-release-assessment-v2"
 MINIMUM_GEOMEAN_SPEEDUP = 1.10
+# The regression limit US-12 (#30) asks to be predefined, declared here - before any numbers exist -
+# rather than in a claim written after seeing them. It bounds the worst **paired seed** of each
+# family x config, which is the finest grain `raw.json` has: a row is one (Family, Arm, Seed) with a
+# single aggregated Value and no task dimension. So a family whose Value averages several tasks can
+# still hide one task below this limit, and closing that needs a task dimension in the registration's
+# row schema - a schema change, not a threshold. Declared rather than implied; review raised it.
+MAXIMUM_SEED_REGRESSION = 0.95
 MAXIMUM_FAMILYWISE_ALPHA = 0.05
 SPEEDUP_METRIC = "speedup"
 MAX_ARTIFACT_BYTES = 32 * 1024 * 1024
@@ -164,8 +177,20 @@ def partition_was_visible(repository, commit, data):
 
 
 def geometric_mean_speedups(registration, rows, family):
-    """Geometric mean of ours/theirs per config; None when any paired run failed or is non-positive."""
+    """Geometric mean of ours/theirs per config, with a 95% lower bound; None when a paired run failed.
+
+    US-12 (#30) asks for "at least 1.10x geometric-mean speedup ... with a 95% interval above 1.0"
+    and "predefined per-task regression limits". The point estimate alone satisfies neither: a mean
+    of 1.10 drawn from seeds that straddle 1.0 is noise, and a mean of 1.10 can hide one task three
+    times slower. So each config reports the geometric mean, the paired bootstrap's 95% lower bound
+    on it, and the worst single-seed ratio.
+
+    The bootstrap resamples the per-seed log ratios with the registration's own `BootstrapSamples`
+    and `BootstrapSeed`, so the bound is deterministic and pre-registered rather than chosen here -
+    the same discipline `campaign_registration.analyze` applies to the superiority p-value.
+    """
     cells = {(row["Family"], row["Arm"], row["Seed"]): row for row in rows}
+    spec = registration["Spec"]
     result = {}
     for config in family["Configs"]:
         logs = []
@@ -175,7 +200,19 @@ def geometric_mean_speedups(registration, rows, family):
                 logs = None
                 break
             logs.append(math.log(ours["Value"] / theirs["Value"]))
-        result[config] = None if logs is None else math.exp(math.fsum(logs) / len(logs))
+        if logs is None:
+            result[config] = None
+            continue
+        rng = random.Random(spec["BootstrapSeed"])
+        count, samples = len(logs), spec["BootstrapSamples"]
+        means = sorted(math.fsum(logs[rng.randrange(count)] for _ in range(count)) / count for _ in range(samples))
+        result[config] = {
+            "GeometricMean": math.exp(math.fsum(logs) / count),
+            # Lower end of the central 95% interval, which is the bound the criterion names.
+            "LowerBound95": math.exp(percentile(means, 0.025)),
+            # The geometric mean is blind to one task falling over; the worst seed is not.
+            "WorstSeedRatio": math.exp(min(logs)),
+        }
     return result
 
 
@@ -235,7 +272,14 @@ def assess_bundle(claim, root, repository):
         if family["Endpoint"]["Metric"] == SPEEDUP_METRIC:
             require(family["Endpoint"]["Direction"] == "maximize", "A speedup endpoint must be maximized")
             speedups = geometric_mean_speedups(registration, rows, family)
-            floor = all(value is not None and value >= MINIMUM_GEOMEAN_SPEEDUP for value in speedups.values())
+            # Three conditions, because the criterion names three: the point estimate reaches the
+            # floor, its 95% interval is above 1.0 so the effect is not noise, and no single task
+            # regressed past the declared limit so the mean is not hiding one.
+            floor = all(value is not None
+                        and value["GeometricMean"] >= MINIMUM_GEOMEAN_SPEEDUP
+                        and value["LowerBound95"] > 1.0
+                        and value["WorstSeedRatio"] >= MAXIMUM_SEED_REGRESSION
+                        for value in speedups.values())
         families.append(dict(Family=family["Family"], Supported=superior and floor, HolmSuperiorAllConfigs=superior,
                              GeometricMeanSpeedup=speedups, MeetsSpeedupFloor=floor if speedups is not None else None,
                              Endpoints=endpoints))

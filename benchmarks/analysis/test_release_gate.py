@@ -152,7 +152,13 @@ class ReleaseGateTests(unittest.TestCase):
         self.assertEqual(report["task_set"], {name: sha(data) for name, data in SEALS.items()})
         self.assertIn("raw.json", report["artifacts"])
         speedups = assessment["families"][0]["GeometricMeanSpeedup"]
-        self.assertGreater(min(speedups.values()), 1.9)
+        self.assertGreater(min(value["GeometricMean"] for value in speedups.values()), 1.9)
+        # The criterion names three conditions, so each config reports all three.
+        for config, value in speedups.items():
+            with self.subTest(config=config):
+                self.assertGreater(value["LowerBound95"], 1.0, "a 95% interval above 1.0")
+                self.assertGreaterEqual(value["WorstSeedRatio"], rg.MAXIMUM_SEED_REGRESSION)
+                self.assertLessEqual(value["WorstSeedRatio"], value["GeometricMean"])
 
     def test_mixed_outcome_limits_the_claim_and_keeps_the_loss_visible(self):
         fixture = self.fixture(raw=lambda registration: rows(registration, sr_ours=0.9))
@@ -171,8 +177,59 @@ class ReleaseGateTests(unittest.TestCase):
         algotune = assessment["families"][0]
         self.assertTrue(algotune["HolmSuperiorAllConfigs"])
         self.assertFalse(algotune["MeetsSpeedupFloor"])
-        self.assertLess(max(algotune["GeometricMeanSpeedup"].values()), rg.MINIMUM_GEOMEAN_SPEEDUP)
+        self.assertLess(max(value["GeometricMean"] for value in algotune["GeometricMeanSpeedup"].values()),
+                        rg.MINIMUM_GEOMEAN_SPEEDUP)
         self.assertFalse(assessment["eligible"])
+
+    def test_a_mean_above_the_floor_whose_interval_straddles_one_is_not_supported(self):
+        """The point estimate was the whole gate, and a noisy win passes a point estimate.
+
+        Seeds alternating well above and well below parity average above 1.10 while the paired
+        bootstrap's 95% interval reaches under 1.0 - which is the condition #30 names and the gate
+        did not have.
+        """
+        def raw(registration):
+            result = rows(registration)
+            for row in result:
+                if row["Family"] == "algotune" and row["Arm"] == "aidotnet":
+                    index = registration["Seeds"].index(row["Seed"])
+                    # Review caught the first version of this using 6.0 and 0.26, where 0.26 also
+                    # breaks the per-seed limit - so the test passed with the interval check removed,
+                    # and isolated nothing. These two straddle parity while staying inside the limit.
+                    row["Value"] = 1.29 if index % 2 == 0 else 0.95
+            return result
+
+        algotune = self.fixture(raw=raw).assess()["families"][0]
+        speedup = algotune["GeometricMeanSpeedup"]["recommended"]
+        self.assertGreater(speedup["GeometricMean"], rg.MINIMUM_GEOMEAN_SPEEDUP, "the point estimate passes")
+        self.assertGreaterEqual(speedup["WorstSeedRatio"], rg.MAXIMUM_SEED_REGRESSION,
+                                "and so does the per-seed limit, so only the interval can reject this")
+        self.assertLess(speedup["LowerBound95"], 1.0, "but the interval reaches under parity")
+        self.assertFalse(algotune["MeetsSpeedupFloor"])
+        self.assertFalse(algotune["Supported"])
+
+    def test_a_mean_above_the_floor_hiding_one_regressed_seed_is_not_supported(self):
+        """A geometric mean of 1.10+ can hold while one paired seed runs at half speed.
+
+        The limit's grain is the seed, which is the finest `raw.json` has - a row is one
+        (Family, Arm, Seed) with a single aggregated Value. A family whose Value averages several
+        tasks can still hide one task below the limit; review raised that, and it needs a task
+        dimension in the row schema rather than a different threshold.
+        """
+        def raw(registration):
+            result = rows(registration, ours=4.0)
+            for row in result:
+                if (row["Family"] == "algotune" and row["Arm"] == "aidotnet"
+                        and row["Seed"] == registration["Seeds"][0]):
+                    row["Value"] = 0.5
+            return result
+
+        algotune = self.fixture(raw=raw).assess()["families"][0]
+        speedup = algotune["GeometricMeanSpeedup"]["recommended"]
+        self.assertGreater(speedup["GeometricMean"], rg.MINIMUM_GEOMEAN_SPEEDUP)
+        self.assertLess(speedup["WorstSeedRatio"], rg.MAXIMUM_SEED_REGRESSION)
+        self.assertFalse(algotune["MeetsSpeedupFloor"])
+        self.assertFalse(algotune["Supported"])
 
     def test_failed_run_has_no_speedup(self):
         def raw(registration):
