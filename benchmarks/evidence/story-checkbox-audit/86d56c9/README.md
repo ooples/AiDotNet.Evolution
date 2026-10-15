@@ -1,10 +1,17 @@
 # V1-01 (#108): what the open boxes actually are
 
 Measured by [`eng/Measure-StoryCheckboxAudit.ps1`](../../../../eng/Measure-StoryCheckboxAudit.ps1) at main
-`86d56c9`. `audit.json` is the script's output, unedited. **75 unchecked, 80 checked, 0 issues closed with
+`86d56c9`. `audit.json` is the script's output, unedited. **72 unchecked, 83 checked, 0 issues closed with
 unticked boxes.**
 
-The count alone invites the wrong conclusion - that 75 pieces of work are missing. This file records what
+The first run of this audit, two hours earlier against the same `main` commit, read **75 unchecked, 80
+checked** - that output is the `audit.json` committed in `fe27471`. Nothing in the repository changed
+between the two runs. The script reads issue bodies, and in between, three of the boxes this file supplies
+values for were ticked: the "metrics table filled" criterion on #21, #24 and #43. The directory is keyed by
+the `main` SHA because the claims below are checked against that tree, but the count itself is a property of
+the issues on the day the script ran, not of the commit.
+
+The count alone invites the wrong conclusion - that 72 pieces of work are missing. This file records what
 each unchecked box **is**, checked against current `main` rather than inferred from the issue text.
 
 ## Metrics now measured, from merged work
@@ -49,6 +56,8 @@ Checked this cycle, each previously reading as open work:
 ## What this evidence is not
 
 It does not tick a box. The script reports and never edits an issue, and ticking is a judgement about
-evidence that stays with the person doing the audit. Nor is 75 a measure of remaining effort: the table
-above shows ten metrics now carrying measured values that the count still reports as unchecked, because the
-boxes they belong to also require a merge and a review.
+evidence that stays with the person doing the audit. Nor is 72 a measure of remaining effort: the table
+above shows ten metrics now carrying measured values, three of whose boxes have since been ticked. The rest
+stay unchecked because the boxes they belong to also require a merge and a review - or, on #29, because the
+box covers two metrics and only the oracle row is measurable without the gate campaign, so ticking it would
+report a filled table that is half empty.

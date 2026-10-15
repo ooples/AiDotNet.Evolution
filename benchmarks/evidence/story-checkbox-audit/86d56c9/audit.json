@@ -1,13 +1,13 @@
 {
   "Repository": "ooples/AiDotNet.Evolution",
-  "MeasuredAtUtc": "2026-10-15T00:01:04.6777342Z",
+  "MeasuredAtUtc": "2026-10-15T01:59:28.7826568Z",
   "Issues": [
     {
       "Number": 21,
       "State": "OPEN",
       "Title": "[US-03] Prevent invalid improvements from winning",
-      "Unchecked": 4,
-      "Checked": 7,
+      "Unchecked": 3,
+      "Checked": 8,
       "DependencyRefs": [
         108
       ],
@@ -28,8 +28,8 @@
       "Number": 24,
       "State": "OPEN",
       "Title": "[US-06] Handle noisy measurements and expensive evaluation",
-      "Unchecked": 4,
-      "Checked": 9,
+      "Unchecked": 3,
+      "Checked": 10,
       "DependencyRefs": [
         108
       ],
@@ -42,7 +42,9 @@
       "Unchecked": 12,
       "Checked": 3,
       "DependencyRefs": [
-        108
+        108,
+        262,
+        122
       ],
       "ClosedWithUnticked": false
     },
@@ -134,16 +136,16 @@
       "Number": 43,
       "State": "OPEN",
       "Title": "[US-25] Promote validated results and retune when conditions change",
-      "Unchecked": 8,
-      "Checked": 6,
+      "Unchecked": 7,
+      "Checked": 7,
       "DependencyRefs": [
         108
       ],
       "ClosedWithUnticked": false
     }
   ],
-  "TotalUnchecked": 75.0,
-  "TotalChecked": 80.0,
+  "TotalUnchecked": 72.0,
+  "TotalChecked": 83.0,
   "ClosedWithUntickedCount": 0,
   "ClosedWithUnticked": []
 }
