@@ -50,34 +50,44 @@ class PilotTaskTests(unittest.TestCase):
                 self.assertGreater(metrics["combined_score"], 0.0)
                 self.assertLess(metrics["combined_score"], 0.95, "a seed this good would leave no headroom")
 
-    def test_selection_never_reads_the_held_out_split(self):
-        # The pilot's endpoint is the sealed test split, scored afterwards. If the evaluator could see
-        # those rows, the endpoint would be a training score. Asserted by tampering with the held-out
-        # rows the evaluator would receive and requiring its score not to move.
-        os.environ["EVOLUTION_SR_TASK"] = "damped_oscillator"
+    def test_the_evaluator_never_builds_the_held_out_rows(self):
+        """Reading, not just tampering. Review found the earlier version wide open here.
+
+        The old evaluator built the whole split and the held-out seed was `seed + TEST_SEED_OFFSET`,
+        so a candidate could `import symbolic_regression_family`, read `EVOLUTION_SR_TASK` and
+        `EVOLUTION_SR_SEED` from its own environment, and rebuild the endpoint's rows exactly - the
+        rebuilt seal matched. A seal stops tampering; it does nothing about reading.
+        """
+        os.environ["EVOLUTION_SR_TASK"] = "rational_gain"
         os.environ["EVOLUTION_SR_SEED"] = str(family.DEV_SEEDS[0])
         module = evaluator_module()
-        honest = module.evaluate(str(SEED_PROGRAM))
 
-        genuine = module.family.build
-        tampered = genuine("damped_oscillator", family.DEV_SEEDS[0])
-        tampered["test"] = [(xs, y + 1000.0) for xs, y in tampered["test"]]
+        asked = []
+        genuine_selection, genuine_holdout = module.family.selection, module.family.holdout
         try:
-            module.family.build = lambda *args, **kwargs: tampered
-            with_tampered_test = module.evaluate(str(SEED_PROGRAM))
-            # Reachability control: the injected split must actually reach the evaluator, or the
-            # assertion above is vacuous. Its train rows are the genuine ones, so the score is equal;
-            # proving arrival needs a split whose TRAIN rows differ.
-            moved = genuine("damped_oscillator", family.DEV_SEEDS[1])
-            module.family.build = lambda *args, **kwargs: moved
-            with_other_train = module.evaluate(str(SEED_PROGRAM))
+            module.family.selection = lambda *args, **kwargs: (asked.append("selection")
+                                                               or genuine_selection(*args, **kwargs))
+            module.family.holdout = lambda *args, **kwargs: asked.append("holdout")
+            metrics = module.evaluate(str(SEED_PROGRAM))
         finally:
-            module.family.build = genuine
+            module.family.selection, module.family.holdout = genuine_selection, genuine_holdout
 
-        self.assertEqual(honest["combined_score"], with_tampered_test["combined_score"],
-                         "the score moved when only held-out rows changed")
-        self.assertNotEqual(honest["combined_score"], with_other_train["combined_score"],
-                            "the injected split never reached the evaluator, so the test above proves nothing")
+        self.assertEqual(["selection"], asked, "the evaluator asked for held-out rows")
+        self.assertNotIn("error", metrics)
+
+    def test_the_endpoints_seed_is_not_in_the_candidates_environment(self):
+        # The selection seed is exported, because the evaluator needs it. The endpoint's seed is
+        # chosen by the scoring side and must not be derivable from what the candidate can read.
+        os.environ["EVOLUTION_SR_TASK"] = "rational_gain"
+        os.environ["EVOLUTION_SR_SEED"] = str(family.DEV_SEEDS[0])
+        exported = {key: value for key, value in os.environ.items() if key.startswith("EVOLUTION_SR")}
+        self.assertEqual({"EVOLUTION_SR_TASK", "EVOLUTION_SR_SEED"}, set(exported))
+
+        chosen = 918273
+        from_environment = family.holdout("rational_gain", family.DEV_SEEDS[0] + family.TEST_SEED_OFFSET)
+        self.assertNotEqual(family.holdout("rational_gain", chosen)["test_seal"],
+                            from_environment["test_seal"],
+                            "the endpoint's rows are derivable from the exported seed")
 
     def test_a_broken_candidate_scores_worst_rather_than_raising(self):
         os.environ["EVOLUTION_SR_TASK"] = "rational_gain"

@@ -5,10 +5,19 @@ return a metrics dict whose `combined_score` is higher-is-better. Both pilot arm
 file - ours through `aidotnet-evolve run --openevolve-config`, OpenEvolve's through its own runner -
 so neither searches a task the other does not.
 
-**The held-out split is never read here.** Selection sees train and validation only; the pilot scores
-the sealed test split afterwards with `symbolic_regression_family.score`, which refuses a split whose
-rows no longer match their seal. An evaluator that could see the test rows would make the pilot's
-endpoint a training score.
+**The held-out split is never built here, and cannot be rebuilt from here.** This calls
+`family.selection`, which constructs train and validation only. Review found that constructing the
+whole split was not enough on its own: a candidate can `import symbolic_regression_family` and rebuild
+the held-out rows from `EVOLUTION_SR_TASK` and `EVOLUTION_SR_SEED`, because the old held-out seed was
+`seed + TEST_SEED_OFFSET`. Reproduced before fixing - the rebuilt seal matched. The endpoint's seed is
+now chosen by whoever scores the endpoint and is never placed in this process's environment.
+
+**Residual risk, declared.** A candidate still executes in this process when it is imported, so it can
+replace `family.nmse` with something that returns 0.0 and be handed `combined_score: 1.0`. The seal and
+the separate holdout seed do not close that; only a restricted process does, and this repo has one
+(`isolated_program_evaluator.py`, `ProgramSandboxOptions`). Until the pilot runs behind it, this
+evaluator trusts the candidate not to subvert its own scorer, and a campaign that cares about an
+adversarial candidate must not use this path.
 
 `EVOLUTION_SR_TASK` and `EVOLUTION_SR_SEED` choose the task and the seed, so one file serves every
 cell of the campaign. NMSE is minimizing, so the reported score is 1 / (1 + nmse): higher is better,
@@ -41,7 +50,7 @@ def _load(program_path):
 
 
 def evaluate(program_path):
-    split = family.build(TASK, SEED)
+    split = family.selection(TASK, SEED)
     try:
         predict = _load(program_path)
         selection = (family.nmse(predict, split["train"]) + family.nmse(predict, split["validation"])) / 2.0

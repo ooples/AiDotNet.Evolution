@@ -44,14 +44,21 @@ def load_predict(program_path):
     return predict
 
 
-def score_held_out(task, seed, program_path):
-    """The endpoint: held-out NMSE through `family.score`, which checks the seal before scoring."""
-    split = family.build(task, seed)
+def score_held_out(task, holdout_seed, program_path):
+    """The endpoint: held-out NMSE on a split built from a seed the candidate never saw.
+
+    `holdout_seed` belongs to this side of the seam. Review found that deriving it from the cell's
+    selection seed let a candidate rebuild the endpoint's rows from its own environment, so it is now
+    passed in and the search environment never carries it.
+    """
+    split = family.holdout(task, holdout_seed)
     predict = load_predict(program_path)
-    return family.score(predict, split)["test_nmse"]
+    if family.seal(split["test"]) != split["test_seal"]:
+        raise ValueError("The held-out split does not match its seal, so its score would not be held out.")
+    return family.nmse(predict, split["test"])
 
 
-def executor(task, searchers):
+def executor(task, searchers, *, holdout_seed):
     """Returns an `execute_cell` for one family, dispatching on the cell's arm.
 
     `searchers` maps an arm name to `search(cell, directory, resume) -> dict` carrying at least
@@ -63,6 +70,8 @@ def executor(task, searchers):
         raise KeyError("Unknown task: " + task)
     if not searchers:
         raise ValueError("A pilot needs at least one arm's searcher")
+    if type(holdout_seed) is not int:
+        raise TypeError("The endpoint needs an explicit integer holdout seed")
 
     def execute_cell(cell, directory, resume):
         arm = cell["Arm"]
@@ -71,7 +80,7 @@ def executor(task, searchers):
         try:
             outcome = searchers[arm](cell, Path(directory), resume)
             program = outcome["program"]
-            value = score_held_out(task, int(cell["Seed"]), program)
+            value = score_held_out(task, holdout_seed, program)
             if not math.isfinite(value):
                 return _failed(outcome, "non-finite held-out score")
         except Exception as error:  # noqa: BLE001 - one cell's failure is that cell's outcome

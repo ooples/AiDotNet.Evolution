@@ -41,7 +41,7 @@ class PilotCellTests(unittest.TestCase):
                     "model_calls": 4, "model_tokens": 1234}
 
         with tempfile.TemporaryDirectory() as directory:
-            outcome = pilot_cells.executor(TASK, {"aidotnet": searcher})(cell("aidotnet"), directory, False)
+            outcome = pilot_cells.executor(TASK, {"aidotnet": searcher}, holdout_seed=918273)(cell("aidotnet"), directory, False)
         self.assertEqual("completed", outcome["Status"])
         self.assertLess(outcome["Value"], 1e-24, "the truth must score ~0 held-out NMSE")
         self.assertNotIn(999.0, outcome.values(), "the searcher's own claim must not reach the row")
@@ -57,7 +57,7 @@ class PilotCellTests(unittest.TestCase):
             return {"program": program(directory, "def predict(x):\n    return (3.0*x + 1.0)/(x*x + 2.0)\n"),
                     "model_calls": 1}
 
-        run = pilot_cells.executor(TASK, {"aidotnet": truth, "openevolve-recommended": constant})
+        run = pilot_cells.executor(TASK, {"aidotnet": truth, "openevolve-recommended": constant}, holdout_seed=918273)
         with tempfile.TemporaryDirectory() as directory:
             ours = run(cell("aidotnet"), directory, False)
             theirs = run(cell("openevolve-recommended"), directory, False)
@@ -72,7 +72,7 @@ class PilotCellTests(unittest.TestCase):
                 def searcher(_cell, where, _resume, body=body):
                     return {"program": program(where, body), "model_calls": 2, "model_tokens": 7}
 
-                outcome = pilot_cells.executor(TASK, {"aidotnet": searcher})(cell("aidotnet"), directory, False)
+                outcome = pilot_cells.executor(TASK, {"aidotnet": searcher}, holdout_seed=918273)(cell("aidotnet"), directory, False)
                 self.assertEqual("failed", outcome["Status"])
                 self.assertIsNone(outcome.get("Value"), "a failed cell must carry no value")
                 # The accounting survives a failure: a cell that spent calls still reports them.
@@ -83,7 +83,7 @@ class PilotCellTests(unittest.TestCase):
             raise TimeoutError("provider timed out")
 
         with tempfile.TemporaryDirectory() as directory:
-            outcome = pilot_cells.executor(TASK, {"aidotnet": searcher})(cell("aidotnet"), directory, False)
+            outcome = pilot_cells.executor(TASK, {"aidotnet": searcher}, holdout_seed=918273)(cell("aidotnet"), directory, False)
         self.assertEqual("failed", outcome["Status"])
         self.assertEqual("TimeoutError", outcome["Reason"])
 
@@ -93,15 +93,15 @@ class PilotCellTests(unittest.TestCase):
         def searcher(_cell, directory, _resume):
             return {"program": program(directory, "def predict(x):\n    return 0.0\n"), "model_calls": 1}
 
-        genuine = pilot_cells.family.build
-        tampered = genuine(TASK, SEED)
+        genuine = pilot_cells.family.holdout
+        tampered = genuine(TASK, 918273)
         tampered["test"] = [(xs, y + 1.0) for xs, y in tampered["test"]]
         try:
-            pilot_cells.family.build = lambda *args, **kwargs: tampered
+            pilot_cells.family.holdout = lambda *args, **kwargs: tampered
             with tempfile.TemporaryDirectory() as directory:
-                outcome = pilot_cells.executor(TASK, {"aidotnet": searcher})(cell("aidotnet"), directory, False)
+                outcome = pilot_cells.executor(TASK, {"aidotnet": searcher}, holdout_seed=918273)(cell("aidotnet"), directory, False)
         finally:
-            pilot_cells.family.build = genuine
+            pilot_cells.family.holdout = genuine
         self.assertEqual("failed", outcome["Status"])
         self.assertEqual("ValueError", outcome["Reason"], "family.score must refuse an unsealed split")
 
@@ -111,7 +111,7 @@ class PilotCellTests(unittest.TestCase):
         def searcher(_cell, directory, _resume):
             return {"program": program(directory, "def predict(x):\n    return 0.0\n")}
 
-        run = pilot_cells.executor(TASK, {"aidotnet": searcher})
+        run = pilot_cells.executor(TASK, {"aidotnet": searcher}, holdout_seed=918273)
         with tempfile.TemporaryDirectory() as directory:
             with self.assertRaises(KeyError):
                 run(cell("openevolve-matched"), directory, False)
@@ -150,7 +150,7 @@ class PilotCellTests(unittest.TestCase):
                     TestPartitionHashes={TASK: "a" * 64}, Published=None), root / "registration")
                 projection = runner.project(registration)
                 rows = runner.run(root / "registration" / "registration.json", root / "state",
-                                  pilot_cells.executor(TASK, searchers(ours, theirs)),
+                                  pilot_cells.executor(TASK, searchers(ours, theirs), holdout_seed=918273),
                                   confirm=projection["ProjectionSha256"], log=lambda *args: None)
                 self.assertEqual(18, len(rows), "3 arms x 6 seeds")
                 self.assertEqual({"completed"}, {row["Status"] for row in rows})
@@ -163,9 +163,9 @@ class PilotCellTests(unittest.TestCase):
 
     def test_an_unknown_task_or_no_searcher_is_refused_at_construction(self):
         with self.assertRaises(KeyError):
-            pilot_cells.executor("no_such_task", {"aidotnet": lambda *a: None})
+            pilot_cells.executor("no_such_task", {"aidotnet": lambda *a: None}, holdout_seed=918273)
         with self.assertRaises(ValueError):
-            pilot_cells.executor(TASK, {})
+            pilot_cells.executor(TASK, {}, holdout_seed=918273)
 
 
 if __name__ == "__main__":

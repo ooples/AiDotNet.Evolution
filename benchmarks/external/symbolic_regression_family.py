@@ -79,11 +79,52 @@ def seal(rows):
     return hashlib.sha256(json.dumps(payload, separators=(",", ":")).encode()).hexdigest()
 
 
+def selection(task, seed, train=60, validation=20):
+    """Train and validation only, for the process a candidate runs in.
+
+    The held-out rows are **not constructed here**, because an evaluator that holds them hands them
+    to any candidate that can read its process. Review of the pilot task found that a candidate could
+    `import symbolic_regression_family` and rebuild the held-out rows from `EVOLUTION_SR_TASK` and
+    `EVOLUTION_SR_SEED`; reproduced before fixing, the rebuilt seal matched. The seal protects against
+    tampering, never against reading.
+    """
+    if task not in TASKS: raise KeyError("Unknown task: " + task)
+    if min(train, validation) < 4: raise ValueError("Each split needs at least 4 rows.")
+    return {
+        "family": FAMILY,
+        "task": task,
+        "seed": seed,
+        "description": TASKS[task]["description"],
+        "variables": list(TASKS[task]["variables"]),
+        "train": _rows(task, seed, train),
+        "validation": _rows(task, seed + 1, validation),
+    }
+
+
+def holdout(task, holdout_seed, test=400):
+    """The sealed held-out split, built from a seed the candidate's process never receives.
+
+    `holdout_seed` is explicit rather than derived from the selection seed: deriving it is what let a
+    candidate reconstruct the endpoint's rows. Whoever scores the endpoint chooses it and keeps it out
+    of the search environment.
+    """
+    if task not in TASKS: raise KeyError("Unknown task: " + task)
+    if test < 4: raise ValueError("A held-out split needs at least 4 rows.")
+    rows = _rows(task, holdout_seed, test)
+    return {"family": FAMILY, "task": task, "holdout_seed": holdout_seed,
+            "variables": list(TASKS[task]["variables"]), "test": rows, "test_seal": seal(rows)}
+
+
 def build(task, seed, train=60, validation=20, test=400):
     """Returns a split whose test rows are drawn from a different seed and sealed by hash.
 
     The test seed is offset by a prime rather than being `seed + 1`, because consecutive seeds of
     the same generator are a common way to accidentally share a grid between train and test.
+
+    **Dev use only where a candidate cannot read this process.** The held-out seed is `seed +
+    TEST_SEED_OFFSET`, so anything holding the selection seed can derive it - fine for this module's
+    own tests and the floor probe, wrong for an evaluator a candidate runs inside. Use `selection`
+    there and `holdout` with an independent seed for the endpoint.
 
     **Why the held-out split is ten times the training split.** At 40 test rows the floor's test NMSE
     on `damped_oscillator` swung 1.133 across eight seeds - larger than the ~0.3 of headroom the task
