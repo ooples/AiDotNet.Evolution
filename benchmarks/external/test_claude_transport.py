@@ -9,7 +9,7 @@ import tempfile
 import unittest
 from unittest.mock import patch
 
-from claude_transport import (CANARY_PROMPT, MAX_OUTPUT, PINNED_CLI, ClaudeModelSet, ClaudeTransport, ExclusiveWorkspace, parse_events,
+from claude_transport import (CANARY_PROMPT, MAX_OUTPUT, PINNED_CLI, SYSTEM_PROMPT, ClaudeModelSet, ClaudeTransport, ExclusiveWorkspace, parse_events,
                               reconcile_receipts,
                               scrubbed_environment, verified_executable)
 
@@ -239,6 +239,43 @@ class LiveTests(unittest.TestCase):
             self.assertEqual((PINNED_CLI, "completed", 0), (receipt["cli"], receipt["status"], receipt["api_key_calls"]))
             self.assertTrue(receipt["resolved_model"].startswith("claude-haiku"))
             self.assertEqual(CANARY_PROMPT, (Path(directory) / "e" / "0" / "prompt.txt").read_text(encoding="utf-8"))
+
+    def test_the_isolation_flag_is_what_keeps_a_hook_out_of_the_measurement(self):
+        """`--setting-sources ""` is load-bearing, and nothing proved it until this test.
+
+        Measured on 2026-10-15 while revalidating the pin for CLI 2.1.299: the same canary prompt
+        run **without** that flag had the development machine's own `SessionStart` hook inject
+        29,406 tokens of instructions into the call, as `hook_started`/`hook_response` events ahead
+        of `system/init`. With the flag, zero hook events. A future edit that drops the flag would
+        keep every other assertion in this file passing while silently measuring a contaminated
+        context, so the comparison is the test: the isolated call must show no hook event, and the
+        unisolated one must cost materially more.
+
+        Two subscription calls, which is why it lives behind EVOLUTION_CLAUDE_EXECUTABLE.
+        """
+        executable = os.environ["EVOLUTION_CLAUDE_EXECUTABLE"]
+        with tempfile.TemporaryDirectory() as directory:
+            transport = ClaudeTransport(executable, "haiku", Path(directory) / "isolated", 2)
+            isolated = transport.canary_input_tokens()
+            events = (Path(directory) / "isolated" / "0" / "events.jsonl").read_text(encoding="utf-8")
+            self.assertNotIn('"hook_started"', events, "a hook reached an isolated call")
+            self.assertNotIn('"hook_response"', events)
+
+            command = [executable, "-p", "--output-format", "stream-json", "--verbose", "--model", "haiku",
+                       "--no-session-persistence", "--max-turns", "1", "--system-prompt", SYSTEM_PROMPT]
+            raw = subprocess.run(command, input=CANARY_PROMPT.encode("utf-8"), capture_output=True,
+                                 timeout=300, check=True).stdout.decode("utf-8", errors="replace")
+            unisolated = 0
+            for line in raw.splitlines():
+                row = json.loads(line)
+                if row.get("type") == "assistant":
+                    usage = row["message"]["usage"]
+                    unisolated = (usage["input_tokens"] + usage["cache_creation_input_tokens"]
+                                  + usage["cache_read_input_tokens"])
+            # Not an equality: what a machine's settings inject is that machine's business. What the
+            # flag must do is keep it out, and a difference this large is what "kept out" looks like.
+            self.assertGreater(unisolated, isolated * 2,
+                               "dropping --setting-sources changed nothing, so the flag is not what isolates")
 
 
 if __name__ == "__main__":
