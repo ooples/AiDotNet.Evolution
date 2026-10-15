@@ -103,12 +103,54 @@ escape - `SyntaxError: (unicode error) 'unicodeescape' codec can't decode bytes 
 \UXXXXXXXX escape` - and every candidate scores zero. Measured by running
 `examples/circle_packing/evaluator.py` directly on its own seed program on both platforms.
 
-**Through this CLI that no longer happens**, because the shim now hands the evaluator a path whose
-separators are forward slashes: valid inside a single-quoted literal, accepted by every Windows path
-API, and already what the separator is on Linux, so it changes nothing there. See *The path the shim
-hands an evaluator* below. The smoke stays on Linux because one Theory covers every example and other
-examples need it - `rust_adaptive_sort` needs a Rust toolchain, `r_robust_regression` needs R - not
-because of the path.
+**Through this CLI the path *we* supply is no longer the problem**, because the shim hands the evaluator
+a path whose separators are forward slashes: valid inside a single-quoted literal, accepted by every
+Windows path API, and already what the separator is on Linux, so it changes nothing there. See *The path
+the shim hands an evaluator* below.
+
+**That is not the whole story for `circle_packing`, and an earlier version of this section overclaimed.**
+Its evaluator embeds **two** paths in single-quoted literals: `program_path` at `evaluator.py:99`, which
+the shim now makes safe, and **its own** `NamedTemporaryFile` path at lines 123 and 131
+(`open('{temp_file.name}.results', 'wb')`). The second is created inside the evaluator from the system
+temp directory, so nothing this CLI passes can influence it. Measured on Windows at the pinned ref,
+through the CLI with the real provider: 4 completed evaluations, **every one `combined_score: 0`,
+`validity: 0`**, including upstream's own seed - and running the evaluator directly reproduces the same
+`truncated \UXXXXXXXX escape`, this time on `C:\Users\...\tmpXXXXXXXX.py.results`.
+
+The evaluator reports that as a completed evaluation scoring zero rather than as a failure, which is why
+a run looks healthy - no retained failures, four completed evaluations - while measuring nothing.
+
+**`circle_packing_with_artifacts` is the same**, measured the same way: its evaluator carries six
+occurrences of the `NamedTemporaryFile`-in-a-literal shape, and on Windows its seed reports
+`combined_score` 0.0 with `validity` 0.0 and the same `truncated \UXXXXXXXX escape`. So of the five smoked
+examples, **two smoke on Linux only for a reason inside the evaluator** rather than anything about this
+CLI, and `background_blur` was chosen for the real-provider run precisely because it has none of that
+shape.
+
+The smoke stays on Linux because one Theory covers every example, because `rust_adaptive_sort` needs a
+Rust toolchain and `r_robust_regression` needs R, **and** because `circle_packing` remains zero-scoring on
+Windows for the reason above.
+
+## The same catalogue measured on Windows, for free
+
+The smoke above runs in a Linux container. Preflight makes **no model calls**, so the same examples can be
+scored on Windows at no cost, and all **11 of 21 that ship a config, an evaluator and a seed program** have
+been: [`benchmarks/evidence/openevolve-examples/86d56c9-windows-preflight`](../../benchmarks/evidence/openevolve-examples/86d56c9-windows-preflight/README.md).
+
+It separates two failure modes that the smoke's pass/fail cannot:
+
+| mode | examples | what a caller sees |
+| --- | --- | --- |
+| **fails loudly** - a missing toolchain or module | `attention_optimization` (`mlir-opt`), `mlx_metal_kernel_opt` (Apple MLX) | `Failed`, `program_script_script_failed`, traceback in the report when the artifact flags are on |
+| **completes at zero** - a missing dataset, or a path the evaluator cannot embed | `arc_benchmark`, `circle_packing_with_artifacts`, `k_module_problem`, `online_judge_programming`, `web_scraper_optillm` | `Completed`, quality 0, **no failure of any kind** |
+
+**Five of the eleven are in the second mode**, which is the one worth knowing about: nothing in the status
+distinguishes it from a working example whose candidate was simply bad. Three of those five are the ones
+this ledger already excludes for *"its own seed scores zero"* - a judgement made before the measurement,
+and confirmed by it.
+
+`claude_code_quickstart` scores 1.3905 under preflight, because what stops it smoking is the provider
+rather than the evaluator.
 
 ## What `circle_packing_with_artifacts` needs that the others do not
 
@@ -157,7 +199,12 @@ would report is the example's score rather than this contract.
 All five smoked examples import with cascade evaluation enabled and their own thresholds mapped —
 `circle_packing` 0.5/0.75, `function_minimization` 1.3, `signal_processing` 0.3/0.6,
 `background_blur` 0.5/0.5, `circle_packing_with_artifacts` 0.5/0.8 — and each evaluator defines
-`evaluate_stage1` and `evaluate_stage2`; `background_blur` defines a third. So the smoke drives
+`evaluate_stage1` and `evaluate_stage2`; `background_blur` defines a third.
+
+**`function_minimization`'s config never mentions `cascade_evaluation`**, which looks like a discrepancy
+until you check the default: upstream declares `cascade_evaluation: bool = True` (`openevolve/config.py`),
+so an absent key means enabled, and this import agrees - measured by importing that config unchanged, which
+yields `cascade: true` with `cascadeThresholds: [1.3]`. So the smoke drives
 V1-56's cascade criterion against real upstream evaluators, not only against the synthetic config in
 `OpenEvolveImportTests`, which is where the stage ordering and threshold semantics are actually
 pinned by assertion.

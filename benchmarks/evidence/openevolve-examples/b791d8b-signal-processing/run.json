@@ -1,0 +1,127 @@
+{
+  "schema": "aidotnet-evolve-run-v1",
+  "runId": "openevolve-config",
+  "initialProgram": "C:\\Users\\cheat\\AppData\\Local\\Temp\\claude\\C--Users-cheat\\5e8549bf-c217-4e8f-9844-5a569ec73bd5\\scratchpad\\sp\\initial_program.py",
+  "evaluator": "C:\\Users\\cheat\\AppData\\Local\\Temp\\claude\\C--Users-cheat\\5e8549bf-c217-4e8f-9844-5a569ec73bd5\\scratchpad\\sp\\evaluator.py",
+  "model": {
+    "provider": "ClaudeCode",
+    "endpoint": "https://generativelanguage.googleapis.com/v1beta/openai/",
+    "name": "sonnet",
+    "apiKeyEnvironmentVariable": null,
+    "temperature": 0.6,
+    "topP": 0.95,
+    "reasoningEffort": null,
+    "maxOutputTokens": 32000,
+    "timeoutSeconds": 60,
+    "maxRetries": 3,
+    "retryDelaySeconds": 5,
+    "maxBudgetUsd": null,
+    "claudeExecutable": null,
+    "manualQueue": null,
+    "manualTimeoutSeconds": 3600,
+    "weight": 0.8
+  },
+  "budget": {
+    "maxEvaluations": 4,
+    "seed": 42,
+    "parallelism": 4,
+    "evaluationTimeLimitSeconds": 120,
+    "maxProgramChars": 60000
+  },
+  "output": ".",
+  "language": "Python",
+  "evaluatorLanguage": "Python",
+  "direction": "Maximize",
+  "taskDescription": null,
+  "runtimeVersion": "aidotnet-evolve-local",
+  "warmStart": null,
+  "mode": "Diff",
+  "additionalModels": [
+    {
+      "provider": "ClaudeCode",
+      "endpoint": "https://generativelanguage.googleapis.com/v1beta/openai/",
+      "name": "haiku",
+      "apiKeyEnvironmentVariable": null,
+      "temperature": 0.6,
+      "topP": 0.95,
+      "reasoningEffort": null,
+      "maxOutputTokens": 32000,
+      "timeoutSeconds": 60,
+      "maxRetries": 3,
+      "retryDelaySeconds": 5,
+      "maxBudgetUsd": null,
+      "claudeExecutable": null,
+      "manualQueue": null,
+      "manualTimeoutSeconds": 3600,
+      "weight": 0.2
+    }
+  ],
+  "prompt": {
+    "templateDirectory": null,
+    "systemMessage": "You are an expert signal processing engineer specializing in real-time adaptive filtering algorithms. Your task is to improve a signal processing algorithm that filters volatile, non-stationary time series data using a sliding window approach. The algorithm must minimize noise while preserving signal dynamics with minimal computational latency and phase delay. Focus on the multi-objective optimization of: (1) Slope change minimization - reducing spurious directional reversals, (2) Lag error minimization - maintaining responsiveness, (3) Tracking accuracy - preserving genuine signal trends, and (4) False reversal penalty - avoiding noise-induced trend changes. Consider advanced techniques like adaptive filtering (Kalman filters, particle filters), multi-scale processing (wavelets, EMD), predictive enhancement (polynomial fitting, neural networks), and trend detection methods.",
+    "systemMessageMode": "Literal",
+    "evaluatorSystemMessage": null,
+    "programsAsChangesDescription": false,
+    "initialChangesDescription": null,
+    "systemMessageChangesDescription": null,
+    "numTopPrograms": 3,
+    "numDiversePrograms": 2,
+    "includeArtifacts": true,
+    "maxArtifactBytes": 20480,
+    "artifactSecurityFilter": true,
+    "useTemplateStochasticity": true,
+    "templateVariations": null,
+    "suggestSimplificationAfterChars": 500,
+    "includeChangesUnderChars": 100,
+    "conciseImplementationMaxLines": 10,
+    "comprehensiveImplementationMinLines": 50
+  },
+  "llmFeedback": null,
+  "search": {
+    "islands": 4,
+    "migrationInterval": 50,
+    "migrationRate": 0.1,
+    "explorationRatio": 0.2,
+    "exploitationRatio": 0.65,
+    "eliteRatio": 0.15000000000000002,
+    "topPrograms": 3,
+    "topInspirations": 1,
+    "diversePrograms": 0,
+    "metricDescriptors": [
+      {
+        "name": "length",
+        "minimum": 0,
+        "maximum": 1,
+        "bins": 10
+      }
+    ],
+    "earlyStoppingPatience": null,
+    "earlyStoppingMinimumImprovement": 0.001,
+    "targetQuality": null,
+    "evaluationRetries": 3,
+    "evaluationMemoryLimitMb": 4096,
+    "includeArtifacts": true,
+    "maxArtifactBytes": 20480,
+    "collectArtifacts": true,
+    "retainArtifactText": false,
+    "archiveCapacity": 80,
+    "eliteArchiveSize": 30
+  },
+  "openEvolveEvaluator": {
+    "python": "C:\\Users\\cheat\\AppData\\Local\\Temp\\claude\\C--Users-cheat\\5e8549bf-c217-4e8f-9844-5a569ec73bd5\\scratchpad\\kfenv\\Scripts\\python.exe",
+    "cascade": true,
+    "cascadeThresholds": [
+      0.3,
+      0.6
+    ],
+    "fileSuffix": ".py",
+    "timeoutSeconds": 120,
+    "featureDimensions": [
+      "complexity",
+      "diversity"
+    ],
+    "pythonPath": [
+      "C:\\Users\\cheat\\AppData\\Local\\Temp\\claude\\C--Users-cheat\\5e8549bf-c217-4e8f-9844-5a569ec73bd5\\scratchpad\\upstream\\oe"
+    ]
+  }
+}

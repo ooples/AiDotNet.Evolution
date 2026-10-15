@@ -1,0 +1,73 @@
+{
+  "story": "V1-56 (#169): preflight across all 11 OpenEvolve examples with a complete triple, on Windows, no model calls",
+  "aidotnet_commit": "86d56c9",
+  "upstream_ref": "411fb59c886c18704caaffb611e17cf9e7d824d2",
+  "examples": [
+    {
+      "example": "background_blur",
+      "seed_status": "Completed",
+      "seed_quality": 1.0020681225355723,
+      "zero_seed_notice": false
+    },
+    {
+      "example": "function_minimization",
+      "seed_status": "Completed",
+      "seed_quality": 1.3919185189804573,
+      "zero_seed_notice": false
+    },
+    {
+      "example": "signal_processing",
+      "seed_status": "Completed",
+      "seed_quality": 9.117545525311503,
+      "zero_seed_notice": false
+    },
+    {
+      "example": "circle_packing_with_artifacts",
+      "seed_status": "Completed",
+      "seed_quality": 0.0,
+      "zero_seed_notice": true
+    },
+    {
+      "example": "k_module_problem",
+      "seed_status": "Completed",
+      "seed_quality": 0.0,
+      "zero_seed_notice": true
+    },
+    {
+      "example": "online_judge_programming",
+      "seed_status": "Completed",
+      "seed_quality": 0.0,
+      "zero_seed_notice": true
+    },
+    {
+      "example": "web_scraper_optillm",
+      "seed_status": "Completed",
+      "seed_quality": 0.0,
+      "zero_seed_notice": true
+    },
+    {
+      "example": "claude_code_quickstart",
+      "seed_status": "Completed",
+      "seed_quality": 1.390494619052681,
+      "zero_seed_notice": false
+    },
+    {
+      "example": "arc_benchmark",
+      "seed_status": "Completed",
+      "seed_quality": 0.0,
+      "zero_seed_notice": true
+    },
+    {
+      "example": "attention_optimization",
+      "seed_status": "Failed",
+      "seed_quality": null,
+      "diagnostic": "program_script_script_failed"
+    },
+    {
+      "example": "mlx_metal_kernel_opt",
+      "seed_status": "Failed",
+      "seed_quality": null,
+      "diagnostic": "program_script_script_failed"
+    }
+  ]
+}

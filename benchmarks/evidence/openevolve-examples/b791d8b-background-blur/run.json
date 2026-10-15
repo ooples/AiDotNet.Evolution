@@ -1,0 +1,116 @@
+{
+  "schema": "aidotnet-evolve-run-v1",
+  "runId": "openevolve-config",
+  "initialProgram": "C:\\Users\\cheat\\AppData\\Local\\Temp\\claude\\C--Users-cheat\\5e8549bf-c217-4e8f-9844-5a569ec73bd5\\scratchpad\\bb\\initial_program.py",
+  "evaluator": "C:\\Users\\cheat\\AppData\\Local\\Temp\\claude\\C--Users-cheat\\5e8549bf-c217-4e8f-9844-5a569ec73bd5\\scratchpad\\bb\\evaluator.py",
+  "model": {
+    "provider": "ClaudeCode",
+    "endpoint": "https://openrouter.ai/api/v1",
+    "name": "sonnet",
+    "apiKeyEnvironmentVariable": null,
+    "temperature": 0.9,
+    "topP": null,
+    "reasoningEffort": null,
+    "maxOutputTokens": 6000,
+    "timeoutSeconds": 180,
+    "maxRetries": 1,
+    "retryDelaySeconds": 8,
+    "maxBudgetUsd": null,
+    "claudeExecutable": null,
+    "manualQueue": null,
+    "manualTimeoutSeconds": 3600,
+    "weight": 1
+  },
+  "budget": {
+    "maxEvaluations": 4,
+    "seed": 42,
+    "parallelism": 1,
+    "evaluationTimeLimitSeconds": 180,
+    "maxProgramChars": 40000
+  },
+  "output": ".",
+  "language": "Python",
+  "evaluatorLanguage": "Python",
+  "direction": "Maximize",
+  "taskDescription": null,
+  "runtimeVersion": "aidotnet-evolve-local",
+  "warmStart": null,
+  "mode": "FullRewrite",
+  "additionalModels": [],
+  "prompt": {
+    "templateDirectory": null,
+    "systemMessage": "You are an expert at high-performance numerical Python (NumPy).\n\nYou are optimising the hot function of a real-time video pipeline: a portrait-mode\nbackground blur. For every frame it must blur the background with a Gaussian of the\ngiven sigma and composite the (sharp) person back on top using the supplied mask:\n\n    blurred = gaussian_blur(frame, sigma)\n    out     = mask * frame \u002B (1 - mask) * blurred\n\nThe current implementation is correct but slow: it convolves with the full 2D\nGaussian kernel directly, costing O(k^2) passes per frame.\n\nYOUR SCORE IS THE SPEEDUP. But speed only counts if the output still matches the\nreference blur. Fidelity is a HARD GATE, not a trade-off:\n\n    mean SSIM         \u003E= 0.98\n    worst-frame SSIM  \u003E= 0.95\n    worst-REGION SSIM \u003E= 0.90   (worst 16x16 block - catches localised artefacts)\n\nFail any of those and you score ZERO no matter how fast you are. So do NOT:\n  - skip the blur, or under-blur with a kernel smaller than sigma demands\n  - blur the person (always respect the mask)\n  - reuse a stale background across frames (the background genuinely changes;\n    a stale background leaves a person-shaped ghost that destroys one region\n    while barely moving the frame average)\n\nLegitimate ways to go faster include (but are not limited to): exploiting the\nseparability of the Gaussian (two 1D passes instead of k^2), blurring at reduced\nresolution and upsampling, approximating the Gaussian with repeated box blurs via\nsummed-area tables/cumsum, FFT convolution, avoiding needless float64 work and\nredundant copies, and vectorising across the sequence.\n\nUse only numpy and the Python standard library. Keep the public entry point\n\u0060process_sequence(frames, masks, sigma)\u0060 with the same signature and return type.\n",
+    "systemMessageMode": "Literal",
+    "evaluatorSystemMessage": null,
+    "programsAsChangesDescription": false,
+    "initialChangesDescription": null,
+    "systemMessageChangesDescription": null,
+    "numTopPrograms": 3,
+    "numDiversePrograms": 2,
+    "includeArtifacts": true,
+    "maxArtifactBytes": 20480,
+    "artifactSecurityFilter": true,
+    "useTemplateStochasticity": true,
+    "templateVariations": null,
+    "suggestSimplificationAfterChars": 500,
+    "includeChangesUnderChars": 100,
+    "conciseImplementationMaxLines": 10,
+    "comprehensiveImplementationMinLines": 50
+  },
+  "llmFeedback": null,
+  "search": {
+    "islands": 2,
+    "migrationInterval": 50,
+    "migrationRate": 0.1,
+    "explorationRatio": 0.2,
+    "exploitationRatio": 0.7,
+    "eliteRatio": 0.10000000000000009,
+    "topPrograms": 3,
+    "topInspirations": 1,
+    "diversePrograms": 0,
+    "metricDescriptors": [
+      {
+        "name": "length",
+        "minimum": 0,
+        "maximum": 1,
+        "bins": 10
+      },
+      {
+        "name": "ssim",
+        "minimum": 0,
+        "maximum": 1,
+        "bins": 10
+      }
+    ],
+    "earlyStoppingPatience": null,
+    "earlyStoppingMinimumImprovement": 0.001,
+    "targetQuality": null,
+    "evaluationRetries": 3,
+    "evaluationMemoryLimitMb": 4096,
+    "includeArtifacts": true,
+    "maxArtifactBytes": 20480,
+    "collectArtifacts": true,
+    "retainArtifactText": false,
+    "archiveCapacity": 30,
+    "eliteArchiveSize": 100
+  },
+  "openEvolveEvaluator": {
+    "python": "C:\\Users\\cheat\\AppData\\Local\\Temp\\claude\\C--Users-cheat\\5e8549bf-c217-4e8f-9844-5a569ec73bd5\\scratchpad\\kfenv\\Scripts\\python.exe",
+    "cascade": true,
+    "cascadeThresholds": [
+      0.5,
+      0.5
+    ],
+    "fileSuffix": ".py",
+    "timeoutSeconds": 180,
+    "featureDimensions": [
+      "complexity",
+      "ssim"
+    ],
+    "pythonPath": [
+      "C:\\Users\\cheat\\AppData\\Local\\Temp\\claude\\C--Users-cheat\\5e8549bf-c217-4e8f-9844-5a569ec73bd5\\scratchpad\\upstream\\oe",
+      "C:\\Users\\cheat\\AppData\\Local\\Temp\\claude\\C--Users-cheat\\5e8549bf-c217-4e8f-9844-5a569ec73bd5\\scratchpad\\bb"
+    ]
+  },
+  "metaPrompt": null
+}
