@@ -52,6 +52,26 @@ class HeadroomProbeTests(unittest.TestCase):
         _, large = headroom.search("damped_oscillator", family.DEV_SEEDS[1], BUDGET * 3)
         self.assertLessEqual(large[0], small[0])
 
+    def test_the_default_split_keeps_the_floors_noise_under_its_headroom(self):
+        """The ratchet on why `build` holds out 400 rows rather than 40.
+
+        At 40 the floor's test NMSE on damped_oscillator swung 1.133 across eight seeds, against
+        about 0.3 of headroom - so a comparison on it would have been reading the draw. Asserting
+        the relation, not the number: the spread at the default size must stay below the gap the
+        task has, or the task cannot carry a claim and this test says so before anyone runs one.
+        """
+        found = []
+        for index in range(8):
+            seed = family.DEV_SEEDS[0] + index
+            split, best = headroom.search("damped_oscillator", seed, BUDGET)
+            found.append(family.score(headroom._predict(best[1], best[2]), split)["test_nmse"])
+        spread = max(found) - min(found)
+        headroom_gap = 1.0 - sum(found) / len(found)  # against the mean predictor, which scores 1.0
+        self.assertGreater(headroom_gap, 0.0, "the floor must beat the mean predictor at all")
+        self.assertLess(spread, headroom_gap,
+                        "seed spread %.3f is not under the headroom %.3f; a smaller held-out split "
+                        "is the usual cause" % (spread, headroom_gap))
+
     def test_a_rendered_expression_names_the_task_variables(self):
         split, best = headroom.search("two_variable_ratio", family.DEV_SEEDS[0], BUDGET)
         rendered = headroom._render(best[1], best[2], split["variables"])
