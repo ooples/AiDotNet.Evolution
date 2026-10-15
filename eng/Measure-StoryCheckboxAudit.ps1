@@ -29,6 +29,13 @@ param(
     # commit's check runs by conclusion. Costs a few API calls per issue, so it is opt-in.
     [Parameter(ParameterSetName = 'Measure')] [switch] $WithDelivery,
 
+    # Classify every unticked box into exactly one bucket, first rule wins, so a reader gets the
+    # shape of what is left rather than a count. Costs nothing extra: it reads bodies already
+    # fetched. The rule order is part of the measurement - a box naming both a sibling story and the
+    # pilot lands in the first bucket - and an earlier hand-eyeballed version of this classification
+    # put ~34 of 66 boxes on the pilot when the measured figure is 8 (#108).
+    [Parameter(ParameterSetName = 'Measure')] [switch] $Classify,
+
     [Parameter(Mandatory, ParameterSetName = 'SelfTest')] [switch] $SelfTest
 )
 
@@ -99,6 +106,28 @@ Not a checkbox: - [ ] inside prose is still matched only at line start.
 if ($SelfTest) {
     Invoke-SelfTest
     return
+}
+
+function Measure-BoxBucket {
+    <#
+    .SYNOPSIS
+        Which kind of thing one unticked box is, by the first rule it matches.
+    #>
+    param([Parameter(Mandatory)] [AllowEmptyString()] [string] $Text)
+
+    $rules = [ordered] @{
+        'dependency on a sibling story'               = '^\[(US|V1)-\d+|/issues/'
+        'a merge-time judgement'                      = 'confirm dependency readiness'
+        'the paired pilot or the gate campaign'       = 'pilot|campaign|#116|#121|#122|metrics table'
+        'a merged PR, hosted CI, or a counted review' = 'merged pr|hosted ci|coderabbit|ci/review|independent review'
+        'attached current-revision evidence'          = 'evidence|attach current-revision'
+        'an acceptance criterion still unmet'         = '^\*\*Given\*\*'
+        'implement and verify every criterion'        = '^implement and verify'
+    }
+    foreach ($bucket in $rules.Keys) {
+        if ($Text -match $rules[$bucket]) { return $bucket }
+    }
+    return 'other'
 }
 
 function Measure-Delivery {
@@ -177,6 +206,17 @@ foreach ($number in $Issues) {
 
     $issue = $json | ConvertFrom-Json
     $counts = Measure-CheckboxBody -Body ([string] $issue.body)
+    $buckets = $null
+    if ($Classify) {
+        $buckets = @{}
+        foreach ($line in ([string] $issue.body) -split "`n") {
+            $trimmed = $line.Trim()
+            if (-not $trimmed.StartsWith('- [ ]')) { continue }
+            $bucket = Measure-BoxBucket -Text $trimmed.Substring(5).Trim()
+            $buckets[$bucket] = 1 + ([int] $buckets[$bucket])
+        }
+        $buckets = [pscustomobject] $buckets
+    }
     $rows.Add([pscustomobject]@{
         Number          = $issue.number
         State           = $issue.state
@@ -187,6 +227,7 @@ foreach ($number in $Issues) {
         # The state the audit exists to remove: closed, yet its own criteria are unticked.
         ClosedWithUnticked = ($issue.state -eq 'CLOSED' -and $counts.Unchecked -gt 0)
         Delivery        = if ($WithDelivery) { Measure-Delivery -Number $issue.number -Repository $Repository } else { $null }
+        Buckets         = $buckets
     })
 }
 

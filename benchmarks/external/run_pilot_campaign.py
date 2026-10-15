@@ -192,6 +192,10 @@ def build_parser():
                         help="per cell; must leave the call ceiling binding first")
     parser.add_argument("--wall-seconds", type=int, default=1800, help="per cell")
     parser.add_argument("--cell-timeout", type=int, default=1800)
+    # V1-40 (#121): the gate campaign's N comes from the variance this pilot measures, against the
+    # CI half width the pre-registration will declare. Reported, never acted on here.
+    parser.add_argument("--target-half-width", type=float, default=0.05,
+                        help="CI half width the gate campaign must reach; sizes its N")
     parser.add_argument("--confirm", help="the printed ProjectionSha256; without it nothing runs")
     parser.add_argument("--stub", action="store_true", help="rehearse the whole path for no spend")
     return parser
@@ -268,10 +272,14 @@ def main():
                 if models is not None else {})
     summary = summarise(rows, report, task=arguments.task, arguments=arguments, frozen=frozen,
                         projection=projection, wall=wall, canaries=canaries, receipts=receipts)
+    analysis = pilot_campaign.power(frozen, rows, report, half_width=arguments.target_half_width)
+    summary["power_analysis"] = analysis
+    (evidence / "power-analysis.json").write_text(json.dumps(analysis, indent=1) + "\n", encoding="utf-8")
     (evidence / "rows.json").write_text(json.dumps(rows, indent=1) + "\n", encoding="utf-8")
     (evidence / "report.json").write_text(json.dumps(report, indent=1) + "\n", encoding="utf-8")
     (evidence / "summary.json").write_text(json.dumps(summary, indent=1, allow_nan=False) + "\n", encoding="utf-8")
     print("\n" + "\n".join(pilot_campaign.report_lines(report)))
+    print("\n" + "\n".join(pilot_campaign.power_lines(analysis)))
     print("\n%d cells in %.1fs, %d model calls, statuses %s"
           % (len(rows), wall, summary["model_calls"], json.dumps(summary["statuses"])))
     if summary["cells_with_unknown_spend"]:

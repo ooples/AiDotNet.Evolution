@@ -55,6 +55,10 @@ MINIMUM_GEOMEAN_SPEEDUP = 1.10
 # still hide one task below this limit, and closing that needs a task dimension in the registration's
 # row schema - a schema change, not a threshold. Declared rather than implied; review raised it.
 MAXIMUM_SEED_REGRESSION = 0.95
+# US-12 (#30) offers a second route to the practical-effect target: "alternatively, predeclare a 20%
+# cost reduction to reach the same target". Until now the gate implemented only the speedup route, so
+# a campaign that reached the target by spending a fifth less had no way to say so.
+MINIMUM_COST_REDUCTION = 0.20
 MAXIMUM_FAMILYWISE_ALPHA = 0.05
 SPEEDUP_METRIC = "speedup"
 MAX_ARTIFACT_BYTES = 32 * 1024 * 1024
@@ -216,6 +220,31 @@ def geometric_mean_speedups(registration, rows, family):
     return result
 
 
+def cost_reductions(registration, rows, family):
+    """Fraction of the competitor's total search cost our arm did not spend, per config.
+
+    The criterion's alternative route. Cost is the registered budget's own currency - model calls and
+    tokens, which every row must report inside the shared ceiling - so this is the same denominator
+    the equal-search-cost check uses rather than a second notion of cost. A failed run has no cost
+    reduction: it did not pay the whole price of an answer, so it cannot claim to have paid less.
+    """
+    cells = {(row["Family"], row["Arm"], row["Seed"]): row for row in rows}
+    result = {}
+    for config in family["Configs"]:
+        ours = theirs = 0
+        complete = True
+        for seed in registration["Seeds"]:
+            mine = cells[(family["Family"], OURS, seed)]
+            yours = cells[(family["Family"], f"openevolve-{config}", seed)]
+            if mine["Status"] != "completed" or yours["Status"] != "completed":
+                complete = False
+                break
+            ours += int(mine["ModelCalls"]) + int(mine["ModelTokens"])
+            theirs += int(yours["ModelCalls"]) + int(yours["ModelTokens"])
+        result[config] = None if not complete or theirs <= 0 else 1.0 - (ours / theirs)
+    return result
+
+
 def assess_bundle(claim, root, repository):
     commit = claim["registration_commit"]
     require(isinstance(commit, str) and HEX40.match(commit) is not None, "registration_commit must be a full commit SHA")
@@ -268,7 +297,7 @@ def assess_bundle(claim, root, repository):
     for family in spec["Families"]:
         endpoints = [e for e in report["Endpoints"] if e["Family"] == family["Family"]]
         superior = all(e["Superior"] for e in endpoints)
-        speedups, floor = None, True
+        speedups, floor, savings = None, True, None
         if family["Endpoint"]["Metric"] == SPEEDUP_METRIC:
             require(family["Endpoint"]["Direction"] == "maximize", "A speedup endpoint must be maximized")
             speedups = geometric_mean_speedups(registration, rows, family)
@@ -280,8 +309,15 @@ def assess_bundle(claim, root, repository):
                         and value["LowerBound95"] > 1.0
                         and value["WorstSeedRatio"] >= MAXIMUM_SEED_REGRESSION
                         for value in speedups.values())
+            savings = cost_reductions(registration, rows, family)
+            if claim.get("effect_route") == "cost-reduction":
+                # The declared alternative: a fifth less search cost for the same quality, which
+                # still needs Holm superiority on every config - the route changes what "practical
+                # effect" means, not whether the result is real.
+                floor = all(value is not None and value >= MINIMUM_COST_REDUCTION for value in savings.values())
         families.append(dict(Family=family["Family"], Supported=superior and floor, HolmSuperiorAllConfigs=superior,
                              GeometricMeanSpeedup=speedups, MeetsSpeedupFloor=floor if speedups is not None else None,
+                             CostReduction=savings, EffectRoute=claim.get("effect_route", "speedup"),
                              Endpoints=endpoints))
 
     published = None
@@ -328,6 +364,15 @@ def release(root, repository, version):
         return dict(base, eligible=True, status="no-competitive-claim", reason=claim["reason"])
     require(claim.get("claim") in ("supported-families", "v1-gate"), "claim must be none, supported-families or v1-gate")
     keys = {"schema", "claim", "benchmark", "hardware", "registration_commit", "registration_path", "bundle"}
+    # The route is optional and defaults to the speedup floor, so every existing claim keeps meaning
+    # exactly what it meant. Declared limitation: the criterion says "predeclare", and a claim is
+    # written at release time - strictly, the route belongs in the frozen registration, which is a
+    # schema change to every committed registration's bytes and so the owner's call rather than this
+    # function's. What is enforced here is that a claim naming the cost route is measured against it.
+    if "effect_route" in claim:
+        keys.add("effect_route")
+        require(claim["effect_route"] in ("speedup", "cost-reduction"),
+                "effect_route is speedup or cost-reduction")
     require(set(claim) == keys | ({"families"} if claim["claim"] == "supported-families" else set()),
             f"A {claim['claim']} claim must carry exactly its declared fields")
     text(claim["benchmark"], "benchmark")

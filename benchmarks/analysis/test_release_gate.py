@@ -231,6 +231,60 @@ class ReleaseGateTests(unittest.TestCase):
         self.assertFalse(algotune["MeetsSpeedupFloor"])
         self.assertFalse(algotune["Supported"])
 
+    def test_the_declared_cost_route_reaches_the_target_without_the_speedup_floor(self):
+        """US-12's alternative: "predeclare a 20% cost reduction to reach the same target".
+
+        The gate had only the speedup route, so a campaign that reached the target by spending a
+        fifth less had no way to say so. Rigged here: our arm is barely faster (below the 1.10x
+        floor) and spends half the calls and tokens, so the speedup route fails and the cost route
+        passes - and the claim has to name the route to get it.
+        """
+        def cheap(registration, share=0.5):
+            # The fixture's calls/tokens apply to every arm, so our arm's share is set here: the
+            # whole point of this route is that the two arms did *not* spend the same.
+            result = rows(registration, ours=1.05)
+            for row in result:
+                if row["Arm"] == "aidotnet":
+                    row["ModelCalls"] = int(row["ModelCalls"] * share)
+                    row["ModelTokens"] = int(row["ModelTokens"] * share)
+            return result
+        default = self.fixture(raw=cheap).assess()["families"][0]
+        self.assertFalse(default["MeetsSpeedupFloor"], "the speedup route still fails")
+        self.assertFalse(default["Supported"])
+        self.assertEqual("speedup", default["EffectRoute"], "a claim that names no route keeps the old meaning")
+
+        fixture = self.fixture(raw=cheap)
+        fixture.claim["effect_route"] = "cost-reduction"
+        fixture.write_claim()
+        declared = fixture.assess()["families"][0]
+        self.assertAlmostEqual(0.5, declared["CostReduction"]["recommended"], places=6)
+        self.assertTrue(declared["MeetsSpeedupFloor"], "the declared route is what the floor now means")
+        self.assertTrue(declared["Supported"])
+
+    def test_the_cost_route_refuses_a_saving_below_the_declared_fifth(self):
+        def barely(registration):
+            result = rows(registration, ours=1.05)
+            for row in result:
+                if row["Arm"] == "aidotnet":
+                    row["ModelCalls"] = 9
+                    row["ModelTokens"] = 900
+            return result
+
+        fixture = self.fixture(raw=barely)
+        fixture.claim["effect_route"] = "cost-reduction"
+        fixture.write_claim()
+        family = fixture.assess()["families"][0]
+        self.assertAlmostEqual(0.1, family["CostReduction"]["recommended"], places=6)
+        self.assertFalse(family["MeetsSpeedupFloor"], "10% is not the predeclared 20%")
+        self.assertFalse(family["Supported"])
+
+    def test_an_undeclared_route_name_is_refused(self):
+        fixture = self.fixture()
+        fixture.claim["effect_route"] = "whatever-wins"
+        fixture.write_claim()
+        with self.assertRaises(ValueError):
+            fixture.assess()
+
     def test_failed_run_has_no_speedup(self):
         def raw(registration):
             result = rows(registration)

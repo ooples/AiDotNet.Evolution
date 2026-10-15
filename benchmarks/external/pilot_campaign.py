@@ -29,6 +29,7 @@ import campaign_registration as registration  # noqa: E402
 import campaign_runner as runner  # noqa: E402
 import pilot_broker  # noqa: E402
 import pilot_cells  # noqa: E402
+import power_analysis  # noqa: E402
 
 
 def spec(task, *, seed_count, model, model_calls, model_tokens, wall_seconds,
@@ -90,6 +91,21 @@ def run(frozen, registration_path, projection, state, task, searchers, *, holdou
     rows = runner.run(Path(registration_path), state, execute,
                       confirm=projection["ProjectionSha256"], log=log)
     return rows, registration.analyze(frozen, rows)
+
+
+def power(frozen, rows, report, *, half_width, confidence=0.95):
+    """V1-07's second criterion: per-endpoint variance and the N a target CI width needs.
+
+    The pilot exists to size the gate campaign, and that number comes from the variance it measured
+    rather than from an effect anyone anticipated - `power_analysis` reports two estimators of it and
+    takes the larger, because six seeds cannot say which is right. Separate from `analyze` on
+    purpose: the report is byte-reproducible evidence and this is a projection off it.
+    """
+    return power_analysis.analyse(frozen, rows, report, half_width=half_width, confidence=confidence)
+
+
+def power_lines(analysis):
+    return power_analysis.lines(analysis)
 
 
 def report_lines(report):

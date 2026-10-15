@@ -1,0 +1,287 @@
+{
+ "schema": "evolution-story-metrics-columns-v1",
+ "why": "V1-19 (#124) cannot ship until every roadmap story is closed with its metrics table filled. A table with no `measured` column has nowhere to put the value, so the box cannot be answered either way - this records which tables carry one.",
+ "note": "Regenerate with: for each story, gh issue view <n> --repo ooples/AiDotNet.Evolution --json body, take the first table row under '## Metrics' whose cells include 'metric' and 'baseline', and record whether its header contains a 'measured' column.",
+ "measuredAtUtc": "2026-10-15T20:05:42.620223+00:00",
+ "stories": {
+  "163": {
+   "state": "CLOSED",
+   "title": "[V1-50] Weighted multi-model LLM ensemble with a separate evaluator mo",
+   "columns": [
+    "metric",
+    "baseline",
+    "target",
+    "measured",
+    "measured by"
+   ],
+   "has_measured_column": true
+  },
+  "164": {
+   "state": "CLOSED",
+   "title": "[V1-51] Model provider parity: OpenAI-compatible, Claude Code CLI, cus",
+   "columns": [
+    "metric",
+    "baseline",
+    "target",
+    "measured by"
+   ],
+   "has_measured_column": false
+  },
+  "165": {
+   "state": "CLOSED",
+   "title": "[V1-52] Prompt context parity: history, top and diverse programs, arti",
+   "columns": [
+    "metric",
+    "baseline",
+    "target",
+    "measured by"
+   ],
+   "has_measured_column": false
+  },
+  "166": {
+   "state": "CLOSED",
+   "title": "[V1-53] Meta-prompt evolution (AlphaEvolve component; declared but uni",
+   "columns": [
+    "metric",
+    "baseline",
+    "target",
+    "measured",
+    "measured by"
+   ],
+   "has_measured_column": true
+  },
+  "167": {
+   "state": "CLOSED",
+   "title": "[V1-54] LLM feedback as a weighted fitness signal",
+   "columns": [
+    "metric",
+    "baseline",
+    "target",
+    "measured",
+    "measured by"
+   ],
+   "has_measured_column": true
+  },
+  "168": {
+   "state": "CLOSED",
+   "title": "[V1-55] Quality-diversity archive parity: built-in and custom descript",
+   "columns": [
+    "metric",
+    "baseline",
+    "target",
+    "measured by"
+   ],
+   "has_measured_column": false
+  },
+  "169": {
+   "state": "CLOSED",
+   "title": "[V1-56] Run unmodified OpenEvolve evaluators and configs through the C",
+   "columns": [
+    "metric",
+    "baseline",
+    "target",
+    "measured",
+    "measured by"
+   ],
+   "has_measured_column": true
+  },
+  "170": {
+   "state": "OPEN",
+   "title": "[V1-57] End-to-end example catalogue at OpenEvolve parity",
+   "columns": [
+    "metric",
+    "baseline",
+    "target",
+    "measured",
+    "measured by"
+   ],
+   "has_measured_column": true
+  },
+  "171": {
+   "state": "CLOSED",
+   "title": "[V1-58] Evaluator artifact channel parity",
+   "columns": [
+    "metric",
+    "baseline",
+    "target",
+    "measured by"
+   ],
+   "has_measured_column": false
+  },
+  "172": {
+   "state": "CLOSED",
+   "title": "[V1-59] Trace export and live visualisation parity",
+   "columns": [
+    "metric",
+    "baseline",
+    "target",
+    "measured by"
+   ],
+   "has_measured_column": false
+  },
+  "173": {
+   "state": "CLOSED",
+   "title": "[V1-60] Stopping, iteration and code-size controls at OpenEvolve parit",
+   "columns": [
+    "metric",
+    "baseline",
+    "target",
+    "measured by"
+   ],
+   "has_measured_column": false
+  },
+  "174": {
+   "state": "OPEN",
+   "title": "[V1-61] Enforced resource limits and multi-host distributed evaluation",
+   "columns": [
+    "metric",
+    "baseline",
+    "target",
+    "measured",
+    "measured by"
+   ],
+   "has_measured_column": true
+  },
+  "175": {
+   "state": "CLOSED",
+   "title": "[V1-70] Engine overhead: regenerate the head-to-head with valid interv",
+   "columns": [
+    "metric",
+    "baseline",
+    "target",
+    "measured by"
+   ],
+   "has_measured_column": false
+  },
+  "176": {
+   "state": "CLOSED",
+   "title": "[V1-71] Cut per-evaluation allocation on the identity path",
+   "columns": [
+    "metric",
+    "baseline",
+    "target",
+    "measured by"
+   ],
+   "has_measured_column": false
+  },
+  "177": {
+   "state": "CLOSED",
+   "title": "[V1-72] Population-size scaling benchmark",
+   "columns": [
+    "metric",
+    "baseline",
+    "target",
+    "measured by"
+   ],
+   "has_measured_column": false
+  },
+  "178": {
+   "state": "CLOSED",
+   "title": "[V1-73] Long-run soak: memory, handles and resume fidelity over 200,00",
+   "columns": [
+    "metric",
+    "baseline",
+    "target",
+    "measured by"
+   ],
+   "has_measured_column": false
+  },
+  "179": {
+   "state": "CLOSED",
+   "title": "[V1-74] Checkpoint write and resume latency targets",
+   "columns": [
+    "metric",
+    "baseline",
+    "target",
+    "measured by"
+   ],
+   "has_measured_column": false
+  },
+  "180": {
+   "state": "CLOSED",
+   "title": "[V1-75] Latency-bound throughput: keep the model busy",
+   "columns": [
+    "metric",
+    "baseline",
+    "target",
+    "measured by"
+   ],
+   "has_measured_column": false
+  },
+  "181": {
+   "state": "CLOSED",
+   "title": "[V1-76] Sandbox overhead per evaluation",
+   "columns": [
+    "metric",
+    "baseline",
+    "target",
+    "measured by"
+   ],
+   "has_measured_column": false
+  },
+  "182": {
+   "state": "CLOSED",
+   "title": "[V1-80] Clock seam: make every timing-dependent test deterministic",
+   "columns": [
+    "metric",
+    "baseline",
+    "target",
+    "measured by"
+   ],
+   "has_measured_column": false
+  },
+  "183": {
+   "state": "CLOSED",
+   "title": "[V1-81] Merge safety: merge queue and repository-wide coverage",
+   "columns": [
+    "metric",
+    "baseline",
+    "target",
+    "measured by"
+   ],
+   "has_measured_column": false
+  },
+  "184": {
+   "state": "CLOSED",
+   "title": "[V1-82] v1 API surface triage",
+   "columns": [
+    "metric",
+    "baseline",
+    "target",
+    "measured by"
+   ],
+   "has_measured_column": false
+  },
+  "185": {
+   "state": "CLOSED",
+   "title": "[V1-83] Robustness suite against OpenEvolve's defect classes",
+   "columns": [
+    "metric",
+    "baseline",
+    "target",
+    "measured by"
+   ],
+   "has_measured_column": false
+  }
+ },
+ "without_measured_column": [
+  "164",
+  "165",
+  "168",
+  "171",
+  "172",
+  "173",
+  "175",
+  "176",
+  "177",
+  "178",
+  "179",
+  "180",
+  "181",
+  "182",
+  "183",
+  "184",
+  "185"
+ ],
+ "outstanding": 17
+}
