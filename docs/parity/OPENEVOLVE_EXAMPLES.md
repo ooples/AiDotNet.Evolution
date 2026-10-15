@@ -131,6 +131,27 @@ The smoke stays on Linux because one Theory covers every example, because `rust_
 Rust toolchain and `r_robust_regression` needs R, **and** because `circle_packing` remains zero-scoring on
 Windows for the reason above.
 
+## The same catalogue measured on Windows, for free
+
+The smoke above runs in a Linux container. Preflight makes **no model calls**, so the same examples can be
+scored on Windows at no cost, and all **11 of 21 that ship a config, an evaluator and a seed program** have
+been: [`benchmarks/evidence/openevolve-examples/86d56c9-windows-preflight`](../../benchmarks/evidence/openevolve-examples/86d56c9-windows-preflight/README.md).
+
+It separates two failure modes that the smoke's pass/fail cannot:
+
+| mode | examples | what a caller sees |
+| --- | --- | --- |
+| **fails loudly** - a missing toolchain or module | `attention_optimization` (`mlir-opt`), `mlx_metal_kernel_opt` (Apple MLX) | `Failed`, `program_script_script_failed`, traceback in the report when the artifact flags are on |
+| **completes at zero** - a missing dataset, or a path the evaluator cannot embed | `arc_benchmark`, `circle_packing_with_artifacts`, `k_module_problem`, `online_judge_programming`, `web_scraper_optillm` | `Completed`, quality 0, **no failure of any kind** |
+
+**Five of the eleven are in the second mode**, which is the one worth knowing about: nothing in the status
+distinguishes it from a working example whose candidate was simply bad. Three of those five are the ones
+this ledger already excludes for *"its own seed scores zero"* - a judgement made before the measurement,
+and confirmed by it.
+
+`claude_code_quickstart` scores 1.3905 under preflight, because what stops it smoking is the provider
+rather than the evaluator.
+
 ## What `circle_packing_with_artifacts` needs that the others do not
 
 It smokes, and it is the one smoked example whose evaluator imports **upstream's own package**:
