@@ -62,8 +62,12 @@ var engine = new EvolutionEngine<EvolutionSearchGenome>(
 EvolutionRunResult<EvolutionSearchGenome> result = await engine.RunAsync(
     new[] { space.Sample(StableRandom.CreateStream(42, 0)) });
 
-Console.WriteLine($"best quality : {result.Best!.Evaluation.Quality:F4}");
+// Best is null when nothing scored, so check it rather than suppressing the warning.
+if (result.Best is null) { Console.Error.WriteLine("no candidate was scored"); return 1; }
+
+Console.WriteLine($"best quality : {result.Best.Evaluation.Quality:F4}");
 Console.WriteLine($"depth        : {result.Best.Candidate.CanonicalGenome.Genome.Number("depth")}");
+return 0;
 ```
 
 ```text
@@ -78,6 +82,37 @@ Three objects: a **space**, a **task** that scores a candidate, and an
 > evaluator version &mdash; are how the engine refuses a checkpoint or a cached
 > score produced by a *different* scoring function. Change how you score, bump
 > the evaluator version, and stale results stop being reused.
+
+## From a clean machine to a report
+
+The search above scores a pure function, so this whole path costs nothing and needs no model, no API
+key and no Python. Add one observer to write a trace, and the CLI turns that trace into a
+self-contained HTML report that opens offline.
+
+```csharp
+// Beside the engine, before RunAsync: one observer, and the run keeps a diary.
+var descriptors = new[] { new EvolutionDescriptorDefinition("depth", 1, 21, 10) };
+using var tracer = new EvolutionTraceObserver<EvolutionSearchGenome>(
+    new EvolutionTraceOptions { Enabled = true, Path = "trace.jsonl" }, "quickstart", descriptors);
+```
+
+Pass it to the engine as `observer: tracer`, reusing `descriptors` for the archive, then:
+
+```bash
+dotnet tool install --global AiDotNet.Evolution.Cli
+aidotnet-evolve report  trace.jsonl report.html   # one HTML file, opens offline
+aidotnet-evolve inspect trace.jsonl               # the same run as JSON on stdout
+```
+
+**Measured end to end: 12.2 s**, median of three, from `dotnet new console` to `report.html`, in a
+container holding nothing but the .NET SDK - no NuGet cache, no installed tool, no packages. Against
+this story's *"under 10 minutes"* target, and reproducible with
+[`eng/readme-walkthrough/`](eng/readme-walkthrough/walkthrough.sh): see
+[the evidence](benchmarks/evidence/readme-walkthrough/86d56c9/README.md) for the per-step timings and
+what the number excludes.
+
+`aidotnet-evolve` does more than report - `run`, `resume`, `preflight`, `compare`, `export` and
+`watch` are in [docs/CLI.md](docs/CLI.md), including the run file that evolves programs with a model.
 
 ## What it gives you
 

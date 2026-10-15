@@ -21,8 +21,8 @@ declares `targets` can have the same block for the cost of two marker lines.
 
 | class | READMEs | what a reader can do |
 | --- | ---: | --- |
-| `Generated` | **4 of 46** | a script re-renders the tables from a committed summary, and drift fails a build |
-| `RawAlongside` | 41 | check the claims by hand against evidence committed at or beneath the README |
+| `Generated` | **4 of 47** | a script re-renders the tables from a committed summary, and drift fails a build |
+| `RawAlongside` | 42 | check the claims by hand against evidence committed at or beneath the README |
 | `Unsupported` | **1** | nothing: the numbers exist nowhere else in the repository |
 
 The same counts, rendered from `census.json` rather than typed, by
@@ -32,14 +32,14 @@ The same counts, rendered from `census.json` rather than typed, by
 | measure | count |
 | --- | ---: |
 | `Generated` READMEs | 4 |
-| `RawAlongside` READMEs | 41 |
+| `RawAlongside` READMEs | 42 |
 | `Unsupported` READMEs | 1 |
-| READMEs in total | 46 |
-| families | 32 |
+| READMEs in total | 47 |
+| families | 33 |
 | families with no README | 0 |
 <!-- END GENERATED TABLES -->
 
-Families with **no README anywhere beneath them: 0 of 32.** The first run of this census found **7**;
+Families with **no README anywhere beneath them: 0 of 33.** The first run of this census found **7**;
 each now has one, written from its own committed JSON, and every figure in those seven was checked back
 against the data rather than transcribed.
 
@@ -79,7 +79,7 @@ whose claims *can* be checked, never claims that *have been*. No count is repeat
 one that changes with every new family drifts here without failing anything: the test compares only the
 generated block.
 
-It also does not tick US-04's box. 4 of 46 is a measured value for the metric, and a metric reading 4 of 46
+It also does not tick US-04's box. 4 of 47 is a measured value for the metric, and a metric reading 4 of 47
 is not a met target.
 
 ## Reproducing
@@ -89,8 +89,9 @@ is not a met target.
 ./eng/Measure-EvidenceRegeneration.ps1 -OutputFile census.json
 ```
 
-The census includes itself: this directory is one of the 32 families, and since it gained a generated
+The census includes itself: this directory is one of the 33 families, and since it gained a generated
 block it is one of the 2 `Generated` READMEs - so the counts it publishes include the act of publishing
 them. That is a fixed point, reached and then checked: inserting the markers moved `Generated` from 1 to 2
 and `RawAlongside` from 44 to 43, the block was re-rendered from the new census, and a further run changes
-nothing.
+nothing. The same loop runs whenever a family is added: `readme-walkthrough` took the counts to 33
+families and 47 READMEs, and the block was re-rendered rather than edited.

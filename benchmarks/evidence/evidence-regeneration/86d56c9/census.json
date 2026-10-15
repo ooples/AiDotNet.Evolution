@@ -352,6 +352,18 @@
       "Undocumented": false
     },
     {
+      "Name": "readme-walkthrough",
+      "Readmes": [
+        {
+          "Path": "readme-walkthrough/86d56c9/README.md",
+          "Class": "RawAlongside",
+          "ArtifactCount": 1
+        }
+      ],
+      "ArtifactCount": 1,
+      "Undocumented": false
+    },
+    {
       "Name": "robustness",
       "Readmes": [
         {
@@ -457,13 +469,13 @@
     }
   ],
   "Totals": {
-    "Families": 32,
-    "Readmes": 46,
+    "Families": 33,
+    "Readmes": 47,
     "Generated": 4,
-    "RawAlongside": 41,
+    "RawAlongside": 42,
     "Unsupported": 1,
     "Undocumented": 0
   },
   "Story": "US-04 (#22): how much committed evidence can be checked against raw data",
-  "MeasuredAtUtc": "2026-10-15T02:56:45.2107885Z"
+  "MeasuredAtUtc": "2026-10-15T02:59:40.7654575Z"
 }

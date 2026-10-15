@@ -1,0 +1,73 @@
+{
+  "story": "US-24 / V1-26 (#42): clean machine to first report",
+  "what": "The README path from dotnet new console to a self-contained HTML report, timed in a container holding only the .NET SDK",
+  "target": "under 10 minutes",
+  "image": "mcr.microsoft.com/dotnet/sdk:10.0",
+  "command": "docker run --rm -v eng/readme-walkthrough:/input:ro -w /root mcr.microsoft.com/dotnet/sdk:10.0 bash -c \"mkdir -p /work && bash /input/walkthrough.sh\"",
+  "packages": "AiDotNet.Evolution and AiDotNet.Evolution.Cli as published on nuget.org, restored fresh in every run",
+  "model_calls": 0,
+  "repeats": 3,
+  "median_total_ms": 12155,
+  "runs": [
+    {
+      "run": 1,
+      "cumulative_step_ms": {
+        "new-console": 1641,
+        "add-package": 5094,
+        "write-program": 5103,
+        "dotnet-run": 9658,
+        "tool-install": 11998,
+        "report": 12191
+      },
+      "total_ms": 12399,
+      "trace_bytes": 347901,
+      "report_bytes": 19515,
+      "trace_records": 301,
+      "stdout_quality": "best quality : -0.0111",
+      "stdout_depth": "depth        : 7"
+    },
+    {
+      "run": 2,
+      "cumulative_step_ms": {
+        "new-console": 1601,
+        "add-package": 4886,
+        "write-program": 4895,
+        "dotnet-run": 9402,
+        "tool-install": 11641,
+        "report": 11821
+      },
+      "total_ms": 12025,
+      "trace_bytes": 347898,
+      "report_bytes": 19515,
+      "trace_records": 301,
+      "stdout_quality": "best quality : -0.0111",
+      "stdout_depth": "depth        : 7"
+    },
+    {
+      "run": 3,
+      "cumulative_step_ms": {
+        "new-console": 1594,
+        "add-package": 4851,
+        "write-program": 4860,
+        "dotnet-run": 9397,
+        "tool-install": 11758,
+        "report": 11937
+      },
+      "total_ms": 12155,
+      "trace_bytes": 347899,
+      "report_bytes": 19515,
+      "trace_records": 301,
+      "stdout_quality": "best quality : -0.0111",
+      "stdout_depth": "depth        : 7"
+    }
+  ],
+  "clean_dimensions": [
+    "no NuGet package cache",
+    "no installed dotnet tool",
+    "no project or packages",
+    "no Python and no virtualenv",
+    "no API key and no model endpoint"
+  ],
+  "not_clean": "The .NET SDK is present, because the README states it as the prerequisite, and its image layer was already pulled. Installing .NET itself and pulling the image are therefore excluded from the number.",
+  "reading": "12.155 s median over 3 repeats against a 600 s target, spread 12.025 to 12.399 s. The run is deterministic across repeats: 301 trace records and a 19515 byte report every time, and the stdout matches the figures the README publishes."
+}
