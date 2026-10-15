@@ -53,11 +53,15 @@ suite names as the honest optimisation.
 
 ```powershell
 aidotnet-evolve run --openevolve-config config.yaml initial_program.py evaluator.py `
-  --iterations 3 --python <venv-python> --python-path <openevolve-checkout> --python-path <example-dir>
+  --iterations 3 --python <venv-python> --python-path <openevolve-checkout>
 ```
 
-Two `--python-path` entries: the evaluator imports `openevolve.evaluation_result` from the checkout and
-`fixtures` from its own directory. The interpreter needs `numpy`.
+**One `--python-path`, for the checkout only.** The evaluator also imports `fixtures` from its own
+directory, and the shim already inserts that directory into `sys.path` - *"OpenEvolve evaluators import
+helpers that sit beside them"*. The run above was taken with a second, redundant `--python-path` for the
+example directory; a later run with only the checkout completed its evaluations the same way, seed
+`combined_score` 1.0162 then 24.2125, so the second entry was never doing anything. The interpreter needs
+`numpy`.
 
 **This example declares its model as an `llm.models` list, not `primary_model`/`secondary_model`.** Routing
 only the latter leaves the member name untouched, so the original model reaches the Claude Code provider,
