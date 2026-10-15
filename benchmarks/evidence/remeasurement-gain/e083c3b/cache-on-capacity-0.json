@@ -1,0 +1,8 @@
+{
+  "story": "US-06 (#24): re-measuring unchanged code must not manufacture a gain",
+  "evaluation_cache": true,
+  "deduplication_capacity": 0,
+  "improvements": 0,
+  "evaluator_calls": 2,
+  "best_quality": 0.2
+}
