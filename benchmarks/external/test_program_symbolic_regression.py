@@ -91,6 +91,23 @@ class SymbolicRegressionFamilyTests(unittest.TestCase):
         with self.assertRaises(ValueError):
             family.nmse(lambda *_: 0.0, [((0.0,), 2.0), ((1.0,), 2.0)])
 
+    def test_the_seal_is_checked_before_the_candidate_runs(self):
+        # The declared residual risk is a candidate that tampers with the scorer. It cannot undo a
+        # refusal that already happened, so the refusal has to come first - asserted by a candidate
+        # that records whether it was ever called.
+        split = family.build("rational_gain", family.DEV_SEEDS[0])
+        xs, y = split["test"][0]
+        split["test"][0] = (xs, y + 1.0)
+        calls = []
+
+        def spy(*args):
+            calls.append(args)
+            return 0.0
+
+        with self.assertRaises(ValueError):
+            family.score(spy, split)
+        self.assertEqual([], calls, "the candidate ran before the seal was checked")
+
     def test_an_unknown_task_and_a_tiny_split_are_refused(self):
         with self.assertRaises(KeyError):
             family.build("no_such_task", family.DEV_SEEDS[0])

@@ -14,6 +14,14 @@ NMSE is the mean squared error over the variance of the held-out targets, so 0 i
 good as predicting the mean, and above 1 is worse than that. Variance, not mean square, because a
 task with a large offset would otherwise flatter every candidate.
 
+**Residual risk, declared.** A candidate is a Python callable, so it runs in this process and could
+monkeypatch `seal`, `nmse` or `math` and forge its own score. Two things bound that. The seal is
+verified *before* any candidate code runs, so a tampered test split is refused by a check the
+candidate has not yet had a chance to touch; and a real LLM candidate belongs behind the sandboxed
+path this repo already has (`isolated_program_evaluator.py`, `ProgramSandboxOptions`), where it never
+shares a process with the scorer. In-process scoring here is for the instrument's own tests and for a
+trusted baseline searcher, and is not an isolation claim.
+
 **This is not the LLM-SRBench subset, and does not claim to be.** `deep-symbolic-mathematics/llm-srbench`
 declares no license, so it is not pinned into this repository or its CI; that is a decision for the
 project owner, not this module. The tasks below are a small in-repo family with the same shape -
@@ -108,7 +116,11 @@ def nmse(predict, rows):
 
 
 def score(predict, split):
-    """Scores a candidate on every split, refusing a test split that no longer matches its seal."""
+    """Scores a candidate on every split, refusing a test split that no longer matches its seal.
+
+    The seal is checked first, before `predict` is called even once: a candidate that tampers with
+    the scorer cannot undo a refusal that has already happened.
+    """
     if seal(split["test"]) != split["test_seal"]:
         raise ValueError("The test split does not match its seal, so its score would not be held out.")
     return {
