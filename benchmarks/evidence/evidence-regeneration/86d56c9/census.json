@@ -261,12 +261,27 @@
           "ArtifactCount": 2
         },
         {
+          "Path": "openevolve-examples/86d56c9-windows-preflight/README.md",
+          "Class": "RawAlongside",
+          "ArtifactCount": 1
+        },
+        {
+          "Path": "openevolve-examples/b791d8b-background-blur/README.md",
+          "Class": "RawAlongside",
+          "ArtifactCount": 3
+        },
+        {
+          "Path": "openevolve-examples/b791d8b-signal-processing/README.md",
+          "Class": "RawAlongside",
+          "ArtifactCount": 2
+        },
+        {
           "Path": "openevolve-examples/e6abeea/README.md",
           "Class": "RawAlongside",
           "ArtifactCount": 1
         }
       ],
-      "ArtifactCount": 5,
+      "ArtifactCount": 11,
       "Undocumented": false
     },
     {
@@ -408,6 +423,11 @@
       "Name": "story-checkbox-audit",
       "Readmes": [
         {
+          "Path": "story-checkbox-audit/86d56c9/README.md",
+          "Class": "RawAlongside",
+          "ArtifactCount": 1
+        },
+        {
           "Path": "story-checkbox-audit/b791d8b/README.md",
           "Class": "RawAlongside",
           "ArtifactCount": 1
@@ -418,7 +438,7 @@
           "ArtifactCount": 1
         }
       ],
-      "ArtifactCount": 2,
+      "ArtifactCount": 3,
       "Undocumented": false
     },
     {
@@ -470,12 +490,12 @@
   ],
   "Totals": {
     "Families": 33,
-    "Readmes": 47,
+    "Readmes": 51,
     "Generated": 4,
-    "RawAlongside": 42,
+    "RawAlongside": 46,
     "Unsupported": 1,
     "Undocumented": 0
   },
   "Story": "US-04 (#22): how much committed evidence can be checked against raw data",
-  "MeasuredAtUtc": "2026-10-15T02:59:40.7654575Z"
+  "MeasuredAtUtc": "2026-10-15T03:34:36.0309956Z"
 }
