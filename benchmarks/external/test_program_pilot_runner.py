@@ -120,6 +120,47 @@ class BudgetConsistencyTests(unittest.TestCase):
                          "18 cells x 10 calls is what the authorised envelope buys at this account's rate")
 
 
+class SummaryTests(unittest.TestCase):
+    """What the run's own account says about a cell it could not account for."""
+
+    def summary(self, rows):
+        arguments = runner.build_parser().parse_args(
+            ["--root", "unused", "--cli", "x", "--upstream", ".", "--holdout-seed", str(HOLDOUT), "--stub"])
+        frozen = {"RegistrationSha256": "r" * 64, "Spec": {"TestPartitionHashes": {TASK: "p" * 64}}}
+        return runner.summarise(rows, {"Endpoints": []}, task=TASK, arguments=arguments, frozen=frozen,
+                                projection={"ProjectionSha256": "j" * 64}, wall=1.0, canaries=None, receipts={})
+
+    def test_a_cell_with_no_call_count_is_counted_beside_the_total_not_absorbed_into_it(self):
+        # Summing an unaccounted cell as zero is the same under-report the searchers' accounting
+        # exists to prevent: the row would read as a free cell.
+        rows = [{"Status": "completed", "ModelCalls": 7, "ModelTokens": 2100},
+                {"Status": "failed", "ModelCalls": None, "ModelTokens": None}]
+        summary = self.summary(rows)
+        self.assertEqual(7, summary["model_calls"], "the known spend is still the total")
+        self.assertEqual(1, summary["cells_with_unknown_spend"])
+        self.assertEqual({"completed": 1, "failed": 1}, summary["statuses"])
+
+    def test_a_fully_accounted_run_reports_no_unknown_cells(self):
+        rows = [{"Status": "completed", "ModelCalls": 3, "ModelTokens": 90},
+                {"Status": "failed", "ModelCalls": 2, "ModelTokens": 60}]
+        summary = self.summary(rows)
+        self.assertEqual(5, summary["model_calls"])
+        self.assertEqual(0, summary["cells_with_unknown_spend"], "a failed cell that accounted for itself is known")
+
+
+class TransportDirectoryTests(unittest.TestCase):
+    def test_a_second_attempt_gets_a_directory_of_its_own(self):
+        # ClaudeModelSet refuses a directory that already exists, so a fixed name would make the
+        # retry after a failed canary crash instead of re-running - on a command that costs money.
+        with tempfile.TemporaryDirectory() as directory:
+            first = runner.transport_directory(directory)
+            first.mkdir(parents=True)
+            second = runner.transport_directory(directory)
+            self.assertNotEqual(first, second)
+            self.assertFalse(second.exists())
+            self.assertTrue(second.name.startswith("transport-"))
+
+
 class StubProviderTests(unittest.TestCase):
     def test_the_stub_answers_whichever_shape_the_prompt_asked_for(self):
         # A stub that answered one shape would have every proposal of the other arms abandoned after

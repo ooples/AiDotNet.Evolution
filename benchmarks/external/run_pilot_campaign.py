@@ -100,6 +100,50 @@ def searchers_for(session, *, cli, upstream, python_executable, iterations, time
     }
 
 
+def transport_directory(evidence):
+    """A fresh transport directory per attempt, because `ClaudeModelSet` refuses an existing one.
+
+    A canary that fails, or a cell that dies, leaves the previous attempt's directory behind - so a
+    fixed name would make the retry crash with `FileExistsError` instead of re-running, on a command
+    someone is paying for. Both attempts' receipts are kept, which is what reconciliation wants.
+    """
+    stamp = time.strftime("%Y%m%dT%H%M%SZ", time.gmtime())
+    for suffix in [""] + ["-" + str(index) for index in range(2, 100)]:
+        candidate = Path(evidence) / ("transport-" + stamp + suffix)
+        if not candidate.exists():
+            return candidate
+    raise RuntimeError("a hundred attempts in one second is not a retry")
+
+
+def summarise(rows, report, *, task, arguments, frozen, projection, wall, canaries, receipts):
+    """The run's own account of itself, including what it could not account for.
+
+    `sum(row["ModelCalls"] or 0)` reads a cell that failed before its broker could report as free,
+    which is the same under-report the searchers' accounting exists to prevent - so the cells with no
+    call count are counted beside the total rather than absorbed into it.
+    """
+    return {
+        "story": "V1-07 (#116)",
+        "task": task,
+        "stub": arguments.stub,
+        "registration_sha256": frozen["RegistrationSha256"],
+        "projection_sha256": projection["ProjectionSha256"],
+        "holdout_partition_sha256": frozen["Spec"]["TestPartitionHashes"][task],
+        "iterations_per_cell": arguments.iterations,
+        "wall_seconds": round(wall, 1),
+        "cells": len(rows),
+        "statuses": {status: sum(1 for row in rows if row["Status"] == status)
+                     for status in sorted({row["Status"] for row in rows})},
+        "model_calls": sum(row["ModelCalls"] or 0 for row in rows),
+        "model_tokens": sum(row["ModelTokens"] or 0 for row in rows),
+        "cells_with_unknown_spend": sum(1 for row in rows if row["ModelCalls"] is None),
+        "canaries": canaries,
+        # Coverage below 1.0 means an admitted call left no receipt, so the bill cannot be reconciled.
+        "receipt_coverage": {name: record["coverage"] for name, record in receipts.items()},
+        "endpoints": report["Endpoints"],
+    }
+
+
 def declare(task, arguments, holdout_seed):
     """The frozen spec, carrying the real sealed partition rather than a placeholder.
 
@@ -191,6 +235,11 @@ def main():
 
     evidence = root / "evidence"
     evidence.mkdir(parents=True, exist_ok=True)
+    # One transport directory per attempt. `ClaudeModelSet` refuses a directory that already exists,
+    # and a canary that fails (or a cell that dies) leaves one behind - so a single fixed name would
+    # make the second attempt crash with FileExistsError instead of re-running, on a command someone
+    # is paying for. Both attempts' receipts are kept, which is also what reconciliation wants.
+    transports = transport_directory(evidence)
     initial = (TASK_DIRECTORY / "initial_program.py").read_text(encoding="utf-8")
     calls, canaries, models = [], None, None
     if arguments.stub:
@@ -199,7 +248,7 @@ def main():
         # The campaign's own ceiling plus the canaries: one warm call and one verify per model, and
         # one model. A looser number here would make the transport's cap - the last backstop against
         # a runaway, since the broker's is per cell - stop meaning anything.
-        models, canaries = transport(arguments.executable, evidence / "transport",
+        models, canaries = transport(arguments.executable, transports,
                                      projection["MaxModelCalls"] + 4,
                                      timeout=min(arguments.wall_seconds, 900))
         provider = models.generate
@@ -215,33 +264,19 @@ def main():
                                       confirm=arguments.confirm)
     wall = time.monotonic() - started
 
-    receipts = ({name: reconcile_receipts(evidence / "transport" / name) for name in models.transports}
+    receipts = ({name: reconcile_receipts(transports / name) for name in models.transports}
                 if models is not None else {})
-    summary = {
-        "story": "V1-07 (#116)",
-        "task": arguments.task,
-        "stub": arguments.stub,
-        "registration_sha256": frozen["RegistrationSha256"],
-        "projection_sha256": projection["ProjectionSha256"],
-        "holdout_partition_sha256": frozen["Spec"]["TestPartitionHashes"][arguments.task],
-        "iterations_per_cell": arguments.iterations,
-        "wall_seconds": round(wall, 1),
-        "cells": len(rows),
-        "statuses": {status: sum(1 for row in rows if row["Status"] == status)
-                     for status in sorted({row["Status"] for row in rows})},
-        "model_calls": sum(row["ModelCalls"] or 0 for row in rows),
-        "model_tokens": sum(row["ModelTokens"] or 0 for row in rows),
-        "canaries": canaries,
-        # Coverage below 1.0 means an admitted call left no receipt, so the bill cannot be reconciled.
-        "receipt_coverage": {name: record["coverage"] for name, record in receipts.items()},
-        "endpoints": report["Endpoints"],
-    }
+    summary = summarise(rows, report, task=arguments.task, arguments=arguments, frozen=frozen,
+                        projection=projection, wall=wall, canaries=canaries, receipts=receipts)
     (evidence / "rows.json").write_text(json.dumps(rows, indent=1) + "\n", encoding="utf-8")
     (evidence / "report.json").write_text(json.dumps(report, indent=1) + "\n", encoding="utf-8")
     (evidence / "summary.json").write_text(json.dumps(summary, indent=1, allow_nan=False) + "\n", encoding="utf-8")
     print("\n" + "\n".join(pilot_campaign.report_lines(report)))
     print("\n%d cells in %.1fs, %d model calls, statuses %s"
           % (len(rows), wall, summary["model_calls"], json.dumps(summary["statuses"])))
+    if summary["cells_with_unknown_spend"]:
+        print("%d cell(s) reported no call count, so the total above is a floor, not the bill"
+              % summary["cells_with_unknown_spend"])
     for name, coverage in summary["receipt_coverage"].items():
         print("receipts %-8s coverage %s" % (name, coverage))
     failed = [row for row in rows if row["Status"] != "completed"]
