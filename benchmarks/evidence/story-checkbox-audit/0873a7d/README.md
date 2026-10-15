@@ -19,20 +19,37 @@ current-revision evidence; #37 is waiting on its metrics table, which needs the 
 The box that moved is the one that asks whether the criteria below it are ticked *with evidence* - and
 for both stories they now are, against this commit rather than a six-week-old one.
 
-## The shape of what is left, counted
+## The shape of what is left, classified by a stated rule
 
-66 unchecked boxes across the twelve stories, and they are not 66 pieces of work:
+66 unchecked boxes across the twelve stories, and they are not 66 pieces of work. Each box text is
+matched against the rules below **in this order, first match wins**, so the counts partition the 66
+rather than overlapping. The rule order is part of the measurement: a box that mentions both a
+sibling story and the pilot lands in the first bucket.
 
-| what the box waits on | issues | roughly |
-| --- | --- | ---: |
-| a paid paired pilot, or the decisive gate campaign after it | #29, #30, #35, #36, #37, #41, #43 | ~34 |
-| a dependency box pointing at a sibling story that is itself open | #22, #24, #35, #36, #42, #43 | ~8 |
-| a merged PR with a counted review, or attached current-revision evidence | all twelve | ~24 |
+| what the box is | boxes | issues |
+| --- | ---: | --- |
+| a merged PR, hosted CI, or a counted review | 17 | #21, #24, #29, #30, #35, #36, #38, #41, #43 |
+| a dependency box naming a sibling story | 15 | #22, #29, #30, #35, #36, #41, #42, #43 |
+| attached current-revision evidence | 9 | #22, #24, #29, #30, #35, #36, #41, #42, #43 |
+| a merge-time judgement ("confirm dependency readiness") | 8 | #22, #29, #30, #35, #36, #37, #42, #43 |
+| the paired pilot, or the gate campaign after it | 8 | #29, #30, #35, #36, #37, #41 |
+| an acceptance criterion still unmet | 6 | #29, #30 |
+| "implement and verify every applicable criterion" | 2 | #29, #30 |
+| one environment note (published-package integration) | 1 | #41 |
 
-**The review half of that last group is not always obtainable.** CodeRabbit's free tier has twice now
-passed a PR's checks while posting no review at all - #238 (recorded on #174) and #293 - so a box
-asking for `gh pr view N --json reviews` to be non-empty can stay unticked on work that is otherwise
-complete. Counting checks instead would tick it falsely.
+**An earlier draft of this file put ~34 of the 66 on the pilot.** That was eyeballed from reading the
+bodies and it was wrong by a factor of four: only **8** boxes say pilot or campaign. The pilot does
+gate more than eight boxes' worth of work - the stories it blocks hold their measurement in metrics
+tables that are already ticked, or in the six unmet acceptance criteria on #29 and #30 - but a box
+count is not a work estimate, and quoting one as if it were is how a roadmap starts lying about its
+own shape. The numbers above come from a classifier over the box texts, re-runnable against the
+twelve bodies.
+
+**The review bucket is the largest, and it is not always obtainable.** CodeRabbit's free tier has
+now three times passed a PR's checks while posting no review at all - #238 (recorded on #174), #293,
+and #294 through #296 as of this reading - so a box asking for `gh pr view N --json reviews` to be
+non-empty can stay unticked on work that is otherwise complete. Counting checks instead would tick
+it falsely.
 
 ## What this evidence is not
 
