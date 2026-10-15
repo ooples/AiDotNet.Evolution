@@ -11,7 +11,11 @@ on:
 
 concurrency:
   group: sonar-${{ github.ref }}
-  cancel-in-progress: true
+  # Cancel a superseded run on a branch, never on main: every push to main shares one ref, so
+  # cancel-in-progress there means each merge kills the previous merge's run. A story's
+  # "hosted CI green on the merged head" box then cannot be ticked, and main-red-alert has
+  # nothing to read, which is how 21 stories came to be closed with that box open (#108).
+  cancel-in-progress: ${{ github.event_name != 'push' }}
 
 permissions:
   contents: read
