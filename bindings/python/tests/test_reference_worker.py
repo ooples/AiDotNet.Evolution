@@ -117,6 +117,64 @@ class ReferenceWorkerTests(unittest.TestCase):
             self.evaluator("def score(path):\n    return {}\n")
 
 
+    def test_receipt_payloads_are_sorted_key_json_and_a_non_finite_metric_becomes_text(self):
+        """The TypeScript binding asserts both of these; Python relied on them untested.
+
+        `serve` commits `json.dumps(..., sort_keys=True, allow_nan=False)`, so a receipt is
+        byte-comparable across workers. The `allow_nan=False` is a backstop, not the non-finite
+        policy: `_json_value` stringifies a non-finite float first, so a NaN metric is recorded as
+        the text `"nan"` and the receipt still completes. I wrote this test expecting a failed
+        receipt and the implementation was right - the contract is in `_json_value`'s docstring and
+        in the TypeScript case "non-finite metrics are recorded as text, not turned into failures".
+        """
+        self.assertEqual('{"a": {"c": "x", "d": [3, {"y": 2, "z": 1}]}, "b": 1}',
+                         json.dumps({"b": 1, "a": {"d": [3, {"z": 1, "y": 2}], "c": "x"}}, sort_keys=True, allow_nan=False))
+        with self.assertRaises(ValueError):   # the backstop, for a non-finite that escapes _json_value
+            json.dumps({"score": float("nan")}, sort_keys=True, allow_nan=False)
+
+        evaluate = self.evaluator("def evaluate(program_path):\n    return {'b': 1, 'a': float('nan')}\n")
+        with DurableWorkClient(self.config, **TRANSPORT) as work:
+            work.enqueue(job("1", "x = 1\n"))
+            self.assertEqual(["accepted"], serve(work, self.worker, evaluate, provenance="nan-v1",
+                                                 actual={"cost": "1"}, source_from=raw_program_source))
+            receipt = work.result("1", 1)
+            self.assertEqual("completed", receipt["outcome"], "a non-finite metric is text, not a failure")
+            self.assertEqual({"a": "nan", "b": 1}, json.loads(receipt["payload"])["metrics"])
+            # Sorted keys all the way down, so two workers' receipts compare as bytes.
+            self.assertLess(receipt["payload"].index('"a"'), receipt["payload"].index('"b"'))
+
+    def test_an_unparseable_envelope_and_an_evaluator_returning_nothing_become_failed_receipts(self):
+        """Both are failed receipts in the TypeScript binding; only the first was here.
+
+        An evaluator that returns `None` is a broken evaluator, and `json.dumps(None)` is the valid
+        document `null`, so without a guard the worker commits a **completed** receipt for it.
+        """
+        evaluate = self.evaluator("def evaluate(program_path):\n    return None\n")
+        with DurableWorkClient(self.config, **TRANSPORT) as work:
+            work.enqueue(job("1", "not an envelope"))
+            work.enqueue(job("2", envelope("2", "ignored")))
+            self.assertEqual(["accepted"] * 2, serve(work, self.worker, evaluate, provenance="failures-v1",
+                                                     actual={"cost": "1"}))
+            self.assertEqual("failed", work.result("1", 1)["outcome"], "an unparseable envelope")
+            second = work.result("2", 1)
+            self.assertEqual("failed", second["outcome"], "an evaluator returning nothing")
+            self.assertEqual({"error": "TypeError"}, json.loads(second["payload"]))
+
+    def test_a_commit_that_fails_is_propagated_never_retried_by_re_running_the_evaluator(self):
+        """The docstring on `serve` claims this; the TypeScript binding asserted it and this did not."""
+        calls = []
+
+        def evaluate(source):
+            calls.append(source)
+            work.close()
+            return {"score": 1.0}
+
+        with DurableWorkClient(self.config, **TRANSPORT) as work:
+            work.enqueue(job("1", envelope("1", "source")))
+            with self.assertRaises(Exception):
+                serve(work, self.worker, evaluate, provenance="closed-v1", actual={"cost": "1"})
+        self.assertEqual(1, len(calls), "the evaluator ran more than once for one lease")
+
     def test_leases_enqueued_by_the_engine_bridge_are_evaluated_as_their_genome_source(self):
         evaluate = self.evaluator(DICT_EVALUATOR)
         with DurableWorkClient(self.config, **TRANSPORT) as work:
