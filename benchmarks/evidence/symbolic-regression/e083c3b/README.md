@@ -40,6 +40,21 @@ have steered the search that produced it. That is asserted, not described:
 `test_program_symbolic_regression_headroom.py` tampers with the held-out rows before the search and
 requires the chosen candidate to be unchanged.
 
+## A limit of this family, found while wiring it to the gate
+
+`benchmarks/analysis/release_gate.py` already names this family `sr` in its fixtures, and seals a
+family's test partition two ways: the opened bytes must hash to `TestPartitionHashes[family]`, and
+**no blob in the registration commit's tree may have exactly those bytes** (`partition_was_visible`).
+
+`partition()` emits that shape, but the second check is not sufficient for *this* family, and the
+module says so. Its rows are a pure function of a seed with a closed form, so a partition built from
+a committed seed - `DEV_SEEDS`, or anything else in the tree - would pass a byte-visibility check
+while being public in substance. A campaign must therefore choose its test seeds **at registration
+time** and keep both the seeds and the partition out of the repository until the bundle is opened.
+
+That is a property of generated data, not a defect in the gate: a family whose test partition is a
+fetched dataset cannot be rebuilt from the tree, and the byte check is enough for it.
+
 ## What this is not
 
 Not the LLM-SRBench subset. `deep-symbolic-mathematics/llm-srbench` declares no license, so it is not

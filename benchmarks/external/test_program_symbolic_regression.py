@@ -108,6 +108,28 @@ class SymbolicRegressionFamilyTests(unittest.TestCase):
             family.score(spy, split)
         self.assertEqual([], calls, "the candidate ran before the seal was checked")
 
+    def test_a_partition_is_byte_stable_and_matches_the_gates_shape(self):
+        first = family.partition({"rational_gain": [21], "damped_oscillator": [7, 9]})
+        second = family.partition({"damped_oscillator": [7, 9], "rational_gain": [21]})
+        self.assertEqual(first, second, "argument order must not change the sealed bytes")
+        self.assertEqual(
+            b'{"Family":"sr","TestSeeds":{"damped_oscillator":[7,9],"rational_gain":[21]}}', first)
+
+    def test_a_partition_refuses_input_a_campaign_could_not_seal(self):
+        for bad in ({}, {"no_such_task": [1]}, {"rational_gain": []},
+                    {"rational_gain": [1, 1]}, {"rational_gain": ["1"]}):
+            with self.subTest(bad=bad):
+                with self.assertRaises((KeyError, ValueError)):
+                    family.partition(bad)
+
+    def test_a_dev_seed_partition_is_reproducible_from_the_tree(self):
+        # Not an assertion about the gate, but about why its visibility check is not enough here:
+        # these rows are a pure function of a committed seed, so anyone can rebuild the held-out
+        # data without the partition bytes ever appearing in the repository.
+        rebuilt = family.build("rational_gain", family.DEV_SEEDS[0])
+        self.assertEqual(family.build("rational_gain", family.DEV_SEEDS[0])["test_seal"],
+                         rebuilt["test_seal"])
+
     def test_an_unknown_task_and_a_tiny_split_are_refused(self):
         with self.assertRaises(KeyError):
             family.build("no_such_task", family.DEV_SEEDS[0])

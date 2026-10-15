@@ -36,6 +36,9 @@ import math
 import random
 
 FAMILY = "symbolic-regression"
+# The name benchmarks/analysis/release_gate.py's fixtures already use for this family, so a sealed
+# partition written here lands in the slot the gate expects rather than a second one beside it.
+GATE_FAMILY = "sr"
 DEV_SEEDS = (5000, 5001, 5002)
 TEST_SEED_OFFSET = 7919  # a prime, so the test grid never coincides with a train grid
 
@@ -96,6 +99,33 @@ def build(task, seed, train=60, validation=20, test=40):
         "test": held_out,
         "test_seal": seal(held_out),
     }
+
+
+def partition(seeds_by_task):
+    """Returns the bytes a campaign seals as its test partition, in the gate's own shape.
+
+    `benchmarks/analysis/release_gate.py` treats a partition as opaque: it checks that the opened
+    bytes hash to `TestPartitionHashes[family]` and that **no blob in the registration commit's tree
+    has exactly those bytes** (`partition_was_visible`). Hence the warning below.
+
+    **The seeds passed here must not be committed.** This module builds its rows from a seed with a
+    closed form, so anyone holding the seed can reproduce the held-out data exactly. A partition
+    built from `DEV_SEEDS`, or from any seed in the tree, would pass the gate's byte-visibility check
+    while being public in substance - which is the failure the check exists to prevent. Choose the
+    campaign's test seeds at registration time, seal these bytes into the registration, and keep both
+    the seeds and the partition out of the repository until the bundle is opened.
+    """
+    if not seeds_by_task: raise ValueError("A test partition needs at least one task.")
+    seeds = {}
+    for task, task_seeds in seeds_by_task.items():
+        if task not in TASKS: raise KeyError("Unknown task: " + task)
+        values = list(task_seeds)
+        if not values or any(type(seed) is not int for seed in values):
+            raise ValueError("Each task needs at least one integer seed: " + task)
+        if len(set(values)) != len(values): raise ValueError("Duplicate seed for task: " + task)
+        seeds[task] = values
+    payload = {"Family": GATE_FAMILY, "TestSeeds": {task: seeds[task] for task in sorted(seeds)}}
+    return json.dumps(payload, separators=(",", ":"), sort_keys=True).encode()
 
 
 def nmse(predict, rows):
