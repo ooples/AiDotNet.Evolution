@@ -44,25 +44,46 @@ def load_predict(program_path):
     return predict
 
 
-def score_held_out(task, seed, program_path):
-    """The endpoint: held-out NMSE through `family.score`, which checks the seal before scoring."""
-    split = family.build(task, seed)
+def score_held_out(task, holdout_seed, program_path):
+    """The endpoint: held-out NMSE on a split built from a seed the candidate never saw.
+
+    `holdout_seed` belongs to this side of the seam. Review found that deriving it from the cell's
+    selection seed let a candidate rebuild the endpoint's rows from its own environment, so it is now
+    passed in and the search environment never carries it.
+    """
+    split = family.holdout(task, holdout_seed)
     predict = load_predict(program_path)
-    return family.score(predict, split)["test_nmse"]
+    if family.seal(split["test"]) != split["test_seal"]:
+        raise ValueError("The held-out split does not match its seal, so its score would not be held out.")
+    return family.nmse(predict, split["test"])
 
 
-def executor(task, searchers):
+def holdout_seal(task, holdout_seed):
+    """The sealed test partition's SHA-256, for the registration to commit to before launch.
+
+    `campaign_registration` takes `TestPartitionHashes` on trust - nothing downstream recomputes it -
+    so a placeholder there buys nothing: the commitment is only worth something if it is the hash of
+    the rows the endpoint will actually be scored on. This is the one place that knows both, and the
+    hash reveals nothing about the rows.
+    """
+    return family.holdout(task, holdout_seed)["test_seal"]
+
+
+def executor(task, searchers, *, holdout_seed):
     """Returns an `execute_cell` for one family, dispatching on the cell's arm.
 
     `searchers` maps an arm name to `search(cell, directory, resume) -> dict` carrying at least
     `program` (a path) and, for a real run, `model_calls` and `model_tokens`. An arm with no searcher
     is a refusal at launch rather than a failed cell: a missing arm is a campaign that was not
-    configured, not a result.
+    configured, not a result. A searcher that raises may carry an `accounting` attribute on the
+    exception; that is how a cell that spent and then failed still reports its spend.
     """
     if task not in family.TASKS:
         raise KeyError("Unknown task: " + task)
     if not searchers:
         raise ValueError("A pilot needs at least one arm's searcher")
+    if type(holdout_seed) is not int:
+        raise TypeError("The endpoint needs an explicit integer holdout seed")
 
     def execute_cell(cell, directory, resume):
         arm = cell["Arm"]
@@ -71,11 +92,15 @@ def executor(task, searchers):
         try:
             outcome = searchers[arm](cell, Path(directory), resume)
             program = outcome["program"]
-            value = score_held_out(task, int(cell["Seed"]), program)
+            value = score_held_out(task, holdout_seed, program)
             if not math.isfinite(value):
                 return _failed(outcome, "non-finite held-out score")
         except Exception as error:  # noqa: BLE001 - one cell's failure is that cell's outcome
-            return _failed(locals().get("outcome"), type(error).__name__)
+            # A searcher that failed after spending attaches what it spent to the exception
+            # (`pilot_searchers.SearchFailed`). Without this the row reported no calls for a cell
+            # that really was billed, and the campaign's spend came out under the truth.
+            return _failed(locals().get("outcome") or getattr(error, "accounting", None),
+                           type(error).__name__)
         return {
             "Status": "completed",
             "Value": value,

@@ -1,0 +1,45 @@
+# OpenEvolve config for the symbolic-regression pilot task (V1-07, #116).
+#
+# Both arms read this file. Ours imports it with `aidotnet-evolve run --openevolve-config`, which is
+# the path V1-56 (#169) exists for; the OpenEvolve arms read it through `openevolve_configs`, which
+# swaps the model names for Claude aliases, forces the shared-broker settings, and returns every
+# change it made - so a difference between the arms cannot come from a config difference nobody
+# recorded. `openevolve-matched` keeps this file's models and system message and takes its engine
+# features from our arm, so the two OpenEvolve arms differ in config shape alone.
+#
+# llm.models is a list rather than primary_model/secondary_model on purpose: the import notice added
+# in #267 fires on a stalling model configuration, and this is the shape that notice was written for,
+# so the pilot exercises it rather than avoiding it.
+max_iterations: 10
+checkpoint_interval: 5
+log_level: INFO
+
+llm:
+  # The alias, not a dated provider name: the shim's transport is keyed by model name, and
+  # `openevolve_configs.TIERS` maps a provider name to an alias - so a dated name here would reach
+  # the account under one name from our arm and another from the OpenEvolve arms, as two transports
+  # with two canary baselines. One name is one metered model for all three arms. The import treats
+  # it as OpenAI-compatible either way (a provider is only ever read from llm.provider).
+  models:
+    - name: "sonnet"
+      weight: 1.0
+  temperature: 0.7
+  max_tokens: 4096
+  timeout: 120
+  # 0, not a retry: a failed call closes broker admission, so a retry is work the budget never
+  # admitted. `openevolve_configs.FORCED` sets the same 0 for the OpenEvolve arms.
+  retries: 0
+
+prompt:
+  system_message: |
+    Improve the Python function `predict(*xs)` so it fits the data better. Return the complete
+    program in a python code fence. Keep the signature, and do not read or guess the held-out data:
+    only the training and validation rows are scored during the search.
+
+database:
+  population_size: 20
+  num_islands: 2
+
+evaluator:
+  timeout: 60
+  cascade_evaluation: false
