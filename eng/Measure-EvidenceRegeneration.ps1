@@ -61,7 +61,6 @@ function Measure-EvidenceReadme {
         Path = $ReadmePath
         Class = $class
         ArtifactCount = $artifacts.Count
-        Bytes = [System.Text.Encoding]::UTF8.GetByteCount($text)
     }
 }
 
