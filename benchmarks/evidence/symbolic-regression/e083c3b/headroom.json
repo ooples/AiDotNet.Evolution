@@ -1,0 +1,107 @@
+{
+  "story": "V1-04d (#113): dev-data headroom, no model calls",
+  "family": "symbolic-regression",
+  "searcher": "seeded random enumeration over a fixed 8-function basis, up to 3 terms; a floor, not this project's searcher",
+  "selection": "train and validation only; the test split is scored once, at the end, through family.score",
+  "rows": [
+    {
+      "task": "damped_oscillator",
+      "seed": 5000,
+      "budget": 20000,
+      "expression": "-1*exp(-t) + 1*1/(1+t^2) + 0.5*1/(1+t^2)",
+      "selection_nmse": 0.657464149213127,
+      "baseline_test_nmse": 1.0,
+      "found_test_nmse": 0.7081599666928421,
+      "gap_closed": 0.2918400333071579,
+      "test_seal": "cd92bb95b3fcf144fbc695c4d68ccd44d33249f0fade2e4046e2e21123cc5151"
+    },
+    {
+      "task": "damped_oscillator",
+      "seed": 5001,
+      "budget": 20000,
+      "expression": "2*1/(1+t^2) + 0.3*exp(-t) + -2*exp(-t)",
+      "selection_nmse": 0.6070676823113492,
+      "baseline_test_nmse": 0.9999999999999996,
+      "found_test_nmse": 0.5163754698236565,
+      "gap_closed": 0.4836245301763433,
+      "test_seal": "710f3620cbd6462f84bae9fb2257e1bc05dc002ce95eaa120326ae4ec19894e2"
+    },
+    {
+      "task": "damped_oscillator",
+      "seed": 5002,
+      "budget": 20000,
+      "expression": "0.3*exp(-t) + 0.3*1/(1+t^2)",
+      "selection_nmse": 0.7433368655755972,
+      "baseline_test_nmse": 1.0,
+      "found_test_nmse": 0.6980584860364661,
+      "gap_closed": 0.30194151396353386,
+      "test_seal": "357a6f25a7751a44f72f1aa37effe659d4c912a7a90b97daf6083d7ccb184663"
+    },
+    {
+      "task": "rational_gain",
+      "seed": 5000,
+      "budget": 20000,
+      "expression": "0.5*1/(1+x^2) + 1*sin(x)",
+      "selection_nmse": 0.055597144459823306,
+      "baseline_test_nmse": 0.9999999999999999,
+      "found_test_nmse": 0.08876747368714642,
+      "gap_closed": 0.9112325263128536,
+      "test_seal": "c01b44cf952e8912f4e69c288073f57f3016ea4c6c5e2cb63d7fd2c59d74a402"
+    },
+    {
+      "task": "rational_gain",
+      "seed": 5001,
+      "budget": 20000,
+      "expression": "1*1 + 0.3*1 + 1*sin(x) + -1",
+      "selection_nmse": 0.09477483630824322,
+      "baseline_test_nmse": 1.0,
+      "found_test_nmse": 0.09836251369653505,
+      "gap_closed": 0.901637486303465,
+      "test_seal": "b211f51994bdd0f1728520193d0635aa89c236574b2540bb0a45fac7384cecb1"
+    },
+    {
+      "task": "rational_gain",
+      "seed": 5002,
+      "budget": 20000,
+      "expression": "0.3*sin(x) + 0.5*1/(1+x^2) + 1*sin(x)",
+      "selection_nmse": 0.052018440299326424,
+      "baseline_test_nmse": 1.0000000000000002,
+      "found_test_nmse": 0.0615905480713148,
+      "gap_closed": 0.9384094519286852,
+      "test_seal": "371ce17a9b3e50ea16b1fd463e1e695f94839845ad561c06ac0821f02cf28f74"
+    },
+    {
+      "task": "two_variable_ratio",
+      "seed": 5000,
+      "budget": 20000,
+      "expression": "-1*1 + 1",
+      "selection_nmse": 1.033982065885878,
+      "baseline_test_nmse": 1.0,
+      "found_test_nmse": 1.0019856976312358,
+      "gap_closed": -0.0019856976312357943,
+      "test_seal": "5fa7bb5f085e24ca31584180943e9b84689437cd931fb509599c5feafc5676f1"
+    },
+    {
+      "task": "two_variable_ratio",
+      "seed": 5001,
+      "budget": 20000,
+      "expression": "1*1 + -1",
+      "selection_nmse": 1.018863742380728,
+      "baseline_test_nmse": 1.0,
+      "found_test_nmse": 1.0251047103566768,
+      "gap_closed": -0.02510471035667683,
+      "test_seal": "aabe956a9609196cb4f8c77297f71b4cfe7bc9c6c55b3c0ad4615b327fd772ae"
+    },
+    {
+      "task": "two_variable_ratio",
+      "seed": 5002,
+      "budget": 20000,
+      "expression": "0.5*1 + -0.5",
+      "selection_nmse": 1.043482987571792,
+      "baseline_test_nmse": 0.9999999999999998,
+      "found_test_nmse": 1.0001953218697188,
+      "gap_closed": -0.00019532186971904508,
+      "test_seal": "7ed0983a4fcb84759080893e86caa6fef8d47038f6ffa1ed761498f740efb9da"
+    }
+  ]
+}
