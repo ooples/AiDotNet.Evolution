@@ -182,6 +182,38 @@ public sealed class CliRunTests
             (row.GetProperty("Text").GetString() ?? string.Empty).Contains("openevolve_missing_module", StringComparison.Ordinal));
     }
 
+    [Theory]
+    // Measured on examples/signal_processing: the mean rose 13.73 -> 16.51 while the example own
+    // composite_score FELL 0.4200 -> 0.3959, because two of its nine metrics count slope changes and
+    // false reversals, where higher is worse. A reader of BestQuality cannot tell that case from an
+    // evaluator whose own objective improved, so the report has to say which rule produced the number.
+    [InlineData(true, "combined_score")]
+    [InlineData(false, "mean-of-reported-metrics")]
+    public void The_report_says_whether_quality_is_the_evaluators_own_score_or_a_mean(
+        bool reportsCombinedScore, string expectedRule)
+    {
+        using var directory = new TemporaryDirectory();
+        using var model = new FakeChatModel();
+        File.WriteAllText(Path.Combine(directory.Path, "initial.py"), "X = 1");
+        string metrics = reportsCombinedScore
+            ? @"{""combined_score"": 0.75}"
+            : @"{""composite_score"": 0.42, ""slope_changes"": 66.0}";
+        File.WriteAllText(Path.Combine(directory.Path, "evaluator.py"),
+            "def evaluate(path):" + (char)10 + "    return " + metrics + (char)10);
+        string runFile = WriteRun(directory.Path, model.Endpoint, maxEvaluations: 1,
+            extra: """, "openEvolveEvaluator": { "timeoutSeconds": 60 }""");
+
+        var (code, output, error) = Run("run", runFile);
+        Assert.True(code == 0, error);
+        using JsonDocument report = JsonDocument.Parse(output);
+        JsonElement fitness = report.RootElement.GetProperty("Fitness");
+        Assert.Equal(expectedRule, fitness.GetProperty("Rule").GetString());
+        if (reportsCombinedScore) return;
+        // The mean case names what fed it, so a quality that rose for the wrong reason can be read back.
+        Assert.Equal(new[] { "composite_score", "slope_changes" },
+            fitness.GetProperty("Metrics").EnumerateArray().Select(item => item.GetString()));
+    }
+
     [Fact]
     public void Preflight_scores_the_seed_exactly_as_run_would_and_never_calls_the_model()
     {

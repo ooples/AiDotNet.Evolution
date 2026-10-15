@@ -522,6 +522,13 @@ internal static class RunCommand
         // OpenEvolve's population_size bounds the whole database; a bound at or above the grid is just the grid.
         long grid = descriptors.Aggregate(1L, (cells, descriptor) => cells * descriptor.BinCount);
         int capacity = run.Search.ArchiveCapacity > 0 && run.Search.ArchiveCapacity < grid ? run.Search.ArchiveCapacity : 0;
+        // What the reported quality actually is. An OpenEvolve evaluator that reports combined_score has
+        // its own objective optimised; one that does not has fitness computed as the mean of its remaining
+        // metrics, upstream's rule and ours. Measured on examples/signal_processing: that mean rose from
+        // 13.73 to 16.51 while the example's own composite_score FELL from 0.4200 to 0.3959, because two of
+        // its nine metrics count slope changes and false reversals, where higher is worse. A reader of
+        // BestQuality cannot tell those two cases apart, so the report now says which one it is.
+        var fitnessBasis = new FitnessBasisObserver();
         EvolutionRunResult<ProgramGenome> result;
         using (var tracer = new EvolutionTraceObserver<ProgramGenome>(new EvolutionTraceOptions { Enabled = true, Path = tracePath }, run.RunId, descriptors))
         {
@@ -529,9 +536,9 @@ internal static class RunCommand
                 // The engine takes one observer, and a judged run needs two: the trace writer, and the
                 // instruction credit that feeds outcomes back into the search. A composite isolates one
                 // observer's failure from the other rather than letting a trace problem cost a credit.
-                observer: instructions is null
-                    ? tracer
-                    : new CompositeEvolutionObserver<ProgramGenome>(new IEvolutionObserver<ProgramGenome>[] { tracer, instructions }),
+                observer: new CompositeEvolutionObserver<ProgramGenome>(instructions is null
+                    ? new IEvolutionObserver<ProgramGenome>[] { tracer, fitnessBasis }
+                    : new IEvolutionObserver<ProgramGenome>[] { tracer, instructions, fitnessBasis }),
                 checkpointStore: checkpoints, genomeCodec: codec);
             interrupt.Attach(engine.RequestStop);
             try
@@ -554,6 +561,7 @@ internal static class RunCommand
             StopReason = result.StopReason.ToString(),
             result.Counters.CompletedEvaluations,
             BestQuality = best?.Evaluation.Quality,
+            Fitness = fitnessBasis.Report(),
             Trace = tracePath,
             Checkpoints = Path.Combine(outputDirectory, "checkpoints"),
             Repertoire = repertoirePath,
@@ -999,6 +1007,60 @@ internal static class RunCommand
             if (counts.TryGetValue(status, out long count) && count > 0) return true;
         }
         return false;
+    }
+
+    /// <summary>
+    /// Records what the run's quality numbers mean: the evaluator's own <c>combined_score</c>, or a mean
+    /// over the metrics it did report.
+    /// </summary>
+    /// <remarks>
+    /// Taken from the first completed evaluation, because the metric names an evaluator reports are a
+    /// property of the evaluator rather than of a candidate. A later evaluation reporting different names
+    /// would be a different question, and one this field does not claim to answer.
+    /// </remarks>
+    private sealed class FitnessBasisObserver : IEvolutionObserver<ProgramGenome>
+    {
+        private const string CombinedScore = "combined_score";
+        private string[]? _metricNames;
+        private bool _hasCombinedScore;
+
+        public ValueTask OnEventAsync(EvolutionEvent<ProgramGenome> evolutionEvent,
+            CancellationToken cancellationToken = default)
+        {
+            if (_metricNames is not null || evolutionEvent.Kind != EvolutionEventKind.Evaluated) return default;
+            if (evolutionEvent.Evaluation is not { } evaluation
+                || evaluation.Status != EvolutionEvaluationStatus.Completed
+                || evaluation.Metrics.Count == 0)
+            {
+                return default;
+            }
+
+            _hasCombinedScore = evaluation.Metrics.ContainsKey(CombinedScore);
+            _metricNames = evaluation.Metrics.Keys.OrderBy(name => name, StringComparer.Ordinal).ToArray();
+            return default;
+        }
+
+        public object? Report()
+        {
+            if (_metricNames is null) return null;
+            if (_hasCombinedScore)
+            {
+                return new
+                {
+                    Rule = CombinedScore,
+                    Note = "the evaluator reported combined_score, so quality is its own objective.",
+                };
+            }
+
+            return new
+            {
+                Rule = "mean-of-reported-metrics",
+                Metrics = _metricNames,
+                Note = "the evaluator reported no combined_score, so quality is the mean of these metrics - "
+                    + "upstream's rule and ours. A metric where higher is worse pulls it the wrong way, so a "
+                    + "rising quality does not by itself mean the evaluator's own score improved.",
+            };
+        }
     }
 
     internal static string ForStderr(string? text)
