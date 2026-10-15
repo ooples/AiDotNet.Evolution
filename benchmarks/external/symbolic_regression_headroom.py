@@ -86,7 +86,11 @@ def main():
     parser = argparse.ArgumentParser(description="Dev-data headroom for the symbolic-regression family.")
     parser.add_argument("--budget", type=int, default=20000, help="candidates enumerated per task and seed")
     parser.add_argument("--output")
+    parser.add_argument("--noise-seeds", type=int, default=0,
+                        help="also sweep this many consecutive seeds per task and report the spread")
     arguments = parser.parse_args()
+    if not 0 <= arguments.noise_seeds <= 64:
+        raise SystemExit("--noise-seeds must be between 0 and 64.")
     if not 100 <= arguments.budget <= 2_000_000:
         raise SystemExit("--budget must be between 100 and 2,000,000.")
 
@@ -110,8 +114,34 @@ def main():
             })
             print(json.dumps(rows[-1]), flush=True)
 
+    # The spread a gate on this family would have to resolve. Measured the same way as the rows
+    # above, over consecutive seeds from the first dev seed, so a reader can see how much of a
+    # between-arm difference would be seed noise rather than a result. It is NOT a pre-registration
+    # input: it is one arm against itself, and an arm that calls a model may be noisier still.
+    noise = {}
+    if arguments.noise_seeds:
+        for task in family.TASKS:
+            found = []
+            for index in range(arguments.noise_seeds):
+                seed = family.DEV_SEEDS[0] + index
+                split, best = search(task, seed, arguments.budget)
+                found.append(family.score(_predict(best[1], best[2]), split)["test_nmse"])
+            found.sort()
+            noise[task] = {
+                "seeds": arguments.noise_seeds, "min": found[0], "max": found[-1],
+                "median": found[len(found) // 2],
+                "spread": found[-1] - found[0],
+                "values": found,
+            }
+            print("%-20s test NMSE over %d seeds: %.3f to %.3f (spread %.3f)" % (
+                task, arguments.noise_seeds, found[0], found[-1], found[-1] - found[0]), flush=True)
+
     payload = {
         "story": "V1-04d (#113): dev-data headroom, no model calls",
+        "noise": noise,
+        "noise_reading": ("One arm against itself across consecutive seeds. A between-arm difference "
+                          "smaller than this spread is seed noise, not a result. Not a "
+                          "pre-registration input: an arm that calls a model may be noisier."),
         "family": family.FAMILY,
         "searcher": "seeded random enumeration over a fixed 8-function basis, up to 3 terms; a floor, not this project's searcher",
         "selection": "train and validation only; the test split is scored once, at the end, through family.score",

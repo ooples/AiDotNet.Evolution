@@ -1,5 +1,59 @@
 {
   "story": "V1-04d (#113): dev-data headroom, no model calls",
+  "noise": {
+    "damped_oscillator": {
+      "seeds": 8,
+      "min": 0.45983533103299173,
+      "max": 1.3352559266320445,
+      "median": 0.6980584860364661,
+      "spread": 0.8754205955990528,
+      "values": [
+        0.45983533103299173,
+        0.5163754698236565,
+        0.5375998351774918,
+        0.6188325502636942,
+        0.6980584860364661,
+        0.7081599666928421,
+        0.8252521910881162,
+        1.3352559266320445
+      ]
+    },
+    "rational_gain": {
+      "seeds": 8,
+      "min": 0.0615905480713148,
+      "max": 0.1550159624328652,
+      "median": 0.09836251369653505,
+      "spread": 0.09342541436155039,
+      "values": [
+        0.0615905480713148,
+        0.07226940158105875,
+        0.07702426042121946,
+        0.08876747368714642,
+        0.09836251369653505,
+        0.10868586436803969,
+        0.11901395169880447,
+        0.1550159624328652
+      ]
+    },
+    "two_variable_ratio": {
+      "seeds": 8,
+      "min": 1.0001554051788315,
+      "max": 1.2939190299876628,
+      "median": 1.0251047103566768,
+      "spread": 0.29376362480883134,
+      "values": [
+        1.0001554051788315,
+        1.0001953218697188,
+        1.0019856976312358,
+        1.0042102973496927,
+        1.0251047103566768,
+        1.037073459283644,
+        1.060100422175035,
+        1.2939190299876628
+      ]
+    }
+  },
+  "noise_reading": "One arm against itself across consecutive seeds. A between-arm difference smaller than this spread is seed noise, not a result. Not a pre-registration input: an arm that calls a model may be noisier.",
   "family": "symbolic-regression",
   "searcher": "seeded random enumeration over a fixed 8-function basis, up to 3 terms; a floor, not this project's searcher",
   "selection": "train and validation only; the test split is scored once, at the end, through family.score",

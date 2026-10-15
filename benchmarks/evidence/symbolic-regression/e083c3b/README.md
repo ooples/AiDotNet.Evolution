@@ -8,14 +8,28 @@ The ground truth lives in the family module, so *"a perfect candidate exists"* i
 and demonstrates nothing. What is shown here is that a deliberately weak search finds candidates
 materially better than the seed **while never seeing the test split** - and how much room it leaves.
 
-| task | gap closed on test (3 dev seeds) | reading |
-| --- | --- | --- |
-| `rational_gain` | **+0.902 to +0.938** | the floor already solves it; it cannot carry a claim about a better searcher |
-| `damped_oscillator` | **+0.292 to +0.484** | **headroom, and the task to compete on** |
-| `two_variable_ratio` | **-0.025 to -0.000** | the floor cannot touch it at all |
+| task | gap closed on test (3 dev seeds) | test NMSE spread over 8 seeds | reading |
+| --- | --- | ---: | --- |
+| `rational_gain` | **+0.902 to +0.938** | **0.093** | the floor already solves it; nothing left to compete over |
+| `damped_oscillator` | **+0.292 to +0.484** | **0.875** | headroom, but **smaller than its own seed noise** |
+| `two_variable_ratio` | **-0.025 to -0.000** | 0.294 | the floor cannot touch it at all |
 
 `gap_closed` is `1 - found_test_nmse / baseline_test_nmse`, where the baseline predicts the training
-mean and so scores NMSE 1.0 by construction.
+mean and so scores NMSE 1.0 by construction. The spread column is the same floor across **8
+consecutive seeds**, one arm against itself.
+
+**No task here is ready to carry a comparison at three seeds, and the noise column is why.** An
+earlier version of this card named `damped_oscillator` as the task to compete on, from the headroom
+column alone. The sweep retracts that: its test NMSE runs **0.460 to 1.335** across eight seeds, so a
+0.3 difference between two arms on that task is about half its own seed noise, and at three seeds
+would be indistinguishable from the draw. `rational_gain` is the only tight one (0.093) and it has
+almost nothing left to win. The family therefore needs more seeds per task, or a tighter searcher,
+before a result on it means anything - which is a finding about this instrument, not about any
+searcher.
+
+This is a measurement, not a pre-registration input: it is one arm against itself, and an arm that
+calls a model may be noisier still. The sample count for any real campaign comes from V1-40's power
+analysis (#121).
 
 ## Why the searcher is deliberately bad
 
@@ -29,8 +43,9 @@ constant - its best expressions are things like `-1*1 + 1`. A task the floor can
 measuring the floor rather than a difference between searchers, which is the same hazard as a task it
 already solves, from the other side.
 
-So the honest selection for a future comparison is `damped_oscillator`: the floor reaches it but does
-not solve it.
+So the floor orders the tasks by distance - `rational_gain`, then `damped_oscillator`, then
+`two_variable_ratio` - but ordering is not readiness: see the noise column above, which is why no task
+is nominated here.
 
 ## How the held-out number is kept held out
 
