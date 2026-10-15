@@ -113,6 +113,52 @@ public sealed class RemeasurementGainSuiteTests
         return (improvements, task.Calls, result.Best?.Evaluation.Quality);
     }
 
+    /// <summary>Writes one arm's row, so US-06's "8 of 10" is an artifact rather than a code comment.</summary>
+    /// <remarks>
+    /// <para>
+    /// One file per arm rather than one appended file: the four arms are separate theory invocations
+    /// and appending from them would race. Written only when <c>EVOLUTION_REMEASUREMENT_EVIDENCE</c>
+    /// names a directory, so an ordinary run writes nothing and the assertions are unchanged.
+    /// </para>
+    /// <para>
+    /// The sweep emits the rows it asserts. Until now the default arm's 0 was asserted while the
+    /// bounded arm's count lived in a comment above an <c>improvements &gt; 0</c> assertion - a number
+    /// a reader could not reach, which is what the evidence census calls <c>Unsupported</c>.
+    /// </para>
+    /// </remarks>
+    private static void RecordArm(bool cache, int deduplicationCapacity, int improvements, int calls, double? best)
+    {
+        string? directory = Environment.GetEnvironmentVariable("EVOLUTION_REMEASUREMENT_EVIDENCE");
+        if (string.IsNullOrWhiteSpace(directory)) return;
+
+        string quality = best is { } value
+            ? value.ToString("R", System.Globalization.CultureInfo.InvariantCulture)
+            : "null";
+        var row = new System.Text.StringBuilder();
+        row.Append('{').Append(NL);
+        row.Append(Text("story", "US-06 (#24): re-measuring unchanged code must not manufacture a gain"));
+        row.Append(Number("evaluation_cache", cache ? "true" : "false"));
+        row.Append(Number("deduplication_capacity", deduplicationCapacity.ToString(System.Globalization.CultureInfo.InvariantCulture)));
+        row.Append(Number("improvements", improvements.ToString(System.Globalization.CultureInfo.InvariantCulture)));
+        row.Append(Number("evaluator_calls", calls.ToString(System.Globalization.CultureInfo.InvariantCulture)));
+        row.Append("  ").Append(QUOTE).Append("best_quality").Append(QUOTE).Append(": ").Append(quality).Append(NL);
+        row.Append('}').Append(NL);
+        Directory.CreateDirectory(Path.GetFullPath(directory));
+        File.WriteAllText(
+            Path.Combine(Path.GetFullPath(directory),
+                FormattableString.Invariant($"cache-{(cache ? "on" : "off")}-capacity-{deduplicationCapacity}.json")),
+            row.ToString());
+    }
+
+    private const string QUOTE = "\"";
+    private const string NL = "\n";
+
+    private static string Text(string name, string value) =>
+        "  " + QUOTE + name + QUOTE + ": " + QUOTE + value + QUOTE + "," + NL;
+
+    private static string Number(string name, string value) =>
+        "  " + QUOTE + name + QUOTE + ": " + value + "," + NL;
+
     [Theory]
     [InlineData(true)]
     [InlineData(false)]
@@ -128,6 +174,7 @@ public sealed class RemeasurementGainSuiteTests
         Assert.Equal(0, improvements);
         Assert.Equal(2, calls); // the two distinct identities, each measured exactly once
         Assert.Equal(0.20, best.GetValueOrDefault(), 10);
+        RecordArm(cache, deduplicationCapacity: 0, improvements, calls, best);
     }
 
     [Theory]
@@ -147,7 +194,8 @@ public sealed class RemeasurementGainSuiteTests
         // Whether that is acceptable is a judgement for the owner: the alternative is retaining cache
         // entries for genomes the run has forgotten, which defeats the bound the capacity exists to
         // provide. This test pins the behaviour so the trade-off is visible rather than discovered.
-        (int improvements, int calls, _) = await RunAsync(cache, deduplicationCapacity: 1);
+        (int improvements, int calls, double? best) = await RunAsync(cache, deduplicationCapacity: 1);
+        RecordArm(cache, deduplicationCapacity: 1, improvements, calls, best);
 
         Assert.True(improvements > 0,
             "a bounded capacity no longer re-measures, so US-06's metric is now unconditional and this "
