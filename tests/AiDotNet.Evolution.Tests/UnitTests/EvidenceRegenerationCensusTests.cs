@@ -132,13 +132,22 @@ public sealed class EvidenceRegenerationCensusTests
             Write(Path.Combine(root, "fam-half-marker", "README.md"), "# half\n" + BeginMarker + "\n| a |");
             Write(Path.Combine(root, "fam-undocumented", "analysis.json"), "{}");
 
+            // A hidden artifact still counts. This side enumerates with Directory.EnumerateFiles,
+            // which includes hidden files, while the script's Get-ChildItem skips them without
+            // -Force; the two disagreed on exactly this directory until the script gained it.
+            string keep = Path.Combine(root, "fam-hidden-artifact", ".gitkeep");
+            Write(Path.Combine(root, "fam-hidden-artifact", "README.md"), "# 42 ms");
+            Write(keep, string.Empty);
+            if (OperatingSystem.IsWindows()) File.SetAttributes(keep, FileAttributes.Hidden);
+
             Dictionary<string, EvidenceReadmeClass> classified = ClassifyTree(root);
 
             Assert.Equal(EvidenceReadmeClass.Generated, classified["fam-generated/README.md"]);
             Assert.Equal(EvidenceReadmeClass.RawAlongside, classified["fam-raw/abc1234/README.md"]);
             Assert.Equal(EvidenceReadmeClass.Unsupported, classified["fam-unsupported/abc1234/README.md"]);
             Assert.Equal(EvidenceReadmeClass.Unsupported, classified["fam-half-marker/README.md"]);
-            Assert.Equal(4, classified.Count);
+            Assert.Equal(EvidenceReadmeClass.RawAlongside, classified["fam-hidden-artifact/README.md"]);
+            Assert.Equal(5, classified.Count);
             Assert.Equal(new[] { "fam-undocumented" }, UndocumentedFamilies(root));
         }
         finally

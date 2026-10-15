@@ -11,6 +11,9 @@ Write latency is the store's `SaveAsync` alone; resume is a fresh engine restori
 | 10,000 (before) | n/a | n/a | n/a | could not be written | n/a | n/a |
 | 10,000 (after) | 1,183 ms | 3,128 ms | 5,218 ms | 51 MB | 5,105 | matches |
 
+The `final checkpoint` and `bytes per elite` columns above are the transcribed `5699058` figures. The
+re-measurement below did not reproduce them, so use its values for any current comparison.
+
 ## Re-measured at current main, with the output committed
 
 The table above was transcribed from a run whose output was never committed, which US-04 (#22)
@@ -45,7 +48,9 @@ them needs that commit reverted, which this run does not do. They stay in the ta
   still verify); only ones it refused use a payload digest.
 
 ## Against the targets
-Bytes per elite is about 1.25x the program size (target ≤ 2x): met. At 1,000 elites writes meet the 250 ms p95.
-At 10,000 elites a full 51 MB snapshot per checkpoint misses both targets (p95 ≤ 250 ms, resume ≤ 1 s). Meeting them
+Bytes per elite is 1.07x the program size at 1,000 elites (4,387 / 4,096) and 1.13x at 10,000 (4,626 / 4,096),
+against a target of 2x: met. The 1.25x this section used to claim came from the transcribed byte figures,
+which the re-measurement did not reproduce. At 1,000 elites writes meet the 250 ms p95. At 10,000 elites a
+full 46 MB snapshot per checkpoint misses both targets (p95 ≤ 250 ms, resume ≤ 1 s). Meeting them
 needs incremental checkpoints (write only the archive changes since the last snapshot), which is a format change and
 is left open on #179.

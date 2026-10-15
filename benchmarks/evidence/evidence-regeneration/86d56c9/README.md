@@ -66,9 +66,11 @@ already committed; none of it said what it was.
 
 It does not regenerate anything, and it does not read a single number out of a README. It classifies by
 **what a reader could do**, which is a property of the files that exist, not of whether the numbers in them
-happen to be right. A `RawAlongside` README can still misquote its own JSON - four such defects were found
-by hand in `openevolve-examples` on the day this was written - so 36 is a count of claims that *can* be
-checked, never of claims that *have been*.
+happen to be right. A `RawAlongside` README can still misquote its own JSON - four such defects were caught
+by hand in `openevolve-examples` on the day this was written - so the `RawAlongside` count counts READMEs
+whose claims *can* be checked, never claims that *have been*. No count is repeated in this prose, because
+one that changes with every new family drifts here without failing anything: the test compares only the
+generated block.
 
 It also does not tick US-04's box. 2 of 46 is a measured value for the metric, and a metric reading 2 of 46
 is not a met target.

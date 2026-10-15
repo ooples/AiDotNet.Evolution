@@ -56,7 +56,12 @@ function Measure-EvidenceReadme {
     # revision README with the sub-studies under it. Anything but a README counts as an artifact:
     # the families commit .json, .jsonl, .json.gz, .zip, .py and .log, and an extension list would
     # silently reclassify a family that commits a new one.
-    $artifacts = @(Get-ChildItem -LiteralPath $directory -Recurse -File |
+    #
+    # -Force because Get-ChildItem hides dot-prefixed and hidden-attribute files without it, while the
+    # C# classifier in EvidenceRegenerationCensusTests uses Directory.EnumerateFiles, which does not.
+    # Measured: one hidden .gitkeep beside a README reads as 0 artifacts here and 1 there, so the
+    # committed census would say Unsupported where the test says RawAlongside.
+    $artifacts = @(Get-ChildItem -LiteralPath $directory -Recurse -File -Force |
         Where-Object { $_.Name -ne 'README.md' })
     $class = if ($text.Contains($script:BeginMarker, [System.StringComparison]::Ordinal) -and
                  $text.Contains($script:EndMarker, [System.StringComparison]::Ordinal)) { 'Generated' }
@@ -75,14 +80,14 @@ function Measure-EvidenceTree {
 
     if (-not (Test-Path -LiteralPath $Root -PathType Container)) { throw "Evidence root not found at $Root." }
     $families = @()
-    foreach ($directory in Get-ChildItem -LiteralPath $Root -Directory | Sort-Object Name) {
-        $readmes = @(Get-ChildItem -LiteralPath $directory.FullName -Recurse -File -Filter 'README.md' |
+    foreach ($directory in Get-ChildItem -LiteralPath $Root -Directory -Force | Sort-Object Name) {
+        $readmes = @(Get-ChildItem -LiteralPath $directory.FullName -Recurse -File -Force -Filter 'README.md' |
             Sort-Object FullName | ForEach-Object {
                 $row = Measure-EvidenceReadme -ReadmePath $_.FullName
                 $row.Path = [System.IO.Path]::GetRelativePath($Root, $_.FullName).Replace('\', '/')
                 $row
             })
-        $artifacts = @(Get-ChildItem -LiteralPath $directory.FullName -Recurse -File |
+        $artifacts = @(Get-ChildItem -LiteralPath $directory.FullName -Recurse -File -Force |
             Where-Object { $_.Name -ne 'README.md' })
         $families += [pscustomobject]@{
             Name = $directory.Name
@@ -143,8 +148,18 @@ function Test-EvidenceCensus {
         New-Item -ItemType Directory -Path $undocumented -Force | Out-Null
         Set-Content -LiteralPath (Join-Path $undocumented 'analysis.json') -Encoding utf8 -Value '{}'
 
+        # A hidden artifact still counts. Get-ChildItem skips dot-prefixed and hidden-attribute files
+        # without -Force, while the C# classifier's Directory.EnumerateFiles does not, so without this
+        # arm the two implementations disagree on exactly this directory and neither one says so.
+        $hidden = Join-Path $root 'fam-hidden-artifact'
+        New-Item -ItemType Directory -Path $hidden -Force | Out-Null
+        Set-Content -LiteralPath (Join-Path $hidden 'README.md') -Encoding utf8 -Value '# 42 ms'
+        $keep = Join-Path $hidden '.gitkeep'
+        Set-Content -LiteralPath $keep -Encoding utf8 -Value ''
+        if ($IsWindows) { (Get-Item -LiteralPath $keep -Force).Attributes = 'Hidden' }
+
         $census = Measure-EvidenceTree -Root $root
-        $expected = @{ Families = 5; Readmes = 4; Generated = 1; RawAlongside = 1; Unsupported = 2; Undocumented = 1 }
+        $expected = @{ Families = 6; Readmes = 5; Generated = 1; RawAlongside = 2; Unsupported = 2; Undocumented = 1 }
         foreach ($key in ($expected.Keys | Sort-Object)) {
             $actual = $census.Totals.$key
             if ($actual -ne $expected[$key]) { throw "Self-test: expected $key = $($expected[$key]), measured $actual." }
@@ -152,10 +167,11 @@ function Test-EvidenceCensus {
         $classes = @{}
         foreach ($family in $census.Families) { foreach ($row in $family.Readmes) { $classes[$family.Name] = $row.Class } }
         foreach ($pair in @(@('fam-generated', 'Generated'), @('fam-raw', 'RawAlongside'),
-                            @('fam-unsupported', 'Unsupported'), @('fam-half-marker', 'Unsupported'))) {
+                            @('fam-unsupported', 'Unsupported'), @('fam-half-marker', 'Unsupported'),
+                            @('fam-hidden-artifact', 'RawAlongside'))) {
             if ($classes[$pair[0]] -ne $pair[1]) { throw "Self-test: $($pair[0]) classified $($classes[$pair[0]]), expected $($pair[1])." }
         }
-        Write-Output "Self-test passed: one of every class is detected, and half a marker pair is not Generated."
+        Write-Output "Self-test passed: one of every class is detected, half a marker pair is not Generated, and a hidden artifact still counts."
     }
     finally {
         if (Test-Path -LiteralPath $root) { Remove-Item -LiteralPath $root -Recurse -Force -Confirm:$false }
