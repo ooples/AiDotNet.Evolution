@@ -1,4 +1,4 @@
-# Preflight across seven examples on Windows, and what the zero-seed notice catches
+# Preflight across eleven examples on Windows, and what the zero-seed notice catches
 
 Measured with `aidotnet-evolve preflight` at main `86d56c9` against upstream's pinned ref `411fb59`. **No
 model calls**: preflight scores the seed and nothing else, so this costs nothing and can be re-run freely.
@@ -45,7 +45,8 @@ land in it.
 
 ## Why this calibrates the notice rather than just exercising it
 
-Three of the four zeros - `k_module_problem`, `online_judge_programming` and `web_scraper_optillm` - are
+Three of the first table's four zeros - `k_module_problem`, `online_judge_programming` and
+`web_scraper_optillm` - are
 examples [the ledger already excludes](../../../docs/parity/OPENEVOLVE_EXAMPLES.md) for exactly this
 reason: *"its own seed scores zero, so a positive-quality assertion cannot distinguish a working run from a
 broken one"*. That judgement was made independently of this guard, and the guard agrees with it on every
@@ -55,8 +56,10 @@ The fourth, `circle_packing_with_artifacts`, is the Windows temp-path case: its 
 `NamedTemporaryFile` path in a single-quoted Python literal, so on Windows every candidate scores zero
 while the evaluation still reports as completed.
 
-**Every row reports `Completed`.** None of these is a crash or a refusal - which is the whole point. A
-caller reading status alone sees seven healthy examples.
+**Nine of the eleven rows report `Completed`, and five of those nine scored 0.** Only the two
+missing-toolchain rows are loud. So a caller reading `seed_status` alone counts nine working examples where
+four actually produced a positive seed score - which is the whole point: status does not identify a healthy
+example.
 
 ## What this is not
 

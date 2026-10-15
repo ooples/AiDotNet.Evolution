@@ -24,9 +24,11 @@ is the one its author's own metric ranks last.
 
 ## Why, and why it is not a divergence from upstream
 
-The evaluator reports nine metrics, among them `slope_changes` (66 -> 92) and `false_reversals`
-(55.2 -> 73.6), where **higher is worse**. Fitness here is the mean of the non-feature metrics, so those
-two dominate it and their rise outweighs the fall in `composite_score`.
+The evaluator reports 16 metrics per evaluation, and because none of them is a declared feature dimension,
+fitness here is the mean of all 16 - the recorded quality equals that mean to four decimal places on every
+row. Two of the 16 are counts where **higher is worse**: `slope_changes` (66 -> 92) and `false_reversals`
+(55.2 -> 73.6). Their rise alone is (26 + 18.4) / 16 = **+2.775** of the **+2.783** total change in
+fitness, so they account for essentially all of it while `composite_score` falls by 0.024.
 
 That mean is also what **OpenEvolve** computes. `openevolve/utils/metrics_utils.py`'s `get_fitness_score`
 prefers `combined_score` when present and otherwise averages the non-feature metrics; this evaluator names

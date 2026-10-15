@@ -1,6 +1,6 @@
 # `background_blur` with the real provider: a real optimisation, checked against upstream's gaming suite
 
-The fourth example run end to end through the CLI against the real Claude Code provider, at upstream's
+The fourth example was run end to end through the CLI against the real Claude Code provider, at upstream's
 pinned ref `411fb59`. Raw rows: `evaluations.json`. Winner: `best.py`. Generated run file: `run.json`.
 
 ## The run
@@ -14,8 +14,14 @@ pinned ref `411fb59`. Raw rows: `evaluations.json`. Winner: `best.py`. Generated
 | 3 | **23.3174** | **1.000** | **2.1** |
 | 4 | 12.7365 | 1.000 | 3.8 |
 
-**22.9x faster at unchanged output quality** - 48.5 ms/frame to 2.1, with mean and worst-frame SSIM both
-1.000.
+**23.3x faster at unchanged output quality** - 48.522 ms/frame to 2.080, with mean and worst-frame SSIM
+both 1.000.
+
+That ratio is the measured `ms_per_frame` of the seed over the winner's. The evaluator's own `speedup`
+metric rises 1.0192 to 23.3174, whose ratio is 22.9x, and that is **not** the figure to quote: `speedup` is
+against a reference time the evaluator re-measures on every evaluation, which came out 49.453 ms for the
+seed and 48.496 ms for the winner. Dividing the two therefore carries the drift between two references as
+well as the improvement.
 
 Unlike `signal_processing` beside it, this evaluator reports `combined_score`, so upstream's own fitness
 rule (`metrics_utils.get_fitness_score`) uses it directly: the number being optimised is the one the
@@ -41,7 +47,7 @@ suite names as the honest optimisation.
 
 ## What the numbers are not
 
-- **22.9x is not "better than upstream's 9.77x".** That figure comes from upstream's own test fixture with
+- **23.3x is not "better than upstream's 9.77x".** That figure comes from upstream's own test fixture with
   its own frame count and timing method; ours is this machine, this fixture, four evaluations. The two are
   not comparable, and the only claim being made is that the winner is the honest strategy their suite
   accepts.
