@@ -32,9 +32,11 @@ import hashlib
 import json
 import math
 from pathlib import Path
+import random
 import re
 import subprocess
 
+from analyze import percentile
 from campaign_registration import CONFIGS, OURS, SCHEMA as REGISTRATION_SCHEMA, analyze, published_gate, render, validate
 from design import digest
 
@@ -42,6 +44,10 @@ CLAIM_SCHEMA = "evolution-release-claim-v2"
 BUNDLE_SCHEMA = "evolution-release-bundle-v2"
 ASSESSMENT_SCHEMA = "evolution-release-assessment-v2"
 MINIMUM_GEOMEAN_SPEEDUP = 1.10
+# The per-task regression limit US-12 (#30) asks to be predefined. A geometric mean of 1.10 can hold
+# while one task runs at 0.5x, and "no task slower than 0.95x" is the floor this gate declares, here
+# rather than in a claim written after the numbers were seen.
+MAXIMUM_PER_TASK_REGRESSION = 0.95
 MAXIMUM_FAMILYWISE_ALPHA = 0.05
 SPEEDUP_METRIC = "speedup"
 MAX_ARTIFACT_BYTES = 32 * 1024 * 1024
@@ -164,8 +170,20 @@ def partition_was_visible(repository, commit, data):
 
 
 def geometric_mean_speedups(registration, rows, family):
-    """Geometric mean of ours/theirs per config; None when any paired run failed or is non-positive."""
+    """Geometric mean of ours/theirs per config, with a 95% lower bound; None when a paired run failed.
+
+    US-12 (#30) asks for "at least 1.10x geometric-mean speedup ... with a 95% interval above 1.0"
+    and "predefined per-task regression limits". The point estimate alone satisfies neither: a mean
+    of 1.10 drawn from seeds that straddle 1.0 is noise, and a mean of 1.10 can hide one task three
+    times slower. So each config reports the geometric mean, the paired bootstrap's 95% lower bound
+    on it, and the worst single-seed ratio.
+
+    The bootstrap resamples the per-seed log ratios with the registration's own `BootstrapSamples`
+    and `BootstrapSeed`, so the bound is deterministic and pre-registered rather than chosen here -
+    the same discipline `campaign_registration.analyze` applies to the superiority p-value.
+    """
     cells = {(row["Family"], row["Arm"], row["Seed"]): row for row in rows}
+    spec = registration["Spec"]
     result = {}
     for config in family["Configs"]:
         logs = []
@@ -175,7 +193,19 @@ def geometric_mean_speedups(registration, rows, family):
                 logs = None
                 break
             logs.append(math.log(ours["Value"] / theirs["Value"]))
-        result[config] = None if logs is None else math.exp(math.fsum(logs) / len(logs))
+        if logs is None:
+            result[config] = None
+            continue
+        rng = random.Random(spec["BootstrapSeed"])
+        count, samples = len(logs), spec["BootstrapSamples"]
+        means = sorted(math.fsum(logs[rng.randrange(count)] for _ in range(count)) / count for _ in range(samples))
+        result[config] = {
+            "GeometricMean": math.exp(math.fsum(logs) / count),
+            # Lower end of the central 95% interval, which is the bound the criterion names.
+            "LowerBound95": math.exp(percentile(means, 0.025)),
+            # The geometric mean is blind to one task falling over; the worst seed is not.
+            "WorstSeedRatio": math.exp(min(logs)),
+        }
     return result
 
 
@@ -235,7 +265,14 @@ def assess_bundle(claim, root, repository):
         if family["Endpoint"]["Metric"] == SPEEDUP_METRIC:
             require(family["Endpoint"]["Direction"] == "maximize", "A speedup endpoint must be maximized")
             speedups = geometric_mean_speedups(registration, rows, family)
-            floor = all(value is not None and value >= MINIMUM_GEOMEAN_SPEEDUP for value in speedups.values())
+            # Three conditions, because the criterion names three: the point estimate reaches the
+            # floor, its 95% interval is above 1.0 so the effect is not noise, and no single task
+            # regressed past the declared limit so the mean is not hiding one.
+            floor = all(value is not None
+                        and value["GeometricMean"] >= MINIMUM_GEOMEAN_SPEEDUP
+                        and value["LowerBound95"] > 1.0
+                        and value["WorstSeedRatio"] >= MAXIMUM_PER_TASK_REGRESSION
+                        for value in speedups.values())
         families.append(dict(Family=family["Family"], Supported=superior and floor, HolmSuperiorAllConfigs=superior,
                              GeometricMeanSpeedup=speedups, MeetsSpeedupFloor=floor if speedups is not None else None,
                              Endpoints=endpoints))
