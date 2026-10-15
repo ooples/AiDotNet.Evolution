@@ -199,7 +199,12 @@ would report is the example's score rather than this contract.
 All five smoked examples import with cascade evaluation enabled and their own thresholds mapped —
 `circle_packing` 0.5/0.75, `function_minimization` 1.3, `signal_processing` 0.3/0.6,
 `background_blur` 0.5/0.5, `circle_packing_with_artifacts` 0.5/0.8 — and each evaluator defines
-`evaluate_stage1` and `evaluate_stage2`; `background_blur` defines a third. So the smoke drives
+`evaluate_stage1` and `evaluate_stage2`; `background_blur` defines a third.
+
+**`function_minimization`'s config never mentions `cascade_evaluation`**, which looks like a discrepancy
+until you check the default: upstream declares `cascade_evaluation: bool = True` (`openevolve/config.py`),
+so an absent key means enabled, and this import agrees - measured by importing that config unchanged, which
+yields `cascade: true` with `cascadeThresholds: [1.3]`. So the smoke drives
 V1-56's cascade criterion against real upstream evaluators, not only against the synthetic config in
 `OpenEvolveImportTests`, which is where the stage ordering and threshold semantics are actually
 pinned by assertion.
