@@ -82,6 +82,36 @@ from a lineage that has one. A run that fails early and then recovers may report
 the prompts, which is where they were most useful. Turning `search.includeArtifacts` off stops the
 delivery without stopping the record - the queue is storage, delivery is a separate decision.
 
+## When fitness is not the score the evaluator meant
+
+OpenEvolve's fitness rule is `combined_score` when the evaluator reports one, and otherwise the **mean of
+the non-feature metrics** (`openevolve/utils/metrics_utils.py`, `get_fitness_score`). This import follows
+it exactly, which means it inherits a trap worth knowing before you read a result.
+
+Measured on `examples/signal_processing` with a real model: fitness rose from **13.73 to 16.51** while the
+example's own `composite_score` **fell from 0.4200 to 0.3959**. Its evaluator reports nine metrics, among
+them `slope_changes` (66 -> 92) and `false_reversals` (55.2 -> 73.6), where **higher is worse** - and
+because its headline is named `composite_score` rather than `combined_score`, nothing is preferred and
+everything is averaged. The run reported no failures and a rising best quality throughout.
+
+Two things help:
+
+```jsonc
+// in <output>/run.json
+"openEvolveEvaluator": { "fitnessMetric": "composite_score" }
+```
+
+names the metric to optimise. The example stays exactly as upstream ships it - evaluator, config and seed
+program untouched - because the field is ours, not a `config.yaml` key. Omit it and OpenEvolve's rule
+stands, so parity is the default. A name the evaluator never reports falls back to that rule rather than
+scoring every candidate zero.
+
+And the run report says which rule produced its numbers:
+
+```jsonc
+"Fitness": { "Rule": "mean-of-reported-metrics", "Metrics": ["composite_score", "slope_changes"], ... }
+```
+
 ## An evaluator that imports a package: `--python-path`
 
 OpenEvolve runs your evaluator as a child of its own process, so the evaluator inherits whatever
