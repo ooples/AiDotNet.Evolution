@@ -661,6 +661,42 @@ public sealed class OpenEvolveImportTests
     }
 
     [Theory]
+    // Neither key is unreasonable alone, so the notice is on their product: how long one proposal can wait
+    // before anything is reported. Measured on examples/background_blur, whose own config carries
+    // timeout: 600 and retries: 6 - a model the provider does not have made a run wait over an hour with
+    // no diagnostic, because the CLI's "all model calls failed" notice is an end-of-run check and the run
+    // had not reached its end.
+    [InlineData(600, 6, true, 4200)]   // the example's own configuration
+    [InlineData(600, 0, false, 0)]     // one attempt at ten minutes is the boundary, not past it
+    [InlineData(60, 3, false, 0)]      // the import defaults
+    [InlineData(300, 2, true, 900)]
+    public void A_model_whose_timeout_and_retries_can_stall_a_run_is_noticed(
+        int timeout, int retries, bool expectNotice, int expectedSeconds)
+    {
+        string yaml = string.Join("\n", new[]
+        {
+            "llm:",
+            "  primary_model: fake-model",
+            "  api_base: https://example.invalid/v1",
+            "  timeout: " + timeout.ToString(System.Globalization.CultureInfo.InvariantCulture),
+            "  retries: " + retries.ToString(System.Globalization.CultureInfo.InvariantCulture),
+            ""
+        });
+
+        using var directory = new TemporaryDirectory();
+        OpenEvolveImport import = Import(directory, yaml);
+
+        string[] stalls = import.Notes
+            .Where(note => note.Contains("before the run reports anything", StringComparison.Ordinal))
+            .ToArray();
+        Assert.Equal(expectNotice ? 1 : 0, stalls.Length);
+        if (!expectNotice) return;
+        Assert.Contains("up to " + expectedSeconds.ToString(System.Globalization.CultureInfo.InvariantCulture)
+            + " s", stalls[0], StringComparison.Ordinal);
+        Assert.Contains("fake-model", stalls[0], StringComparison.Ordinal);
+    }
+
+    [Theory]
     // Every list in the run file deserializes over its initializer when the JSON says null, and the first
     // read of .Count then threw NullReferenceException - a stack trace on the console where this surface
     // promises a named refusal for every other bad value. Measured before the fix: "criteria": null crashed

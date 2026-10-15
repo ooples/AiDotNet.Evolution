@@ -61,6 +61,23 @@ internal static class OpenEvolveConfigImporter
         if (config.TryGetValue("llm.api_key", out object? configuredKey) && configuredKey is not null)
             notes.Add("llm.api_key in the config is not used; the key is read from OPENAI_API_KEY.");
         List<RunModel> models = Models(merged, defaults, errors);
+        // How long one proposal can take before anything is reported. Measured on examples/background_blur,
+        // whose config carries timeout: 600 and retries: 6: a model the provider does not have made the run
+        // wait over an hour with no diagnostic, because the CLI's "all model calls failed" notice is an
+        // end-of-run check and the run had not reached its end. The note names the product rather than the
+        // two keys, because neither is unreasonable alone.
+        foreach (RunModel model in models)
+        {
+            long worstCaseSeconds = (long)model.TimeoutSeconds * (model.MaxRetries + 1);
+            if (worstCaseSeconds > SlowModelNoticeSeconds)
+            {
+                notes.Add("llm.timeout " + model.TimeoutSeconds.ToString(CultureInfo.InvariantCulture)
+                    + " s with llm.retries " + model.MaxRetries.ToString(CultureInfo.InvariantCulture)
+                    + " lets one proposal wait up to " + worstCaseSeconds.ToString(CultureInfo.InvariantCulture)
+                    + " s for '" + (model.Name ?? "?") + "' before the run reports anything. A model the "
+                    + "provider does not have looks like a stall rather than an error for that long.");
+            }
+        }
         foreach (object? judge in List(merged["llm.evaluator_models"]))
         {
             if (judge is not Dictionary<string, object?> fields) errors.Add("llm.evaluator_models: every entry must be a mapping");
@@ -279,6 +296,10 @@ internal static class OpenEvolveConfigImporter
             ? weighted
             : throw new InvalidDataException("llm: every configured model has weight 0.");
     }
+
+    // Ten minutes: long enough that no ordinary configuration trips it, short enough that the hour this
+    // note exists to prevent cannot pass unmentioned.
+    private const int SlowModelNoticeSeconds = 600;
 
     private static RunModel ToModel(Dictionary<string, object?> model)
     {
