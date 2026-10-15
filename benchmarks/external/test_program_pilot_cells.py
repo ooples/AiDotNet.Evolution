@@ -87,6 +87,40 @@ class PilotCellTests(unittest.TestCase):
         self.assertEqual("failed", outcome["Status"])
         self.assertEqual("TimeoutError", outcome["Reason"])
 
+    def test_a_cell_that_spent_and_then_failed_still_reports_what_it_spent(self):
+        """A failed cell used to report no calls at all, so the campaign's bill came out under.
+
+        The searcher is the only thing that knows what the cell spent before it broke - its broker
+        is already closed by the time the exception arrives - so it attaches the spend to the
+        exception, and the row carries it. Without this the row said ModelCalls: None for a cell
+        that really was billed for four calls.
+        """
+        class Failed(RuntimeError):
+            accounting = {"model_calls": 4, "model_tokens": 1200, "throttle_seconds": 2.5, "lost_calls": 1}
+
+        def searcher(_cell, _directory, _resume):
+            raise Failed("the adapter exited 1")
+
+        with tempfile.TemporaryDirectory() as directory:
+            outcome = pilot_cells.executor(TASK, {"aidotnet": searcher}, holdout_seed=918273)(
+                cell("aidotnet"), directory, False)
+        self.assertEqual("failed", outcome["Status"])
+        self.assertEqual("Failed", outcome["Reason"])
+        self.assertEqual(4, outcome["ModelCalls"])
+        self.assertEqual(1200, outcome["ModelTokens"])
+        self.assertEqual(2.5, outcome["ThrottleSeconds"])
+        self.assertEqual(1, outcome["LostCalls"])
+
+    def test_a_searcher_that_failed_without_spending_reports_nothing_rather_than_a_guess(self):
+        def searcher(_cell, _directory, _resume):
+            raise TimeoutError("provider timed out")
+
+        with tempfile.TemporaryDirectory() as directory:
+            outcome = pilot_cells.executor(TASK, {"aidotnet": searcher}, holdout_seed=918273)(
+                cell("aidotnet"), directory, False)
+        self.assertIsNone(outcome["ModelCalls"])
+        self.assertIsNone(outcome["ModelTokens"])
+
     def test_a_tampered_held_out_split_fails_the_cell_rather_than_scoring_it(self):
         # The seal is the endpoint's integrity. If a run could hand back a split whose test rows had
         # moved, the pilot's number would be whatever that run chose.

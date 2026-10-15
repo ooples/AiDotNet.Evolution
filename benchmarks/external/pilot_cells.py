@@ -64,7 +64,8 @@ def executor(task, searchers, *, holdout_seed):
     `searchers` maps an arm name to `search(cell, directory, resume) -> dict` carrying at least
     `program` (a path) and, for a real run, `model_calls` and `model_tokens`. An arm with no searcher
     is a refusal at launch rather than a failed cell: a missing arm is a campaign that was not
-    configured, not a result.
+    configured, not a result. A searcher that raises may carry an `accounting` attribute on the
+    exception; that is how a cell that spent and then failed still reports its spend.
     """
     if task not in family.TASKS:
         raise KeyError("Unknown task: " + task)
@@ -84,7 +85,11 @@ def executor(task, searchers, *, holdout_seed):
             if not math.isfinite(value):
                 return _failed(outcome, "non-finite held-out score")
         except Exception as error:  # noqa: BLE001 - one cell's failure is that cell's outcome
-            return _failed(locals().get("outcome"), type(error).__name__)
+            # A searcher that failed after spending attaches what it spent to the exception
+            # (`pilot_searchers.SearchFailed`). Without this the row reported no calls for a cell
+            # that really was billed, and the campaign's spend came out under the truth.
+            return _failed(locals().get("outcome") or getattr(error, "accounting", None),
+                           type(error).__name__)
         return {
             "Status": "completed",
             "Value": value,

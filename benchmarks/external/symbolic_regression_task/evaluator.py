@@ -1,9 +1,14 @@
 """OpenEvolve-contract evaluator for the symbolic-regression pilot task.
 
 `evaluate(program_path)` is the whole contract, as in OpenEvolve: load the candidate, score it, and
-return a metrics dict whose `combined_score` is higher-is-better. Both pilot arms run this exact
-file - ours through `aidotnet-evolve run --openevolve-config`, OpenEvolve's through its own runner -
-so neither searches a task the other does not.
+return a metrics dict whose `combined_score` is higher-is-better.
+
+**The metered pilot does not run this file; `pilot_task_evaluator.py` does.** Both arms' model calls
+go through one broker, and the broker admits a call only after a valid evaluation has come back
+through it, so a locally scoring evaluator would have had every call refused. This file is the same
+metric (`family.selection`, mean of train and validation NMSE) in standalone form: it is what makes
+the directory an ordinary OpenEvolve task that either engine can run with no broker at all, which
+is the V1-56 (#169) capability, and it is what a reader should check the brokered delegate against.
 
 **The held-out split is never built here, and cannot be rebuilt from here.** This calls
 `family.selection`, which constructs train and validation only. Review found that constructing the

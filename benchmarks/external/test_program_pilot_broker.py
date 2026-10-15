@@ -12,6 +12,7 @@ ROOT = Path(__file__).resolve().parent
 sys.path.insert(0, str(ROOT))
 
 import pilot_broker  # noqa: E402
+from program_broker import ProgramBroker  # noqa: E402
 import symbolic_regression_family as family  # noqa: E402
 
 TASK = "rational_gain"
@@ -22,8 +23,19 @@ CONSTANT = "def predict(x):\n    return 0.0\n"
 
 class ModelCallbackTests(unittest.TestCase):
     def test_a_well_behaved_provider_becomes_the_brokers_shape(self):
+        # cost_metric is part of that shape, not an extra: the broker refuses a reply without one
+        # (program_broker.py:299-302), so a reply that omits it closes admission.
         generate = pilot_broker.model_callback(lambda system, messages: ("answer", 12))
-        self.assertEqual({"text": "answer", "cost_units": 12}, generate("sys", []))
+        self.assertEqual({"text": "answer", "cost_units": 12,
+                          "cost_metric": "reported_input_plus_cache_plus_output_tokens"},
+                         generate("sys", []))
+
+    def test_the_declared_cost_metric_is_reported_and_an_undeclared_one_is_refused(self):
+        generate = pilot_broker.model_callback(lambda system, messages: ("answer", 12),
+                                               cost_metric="reported_input_plus_output_tokens")
+        self.assertEqual("reported_input_plus_output_tokens", generate("sys", [])["cost_metric"])
+        with self.assertRaises(ValueError):
+            pilot_broker.model_callback(lambda system, messages: ("answer", 1), cost_metric="tokens")
 
     def test_the_shapes_the_broker_would_reject_are_refused_here(self):
         for provider, expected in (
@@ -82,6 +94,72 @@ class EvaluateCallbackTests(unittest.TestCase):
     def test_an_unknown_task_is_refused_at_construction(self):
         with self.assertRaises(KeyError):
             pilot_broker.evaluate_callback("no_such_task", SEED)
+
+
+class RealBrokerTests(unittest.TestCase):
+    """The callbacks against the real broker, which is the only thing that enforces their shape.
+
+    The unit tests above check the shapes the module declares. They passed while both callbacks were
+    missing fields the broker requires - `candidate_hash`, `unknown_work`, `work_units`,
+    `cost_metric` - so the first candidate of the first cell would have raised "Evaluator did not
+    reconcile the dispatched program", closed admission, and lost the cell. Only a live broker
+    catches that, so one runs here.
+    """
+
+    def dispatch(self, broker, code):
+        return broker.dispatch("evaluate", {"code": code})
+
+    def test_an_evaluation_and_a_model_call_both_reconcile_against_a_live_broker(self):
+        generate = pilot_broker.model_callback(lambda system, messages, model=None: ("answer", 7))
+        with ProgramBroker(generate, pilot_broker.evaluate_callback(TASK, SEED), model_calls=2,
+                           evaluations=3, seconds=60, initial=CONSTANT, model_tokens=1000) as broker:
+            seed = self.dispatch(broker, CONSTANT)  # the broker requires the initial program first
+            self.assertEqual("valid", seed["status"])
+            self.assertEqual("answer", broker.dispatch("model", {"system": "s", "messages": []}))
+            truth = self.dispatch(broker, TRUTH)
+            self.assertEqual(1.0, truth["quality"])
+        self.assertFalse(broker.closed, "a reply the broker cannot reconcile closes it and loses the cell")
+        self.assertEqual([], broker.refusals)
+        self.assertEqual(7, broker.model_tokens)
+        self.assertEqual(0, broker.unknown_attempts["evaluate"], "every evaluation accounted for its work")
+
+    def test_an_invalid_candidate_is_one_candidate_lost_not_the_cell(self):
+        generate = pilot_broker.model_callback(lambda system, messages, model=None: ("answer", 1))
+        with ProgramBroker(generate, pilot_broker.evaluate_callback(TASK, SEED), model_calls=1,
+                           evaluations=3, seconds=60, initial=CONSTANT, model_tokens=1000) as broker:
+            self.dispatch(broker, CONSTANT)
+            self.assertEqual("invalid", self.dispatch(broker, "def predict(x)\n")["status"])
+            self.assertEqual("answer", broker.dispatch("model", {"system": "s", "messages": []}))
+        self.assertFalse(broker.closed)
+
+
+class SessionTests(unittest.TestCase):
+    """One broker per cell, bound to that cell's own seed."""
+
+    def session(self, **overrides):
+        budget = dict(model_calls=2, evaluations=3, seconds=60, initial=CONSTANT, model_tokens=1000)
+        budget.update(overrides)
+        return pilot_broker.session(lambda system, messages, model=None: ("answer", 1), TASK, **budget)
+
+    def test_each_cell_is_scored_on_its_own_seed(self):
+        # A campaign-wide broker would have bound one seed's rows and scored every later cell on
+        # them; this is the measurement that would have silently gone wrong.
+        open_for, scores = self.session(), []
+        for seed in (family.DEV_SEEDS[0], family.DEV_SEEDS[1]):
+            with open_for({"Family": TASK, "Seed": seed}) as broker:
+                scores.append(broker.dispatch("evaluate", {"code": CONSTANT})["selection_nmse"])
+        self.assertNotEqual(scores[0], scores[1], "two seeds must not be the same rows")
+
+    def test_a_cell_cannot_be_given_a_budget_the_broker_refuses(self):
+        # The reason a broker is per cell: it will not take a campaign-sized budget at all.
+        with self.assertRaises(ValueError):
+            with self.session(model_calls=180)({"Family": TASK, "Seed": SEED}):
+                pass
+
+    def test_the_cells_broker_is_closed_when_the_cell_ends(self):
+        with self.session()({"Family": TASK, "Seed": SEED}) as broker:
+            endpoint = broker.endpoint
+        self.assertTrue(broker.shut, "a cell's broker must not outlive the cell: " + endpoint)
 
 
 if __name__ == "__main__":
