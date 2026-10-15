@@ -259,6 +259,16 @@ public sealed class EvolutionEngineOptions
     /// to its length. With a capacity set, the oldest committed genome is forgotten first (commit order), so a genome
     /// proposed again after it was forgotten is evaluated again rather than reported as a duplicate. That changes
     /// results, so a non-zero capacity is part of the run's compatibility identity.
+    /// <para>
+    /// <b>With a noisy evaluator, that re-measurement can manufacture a gain.</b> Forgetting a genome evicts it from
+    /// the deduplication set <i>and</i> the evaluation cache together, so the same eviction that allows the
+    /// re-proposal has already discarded the measurement that would have prevented a second sample. An evaluator
+    /// whose answer varies then reports a luckier number and the run records an improvement no code change earned:
+    /// measured at <b>8 of 10</b> evaluations with a capacity of 1, against <b>0</b> at the default of 0, and with
+    /// the evaluation cache both on and off, because the cache cannot help in that regime even in principle. Pinned
+    /// by <c>RemeasurementGainSuiteTests</c>. Leave this at 0 unless the memory bound is worth that, and prefer a
+    /// deterministic evaluator or explicit repeated sampling if it is.
+    /// </para>
     /// </remarks>
     public int DeduplicationCapacity { get; set; }
 
