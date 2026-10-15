@@ -606,6 +606,22 @@ internal static class RunCommand
             string bestPath = Path.Combine(outputDirectory, "best" + Extension(run.Language));
             File.WriteAllText(bestPath, best.Candidate.CanonicalGenome.Genome.Source, new UTF8Encoding(false));
         }
+        // A run whose every candidate scored zero, including the seed. "Produced no candidate" does not
+        // cover it - there IS a best entry, it is just worthless - so without this the run reports a best
+        // quality of 0, no failures, and looks healthy. Measured on examples/circle_packing, whose
+        // evaluator embeds a Windows temp path in a single-quoted Python literal: four completed
+        // evaluations, every one combined_score 0 and validity 0, nothing said the numbers were
+        // meaningless. A notice rather than an error, because a task whose baseline is genuinely zero is
+        // legitimate and this surface cannot tell the two apart.
+        if (best is { } winner && winner.Evaluation.Quality is 0 && result.Counters.CompletedEvaluations > 1
+            && result.Islands.SelectMany(island => island.Entries)
+                .All(entry => entry.Evaluation.Quality is 0 or null))
+        {
+            error.WriteLine("note: every completed evaluation scored 0, the seed included, so this run "
+                + "cannot distinguish an improvement from an evaluator that reports nothing useful. Score "
+                + "the seed by hand before trusting the archive.");
+        }
+
         if (best is null && result.RetainedFailures.Count > 0)
         {
             EvolutionDiagnostic first = result.RetainedFailures[0];

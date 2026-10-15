@@ -182,6 +182,32 @@ public sealed class CliRunTests
             (row.GetProperty("Text").GetString() ?? string.Empty).Contains("openevolve_missing_module", StringComparison.Ordinal));
     }
 
+    [Theory]
+    // "Produced no candidate" does not cover this: there IS a best entry, it is just worthless, so the
+    // run reports a best quality of 0, no failures, and looks healthy. Measured on
+    // examples/circle_packing, whose evaluator embeds a Windows temp path in a single-quoted Python
+    // literal: four completed evaluations, every one combined_score 0 and validity 0, and nothing said
+    // the numbers were meaningless.
+    [InlineData("0.0", true)]
+    [InlineData("0.5", false)]
+    public void A_run_where_everything_scored_zero_says_so(string score, bool expectNotice)
+    {
+        using var directory = new TemporaryDirectory();
+        using var model = new FakeChatModel();
+        File.WriteAllText(Path.Combine(directory.Path, "initial.py"), "X = 1");
+        File.WriteAllText(Path.Combine(directory.Path, "evaluator.py"),
+            @"def evaluate(path):" + (char)10 + @"    return {""combined_score"": "
+                + score + "}" + (char)10);
+        string runFile = WriteRun(directory.Path, model.Endpoint, maxEvaluations: 3,
+            extra: """, "openEvolveEvaluator": { "timeoutSeconds": 60 }""");
+
+        var (code, _, error) = Run("run", runFile);
+
+        Assert.Equal(0, code);   // a run that scores zero throughout is not a failed run
+        Assert.Equal(expectNotice,
+            error.Contains("every completed evaluation scored 0", StringComparison.Ordinal));
+    }
+
     [Fact]
     public void Preflight_scores_the_seed_exactly_as_run_would_and_never_calls_the_model()
     {
