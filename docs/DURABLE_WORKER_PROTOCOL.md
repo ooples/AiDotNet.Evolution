@@ -111,6 +111,24 @@ amounts. Unknown actual consumption is **not** accepted as a fabricated zero rec
 claims can sort before the cursor: restart the scan when reconciling new claims. Settlement
 of a prior page cannot shift an offset and silently skip the next original lease.
 
+## What each binding is held to
+
+Two files, and they divide the subject between them.
+
+`conformance/durable-v1/scenarios.json` pins the **protocol**: one declarative step list per
+scenario, run by the C# endpoint (`DurableConformanceTests`), the Python client
+(`bindings/python/tests/test_conformance.py`) and the TypeScript client
+(`bindings/typescript/test/conformance.test.mjs`). All three must agree, and a scenario added there
+is immediately a requirement for all three.
+
+`conformance/reference-worker-v1/behaviours.json` pins the **reference worker** above the protocol -
+envelope handling, metric normalisation, receipt canonicalisation, lease discipline. Those cannot
+share a step list, because each binding implements them in its own language: Python normalises
+numpy scalars, TypeScript normalises BigInt and `undefined`. So the file lists the behaviour and
+why it matters, each binding's test claims the id it covers, and each suite fails when a declared
+behaviour has no test of its own. Parity is then a property CI checks rather than a count someone
+compared by hand: adding a behaviour to the manifest fails whichever binding does not cover it.
+
 ## Clients and recovery discipline
 
 The TypeScript package exports `DurableWorkClient`, exact wire types and

@@ -1,0 +1,21 @@
+test_a_claim_on_an_undeclared_behaviour_is_refused (test_reference_worker.BehaviourCoverageTests.test_a_claim_on_an_undeclared_behaviour_is_refused) ... ok
+test_each_claim_names_a_test_that_exists (test_reference_worker.BehaviourCoverageTests.test_each_claim_names_a_test_that_exists) ... ok
+test_every_declared_behaviour_is_covered_by_a_test_here (test_reference_worker.BehaviourCoverageTests.test_every_declared_behaviour_is_covered_by_a_test_here) ... ok
+test_the_manifest_entries_are_distinct_and_say_why_each_matters (test_reference_worker.BehaviourCoverageTests.test_the_manifest_entries_are_distinct_and_say_why_each_matters) ... ok
+test_array_metrics_and_artifacts_are_recorded_not_turned_into_failures (test_reference_worker.PayloadTests.test_array_metrics_and_artifacts_are_recorded_not_turned_into_failures) ... ok
+test_the_engine_envelope_yields_the_genome_source_and_raw_payloads_pass_through (test_reference_worker.PayloadTests.test_the_engine_envelope_yields_the_genome_source_and_raw_payloads_pass_through) ... ok
+test_a_commit_that_fails_is_propagated_never_retried_by_re_running_the_evaluator (test_reference_worker.ReferenceWorkerTests.test_a_commit_that_fails_is_propagated_never_retried_by_re_running_the_evaluator)
+The docstring on `serve` claims this; the TypeScript binding asserted it and this did not. ... ok
+test_an_evaluator_without_evaluate_is_refused_at_load (test_reference_worker.ReferenceWorkerTests.test_an_evaluator_without_evaluate_is_refused_at_load) ... ok
+test_an_unparseable_envelope_and_an_evaluator_returning_nothing_become_failed_receipts (test_reference_worker.ReferenceWorkerTests.test_an_unparseable_envelope_and_an_evaluator_returning_nothing_become_failed_receipts)
+Both are failed receipts in the TypeScript binding; only the first was here. ... ok
+test_evaluation_result_objects_keep_metrics_and_artifacts_and_max_leases_bounds_the_loop (test_reference_worker.ReferenceWorkerTests.test_evaluation_result_objects_keep_metrics_and_artifacts_and_max_leases_bounds_the_loop) ... ok
+test_every_lease_is_committed_once_and_failures_are_receipts_not_crashes (test_reference_worker.ReferenceWorkerTests.test_every_lease_is_committed_once_and_failures_are_receipts_not_crashes) ... ok
+test_leases_enqueued_by_the_engine_bridge_are_evaluated_as_their_genome_source (test_reference_worker.ReferenceWorkerTests.test_leases_enqueued_by_the_engine_bridge_are_evaluated_as_their_genome_source) ... ok
+test_receipt_payloads_are_sorted_key_json_and_a_non_finite_metric_becomes_text (test_reference_worker.ReferenceWorkerTests.test_receipt_payloads_are_sorted_key_json_and_a_non_finite_metric_becomes_text)
+The TypeScript binding asserts both of these; Python relied on them untested. ... ok
+
+----------------------------------------------------------------------
+Ran 13 tests in 3.460s
+
+OK

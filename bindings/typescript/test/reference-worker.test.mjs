@@ -1,9 +1,15 @@
 // The TypeScript reference worker, held to the same behaviour as the Python one
 // (bindings/python/tests/test_reference_worker.py): every lease committed once, evaluator failures are failed
 // receipts, both OpenEvolve result shapes keep their metrics and artifacts, and engine-bridge envelopes are unwrapped.
+// Each test claims a behaviour id from conformance/reference-worker-v1/behaviours.json, and the last
+// test fails when a declared behaviour has no test here. The Python suite claims from the same file,
+// so a behaviour added to one binding cannot be quietly missing from the other. The protocol itself
+// is pinned separately, by conformance/durable-v1/scenarios.json, which both clients and the C# host
+// run; these are the behaviours above the protocol, which each binding implements in its own
+// language and so cannot share a test for.
 import assert from 'node:assert/strict';
 import test from 'node:test';
-import { existsSync } from 'node:fs';
+import { existsSync, readFileSync } from 'node:fs';
 import { mkdtemp, rm, writeFile } from 'node:fs/promises';
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';
@@ -17,6 +23,17 @@ const root = fileURLToPath(new URL('../../../', import.meta.url));
 // Same host selection as conformance.test.mjs; never a skip (check-test-output.mjs fails a run that skips).
 const dll = process.env.AIDOTNET_DURABLE_HOST_DLL
   ?? join(root, 'src', 'AiDotNet.Evolution.Host', 'bin', 'Release', 'net10.0', 'aidotnet-evolution-host.dll');
+const behaviours = JSON.parse(readFileSync(join(root, 'conformance', 'reference-worker-v1', 'behaviours.json'), 'utf8'));
+const declared = new Set(behaviours.behaviours.map((entry) => entry.id));
+const covered = new Set();
+
+/** Registers a test and claims the manifest behaviour it covers. An unknown id fails here, not silently. */
+function covering(behaviour, title, fn) {
+  if (!declared.has(behaviour)) throw new Error(`No such reference-worker behaviour: ${behaviour}`);
+  covered.add(behaviour);
+  test(title, fn);
+}
+
 const host = process.env.AIDOTNET_DURABLE_HOST_PATH;
 const transport = host ? { hostPath: host } : existsSync(dll) ? { hostPath: 'dotnet', hostArgs: [dll] } : {};
 
@@ -63,13 +80,13 @@ async function evaluatorModule(directory, text) {
   return loadEvaluatorModule(path, '.mjs');
 }
 
-test('the engine envelope yields the genome source and raw payloads pass through', () => {
+covering('engine-envelope-yields-genome-source', 'the engine envelope yields the genome source and raw payloads pass through', () => {
   assert.equal(engineProgramSource(envelope('1', 'def run():\n    return 1\n')), 'def run():\n    return 1\n');
   assert.equal(rawProgramSource('x = 1\n'), 'x = 1\n');
   assert.throws(() => engineProgramSource('x = 1\n'));
 });
 
-test('non-scalar and non-finite metrics are recorded as text, not turned into failures', () => {
+covering('non-scalar-and-non-finite-metrics-are-text', 'non-scalar and non-finite metrics are recorded as text, not turned into failures', () => {
   const result = normalizeEvaluation(new Map([['combined_score', 2.5], ['flag', true], ['curve', [1, 2]],
     ['nan', NaN], ['low', -Infinity], ['big', 2n ** 70n], ['missing', undefined]]));
   assert.deepEqual(result, { metrics: { combined_score: 2.5, flag: true, curve: '[1,2]', nan: 'nan', low: '-inf',
@@ -81,7 +98,7 @@ test('non-scalar and non-finite metrics are recorded as text, not turned into fa
   assert.throws(() => normalizeEvaluation({ get metrics() { return 1; }, __proto__: { kind: 'result' } }), TypeError);
 });
 
-test('receipt payloads are sorted-key JSON and a non-finite number is refused, as Python json.dumps does', () => {
+covering('receipt-payload-is-canonical-json', 'receipt payloads are sorted-key JSON and a non-finite number is refused, as Python json.dumps does', () => {
   assert.equal(canonicalJson({ b: 1, a: { d: [3, { z: 1, y: 2 }], c: 'x' } }), '{"a":{"c":"x","d":[3,{"y":2,"z":1}]},"b":1}');
   assert.equal(canonicalJson(new Map([['b', 1], ['a', 2]])), '{"a":2,"b":1}');
   assert.throws(() => canonicalJson({ score: NaN }), RangeError);
@@ -89,7 +106,7 @@ test('receipt payloads are sorted-key JSON and a non-finite number is refused, a
   assert.throws(() => canonicalJson(undefined), TypeError);
 });
 
-test('every lease is committed once and failures are receipts, not crashes', () => withHost(async (work, directory) => {
+covering('one-commit-per-lease-and-failures-are-receipts', 'every lease is committed once and failures are receipts, not crashes', () => withHost(async (work, directory) => {
   const evaluate = await evaluatorModule(directory, DICT_EVALUATOR);
   for (const [index, value] of [3, 5, -1].entries()) {
     assert.equal(await work.enqueue(job(String(index + 1), `export const run = () => ${value};\n`)), true);
@@ -105,7 +122,7 @@ test('every lease is committed once and failures are receipts, not crashes', () 
   assert.deepEqual(JSON.parse(failed.payload), { error: 'RangeError' });
 }));
 
-test('evaluation result objects keep metrics and artifacts and maxLeases bounds the loop', () => withHost(async (work, directory) => {
+covering('result-objects-keep-metrics-and-artifacts', 'evaluation result objects keep metrics and artifacts and maxLeases bounds the loop', () => withHost(async (work, directory) => {
   const evaluate = await evaluatorModule(directory, RESULT_EVALUATOR);
   await work.enqueue(job('1', 'x = 1\n'));
   await work.enqueue(job('2', 'y = 22\n'));
@@ -121,7 +138,7 @@ test('evaluation result objects keep metrics and artifacts and maxLeases bounds 
   assert.equal(await work.result('2', 1), null); // a refused call claims nothing
 }));
 
-test('an evaluator module without evaluate is refused at load', async () => {
+covering('evaluator-without-evaluate-is-refused-at-load', 'an evaluator module without evaluate is refused at load', async () => {
   const directory = await mkdtemp(join(tmpdir(), 'reference-worker-'));
   try {
     const path = join(directory, 'evaluator.mjs');
@@ -131,14 +148,14 @@ test('an evaluator module without evaluate is refused at load', async () => {
   } finally { await rm(directory, { recursive: true, force: true }); }
 });
 
-test('leases enqueued by the engine bridge are evaluated as their genome source', () => withHost(async (work, directory) => {
+covering('engine-bridge-lease-is-evaluated-as-its-genome-source', 'leases enqueued by the engine bridge are evaluated as their genome source', () => withHost(async (work, directory) => {
   const evaluate = await evaluatorModule(directory, DICT_EVALUATOR);
   assert.equal(await work.enqueue(job('1', envelope('1', 'export const run = () => 4;\n'))), true);
   assert.deepEqual(await serve(work, worker, evaluate, { provenance: 'engine-v1', actual: { cost: '1' } }), ['accepted']);
   assert.equal(JSON.parse((await work.result('1', 1)).payload).metrics.combined_score, 4);
 }));
 
-test('an unparseable envelope and an evaluator returning no JSON become failed receipts', () => withHost(async (work) => {
+covering('unparseable-envelope-and-empty-result-are-failed-receipts', 'an unparseable envelope and an evaluator returning no JSON become failed receipts', () => withHost(async (work) => {
   await work.enqueue(job('1', 'not an envelope'));
   await work.enqueue(job('2', envelope('2', 'ignored')));
   const options = { provenance: 'failures-v1', actual: { cost: '1' } };
@@ -147,10 +164,20 @@ test('an unparseable envelope and an evaluator returning no JSON become failed r
   assert.deepEqual(JSON.parse((await work.result('2', 1)).payload), { error: 'TypeError' });
 }));
 
-test('a commit that fails is propagated, never retried by re-running the evaluator', () => withHost(async (work) => {
+covering('commit-failure-is-propagated-not-retried', 'a commit that fails is propagated, never retried by re-running the evaluator', () => withHost(async (work) => {
   await work.enqueue(job('1', envelope('1', 'source')));
   let calls = 0;
   const evaluate = async () => { calls += 1; await work.close(); return { score: 1 }; };
   await assert.rejects(serve(work, worker, evaluate, { provenance: 'closed-v1', actual: { cost: '1' } }));
   assert.equal(calls, 1);
 }));
+
+test('a claim on an undeclared behaviour is refused', () => {
+  // Otherwise a typo in an id would read as coverage of something nobody declared.
+  assert.throws(() => covering('no-such-behaviour', 'never registered', () => {}), /No such reference-worker behaviour/);
+});
+
+test('every declared reference-worker behaviour is covered by a test here', () => {
+  const missing = [...declared].filter((behaviour) => !covered.has(behaviour)).sort();
+  assert.deepEqual(missing, [], `declared reference-worker behaviours with no TypeScript test: ${missing}`);
+});

@@ -1,0 +1,21 @@
+..F..........
+======================================================================
+FAIL: test_every_declared_behaviour_is_covered_by_a_test_here (test_reference_worker.BehaviourCoverageTests.test_every_declared_behaviour_is_covered_by_a_test_here)
+----------------------------------------------------------------------
+Traceback (most recent call last):
+  File "~\source\repos\AiDotNet.Evolution-wt\vrefparity\bindings\python\tests\test_reference_worker.py", line 229, in test_every_declared_behaviour_is_covered_by_a_test_here
+    self.assertEqual([], missing, "declared reference-worker behaviours with no Python test: " + str(missing))
+    ~~~~~~~~~~~~~~~~^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+AssertionError: Lists differ: [] != ['probe-uncovered-behaviour']
+
+Second list contains 1 additional elements.
+First extra element 0:
+'probe-uncovered-behaviour'
+
+- []
++ ['probe-uncovered-behaviour'] : declared reference-worker behaviours with no Python test: ['probe-uncovered-behaviour']
+
+----------------------------------------------------------------------
+Ran 13 tests in 2.026s
+
+FAILED (failures=1)
