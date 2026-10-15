@@ -1,0 +1,36 @@
+# OpenEvolve config for the symbolic-regression pilot task (V1-07, #116).
+#
+# Both arms read this file. Ours imports it with `aidotnet-evolve run --openevolve-config`, which is
+# the path V1-56 (#169) exists for; the OpenEvolve arms hand it to OpenEvolve's own runner. The
+# `openevolve-matched` arm overrides only what the registration declares as matched (iterations and
+# the model), so a difference between the arms cannot come from a config difference nobody recorded.
+#
+# llm.models is a list rather than primary_model/secondary_model on purpose: the import notice added
+# in #267 fires on a stalling model configuration, and this is the shape that notice was written for,
+# so the pilot exercises it rather than avoiding it.
+max_iterations: 10
+checkpoint_interval: 5
+log_level: INFO
+
+llm:
+  models:
+    - name: "claude-sonnet-4-5"
+      weight: 1.0
+  temperature: 0.7
+  max_tokens: 4096
+  timeout: 120
+  retries: 2
+
+prompt:
+  system_message: |
+    Improve the Python function `predict(*xs)` so it fits the data better. Return the complete
+    program in a python code fence. Keep the signature, and do not read or guess the held-out data:
+    only the training and validation rows are scored during the search.
+
+database:
+  population_size: 20
+  num_islands: 2
+
+evaluator:
+  timeout: 60
+  cascade_evaluation: false
