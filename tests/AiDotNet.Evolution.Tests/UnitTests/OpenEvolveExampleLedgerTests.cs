@@ -82,6 +82,137 @@ public sealed class OpenEvolveExampleLedgerTests
         Assert.Contains(expected, ledger, StringComparison.Ordinal);
     }
 
+    /// <summary>The run-command table's heading, and the row shape its two tests parse.</summary>
+    private const string CommandSectionHeading = "## The command for a real run";
+
+    private static readonly Regex CommandRow = new(
+        @"^\| `(?<example>[^`]+)` \| `(?<command>aidotnet-evolve run [^`]+)` \| (?<needs>yes|no) \| (?<notes>.+) \|$",
+        RegexOptions.None, RegexTimeout);
+
+    private static CommandRowValue[] Commands()
+    {
+        var rows = new List<CommandRowValue>();
+        bool inSection = false;
+        foreach (string line in File.ReadAllLines(LedgerPath()))
+        {
+            if (line.StartsWith("## ", StringComparison.Ordinal))
+            {
+                if (inSection) break;
+                inSection = line.Equals(CommandSectionHeading, StringComparison.Ordinal);
+                continue;
+            }
+
+            if (!inSection) continue;
+            Match match = CommandRow.Match(line);
+            if (match.Success)
+            {
+                rows.Add(new CommandRowValue(match.Groups["example"].Value, match.Groups["command"].Value,
+                    match.Groups["needs"].Value == "yes"));
+            }
+        }
+
+        Assert.NotEmpty(rows);
+        return rows.ToArray();
+    }
+
+    private sealed record CommandRowValue(string Example, string Command, bool NeedsCheckout);
+
+    /// <summary>
+    /// Every example with a runnable triple documents a real-run command, and every documented
+    /// command names that example's own files.
+    /// </summary>
+    /// <remarks>
+    /// V1-57 (#170) asks for "a documented command for a real run" beside the no-spend smoke. A
+    /// prose paragraph would satisfy a reader and nothing else, so the commands are a table and this
+    /// is what keeps them honest: a command that names another example's config, or an example that
+    /// grows a triple upstream and gains no command, fails here.
+    /// </remarks>
+    [Fact]
+    public void Every_runnable_example_documents_its_real_run_command()
+    {
+        var failures = new List<string>();
+        foreach (CommandRowValue row in Commands())
+        {
+            string prefix = "examples/" + row.Example + "/";
+            string[] arguments = row.Command.Split(' ', StringSplitOptions.RemoveEmptyEntries);
+            string[] paths = arguments.Where(argument => argument.StartsWith("examples/", StringComparison.Ordinal)).ToArray();
+            if (paths.Length != 3)
+                failures.Add(row.Example + ": a run names a config, a seed and an evaluator, not " + paths.Length + " paths");
+            foreach (string path in paths.Where(path => !path.StartsWith(prefix, StringComparison.Ordinal)))
+                failures.Add(row.Example + ": the command names another example's file, " + path);
+            if (!row.Command.Contains("--openevolve-config " + prefix, StringComparison.Ordinal))
+                failures.Add(row.Example + ": the config is not the one --openevolve-config receives");
+            if (!paths.Any(path => path.EndsWith("/evaluator.py", StringComparison.Ordinal)))
+                failures.Add(row.Example + ": the command runs no evaluator");
+            if (row.NeedsCheckout != row.Command.Contains("--python-path", StringComparison.Ordinal))
+                failures.Add(row.Example + ": the 'needs the checkout' column and --python-path disagree");
+        }
+
+        Assert.Empty(failures);
+    }
+
+    /// <summary>
+    /// With the pinned checkout present, the run-command table is re-measured: every path it names
+    /// exists, the "needs the checkout" column matches whether that evaluator really imports
+    /// <c>openevolve</c>, and no example with a runnable triple is missing a command.
+    /// </summary>
+    /// <remarks>
+    /// This is the test the table exists for. An earlier version of the prose above said
+    /// <i>one</i> smoked example imported upstream's package when three of the five do, which is
+    /// how a reader ends up without <c>--python-path</c> on a run that needs it; a paragraph cannot
+    /// be wrong twice if the checkout is what answers the question.
+    /// </remarks>
+    [Fact]
+    public void Every_example_needing_upstream_declares_it()
+    {
+        string? checkout = Environment.GetEnvironmentVariable("EVOLUTION_OPENEVOLVE_CHECKOUT");
+        if (string.IsNullOrEmpty(checkout)) return;   // as in The_ledger_matches_the_pinned_checkout
+
+        string examples = Path.Combine(checkout, "examples");
+        Assert.True(Directory.Exists(examples), "the checkout has no examples directory: " + examples);
+        CommandRowValue[] rows = Commands();
+        var failures = new List<string>();
+
+        foreach (CommandRowValue row in rows)
+        {
+            foreach (string relative in row.Command.Split(' ', StringSplitOptions.RemoveEmptyEntries)
+                         .Where(argument => argument.StartsWith("examples/", StringComparison.Ordinal)))
+            {
+                string path = Path.Combine(checkout, relative.Replace('/', Path.DirectorySeparatorChar));
+                if (!File.Exists(path)) failures.Add(row.Example + ": the command names a file the checkout does not have, " + relative);
+            }
+
+            string evaluator = Path.Combine(examples, row.Example, "evaluator.py");
+            if (!File.Exists(evaluator))
+            {
+                failures.Add(row.Example + ": documented with no evaluator.py in the checkout");
+                continue;
+            }
+
+            bool imports = File.ReadAllText(evaluator).Contains("openevolve", StringComparison.Ordinal);
+            if (imports != row.NeedsCheckout)
+            {
+                failures.Add(row.Example + ": the table says needs-the-checkout " + row.NeedsCheckout
+                    + ", the evaluator says " + imports);
+            }
+        }
+
+        // The other direction: an example that gains a config, an evaluator and a seed upstream must
+        // gain a command, or the table silently covers fewer examples than the catalogue has.
+        foreach (string directory in Directory.EnumerateDirectories(examples))
+        {
+            string name = Path.GetFileName(directory);
+            bool triple = File.Exists(Path.Combine(directory, "evaluator.py"))
+                && Directory.EnumerateFiles(directory, "initial_program.*").Any()
+                && (Directory.EnumerateFiles(directory, "config*.yaml").Any()
+                    || Directory.EnumerateFiles(directory, "config*.yml").Any());
+            if (triple && !rows.Any(row => row.Example == name))
+                failures.Add(name + ": has a config, an evaluator and a seed in the checkout, but no documented command");
+        }
+
+        Assert.Empty(failures);
+    }
+
     /// <summary>Every row that does not import carries a reason, and no reason is a placeholder.</summary>
     [Fact]
     public void Every_example_that_does_not_import_has_a_tracked_reason()
