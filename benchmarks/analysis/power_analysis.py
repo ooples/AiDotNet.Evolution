@@ -54,7 +54,13 @@ def endpoint_requirement(endpoint, differences, *, half_width, confidence=0.95):
     """Both estimators for one endpoint, plus the spread each reads them from."""
     require(isinstance(half_width, (int, float)) and math.isfinite(half_width) and half_width > 0,
             "The target CI half width must be a positive number")
-    require(isinstance(confidence, float) and 0.5 < confidence < 1, "Confidence must be in (0.5, 1)")
+    # Refused rather than approximated, because the scaled estimator can only scale the interval
+    # `analyze` produced, and that interval is `Interval95`. Accepting 0.9 here would have scaled a
+    # 95% interval while the normal estimator used a 90% z, and `RequiredN` would be the larger of
+    # two numbers measured at different levels - review caught that.
+    require(confidence == 0.95,
+            "Only 0.95 is supported: the pilot report carries a 95% interval, and mixing levels "
+            "between the two estimators would make RequiredN the max of incomparable numbers")
     count = endpoint["N"]
     require(count >= MINIMUM_SEEDS and len(differences) == count,
             "The endpoint's N must match the differences it was computed from")
@@ -72,6 +78,8 @@ def endpoint_requirement(endpoint, differences, *, half_width, confidence=0.95):
         "PilotN": count,
         "MeanDifference": endpoint["MeanDifference"],
         "StandardDeviation": deviation,
+        # #116 asks for the variance, so it is reported rather than left for a reader to square.
+        "Variance": deviation ** 2,
         "ObservedHalfWidth": observed,
         "TargetHalfWidth": float(half_width),
         "ScaledRequiredN": scaled,
@@ -110,10 +118,11 @@ def lines(analysis):
     """One line per endpoint, so the variance is as visible as the number derived from it."""
     out = []
     for row in analysis["Endpoints"]:
-        out.append("%-22s %-12s n=%-3d sd=%.4f observed=%.4f target=%.4f required=%-5d (scaled %d, normal %d)%s"
-                   % (row["Family"], row["Config"], row["PilotN"], row["StandardDeviation"],
-                      row["ObservedHalfWidth"], row["TargetHalfWidth"], row["RequiredN"],
-                      row["ScaledRequiredN"], row["NormalRequiredN"],
+        out.append("%-22s %-12s n=%-3d var=%.4f sd=%.4f observed=%.4f target=%.4f required=%-5d "
+                   "(scaled %d, normal %d)%s"
+                   % (row["Family"], row["Config"], row["PilotN"], row["Variance"],
+                      row["StandardDeviation"], row["ObservedHalfWidth"], row["TargetHalfWidth"],
+                      row["RequiredN"], row["ScaledRequiredN"], row["NormalRequiredN"],
                       " DEGENERATE" if row["Degenerate"] else ""))
     out.append("campaign N = %d (the widest endpoint sets it)" % analysis["RequiredN"])
     return out

@@ -297,28 +297,37 @@ def assess_bundle(claim, root, repository):
     for family in spec["Families"]:
         endpoints = [e for e in report["Endpoints"] if e["Family"] == family["Family"]]
         superior = all(e["Superior"] for e in endpoints)
-        speedups, floor, savings = None, True, None
+        speedups, savings = None, None
+        speedup_floor = effect_floor = None
+        route = claim.get("effect_route", "speedup")
+        if route == "cost-reduction":
+            # Measured for every family, not only speedup ones: a claim that declares this route and
+            # names an nmse family used to get CostReduction=None and a route with no effect, which
+            # review caught - the route is a property of the claim, not of the endpoint's metric.
+            savings = cost_reductions(registration, rows, family)
+            effect_floor = all(value is not None and value >= MINIMUM_COST_REDUCTION
+                               for value in savings.values())
         if family["Endpoint"]["Metric"] == SPEEDUP_METRIC:
             require(family["Endpoint"]["Direction"] == "maximize", "A speedup endpoint must be maximized")
             speedups = geometric_mean_speedups(registration, rows, family)
             # Three conditions, because the criterion names three: the point estimate reaches the
-            # floor, its 95% interval is above 1.0 so the effect is not noise, and no single task
+            # floor, its 95% interval is above 1.0 so the effect is not noise, and no single seed
             # regressed past the declared limit so the mean is not hiding one.
-            floor = all(value is not None
-                        and value["GeometricMean"] >= MINIMUM_GEOMEAN_SPEEDUP
-                        and value["LowerBound95"] > 1.0
-                        and value["WorstSeedRatio"] >= MAXIMUM_SEED_REGRESSION
-                        for value in speedups.values())
-            savings = cost_reductions(registration, rows, family)
-            if claim.get("effect_route") == "cost-reduction":
-                # The declared alternative: a fifth less search cost for the same quality, which
-                # still needs Holm superiority on every config - the route changes what "practical
-                # effect" means, not whether the result is real.
-                floor = all(value is not None and value >= MINIMUM_COST_REDUCTION for value in savings.values())
-        families.append(dict(Family=family["Family"], Supported=superior and floor, HolmSuperiorAllConfigs=superior,
-                             GeometricMeanSpeedup=speedups, MeetsSpeedupFloor=floor if speedups is not None else None,
-                             CostReduction=savings, EffectRoute=claim.get("effect_route", "speedup"),
-                             Endpoints=endpoints))
+            speedup_floor = all(value is not None
+                                and value["GeometricMean"] >= MINIMUM_GEOMEAN_SPEEDUP
+                                and value["LowerBound95"] > 1.0
+                                and value["WorstSeedRatio"] >= MAXIMUM_SEED_REGRESSION
+                                for value in speedups.values())
+        # MeetsEffectFloor is what the claim's declared route requires; MeetsSpeedupFloor stays the
+        # speedup reading alone, so the two are not confused with one another (review: the single
+        # field used to mean whichever floor the route had chosen).
+        if route == "speedup":
+            effect_floor = speedup_floor
+        families.append(dict(Family=family["Family"],
+                             Supported=superior and (True if effect_floor is None else effect_floor),
+                             HolmSuperiorAllConfigs=superior, GeometricMeanSpeedup=speedups,
+                             MeetsSpeedupFloor=speedup_floor, MeetsEffectFloor=effect_floor,
+                             CostReduction=savings, EffectRoute=route, Endpoints=endpoints))
 
     published = None
     if spec["Published"] is not None:

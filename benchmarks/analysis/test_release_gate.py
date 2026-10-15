@@ -250,6 +250,7 @@ class ReleaseGateTests(unittest.TestCase):
             return result
         default = self.fixture(raw=cheap).assess()["families"][0]
         self.assertFalse(default["MeetsSpeedupFloor"], "the speedup route still fails")
+        self.assertFalse(default["MeetsEffectFloor"], "and with no route declared it is the effect floor")
         self.assertFalse(default["Supported"])
         self.assertEqual("speedup", default["EffectRoute"], "a claim that names no route keeps the old meaning")
 
@@ -258,7 +259,8 @@ class ReleaseGateTests(unittest.TestCase):
         fixture.write_claim()
         declared = fixture.assess()["families"][0]
         self.assertAlmostEqual(0.5, declared["CostReduction"]["recommended"], places=6)
-        self.assertTrue(declared["MeetsSpeedupFloor"], "the declared route is what the floor now means")
+        self.assertTrue(declared["MeetsEffectFloor"], "the declared route is what the effect floor means")
+        self.assertFalse(declared["MeetsSpeedupFloor"], "and the speedup reading is unchanged by the route")
         self.assertTrue(declared["Supported"])
 
     def test_the_cost_route_refuses_a_saving_below_the_declared_fifth(self):
@@ -275,15 +277,42 @@ class ReleaseGateTests(unittest.TestCase):
         fixture.write_claim()
         family = fixture.assess()["families"][0]
         self.assertAlmostEqual(0.1, family["CostReduction"]["recommended"], places=6)
-        self.assertFalse(family["MeetsSpeedupFloor"], "10% is not the predeclared 20%")
+        self.assertFalse(family["MeetsEffectFloor"], "10% is not the predeclared 20%")
         self.assertFalse(family["Supported"])
 
     def test_an_undeclared_route_name_is_refused(self):
         fixture = self.fixture()
         fixture.claim["effect_route"] = "whatever-wins"
         fixture.write_claim()
-        with self.assertRaises(ValueError):
+        # Regex rather than bare ValueError: the bare form passes on any unrelated failure, which
+        # would leave the validation itself untested.
+        with self.assertRaisesRegex(ValueError, "effect_route"):
             fixture.assess()
+
+    def test_the_cost_route_reaches_a_family_whose_endpoint_is_not_a_speedup(self):
+        """The route is a property of the claim, not of the endpoint's metric.
+
+        `sr` is an nmse family, so it never enters the speedup branch - and the first version of
+        this computed the saving inside that branch, so a claim declaring the cost route over `sr`
+        got `CostReduction: None` and a route with no effect at all. Review caught it; this is the
+        test that would have.
+        """
+        def cheap_sr(registration):
+            result = rows(registration)
+            for row in result:
+                if row["Arm"] == "aidotnet":
+                    row["ModelCalls"] = int(row["ModelCalls"] * 0.5)
+                    row["ModelTokens"] = int(row["ModelTokens"] * 0.5)
+            return result
+
+        fixture = self.fixture(raw=cheap_sr, families=("algotune", "sr"))
+        fixture.claim["effect_route"] = "cost-reduction"
+        fixture.write_claim()
+        sr = next(f for f in fixture.assess()["families"] if f["Family"] == "sr")
+        self.assertIsNone(sr["GeometricMeanSpeedup"], "sr has no speedup endpoint")
+        self.assertIsNone(sr["MeetsSpeedupFloor"])
+        self.assertAlmostEqual(0.5, sr["CostReduction"]["recommended"], places=6)
+        self.assertTrue(sr["MeetsEffectFloor"], "the declared route must reach a non-speedup family")
 
     def test_failed_run_has_no_speedup(self):
         def raw(registration):

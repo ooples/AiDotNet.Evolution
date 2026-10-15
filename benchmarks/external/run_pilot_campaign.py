@@ -21,6 +21,7 @@ from __future__ import annotations
 
 import argparse
 import json
+import math
 from pathlib import Path
 import sys
 import time
@@ -212,6 +213,8 @@ def main():
     if not arguments.stub and not arguments.executable:
         parser.error("--executable is required unless --stub is given")
 
+    if not (math.isfinite(arguments.target_half_width) and arguments.target_half_width > 0):
+        raise SystemExit("--target-half-width must be a positive, finite number; it sizes the gate campaign")
     budget_tokens = arguments.model_calls * TOKENS_PER_CALL
     if arguments.model_tokens < budget_tokens:
         raise SystemExit("--model-tokens %d is below %d calls x ~%d tokens: the token ceiling would bind "
@@ -277,14 +280,25 @@ def main():
                 if models is not None else {})
     summary = summarise(rows, report, task=arguments.task, arguments=arguments, frozen=frozen,
                         projection=projection, wall=wall, canaries=canaries, receipts=receipts)
-    analysis = pilot_campaign.power(frozen, rows, report, half_width=arguments.target_half_width)
+    # The raw results are written before the sizing is computed, because the sizing can refuse:
+    # an endpoint needing more than the cap raises, and a campaign that cost real money would
+    # otherwise lose rows.json, report.json and summary.json to a projection off them.
+    (evidence / "rows.json").write_text(json.dumps(rows, indent=1) + chr(10), encoding="utf-8")
+    (evidence / "report.json").write_text(json.dumps(report, indent=1) + chr(10), encoding="utf-8")
+    try:
+        analysis = pilot_campaign.power(frozen, rows, report, half_width=arguments.target_half_width)
+    except ValueError as error:
+        analysis = {"Schema": "evolution-power-analysis-v1", "Unachievable": str(error),
+                    "TargetHalfWidth": arguments.target_half_width}
     summary["power_analysis"] = analysis
-    (evidence / "power-analysis.json").write_text(json.dumps(analysis, indent=1) + "\n", encoding="utf-8")
-    (evidence / "rows.json").write_text(json.dumps(rows, indent=1) + "\n", encoding="utf-8")
-    (evidence / "report.json").write_text(json.dumps(report, indent=1) + "\n", encoding="utf-8")
+    (evidence / "power-analysis.json").write_text(json.dumps(analysis, indent=1) + chr(10), encoding="utf-8")
     (evidence / "summary.json").write_text(json.dumps(summary, indent=1, allow_nan=False) + "\n", encoding="utf-8")
     print("\n" + "\n".join(pilot_campaign.report_lines(report)))
-    print("\n" + "\n".join(pilot_campaign.power_lines(analysis)))
+    if "Unachievable" in analysis:
+        print(chr(10) + "sizing refused: " + analysis["Unachievable"])
+        print("the campaign's rows, report and summary are written; only the projection is missing")
+    else:
+        print(chr(10) + chr(10).join(pilot_campaign.power_lines(analysis)))
     print("\n%d cells in %.1fs, %d model calls, statuses %s"
           % (len(rows), wall, summary["model_calls"], json.dumps(summary["statuses"])))
     if summary["cells_with_unknown_spend"]:

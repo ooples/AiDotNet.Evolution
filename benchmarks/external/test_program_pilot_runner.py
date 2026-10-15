@@ -124,6 +124,28 @@ class BudgetConsistencyTests(unittest.TestCase):
                          "18 cells x 10 calls is what the authorised envelope buys at this account's rate")
 
 
+class TargetWidthTests(unittest.TestCase):
+    def test_a_target_width_that_cannot_size_anything_is_refused_before_the_cells_run(self):
+        # It reached argparse unvalidated, so a zero or infinite width only failed after a paid
+        # campaign had already run - review caught that.
+        for width in ("0", "-0.1", "inf", "nan"):
+            with self.subTest(width=width), tempfile.TemporaryDirectory() as directory:
+                code, _ = invoke(Path(directory) / "campaign", "--target-half-width", width)
+                self.assertIsInstance(code, str)
+                self.assertIn("positive, finite", code)
+
+    def test_the_sizing_refusal_cannot_destroy_the_campaign_evidence(self):
+        # An endpoint needing more than the cap raises inside the projection. Writing rows and the
+        # report first is what keeps a run that cost money from losing them to that refusal.
+        source = Path(runner.__file__).read_text(encoding="utf-8")
+        rows_at = source.index('(evidence / "rows.json")')
+        report_at = source.index('(evidence / "report.json")')
+        sizing_at = source.index("analysis = pilot_campaign.power(")
+        self.assertLess(rows_at, sizing_at, "rows.json must be written before the sizing can refuse")
+        self.assertLess(report_at, sizing_at, "report.json too")
+        self.assertIn("Unachievable", source, "a refused sizing is recorded rather than thrown away")
+
+
 class SummaryTests(unittest.TestCase):
     """What the run's own account says about a cell it could not account for."""
 

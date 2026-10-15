@@ -265,17 +265,22 @@ class LiveTests(unittest.TestCase):
                        "--no-session-persistence", "--max-turns", "1", "--system-prompt", SYSTEM_PROMPT]
             raw = subprocess.run(command, input=CANARY_PROMPT.encode("utf-8"), capture_output=True,
                                  timeout=300, check=True).stdout.decode("utf-8", errors="replace")
-            unisolated = 0
+            unisolated, hooks = 0, 0
             for line in raw.splitlines():
                 row = json.loads(line)
+                if "hook" in str(row.get("subtype") or ""):
+                    hooks += 1
                 if row.get("type") == "assistant":
                     usage = row["message"]["usage"]
                     unisolated = (usage["input_tokens"] + usage["cache_creation_input_tokens"]
                                   + usage["cache_read_input_tokens"])
-            # Not an equality: what a machine's settings inject is that machine's business. What the
-            # flag must do is keep it out, and a difference this large is what "kept out" looks like.
-            self.assertGreater(unisolated, isolated * 2,
-                               "dropping --setting-sources changed nothing, so the flag is not what isolates")
+            # The comparison has to hold on a host with no hooks as well, so a token ratio cannot be
+            # the assertion - review caught that. What is always true: the isolated call shows no
+            # hook event, and *if* this host injects any, the flag must be what keeps them out.
+            if hooks == 0:
+                self.skipTest("this host injects nothing without the flag, so there is no difference to attribute")
+            self.assertGreater(unisolated, isolated,
+                               "this host's hooks ran yet cost nothing, so the flag is not what isolates")
 
 
 if __name__ == "__main__":

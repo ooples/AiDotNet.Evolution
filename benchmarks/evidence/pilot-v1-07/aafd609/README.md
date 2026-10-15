@@ -9,11 +9,26 @@ committed).
 
 Launched by `benchmarks/external/run_pilot_campaign.py` with the printed `ProjectionSha256`
 `7042534e58c080745fea847c0ef66367080d6c98c8e982f42c646cad73e6d7cd` handed back, against registration
-`abb44f490d86` whose seeds were drawn before anything ran, sealing holdout partition `d857373eebc0`.
+`abb44f490d86` whose seeds were drawn before anything ran.
+
+**The scored partition is reproducible from these inputs**, which the sealed hash alone does not
+give a reader:
+
+```text
+run_pilot_campaign.py --task rational_gain --seed-count 6 --iterations 10     --model-calls 10 --model-tokens 600000 --wall-seconds 1800     --target-half-width 0.05 --holdout-seed 20261015     --cli dotnet <repo>/src/AiDotNet.Evolution.Cli/bin/Release/net10.0/aidotnet-evolve.dll     --upstream <openevolve @ 411fb59c886c> --executable <claude.exe 2.1.299>
+```
+
+`pilot_cells.holdout_seal("rational_gain", 20261015)` reproduces the sealed partition hash
+`d857373eebc0df79...`, which is the value `registration.json` committed before the run. The six
+paired seeds the registration drew are in `registration.json`; nothing here chose them.
 
 ## The result: ahead on the mean, tied on the cells, significant nowhere
 
-| endpoint | mean difference (ours - theirs, positive favours us) | one-sided p | superior |
+The endpoint **minimises** NMSE, so `analyze` orients the paired difference as *theirs minus ours*:
+positive means our held-out error is lower. The raw values in the table below it are NMSE, where
+lower is better - the two columns read in opposite directions by design.
+
+| endpoint | mean difference (oriented so positive favours us) | one-sided p | superior |
 | --- | ---: | ---: | --- |
 | `openevolve-recommended` | **+0.3327** | 0.0889 | **no** |
 | `openevolve-matched` | **+0.0260** | 0.4116 | **no** |
@@ -36,8 +51,10 @@ other three are the best cells in the table. Ours is the consistent arm (0.1754 
 ~0.28) and wins no more cells than either competitor. A reader who took `+0.3327` as "we are better"
 would be reading one arm's failures as our skill.
 
-**Equal search cost held exactly**: every one of the 18 cells spent **10** model calls, the per-cell
-broker ceiling, so no arm bought its result.
+**Equal model-call counts held exactly**: every one of the 18 cells spent **10** model calls, the
+per-cell broker ceiling, so no arm bought its result with extra calls. Token spend did vary -
+21,486 to 35,361 per cell, median 25,933 - because a call's cost depends on the prompt each engine
+builds, so this is equality of the budgeted unit rather than of tokens.
 
 ## What this sizes: N = 514, which is the real finding
 

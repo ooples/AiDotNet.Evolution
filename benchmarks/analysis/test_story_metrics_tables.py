@@ -29,13 +29,23 @@ class StoryMetricsTableTests(unittest.TestCase):
         self.assertEqual(sorted(expected, key=int), sorted(self.snapshot["stories"], key=int),
                          "a story added to the roadmap needs a row here, or the ratchet stops covering it")
 
-    def test_every_story_that_has_the_column_keeps_it(self):
-        # The ones that already carry a measured column are the ratchet: they may not lose it.
-        kept = [number for number, row in self.snapshot["stories"].items() if row["has_measured_column"]]
-        self.assertTrue(kept, "the snapshot records none, which would make this test vacuous")
-        for number in kept:
+    # The six that carried a measured column when this ratchet was written. Pinned here rather than
+    # read out of the snapshot: review caught that deriving the list from the snapshot and then
+    # asserting the snapshot's own flags is true for every possible snapshot, so a story that lost
+    # its column would simply drop out of the list and the test could never fail.
+    CARRY_THE_COLUMN = ("163", "166", "167", "169", "170", "174")
+
+    def test_no_story_that_had_the_column_may_lose_it(self):
+        for number in self.CARRY_THE_COLUMN:
             with self.subTest(story=number):
-                self.assertTrue(self.snapshot["stories"][number]["has_measured_column"])
+                self.assertIn(number, self.snapshot["stories"], "a pinned story vanished from the snapshot")
+                self.assertTrue(self.snapshot["stories"][number]["has_measured_column"],
+                                "#%s had a measured column and the snapshot now says it does not" % number)
+        gained = sorted(number for number, row in self.snapshot["stories"].items()
+                        if row["has_measured_column"] and number not in self.CARRY_THE_COLUMN)
+        self.assertEqual([], gained,
+                         "these stories gained a measured column - good, add them to CARRY_THE_COLUMN "
+                         "so the ratchet holds them too: " + str(gained))
 
     def test_the_outstanding_count_matches_the_rows_it_is_derived_from(self):
         # The headline is what a reader of #124 sees; it cannot drift from the rows beneath it.

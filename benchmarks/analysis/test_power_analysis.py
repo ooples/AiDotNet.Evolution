@@ -106,6 +106,22 @@ class PowerAnalysisTests(unittest.TestCase):
         with self.assertRaises(ValueError):
             self.analyse([0.10, 0.90, 0.20, 0.80, 0.30, 0.70], 1e-6)
 
+    def test_a_confidence_other_than_the_reports_own_level_is_refused(self):
+        # The scaled estimator can only scale the interval `analyze` produced, which is 95%. Taking
+        # a 90% z for the normal estimator while scaling a 95% interval would make RequiredN the
+        # larger of two numbers measured at different levels.
+        record = frozen()
+        rows_ = runs([0.1, 0.9, 0.2, 0.8, 0.3, 0.7])
+        report = registration.analyze(record, rows_)
+        with self.assertRaisesRegex(ValueError, "0.95"):
+            power.analyse(record, rows_, report, half_width=0.05, confidence=0.9)
+
+    def test_the_variance_is_reported_not_only_its_square_root(self):
+        row = self.analyse([0.10, 0.90, 0.20, 0.80, 0.30, 0.70], 0.05)["Endpoints"][0]
+        self.assertAlmostEqual(row["StandardDeviation"] ** 2, row["Variance"], places=10)
+        self.assertIn("var=", chr(10).join(
+            power.lines({"Endpoints": [row], "RequiredN": row["RequiredN"]})))
+
     def test_a_non_positive_target_width_is_refused(self):
         for width in (0.0, -1.0, math.inf):
             with self.subTest(width=width), self.assertRaises(ValueError):
