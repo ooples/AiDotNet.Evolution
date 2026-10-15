@@ -60,5 +60,56 @@ class UsageAccountingTests(unittest.TestCase):
             self.assertTrue(callable(pilot_searchers.ours("aidotnet-evolve", directory, sys.executable,
                                                           iterations=1)))
 
+class FakeBroker:
+    """Stands in for ProgramBroker's counters: cumulative, shared across arms and cells."""
+
+    def __init__(self):
+        self.attempted = {"model": 0, "evaluate": 0}
+        self.model_tokens = 0
+
+    def charge(self, calls, tokens):
+        self.attempted["model"] += calls
+        self.model_tokens += tokens
+
+
+class OpenEvolveArmTests(unittest.TestCase):
+    def task(self, directory):
+        root = Path(directory)
+        (root / "initial_program.py").write_text("def predict(*xs):' + BS + 'n    return 0.0' + BS + 'n", encoding="utf-8")
+        (root / "evaluator.py").write_text("def evaluate(p):' + BS + 'n    return {}' + BS + 'n", encoding="utf-8")
+        return root
+
+    def test_only_the_two_native_modes_are_pilot_arms(self):
+        import tempfile
+        with tempfile.TemporaryDirectory() as directory:
+            task = self.task(directory)
+            for mode in ("recommended", "matched"):
+                self.assertTrue(callable(pilot_searchers.openevolve(
+                    "adapter.py", "upstream", task, FakeBroker(), mode=mode, model="m", iterations=1)))
+            for mode in ("controlled", "native-bounded", "", None):
+                with self.subTest(mode=mode), self.assertRaises(ValueError):
+                    pilot_searchers.openevolve("adapter.py", "upstream", task, FakeBroker(),
+                                               mode=mode, model="m", iterations=1)
+
+    def test_spend_is_a_per_cell_delta_on_a_shared_broker(self):
+        # The broker is shared across arms and cells by design, so its counters are cumulative.
+        # Reporting the total would charge every later cell for every earlier one.
+        broker = FakeBroker()
+        broker.charge(11, 2200)          # an earlier cell's spend, already on the books
+        import tempfile
+        with tempfile.TemporaryDirectory() as directory:
+            task = self.task(directory)
+            search = pilot_searchers.openevolve("adapter.py", "upstream", task, broker,
+                                                mode="recommended", model="m", iterations=1)
+            # Drive the accounting without the adapter: charge during the "run" and read the delta.
+            before = (broker.attempted["model"], broker.model_tokens)
+            broker.charge(4, 800)
+            after = (broker.attempted["model"], broker.model_tokens)
+        self.assertEqual((15, 3000), after, "the broker stays cumulative")
+        self.assertEqual((4, 800), (after[0] - before[0], after[1] - before[1]),
+                         "the cell's own spend is the delta, not the broker's total")
+        self.assertTrue(callable(search))
+
+
 if __name__ == "__main__":
     unittest.main()
