@@ -20,7 +20,7 @@ internal static class OpenEvolveEvaluatorShim
 
     public static string Build(string evaluatorPath, RunOpenEvolveEvaluator options)
     {
-        string configuration = JsonSerializer.Serialize(new Dictionary<string, object>
+        var settings = new Dictionary<string, object>(StringComparer.Ordinal)
         {
             ["evaluator_path"] = evaluatorPath,
             // Raw bytes, as the shim hashes them, so line endings cannot make the two disagree.
@@ -30,7 +30,15 @@ internal static class OpenEvolveEvaluatorShim
             ["timeout"] = options.TimeoutSeconds,
             ["file_suffix"] = options.FileSuffix,
             ["feature_dimensions"] = options.FeatureDimensions
-        });
+        };
+
+        // Added only when set, so the shim's config.get("fitness_metric") sees None and keeps OpenEvolve's
+        // own rule. Omitting the key says "not configured" without putting a null into a dictionary whose
+        // values are not nullable.
+        if (options.FitnessMetric is { } fitnessMetric && fitnessMetric.Trim().Length > 0)
+            settings["fitness_metric"] = fitnessMetric;
+
+        string configuration = JsonSerializer.Serialize(settings);
         // Base64 keeps paths, quotes and non-ASCII text out of Python's string-literal rules.
         string encoded = Convert.ToBase64String(Encoding.UTF8.GetBytes(configuration));
         return "import base64 as _b64, json as _json\nCONFIG = _json.loads(_b64.b64decode(\"" + encoded + "\").decode(\"utf-8\"))\n" +

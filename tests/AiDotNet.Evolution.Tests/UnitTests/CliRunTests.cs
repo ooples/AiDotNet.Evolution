@@ -182,6 +182,38 @@ public sealed class CliRunTests
             (row.GetProperty("Text").GetString() ?? string.Empty).Contains("openevolve_missing_module", StringComparison.Ordinal));
     }
 
+    [Theory]
+    // OpenEvolve prefers combined_score and otherwise averages the non-feature metrics, and that mean can
+    // move opposite to the evaluator own objective: measured on examples/signal_processing, whose headline
+    // is named composite_score, the mean rose 13.73 -> 16.51 while composite_score fell 0.4200 -> 0.3959.
+    // Naming the metric fixes that without touching the example. Absent, OpenEvolve rule stands, so
+    // parity is the default. A name the evaluator never reported falls through to that rule rather than
+    // scoring the candidate zero, because a typo in a run file should not look like a bad program.
+    [InlineData(null, 33.21)]
+    [InlineData("composite_score", 0.42)]
+    [InlineData("no_such_metric", 33.21)]
+    public void The_fitness_metric_can_be_named_without_touching_the_example(string? metric, double expected)
+    {
+        using var directory = new TemporaryDirectory();
+        using var model = new FakeChatModel();
+        File.WriteAllText(Path.Combine(directory.Path, "initial.py"), "X = 1");
+        File.WriteAllText(Path.Combine(directory.Path, "evaluator.py"), """
+            def evaluate(path):
+                return {"composite_score": 0.42, "slope_changes": 66.0}
+            """);
+        string chosen = metric is null
+            ? string.Empty
+            : ", \"fitnessMetric\": \"" + metric + "\"";
+        string runFile = WriteRun(directory.Path, model.Endpoint, maxEvaluations: 1,
+            extra: ", \"openEvolveEvaluator\": { \"timeoutSeconds\": 60" + chosen + " }");
+
+        var (code, output, error) = Run("preflight", runFile);
+
+        Assert.True(code == 0, error);
+        using JsonDocument report = JsonDocument.Parse(output);
+        Assert.Equal(expected, report.RootElement.GetProperty("SeedQuality").GetDouble(), 2);
+    }
+
     [Fact]
     public void Preflight_scores_the_seed_exactly_as_run_would_and_never_calls_the_model()
     {

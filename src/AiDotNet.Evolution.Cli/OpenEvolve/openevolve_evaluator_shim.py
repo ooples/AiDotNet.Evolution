@@ -74,9 +74,17 @@ def _passes_threshold(metrics, threshold):
     return bool(valid) and sum(valid) / len(valid) >= threshold
 
 
-def _fitness(metrics, feature_dimensions):
+def _fitness(metrics, feature_dimensions, fitness_metric=None):
     if not metrics:
         return 0.0
+    # A named metric wins over OpenEvolve's rule, and only when the evaluator actually reported it as a
+    # number: an absent or unusable name falls through rather than scoring the candidate zero, because a
+    # typo in a run file should not look like a bad program.
+    if fitness_metric and fitness_metric in metrics:
+        try:
+            return float(metrics[fitness_metric])
+        except (ValueError, TypeError):
+            pass
     if "combined_score" in metrics:
         try:
             return float(metrics["combined_score"])
@@ -175,7 +183,7 @@ def main():
     numeric = {k: float(v) for k, v in metrics.items()
                if isinstance(v, (int, float)) and not isinstance(v, bool) and math.isfinite(float(v))}
     text = {k: (v if isinstance(v, str) else json.dumps(v, default=str)) for k, v in artifacts.items()}
-    quality = _fitness(metrics, config["feature_dimensions"])
+    quality = _fitness(metrics, config["feature_dimensions"], config.get("fitness_metric"))
     result_stream.write(json.dumps({"quality": quality if math.isfinite(quality) else 0.0, "metrics": numeric, "artifacts": text}))
     result_stream.write("\n")
     result_stream.flush()

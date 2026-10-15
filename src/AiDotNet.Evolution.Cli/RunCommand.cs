@@ -238,6 +238,23 @@ internal sealed class RunOpenEvolveEvaluator
     /// <summary>Metrics excluded from the fitness average, as OpenEvolve excludes its feature dimensions.</summary>
     public List<string> FeatureDimensions { get; init; } = new();
 
+    /// <summary>The metric to use as fitness, for an evaluator whose headline is not <c>combined_score</c>.</summary>
+    /// <remarks>
+    /// <para>
+    /// OpenEvolve's rule is <c>combined_score</c> when the evaluator reports one, and otherwise the mean of
+    /// the non-feature metrics. That mean can move opposite to the evaluator's own objective: measured on
+    /// <c>examples/signal_processing</c>, whose headline is named <c>composite_score</c>, the mean rose from
+    /// 13.73 to 16.51 while <c>composite_score</c> fell from 0.4200 to 0.3959, because two of its nine
+    /// metrics count slope changes and false reversals where higher is worse.
+    /// </para>
+    /// <para>
+    /// Naming the metric here fixes that without touching the example: the evaluator, its config and its
+    /// seed program stay exactly as upstream ships them. <c>null</c> keeps OpenEvolve's rule, so parity is
+    /// the default and this is opt-in.
+    /// </para>
+    /// </remarks>
+    public string? FitnessMetric { get; init; }
+
     /// <summary>Directories added to the evaluator's module search path, relative to the run file.</summary>
     /// <remarks>
     /// An unmodified OpenEvolve evaluator may <c>import openevolve</c> - <c>circle_packing_with_artifacts</c>
