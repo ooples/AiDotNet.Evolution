@@ -151,6 +151,17 @@ class HostTests(unittest.TestCase):
                 # stop reason and counters, every evaluation's status, the proposal
                 # attempts the operator recorded, and the broker's request order.
                 evidence = self.evidence(report, records)
+                # One evaluation per model call, plus the seed. Measured against this host at
+                # iterations 1, 2, 3 and 5 - 2/1, 3/2, 4/3 and 6/5 - and it still holds when a
+                # proposal is abandoned, because the operator returns the parent and the engine
+                # records that as a Duplicate. It is an invariant of this host's configuration
+                # (ProposalBatchSize 1, MaxDegreeOfParallelism 1), not of the engine in general.
+                #
+                # It is asserted because the CI-only failure violates it: three evaluations with
+                # ChatCalls 1 is one evaluation with no model call and no seed behind it. The three
+                # counts below cannot say that; this can, and names it when it happens again.
+                self.assertEqual(1 + report["usage"]["ChatCalls"], len(report["evaluations"]),
+                                 "one evaluation per model call plus the seed: " + evidence)
                 self.assertEqual(3, len(report["evaluations"]), evidence)
                 self.assertEqual(2, report["usage"]["ChatCalls"], evidence)
                 self.assertEqual(2, sum(path == "/model" for path, _ in records), evidence)
