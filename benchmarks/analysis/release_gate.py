@@ -14,9 +14,13 @@ release revision plus a complete result bundle. The gate then re-derives every n
   Nothing here re-tests with another method.
 - EQUAL SEARCH COST. Every row must report model calls and tokens within the shared registered
   budget, so no arm won by spending more.
-- PRACTICAL EFFECT (#30). A family whose endpoint is a runtime `speedup` must also show a
-  geometric-mean speedup of at least 1.10x over OpenEvolve's resulting programs, per config;
-  a failed run has no speedup and so cannot satisfy it.
+- PRACTICAL EFFECT (#30). A family whose endpoint is a runtime `speedup` must show three things
+  per config, because the criterion names three: a geometric-mean speedup of at least 1.10x over
+  OpenEvolve's resulting programs, a 95% lower bound on that mean above 1.0 so the effect is not
+  noise, and no paired seed below MAXIMUM_SEED_REGRESSION so the mean is not hiding a collapse. A
+  failed run has no speedup and so cannot satisfy any of them. The bound comes from resampling the
+  per-seed log ratios with the registration's own bootstrap settings, so it is pre-registered rather
+  than chosen here. The limit's grain is the paired seed, which is the finest `raw.json` has.
 - SCOPE (#30). A claim is limited to the families it names, each of which must be supported.
   Every family, supported or not, stays in the assessment. A 1.x version requires the decisive
   `v1-gate` claim: every family x config superior, every speedup floor met, and AlphaEvolve's
@@ -44,10 +48,13 @@ CLAIM_SCHEMA = "evolution-release-claim-v2"
 BUNDLE_SCHEMA = "evolution-release-bundle-v2"
 ASSESSMENT_SCHEMA = "evolution-release-assessment-v2"
 MINIMUM_GEOMEAN_SPEEDUP = 1.10
-# The per-task regression limit US-12 (#30) asks to be predefined. A geometric mean of 1.10 can hold
-# while one task runs at 0.5x, and "no task slower than 0.95x" is the floor this gate declares, here
-# rather than in a claim written after the numbers were seen.
-MAXIMUM_PER_TASK_REGRESSION = 0.95
+# The regression limit US-12 (#30) asks to be predefined, declared here - before any numbers exist -
+# rather than in a claim written after seeing them. It bounds the worst **paired seed** of each
+# family x config, which is the finest grain `raw.json` has: a row is one (Family, Arm, Seed) with a
+# single aggregated Value and no task dimension. So a family whose Value averages several tasks can
+# still hide one task below this limit, and closing that needs a task dimension in the registration's
+# row schema - a schema change, not a threshold. Declared rather than implied; review raised it.
+MAXIMUM_SEED_REGRESSION = 0.95
 MAXIMUM_FAMILYWISE_ALPHA = 0.05
 SPEEDUP_METRIC = "speedup"
 MAX_ARTIFACT_BYTES = 32 * 1024 * 1024
@@ -271,7 +278,7 @@ def assess_bundle(claim, root, repository):
             floor = all(value is not None
                         and value["GeometricMean"] >= MINIMUM_GEOMEAN_SPEEDUP
                         and value["LowerBound95"] > 1.0
-                        and value["WorstSeedRatio"] >= MAXIMUM_PER_TASK_REGRESSION
+                        and value["WorstSeedRatio"] >= MAXIMUM_SEED_REGRESSION
                         for value in speedups.values())
         families.append(dict(Family=family["Family"], Supported=superior and floor, HolmSuperiorAllConfigs=superior,
                              GeometricMeanSpeedup=speedups, MeetsSpeedupFloor=floor if speedups is not None else None,

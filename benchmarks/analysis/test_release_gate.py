@@ -157,7 +157,7 @@ class ReleaseGateTests(unittest.TestCase):
         for config, value in speedups.items():
             with self.subTest(config=config):
                 self.assertGreater(value["LowerBound95"], 1.0, "a 95% interval above 1.0")
-                self.assertGreaterEqual(value["WorstSeedRatio"], rg.MAXIMUM_PER_TASK_REGRESSION)
+                self.assertGreaterEqual(value["WorstSeedRatio"], rg.MAXIMUM_SEED_REGRESSION)
                 self.assertLessEqual(value["WorstSeedRatio"], value["GeometricMean"])
 
     def test_mixed_outcome_limits_the_claim_and_keeps_the_loss_visible(self):
@@ -193,19 +193,29 @@ class ReleaseGateTests(unittest.TestCase):
             for row in result:
                 if row["Family"] == "algotune" and row["Arm"] == "aidotnet":
                     index = registration["Seeds"].index(row["Seed"])
-                    row["Value"] = 6.0 if index % 2 == 0 else 0.26
+                    # Review caught the first version of this using 6.0 and 0.26, where 0.26 also
+                    # breaks the per-seed limit - so the test passed with the interval check removed,
+                    # and isolated nothing. These two straddle parity while staying inside the limit.
+                    row["Value"] = 1.29 if index % 2 == 0 else 0.95
             return result
 
         algotune = self.fixture(raw=raw).assess()["families"][0]
         speedup = algotune["GeometricMeanSpeedup"]["recommended"]
         self.assertGreater(speedup["GeometricMean"], rg.MINIMUM_GEOMEAN_SPEEDUP, "the point estimate passes")
-        self.assertLess(speedup["LowerBound95"], 1.0, "and the interval does not")
+        self.assertGreaterEqual(speedup["WorstSeedRatio"], rg.MAXIMUM_SEED_REGRESSION,
+                                "and so does the per-seed limit, so only the interval can reject this")
+        self.assertLess(speedup["LowerBound95"], 1.0, "but the interval reaches under parity")
         self.assertFalse(algotune["MeetsSpeedupFloor"])
         self.assertFalse(algotune["Supported"])
 
-    def test_a_mean_above_the_floor_hiding_one_regressed_task_is_not_supported(self):
-        # A geometric mean of 1.10+ can hold while one task runs at half speed; the worst seed is
-        # what sees it, and MAXIMUM_PER_TASK_REGRESSION is the predeclared limit.
+    def test_a_mean_above_the_floor_hiding_one_regressed_seed_is_not_supported(self):
+        """A geometric mean of 1.10+ can hold while one paired seed runs at half speed.
+
+        The limit's grain is the seed, which is the finest `raw.json` has - a row is one
+        (Family, Arm, Seed) with a single aggregated Value. A family whose Value averages several
+        tasks can still hide one task below the limit; review raised that, and it needs a task
+        dimension in the row schema rather than a different threshold.
+        """
         def raw(registration):
             result = rows(registration, ours=4.0)
             for row in result:
@@ -217,7 +227,7 @@ class ReleaseGateTests(unittest.TestCase):
         algotune = self.fixture(raw=raw).assess()["families"][0]
         speedup = algotune["GeometricMeanSpeedup"]["recommended"]
         self.assertGreater(speedup["GeometricMean"], rg.MINIMUM_GEOMEAN_SPEEDUP)
-        self.assertLess(speedup["WorstSeedRatio"], rg.MAXIMUM_PER_TASK_REGRESSION)
+        self.assertLess(speedup["WorstSeedRatio"], rg.MAXIMUM_SEED_REGRESSION)
         self.assertFalse(algotune["MeetsSpeedupFloor"])
         self.assertFalse(algotune["Supported"])
 
