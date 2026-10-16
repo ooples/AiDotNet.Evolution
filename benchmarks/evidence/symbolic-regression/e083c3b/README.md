@@ -30,8 +30,13 @@ the closed forms go through libm (`exp`, `sin`, `cos`), whose last bits differ b
 the committed seals rebuild on Windows - where they were measured - and not on CI's Linux. A sealed
 partition that only verifies where it was produced is weaker than it looks, and the same `seal`
 backs the pilot campaign's frozen `TestPartitionHashes`, so correcting it would move a hash a paid
-pre-registration already committed to. The test therefore skips the rebuild comparison with that
-reason where the platform cannot reproduce it, asserts everything portable regardless, and the
+pre-registration already committed to. `damped_oscillator` is the only task whose closed form goes through libm - `exp(-0.3 t) sin(2 t)`
+- and the other two are polynomial ratios, reproducible bit for bit anywhere. CI measured exactly
+that: **3 of 9** seals differ on Linux, all three of them `damped_oscillator`. So the tests assert
+the invariant rather than skipping (a required gate that skips is a failure here, by design): the
+committed seals must equal the ones the test pins, the two rational tasks must rebuild theirs on
+every platform, and any seal that cannot be rebuilt must belong to that one transcendental task -
+with a further assertion that it *is* the only one, so the carve-out cannot widen unnoticed. The
 exposure itself is measured by `test_the_seal_binds_more_precision_than_libm_agrees_on`. Tracked on
 #113.
 

@@ -50,25 +50,14 @@ class CommittedHeadroomEvidenceTests(unittest.TestCase):
                 split = family.build(row["task"], row["seed"])
                 self.assertEqual(split["test_seal"], family.seal(split["test"]))
 
-    def test_the_committed_seals_rebuild_on_a_platform_that_can_reproduce_them(self):
-        """The provenance check, and the defect it exposed.
+    def test_the_committed_seals_are_the_ones_this_test_pins(self):
+        """Corruption check, and it runs everywhere: the bundle must carry the pinned seals.
 
-        If the family's sampling, ranges or closed forms change, these stop matching and the
-        committed NMSEs describe other data - which is what this is for. But the seal digests each
-        value to 17 significant digits (`%.16e` keeps one digit before the point and sixteen after), and the closed forms go through libm (`exp`, `sin`, `cos`),
-        whose last bits are not identical across platforms. So the committed seals rebuild on the
-        machine that produced them (Windows, where they were measured) and not on CI's Linux.
-
-        That is a real limitation of the seal rather than of this test, and it is recorded on #113:
-        a sealed partition that only verifies on one platform is weaker than it looks, and it also
-        affects the pilot's frozen `TestPartitionHashes`. Changing `seal` would move hashes that a
-        paid campaign's pre-registration already committed to, so this skips with the reason rather
-        than silently passing or silently weakening.
+        This is the half that is platform-independent, so it is asserted rather than skipped. A
+        required gate that skips is a failure in this repository (`eng/run_required_tests.py`), and
+        rightly: the first version of this skipped the whole provenance check wherever one seal
+        differed, which would also have swallowed a corrupted bundle.
         """
-        # The committed seals are pinned in this file, so the two causes of a mismatch stay apart: a
-        # bundle that no longer carries these values is corruption and fails, while a platform that
-        # cannot rebuild them is the libm difference and skips. Treating both as a skip - the first
-        # version of this - would have let an edited seal through on the machine that produced it.
         for row in self.rows:
             key = (row["task"], row["seed"])
             with self.subTest(task=row["task"], seed=row["seed"]):
@@ -77,12 +66,41 @@ class CommittedHeadroomEvidenceTests(unittest.TestCase):
                                  "the committed seal is not the one this test pins: the bundle changed")
         self.assertEqual(len(EXPECTED_SEALS), len(self.rows), "every pinned seal must appear in the bundle")
 
-        unrebuildable = [key for key in sorted(EXPECTED_SEALS)
-                         if family.build(key[0], key[1])["test_seal"] != EXPECTED_SEALS[key]]
-        if unrebuildable:
-            raise unittest.SkipTest(
-                "This platform rebuilds %d of %d pinned seals differently; see #113 on the "
-                "17-significant-digit seal over libm results." % (len(unrebuildable), len(EXPECTED_SEALS)))
+    def test_the_rational_tasks_rebuild_their_seals_on_every_platform(self):
+        """Two of the three tasks are pure rational arithmetic, so their seals are IEEE-exact.
+
+        `rational_gain` and `two_variable_ratio` are polynomial ratios: every value is reproducible
+        bit for bit anywhere, and a seal that stopped matching would mean the sampling, the ranges or
+        the formula changed. Asserted unconditionally, which is what makes the carve-out below narrow
+        rather than a blanket excuse.
+        """
+        for task in ("rational_gain", "two_variable_ratio"):
+            for seed in family.DEV_SEEDS:
+                with self.subTest(task=task, seed=seed):
+                    self.assertEqual(EXPECTED_SEALS[(task, seed)], family.build(task, seed)["test_seal"])
+
+    def test_any_seal_that_cannot_be_rebuilt_belongs_to_the_one_transcendental_task(self):
+        """The defect, asserted as the invariant it actually is rather than skipped.
+
+        `seal` keeps 17 significant digits and `damped_oscillator` is the only task whose closed form
+        goes through libm - `exp(-0.3 t) sin(2 t)` - whose last bits differ between platforms. So on
+        the machine that produced the bundle every seal rebuilds, and on CI's Linux exactly the three
+        `damped_oscillator` rows do not. Either way the mismatch set must be a subset of that one
+        task; a mismatch anywhere else is a real change to the family.
+
+        Correcting the seal would move the pilot campaign's frozen `TestPartitionHashes`, which a
+        paid pre-registration already committed to, so the precision stays and this is the guard.
+        Tracked on #113.
+        """
+        transcendental = {task for task, specification in family.TASKS.items()
+                          if any(name in specification["description"] for name in ("exp", "sin", "cos", "log"))}
+        self.assertEqual({"damped_oscillator"}, transcendental,
+                         "the carve-out below is only valid while one task uses libm")
+        mismatched = {key for key in EXPECTED_SEALS
+                      if family.build(key[0], key[1])["test_seal"] != EXPECTED_SEALS[key]}
+        self.assertTrue({task for task, _ in mismatched} <= transcendental,
+                        "a seal outside %s stopped rebuilding, which is a change to the family: %s"
+                        % (sorted(transcendental), sorted(mismatched)))
 
     def test_the_seal_binds_more_precision_than_libm_agrees_on(self):
         """The exposure, measured rather than described: 17 significant digits (`%.16e` keeps one digit before the point and sixteen after) is finer than libm.
