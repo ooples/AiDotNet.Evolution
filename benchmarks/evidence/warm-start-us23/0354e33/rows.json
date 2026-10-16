@@ -1,0 +1,105 @@
+{
+  "Protocol": "warm-start-v1",
+  "Budget": 120,
+  "Prefix": 60,
+  "Seeds": [
+    9101,
+    9102,
+    9103,
+    9104,
+    9105,
+    9106,
+    9107,
+    9108
+  ],
+  "Rows": [
+    {
+      "Seed": 9101,
+      "ColdBar": -0.06947309086552199,
+      "ColdEvaluationsToBar": 121,
+      "PrefixBest": -0.22603364289425754,
+      "WarmEvaluationsAfterResume": 59,
+      "WarmReachedBar": true,
+      "BarMetOnResume": false,
+      "EvaluationRatio": 0.48760330578512395,
+      "WarmFinalBest": -0.06947309086552199
+    },
+    {
+      "Seed": 9102,
+      "ColdBar": 0.12440358454828315,
+      "ColdEvaluationsToBar": 113,
+      "PrefixBest": -0.15065371413896136,
+      "WarmEvaluationsAfterResume": 52,
+      "WarmReachedBar": true,
+      "BarMetOnResume": false,
+      "EvaluationRatio": 0.46017699115044247,
+      "WarmFinalBest": 0.12440358454828315
+    },
+    {
+      "Seed": 9103,
+      "ColdBar": 0.04395910338280916,
+      "ColdEvaluationsToBar": 55,
+      "PrefixBest": 0.04395910338280916,
+      "WarmEvaluationsAfterResume": 0,
+      "WarmReachedBar": true,
+      "BarMetOnResume": true,
+      "EvaluationRatio": 0,
+      "WarmFinalBest": 0.04395910338280916
+    },
+    {
+      "Seed": 9104,
+      "ColdBar": -0.018411171867139017,
+      "ColdEvaluationsToBar": 112,
+      "PrefixBest": -0.06273419291886488,
+      "WarmEvaluationsAfterResume": 52,
+      "WarmReachedBar": true,
+      "BarMetOnResume": false,
+      "EvaluationRatio": 0.4642857142857143,
+      "WarmFinalBest": -0.018411171867139017
+    },
+    {
+      "Seed": 9105,
+      "ColdBar": 0.3473138114476755,
+      "ColdEvaluationsToBar": 115,
+      "PrefixBest": -0.0002859902587681734,
+      "WarmEvaluationsAfterResume": 55,
+      "WarmReachedBar": true,
+      "BarMetOnResume": false,
+      "EvaluationRatio": 0.4782608695652174,
+      "WarmFinalBest": 0.3473138114476755
+    },
+    {
+      "Seed": 9106,
+      "ColdBar": 0.15911175285799606,
+      "ColdEvaluationsToBar": 120,
+      "PrefixBest": -0.17896760615555457,
+      "WarmEvaluationsAfterResume": 60,
+      "WarmReachedBar": true,
+      "BarMetOnResume": false,
+      "EvaluationRatio": 0.5,
+      "WarmFinalBest": 0.15911175285799606
+    },
+    {
+      "Seed": 9107,
+      "ColdBar": 0.019338891130211353,
+      "ColdEvaluationsToBar": 67,
+      "PrefixBest": -0.3826795888246698,
+      "WarmEvaluationsAfterResume": 5,
+      "WarmReachedBar": true,
+      "BarMetOnResume": false,
+      "EvaluationRatio": 0.07462686567164178,
+      "WarmFinalBest": 0.019338891130211353
+    },
+    {
+      "Seed": 9108,
+      "ColdBar": 0.1541517216369443,
+      "ColdEvaluationsToBar": 10,
+      "PrefixBest": 0.1541517216369443,
+      "WarmEvaluationsAfterResume": 0,
+      "WarmReachedBar": true,
+      "BarMetOnResume": true,
+      "EvaluationRatio": 0,
+      "WarmFinalBest": 0.1541517216369443
+    }
+  ]
+}

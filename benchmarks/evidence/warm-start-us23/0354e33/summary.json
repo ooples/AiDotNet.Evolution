@@ -1,0 +1,20 @@
+{
+ "Schema": "evolution-warm-start-v1",
+ "Protocol": "warm-start-v1",
+ "Seeds": 8,
+ "Budget": 120,
+ "PrefixBudget": 60,
+ "SeedsBarMetOnResume": 2,
+ "SeedsWarmNeverReachedBar": 0,
+ "EvaluationRatio": {
+  "Mean": 0.41082562440969,
+  "LowerBound95": 0.2741146750718457,
+  "UpperBound95": 0.4871644847509691,
+  "Seeds": 6,
+  "Unit": "ratio"
+ },
+ "WorstSeedRatio": 0.5,
+ "SeedsWithinTarget": 8,
+ "Target": 0.5,
+ "TokensMeasured": false
+}
