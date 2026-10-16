@@ -15,6 +15,7 @@ disagreed, this test is what would say so.
 """
 import importlib.util
 import json
+import re
 import unittest
 from pathlib import Path
 
@@ -26,6 +27,9 @@ VERIFIER = ROOT / "benchmarks" / "EvolutionDistributed" / "verify.py"
 # same thing as a ratio, and this is the only place the two forms are tied together.
 DECLARED_EFFICIENCY = 0.875
 WORKERS = 4
+# A state hash is a SHA-256 digest. Comparing two empty strings succeeds, so the shape is checked
+# before the equality - review caught that an emptied pair would have passed every check here.
+HASH = re.compile(r"^[0-9a-f]{64}$")
 
 
 def load_verifier():
@@ -57,12 +61,27 @@ class CommittedEvidenceTests(unittest.TestCase):
 
     def test_the_multi_host_state_hash_is_re_derived_not_quoted(self):
         # The whole point of the story: more hosts must not change the answer.
+        for name, row in (("single", self.single), ("multi", self.multi), ("tp1", self.tp1), ("tp4", self.tp4)):
+            with self.subTest(row=name):
+                self.assertRegex(row["stateHash"], HASH, name + " carries no usable state hash")
         self.assertEqual(self.single["stateHash"], self.multi["stateHash"])
         self.assertEqual(self.tp1["stateHash"], self.tp4["stateHash"],
                          "one and four workers must reach the same state")
-        recorded = self.checks["state_hash_matches_single_host"]
-        self.assertEqual(self.single["stateHash"], recorded["single"])
-        self.assertEqual(self.multi["stateHash"], recorded["multi"])
+        # Every recorded field, not a sample of them: an edited `four_workers` used to leave all of
+        # these tests passing.
+        across_hosts = self.checks["state_hash_matches_single_host"]
+        self.assertEqual({"passed": True, "single": self.single["stateHash"], "multi": self.multi["stateHash"]},
+                         across_hosts)
+        across_workers = self.checks["state_hash_independent_of_worker_count"]
+        self.assertEqual({"passed": True, "one_worker": self.tp1["stateHash"], "four_workers": self.tp4["stateHash"]},
+                         across_workers)
+
+    def test_every_check_the_summary_records_is_marked_passed(self):
+        # The `passed` flags are the verdict verify.py exited on; a check whose fields were edited to
+        # agree with each other could still carry passed=false, and this is what refuses that.
+        for name, check in self.checks.items():
+            with self.subTest(check=name):
+                self.assertTrue(check["passed"], name + " is recorded as failing")
 
     def test_exactly_once_is_re_derived_from_the_coordinators_accepted_set(self):
         asked = self.multi["evaluationsAsked"]
@@ -72,27 +91,51 @@ class CommittedEvidenceTests(unittest.TestCase):
         self.assertEqual(asked, len(committed), "every asked evaluation must carry a commit")
         self.assertEqual(len(committed), len(set(committed)), "no evaluation may be committed twice")
         recorded = self.checks["exactly_once"]
-        self.assertEqual([asked, asked, 0, asked],
-                         [recorded["asked"], recorded["delivered"], recorded["missing"],
-                          recorded["evaluations_with_an_accepted_commit"]],
+        self.assertEqual({"passed": True, "asked": asked, "delivered": asked, "missing": 0,
+                          "evaluations_with_an_accepted_commit": asked,
+                          "evaluations_accepted_more_than_once": []}, recorded,
                          "the worker-side counts verify.py recorded must match the coordinator's set")
-        self.assertEqual([], recorded["evaluations_accepted_more_than_once"])
 
     def test_the_killed_workers_lease_was_re_issued_to_another_worker(self):
-        claims = [e for e in self.verify.events(EVIDENCE / "multi-w1.log") if e.get("event") == "claim"]
+        events = self.verify.events(EVIDENCE / "multi-w1.log")
+        claims = [e for e in events if e.get("event") == "claim"]
         self.assertTrue(claims, "the killed worker's log must show the lease it held")
         last = claims[-1]["identity"]
+        # The re-issue only means anything if the killed worker never committed that lease itself -
+        # otherwise a second commit under a different lease would read as a re-issue. verify.py
+        # rejects that case and this did not, until review pointed it out.
+        committed_by_killed = {e["identity"]["leaseId"] for e in events
+                               if str(e.get("event", "")).startswith("commit")}
+        self.assertNotIn(last["leaseId"], committed_by_killed,
+                         "the killed worker committed the lease it is supposed to have lost")
         final = next((c for c in self.multi["committed"]
                       if str(c["evaluationId"]) == str(last["evaluationId"])), None)
         self.assertIsNotNone(final, "the claimed evaluation must still have been committed")
         self.assertNotEqual(last["leaseId"], final["leaseId"], "a re-issue means a new lease")
         self.assertNotEqual("worker:w1", final["provenance"], "and a different worker")
-        self.assertEqual(last, self.checks["killed_worker_lease_reissued"]["killed_worker_last_claim"])
+        self.assertEqual({"passed": True, "killed_worker_last_claim": last, "final_commit": final},
+                         self.checks["killed_worker_lease_reissued"],
+                         "every field of the recorded check, not only the claim")
 
     def test_the_scaling_claim_is_computed_from_the_two_throughput_runs(self):
+        # The ratio means nothing unless the two runs are the one- and four-worker runs they claim to
+        # be, with no local worker quietly helping either of them (review caught that gap).
+        self.assertEqual(1, self.tp1["workersAwaited"], "tp1 must be the single remote worker run")
+        self.assertEqual(WORKERS, self.tp4["workersAwaited"], "tp4 must be the four remote worker run")
+        for name, row in (("tp1", self.tp1), ("tp4", self.tp4)):
+            with self.subTest(row=name):
+                self.assertEqual(0, row["localWorkers"], name + " ran a local worker, so it is not remote-only")
         ratio = self.tp4["evaluationsPerSecond"] / self.tp1["evaluationsPerSecond"]
-        self.assertAlmostEqual(ratio, self.checks["four_worker_scaling"]["ratio"], places=9,
+        recorded = self.checks["four_worker_scaling"]
+        self.assertEqual({"passed", "one_worker_per_second", "four_workers_per_second", "ratio", "target", "efficiency"},
+                         set(recorded), "the recorded check changed shape")
+        self.assertTrue(recorded["passed"])
+        self.assertEqual(self.tp1["evaluationsPerSecond"], recorded["one_worker_per_second"])
+        self.assertEqual(self.tp4["evaluationsPerSecond"], recorded["four_workers_per_second"])
+        self.assertAlmostEqual(ratio, recorded["ratio"], places=9,
                                msg="the recorded ratio must be the one the rows produce")
+        self.assertEqual(self.verify.SCALING_TARGET, recorded["target"], "the recorded gate is the verifier's")
+        self.assertAlmostEqual(ratio / WORKERS, recorded["efficiency"], places=9)
         self.assertGreaterEqual(ratio, self.verify.SCALING_TARGET)
         self.assertGreaterEqual(ratio / WORKERS, DECLARED_EFFICIENCY,
                                 "the story declares >= 87.5% of linear scaling")
