@@ -59,7 +59,11 @@ public sealed partial class EvolutionEngine<TGenome>
                 CancellationToken waveToken = waveCancellation.Token;
                 var meteredVariation = _variation as ResourceMeteredVariationOperator<TGenome>;
                 var meteredTask = _task as ResourceMeteredEvolutionTask<TGenome>;
-                bool proposalResourcePhase = false, evaluationResourcePhase = false;
+                // The open phase *is* the operator, not a flag beside it: a boolean pair that has to agree
+                // with two nullables is what made the end-of-phase null checks constant conditions (CodeQL
+                // caught it), and this is the shape the retry round below already uses.
+                ResourceMeteredVariationOperator<TGenome>? proposalPhase = null;
+                ResourceMeteredEvolutionTask<TGenome>? evaluationPhase = null;
                 try
                 {
                     // A bounded planning buffer fixes identities, snapshots and all first-attempt reservations before
@@ -69,8 +73,8 @@ public sealed partial class EvolutionEngine<TGenome>
                     // parents first is short for another reason, and a larger budget would plan it the same.
                     truncatedByBudget = plan.Count == waveLimit && waveLimit < settings.WaveSize &&
                         (waveLimit == attemptsLeft || carriedSize > 0);
-                    if (meteredVariation is not null) { meteredVariation.BeginPipelinePhase(); proposalResourcePhase = true; }
-                    if (meteredTask is not null) { meteredTask.BeginPipelinePhase(); evaluationResourcePhase = true; }
+                    if (meteredVariation is not null) { meteredVariation.BeginPipelinePhase(); proposalPhase = meteredVariation; }
+                    if (meteredTask is not null) { meteredTask.BeginPipelinePhase(); evaluationPhase = meteredTask; }
                     foreach (PipelineProposal planned in plan)
                     {
                         bool canPropose = planned.Request is null || meteredVariation is null || meteredVariation.ReservePipelineProposal(planned.Lineage.Generation);
@@ -121,8 +125,9 @@ public sealed partial class EvolutionEngine<TGenome>
                     }
                     await Task.WhenAll(evaluations).ConfigureAwait(false);
                     waveToken.ThrowIfCancellationRequested();
-                    if (proposalResourcePhase) { proposalResourcePhase = false; meteredVariation?.EndPipelinePhase(); }
-                    if (evaluationResourcePhase) { evaluationResourcePhase = false; meteredTask?.EndPipelinePhase(); }
+                    // Cleared before the call, so the finally below cannot end the same phase twice.
+                    if (proposalPhase is { } openProposalPhase) { proposalPhase = null; openProposalPhase.EndPipelinePhase(); }
+                    if (evaluationPhase is { } openEvaluationPhase) { evaluationPhase = null; openEvaluationPhase.EndPipelinePhase(); }
                     foreach (WorkItem item in batch.Where(item => item.RequiresEvaluation))
                     {
                         if (item.CascadeRejectedStage.HasValue && !_options.Cascade.ChargeRejectedStagesToBudget)
@@ -169,8 +174,8 @@ public sealed partial class EvolutionEngine<TGenome>
                 }
                 finally
                 {
-                    try { if (proposalResourcePhase) meteredVariation?.EndPipelinePhase(); }
-                    finally { if (evaluationResourcePhase) meteredTask?.EndPipelinePhase(); }
+                    try { proposalPhase?.EndPipelinePhase(); }
+                    finally { evaluationPhase?.EndPipelinePhase(); }
                 }
                 if (batch.Count == 0) return StopReasonWithNothingInFlight();
                 bool failedFast = await CommitBatchAsync(batch, CancellationToken.None).ConfigureAwait(false);
