@@ -4,6 +4,7 @@
     <Project Path="benchmarks/EvolutionComparison/EvolutionComparison.csproj" />
     <Project Path="benchmarks/EvolutionDistributed/EvolutionDistributed.csproj" />
     <Project Path="benchmarks/EvolutionMetaPrompt/EvolutionMetaPrompt.csproj" />
+    <Project Path="benchmarks/EvolutionRepair/EvolutionRepair.csproj" />
     <Project Path="benchmarks/AiDotNet.Evolution.Performance/AiDotNet.Evolution.Performance.csproj" />
     <Project Path="benchmarks/AiDotNet.Evolution.Quality/AiDotNet.Evolution.Quality.csproj" />
   </Folder>
