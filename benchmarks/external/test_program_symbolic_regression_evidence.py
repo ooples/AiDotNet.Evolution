@@ -14,6 +14,7 @@ rows, and the documented command above is what catches that.
 """
 from __future__ import annotations
 
+import hashlib
 import json
 import unittest
 from pathlib import Path
@@ -34,6 +35,36 @@ EXPECTED_SEALS = {
     ("two_variable_ratio", 5001): "72a21c8056f05993a72e00074c04df1792eb1dfcb076acbec515a76860fd1b53",
     ("two_variable_ratio", 5002): "3cbaf77968ef48bff67134c472cdd4a0e19712d5329cfd50f78f1ecdad74e625",
 }
+
+# The *inputs* of each test split, digested on their own. `random.Random.uniform` is platform-stable,
+# so these are exact everywhere - including for the task whose targets are not. A changed range or a
+# changed sampling order fails here regardless of platform.
+EXPECTED_INPUT_DIGESTS = {
+    ("damped_oscillator", 5000): "2128a000b0922bfeea88407d56805887f66c079e4bf9320fb26b85faf43a262d",
+    ("damped_oscillator", 5001): "6c3d36e89cc4ff4248405ad1990f0409014a9e34a380a6549327bc46b4bd1622",
+    ("damped_oscillator", 5002): "cbbed6accef0351642aefdfb2b02bd2e3a4e3031c46e9ccc857cecbb98a30a32",
+    ("rational_gain", 5000): "f430fc127a4f31727ff1187fc5c0a7a11a6d60324fe201f702e1144e4b07f5fc",
+    ("rational_gain", 5001): "e40bfe0e08367691776ebff04146db1554d6cfc140a5555be8abc8f00eef6188",
+    ("rational_gain", 5002): "619011e760418e8a0e266f5efcb42b4fdcd720ee4b0888926a3897c16f356f81",
+    ("two_variable_ratio", 5000): "6ae004c21ff3164154bf751da39e16e21533b52f5c1bee954b6138ba23434efc",
+    ("two_variable_ratio", 5001): "55d24f66538f9d899ea0f529a1d37b12176d9552b361bdab719b8d28f759c8e5",
+    ("two_variable_ratio", 5002): "943c38d5fbea97cb846ea4ccabf114b2d86cd239fb010fe3e810f63c6572969d",
+}
+
+# Three (t, y) pairs from `damped_oscillator`'s first dev split, pinned so that task's *targets* are
+# guarded too. Compared at 1e-12: libm disagreement between platforms is ~1e-16, and any change to
+# the closed form moves these by orders of magnitude more, so this separates the two.
+EXPECTED_DAMPED_SAMPLES = (
+    (0.830851758963639, 0.7761625646072241),
+    (5.943486576498584, -0.10563720279217967),
+    (2.393809510145355, -0.4862777551160272),
+)
+LIBM_TOLERANCE = 1e-12
+
+
+def input_digest(rows):
+    payload = [["%.17g" % value for value in xs] for xs, _ in rows]
+    return hashlib.sha256(json.dumps(payload, separators=(",", ":")).encode()).hexdigest()
 
 
 class CommittedHeadroomEvidenceTests(unittest.TestCase):
@@ -101,6 +132,34 @@ class CommittedHeadroomEvidenceTests(unittest.TestCase):
         self.assertTrue({task for task, _ in mismatched} <= transcendental,
                         "a seal outside %s stopped rebuilding, which is a change to the family: %s"
                         % (sorted(transcendental), sorted(mismatched)))
+
+    def test_the_transcendental_tasks_data_is_pinned_even_where_its_seal_cannot_be(self):
+        """The carve-out above permits *any* `damped_oscillator` mismatch, which is too much.
+
+        A changed coefficient or range would move those seals and still satisfy it, leaving that
+        task's provenance unguarded (review caught it). So the task's data is pinned in two ways
+        that do not depend on libm: the digest of its sampled **inputs**, which come from
+        `random.Random.uniform` and are exact on every platform, and three of its (t, y) pairs
+        compared at 1e-12 - four orders of magnitude looser than the ~1e-16 platform disagreement
+        and many orders tighter than any change to `exp(-0.3 t) sin(2 t)` would produce.
+        """
+        for seed in family.DEV_SEEDS:
+            with self.subTest(seed=seed):
+                rows = family.build("damped_oscillator", seed)["test"]
+                self.assertEqual(EXPECTED_INPUT_DIGESTS[("damped_oscillator", seed)], input_digest(rows),
+                                 "the sampled inputs changed, so the range or the sampling did")
+        rows = family.build("damped_oscillator", family.DEV_SEEDS[0])["test"]
+        for index, (expected_t, expected_y) in enumerate(EXPECTED_DAMPED_SAMPLES):
+            with self.subTest(row=index):
+                (actual_t,), actual_y = rows[index]
+                self.assertEqual(expected_t, round(actual_t, 15), "the sampled input moved")
+                self.assertAlmostEqual(expected_y, actual_y, delta=LIBM_TOLERANCE,
+                                       msg="the closed form moved by more than libm ever disagrees")
+
+    def test_every_tasks_inputs_are_pinned_on_every_platform(self):
+        for key, digest in EXPECTED_INPUT_DIGESTS.items():
+            with self.subTest(task=key[0], seed=key[1]):
+                self.assertEqual(digest, input_digest(family.build(key[0], key[1])["test"]))
 
     def test_the_seal_binds_more_precision_than_libm_agrees_on(self):
         """The exposure, measured rather than described: 17 significant digits (`%.16e` keeps one digit before the point and sixteen after) is finer than libm.
