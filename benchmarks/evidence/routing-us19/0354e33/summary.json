@@ -1,0 +1,75 @@
+{
+ "Schema": "evolution-routing-study-v1",
+ "Router": "adaptive-archive",
+ "SourceSha256": "1c2431bc7124f2d0409710638946efa085f73d94471602619eccb918c89bc4ea",
+ "PlanHash": "1e8f67b29cd6d3c5c6b6095f1017946356a81ed7f232499a15eea3b2426eb260",
+ "DevelopmentHash": "0a47b5448382a4f2d0b7202020f004d80a6702924ca4e90f41119324001b00bf",
+ "BestStatic": {
+  "numeric": "restart",
+  "program": "crossover",
+  "kernel": "restart"
+ },
+ "Families": [
+  {
+   "Family": "kernel",
+   "Comparator": "restart",
+   "QualityDifference": {
+    "Mean": -0.003940495627720607,
+    "LowerBound95": -0.010465367942949716,
+    "UpperBound95": 0.0026733586792199583,
+    "Pairs": 16,
+    "Unit": "quality"
+   },
+   "ObjectiveCallRatio": {
+    "Mean": 0.9861169467787114,
+    "LowerBound95": 0.9645394199346404,
+    "UpperBound95": 1.005716182306256,
+    "Pairs": 16,
+    "Unit": "ratio"
+   },
+   "RouterCalls": 34.9375,
+   "ComparatorCalls": 35.4375
+  },
+  {
+   "Family": "numeric",
+   "Comparator": "restart",
+   "QualityDifference": {
+    "Mean": -0.015295554469317536,
+    "LowerBound95": -0.0557468488136989,
+    "UpperBound95": 0.02628510109079576,
+    "Pairs": 16,
+    "Unit": "quality"
+   },
+   "ObjectiveCallRatio": {
+    "Mean": 1.0520833333333333,
+    "LowerBound95": 1.0399305555555556,
+    "UpperBound95": 1.0625,
+    "Pairs": 16,
+    "Unit": "ratio"
+   },
+   "RouterCalls": 37.875,
+   "ComparatorCalls": 36.0
+  },
+  {
+   "Family": "program",
+   "Comparator": "crossover",
+   "QualityDifference": {
+    "Mean": 0.034522647516433705,
+    "LowerBound95": -0.03196678040249744,
+    "UpperBound95": 0.1068587555888074,
+    "Pairs": 16,
+    "Unit": "quality"
+   },
+   "ObjectiveCallRatio": {
+    "Mean": 1.0520833333333333,
+    "LowerBound95": 1.0399305555555556,
+    "UpperBound95": 1.0625,
+    "Pairs": 16,
+    "Unit": "ratio"
+   },
+   "RouterCalls": 37.875,
+   "ComparatorCalls": 36.0
+  }
+ ],
+ "TokensMeasured": false
+}
