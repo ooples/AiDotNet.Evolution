@@ -1,5 +1,72 @@
 # Changelog
 
+## [0.4.0](https://github.com/ooples/AiDotNet.Evolution/compare/v0.3.0...v0.4.0) (2026-10-16)
+
+
+### Features
+
+* **bench:** rank the cells we lose, which is v1-07's third criterion ([#302](https://github.com/ooples/AiDotNet.Evolution/issues/302)) ([e220730](https://github.com/ooples/AiDotNet.Evolution/commit/e220730af66da240299a7165f64a280a8201bd4f))
+* **bench:** the execute_cell campaign_runner has never had ([#289](https://github.com/ooples/AiDotNet.Evolution/issues/289)) ([9a6c64d](https://github.com/ooples/AiDotNet.Evolution/commit/9a6c64d244a6bc26b2f52542a49ade3366dc37c9)), closes [#116](https://github.com/ooples/AiDotNet.Evolution/issues/116)
+* **bench:** the live pilot runner, with the two refusals that stand before a bill ([#294](https://github.com/ooples/AiDotNet.Evolution/issues/294)) ([51d5959](https://github.com/ooples/AiDotNet.Evolution/commit/51d5959e5ac5f9b95d5ecd40699d5fd9cb3834e8))
+* **bindings:** TypeScript reference worker, worker-overhead harness and CI-run upstream evaluator (V1-25) ([#239](https://github.com/ooples/AiDotNet.Evolution/issues/239)) ([f744ba5](https://github.com/ooples/AiDotNet.Evolution/commit/f744ba58e43cb3bf757225ba7970af8060fccc4b))
+* both pilot arms behind one seam, each accounting for what it actually spent ([#292](https://github.com/ooples/AiDotNet.Evolution/issues/292)) ([e5b7c18](https://github.com/ooples/AiDotNet.Evolution/commit/e5b7c18e6d6d042803746d5a4979ed7e42ca2c66))
+* **cli:** make a run's quality legible, and say when it is not trustworthy ([#272](https://github.com/ooples/AiDotNet.Evolution/issues/272)) ([934909c](https://github.com/ooples/AiDotNet.Evolution/commit/934909cf1ccd42bc77d07c51acfff1b720959bab)), closes [#169](https://github.com/ooples/AiDotNet.Evolution/issues/169) [#170](https://github.com/ooples/AiDotNet.Evolution/issues/170) [#42](https://github.com/ooples/AiDotNet.Evolution/issues/42)
+* **cli:** notice an imported model configuration that can stall a run silently ([#267](https://github.com/ooples/AiDotNet.Evolution/issues/267)) ([5b3cbce](https://github.com/ooples/AiDotNet.Evolution/commit/5b3cbceb390243894d6c2dfcbe4b3b98039c6d0f)), closes [#169](https://github.com/ooples/AiDotNet.Evolution/issues/169) [#42](https://github.com/ooples/AiDotNet.Evolution/issues/42)
+* **core:** draw each proposal's model from weights on the run's own stream ([#163](https://github.com/ooples/AiDotNet.Evolution/issues/163)) ([#231](https://github.com/ooples/AiDotNet.Evolution/issues/231)) ([444b5a2](https://github.com/ooples/AiDotNet.Evolution/commit/444b5a28376dd412253f2ca549da77eb3037126b))
+* **deployment:** have the promotion sweep emit the evidence it asserts ([#284](https://github.com/ooples/AiDotNet.Evolution/issues/284)) ([14e0fbb](https://github.com/ooples/AiDotNet.Evolution/commit/14e0fbb66b64b66f1525e7e9b4700b5b6d500e17)), closes [#43](https://github.com/ooples/AiDotNet.Evolution/issues/43)
+* dev-partition ablation for llm feedback, and the two defects it exposed ([#246](https://github.com/ooples/AiDotNet.Evolution/issues/246)) ([d8a6eda](https://github.com/ooples/AiDotNet.Evolution/commit/d8a6eda052fd0ffe8467e6676d2f6eb8f6231ea9))
+* **eng:** add the story-checkbox audit script and its measured baseline ([#108](https://github.com/ooples/AiDotNet.Evolution/issues/108)) ([#230](https://github.com/ooples/AiDotNet.Evolution/issues/230)) ([ccb430f](https://github.com/ooples/AiDotNet.Evolution/commit/ccb430f8b8d4b6065a333240700812081214e76c))
+* **engine:** have the re-measurement sweep emit the evidence it asserts ([#285](https://github.com/ooples/AiDotNet.Evolution/issues/285)) ([b193f20](https://github.com/ooples/AiDotNet.Evolution/commit/b193f20e25ab3d9af72951e6d85a523f9ca0ce70)), closes [#24](https://github.com/ooples/AiDotNet.Evolution/issues/24)
+* **eng:** measure the delivery boxes instead of annotating them by hand ([#300](https://github.com/ooples/AiDotNet.Evolution/issues/300)) ([ccd64cf](https://github.com/ooples/AiDotNet.Evolution/commit/ccd64cf123b103eddc623448fc04bca31a5ad5d2)), closes [#108](https://github.com/ooples/AiDotNet.Evolution/issues/108)
+* expose the judge knobs that decide whether feedback can act ([#253](https://github.com/ooples/AiDotNet.Evolution/issues/253)) ([3529e46](https://github.com/ooples/AiDotNet.Evolution/commit/3529e46372881c7951c4d7efb6dcd7a432647532))
+* five v1 gaps the audits found, each measured rather than asserted ([#301](https://github.com/ooples/AiDotNet.Evolution/issues/301)) ([c5c4ecb](https://github.com/ooples/AiDotNet.Evolution/commit/c5c4ecbe020aea5f7819ed5f55569d4926a1fc5b))
+* **gate:** require a 95% interval above 1.0 and a per-task regression limit, not just the mean ([#297](https://github.com/ooples/AiDotNet.Evolution/issues/297)) ([dda6bce](https://github.com/ooples/AiDotNet.Evolution/commit/dda6bcee33f0fa41a923408c4405a49f5e09ca04))
+* let a caller declare the environment a sandboxed evaluator sees ([#245](https://github.com/ooples/AiDotNet.Evolution/issues/245)) ([270ca44](https://github.com/ooples/AiDotNet.Evolution/commit/270ca4407958d99319b8ae07314416f5232b21b2))
+* measure whether the proposer can solve the ablation task at all ([#256](https://github.com/ooples/AiDotNet.Evolution/issues/256)) ([9e44328](https://github.com/ooples/AiDotNet.Evolution/commit/9e44328183ff0e0071792545483ad7f1de2830cf))
+* one task both pilot arms can run, with the held-out split kept out of selection ([#288](https://github.com/ooples/AiDotNet.Evolution/issues/288)) ([0570c8c](https://github.com/ooples/AiDotNet.Evolution/commit/0570c8ca004207dedc6c206d0f0c47e862d45786))
+* paired ablation for meta-prompt evolution, and the two gaps it exposed ([#249](https://github.com/ooples/AiDotNet.Evolution/issues/249)) ([d41d8e1](https://github.com/ooples/AiDotNet.Evolution/commit/d41d8e1c37026322056443ea7e464666ff1d66a5))
+* **programs:** evolve the system instructions alongside the programs ([#166](https://github.com/ooples/AiDotNet.Evolution/issues/166)) ([#233](https://github.com/ooples/AiDotNet.Evolution/issues/233)) ([818b642](https://github.com/ooples/AiDotNet.Evolution/commit/818b642affbc8e46318ccbde6612fc15e4380374))
+* **ptx:** evolve PTX kernel source with verified correctness and timing ([#218](https://github.com/ooples/AiDotNet.Evolution/issues/218)) ([ca96524](https://github.com/ooples/AiDotNet.Evolution/commit/ca965243c6fb38f4d3353cf54315d9d7541d3966))
+* **release:** port the US-12 release claim gate to main ([#240](https://github.com/ooples/AiDotNet.Evolution/issues/240)) ([65ced88](https://github.com/ooples/AiDotNet.Evolution/commit/65ced8823770bdd7b1901f0a5650c62443e9a5d5))
+* seal a held-out split, score it independently, and measure whether the family can carry a claim ([#282](https://github.com/ooples/AiDotNet.Evolution/issues/282)) ([1b3c9fb](https://github.com/ooples/AiDotNet.Evolution/commit/1b3c9fbceaf0b42f5017782c5054f714bce30f2c))
+* ship the observer that credits an evolving instruction ([#250](https://github.com/ooples/AiDotNet.Evolution/issues/250)) ([6fb9d24](https://github.com/ooples/AiDotNet.Evolution/commit/6fb9d2430e87767fda83d29ac32ffcd1af46a74d))
+
+
+### Bug Fixes
+
+* **bench:** run the declared track panel instead of silently running all six ([#287](https://github.com/ooples/AiDotNet.Evolution/issues/287)) ([9189f22](https://github.com/ooples/AiDotNet.Evolution/commit/9189f22b6b0c650f780bd37634249ea876e46248)), closes [#286](https://github.com/ooples/AiDotNet.Evolution/issues/286)
+* **ci:** stop each merge to main cancelling the previous merge's run ([#299](https://github.com/ooples/AiDotNet.Evolution/issues/299)) ([a875c8d](https://github.com/ooples/AiDotNet.Evolution/commit/a875c8d78128eab04417f729d17eb4df6ca514e0)), closes [#108](https://github.com/ooples/AiDotNet.Evolution/issues/108)
+* **engine:** refuse a declared constraint violation in the default archive too ([#259](https://github.com/ooples/AiDotNet.Evolution/issues/259)) ([0a1a561](https://github.com/ooples/AiDotNet.Evolution/commit/0a1a56103f310737ceaa9dce396d8c54aa7c45b2)), closes [#21](https://github.com/ooples/AiDotNet.Evolution/issues/21) [#108](https://github.com/ooples/AiDotNet.Evolution/issues/108)
+* **evidence:** stop an unrelated merge turning main red, and refresh the census ([#277](https://github.com/ooples/AiDotNet.Evolution/issues/277)) ([1c68d2c](https://github.com/ooples/AiDotNet.Evolution/commit/1c68d2ce00472a1a097999240a2f0d5e73c0239f)), closes [#22](https://github.com/ooples/AiDotNet.Evolution/issues/22)
+* **execution:** report the address-space backstop's kill as a memory violation, not a generic failure ([#235](https://github.com/ooples/AiDotNet.Evolution/issues/235)) ([b84f675](https://github.com/ooples/AiDotNet.Evolution/commit/b84f6750a47669737ca7eaef275ed70091f516a8))
+* hand the openevolve evaluator a path a python literal can hold ([#247](https://github.com/ooples/AiDotNet.Evolution/issues/247)) ([55010f7](https://github.com/ooples/AiDotNet.Evolution/commit/55010f749985d4081a375b8d04bdddd48a976c0e))
+* make a failing evaluator's own output reachable from the run report ([#258](https://github.com/ooples/AiDotNet.Evolution/issues/258)) ([1bae398](https://github.com/ooples/AiDotNet.Evolution/commit/1bae398b38928d43ddd635ffd8bea0bb2c9058aa))
+* **programs:** stop the proposal options clone from dropping the declared descriptors ([#243](https://github.com/ooples/AiDotNet.Evolution/issues/243)) ([3adaec0](https://github.com/ooples/AiDotNet.Evolution/commit/3adaec0e9cae50026d370fbef1979a24c2251a29))
+
+
+### Performance
+
+* **work:** append-only group-committed journal for durable delivery ([#241](https://github.com/ooples/AiDotNet.Evolution/issues/241)) ([4cda0c9](https://github.com/ooples/AiDotNet.Evolution/commit/4cda0c942bfd90b88cfb598e0a77543ac9460e5c))
+
+
+### Documentation
+
+* claude_code_quickstart runs unmodified with the real provider ([#257](https://github.com/ooples/AiDotNet.Evolution/issues/257)) ([b791d8b](https://github.com/ooples/AiDotNet.Evolution/commit/b791d8b61545fc3fa72f37a49c22e4a0a862ec1b))
+* correct the judge-score derivation, which used the wrong blend coefficient ([#255](https://github.com/ooples/AiDotNet.Evolution/issues/255)) ([568f356](https://github.com/ooples/AiDotNet.Evolution/commit/568f356af6306d0bf7e4a58c7757b719b216b40c))
+* **engine:** warn where the capacity is chosen, not only where it is tested ([#273](https://github.com/ooples/AiDotNet.Evolution/issues/273)) ([5e94baa](https://github.com/ooples/AiDotNet.Evolution/commit/5e94baad87b8d92b17e9dd211be0a03f3dca1cc6)), closes [#24](https://github.com/ooples/AiDotNet.Evolution/issues/24)
+* **evidence:** audit the parity stories, where 21 of 23 are closed with unticked criteria ([#298](https://github.com/ooples/AiDotNet.Evolution/issues/298)) ([0424022](https://github.com/ooples/AiDotNet.Evolution/commit/0424022c49342a9567b376b9b16ae86ff9befe49)), closes [#108](https://github.com/ooples/AiDotNet.Evolution/issues/108)
+* **evidence:** re-measure our overhead column at main, meeting the last V1-70 target ([#175](https://github.com/ooples/AiDotNet.Evolution/issues/175)) ([#242](https://github.com/ooples/AiDotNet.Evolution/issues/242)) ([de05cb5](https://github.com/ooples/AiDotNet.Evolution/commit/de05cb53f6662e86ba9c8bbefb17acb391d13818))
+* **evidence:** re-measure the story-checkbox audit, and what the fall from 90 is not ([#260](https://github.com/ooples/AiDotNet.Evolution/issues/260)) ([e8f21c9](https://github.com/ooples/AiDotNet.Evolution/commit/e8f21c9e4eeeee20c9b7960af1e4cee172f2a6e7)), closes [#108](https://github.com/ooples/AiDotNet.Evolution/issues/108)
+* **evidence:** record the audit after the merges, 72 to 68 ([#281](https://github.com/ooples/AiDotNet.Evolution/issues/281)) ([03e6114](https://github.com/ooples/AiDotNet.Evolution/commit/03e611499a02f5404781c29179b850d143ca2f0c)), closes [#108](https://github.com/ooples/AiDotNet.Evolution/issues/108)
+* **evidence:** record the distributed run V1-61 asks for, measured ([#174](https://github.com/ooples/AiDotNet.Evolution/issues/174)) ([#238](https://github.com/ooples/AiDotNet.Evolution/issues/238)) ([c458617](https://github.com/ooples/AiDotNet.Evolution/commit/c458617fd8c586eb9e2cee3b12d0dbbc723e3231))
+* **evidence:** record what process isolation costs per evaluation ([#181](https://github.com/ooples/AiDotNet.Evolution/issues/181)) ([#229](https://github.com/ooples/AiDotNet.Evolution/issues/229)) ([f0b1aee](https://github.com/ooples/AiDotNet.Evolution/commit/f0b1aee9837032be3f286e222751455a8909bc43))
+* **evidence:** the V1-01 checkbox audit at 0873a7d, 68 to 66 ([#295](https://github.com/ooples/AiDotNet.Evolution/issues/295)) ([0f8cc16](https://github.com/ooples/AiDotNet.Evolution/commit/0f8cc16c5776b3bd7fed358a1c4d9529b16e9cd8))
+* give the readme a path to a first report, and time it on a clean machine ([#275](https://github.com/ooples/AiDotNet.Evolution/issues/275)) ([b8996a4](https://github.com/ooples/AiDotNet.Evolution/commit/b8996a4e1ea334cf1c5ce6a7b278360c91e5c1bc))
+* **parity:** document each example's real-run command, and measure the claim about it ([#296](https://github.com/ooples/AiDotNet.Evolution/issues/296)) ([e981bcf](https://github.com/ooples/AiDotNet.Evolution/commit/e981bcf76ceb59a65ecf0022db848bf5ad15bab0)), closes [#170](https://github.com/ooples/AiDotNet.Evolution/issues/170)
+* **parity:** record what the artifacts example needs, without unsmoking it ([#244](https://github.com/ooples/AiDotNet.Evolution/issues/244)) ([0c3a15a](https://github.com/ooples/AiDotNet.Evolution/commit/0c3a15a9dee565ad74bfcd465578d0182058e238))
+* record what V1-01's 72 open boxes actually are ([#266](https://github.com/ooples/AiDotNet.Evolution/issues/266)) ([0c6faf3](https://github.com/ooples/AiDotNet.Evolution/commit/0c6faf370859947f7c6a791c4d46c466847090b7))
+* two more real-provider runs, and what each one actually optimised ([#265](https://github.com/ooples/AiDotNet.Evolution/issues/265)) ([ed3e786](https://github.com/ooples/AiDotNet.Evolution/commit/ed3e78659d192d2a021f67df5698f06443d13b38))
+
 ## [0.3.0](https://github.com/ooples/AiDotNet.Evolution/compare/v0.2.0...v0.3.0) (2026-10-13)
 
 
