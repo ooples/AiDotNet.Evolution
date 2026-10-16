@@ -272,8 +272,9 @@ public sealed class WarmPythonExecutionEngineTests
             // killed the worker with the file still empty (seen on the net471 CI runner).
             var clock = Stopwatch.StartNew();
             int pid = 0;
-            while (!TryReadPid(pidPath, out pid) && clock.Elapsed < TimeSpan.FromSeconds(15)) await Task.Delay(50);
-            Assert.True(pid > 0, "the candidate never started");
+            while (!TryReadPid(pidPath, out pid) && clock.Elapsed < WorkerStartupAllowance) await Task.Delay(50);
+            Assert.True(pid > 0,
+                $"the candidate never started within {WorkerStartupAllowance.TotalSeconds:F0} s");
 
             engine.Dispose();
             ProgramExecuteResponse response = await running.WaitAsync(TimeSpan.FromSeconds(10));
@@ -289,6 +290,16 @@ public sealed class WarmPythonExecutionEngineTests
             try { Directory.Delete(directory, recursive: true); } catch (IOException) { }
         }
     }
+
+    /// <summary>How long a warm worker may take to spawn before the test calls it a failure.</summary>
+    /// <remarks>
+    /// Waiting for the worker is setup, not the behaviour under test - what is asserted is that
+    /// disposing during an execution ends the worker and fails the run. At 15 s a contended Windows
+    /// runner occasionally had not finished spawning the process and importing Python, and the test
+    /// failed as "the candidate never started": a true statement about the runner and a false one
+    /// about the engine. The assertions after it are unchanged.
+    /// </remarks>
+    private static readonly TimeSpan WorkerStartupAllowance = TimeSpan.FromSeconds(60);
 
     private static bool TryReadPid(string path, out int pid)
     {
