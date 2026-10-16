@@ -24,7 +24,8 @@ produces a file byte-identical to `headroom.json` - verified at `main` `0354e33`
 two months after the `e083c3b` the bundle is named for, which is what says the family, the splits,
 the seals and the search are all unchanged **on the platform that produced it**.
 
-**That qualifier is a defect, not a caveat.** `seal` digests each value to 16 significant digits and
+**That qualifier is a defect, not a caveat.** `seal` digests each value to **17** significant digits
+(`%.16e` keeps one digit before the point and sixteen after) and
 the closed forms go through libm (`exp`, `sin`, `cos`), whose last bits differ between platforms, so
 the committed seals rebuild on Windows - where they were measured - and not on CI's Linux. A sealed
 partition that only verifies where it was produced is weaker than it looks, and the same `seal`
