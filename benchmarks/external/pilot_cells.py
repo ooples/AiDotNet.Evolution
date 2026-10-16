@@ -99,8 +99,10 @@ def executor(task, searchers, *, holdout_seed):
             # A searcher that failed after spending attaches what it spent to the exception
             # (`pilot_searchers.SearchFailed`). Without this the row reported no calls for a cell
             # that really was billed, and the campaign's spend came out under the truth.
+            # The type alone does not diagnose anything: eighteen cells reading `SearchFailed` say
+            # only that a search failed. The message is what names the cause, so it is carried too.
             return _failed(locals().get("outcome") or getattr(error, "accounting", None),
-                           type(error).__name__)
+                           _reason(error))
         return {
             "Status": "completed",
             "Value": value,
@@ -111,6 +113,21 @@ def executor(task, searchers, *, holdout_seed):
         }
 
     return execute_cell
+
+
+# The message a failure carries is often a subprocess's whole traceback, whose INFORMATIVE END is
+# the exception line. Keeping the head alone - the obvious bound - cut exactly that off and left
+# eighteen cells all reporting the same asyncio frame. So both ends are kept.
+_REASON_HEAD = 120
+_REASON_TAIL = 200
+
+
+def _reason(error):
+    """The failure's type and message, bounded without discarding the end of a traceback."""
+    detail = " ".join(str(error).split())
+    if len(detail) > _REASON_HEAD + _REASON_TAIL:
+        detail = detail[:_REASON_HEAD] + " ... " + detail[-_REASON_TAIL:]
+    return type(error).__name__ + (": " + detail if detail else "")
 
 
 def _failed(outcome, reason):

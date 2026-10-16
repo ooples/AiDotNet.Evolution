@@ -85,7 +85,29 @@ class PilotCellTests(unittest.TestCase):
         with tempfile.TemporaryDirectory() as directory:
             outcome = pilot_cells.executor(TASK, {"aidotnet": searcher}, holdout_seed=918273)(cell("aidotnet"), directory, False)
         self.assertEqual("failed", outcome["Status"])
-        self.assertEqual("TimeoutError", outcome["Reason"])
+        # Type AND message: eighteen cells reading "SearchFailed" name no cause at all, which is
+        # what a re-pilot whose every cell failed actually printed.
+        self.assertEqual("TimeoutError: provider timed out", outcome["Reason"])
+
+    def test_a_long_failure_keeps_both_ends_of_its_message(self):
+        """A subprocess failure carries a traceback, and its exception line is at the END.
+
+        Bounding the message by its head alone - the obvious thing - cut off exactly the line that
+        names the cause: every OpenEvolve cell of a rehearsal reported the same asyncio frame, and
+        the `ModuleNotFoundError` that explained all of them was past the cut.
+        """
+        tail = "ModuleNotFoundError: No module named 'openevolve'"
+
+        def searcher(_cell, _directory, _resume):
+            raise RuntimeError("the adapter exited 1: " + "stack frame " * 200 + tail)
+
+        with tempfile.TemporaryDirectory() as directory:
+            outcome = pilot_cells.executor(TASK, {"aidotnet": searcher}, holdout_seed=918273)(
+                cell("aidotnet"), directory, False)
+        reason = outcome["Reason"]
+        self.assertTrue(reason.startswith("RuntimeError: the adapter exited 1:"), reason)
+        self.assertTrue(reason.endswith(tail), reason)
+        self.assertLess(len(reason), 400, "a stack-sized string must not become the journal")
 
     def test_a_cell_that_spent_and_then_failed_still_reports_what_it_spent(self):
         """A failed cell used to report no calls at all, so the campaign's bill came out under.
@@ -105,7 +127,7 @@ class PilotCellTests(unittest.TestCase):
             outcome = pilot_cells.executor(TASK, {"aidotnet": searcher}, holdout_seed=918273)(
                 cell("aidotnet"), directory, False)
         self.assertEqual("failed", outcome["Status"])
-        self.assertEqual("Failed", outcome["Reason"])
+        self.assertEqual("Failed: the adapter exited 1", outcome["Reason"])
         self.assertEqual(4, outcome["ModelCalls"])
         self.assertEqual(1200, outcome["ModelTokens"])
         self.assertEqual(2.5, outcome["ThrottleSeconds"])
@@ -137,7 +159,9 @@ class PilotCellTests(unittest.TestCase):
         finally:
             pilot_cells.family.holdout = genuine
         self.assertEqual("failed", outcome["Status"])
-        self.assertEqual("ValueError", outcome["Reason"], "family.score must refuse an unsealed split")
+        self.assertEqual("ValueError: The held-out split does not match its seal, so its score would "
+                         "not be held out.", outcome["Reason"],
+                         "family.score must refuse an unsealed split, and say which refusal it was")
 
     def test_the_registered_partition_seal_is_the_one_the_endpoint_is_scored_against(self):
         """A pre-registered hash is only a commitment if it is the hash of the rows that get scored.
