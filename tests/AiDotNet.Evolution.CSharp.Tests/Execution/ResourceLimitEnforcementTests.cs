@@ -60,16 +60,18 @@ public sealed class ResourceLimitEnforcementTests
     public async Task A_candidate_past_its_cpu_time_limit_is_terminated_and_reported()
     {
         var clock = Stopwatch.StartNew();
-        ProgramExecuteResponse over = await Run("while True:\n    pass\n", limits => limits.CpuTimeLimitSeconds = 1);
+        ProgramExecuteResponse over = await Run("while True:\n    pass\n",
+            limits => limits.CpuTimeLimitSeconds = 1, CpuCaseWallLimitSeconds);
         // The engine's own account (exit code, which limit it saw) makes a runner-specific failure diagnosable.
         Assert.True(over.ErrorCode == ProgramExecuteErrorCode.CpuTimeLimitExceeded,
             $"expected CpuTimeLimitExceeded, got {over.ErrorCode} after {clock.Elapsed.TotalSeconds:F1} s: {over.Error}");
         Assert.False(over.Success);
-        Assert.True(clock.Elapsed < TimeSpan.FromSeconds(15), "the wall-clock limit ended it, not the CPU-time limit");
+        Assert.True(clock.Elapsed < TimeSpan.FromSeconds(CpuCaseWallLimitSeconds),
+            "the wall-clock limit ended it, not the CPU-time limit");
 
         ProgramExecuteResponse under = await Run(
             "import time\nend = time.time() + 0.2\nwhile time.time() < end:\n    pass\nprint('done')\n",
-            limits => limits.CpuTimeLimitSeconds = 5);
+            limits => limits.CpuTimeLimitSeconds = 5, CpuCaseWallLimitSeconds);
         Assert.True(under.Success, under.Error);
         Assert.Contains("done", under.StdOut, StringComparison.Ordinal);
     }
@@ -78,7 +80,8 @@ public sealed class ResourceLimitEnforcementTests
     public async Task Waiting_does_not_count_against_the_cpu_time_limit()
     {
         ProgramExecuteResponse sleeper = await Run(
-            "import time\ntime.sleep(3)\nprint('rested')\n", limits => limits.CpuTimeLimitSeconds = 1);
+            "import time\ntime.sleep(3)\nprint('rested')\n",
+            limits => limits.CpuTimeLimitSeconds = 1, CpuCaseWallLimitSeconds);
         Assert.True(sleeper.Success, sleeper.Error);
         Assert.Contains("rested", sleeper.StdOut, StringComparison.Ordinal);
     }
@@ -137,13 +140,24 @@ public sealed class ResourceLimitEnforcementTests
         Assert.Null(fine.ErrorCode);
     }
 
-    private static async Task<ProgramExecuteResponse> Run(string source, Action<ProgramSandboxLimitOptions> configure)
+    /// <summary>The wall limit the CPU-time cases run under, so only the limit under test can fire.</summary>
+    /// <remarks>
+    /// A busy shared runner gives a candidate a small CPU share, so one second of *CPU* can take far
+    /// longer than that in wall time. At the 20 s default the wall limit sometimes won that race and
+    /// the test failed reporting the wrong error code - the assertion was right and the setup was
+    /// wrong. Raising the net for those cases removes the second limit without touching the first:
+    /// the CPU-limit error code is still asserted exactly, and the run is still bounded.
+    /// </remarks>
+    private const int CpuCaseWallLimitSeconds = 120;
+
+    private static async Task<ProgramExecuteResponse> Run(string source, Action<ProgramSandboxLimitOptions> configure,
+        int wallLimitSeconds = 20)
     {
         if (MissingInterpreter.Value is { } missing)
             Assert.Fail("These tests need Python on PATH or in EVOLUTION_PYTHON: " + missing);
         var options = new ProgramSandboxOptions();
         options.SetInterpreter(ProgramLanguage.Python, new ProgramInterpreterSpecification(Python, "{source}"));
-        options.Limits.TimeLimitSeconds = 20;
+        options.Limits.TimeLimitSeconds = wallLimitSeconds;
         configure(options.Limits);
         using var engine = new ProcessProgramExecutionEngine(options);
         return await engine.ExecuteAsync(new ProgramExecuteRequest { Language = ProgramLanguage.Python, SourceCode = source });
