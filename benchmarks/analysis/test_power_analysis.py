@@ -122,6 +122,17 @@ class PowerAnalysisTests(unittest.TestCase):
         self.assertIn("var=", chr(10).join(
             power.lines({"Endpoints": [row], "RequiredN": row["RequiredN"]})))
 
+    def test_a_variance_too_small_for_four_decimals_is_still_reported(self):
+        # `%.4f` printed var=0.0000 for anything under 0.00005, so a nondegenerate endpoint read as
+        # a degenerate one in the very report the variance was added to (review caught it).
+        row = self.analyse([0.10, 0.90, 0.20, 0.80, 0.30, 0.70], 0.05)["Endpoints"][0]
+        tiny = dict(row, Variance=4e-9, StandardDeviation=6.3246e-5, Degenerate=False)
+        line = power.lines({"Endpoints": [tiny], "RequiredN": tiny["RequiredN"]})[0]
+        self.assertNotIn("var=0.0000", line)
+        self.assertNotIn("sd=0.0000", line)
+        self.assertIn("var=4e-09", line)
+        self.assertNotIn("DEGENERATE", line, "a small variance is not a zero one")
+
     def test_a_non_positive_target_width_is_refused(self):
         for width in (0.0, -1.0, math.inf):
             with self.subTest(width=width), self.assertRaises(ValueError):

@@ -32,6 +32,7 @@ campaign machine remain review responsibilities.
 from __future__ import annotations
 
 import argparse
+from fractions import Fraction
 import hashlib
 import json
 import math
@@ -220,13 +221,13 @@ def geometric_mean_speedups(registration, rows, family):
     return result
 
 
-def cost_reductions(registration, rows, family):
-    """Fraction of the competitor's total search cost our arm did not spend, per config.
+def cost_totals(registration, rows, family):
+    """The two integer cost totals per config: what we spent and what they spent.
 
-    The criterion's alternative route. Cost is the registered budget's own currency - model calls and
-    tokens, which every row must report inside the shared ceiling - so this is the same denominator
-    the equal-search-cost check uses rather than a second notion of cost. A failed run has no cost
-    reduction: it did not pay the whole price of an answer, so it cannot claim to have paid less.
+    Cost is the registered budget's own currency - model calls and tokens, which every row must
+    report inside the shared ceiling - so this is the same denominator the equal-search-cost check
+    uses rather than a second notion of cost. A failed run has no cost total: it did not pay the
+    whole price of an answer, so it cannot claim to have paid less.
     """
     cells = {(row["Family"], row["Arm"], row["Seed"]): row for row in rows}
     result = {}
@@ -241,8 +242,32 @@ def cost_reductions(registration, rows, family):
                 break
             ours += int(mine["ModelCalls"]) + int(mine["ModelTokens"])
             theirs += int(yours["ModelCalls"]) + int(yours["ModelTokens"])
-        result[config] = None if not complete or theirs <= 0 else 1.0 - (ours / theirs)
+        result[config] = None if not complete or theirs <= 0 else (ours, theirs)
     return result
+
+
+def cost_reductions(totals):
+    """Fraction of the competitor's total search cost our arm did not spend, per config.
+
+    The criterion's alternative route. This is the reported number; the floor is decided on the
+    integer totals it came from, because the division cannot represent the floor exactly.
+    """
+    return {config: None if total is None else 1.0 - (total[0] / total[1])
+            for config, total in totals.items()}
+
+
+def meets_cost_reduction_floor(totals):
+    """Whether every config saved at least the predeclared fraction, decided on the integers.
+
+    `1.0 - 808 / 1010` is 0.19999999999999996, so an arm that spent exactly a fifth less than the
+    competitor failed a float comparison against 0.20 - the declared floor rejecting the very
+    reduction it declares (review caught it). The totals are counts, so the comparison is exact
+    rational arithmetic on them: ours/theirs <= 1 - floor, with the floor read from its decimal
+    form rather than from the binary double nearest to it.
+    """
+    floor = Fraction(str(MINIMUM_COST_REDUCTION))
+    return all(total is not None and Fraction(total[0], total[1]) <= 1 - floor
+               for total in totals.values())
 
 
 def assess_bundle(claim, root, repository):
@@ -304,9 +329,9 @@ def assess_bundle(claim, root, repository):
             # Measured for every family, not only speedup ones: a claim that declares this route and
             # names an nmse family used to get CostReduction=None and a route with no effect, which
             # review caught - the route is a property of the claim, not of the endpoint's metric.
-            savings = cost_reductions(registration, rows, family)
-            effect_floor = all(value is not None and value >= MINIMUM_COST_REDUCTION
-                               for value in savings.values())
+            totals = cost_totals(registration, rows, family)
+            savings = cost_reductions(totals)
+            effect_floor = meets_cost_reduction_floor(totals)
         if family["Endpoint"]["Metric"] == SPEEDUP_METRIC:
             require(family["Endpoint"]["Direction"] == "maximize", "A speedup endpoint must be maximized")
             speedups = geometric_mean_speedups(registration, rows, family)

@@ -146,6 +146,22 @@ class TargetWidthTests(unittest.TestCase):
         self.assertIn("Unachievable", source, "a refused sizing is recorded rather than thrown away")
 
 
+class ExitStatusTests(unittest.TestCase):
+    """What the status says about a campaign that wrote everything except a size."""
+
+    def test_a_refused_sizing_is_not_a_successful_campaign(self):
+        # The refusal records Unachievable and keeps the evidence, but the status stayed zero while
+        # every cell had completed - so an automated caller read a campaign with no number in it as
+        # a campaign with one (review caught it).
+        refused = {"Schema": "evolution-power-analysis-v1", "Unachievable": "514 seeds exceeds the cap"}
+        sized = {"Schema": "evolution-power-analysis-v1", "RequiredN": 514}
+        hole = [{"Status": "failed", "Arm": "aidotnet", "Seed": 1}]
+        self.assertEqual(1, runner.exit_status([], refused), "no size is a failed campaign")
+        self.assertEqual(1, runner.exit_status(hole, refused))
+        self.assertEqual(1, runner.exit_status(hole, sized), "a hole in the paired design still fails")
+        self.assertEqual(0, runner.exit_status([], sized), "every cell completed and the sizing holds")
+
+
 class SummaryTests(unittest.TestCase):
     """What the run's own account says about a cell it could not account for."""
 

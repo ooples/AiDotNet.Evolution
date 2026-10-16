@@ -280,6 +280,29 @@ class ReleaseGateTests(unittest.TestCase):
         self.assertFalse(family["MeetsEffectFloor"], "10% is not the predeclared 20%")
         self.assertFalse(family["Supported"])
 
+    def test_the_cost_route_accepts_a_saving_of_exactly_the_declared_fifth(self):
+        """`1.0 - 808 / 1010` is 0.19999999999999996, which is not >= 0.20 as a double.
+
+        So the float comparison rejected an arm that spent exactly the predeclared fifth less - the
+        floor turning down the very reduction it declares (review caught it). The totals are counts,
+        and the floor is now decided on them.
+        """
+        def exactly(registration):
+            result = rows(registration, ours=1.05)
+            for row in result:
+                if row["Arm"] == "aidotnet":
+                    row["ModelCalls"], row["ModelTokens"] = 8, 800
+            return result
+
+        fixture = self.fixture(raw=exactly)
+        fixture.claim["effect_route"] = "cost-reduction"
+        fixture.write_claim()
+        family = fixture.assess()["families"][0]
+        self.assertLess(family["CostReduction"]["recommended"], rg.MINIMUM_COST_REDUCTION,
+                        "the reported fraction is the division, and the division lands under the floor")
+        self.assertTrue(family["MeetsEffectFloor"], "the floor is decided on the integers it came from")
+        self.assertTrue(family["Supported"])
+
     def test_an_undeclared_route_name_is_refused(self):
         fixture = self.fixture()
         fixture.claim["effect_route"] = "whatever-wins"

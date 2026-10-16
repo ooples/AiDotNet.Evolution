@@ -115,10 +115,15 @@ def analyse(registration, runs, report, *, half_width, confidence=0.95):
 
 
 def lines(analysis):
-    """One line per endpoint, so the variance is as visible as the number derived from it."""
+    """One line per endpoint, so the variance is as visible as the number derived from it.
+
+    The two spread numbers are printed to four significant figures rather than four decimals: a
+    variance below 0.00005 reads as `var=0.0000` under a fixed format, which is how a nondegenerate
+    endpoint comes to look like a degenerate one in the report (review caught it).
+    """
     out = []
     for row in analysis["Endpoints"]:
-        out.append("%-22s %-12s n=%-3d var=%.4f sd=%.4f observed=%.4f target=%.4f required=%-5d "
+        out.append("%-22s %-12s n=%-3d var=%.4g sd=%.4g observed=%.4f target=%.4f required=%-5d "
                    "(scaled %d, normal %d)%s"
                    % (row["Family"], row["Config"], row["PilotN"], row["Variance"],
                       row["StandardDeviation"], row["ObservedHalfWidth"], row["TargetHalfWidth"],

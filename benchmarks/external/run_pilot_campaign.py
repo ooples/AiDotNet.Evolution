@@ -207,6 +207,16 @@ def build_parser():
     return parser
 
 
+def exit_status(failed, analysis):
+    """Nonzero when the campaign has a hole in its paired design, or no size estimate to show for it.
+
+    Both of those are still written to disk in full - the status is for the automated caller, which
+    read a refused sizing as a successful campaign while every cell had completed, so a run with no
+    number in it looked like a run with one (review caught it).
+    """
+    return 1 if failed or "Unachievable" in analysis else 0
+
+
 def main():
     parser = build_parser()
     arguments = parser.parse_args()
@@ -309,9 +319,7 @@ def main():
     failed = [row for row in rows if row["Status"] != "completed"]
     for row in failed:
         print("FAILED %-24s seed %s %s calls=%s" % (row["Arm"], row["Seed"], row.get("Reason"), row["ModelCalls"]))
-    # A failed cell is a hole in a paired design, so the exit code says so even though the rows,
-    # the report and every receipt are already written.
-    raise SystemExit(1 if failed else 0)
+    raise SystemExit(exit_status(failed, analysis))
 
 
 if __name__ == "__main__":
