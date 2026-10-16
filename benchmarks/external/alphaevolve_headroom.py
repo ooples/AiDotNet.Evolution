@@ -20,6 +20,7 @@ from __future__ import annotations
 
 import argparse
 import json
+import pathlib
 import random
 
 import numpy as np
@@ -27,8 +28,18 @@ import numpy as np
 import alphaevolve_math as ae
 
 def free(heights):
-    """No constraint beyond what the verifier itself imposes."""
+    """No constraint beyond what the verifier itself imposes - c4 takes a SIGNED coefficient vector."""
     return heights
+
+
+def nonnegative(heights):
+    """The height-vector problems' only constraint: every coordinate at or above zero.
+
+    This belongs to the problem and not to the search, which is why it is a repair. The clamp used to
+    live inside `descend`, where it silently applied to c4 as well and refused half of that
+    problem's feasible set before the verifier ever saw a candidate.
+    """
+    return np.clip(np.asarray(heights, dtype=np.float64), 0.0, None)
 
 
 def half_sum_in_unit_box(heights):
@@ -54,22 +65,74 @@ def half_sum_in_unit_box(heights):
     return None
 
 
-# id -> (verifier, repair, direction, published, candidate lengths to try)
+# Every problem whose candidate is a vector of reals. `cap` bounds the iterations for a verifier too
+# slow to run at the full budget - c4's is exact rational arithmetic - and the effective budget is
+# recorded per row, so a capped problem cannot read as though it had the whole budget.
+VECTOR = (8, 12, 16, 24, 32, 50)
 IN_SCOPE = {
-    "c1-autocorrelation": (lambda v: ae.c1(v), free, "minimize", 1.5053, (8, 12, 16, 24, 32, 50)),
-    "c2-autocorrelation": (lambda v: ae.c2(v), free, "maximize", 0.8962, (8, 12, 16, 24, 32, 50)),
-    "c3-autocorrelation": (lambda v: ae.c3(v), free, "minimize", 1.4557, (8, 12, 16, 24, 32, 50)),
-    "c3prime-autocorrelation": (lambda v: ae.c3(v, True), free, "minimize", 1.4688, (8, 12, 16, 24, 32, 50)),
-    "c5-erdos-overlap": (lambda v: ae.c5(v), half_sum_in_unit_box, "minimize", 0.380924, (8, 12, 16, 24, 32)),
+    "c1-autocorrelation": dict(objective=lambda v: ae.c1(v), repair=nonnegative, direction="minimize",
+                               published=1.5053, lengths=VECTOR, cap=None),
+    "c2-autocorrelation": dict(objective=lambda v: ae.c2(v), repair=nonnegative, direction="maximize",
+                               published=0.8962, lengths=VECTOR, cap=None),
+    "c3-autocorrelation": dict(objective=lambda v: ae.c3(v), repair=nonnegative, direction="minimize",
+                               published=1.4557, lengths=VECTOR, cap=None),
+    "c3prime-autocorrelation": dict(objective=lambda v: ae.c3(v, True), repair=nonnegative,
+                                    direction="minimize", published=1.4688, lengths=VECTOR, cap=None),
+    "c5-erdos-overlap": dict(objective=lambda v: ae.c5(v), repair=half_sum_in_unit_box,
+                             direction="minimize", published=0.380924, lengths=(8, 12, 16, 24, 32),
+                             cap=None),
+    "c4-uncertainty-hermite": dict(objective=lambda v: ae.hermite_bound(v), repair=free,
+                                   direction="minimize", published=0.3521, lengths=(1, 2, 3),
+                                   cap=1000),
 }
-# c6 takes a set of INTEGERS with minimum 0, not a height vector: a float candidate is refused by
-# its verifier, so it belongs here with the other candidate shapes rather than behind a repair
-# that would quietly turn it into a different problem.
-OUT_OF_SCOPE = ("c6-sums-differences-2003", "c6-sums-differences-54265", "hexagons-11", "hexagons-12", "maxmin-ratio-2d-16", "maxmin-ratio-3d-14",
-                "heilbronn-triangle-11", "heilbronn-convex-13", "heilbronn-convex-14", "kissing-11",
-                "circles-square-26", "circles-square-32", "circles-rectangle-21")
+
+# Why each transcribed problem the floor does not touch is not touched. The partition is checked
+# against the manifest rather than listed by hand: the first version of this file named 13
+# exclusions and the notebook transcribes 36, so 18 tensor problems and both c4 problems were
+# missing from it - and one of the two turned out to be in scope.
+TENSOR = ("the candidate is a rank-R decomposition - three factor matrices over a ring - and not a "
+          "vector of reals")
+GEOMETRY = ("the candidate is a point set, triangle, hexagon or set of sphere centres, whose shape "
+            "and feasibility differ per problem")
+INTEGER_SET = ("the candidate is a set of INTEGERS with minimum 0, so a float vector is refused by "
+               "its own verifier, and a repair that rounded would quietly change the problem")
+UNCHECKED_ADMISSIBILITY = (
+    "its verifier computes the bound from a construction it ASSUMES admissible and never checks that "
+    "assumption: a random vector of twelve positive reals scores 0.101685 against the published "
+    "0.3216, so minimising it rewards an inadmissible candidate rather than a better one. Scoring a "
+    "search against this would manufacture a win over AlphaEvolve out of an invalid construction")
+BY_ID = {
+    "c6-sums-differences-2003": INTEGER_SET,
+    "c6-sums-differences-54265": INTEGER_SET,
+    "c4-uncertainty-laguerre": UNCHECKED_ADMISSIBILITY,
+}
+
+
+def out_of_scope(manifest_path):
+    """Every transcribed problem not in scope, with its reason. Raises if the partition is not whole."""
+    manifest = json.loads(pathlib.Path(manifest_path).read_text(encoding="utf-8"))
+    rows = []
+    for problem in manifest["rows"]:
+        identity = problem["id"]
+        if identity in IN_SCOPE:
+            continue
+        reason = BY_ID.get(identity, TENSOR if problem["kind"] == "tensor" else GEOMETRY)
+        rows.append({"Problem": identity, "Kind": problem["kind"], "Reason": reason})
+    if len(rows) + len(IN_SCOPE) != manifest["problems"]:
+        raise ValueError(
+            "The partition covers %d problems and the manifest transcribes %d: a problem in neither "
+            "list is one silently dropped from the inventory."
+            % (len(rows) + len(IN_SCOPE), manifest["problems"]))
+    missing = sorted(set(IN_SCOPE) - {problem["id"] for problem in manifest["rows"]})
+    if missing:
+        raise ValueError("In scope but not transcribed, so there is no published value to be behind: "
+                         + ", ".join(missing))
+    return rows
+
+
+MANIFEST = pathlib.Path(__file__).resolve().parents[1] / "evidence/alphaevolve-math/manifest.json"
 SEEDS = (1, 2, 3, 4, 5)
-PROTOCOL = "alphaevolve-headroom-v2"
+PROTOCOL = "alphaevolve-headroom-v3"
 
 # The step schedule is absolute rather than a fraction of the budget, which is what makes the floor
 # MONOTONE IN BUDGET: an N-iteration run draws exactly the prefix a longer run draws and takes the
@@ -100,7 +163,7 @@ def descend(objective, repair, direction, length, seed, iterations):
         step = 0.25 * 0.5 ** min(index // STAGE, STAGE_HALVINGS)
         position = rng.randrange(length)
         trial = heights.copy()
-        trial[position] = max(0.0, trial[position] + rng.gauss(0, step))
+        trial[position] = trial[position] + rng.gauss(0, step)
         repaired = repair(trial)
         if repaired is not None:
             value = objective(repaired)
@@ -109,14 +172,17 @@ def descend(objective, repair, direction, length, seed, iterations):
     return best
 
 
-def measure(iterations):
+def measure(iterations, manifest_path=None):
+    excluded = out_of_scope(manifest_path or MANIFEST)
     rows = []
-    for identity, (objective, repair, direction, published, lengths) in IN_SCOPE.items():
+    for identity, spec in IN_SCOPE.items():
+        direction, published = spec["direction"], spec["published"]
+        budget = iterations if spec["cap"] is None else min(iterations, spec["cap"])
         wins = better(direction)
         best, best_length = None, None
-        for length in lengths:
+        for length in spec["lengths"]:
             for seed in SEEDS:
-                value = descend(objective, repair, direction, length, seed, iterations)
+                value = descend(spec["objective"], spec["repair"], direction, length, seed, budget)
                 if value is not None and (best is None or wins(value, best)):
                     best, best_length = value, length
         if best is None:
@@ -128,20 +194,25 @@ def measure(iterations):
             "Problem": identity, "Direction": direction, "Published": published,
             "FloorBest": best, "FloorLength": best_length, "GapFraction": gap,
             "FloorReachesPublished": not (gap > 0),
-            "Iterations": iterations, "Seeds": len(SEEDS), "Lengths": list(lengths),
+            "Iterations": budget, "Capped": budget < iterations,
+            "Seeds": len(SEEDS), "Lengths": list(spec["lengths"]),
         })
     return {"Protocol": PROTOCOL, "Source": ae.SOURCE_REPOSITORY, "SourceCommit": ae.SOURCE_COMMIT,
-            "InScope": sorted(IN_SCOPE), "OutOfScope": list(OUT_OF_SCOPE), "Rows": rows}
+            "RequestedIterations": iterations, "Transcribed": len(rows) + len(excluded),
+            "InScope": sorted(IN_SCOPE), "OutOfScope": excluded, "Rows": rows}
 
 
 def lines(report):
-    out = ["floor vs published, %d problems in scope of %d transcribed (%d out of scope: other candidate shapes)"
-           % (len(report["Rows"]), len(report["Rows"]) + len(report["OutOfScope"]), len(report["OutOfScope"]))]
+    out = ["floor vs published, %d of %d transcribed problems in scope (%d out of scope, each with a reason)"
+           % (len(report["Rows"]), report["Transcribed"], len(report["OutOfScope"]))]
     for row in report["Rows"]:
-        out.append("%-26s %-8s published %-12s floor %-12s gap %+.2f%%  %s"
+        out.append("%-26s %-8s published %-12s floor %-12s gap %+.2f%%  %s%s"
                    % (row["Problem"], row["Direction"], ("%.6g" % row["Published"]),
                       ("%.6g" % row["FloorBest"]), 100 * row["GapFraction"],
-                      "FLOOR REACHES IT" if row["FloorReachesPublished"] else "room to compete"))
+                      "FLOOR REACHES IT" if row["FloorReachesPublished"] else "room to compete",
+                      " (capped at %d iterations)" % row["Iterations"] if row["Capped"] else ""))
+    for row in report["OutOfScope"]:
+        out.append("  out of scope  %-28s %s" % (row["Problem"], row["Reason"][:96]))
     return out
 
 
@@ -149,8 +220,9 @@ def main():
     parser = argparse.ArgumentParser(description=__doc__.splitlines()[0])
     parser.add_argument("--iterations", type=int, default=20000)
     parser.add_argument("--output")
+    parser.add_argument("--manifest", default=str(MANIFEST))
     arguments = parser.parse_args()
-    report = measure(arguments.iterations)
+    report = measure(arguments.iterations, arguments.manifest)
     print("\n".join(lines(report)))
     if arguments.output:
         with open(arguments.output, "x", encoding="utf-8") as handle:
