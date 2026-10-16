@@ -76,25 +76,33 @@ public sealed partial class EvolutionEngine<TGenome>
             (ulong)evaluationId);
 
         IReadOnlyList<EvolutionArtifact> parentArtifacts = ConsumeArtifacts(selection.Parent.Evaluation.GenomeId);
-        IEvolutionArchiveView<TGenome> view = sourceArchive;
-        string? snapshotHash = null;
-        if (snapshots is not null)
+        EvolutionVariationContext<TGenome> context;
+        if (snapshots is null)
         {
+            context = new EvolutionVariationContext<TGenome>(selection.Parent, selection.Inspirations, proposalRandom,
+                generation, island, parentArtifacts, sourceArchive);
+        }
+        else
+        {
+            // The pipeline path. Its three extra parts - the archive snapshot's fingerprint, the parent
+            // artifacts' fingerprint and the content identity built from both - exist exactly when
+            // `snapshots` does, so they are computed in this branch. The first version computed them
+            // outside it as nullables and then suppressed all three at the call, which hid that the
+            // identity replay is keyed on could be absent.
             if (!snapshots.TryGetValue(sourceIsland, out PipelineArchiveContext? snapshot))
                 snapshots.Add(sourceIsland, snapshot = new PipelineArchiveContext(new EvolutionArchiveSnapshot<TGenome>(sourceArchive)));
-            view = snapshot.Archive;
-            snapshotHash = snapshot.Fingerprint;
+            IEvolutionArchiveView<TGenome> view = snapshot.Archive;
+            string snapshotHash = snapshot.Fingerprint;
+            // Most proposals have no parent artifacts; their fingerprint is a constant computed once.
+            string artifactHash = parentArtifacts.Count == 0 ? EmptyArtifactsHash : HashArtifacts(parentArtifacts);
+            string identity = EvolutionHash.Combine(new[] { "pipeline-proposal-v3-content", _options.RunId, _compatibilityHash,
+                evaluationId.ToString(CultureInfo.InvariantCulture), generation.ToString(CultureInfo.InvariantCulture),
+                island.ToString(CultureInfo.InvariantCulture), view.DefinitionHash, view.Version.ToString(CultureInfo.InvariantCulture),
+                snapshotHash, FingerprintPipelineEvaluation(selection.Parent.Evaluation), artifactHash }
+                .Concat(selection.Inspirations.Select(entry => FingerprintPipelineEvaluation(entry.Evaluation))));
+            context = new EvolutionVariationContext<TGenome>(selection.Parent, selection.Inspirations, proposalRandom,
+                generation, island, parentArtifacts, view, identity, evaluationId, committedBefore);
         }
-        // Most proposals have no parent artifacts; their fingerprint is a constant computed once.
-        string? artifactHash = snapshots is null ? null : parentArtifacts.Count == 0 ? EmptyArtifactsHash : HashArtifacts(parentArtifacts);
-        string? identity = snapshots is null ? null : EvolutionHash.Combine(new[] { "pipeline-proposal-v3-content", _options.RunId, _compatibilityHash,
-            evaluationId.ToString(CultureInfo.InvariantCulture), generation.ToString(CultureInfo.InvariantCulture),
-            island.ToString(CultureInfo.InvariantCulture), view.DefinitionHash, view.Version.ToString(CultureInfo.InvariantCulture),
-            snapshotHash!, FingerprintPipelineEvaluation(selection.Parent.Evaluation), artifactHash! }
-            .Concat(selection.Inspirations.Select(entry => FingerprintPipelineEvaluation(entry.Evaluation))));
-        var context = snapshots is null
-            ? new EvolutionVariationContext<TGenome>(selection.Parent, selection.Inspirations, proposalRandom, generation, island, parentArtifacts, view)
-            : new EvolutionVariationContext<TGenome>(selection.Parent, selection.Inspirations, proposalRandom, generation, island, parentArtifacts, view, identity!, evaluationId, committedBefore);
         return new VariationRequest(evaluationId, island, lineage, context);
     }
 
@@ -114,7 +122,7 @@ public sealed partial class EvolutionEngine<TGenome>
         {
             TGenome proposed = await _variation.ProposeAsync(request.Context, cancellationToken).ConfigureAwait(false);
             if (proposed is null) throw new InvalidOperationException("The variation operator returned null.");
-            return new VariationResponse(proposed, false);
+            return VariationResponse.Proposed(proposed);
         }
         catch (OperationCanceledException) when (cancellationToken.IsCancellationRequested)
         {
@@ -122,7 +130,8 @@ public sealed partial class EvolutionEngine<TGenome>
         }
         catch (Exception exception) when (EvolutionExceptionPolicy.IsRecoverable(exception))
         {
-            return new VariationResponse(default!, true);
+            // A recoverable failure produced no genome at all, so there is none to carry.
+            return VariationResponse.Failure();
         }
     }
 
@@ -146,10 +155,32 @@ public sealed partial class EvolutionEngine<TGenome>
         public EvolutionVariationContext<TGenome> Context { get; } = context;
     }
 
-    private sealed class VariationResponse(TGenome genome, bool failed)
+    /// <summary>One variation attempt's outcome: a proposed genome, or a recoverable failure with none.</summary>
+    /// <remarks>
+    /// Built through factories because a failure has no genome. The first version passed `default!` for it,
+    /// which suppresses the warning and misdescribes the value: `TGenome` is unconstrained, so for a struct
+    /// genome that default is a real zero value rather than an absence, and `Failed` was the only thing
+    /// standing between it and `PrepareGenomeAsync`. A one-or-zero element array carries the absence itself.
+    /// </remarks>
+    private sealed class VariationResponse
     {
-        public TGenome Genome { get; } = genome;
-        public bool Failed { get; } = failed;
+        private readonly TGenome[] _genome;
+
+        private VariationResponse(TGenome[] genome, bool failed)
+        {
+            _genome = genome;
+            Failed = failed;
+        }
+
+        public static VariationResponse Proposed(TGenome genome) => new(new[] { genome }, false);
+
+        public static VariationResponse Failure() => new(Array.Empty<TGenome>(), true);
+
+        public bool Failed { get; }
+
+        public TGenome Genome => _genome.Length == 1
+            ? _genome[0]
+            : throw new InvalidOperationException("A failed variation produced no genome; check Failed before reading it.");
     }
 
     // An evaluation is immutable, so its fingerprint is a pure function of the instance. Pipeline
