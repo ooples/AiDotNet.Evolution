@@ -21,6 +21,7 @@ from __future__ import annotations
 
 import argparse
 import json
+import math
 from pathlib import Path
 import sys
 import time
@@ -48,7 +49,12 @@ MODEL = "sonnet"
 # this many of the broker's tokens. It is here so the two ceilings can be checked against each other
 # rather than set independently: a token ceiling that binds before the call ceiling does not refuse a
 # call, it shortens the search, and the row still reads as a completed cell.
-TOKENS_PER_CALL = 40_000
+# Measured over the 180 calls of the first real campaign: 478,903 broker tokens, **2,661 per
+# call**. The 40,000 this started at came from a full interactive session's cache-creation cost
+# and overestimated an isolated `claude -p` call by ~15x, which made the projection print 7.2M
+# tokens for a campaign that spent 479k. Kept well above the measurement, because the ceiling
+# this sizes must bind after the call ceiling rather than before it.
+TOKENS_PER_CALL = 8_000
 
 
 STUB_DIFF = "\n".join(["<<<<<<< SEARCH", "def predict(*xs):", "    return 0.0", "=======",
@@ -168,6 +174,7 @@ def describe(projection, arguments):
         % (arguments.model_calls, arguments.iterations),
         "rough cost           ~%d tokens if every call is served, at ~%dk per call"
         % (projection["MaxModelCalls"] * TOKENS_PER_CALL, TOKENS_PER_CALL // 1000),
+        "sizing target        CI half width %.4g, frozen with the seeds" % arguments.target_half_width,
         "ProjectionSha256     " + projection["ProjectionSha256"],
     ]
 
@@ -192,9 +199,43 @@ def build_parser():
                         help="per cell; must leave the call ceiling binding first")
     parser.add_argument("--wall-seconds", type=int, default=1800, help="per cell")
     parser.add_argument("--cell-timeout", type=int, default=1800)
+    # V1-40 (#121): the gate campaign's N comes from the variance this pilot measures, against the
+    # CI half width the pre-registration will declare. Reported, never acted on here.
+    parser.add_argument("--target-half-width", type=float, default=0.05,
+                        help="CI half width the gate campaign must reach; sizes its N")
     parser.add_argument("--confirm", help="the printed ProjectionSha256; without it nothing runs")
     parser.add_argument("--stub", action="store_true", help="rehearse the whole path for no spend")
     return parser
+
+
+def frozen_half_width(path, requested):
+    """The sizing target the first run froze, refusing a later run that changed it.
+
+    The width is the denominator of the reported N, so a run free to change it after the seeds were
+    drawn could pick the number the pilot reports - which is the one thing freezing a registration
+    exists to prevent (review caught it). It is frozen beside the registration rather than inside
+    it because `pilot_campaign.spec` is a closed field set the release gate validates: an undeclared
+    knob cannot ride along into a frozen registration.
+    """
+    if not path.exists():
+        raise SystemExit("Refusing " + str(path.parent) + ": it holds a frozen registration but no "
+                         "frozen sizing target, so nothing says which width the reported N was for")
+    frozen = json.loads(path.read_text(encoding="utf-8"))["TargetHalfWidth"]
+    if frozen != requested:
+        raise SystemExit("--target-half-width %r is not the %r this campaign froze with its seeds. "
+                         "The width sizes the N the pilot reports, so it is not a choice left open "
+                         "after the registration." % (requested, frozen))
+    return frozen
+
+
+def exit_status(failed, analysis):
+    """Nonzero when the campaign has a hole in its paired design, or no size estimate to show for it.
+
+    Both of those are still written to disk in full - the status is for the automated caller, which
+    read a refused sizing as a successful campaign while every cell had completed, so a run with no
+    number in it looked like a run with one (review caught it).
+    """
+    return 1 if failed or "Unachievable" in analysis else 0
 
 
 def main():
@@ -203,6 +244,8 @@ def main():
     if not arguments.stub and not arguments.executable:
         parser.error("--executable is required unless --stub is given")
 
+    if not (math.isfinite(arguments.target_half_width) and arguments.target_half_width > 0):
+        raise SystemExit("--target-half-width must be a positive, finite number; it sizes the gate campaign")
     budget_tokens = arguments.model_calls * TOKENS_PER_CALL
     if arguments.model_tokens < budget_tokens:
         raise SystemExit("--model-tokens %d is below %d calls x ~%d tokens: the token ceiling would bind "
@@ -210,6 +253,7 @@ def main():
                          % (arguments.model_tokens, arguments.model_calls, TOKENS_PER_CALL))
     root = Path(arguments.root)
     registration_path = root / "registration" / "registration.json"
+    sizing_path = root / "registration" / "sizing.json"
     if registration_path.exists():
         # The second run is the one that launches, and it must use the seeds the first run drew -
         # re-freezing would draw new ones after the operator had seen the projection, which is the
@@ -225,6 +269,9 @@ def main():
     else:
         frozen, _, projection = pilot_campaign.freeze(
             declare(arguments.task, arguments, arguments.holdout_seed), root / "registration")
+        sizing_path.write_text(json.dumps({"TargetHalfWidth": arguments.target_half_width}, indent=1)
+                               + chr(10), encoding="utf-8")
+    half_width = frozen_half_width(sizing_path, arguments.target_half_width)
     for line in describe(projection, arguments):
         print(line)
     if arguments.confirm != projection["ProjectionSha256"]:
@@ -268,10 +315,25 @@ def main():
                 if models is not None else {})
     summary = summarise(rows, report, task=arguments.task, arguments=arguments, frozen=frozen,
                         projection=projection, wall=wall, canaries=canaries, receipts=receipts)
-    (evidence / "rows.json").write_text(json.dumps(rows, indent=1) + "\n", encoding="utf-8")
-    (evidence / "report.json").write_text(json.dumps(report, indent=1) + "\n", encoding="utf-8")
+    # The raw results are written before the sizing is computed, because the sizing can refuse:
+    # an endpoint needing more than the cap raises, and a campaign that cost real money would
+    # otherwise lose rows.json, report.json and summary.json to a projection off them.
+    (evidence / "rows.json").write_text(json.dumps(rows, indent=1) + chr(10), encoding="utf-8")
+    (evidence / "report.json").write_text(json.dumps(report, indent=1) + chr(10), encoding="utf-8")
+    try:
+        analysis = pilot_campaign.power(frozen, rows, report, half_width=half_width)
+    except ValueError as error:
+        analysis = {"Schema": "evolution-power-analysis-v1", "Unachievable": str(error),
+                    "TargetHalfWidth": half_width}
+    summary["power_analysis"] = analysis
+    (evidence / "power-analysis.json").write_text(json.dumps(analysis, indent=1) + chr(10), encoding="utf-8")
     (evidence / "summary.json").write_text(json.dumps(summary, indent=1, allow_nan=False) + "\n", encoding="utf-8")
     print("\n" + "\n".join(pilot_campaign.report_lines(report)))
+    if "Unachievable" in analysis:
+        print(chr(10) + "sizing refused: " + analysis["Unachievable"])
+        print("the campaign's rows, report and summary are written; only the projection is missing")
+    else:
+        print(chr(10) + chr(10).join(pilot_campaign.power_lines(analysis)))
     print("\n%d cells in %.1fs, %d model calls, statuses %s"
           % (len(rows), wall, summary["model_calls"], json.dumps(summary["statuses"])))
     if summary["cells_with_unknown_spend"]:
@@ -282,9 +344,7 @@ def main():
     failed = [row for row in rows if row["Status"] != "completed"]
     for row in failed:
         print("FAILED %-24s seed %s %s calls=%s" % (row["Arm"], row["Seed"], row.get("Reason"), row["ModelCalls"]))
-    # A failed cell is a hole in a paired design, so the exit code says so even though the rows,
-    # the report and every receipt are already written.
-    raise SystemExit(1 if failed else 0)
+    raise SystemExit(exit_status(failed, analysis))
 
 
 if __name__ == "__main__":

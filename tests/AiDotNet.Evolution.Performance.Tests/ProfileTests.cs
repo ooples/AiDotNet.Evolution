@@ -452,8 +452,10 @@ public sealed partial class ProfileTests
         var measurement = await ProfileRunner.MeasureUnpinnedAsync(scenario);
         Assert.Equal(ProfileDelaySchedule.Milliseconds, measurement.DelayBuckets.Select(bucket => bucket.RequestedMilliseconds).ToArray());
         Assert.Equal(measurement.EvaluationCalls, measurement.DelayBuckets.Sum(bucket => bucket.Count));
+        // A measured delay waits the clock out, so it can overrun the request but never fall short of it.
+        // The validator keeps a shortfall allowance for supplied evidence; what we measure here has none.
         foreach (var bucket in measurement.DelayBuckets.Where(bucket => bucket.RequestedMilliseconds > 0))
-            Assert.InRange(bucket.MeanMilliseconds, bucket.RequestedMilliseconds - 0.25,
+            Assert.InRange(bucket.MeanMilliseconds, bucket.RequestedMilliseconds,
                 bucket.RequestedMilliseconds + ProfileProtocol.DelayToleranceMilliseconds);
         Assert.InRange(measurement.Environment.TimerResolutionMilliseconds, 0, 1);
     }

@@ -36,7 +36,14 @@ import time
 
 from codex_transport import kill_owned
 
-PINNED_CLI = "2.1.280 (Claude Code)"
+# Revalidated for 2.1.299 on 2026-10-15, which is what this pin is for: every flag below is still
+# accepted (`--max-turns` works although 2.1.299 dropped it from `--help`), the stream-json shape
+# the parser expects is unchanged (system/init -> assistant -> result/success, plus the
+# rate_limit_event it already collects), and `--setting-sources ""` still suppresses hooks - a
+# probe without that flag had this machine's SessionStart hook inject 29,406 tokens, with it zero
+# hook events. The canary baselines moved 448/579/516 -> re-recorded, because the CLI's own
+# scaffolding grew between the two versions; that is the canary working, not contamination.
+PINNED_CLI = "2.1.299 (Claude Code)"
 MAX_OUTPUT = 4 * 1024 * 1024
 MAX_TEXT = 64 * 1024
 SYSTEM_PROMPT = ("Generate exactly one candidate response to the benchmark conversation in the user message. "

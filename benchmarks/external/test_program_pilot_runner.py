@@ -107,8 +107,12 @@ class BudgetConsistencyTests(unittest.TestCase):
         # The trap this closes: a token cap that binds first does not refuse a call, it shortens the
         # search, and the row still reads as a completed cell. The first version of this script
         # defaulted to 30 calls and 400,000 tokens, which would have stopped every cell at about 10.
+        # The inconsistent pair is derived from TOKENS_PER_CALL rather than written down, because the
+        # constant moved once already - measured at 2,661 per call over the first real campaign.
+        calls = 30
         with tempfile.TemporaryDirectory() as directory:
-            code, _ = invoke(Path(directory) / "campaign", "--model-calls", "30", "--model-tokens", "400000")
+            code, _ = invoke(Path(directory) / "campaign", "--model-calls", str(calls),
+                             "--model-tokens", str(calls * runner.TOKENS_PER_CALL - 1))
             self.assertIsInstance(code, str)
             self.assertIn("token ceiling would bind", code)
 
@@ -118,6 +122,70 @@ class BudgetConsistencyTests(unittest.TestCase):
         self.assertGreaterEqual(defaults["model_tokens"], defaults["model_calls"] * runner.TOKENS_PER_CALL)
         self.assertEqual(10, defaults["model_calls"],
                          "18 cells x 10 calls is what the authorised envelope buys at this account's rate")
+
+
+class TargetWidthTests(unittest.TestCase):
+    def test_a_target_width_that_cannot_size_anything_is_refused_before_the_cells_run(self):
+        # It reached argparse unvalidated, so a zero or infinite width only failed after a paid
+        # campaign had already run - review caught that.
+        for width in ("0", "-0.1", "inf", "nan"):
+            with self.subTest(width=width), tempfile.TemporaryDirectory() as directory:
+                code, _ = invoke(Path(directory) / "campaign", "--target-half-width", width)
+                self.assertIsInstance(code, str)
+                self.assertIn("positive, finite", code)
+
+    def test_a_width_the_registration_did_not_freeze_is_refused(self):
+        # The width is the denominator of the reported N, and the confirming run could change it
+        # without changing ProjectionSha256 - so the number the pilot reports was still a choice
+        # left open after the seeds were drawn (review caught it).
+        with tempfile.TemporaryDirectory() as directory:
+            root = Path(directory) / "campaign"
+            first = invoke(root, "--target-half-width", "0.05")[1]
+            self.assertIn("CI half width 0.05", first, "the operator sees the width before confirming")
+            frozen = json.loads((root / "registration" / "sizing.json").read_text(encoding="utf-8"))
+            self.assertEqual(0.05, frozen["TargetHalfWidth"])
+            code, _ = invoke(root, "--target-half-width", "0.2")
+            self.assertIsInstance(code, str)
+            self.assertIn("froze with its seeds", code)
+            self.assertEqual(2, invoke(root, "--target-half-width", "0.05")[0],
+                             "the frozen width still reaches the gate")
+
+    def test_a_registration_without_a_frozen_sizing_target_is_refused(self):
+        with tempfile.TemporaryDirectory() as directory:
+            root = Path(directory) / "campaign"
+            invoke(root)
+            (root / "registration" / "sizing.json").unlink()
+            code, _ = invoke(root)
+            self.assertIsInstance(code, str)
+            self.assertIn("no", code)
+            self.assertIn("frozen sizing target", code)
+
+    def test_the_sizing_refusal_cannot_destroy_the_campaign_evidence(self):
+        # An endpoint needing more than the cap raises inside the projection. Writing rows and the
+        # report first is what keeps a run that cost money from losing them to that refusal.
+        source = Path(runner.__file__).read_text(encoding="utf-8")
+        rows_at = source.index('(evidence / "rows.json")')
+        report_at = source.index('(evidence / "report.json")')
+        sizing_at = source.index("analysis = pilot_campaign.power(")
+        self.assertLess(rows_at, sizing_at, "rows.json must be written before the sizing can refuse")
+        self.assertLess(report_at, sizing_at, "report.json too")
+        self.assertIn("Unachievable", source, "a refused sizing is recorded rather than thrown away")
+
+
+class ExitStatusTests(unittest.TestCase):
+    """What the status says about a campaign that wrote everything except a size."""
+
+    def test_a_refused_sizing_is_not_a_successful_campaign(self):
+        # The refusal records Unachievable and keeps the evidence, but the status stayed zero while
+        # every cell had completed - so an automated caller read a campaign with no number in it as
+        # a campaign with one (review caught it).
+        refused = {"Schema": "evolution-power-analysis-v1", "Unachievable": "514 seeds exceeds the cap"}
+        sized = {"Schema": "evolution-power-analysis-v1", "RequiredN": 514}
+        hole = [{"Status": "failed", "Arm": "aidotnet", "Seed": 1}]
+        self.assertEqual(1, runner.exit_status([], refused), "no size is a failed campaign")
+        self.assertEqual(1, runner.exit_status(hole, refused))
+        self.assertEqual(1, runner.exit_status(hole, sized), "a hole in the paired design still fails")
+        self.assertEqual(0, runner.exit_status([], sized), "every cell completed and the sizing holds")
 
 
 class SummaryTests(unittest.TestCase):

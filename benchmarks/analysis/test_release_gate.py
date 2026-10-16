@@ -231,6 +231,142 @@ class ReleaseGateTests(unittest.TestCase):
         self.assertFalse(algotune["MeetsSpeedupFloor"])
         self.assertFalse(algotune["Supported"])
 
+    def test_the_declared_cost_route_reaches_the_target_without_the_speedup_floor(self):
+        """US-12's alternative: "predeclare a 20% cost reduction to reach the same target".
+
+        The gate had only the speedup route, so a campaign that reached the target by spending a
+        fifth less had no way to say so. Rigged here: our arm is barely faster (below the 1.10x
+        floor) and spends half the calls and tokens, so the speedup route fails and the cost route
+        passes - and the claim has to name the route to get it.
+        """
+        def cheap(registration, share=0.5):
+            # The fixture's calls/tokens apply to every arm, so our arm's share is set here: the
+            # whole point of this route is that the two arms did *not* spend the same.
+            result = rows(registration, ours=1.05)
+            for row in result:
+                if row["Arm"] == "aidotnet":
+                    row["ModelCalls"] = int(row["ModelCalls"] * share)
+                    row["ModelTokens"] = int(row["ModelTokens"] * share)
+            return result
+        default = self.fixture(raw=cheap).assess()["families"][0]
+        self.assertFalse(default["MeetsSpeedupFloor"], "the speedup route still fails")
+        self.assertFalse(default["MeetsEffectFloor"], "and with no route declared it is the effect floor")
+        self.assertFalse(default["Supported"])
+        self.assertEqual("speedup", default["EffectRoute"], "a claim that names no route keeps the old meaning")
+
+        fixture = self.fixture(raw=cheap)
+        fixture.claim["effect_route"] = "cost-reduction"
+        fixture.write_claim()
+        declared = fixture.assess()["families"][0]
+        for field, saving in declared["CostReduction"]["recommended"].items():
+            self.assertAlmostEqual(0.5, saving, places=6, msg=field)
+        self.assertTrue(declared["MeetsEffectFloor"], "the declared route is what the effect floor means")
+        self.assertFalse(declared["MeetsSpeedupFloor"], "and the speedup reading is unchanged by the route")
+        self.assertTrue(declared["Supported"])
+
+    def test_the_cost_route_refuses_a_saving_below_the_declared_fifth(self):
+        def barely(registration):
+            result = rows(registration, ours=1.05)
+            for row in result:
+                if row["Arm"] == "aidotnet":
+                    row["ModelCalls"] = 9
+                    row["ModelTokens"] = 900
+            return result
+
+        fixture = self.fixture(raw=barely)
+        fixture.claim["effect_route"] = "cost-reduction"
+        fixture.write_claim()
+        family = fixture.assess()["families"][0]
+        for field, saving in family["CostReduction"]["recommended"].items():
+            self.assertAlmostEqual(0.1, saving, places=6, msg=field)
+        self.assertFalse(family["MeetsEffectFloor"], "10% is not the predeclared 20%")
+        self.assertFalse(family["Supported"])
+
+    def test_the_cost_route_accepts_a_saving_of_exactly_the_declared_fifth(self):
+        """`1.0 - 808 / 1010` is 0.19999999999999996, which is not >= 0.20 as a double.
+
+        So the float comparison rejected an arm that spent exactly the predeclared fifth less - the
+        floor turning down the very reduction it declares (review caught it). The totals are counts,
+        and the floor is now decided on them.
+        """
+        def exactly(registration):
+            result = rows(registration, ours=1.05)
+            for row in result:
+                if row["Arm"] == "aidotnet":
+                    row["ModelCalls"], row["ModelTokens"] = 8, 800
+            return result
+
+        fixture = self.fixture(raw=exactly)
+        fixture.claim["effect_route"] = "cost-reduction"
+        fixture.write_claim()
+        family = fixture.assess()["families"][0]
+        for field, saving in family["CostReduction"]["recommended"].items():
+            self.assertLess(saving, rg.MINIMUM_COST_REDUCTION, "%s: the reported fraction is the "
+                            "division, and the division lands under the floor" % field)
+        self.assertTrue(family["MeetsEffectFloor"], "the floor is decided on the integers it came from")
+        self.assertTrue(family["Supported"])
+
+    def test_a_saving_bought_by_spending_ten_times_the_calls_is_not_a_saving(self):
+        """Calls and tokens were added together, which priced a model call at one token.
+
+        Rigged to the review's own example: our arm spends 10 calls and 500 tokens against a
+        competitor's 1 call and 1,000 tokens. Summed, that reads as a 49% reduction; by dimension it
+        is a 90% *increase* in calls, and the floor has to see that.
+        """
+        def lopsided(registration):
+            result = rows(registration, ours=1.05)
+            for row in result:
+                calls, tokens = (10, 500) if row["Arm"] == "aidotnet" else (1, 1000)
+                row["ModelCalls"], row["ModelTokens"] = calls, tokens
+            return result
+
+        fixture = self.fixture(raw=lopsided)
+        fixture.claim["effect_route"] = "cost-reduction"
+        fixture.write_claim()
+        family = fixture.assess()["families"][0]
+        savings = family["CostReduction"]["recommended"]
+        self.assertAlmostEqual(0.5, savings["ModelTokens"], places=6, msg="half the tokens, as rigged")
+        self.assertAlmostEqual(-9.0, savings["ModelCalls"], places=6, msg="and ten times the calls")
+        self.assertGreater(1.0 - (10 + 500) / (1 + 1000), rg.MINIMUM_COST_REDUCTION,
+                           "summing the two dimensions is what used to pass this")
+        self.assertFalse(family["MeetsEffectFloor"], "a dimension that got worse is not a reduction")
+        self.assertFalse(family["Supported"])
+
+    def test_an_undeclared_route_name_is_refused(self):
+        fixture = self.fixture()
+        fixture.claim["effect_route"] = "whatever-wins"
+        fixture.write_claim()
+        # Regex rather than bare ValueError: the bare form passes on any unrelated failure, which
+        # would leave the validation itself untested.
+        with self.assertRaisesRegex(ValueError, "effect_route"):
+            fixture.assess()
+
+    def test_the_cost_route_reaches_a_family_whose_endpoint_is_not_a_speedup(self):
+        """The route is a property of the claim, not of the endpoint's metric.
+
+        `sr` is an nmse family, so it never enters the speedup branch - and the first version of
+        this computed the saving inside that branch, so a claim declaring the cost route over `sr`
+        got `CostReduction: None` and a route with no effect at all. Review caught it; this is the
+        test that would have.
+        """
+        def cheap_sr(registration):
+            result = rows(registration)
+            for row in result:
+                if row["Arm"] == "aidotnet":
+                    row["ModelCalls"] = int(row["ModelCalls"] * 0.5)
+                    row["ModelTokens"] = int(row["ModelTokens"] * 0.5)
+            return result
+
+        fixture = self.fixture(raw=cheap_sr, families=("algotune", "sr"))
+        fixture.claim["effect_route"] = "cost-reduction"
+        fixture.write_claim()
+        sr = next(f for f in fixture.assess()["families"] if f["Family"] == "sr")
+        self.assertIsNone(sr["GeometricMeanSpeedup"], "sr has no speedup endpoint")
+        self.assertIsNone(sr["MeetsSpeedupFloor"])
+        for field, saving in sr["CostReduction"]["recommended"].items():
+            self.assertAlmostEqual(0.5, saving, places=6, msg=field)
+        self.assertTrue(sr["MeetsEffectFloor"], "the declared route must reach a non-speedup family")
+
     def test_failed_run_has_no_speedup(self):
         def raw(registration):
             result = rows(registration)

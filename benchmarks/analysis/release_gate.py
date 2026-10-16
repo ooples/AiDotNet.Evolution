@@ -32,6 +32,7 @@ campaign machine remain review responsibilities.
 from __future__ import annotations
 
 import argparse
+from fractions import Fraction
 import hashlib
 import json
 import math
@@ -55,6 +56,10 @@ MINIMUM_GEOMEAN_SPEEDUP = 1.10
 # still hide one task below this limit, and closing that needs a task dimension in the registration's
 # row schema - a schema change, not a threshold. Declared rather than implied; review raised it.
 MAXIMUM_SEED_REGRESSION = 0.95
+# US-12 (#30) offers a second route to the practical-effect target: "alternatively, predeclare a 20%
+# cost reduction to reach the same target". Until now the gate implemented only the speedup route, so
+# a campaign that reached the target by spending a fifth less had no way to say so.
+MINIMUM_COST_REDUCTION = 0.20
 MAXIMUM_FAMILYWISE_ALPHA = 0.05
 SPEEDUP_METRIC = "speedup"
 MAX_ARTIFACT_BYTES = 32 * 1024 * 1024
@@ -216,6 +221,69 @@ def geometric_mean_speedups(registration, rows, family):
     return result
 
 
+# The two dimensions of registered cost. Separate, never summed: see `cost_totals`.
+COST_FIELDS = ("ModelCalls", "ModelTokens")
+
+
+def cost_totals(registration, rows, family):
+    """Each cost dimension per config, as the integer pair (ours, theirs).
+
+    Cost is the registered budget's own currency, and its two parts are not interchangeable: one
+    model call carried about 2,661 tokens over the first measured campaign, so adding calls to
+    tokens prices a call at one token. An arm spending ten calls and 500 tokens against a
+    competitor's one call and 1,000 tokens would have read as a 49% saving while using ten times
+    the calls (review caught it). The dimensions therefore stay apart here, and the floor has to
+    hold in each of them - which needs no conversion constant to be fair in either direction.
+
+    A failed run has no cost total: it did not pay the whole price of an answer, so it cannot claim
+    to have paid less.
+    """
+    cells = {(row["Family"], row["Arm"], row["Seed"]): row for row in rows}
+    result = {}
+    for config in family["Configs"]:
+        ours = {field: 0 for field in COST_FIELDS}
+        theirs = {field: 0 for field in COST_FIELDS}
+        complete = True
+        for seed in registration["Seeds"]:
+            mine = cells[(family["Family"], OURS, seed)]
+            yours = cells[(family["Family"], f"openevolve-{config}", seed)]
+            if mine["Status"] != "completed" or yours["Status"] != "completed":
+                complete = False
+                break
+            for field in COST_FIELDS:
+                ours[field] += int(mine[field])
+                theirs[field] += int(yours[field])
+        result[config] = (None if not complete or any(theirs[field] <= 0 for field in COST_FIELDS)
+                          else {field: (ours[field], theirs[field]) for field in COST_FIELDS})
+    return result
+
+
+def cost_reductions(totals):
+    """Fraction of the competitor's spend our arm did not spend, per config and per dimension.
+
+    The criterion's alternative route. These are the reported numbers; the floor is decided on the
+    integer totals they came from, because the division cannot represent the floor exactly.
+    """
+    return {config: None if total is None else
+            {field: 1.0 - (pair[0] / pair[1]) for field, pair in total.items()}
+            for config, total in totals.items()}
+
+
+def meets_cost_reduction_floor(totals):
+    """Whether every config saved at least the predeclared fraction of every dimension.
+
+    Decided on the integers: `1.0 - 808 / 1010` is 0.19999999999999996, so an arm that spent
+    exactly a fifth less than the competitor failed a float comparison against 0.20 - the declared
+    floor rejecting the very reduction it declares (review caught it). The totals are counts, so
+    the comparison is exact rational arithmetic on them: ours/theirs <= 1 - floor, with the floor
+    read from its decimal form rather than from the binary double nearest to it.
+    """
+    floor = Fraction(str(MINIMUM_COST_REDUCTION))
+    return all(total is not None
+               and all(Fraction(pair[0], pair[1]) <= 1 - floor for pair in total.values())
+               for total in totals.values())
+
+
 def assess_bundle(claim, root, repository):
     commit = claim["registration_commit"]
     require(isinstance(commit, str) and HEX40.match(commit) is not None, "registration_commit must be a full commit SHA")
@@ -257,7 +325,8 @@ def assess_bundle(claim, root, repository):
     budget = spec["Budget"]
     for row in rows:
         require(isinstance(row, dict), "Every raw row must be an object")
-        for field, cap in (("ModelCalls", budget["ModelCalls"]), ("ModelTokens", budget["ModelTokens"])):
+        for field in COST_FIELDS:
+            cap = budget[field]
             value = row.get(field)
             require(type(value) is int and 0 <= value <= cap,
                     f"Row {row.get('Family')}/{row.get('Arm')}/{row.get('Seed')} {field} is unreported or exceeds the shared budget")
@@ -268,21 +337,37 @@ def assess_bundle(claim, root, repository):
     for family in spec["Families"]:
         endpoints = [e for e in report["Endpoints"] if e["Family"] == family["Family"]]
         superior = all(e["Superior"] for e in endpoints)
-        speedups, floor = None, True
+        speedups, savings = None, None
+        speedup_floor = effect_floor = None
+        route = claim.get("effect_route", "speedup")
+        if route == "cost-reduction":
+            # Measured for every family, not only speedup ones: a claim that declares this route and
+            # names an nmse family used to get CostReduction=None and a route with no effect, which
+            # review caught - the route is a property of the claim, not of the endpoint's metric.
+            totals = cost_totals(registration, rows, family)
+            savings = cost_reductions(totals)
+            effect_floor = meets_cost_reduction_floor(totals)
         if family["Endpoint"]["Metric"] == SPEEDUP_METRIC:
             require(family["Endpoint"]["Direction"] == "maximize", "A speedup endpoint must be maximized")
             speedups = geometric_mean_speedups(registration, rows, family)
             # Three conditions, because the criterion names three: the point estimate reaches the
-            # floor, its 95% interval is above 1.0 so the effect is not noise, and no single task
+            # floor, its 95% interval is above 1.0 so the effect is not noise, and no single seed
             # regressed past the declared limit so the mean is not hiding one.
-            floor = all(value is not None
-                        and value["GeometricMean"] >= MINIMUM_GEOMEAN_SPEEDUP
-                        and value["LowerBound95"] > 1.0
-                        and value["WorstSeedRatio"] >= MAXIMUM_SEED_REGRESSION
-                        for value in speedups.values())
-        families.append(dict(Family=family["Family"], Supported=superior and floor, HolmSuperiorAllConfigs=superior,
-                             GeometricMeanSpeedup=speedups, MeetsSpeedupFloor=floor if speedups is not None else None,
-                             Endpoints=endpoints))
+            speedup_floor = all(value is not None
+                                and value["GeometricMean"] >= MINIMUM_GEOMEAN_SPEEDUP
+                                and value["LowerBound95"] > 1.0
+                                and value["WorstSeedRatio"] >= MAXIMUM_SEED_REGRESSION
+                                for value in speedups.values())
+        # MeetsEffectFloor is what the claim's declared route requires; MeetsSpeedupFloor stays the
+        # speedup reading alone, so the two are not confused with one another (review: the single
+        # field used to mean whichever floor the route had chosen).
+        if route == "speedup":
+            effect_floor = speedup_floor
+        families.append(dict(Family=family["Family"],
+                             Supported=superior and (True if effect_floor is None else effect_floor),
+                             HolmSuperiorAllConfigs=superior, GeometricMeanSpeedup=speedups,
+                             MeetsSpeedupFloor=speedup_floor, MeetsEffectFloor=effect_floor,
+                             CostReduction=savings, EffectRoute=route, Endpoints=endpoints))
 
     published = None
     if spec["Published"] is not None:
@@ -328,6 +413,15 @@ def release(root, repository, version):
         return dict(base, eligible=True, status="no-competitive-claim", reason=claim["reason"])
     require(claim.get("claim") in ("supported-families", "v1-gate"), "claim must be none, supported-families or v1-gate")
     keys = {"schema", "claim", "benchmark", "hardware", "registration_commit", "registration_path", "bundle"}
+    # The route is optional and defaults to the speedup floor, so every existing claim keeps meaning
+    # exactly what it meant. Declared limitation: the criterion says "predeclare", and a claim is
+    # written at release time - strictly, the route belongs in the frozen registration, which is a
+    # schema change to every committed registration's bytes and so the owner's call rather than this
+    # function's. What is enforced here is that a claim naming the cost route is measured against it.
+    if "effect_route" in claim:
+        keys.add("effect_route")
+        require(claim["effect_route"] in ("speedup", "cost-reduction"),
+                "effect_route is speedup or cost-reduction")
     require(set(claim) == keys | ({"families"} if claim["claim"] == "supported-families" else set()),
             f"A {claim['claim']} claim must carry exactly its declared fields")
     text(claim["benchmark"], "benchmark")

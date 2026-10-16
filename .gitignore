@@ -105,3 +105,7 @@ bindings/python/*.egg-info/
 
 # Reviewed release claims and evidence bundles (US-12) are source-controlled, unlike compiler Release output.
 !/release/
+
+# A pilot campaign working tree (run_pilot_campaign.py --root): receipt bodies run to megabytes.
+# What a reader needs is the reviewed bundle under benchmarks/evidence/, which is committed.
+.pilot-run/

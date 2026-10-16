@@ -232,7 +232,12 @@ public static class ProfileRunner
                 if (delay > 0)
                 {
                     long delayStarted = Stopwatch.GetTimestamp();
-                    await Task.Delay(delay, token).ConfigureAwait(false);
+                    // Task.Delay measures its due time against the runtime's integer-millisecond tick, so a
+                    // 1 ms delay started mid-tick can complete after a fraction of a millisecond. The declared
+                    // schedule has to be observed and not merely requested, so wait until the clock agrees.
+                    for (double remaining = delay; remaining > 0;
+                         remaining = delay - Stopwatch.GetElapsedTime(delayStarted).TotalMilliseconds)
+                        await Task.Delay((int)Math.Ceiling(remaining), token).ConfigureAwait(false);
                     observed = Stopwatch.GetElapsedTime(delayStarted).TotalMilliseconds;
                 }
                 probe.RecordDelay(bucket, observed);
