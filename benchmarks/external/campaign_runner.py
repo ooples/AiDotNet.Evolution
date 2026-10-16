@@ -118,7 +118,8 @@ class CellJournal:
 
 def run(registration_path, state, execute_cell, *, confirm, mean_tokens_per_call=None, log=print):
     """Run (or resume) every registered cell once. execute_cell(cell, directory, resume) -> dict
-    with Status ('completed'|'failed'), Value, and optional ThrottleSeconds/ModelCalls/ModelTokens/LostCalls."""
+    with Status ('completed'|'failed'), Value, an optional Reason for a failure, and optional
+    ThrottleSeconds/ModelCalls/ModelTokens/LostCalls."""
     registration = load_registration(registration_path)
     projection = project(registration, mean_tokens_per_call)
     log(json.dumps(projection, indent=2))
@@ -144,6 +145,10 @@ def run(registration_path, state, execute_cell, *, confirm, mean_tokens_per_call
             raise ValueError(f"Cell {cell['Cell']} returned no terminal status")
         row = dict(Family=cell["Family"], Arm=cell["Arm"], Seed=cell["Seed"], Status=outcome["Status"],
                    Value=outcome.get("Value") if outcome["Status"] == "completed" else None,
+                   # Why a cell failed is the only thing a failed campaign has to offer, and this
+                   # row used to drop it: the runner prints `row.get("Reason")` and every failure
+                   # printed None, so a campaign where all 18 cells failed said nothing about why.
+                   Reason=outcome.get("Reason"),
                    Position=cell["Position"], Block=cell["Block"], Resumed=resume,
                    ThrottleSeconds=float(outcome.get("ThrottleSeconds", 0.0)),
                    ModelCalls=outcome.get("ModelCalls"), ModelTokens=outcome.get("ModelTokens"),

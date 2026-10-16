@@ -2,6 +2,7 @@ import collections
 import json
 import os
 from pathlib import Path
+import shutil
 import subprocess
 import sys
 import tempfile
@@ -97,6 +98,36 @@ class RunnerTests(unittest.TestCase):
         self.assertTrue(all(r["ThrottleSeconds"] == 0.5 for r in rows))
         report = campaign_registration.analyze(campaign_registration.load_registration(self.path), rows)
         self.assertTrue(report["OpenEvolveGate"])
+
+
+class FailureReportingTests(unittest.TestCase):
+    """A failed cell has to say why, or a failed campaign says nothing at all."""
+
+    def setUp(self):
+        self.root = Path(tempfile.mkdtemp())
+        self.addCleanup(shutil.rmtree, self.root, ignore_errors=True)
+        self.registration = campaign_registration.register(SPEC, self.root / "reg")
+        self.path = self.root / "reg" / "registration.json"
+
+    def test_a_failed_cell_carries_the_reason_its_searcher_gave(self):
+        # The runner prints `row.get("Reason")`; the row dict used to drop the key, so every
+        # failure in a live campaign printed None and could not be diagnosed from the journal.
+        def execute(cell, directory, resume):
+            if cell["Arm"] == "aidotnet":
+                return {"Status": "failed", "Reason": "ZeroDivisionError", "ModelCalls": 3}
+            return {"Status": "completed", "Value": 1.0, "ModelCalls": 3}
+
+        state = self.root / "state"
+        rows = cr.run(self.path, state, execute,
+                      confirm=cr.project(self.registration)["ProjectionSha256"], log=lambda _: None)
+        failed = [row for row in rows if row["Status"] == "failed"]
+        self.assertTrue(failed, "the fixture was meant to fail one arm")
+        self.assertEqual({"ZeroDivisionError"}, {row["Reason"] for row in failed})
+        self.assertEqual({None}, {row["Reason"] for row in rows if row["Status"] == "completed"})
+        # And it survives the journal, which is what a post-mortem actually reads.
+        journaled = json.loads((state / "raw.json").read_text(encoding="utf-8"))
+        self.assertEqual({"ZeroDivisionError"},
+                         {row["Reason"] for row in journaled if row["Status"] == "failed"})
 
 
 if __name__ == "__main__":
