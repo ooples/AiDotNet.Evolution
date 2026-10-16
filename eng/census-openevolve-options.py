@@ -47,10 +47,27 @@ def dataclass_fields(source, name):
     return None
 
 
+# A parse that finds nothing must not read as "nothing to classify". An empty or renamed
+# `config.py`, or a decorator style this regex does not match, would otherwise make the upstream set
+# empty - and an empty set has no unclassified members, so the census would exit 0 having measured
+# nothing at all (review caught it). Every class it depends on is required by name, and the derived
+# surface has to clear a floor: 411fb59 declares 102 options, and a parse that found a tenth of that
+# is a broken parse rather than a shrunken OpenEvolve.
+REQUIRED_CLASSES = ("Config", "LLMModelConfig", *NESTED.values())
+MINIMUM_OPTIONS = 50
+
+
 def upstream_keys(source):
-    """Every option a run file can set, dotted as the catalog names them."""
+    """Every option a run file can set, dotted as the catalog names them. Refuses a parse that found nothing."""
+    for name in REQUIRED_CLASSES:
+        fields = dataclass_fields(source, name)
+        if not fields:
+            raise ValueError(
+                "The checkout's openevolve/config.py declares no readable `%s` dataclass, so the "
+                "upstream option set cannot be derived. Check the ref and the decorator style before "
+                "reading any count from this." % name)
     keys = set()
-    for field in dataclass_fields(source, "Config") or []:
+    for field in dataclass_fields(source, "Config"):
         nested = NESTED.get(field)
         children = dataclass_fields(source, nested) if nested else None
         if children is None:
@@ -58,15 +75,26 @@ def upstream_keys(source):
             continue
         keys.update(field + "." + child for child in children)
     # A model's own options are set under `llm` in a run file, so that is where they are counted.
-    for field in dataclass_fields(source, "LLMModelConfig") or []:
+    for field in dataclass_fields(source, "LLMModelConfig"):
         if not field.startswith("_"):
             keys.add("llm." + field)
+    if len(keys) < MINIMUM_OPTIONS:
+        raise ValueError(
+            "Derived only %d upstream options, below the %d floor: this is a parse that went wrong, "
+            "not an OpenEvolve that shrank." % (len(keys), MINIMUM_OPTIONS))
     return keys
 
 
 def catalog_keys(path):
     text = path.read_text(encoding="utf-8")
-    return set(re.findall(r'new\("([^"]+)",\s*OpenEvolveKeyDisposition', text))
+    keys = set(re.findall(r'new\("([^"]+)",\s*OpenEvolveKeyDisposition', text))
+    # The same trap on the other side: a catalog this regex cannot read would make every upstream
+    # option look unclassified, which is loud, or - paired with an empty upstream - silent.
+    if len(keys) < MINIMUM_OPTIONS:
+        raise ValueError(
+            "Read only %d keys from %s, below the %d floor: the catalog's shape changed and this "
+            "regex no longer sees it." % (len(keys), path, MINIMUM_OPTIONS))
+    return keys
 
 
 def main():
