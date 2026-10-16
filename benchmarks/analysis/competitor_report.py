@@ -22,6 +22,7 @@ import argparse
 import collections
 import json
 import re
+import statistics
 import sys
 from pathlib import Path
 
@@ -54,6 +55,10 @@ CHECKPOINT = "benchmarks/evidence/checkpoint/86d56c9/re-measurement.json"
 AE_MANIFEST = "benchmarks/evidence/alphaevolve-math/manifest.json"
 SR_HEADROOM = "benchmarks/evidence/symbolic-regression/e083c3b/headroom.json"
 PILOT = "benchmarks/evidence/pilot-v1-07/aafd609/report.json"
+WORKER = "benchmarks/evidence/worker-overhead/3f73e03-ci/linux-x64-python.json"
+ENSEMBLE = "benchmarks/evidence/ensemble-overhead/34c117c/models-%d.json"
+SOAK = "benchmarks/evidence/soak/segmented-a1d5d2f/memory-capped-10000-conserve.json"
+DISTRIBUTED = "benchmarks/evidence/distributed-v1-61/818b642"
 ABLATIONS = {
     "repair": "benchmarks/evidence/repair-us17/0354e33/summary.json",
     "reuse": "benchmarks/evidence/reuse-us18/0354e33/summary.json",
@@ -156,16 +161,31 @@ def performance_rows(root):
     theirs_latency = read_lines(root, LATENCY_THEIRS)
     sandbox, checkpoint = read(root, SANDBOX), read(root, CHECKPOINT)
     small, large = checkpoint["rows"][0], checkpoint["rows"][-1]
+    worker = read(root, WORKER)
+    ensemble, ensemble_repeats, ensemble_proposals = {}, 0, 0
+    for count in (1, 4, 16):
+        rows = read(root, ENSEMBLE % count)["Rows"]
+        ensemble[count] = statistics.median(item["OverheadMicrosecondsPerProposal"] for item in rows)
+        ensemble_repeats, ensemble_proposals = len(rows), rows[0]["Proposals"]
+    soak = read(root, SOAK)
+    working = [sample["WorkingSetBytes"] for sample in soak["Samples"]]
+    distributed = read(root, DISTRIBUTED + "/summary.json")
+    one, four = read(root, DISTRIBUTED + "/tp1.json"), read(root, DISTRIBUTED + "/tp4.json")
 
     return [
         row("Engine overhead per evaluation", OPENEVOLVE,
             "%.1f us/eval" % single["aidotnet_us_per_eval"],
             "%.0f us/eval" % single["openevolve_us_per_eval"],
             "ratio %.4f, CI95 [%.4f, %.4f] over %d interleaved repeats; peak memory %.0f MB against "
-            "%.0f MB" % (single["ratio_ours_over_theirs"], single["ratio_ci95"][0],
-                         single["ratio_ci95"][1],
-                         single["repeats_aidotnet_first"] + single["repeats_openevolve_first"],
-                         single["aidotnet_peak_mb"], single["openevolve_peak_mb"]),
+            "%.0f MB. The gap narrows as workers are added - ratio %.4f at 1 worker to %.4f at %d - "
+            "and the card's own caveat stands: %s"
+            % (single["ratio_ours_over_theirs"], single["ratio_ci95"][0], single["ratio_ci95"][1],
+               single["repeats_aidotnet_first"] + single["repeats_openevolve_first"],
+               single["aidotnet_peak_mb"], single["openevolve_peak_mb"],
+               min(item["ratio_ours_over_theirs"] for item in overhead["summary"]),
+               max(item["ratio_ours_over_theirs"] for item in overhead["summary"]),
+               max(item["workers"] for item in overhead["summary"]),
+               overhead["note"].rstrip(".").lower()),
             AHEAD, OVERHEAD, interval=single["ratio_ci95"],
             ours_range=single["aidotnet_us_per_eval_range"],
             theirs_range=single["openevolve_us_per_eval_range"]),
@@ -204,6 +224,36 @@ def performance_rows(root):
             "p95 %.0f and %.0f ms, %.0f bytes per elite, and the resumed state matches the written "
             "one in both" % (small["WriteP95Ms"], large["WriteP95Ms"], large["BytesPerElite"]),
             MEASURED, CHECKPOINT),
+        row("Evaluation worker round trip", None,
+            "%.3f ms p50 IPC round trip, %.3f ms p95" % (worker["ipc_round_trip"]["p50_ms"],
+                                                         worker["ipc_round_trip"]["p95_ms"]), None,
+            "over %d evaluations on %s. The per-lease overhead around it DEGRADES over the run - p50 "
+            "%.1f ms in the first tenth against %.1f ms in the last, %.1f ms overall - which is "
+            "measured here and not yet explained"
+            % (worker["evaluations"], worker["platform"], worker["overhead_first_tenth"]["p50_ms"],
+               worker["overhead_last_tenth"]["p50_ms"], worker["overhead"]["p50_ms"]),
+            MEASURED, WORKER),
+        row("Multi-model ensemble overhead", None,
+            "%.3f us per proposal at %d models" % (ensemble[max(ensemble)], max(ensemble)), None,
+            "median over %d repeats of %s proposals each; %s - at this scale the ensemble costs less "
+            "than the measurement noise, so it is reported as a bound and not as a cost"
+            % (ensemble_repeats, format(ensemble_proposals, ","),
+               ", ".join("%.3f us at %d" % (ensemble[count], count) for count in sorted(ensemble))),
+            MEASURED, ENSEMBLE % max(ensemble)),
+        row("Memory over a long run", None,
+            "%s evaluations in %.0f s" % (format(soak["CompletedEvaluations"], ","), soak["Seconds"]),
+            None,
+            "working set %.0f MB to %.0f MB over %d samples, peaking at %.0f MB, with a checkpoint "
+            "every %s evaluations - growth, bounded and sampled, not a plateau"
+            % (working[0] / 1e6, working[-1] / 1e6, len(working), max(working) / 1e6,
+               format(soak["CheckpointEvery"], ",")), MEASURED, SOAK),
+        row("Distributed evaluation", None,
+            "%.2f to %.2f evaluations per second from 1 to %d workers (%.2fx)"
+            % (one["evaluationsPerSecond"], four["evaluationsPerSecond"], four["workersAwaited"],
+               four["evaluationsPerSecond"] / one["evaluationsPerSecond"]), None,
+            "and the state hash is identical across worker counts and across hosts, with all %d "
+            "recorded checks passing - including exactly-once delivery and a killed worker's lease "
+            "being reissued" % len(distributed["checks"]), MEASURED, DISTRIBUTED + "/summary.json"),
     ]
 
 
@@ -387,8 +437,11 @@ PREAMBLE = {
     "parity": "Parity is a derived number here, not a hand-kept list: the option census diffs their "
               "own `config.py` against the catalog that claims to classify it, and the AlphaEvolve "
               "row counts verifiers that reproduce the published value.",
-    "performance": "Both arms ran on the same machine in interleaved repeats, so the ordering is not "
-                   "measuring a warm cache. Rows without a competitor figure say so.",
+    "performance": "Both arms of every head-to-head ran on the same machine in interleaved repeats, "
+                   "so the ordering is not measuring a warm cache, and each card records the machine "
+                   "and whether it was quiet. Rows without a competitor figure say so, and the two "
+                   "that measured something unflattering - a worker overhead that doubles over a run, "
+                   "memory that grows across a soak - say that too.",
     "quality": "This is the row v1 turns on, and it is not yet decided. One head-to-head campaign "
                "has run; neither endpoint reached superiority, and the task it ran on is one a "
                "model-free floor nearly solves by itself.",

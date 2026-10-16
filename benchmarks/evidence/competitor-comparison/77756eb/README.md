@@ -24,7 +24,7 @@ themselves - 102 upstream options and 103 catalog keys, listed, not counted - ta
 | --- | ---: |
 | ahead | 4 |
 | parity | 3 |
-| measured, no competitor figure | 8 |
+| measured, no competitor figure | 12 |
 | inconclusive | 1 |
 | unmeasured | 1 |
 | behind | 0 |
@@ -33,7 +33,14 @@ Ahead on overhead per evaluation (48.3 us against 26,917 us, ratio CI95 `[0.0016
 overhead as the population grows (0.9985x across 100 to 50,000 against 13.35x across 100 to 5,000,
 where 5,000 is the largest they completed), on keeping a concurrency budget busy (1.040x ideal wall
 time at 96.2% in-flight utilisation against 2.401x at 41.6%), and on the eight archive and scheduling
-defect classes that reproduce on both 0.3.2 and 0.4.0 and pass here.
+defect classes that reproduce on both 0.3.2 and 0.4.0 and pass here. The overhead card's own caveat
+is carried into the row: a C# controller against a Python one is expected to favour us, the ratio
+narrows from 0.0018 at one worker to 0.0049 at sixteen, and it is not offered as a headline claim.
+
+Two of the twelve rows with no competitor figure measured something **unflattering**, and say so: the
+per-lease worker overhead more than doubles over a run (p50 18.7 ms in the first tenth against 44.0 ms
+in the last) and the working set grows from 98 MB to 137 MB across a 200,000-evaluation soak. A
+comparison that only reported the dimensions we win would not be worth generating.
 
 **Parity on features, and it is derived rather than asserted**: 0 of their 102 config options are
 unclassified, 4 of their example evaluators run through our CLI against the upstream evaluator
