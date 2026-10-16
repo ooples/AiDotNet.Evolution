@@ -738,7 +738,9 @@ public sealed partial class EvolutionEngine<TGenome>
         {
             try
             {
-                front = new EvolutionParetoFront<TGenome>(islands[0].Pareto!.ToDefinition(),
+                ParetoDocument pareto = islands[0].Pareto
+                    ?? throw new InvalidDataException("The first island of a Pareto checkpoint carries no front.");
+                front = new EvolutionParetoFront<TGenome>(pareto.ToDefinition(),
                     entries.Where(entry => entry.Source == EvolutionCheckpointEntrySource.IslandArchive).Select(entry => entry.Entry));
             }
             catch (ArgumentException exception) { throw new InvalidDataException("Invalid checkpoint Pareto front.", exception); }
@@ -776,16 +778,20 @@ public sealed partial class EvolutionEngine<TGenome>
         ValidatePackageCheckpointBounds(state);
         if (HasMeasurementOrigins(state) && featureVersion < EngineMeasurementOriginSchemaVersion)
             throw new InvalidDataException("Measurement-origin metadata requires the versioned checkpoint schema.");
-        var paretoIslands = state.Islands!;
+        var paretoIslands = state.Islands
+            ?? throw new InvalidDataException("A checkpoint carries no islands.");
         if (paretoIslands.Any(island => island.Pareto is not null))
         {
             bool declaredConstraints = paretoIslands.Any(island => island.Pareto?.ConstraintCount is not null);
             if (featureVersion != (declaredConstraints ? EngineParetoConstraintSchemaVersion : EngineParetoSchemaVersion))
                 throw new InvalidDataException("Pareto metadata requires the versioned checkpoint schema.");
-            var definition = paretoIslands.First(island => island.Pareto is not null).Pareto!.ToDefinition();
+            ParetoDocument first = paretoIslands.Select(island => island.Pareto).First(pareto => pareto is not null)
+                ?? throw new InvalidDataException("A Pareto checkpoint island carries no front.");
+            var definition = first.ToDefinition();
             if ((long)paretoIslands.Count * (definition.Capacity + definition.InfeasibleCapacity) > 4096 ||
                 paretoIslands.Any(island => island.Pareto?.ToDefinition().DefinitionHash != definition.DefinitionHash) ||
-                state.GlobalElites!.Count != 0 || state.IslandHistories!.Any(history => history.Count != 0))
+                (state.GlobalElites ?? throw new InvalidDataException("A checkpoint carries no global elite index.")).Count != 0 ||
+                (state.IslandHistories ?? throw new InvalidDataException("A checkpoint carries no island histories.")).Any(history => history.Count != 0))
                 throw new InvalidDataException("Pareto checkpoints require compatible bounded fronts without scalar auxiliary indexes.");
             foreach (var island in paretoIslands) ValidateParetoCheckpointArchive(island, definition);
         }
@@ -803,7 +809,9 @@ public sealed partial class EvolutionEngine<TGenome>
         {
             if ((definition.InfeasibleCapacity > 0) != (archive.InfeasibleEntries is not null))
                 throw new InvalidDataException("Exploration entries must be present exactly when exploration is enabled.");
-            var entries = archive.Entries!.Concat(archive.InfeasibleEntries ?? new List<ArchiveEntryDocument>()).Select(document =>
+            List<ArchiveEntryDocument> feasible = archive.Entries
+                ?? throw new InvalidDataException("A Pareto checkpoint archive carries no entries.");
+            var entries = feasible.Concat(archive.InfeasibleEntries ?? new List<ArchiveEntryDocument>()).Select(document =>
             {
                 if (document.Lineage is null || document.Evaluation is null || document.CellBins is null || document.GenomePayload is null)
                     throw new InvalidDataException("Incomplete Pareto checkpoint entry.");
@@ -814,8 +822,10 @@ public sealed partial class EvolutionEngine<TGenome>
                     document.Evaluation.ToEvaluation(document.EvaluationId, document.GenomeId, lineage));
             }).ToArray();
             var restored = new ParetoArchive<string>(definition, entries.Length == 0 ? EvolutionOptimizationDirection.Maximize : entries[0].Evaluation.Direction);
-            restored.RestoreWithExploration(entries.Take(archive.Entries!.Count).ToArray(), entries.Skip(archive.Entries.Count).ToArray(),
-                archive.Descriptors!.Select(axis => axis.ToDefinition()).ToArray(), archive.Version);
+            List<DescriptorDocument> descriptors = archive.Descriptors
+                ?? throw new InvalidDataException("A Pareto checkpoint archive carries no descriptor axes.");
+            restored.RestoreWithExploration(entries.Take(feasible.Count).ToArray(), entries.Skip(feasible.Count).ToArray(),
+                descriptors.Select(axis => axis.ToDefinition()).ToArray(), archive.Version);
         }
         catch (ArgumentException exception) { throw new InvalidDataException("Invalid Pareto checkpoint archive.", exception); }
     }

@@ -65,9 +65,16 @@ public sealed class EvolutionIncumbentChallenge<TGenome>
         var incumbentSearch = await _search.RunAsync(incumbent, context, identity, cancellationToken: cancellationToken).ConfigureAwait(false);
         if (cancellationToken.IsCancellationRequested) return Report(candidateSearch, incumbentSearch, null, null, null, EvolutionIncumbentChallengeOutcome.Canceled);
         if (!incumbentSearch.IsComplete) return Report(candidateSearch, incumbentSearch, null, null, null, EvolutionIncumbentChallengeOutcome.IncumbentSearchIncomplete);
+        // `IsComplete` is what populates the mean, and both were just checked - but that invariant
+        // lives in the replication result rather than in its type, so it is bound here rather than
+        // suppressed. A complete search without a mean is a bug in replication, and says so.
+        double candidateMean = candidateSearch.MeanQuality
+            ?? throw new InvalidOperationException("A complete candidate search carries no mean quality.");
+        double incumbentMean = incumbentSearch.MeanQuality
+            ?? throw new InvalidOperationException("A complete incumbent search carries no mean quality.");
         double searchGain = _direction == EvolutionOptimizationDirection.Maximize
-            ? candidateSearch.MeanQuality!.Value - incumbentSearch.MeanQuality!.Value
-            : incumbentSearch.MeanQuality!.Value - candidateSearch.MeanQuality!.Value;
+            ? candidateMean - incumbentMean
+            : incumbentMean - candidateMean;
         if (searchGain <= _minimumImprovement) return Report(candidateSearch, incumbentSearch, null, null, null, EvolutionIncumbentChallengeOutcome.NotPromising);
         var candidateConfirmation = await _confirm.RunAsync(candidate, context, identity, EvolutionReplicationPurpose.Confirmation, cancellationToken).ConfigureAwait(false);
         if (cancellationToken.IsCancellationRequested) return Report(candidateSearch, incumbentSearch, candidateConfirmation, null, null, EvolutionIncumbentChallengeOutcome.Canceled);
@@ -75,9 +82,18 @@ public sealed class EvolutionIncumbentChallenge<TGenome>
         var incumbentConfirmation = await _confirm.RunAsync(incumbent, context, identity, EvolutionReplicationPurpose.Confirmation, cancellationToken).ConfigureAwait(false);
         if (cancellationToken.IsCancellationRequested) return Report(candidateSearch, incumbentSearch, candidateConfirmation, incumbentConfirmation, null, EvolutionIncumbentChallengeOutcome.Canceled);
         if (!incumbentConfirmation.IsComplete) return Report(candidateSearch, incumbentSearch, candidateConfirmation, incumbentConfirmation, null, EvolutionIncumbentChallengeOutcome.IncumbentConfirmationIncomplete);
+        // Both bounds of both arms, because the two directions read different ends of each interval.
+        double candidateLower = candidateConfirmation.LowerBound
+            ?? throw new InvalidOperationException("A complete candidate confirmation carries no lower bound.");
+        double candidateUpper = candidateConfirmation.UpperBound
+            ?? throw new InvalidOperationException("A complete candidate confirmation carries no upper bound.");
+        double incumbentLower = incumbentConfirmation.LowerBound
+            ?? throw new InvalidOperationException("A complete incumbent confirmation carries no lower bound.");
+        double incumbentUpper = incumbentConfirmation.UpperBound
+            ?? throw new InvalidOperationException("A complete incumbent confirmation carries no upper bound.");
         double lowerGain = _direction == EvolutionOptimizationDirection.Maximize
-            ? candidateConfirmation.LowerBound!.Value - incumbentConfirmation.UpperBound!.Value
-            : incumbentConfirmation.LowerBound!.Value - candidateConfirmation.UpperBound!.Value;
+            ? candidateLower - incumbentUpper
+            : incumbentLower - candidateUpper;
         return Report(candidateSearch, incumbentSearch, candidateConfirmation, incumbentConfirmation, lowerGain,
             lowerGain > _minimumImprovement ? EvolutionIncumbentChallengeOutcome.ConfirmedImprovement : EvolutionIncumbentChallengeOutcome.NotConfirmed);
     }
