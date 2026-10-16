@@ -212,6 +212,7 @@ that skips a test fails the build rather than reporting green.
 | Where a measurement came from | [Measurement origin](docs/MEASUREMENT_ORIGIN.md) |
 | High-dimensional archives | [Centroid archives](docs/CENTROID_ARCHIVES.md) |
 | Work that runs outside the process | [Durable external work](docs/DURABLE_EXTERNAL_WORK.md) · [Worker protocol](docs/DURABLE_WORKER_PROTOCOL.md) · [Work identity](docs/EXTERNAL_WORK_IDENTITY.md) |
+| How this compares with OpenEvolve and AlphaEvolve | [Competitor comparison](docs/COMPETITOR_COMPARISON.md) - derived from the evidence bundles, including the one row still undecided |
 
 ### Contracts you implement
 
