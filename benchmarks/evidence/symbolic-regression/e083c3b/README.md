@@ -14,6 +14,38 @@ materially better than the seed **while never seeing the test split** - and how 
 | `damped_oscillator` | **+0.300 to +0.322** | **0.124** | **~2.4x - the task to compete on** |
 | `two_variable_ratio` | +0.001 to +0.041 | 0.112 | the floor cannot touch it at all |
 
+**This bundle reproduces exactly.** The enumeration is seeded, so
+
+```text
+python benchmarks/external/symbolic_regression_headroom.py --budget 20000 --noise-seeds 8 --output fresh.json
+```
+
+produces a file byte-identical to `headroom.json` - verified at `main` `0354e33`, nine commits and
+two months after the `e083c3b` the bundle is named for, which is what says the family, the splits,
+the seals and the search are all unchanged **on the platform that produced it**.
+
+**That qualifier is a defect, not a caveat.** `seal` digests each value to **17** significant digits
+(`%.16e` keeps one digit before the point and sixteen after) and
+the closed forms go through libm (`exp`, `sin`, `cos`), whose last bits differ between platforms, so
+the committed seals rebuild on Windows - where they were measured - and not on CI's Linux. A sealed
+partition that only verifies where it was produced is weaker than it looks, and the same `seal`
+backs the pilot campaign's frozen `TestPartitionHashes`, so correcting it would move a hash a paid
+pre-registration already committed to. `damped_oscillator` is the only task whose closed form goes through libm - `exp(-0.3 t) sin(2 t)`
+- and the other two are polynomial ratios, reproducible bit for bit anywhere. CI measured exactly
+that: **3 of 9** seals differ on Linux, all three of them `damped_oscillator`. So the tests assert
+the invariant rather than skipping (a required gate that skips is a failure here, by design): the
+committed seals must equal the ones the test pins, the two rational tasks must rebuild theirs on
+every platform, and any seal that cannot be rebuilt must belong to that one transcendental task -
+with a further assertion that it *is* the only one, so the carve-out cannot widen unnoticed. The
+exposure itself is measured by `test_the_seal_binds_more_precision_than_libm_agrees_on`. Tracked on
+#113.
+
+The 20,000-candidate run takes about 56 seconds, so
+`benchmarks/external/test_program_symbolic_regression_evidence.py` guards the cheap half of it in
+CI: every committed `test_seal` is rebuilt from the family module, the quoted aggregates are
+recomputed from the rows they summarise, `gap_closed` is re-derived from its two NMSE columns, and
+the eligibility ordering between the three tasks is pinned.
+
 `gap_closed` is `1 - found_test_nmse / baseline_test_nmse`, where the baseline predicts the
 **training** mean. Review caught this card taking that mean from the held-out rows instead, which made
 `baseline_test_nmse` exactly 1.0 for every row - it is the definition of this NMSE's denominator - so
