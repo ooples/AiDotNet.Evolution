@@ -134,6 +134,32 @@ class TargetWidthTests(unittest.TestCase):
                 self.assertIsInstance(code, str)
                 self.assertIn("positive, finite", code)
 
+    def test_a_width_the_registration_did_not_freeze_is_refused(self):
+        # The width is the denominator of the reported N, and the confirming run could change it
+        # without changing ProjectionSha256 - so the number the pilot reports was still a choice
+        # left open after the seeds were drawn (review caught it).
+        with tempfile.TemporaryDirectory() as directory:
+            root = Path(directory) / "campaign"
+            first = invoke(root, "--target-half-width", "0.05")[1]
+            self.assertIn("CI half width 0.05", first, "the operator sees the width before confirming")
+            frozen = json.loads((root / "registration" / "sizing.json").read_text(encoding="utf-8"))
+            self.assertEqual(0.05, frozen["TargetHalfWidth"])
+            code, _ = invoke(root, "--target-half-width", "0.2")
+            self.assertIsInstance(code, str)
+            self.assertIn("froze with its seeds", code)
+            self.assertEqual(2, invoke(root, "--target-half-width", "0.05")[0],
+                             "the frozen width still reaches the gate")
+
+    def test_a_registration_without_a_frozen_sizing_target_is_refused(self):
+        with tempfile.TemporaryDirectory() as directory:
+            root = Path(directory) / "campaign"
+            invoke(root)
+            (root / "registration" / "sizing.json").unlink()
+            code, _ = invoke(root)
+            self.assertIsInstance(code, str)
+            self.assertIn("no", code)
+            self.assertIn("frozen sizing target", code)
+
     def test_the_sizing_refusal_cannot_destroy_the_campaign_evidence(self):
         # An endpoint needing more than the cap raises inside the projection. Writing rows and the
         # report first is what keeps a run that cost money from losing them to that refusal.

@@ -258,7 +258,8 @@ class ReleaseGateTests(unittest.TestCase):
         fixture.claim["effect_route"] = "cost-reduction"
         fixture.write_claim()
         declared = fixture.assess()["families"][0]
-        self.assertAlmostEqual(0.5, declared["CostReduction"]["recommended"], places=6)
+        for field, saving in declared["CostReduction"]["recommended"].items():
+            self.assertAlmostEqual(0.5, saving, places=6, msg=field)
         self.assertTrue(declared["MeetsEffectFloor"], "the declared route is what the effect floor means")
         self.assertFalse(declared["MeetsSpeedupFloor"], "and the speedup reading is unchanged by the route")
         self.assertTrue(declared["Supported"])
@@ -276,7 +277,8 @@ class ReleaseGateTests(unittest.TestCase):
         fixture.claim["effect_route"] = "cost-reduction"
         fixture.write_claim()
         family = fixture.assess()["families"][0]
-        self.assertAlmostEqual(0.1, family["CostReduction"]["recommended"], places=6)
+        for field, saving in family["CostReduction"]["recommended"].items():
+            self.assertAlmostEqual(0.1, saving, places=6, msg=field)
         self.assertFalse(family["MeetsEffectFloor"], "10% is not the predeclared 20%")
         self.assertFalse(family["Supported"])
 
@@ -298,10 +300,37 @@ class ReleaseGateTests(unittest.TestCase):
         fixture.claim["effect_route"] = "cost-reduction"
         fixture.write_claim()
         family = fixture.assess()["families"][0]
-        self.assertLess(family["CostReduction"]["recommended"], rg.MINIMUM_COST_REDUCTION,
-                        "the reported fraction is the division, and the division lands under the floor")
+        for field, saving in family["CostReduction"]["recommended"].items():
+            self.assertLess(saving, rg.MINIMUM_COST_REDUCTION, "%s: the reported fraction is the "
+                            "division, and the division lands under the floor" % field)
         self.assertTrue(family["MeetsEffectFloor"], "the floor is decided on the integers it came from")
         self.assertTrue(family["Supported"])
+
+    def test_a_saving_bought_by_spending_ten_times_the_calls_is_not_a_saving(self):
+        """Calls and tokens were added together, which priced a model call at one token.
+
+        Rigged to the review's own example: our arm spends 10 calls and 500 tokens against a
+        competitor's 1 call and 1,000 tokens. Summed, that reads as a 49% reduction; by dimension it
+        is a 90% *increase* in calls, and the floor has to see that.
+        """
+        def lopsided(registration):
+            result = rows(registration, ours=1.05)
+            for row in result:
+                calls, tokens = (10, 500) if row["Arm"] == "aidotnet" else (1, 1000)
+                row["ModelCalls"], row["ModelTokens"] = calls, tokens
+            return result
+
+        fixture = self.fixture(raw=lopsided)
+        fixture.claim["effect_route"] = "cost-reduction"
+        fixture.write_claim()
+        family = fixture.assess()["families"][0]
+        savings = family["CostReduction"]["recommended"]
+        self.assertAlmostEqual(0.5, savings["ModelTokens"], places=6, msg="half the tokens, as rigged")
+        self.assertAlmostEqual(-9.0, savings["ModelCalls"], places=6, msg="and ten times the calls")
+        self.assertGreater(1.0 - (10 + 500) / (1 + 1000), rg.MINIMUM_COST_REDUCTION,
+                           "summing the two dimensions is what used to pass this")
+        self.assertFalse(family["MeetsEffectFloor"], "a dimension that got worse is not a reduction")
+        self.assertFalse(family["Supported"])
 
     def test_an_undeclared_route_name_is_refused(self):
         fixture = self.fixture()
@@ -334,7 +363,8 @@ class ReleaseGateTests(unittest.TestCase):
         sr = next(f for f in fixture.assess()["families"] if f["Family"] == "sr")
         self.assertIsNone(sr["GeometricMeanSpeedup"], "sr has no speedup endpoint")
         self.assertIsNone(sr["MeetsSpeedupFloor"])
-        self.assertAlmostEqual(0.5, sr["CostReduction"]["recommended"], places=6)
+        for field, saving in sr["CostReduction"]["recommended"].items():
+            self.assertAlmostEqual(0.5, saving, places=6, msg=field)
         self.assertTrue(sr["MeetsEffectFloor"], "the declared route must reach a non-speedup family")
 
     def test_failed_run_has_no_speedup(self):

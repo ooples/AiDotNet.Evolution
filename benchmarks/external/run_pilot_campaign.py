@@ -174,6 +174,7 @@ def describe(projection, arguments):
         % (arguments.model_calls, arguments.iterations),
         "rough cost           ~%d tokens if every call is served, at ~%dk per call"
         % (projection["MaxModelCalls"] * TOKENS_PER_CALL, TOKENS_PER_CALL // 1000),
+        "sizing target        CI half width %.4g, frozen with the seeds" % arguments.target_half_width,
         "ProjectionSha256     " + projection["ProjectionSha256"],
     ]
 
@@ -207,6 +208,26 @@ def build_parser():
     return parser
 
 
+def frozen_half_width(path, requested):
+    """The sizing target the first run froze, refusing a later run that changed it.
+
+    The width is the denominator of the reported N, so a run free to change it after the seeds were
+    drawn could pick the number the pilot reports - which is the one thing freezing a registration
+    exists to prevent (review caught it). It is frozen beside the registration rather than inside
+    it because `pilot_campaign.spec` is a closed field set the release gate validates: an undeclared
+    knob cannot ride along into a frozen registration.
+    """
+    if not path.exists():
+        raise SystemExit("Refusing " + str(path.parent) + ": it holds a frozen registration but no "
+                         "frozen sizing target, so nothing says which width the reported N was for")
+    frozen = json.loads(path.read_text(encoding="utf-8"))["TargetHalfWidth"]
+    if frozen != requested:
+        raise SystemExit("--target-half-width %r is not the %r this campaign froze with its seeds. "
+                         "The width sizes the N the pilot reports, so it is not a choice left open "
+                         "after the registration." % (requested, frozen))
+    return frozen
+
+
 def exit_status(failed, analysis):
     """Nonzero when the campaign has a hole in its paired design, or no size estimate to show for it.
 
@@ -232,6 +253,7 @@ def main():
                          % (arguments.model_tokens, arguments.model_calls, TOKENS_PER_CALL))
     root = Path(arguments.root)
     registration_path = root / "registration" / "registration.json"
+    sizing_path = root / "registration" / "sizing.json"
     if registration_path.exists():
         # The second run is the one that launches, and it must use the seeds the first run drew -
         # re-freezing would draw new ones after the operator had seen the projection, which is the
@@ -247,6 +269,9 @@ def main():
     else:
         frozen, _, projection = pilot_campaign.freeze(
             declare(arguments.task, arguments, arguments.holdout_seed), root / "registration")
+        sizing_path.write_text(json.dumps({"TargetHalfWidth": arguments.target_half_width}, indent=1)
+                               + chr(10), encoding="utf-8")
+    half_width = frozen_half_width(sizing_path, arguments.target_half_width)
     for line in describe(projection, arguments):
         print(line)
     if arguments.confirm != projection["ProjectionSha256"]:
@@ -296,10 +321,10 @@ def main():
     (evidence / "rows.json").write_text(json.dumps(rows, indent=1) + chr(10), encoding="utf-8")
     (evidence / "report.json").write_text(json.dumps(report, indent=1) + chr(10), encoding="utf-8")
     try:
-        analysis = pilot_campaign.power(frozen, rows, report, half_width=arguments.target_half_width)
+        analysis = pilot_campaign.power(frozen, rows, report, half_width=half_width)
     except ValueError as error:
         analysis = {"Schema": "evolution-power-analysis-v1", "Unachievable": str(error),
-                    "TargetHalfWidth": arguments.target_half_width}
+                    "TargetHalfWidth": half_width}
     summary["power_analysis"] = analysis
     (evidence / "power-analysis.json").write_text(json.dumps(analysis, indent=1) + chr(10), encoding="utf-8")
     (evidence / "summary.json").write_text(json.dumps(summary, indent=1, allow_nan=False) + "\n", encoding="utf-8")

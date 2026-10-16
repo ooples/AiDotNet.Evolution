@@ -221,18 +221,28 @@ def geometric_mean_speedups(registration, rows, family):
     return result
 
 
-def cost_totals(registration, rows, family):
-    """The two integer cost totals per config: what we spent and what they spent.
+# The two dimensions of registered cost. Separate, never summed: see `cost_totals`.
+COST_FIELDS = ("ModelCalls", "ModelTokens")
 
-    Cost is the registered budget's own currency - model calls and tokens, which every row must
-    report inside the shared ceiling - so this is the same denominator the equal-search-cost check
-    uses rather than a second notion of cost. A failed run has no cost total: it did not pay the
-    whole price of an answer, so it cannot claim to have paid less.
+
+def cost_totals(registration, rows, family):
+    """Each cost dimension per config, as the integer pair (ours, theirs).
+
+    Cost is the registered budget's own currency, and its two parts are not interchangeable: one
+    model call carried about 2,661 tokens over the first measured campaign, so adding calls to
+    tokens prices a call at one token. An arm spending ten calls and 500 tokens against a
+    competitor's one call and 1,000 tokens would have read as a 49% saving while using ten times
+    the calls (review caught it). The dimensions therefore stay apart here, and the floor has to
+    hold in each of them - which needs no conversion constant to be fair in either direction.
+
+    A failed run has no cost total: it did not pay the whole price of an answer, so it cannot claim
+    to have paid less.
     """
     cells = {(row["Family"], row["Arm"], row["Seed"]): row for row in rows}
     result = {}
     for config in family["Configs"]:
-        ours = theirs = 0
+        ours = {field: 0 for field in COST_FIELDS}
+        theirs = {field: 0 for field in COST_FIELDS}
         complete = True
         for seed in registration["Seeds"]:
             mine = cells[(family["Family"], OURS, seed)]
@@ -240,33 +250,37 @@ def cost_totals(registration, rows, family):
             if mine["Status"] != "completed" or yours["Status"] != "completed":
                 complete = False
                 break
-            ours += int(mine["ModelCalls"]) + int(mine["ModelTokens"])
-            theirs += int(yours["ModelCalls"]) + int(yours["ModelTokens"])
-        result[config] = None if not complete or theirs <= 0 else (ours, theirs)
+            for field in COST_FIELDS:
+                ours[field] += int(mine[field])
+                theirs[field] += int(yours[field])
+        result[config] = (None if not complete or any(theirs[field] <= 0 for field in COST_FIELDS)
+                          else {field: (ours[field], theirs[field]) for field in COST_FIELDS})
     return result
 
 
 def cost_reductions(totals):
-    """Fraction of the competitor's total search cost our arm did not spend, per config.
+    """Fraction of the competitor's spend our arm did not spend, per config and per dimension.
 
-    The criterion's alternative route. This is the reported number; the floor is decided on the
-    integer totals it came from, because the division cannot represent the floor exactly.
+    The criterion's alternative route. These are the reported numbers; the floor is decided on the
+    integer totals they came from, because the division cannot represent the floor exactly.
     """
-    return {config: None if total is None else 1.0 - (total[0] / total[1])
+    return {config: None if total is None else
+            {field: 1.0 - (pair[0] / pair[1]) for field, pair in total.items()}
             for config, total in totals.items()}
 
 
 def meets_cost_reduction_floor(totals):
-    """Whether every config saved at least the predeclared fraction, decided on the integers.
+    """Whether every config saved at least the predeclared fraction of every dimension.
 
-    `1.0 - 808 / 1010` is 0.19999999999999996, so an arm that spent exactly a fifth less than the
-    competitor failed a float comparison against 0.20 - the declared floor rejecting the very
-    reduction it declares (review caught it). The totals are counts, so the comparison is exact
-    rational arithmetic on them: ours/theirs <= 1 - floor, with the floor read from its decimal
-    form rather than from the binary double nearest to it.
+    Decided on the integers: `1.0 - 808 / 1010` is 0.19999999999999996, so an arm that spent
+    exactly a fifth less than the competitor failed a float comparison against 0.20 - the declared
+    floor rejecting the very reduction it declares (review caught it). The totals are counts, so
+    the comparison is exact rational arithmetic on them: ours/theirs <= 1 - floor, with the floor
+    read from its decimal form rather than from the binary double nearest to it.
     """
     floor = Fraction(str(MINIMUM_COST_REDUCTION))
-    return all(total is not None and Fraction(total[0], total[1]) <= 1 - floor
+    return all(total is not None
+               and all(Fraction(pair[0], pair[1]) <= 1 - floor for pair in total.values())
                for total in totals.values())
 
 
@@ -311,7 +325,8 @@ def assess_bundle(claim, root, repository):
     budget = spec["Budget"]
     for row in rows:
         require(isinstance(row, dict), "Every raw row must be an object")
-        for field, cap in (("ModelCalls", budget["ModelCalls"]), ("ModelTokens", budget["ModelTokens"])):
+        for field in COST_FIELDS:
+            cap = budget[field]
             value = row.get(field)
             require(type(value) is int and 0 <= value <= cap,
                     f"Row {row.get('Family')}/{row.get('Arm')}/{row.get('Seed')} {field} is unreported or exceeds the shared budget")

@@ -82,4 +82,6 @@ whose failure mode is less binary), or accept a much larger campaign. Nothing he
   `test_program_pilot_campaign.py` rather than by this run.
 - **10 iterations per cell**, which is what the budget bought, not what the engines want.
 - **Measured cost ~2,661 tokens per call**, far under the 40,000 the runner's planning constant
-  assumed - 479k tokens for the whole campaign rather than the projected 7.2M.
+  assumed *at the time of this run* - 479k tokens for the whole campaign rather than the projected
+  7.2M. That measurement is why `TOKENS_PER_CALL` is now 8,000, so the 7.2M projection above
+  reproduces only with the historical 40,000: today's constant projects 1.4M for the same 180 calls.
