@@ -108,6 +108,72 @@ def power_lines(analysis):
     return power_analysis.lines(analysis)
 
 
+def ranked_losses(frozen, rows):
+    """V1-07's third criterion: every cell the competitor won, worst margin first.
+
+    The report says whether we are superior; it does not say *where we lose*, and a mean difference
+    of +0.33 can be an arm that wins four cells and is beaten badly in two. This ranks the beaten
+    cells so the ordering - not an impression of the table - is what sets workstream C's priority.
+
+    The endpoint's own `Direction` decides what losing means, so a maximised metric is not silently
+    read as a minimised one. A pair where either side did not complete is **not** a loss and not a
+    win: it is incomparable, counted separately rather than dropped, because a dropped pair would
+    quietly shorten the denominator the ranking is read against.
+    """
+    cells = {(row["Family"], row["Arm"], row["Seed"]): row for row in rows}
+    out = []
+    for family in frozen["Spec"]["Families"]:
+        name = family["Family"]
+        minimise = family["Endpoint"]["Direction"] == "minimize"
+        for config in family["Configs"]:
+            losses, incomparable = [], 0
+            for seed in frozen["Seeds"]:
+                mine = cells.get((name, registration.OURS, seed))
+                yours = cells.get((name, "openevolve-" + config, seed))
+                if (mine is None or yours is None or mine["Status"] != "completed"
+                        or yours["Status"] != "completed" or mine["Value"] is None or yours["Value"] is None):
+                    incomparable += 1
+                    continue
+                ours, theirs = float(mine["Value"]), float(yours["Value"])
+                margin = ours - theirs if minimise else theirs - ours
+                if margin > 0:
+                    losses.append({"Seed": seed, "Ours": ours, "Theirs": theirs, "Margin": margin})
+            # Worst margin first, and the seed breaks a tie so the order is a function of the rows
+            # rather than of the dict iteration that produced them.
+            losses.sort(key=lambda loss: (-loss["Margin"], loss["Seed"]))
+            out.append({"Family": name, "Config": config, "Metric": family["Endpoint"]["Metric"],
+                        "Direction": family["Endpoint"]["Direction"], "ComparablePairs": len(frozen["Seeds"]) - incomparable,
+                        "IncomparablePairs": incomparable, "LostCells": len(losses),
+                        "WorstMargin": losses[0]["Margin"] if losses else None, "Losses": losses})
+    # The endpoint we lose most often comes first, and a tie there is broken by the worst single
+    # margin: that pair is the ordering workstream C is meant to read top-down.
+    out.sort(key=lambda row: (-row["LostCells"], -(row["WorstMargin"] or 0.0), row["Family"], row["Config"]))
+    return {"Schema": "evolution-pilot-losses-v1", "RegistrationSha256": frozen["RegistrationSha256"],
+            "Endpoints": out}
+
+
+def loss_lines(losses):
+    """The ranking as text, because this is the list a priority call is actually made from."""
+    lines = []
+    for row in losses["Endpoints"]:
+        lines.append("%-22s %-12s lost %d/%d cells%s worst=%s"
+                     % (row["Family"], row["Config"], row["LostCells"], row["ComparablePairs"],
+                        "" if not row["IncomparablePairs"] else
+                        " (%d incomparable)" % row["IncomparablePairs"],
+                        "none" if row["WorstMargin"] is None else "%+.4f" % row["WorstMargin"]))
+        for loss in row["Losses"]:
+            lines.append("    seed %-11s ours=%.4f theirs=%.4f margin=%+.4f"
+                         % (loss["Seed"], loss["Ours"], loss["Theirs"], loss["Margin"]))
+    # "Nothing was lost" and "nothing could be compared" are different readings, and the second
+    # one must not be printed as the first: a campaign whose cells all failed would otherwise
+    # report a clean sweep (review caught it).
+    if not sum(row["ComparablePairs"] for row in losses["Endpoints"]):
+        lines.append("no pair could be compared on any endpoint, so nothing was won or lost")
+    elif not any(row["LostCells"] for row in losses["Endpoints"]):
+        lines.append("no cell was lost on any endpoint")
+    return lines
+
+
 def report_lines(report):
     """One line per endpoint, so a reader sees the losses as plainly as the wins."""
     lines = []

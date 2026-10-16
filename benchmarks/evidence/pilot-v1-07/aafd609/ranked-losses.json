@@ -1,0 +1,60 @@
+{
+ "Schema": "evolution-pilot-losses-v1",
+ "RegistrationSha256": "abb44f490d868ca74e8f2e07096bde93bfe5058832f4c8d9d759ebbe4ba33929",
+ "Endpoints": [
+  {
+   "Family": "rational_gain",
+   "Config": "matched",
+   "Metric": "nmse",
+   "Direction": "minimize",
+   "ComparablePairs": 6,
+   "IncomparablePairs": 0,
+   "LostCells": 3,
+   "WorstMargin": 0.35646878383477637,
+   "Losses": [
+    {
+     "Seed": 782783836,
+     "Ours": 0.7562288245589589,
+     "Theirs": 0.39976004072418253,
+     "Margin": 0.35646878383477637
+    },
+    {
+     "Seed": 149773946,
+     "Ours": 0.2811690588772789,
+     "Theirs": 0.13279265379440294,
+     "Margin": 0.14837640508287595
+    },
+    {
+     "Seed": 283099245,
+     "Ours": 0.27077148408550444,
+     "Theirs": 0.21201882805804134,
+     "Margin": 0.0587526560274631
+    }
+   ]
+  },
+  {
+   "Family": "rational_gain",
+   "Config": "recommended",
+   "Metric": "nmse",
+   "Direction": "minimize",
+   "ComparablePairs": 6,
+   "IncomparablePairs": 0,
+   "LostCells": 2,
+   "WorstMargin": 0.48568416591862407,
+   "Losses": [
+    {
+     "Seed": 782783836,
+     "Ours": 0.7562288245589589,
+     "Theirs": 0.27054465864033483,
+     "Margin": 0.48568416591862407
+    },
+    {
+     "Seed": 2095417139,
+     "Ours": 0.35450999292273705,
+     "Theirs": 0.13279265379440294,
+     "Margin": 0.2217173391283341
+    }
+   ]
+  }
+ ]
+}

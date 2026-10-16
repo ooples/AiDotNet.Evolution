@@ -320,6 +320,10 @@ def main():
     # otherwise lose rows.json, report.json and summary.json to a projection off them.
     (evidence / "rows.json").write_text(json.dumps(rows, indent=1) + chr(10), encoding="utf-8")
     (evidence / "report.json").write_text(json.dumps(report, indent=1) + chr(10), encoding="utf-8")
+    # The ranking depends on the rows alone, so it is written here rather than after the sizing:
+    # the projection can refuse, and where we lose is evidence in its own right.
+    losses = pilot_campaign.ranked_losses(frozen, rows)
+    (evidence / "ranked-losses.json").write_text(json.dumps(losses, indent=1) + chr(10), encoding="utf-8")
     try:
         analysis = pilot_campaign.power(frozen, rows, report, half_width=half_width)
     except ValueError as error:
@@ -329,6 +333,7 @@ def main():
     (evidence / "power-analysis.json").write_text(json.dumps(analysis, indent=1) + chr(10), encoding="utf-8")
     (evidence / "summary.json").write_text(json.dumps(summary, indent=1, allow_nan=False) + "\n", encoding="utf-8")
     print("\n" + "\n".join(pilot_campaign.report_lines(report)))
+    print(chr(10) + chr(10).join(pilot_campaign.loss_lines(losses)))
     if "Unachievable" in analysis:
         print(chr(10) + "sizing refused: " + analysis["Unachievable"])
         print("the campaign's rows, report and summary are written; only the projection is missing")

@@ -56,6 +56,34 @@ per-cell broker ceiling, so no arm bought its result with extra calls. Token spe
 21,486 to 35,361 per cell, median 25,933 - because a call's cost depends on the prompt each engine
 builds, so this is equality of the budgeted unit rather than of tokens.
 
+## Where we lose, ranked: `ranked-losses.json`
+
+V1-07's third criterion. The report says whether we are superior; it does not say *where* we are
+beaten, and a mean difference of `+0.3327` can hide an arm that is beaten badly in two cells. This
+ranking is computed by `pilot_campaign.ranked_losses` from `rows.json` together with the frozen
+`registration.json` - which supplies the seeds, the configs and the endpoint direction that decides
+what losing means - worst margin first, and it is the ordering workstream C is meant to read
+top-down rather than an impression of the table above.
+
+| rank | config | seed | ours (NMSE) | theirs (NMSE) | margin |
+| ---: | --- | --- | ---: | ---: | ---: |
+| 1 | matched | 782783836 | 0.7562 | 0.3998 | +0.3565 |
+| 2 | matched | 149773946 | 0.2812 | 0.1328 | +0.1484 |
+| 3 | matched | 283099245 | 0.2708 | 0.2120 | +0.0588 |
+| 1 | recommended | 782783836 | 0.7562 | 0.2705 | +0.4857 |
+| 2 | recommended | 2095417139 | 0.3545 | 0.1328 | +0.2217 |
+
+`matched` beat us in **3 of 6** cells, `recommended` in **2 of 6**; no pair was incomparable, since
+every cell completed. Both rankings are led by **seed 782783836**, which is our worst cell in the
+whole campaign (0.7562, against a 0.1754-0.3545 spread everywhere else) - so the first priority this
+list sets is not "beat OpenEvolve on average" but *why that one seed goes wrong for us*, since
+fixing it alone moves both endpoints. The second-ranked losses are both to a competitor cell at
+**0.1328**, the best value any arm reached: that is the gap at the top end, and it is a different
+problem from the first.
+
+Three lost cells out of six is a tie on cell counts, not a deficit - which is the same reading as
+the result section, and the reason this pilot sizes a campaign instead of concluding one.
+
 ## What this sizes: N = 514, which is the real finding
 
 | endpoint | sd of paired differences | observed 95% half width | required N for 0.05 | scaled | normal | agreement |
