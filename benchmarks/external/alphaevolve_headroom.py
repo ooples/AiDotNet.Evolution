@@ -74,9 +74,13 @@ IN_SCOPE = {
                                published=1.5053, lengths=VECTOR, cap=None),
     "c2-autocorrelation": dict(objective=lambda v: ae.c2(v), repair=nonnegative, direction="maximize",
                                published=0.8962, lengths=VECTOR, cap=None),
-    "c3-autocorrelation": dict(objective=lambda v: ae.c3(v), repair=nonnegative, direction="minimize",
+    # c3 and c3' are the SIGNED versions of c1 - `_heights(value, nonnegative=False)` - and that is
+    # the whole difference between them. Repaired to non-negative they returned c1's number to the
+    # last bit, because conv(h, h) >= 0 makes all three peaks the same quantity, so the study was
+    # reporting one measurement against three published targets. They get the free repair.
+    "c3-autocorrelation": dict(objective=lambda v: ae.c3(v), repair=free, direction="minimize",
                                published=1.4557, lengths=VECTOR, cap=None),
-    "c3prime-autocorrelation": dict(objective=lambda v: ae.c3(v, True), repair=nonnegative,
+    "c3prime-autocorrelation": dict(objective=lambda v: ae.c3(v, True), repair=free,
                                     direction="minimize", published=1.4688, lengths=VECTOR, cap=None),
     "c5-erdos-overlap": dict(objective=lambda v: ae.c5(v), repair=half_sum_in_unit_box,
                              direction="minimize", published=0.380924, lengths=(8, 12, 16, 24, 32),
@@ -132,7 +136,7 @@ def out_of_scope(manifest_path):
 
 MANIFEST = pathlib.Path(__file__).resolve().parents[1] / "evidence/alphaevolve-math/manifest.json"
 SEEDS = (1, 2, 3, 4, 5)
-PROTOCOL = "alphaevolve-headroom-v3"
+PROTOCOL = "alphaevolve-headroom-v4"
 
 # The step schedule is absolute rather than a fraction of the budget, which is what makes the floor
 # MONOTONE IN BUDGET: an N-iteration run draws exactly the prefix a longer run draws and takes the
