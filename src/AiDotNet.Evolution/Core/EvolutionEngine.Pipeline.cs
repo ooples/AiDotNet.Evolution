@@ -92,10 +92,20 @@ public sealed partial class EvolutionEngine<TGenome>
                         }
                         if (proposals.Count == 0) break;
                         PipelineProposal next = proposals.Dequeue();
-                        WorkItem item = next.Request is null
-                            ? await PrepareGenomeAsync(next.Seed, next.EvaluationId, next.Island, next.Lineage, waveToken).ConfigureAwait(false)
-                            : await CompleteVariationAsync(next.Request, await next.Response!.ConfigureAwait(false), waveToken).ConfigureAwait(false);
-                        item.IsSeed = next.Request is null;
+                        WorkItem item;
+                        if (next.HasSeed)
+                            item = await PrepareGenomeAsync(next.Seed, next.EvaluationId, next.Island, next.Lineage, waveToken).ConfigureAwait(false);
+                        else
+                        {
+                            // Admission starts the response, so a proposal that reaches here without one is a
+                            // broken invariant rather than a case to handle quietly.
+                            VariationRequest request = next.Request
+                                ?? throw new InvalidOperationException("A pipeline proposal with no seed must carry its variation request.");
+                            Task<VariationResponse> inflight = next.Response
+                                ?? throw new InvalidOperationException("An admitted pipeline proposal carries no in-flight response.");
+                            item = await CompleteVariationAsync(request, await inflight.ConfigureAwait(false), waveToken).ConfigureAwait(false);
+                        }
+                        item.IsSeed = next.HasSeed;
                         batch.Add(item);
                         if (!item.RequiresEvaluation) continue;
                         activeEvaluations.RemoveAll(task => task.IsCompleted);
@@ -111,8 +121,8 @@ public sealed partial class EvolutionEngine<TGenome>
                     }
                     await Task.WhenAll(evaluations).ConfigureAwait(false);
                     waveToken.ThrowIfCancellationRequested();
-                    if (proposalResourcePhase) { proposalResourcePhase = false; meteredVariation!.EndPipelinePhase(); }
-                    if (evaluationResourcePhase) { evaluationResourcePhase = false; meteredTask!.EndPipelinePhase(); }
+                    if (proposalResourcePhase) { proposalResourcePhase = false; meteredVariation?.EndPipelinePhase(); }
+                    if (evaluationResourcePhase) { evaluationResourcePhase = false; meteredTask?.EndPipelinePhase(); }
                     foreach (WorkItem item in batch.Where(item => item.RequiresEvaluation))
                     {
                         if (item.CascadeRejectedStage.HasValue && !_options.Cascade.ChargeRejectedStagesToBudget)
@@ -159,8 +169,8 @@ public sealed partial class EvolutionEngine<TGenome>
                 }
                 finally
                 {
-                    try { if (proposalResourcePhase) meteredVariation!.EndPipelinePhase(); }
-                    finally { if (evaluationResourcePhase) meteredTask!.EndPipelinePhase(); }
+                    try { if (proposalResourcePhase) meteredVariation?.EndPipelinePhase(); }
+                    finally { if (evaluationResourcePhase) meteredTask?.EndPipelinePhase(); }
                 }
                 if (batch.Count == 0) return StopReasonWithNothingInFlight();
                 bool failedFast = await CommitBatchAsync(batch, CancellationToken.None).ConfigureAwait(false);
@@ -184,15 +194,16 @@ public sealed partial class EvolutionEngine<TGenome>
     private async Task<VariationResponse> RunPipelineProposalAsync(VariationRequest request, SemaphoreSlim slots,
         EvolutionPipelineRateGate rate, CancellationToken cancellationToken)
     {
-        _pipelineStatistics!.Enqueue(0);
+        var statistics = _pipelineStatistics ?? throw new InvalidOperationException("Pipeline diagnostics were not initialized.");
+        statistics.Enqueue(0);
         try { await slots.WaitAsync(cancellationToken).ConfigureAwait(false); }
-        catch { _pipelineStatistics.CancelQueued(0); throw; }
-        _pipelineStatistics.Claim(0);
+        catch { statistics.CancelQueued(0); throw; }
+        statistics.Claim(0);
         long started = 0;
         try
         {
             await rate.WaitAsync(cancellationToken).ConfigureAwait(false);
-            _pipelineStatistics.Started(0); started = Stopwatch.GetTimestamp();
+            statistics.Started(0); started = Stopwatch.GetTimestamp();
             if (Volatile.Read(ref _pipelineInlineProposals))
             {
                 // A source that returns promptly (completed, or genuinely asynchronous) needs no thread hop;
@@ -208,7 +219,7 @@ public sealed partial class EvolutionEngine<TGenome>
         finally
         {
             double seconds = started == 0 ? 0 : (Stopwatch.GetTimestamp() - started) / (double)Stopwatch.Frequency;
-            _pipelineStatistics.Released(0, seconds); slots.Release();
+            statistics.Released(0, seconds); slots.Release();
         }
     }
 
@@ -220,6 +231,7 @@ public sealed partial class EvolutionEngine<TGenome>
         Dictionary<int, PipelineArchiveContext> snapshots)
     {
         var plan = new List<PipelineProposal>(limit);
+        var statistics = _pipelineStatistics ?? throw new InvalidOperationException("Pipeline diagnostics were not initialized.");
         long committedBefore = _nextEvaluationId; // every earlier wave has committed
         while (plan.Count < limit)
         {
@@ -227,16 +239,21 @@ public sealed partial class EvolutionEngine<TGenome>
             {
                 long id = AllocateProposalId(); int island = (int)(id % _islands.Length);
                 var lineage = new EvolutionLineage(null, null, "seed", _refiner?.Id, 0, island, (ulong)id);
-                plan.Add(new PipelineProposal(id, island, lineage, seeds[seedIndex++], null, null));
-                _pipelineStatistics!.Record(EvolutionPipelineScheduleKind.ProposalSnapshot, id, 0, "seed");
+                plan.Add(PipelineProposal.ForSeed(id, island, lineage, seeds[seedIndex++]));
+                statistics.Record(EvolutionPipelineScheduleKind.ProposalSnapshot, id, 0, "seed");
             }
             else
             {
                 if (_generation >= _options.MaxGenerations && plan.Count >= replay) break;
                 VariationRequest? request = CreateVariationRequest(snapshots, committedBefore);
                 if (request is null) break;
-                plan.Add(new PipelineProposal(request.EvaluationId, request.Island, request.Lineage, default!, request, null));
-                _pipelineStatistics!.Record(EvolutionPipelineScheduleKind.ProposalSnapshot, request.EvaluationId, request.Lineage.Generation, request.Context.ProposalIdentity!);
+                // US-20's second criterion is that a dispatched proposal carries a stable request identity.
+                // Suppressing the null here let a proposal without one be scheduled and only fail at replay.
+                string identity = request.Context.ProposalIdentity
+                    ?? throw new InvalidOperationException("A pipeline proposal must carry the stable request identity replay is keyed on.");
+                plan.Add(PipelineProposal.ForVariation(request));
+                statistics.Record(EvolutionPipelineScheduleKind.ProposalSnapshot, request.EvaluationId,
+                    request.Lineage.Generation, identity);
             }
         }
         return plan;
@@ -355,14 +372,44 @@ public sealed partial class EvolutionEngine<TGenome>
         foreach (WorkItem item in pending) item.RequiresEvaluation = false;
     }
 
-    private sealed class PipelineProposal(long evaluationId, int island, EvolutionLineage lineage, TGenome seed,
-        VariationRequest? request, Task<VariationResponse>? response)
+    /// <summary>One planned pipeline slot: either a seed already in hand, or a variation still to be proposed.</summary>
+    /// <remarks>
+    /// The two shapes are built through named factories because only one of them has a genome. The first
+    /// version stored `default!` for a variation's absent seed, which is a suppression and also a lie about
+    /// the type: `TGenome` is unconstrained here, so for a struct genome that default is an indistinguishable
+    /// zero value rather than "no seed". A one-or-zero element array carries the presence honestly without
+    /// needing a constraint.
+    /// </remarks>
+    private sealed class PipelineProposal
     {
-        public long EvaluationId { get; } = evaluationId;
-        public int Island { get; } = island;
-        public EvolutionLineage Lineage { get; } = lineage;
-        public TGenome Seed { get; } = seed;
-        public VariationRequest? Request { get; } = request;
-        public Task<VariationResponse>? Response { get; set; } = response;
+        private readonly TGenome[] _seed;
+
+        private PipelineProposal(long evaluationId, int island, EvolutionLineage lineage, TGenome[] seed, VariationRequest? request)
+        {
+            EvaluationId = evaluationId;
+            Island = island;
+            Lineage = lineage;
+            _seed = seed;
+            Request = request;
+        }
+
+        public static PipelineProposal ForSeed(long evaluationId, int island, EvolutionLineage lineage, TGenome seed) =>
+            new(evaluationId, island, lineage, new[] { seed }, null);
+
+        public static PipelineProposal ForVariation(VariationRequest request) =>
+            new(request.EvaluationId, request.Island, request.Lineage, Array.Empty<TGenome>(), request);
+
+        public long EvaluationId { get; }
+        public int Island { get; }
+        public EvolutionLineage Lineage { get; }
+        public VariationRequest? Request { get; }
+        public Task<VariationResponse>? Response { get; set; }
+
+        /// <summary>True when this slot was planned from a seed, which is exactly when <see cref="Request"/> is null.</summary>
+        public bool HasSeed => _seed.Length == 1;
+
+        public TGenome Seed => _seed.Length == 1
+            ? _seed[0]
+            : throw new InvalidOperationException("A variation proposal has no seed; its genome comes from the request.");
     }
 }
