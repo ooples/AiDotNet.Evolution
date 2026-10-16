@@ -14,6 +14,20 @@ materially better than the seed **while never seeing the test split** - and how 
 | `damped_oscillator` | **+0.300 to +0.322** | **0.124** | **~2.4x - the task to compete on** |
 | `two_variable_ratio` | +0.001 to +0.041 | 0.112 | the floor cannot touch it at all |
 
+**This bundle reproduces exactly.** The enumeration is seeded, so
+
+```text
+python benchmarks/external/symbolic_regression_headroom.py --budget 20000 --noise-seeds 8 --output fresh.json
+```
+
+produces a file byte-identical to `headroom.json` - verified at `main` `0354e33`, nine commits and
+two months after the `e083c3b` the bundle is named for, which is what says the family, the splits,
+the seals and the search are all unchanged. That run takes about 56 seconds, so
+`benchmarks/external/test_program_symbolic_regression_evidence.py` guards the cheap half of it in
+CI: every committed `test_seal` is rebuilt from the family module, the quoted aggregates are
+recomputed from the rows they summarise, `gap_closed` is re-derived from its two NMSE columns, and
+the eligibility ordering between the three tasks is pinned.
+
 `gap_closed` is `1 - found_test_nmse / baseline_test_nmse`, where the baseline predicts the
 **training** mean. Review caught this card taking that mean from the held-out rows instead, which made
 `baseline_test_nmse` exactly 1.0 for every row - it is the definition of this NMSE's denominator - so
