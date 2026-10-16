@@ -60,9 +60,10 @@ builds, so this is equality of the budgeted unit rather than of tokens.
 
 V1-07's third criterion. The report says whether we are superior; it does not say *where* we are
 beaten, and a mean difference of `+0.3327` can hide an arm that is beaten badly in two cells. This
-ranking is computed from `rows.json` alone (`pilot_campaign.ranked_losses`), worst margin first, and
-it is the ordering workstream C is meant to read top-down rather than an impression of the table
-above.
+ranking is computed by `pilot_campaign.ranked_losses` from `rows.json` together with the frozen
+`registration.json` - which supplies the seeds, the configs and the endpoint direction that decides
+what losing means - worst margin first, and it is the ordering workstream C is meant to read
+top-down rather than an impression of the table above.
 
 | rank | config | seed | ours (NMSE) | theirs (NMSE) | margin |
 | ---: | --- | --- | ---: | ---: | ---: |

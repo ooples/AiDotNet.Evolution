@@ -164,7 +164,12 @@ def loss_lines(losses):
         for loss in row["Losses"]:
             lines.append("    seed %-11s ours=%.4f theirs=%.4f margin=%+.4f"
                          % (loss["Seed"], loss["Ours"], loss["Theirs"], loss["Margin"]))
-    if not any(row["LostCells"] for row in losses["Endpoints"]):
+    # "Nothing was lost" and "nothing could be compared" are different readings, and the second
+    # one must not be printed as the first: a campaign whose cells all failed would otherwise
+    # report a clean sweep (review caught it).
+    if not sum(row["ComparablePairs"] for row in losses["Endpoints"]):
+        lines.append("no pair could be compared on any endpoint, so nothing was won or lost")
+    elif not any(row["LostCells"] for row in losses["Endpoints"]):
         lines.append("no cell was lost on any endpoint")
     return lines
 

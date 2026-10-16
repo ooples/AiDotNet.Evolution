@@ -96,14 +96,27 @@ class RankedLossTests(unittest.TestCase):
             self.assertEqual(1, row["LostCells"], "the completed pair, and only it")
         self.assertIn("(1 incomparable)", chr(10).join(campaign.loss_lines(ranking)))
 
+    def test_a_campaign_with_nothing_comparable_does_not_report_a_clean_sweep(self):
+        # "No cell was lost" and "no pair could be compared" are different readings; printing the
+        # second as the first would let a campaign whose cells all failed read as a clean sweep.
+        rows = [cell("aidotnet", 11, None, "failed"),
+                cell("openevolve-recommended", 11, 0.10), cell("openevolve-matched", 11, 0.10)]
+        ranking = campaign.ranked_losses(frozen_for([11]), rows)
+        text = chr(10).join(campaign.loss_lines(ranking))
+        self.assertEqual([0, 0], [row["ComparablePairs"] for row in ranking["Endpoints"]])
+        self.assertIn("no pair could be compared", text)
+        self.assertNotIn("no cell was lost", text)
+
     def test_the_ranking_is_a_function_of_the_rows_not_of_their_order(self):
         seeds = [11, 22]
         rows = [cell("aidotnet", 11, 0.50), cell("aidotnet", 22, 0.50),
                 cell("openevolve-recommended", 11, 0.20), cell("openevolve-recommended", 22, 0.20),
                 cell("openevolve-matched", 11, 0.20), cell("openevolve-matched", 22, 0.20)]
-        # Equal margins throughout, so only the tie-break can decide the order.
-        forward = campaign.ranked_losses(frozen_for(seeds), rows)
-        backward = campaign.ranked_losses(frozen_for(seeds), list(reversed(rows)))
+        # Equal margins throughout, so only the tie-break can decide the order - and the frozen
+        # seeds are reversed so that iterating them is not the same as sorting them. Without the
+        # tie-break this test fails rather than passing by coincidence (review caught that).
+        forward = campaign.ranked_losses(frozen_for(list(reversed(seeds))), rows)
+        backward = campaign.ranked_losses(frozen_for(list(reversed(seeds))), list(reversed(rows)))
         self.assertEqual(forward, backward)
         self.assertEqual([11, 22], [loss["Seed"] for loss in forward["Endpoints"][0]["Losses"]])
 
