@@ -1,0 +1,24 @@
+{
+ "Schema": "evolution-automl-tuning-v1",
+ "Protocol": "automl-tuning-v1",
+ "Seeds": 8,
+ "Budget": 36,
+ "Features": 4,
+ "Rows": {
+  "Train": 120,
+  "Validation": 60,
+  "Test": 400
+ },
+ "TestMseRatio": {
+  "Mean": 1.0012191601861482,
+  "LowerBound95": 0.9963414587091871,
+  "UpperBound95": 1.0062650301884866,
+  "Seeds": 8,
+  "Unit": "ratio"
+ },
+ "SeedsEngineBetter": 4,
+ "SeedsGridBetter": 4,
+ "WorstSeedRatio": 1.013223917022935,
+ "BestSeedRatio": 0.9874475978064728,
+ "EqualFitsPerSearcher": 36
+}
