@@ -1,5 +1,24 @@
 # Changelog
 
+## [0.5.0](https://github.com/ooples/AiDotNet.Evolution/compare/v0.4.0...v0.5.0) (2026-10-16)
+
+
+### Features
+
+* **bench:** build the release evidence report, and the lint its metric is ([#311](https://github.com/ooples/AiDotNet.Evolution/issues/311)) ([f862513](https://github.com/ooples/AiDotNet.Evolution/commit/f862513d1af2494ecf157a25d3c7986c300afc08))
+* **bench:** measure the router against the best single method it must beat ([#307](https://github.com/ooples/AiDotNet.Evolution/issues/307)) ([9ee2c99](https://github.com/ooples/AiDotNet.Evolution/commit/9ee2c99d6f7e955608065ea51728971b3140add0))
+* **bench:** measure what a warm start saves, in evaluations ([#312](https://github.com/ooples/AiDotNet.Evolution/issues/312)) ([d88a5ed](https://github.com/ooples/AiDotNet.Evolution/commit/d88a5ed54f6ab6d29b1890caf78a59c2bebca1f7))
+* **bench:** measure what compiler-guided repair recovers, and what it costs ([#305](https://github.com/ooples/AiDotNet.Evolution/issues/305)) ([4756182](https://github.com/ooples/AiDotNet.Evolution/commit/47561821ed4f9aecde229bf6a7944afea68475c2))
+* **bench:** measure what novelty detection and experience reuse suppress ([#306](https://github.com/ooples/AiDotNet.Evolution/issues/306)) ([f5a4d12](https://github.com/ooples/AiDotNet.Evolution/commit/f5a4d121e2620282049f982f7ba6c0bb328230a5))
+* **bench:** tune a consumer model with the engine against grid search at equal budget ([#310](https://github.com/ooples/AiDotNet.Evolution/issues/310)) ([dfddeaf](https://github.com/ooples/AiDotNet.Evolution/commit/dfddeaf47356d7cfee66b5e6815ad3255bf737e0))
+* **eng:** diff openevolve's config against the catalog, not against prose ([#315](https://github.com/ooples/AiDotNet.Evolution/issues/315)) ([5097fef](https://github.com/ooples/AiDotNet.Evolution/commit/5097fefcf0bf936440c85041c798e4b1cd72b947))
+
+
+### Refactoring
+
+* **core:** handle nulls in the three worst offenders instead of suppressing them ([#313](https://github.com/ooples/AiDotNet.Evolution/issues/313)) ([5109363](https://github.com/ooples/AiDotNet.Evolution/commit/5109363880a1a3c07b5d3d2234719ee1fe727858))
+* **core:** handle the pipeline's nulls instead of suppressing them ([#304](https://github.com/ooples/AiDotNet.Evolution/issues/304)) ([7bad10a](https://github.com/ooples/AiDotNet.Evolution/commit/7bad10a9c2efe95cf0ef2c1333749342a3d94ccc))
+
 ## [0.4.0](https://github.com/ooples/AiDotNet.Evolution/compare/v0.3.0...v0.4.0) (2026-10-16)
 
 
