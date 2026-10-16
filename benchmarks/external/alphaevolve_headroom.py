@@ -229,7 +229,7 @@ def main():
     report = measure(arguments.iterations, arguments.manifest)
     print("\n".join(lines(report)))
     if arguments.output:
-        with open(arguments.output, "x", encoding="utf-8") as handle:
+        with open(arguments.output, "x", encoding="utf-8", newline="\n") as handle:
             handle.write(json.dumps(report, indent=1) + "\n")
         print("wrote " + arguments.output)
     return report

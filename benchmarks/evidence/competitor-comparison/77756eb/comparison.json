@@ -1,0 +1,340 @@
+{
+ "Schema": "evolution-competitor-comparison-v1",
+ "Competitors": [
+  "OpenEvolve",
+  "AlphaEvolve"
+ ],
+ "Rows": [
+  {
+   "Dimension": "Configuration surface",
+   "Competitor": "OpenEvolve",
+   "Ours": "103 keys classified (65 Mapped, 23 NoEffect, 15 RefusedUnlessDefault)",
+   "Theirs": "102 options at v0.3.2",
+   "Reading": "0 upstream options are unclassified; 1 catalog key(s) upstream does not expose (llm._manual_queue_dir)",
+   "Verdict": "parity",
+   "Evidence": "benchmarks/evidence/competitor-comparison/77756eb/openevolve-config-census.json",
+   "OursRange": null,
+   "TheirsRange": null,
+   "Interval": null,
+   "LowerIsBetter": true,
+   "FloorStudy": false,
+   "Endpoints": null,
+   "Section": "parity"
+  },
+  {
+   "Dimension": "Unmodified upstream evaluators",
+   "Competitor": "OpenEvolve",
+   "Ours": "4 of their example evaluators run through our CLI",
+   "Theirs": "4 example evaluators",
+   "Reading": "run end to end against the upstream evaluator process, not a reimplementation: 767b31a-claude-code-quickstart, 767b31a-function-minimization, b791d8b-background-blur, b791d8b-signal-processing",
+   "Verdict": "parity",
+   "Evidence": "benchmarks/evidence/openevolve-examples",
+   "OursRange": null,
+   "TheirsRange": null,
+   "Interval": null,
+   "LowerIsBetter": true,
+   "FloorStudy": false,
+   "Endpoints": null,
+   "Section": "parity"
+  },
+  {
+   "Dimension": "Archive and scheduling defects",
+   "Competitor": "OpenEvolve",
+   "Ours": "10 of 10 scenarios pass",
+   "Theirs": "8 defect classes reproduced on 0.3.2 and 8 on 0.4.0",
+   "Reading": "each class is a probe that fails upstream and passes here; the same eight reproduce two releases apart, so they are design, not a bad build",
+   "Verdict": "ahead",
+   "Evidence": "benchmarks/evidence/robustness/c30c875/ours.json",
+   "OursRange": [
+    0,
+    0
+   ],
+   "TheirsRange": [
+    8,
+    8
+   ],
+   "Interval": null,
+   "LowerIsBetter": true,
+   "FloorStudy": false,
+   "Endpoints": null,
+   "Section": "parity"
+  },
+  {
+   "Dimension": "Published results transcribed",
+   "Competitor": "AlphaEvolve",
+   "Ours": "36 of 36 verified by an independent verifier, 0 pending",
+   "Theirs": "36 published constructions",
+   "Reading": "every verifier reproduces the published value from the published construction, so the target list is checkable rather than quoted",
+   "Verdict": "parity",
+   "Evidence": "benchmarks/evidence/alphaevolve-math/manifest.json",
+   "OursRange": null,
+   "TheirsRange": null,
+   "Interval": null,
+   "LowerIsBetter": true,
+   "FloorStudy": false,
+   "Endpoints": null,
+   "Section": "parity"
+  },
+  {
+   "Dimension": "Distance to the published constructions",
+   "Competitor": "AlphaEvolve",
+   "Ours": "not run: the engine has never been pointed at these problems",
+   "Theirs": "6 in-scope problems, 30 others of other candidate shapes",
+   "Reading": "a model-free floor is behind on 6 of 6 by +0.27% to +13.53% - room to compete, and nothing yet competing for it. Its closest is c4-uncertainty-hermite at +0.27%, which is near enough that a result there would say little about the searcher",
+   "Verdict": "unmeasured",
+   "Evidence": "benchmarks/evidence/alphaevolve-headroom/77756eb/headroom.json",
+   "OursRange": null,
+   "TheirsRange": null,
+   "Interval": null,
+   "LowerIsBetter": true,
+   "FloorStudy": true,
+   "Endpoints": null,
+   "Section": "parity"
+  },
+  {
+   "Dimension": "Engine overhead per evaluation",
+   "Competitor": "OpenEvolve",
+   "Ours": "48.3 us/eval",
+   "Theirs": "26917 us/eval",
+   "Reading": "ratio 0.0018, CI95 [0.0016, 0.0021] over 9 interleaved repeats; peak memory 61 MB against 143 MB",
+   "Verdict": "ahead",
+   "Evidence": "benchmarks/evidence/engine-overhead/65ced88/head-to-head.json",
+   "OursRange": [
+    43.592,
+    66.371
+   ],
+   "TheirsRange": [
+    19081.676,
+    31145.39
+   ],
+   "Interval": [
+    0.0015706400336120857,
+    0.0021309915596016203
+   ],
+   "LowerIsBetter": true,
+   "FloorStudy": false,
+   "Endpoints": null,
+   "Section": "performance"
+  },
+  {
+   "Dimension": "Overhead as the population grows",
+   "Competitor": "OpenEvolve",
+   "Ours": "33.9 to 53.5 us/eval across 100 to 50000",
+   "Theirs": "15847 to 211486 us/eval across 100 to 5000",
+   "Reading": "largest over smallest: 0.9985x here against 13.35x there, and their largest size is the largest they completed",
+   "Verdict": "ahead",
+   "Evidence": "benchmarks/evidence/population-scaling/47899db/scaling.json",
+   "OursRange": [
+    33.914385,
+    53.473994999999995
+   ],
+   "TheirsRange": [
+    15846.524000007776,
+    211485.8694999566
+   ],
+   "Interval": null,
+   "LowerIsBetter": true,
+   "FloorStudy": false,
+   "Endpoints": null,
+   "Section": "performance"
+  },
+  {
+   "Dimension": "Keeping a concurrency budget busy",
+   "Competitor": "OpenEvolve",
+   "Ours": "1.040x ideal wall time",
+   "Theirs": "2.401x ideal wall time",
+   "Reading": "in-flight utilisation 96.2% against 41.6% at the same concurrency of 16, over 5 and 3 repeats",
+   "Verdict": "ahead",
+   "Evidence": "benchmarks/evidence/latency/4c31b32/runs.jsonl",
+   "OursRange": [
+    1.0399197742881905,
+    1.0410266421868626
+   ],
+   "TheirsRange": [
+    2.401076428471001,
+    2.488158748312257
+   ],
+   "Interval": null,
+   "LowerIsBetter": true,
+   "FloorStudy": false,
+   "Endpoints": null,
+   "Section": "performance"
+  },
+  {
+   "Dimension": "Sandbox cost per evaluation",
+   "Competitor": null,
+   "Ours": "+2.79 ms p50 warm, +62.2 ms per process, +150.9 ms in Docker",
+   "Theirs": null,
+   "Reading": "500 evaluations on Ubuntu 24.04.5 LTS; the warm worker is the default and the other two are the fallbacks",
+   "Verdict": "measured, no competitor figure",
+   "Evidence": "benchmarks/evidence/sandbox-overhead/ca96524/ubuntu-latest.json",
+   "OursRange": null,
+   "TheirsRange": null,
+   "Interval": null,
+   "LowerIsBetter": true,
+   "FloorStudy": false,
+   "Endpoints": null,
+   "Section": "performance"
+  },
+  {
+   "Dimension": "Checkpoint and resume",
+   "Competitor": null,
+   "Ours": "80 ms p50 write at 1,000 elites and 1000 ms at 10,000; resume 546 ms and 5288 ms",
+   "Theirs": null,
+   "Reading": "p95 158 and 2959 ms, 4626 bytes per elite, and the resumed state matches the written one in both",
+   "Verdict": "measured, no competitor figure",
+   "Evidence": "benchmarks/evidence/checkpoint/86d56c9/re-measurement.json",
+   "OursRange": null,
+   "TheirsRange": null,
+   "Interval": null,
+   "LowerIsBetter": true,
+   "FloorStudy": false,
+   "Endpoints": null,
+   "Section": "performance"
+  },
+  {
+   "Dimension": "Search quality, head to head",
+   "Competitor": "OpenEvolve",
+   "Ours": "one campaign run: v1-07-pilot-rational_gain",
+   "Theirs": "both their configurations, recommended and matched",
+   "Reading": "recommended +0.3327 CI95 [-0.1020, +0.7216] holm 0.178 on n=6; matched +0.0260 CI95 [-0.1813, +0.2278] holm 0.412 on n=6 - no endpoint is superior, and the gate is false",
+   "Verdict": "inconclusive",
+   "Evidence": "benchmarks/evidence/pilot-v1-07/aafd609/report.json",
+   "OursRange": null,
+   "TheirsRange": null,
+   "Interval": null,
+   "LowerIsBetter": true,
+   "FloorStudy": false,
+   "Endpoints": [
+    {
+     "Config": "recommended",
+     "Superior": false,
+     "MeanDifference": 0.33265074344296136,
+     "Interval95": [
+      -0.10200597788313837,
+      0.7215800645053836
+     ],
+     "HolmAdjustedP": 0.17782217782217782,
+     "N": 6
+    },
+    {
+     "Config": "matched",
+     "Superior": false,
+     "MeanDifference": 0.026001523364407683,
+     "Interval95": [
+      -0.1812572694723065,
+      0.2278408687386717
+     ],
+     "HolmAdjustedP": 0.4115884115884116,
+     "N": 6
+    }
+   ],
+   "Section": "quality"
+  },
+  {
+   "Dimension": "Could the pilot's task separate two searchers",
+   "Competitor": null,
+   "Ours": "a model-free floor closes 89.9% to 94.8% of the gap on the pilot's task",
+   "Theirs": null,
+   "Reading": "so the one campaign that has run measured the task with the least room to separate two searchers; damped_oscillator is the discriminating one in the same family",
+   "Verdict": "measured, no competitor figure",
+   "Evidence": "benchmarks/evidence/symbolic-regression/e083c3b/headroom.json",
+   "OursRange": null,
+   "TheirsRange": null,
+   "Interval": null,
+   "LowerIsBetter": true,
+   "FloorStudy": true,
+   "Endpoints": null,
+   "Section": "quality"
+  },
+  {
+   "Dimension": "Compiler-guided repair",
+   "Competitor": null,
+   "Ours": "+48.44 points of valid proposals",
+   "Theirs": null,
+   "Reading": "CI95 [+39.84, +57.03] over 8 seeds, and -0.5928 model calls per valid candidate [-0.9126, -0.3090] - the feature pays for itself in calls",
+   "Verdict": "measured, no competitor figure",
+   "Evidence": "benchmarks/evidence/repair-us17/0354e33/summary.json",
+   "OursRange": null,
+   "TheirsRange": null,
+   "Interval": null,
+   "LowerIsBetter": true,
+   "FloorStudy": false,
+   "Endpoints": null,
+   "Section": "capability"
+  },
+  {
+   "Dimension": "Novelty and experience reuse",
+   "Competitor": null,
+   "Ours": "+27.25 points of proposals suppressed",
+   "Theirs": null,
+   "Reading": "but calls to target moved the wrong way, +1.53 [-0.21, +3.94] over 34 pairs that reached it: the suppression is real and the saving it was meant to buy is NOT SUPPORTED",
+   "Verdict": "measured, no competitor figure",
+   "Evidence": "benchmarks/evidence/reuse-us18/0354e33/summary.json",
+   "OursRange": null,
+   "TheirsRange": null,
+   "Interval": null,
+   "LowerIsBetter": true,
+   "FloorStudy": false,
+   "Endpoints": null,
+   "Section": "capability"
+  },
+  {
+   "Dimension": "Adaptive operator routing",
+   "Competitor": null,
+   "Ours": "quality non-inferior to the best single operator in all 3 families",
+   "Theirs": null,
+   "Reading": "objective calls x1.0521 [1.0399, 1.0625] against the best static choice on the numeric family, so the 0.75x call-reduction target is NOT SUPPORTED",
+   "Verdict": "measured, no competitor figure",
+   "Evidence": "benchmarks/evidence/routing-us19/0354e33/summary.json",
+   "OursRange": null,
+   "TheirsRange": null,
+   "Interval": null,
+   "LowerIsBetter": true,
+   "FloorStudy": false,
+   "Endpoints": null,
+   "Section": "capability"
+  },
+  {
+   "Dimension": "Hyperparameter search against grid search",
+   "Competitor": null,
+   "Ours": "test MSE ratio 1.0012",
+   "Theirs": null,
+   "Reading": "CI95 [0.9963, 1.0063] at an equal budget of 36 fits each, 4 seeds better here and 4 there: parity, not a win",
+   "Verdict": "measured, no competitor figure",
+   "Evidence": "benchmarks/evidence/automl-us11/0354e33/summary.json",
+   "OursRange": null,
+   "TheirsRange": null,
+   "Interval": null,
+   "LowerIsBetter": true,
+   "FloorStudy": false,
+   "Endpoints": null,
+   "Section": "capability"
+  },
+  {
+   "Dimension": "Warm start from a previous run",
+   "Competitor": null,
+   "Ours": "0.4108 of the evaluations to the same bar",
+   "Theirs": null,
+   "Reading": "CI95 [0.2741, 0.4872]; 2 of 8 seeds met the bar on resume at zero further cost, and 0 never reached it",
+   "Verdict": "measured, no competitor figure",
+   "Evidence": "benchmarks/evidence/warm-start-us23/0354e33/summary.json",
+   "OursRange": null,
+   "TheirsRange": null,
+   "Interval": null,
+   "LowerIsBetter": true,
+   "FloorStudy": false,
+   "Endpoints": null,
+   "Section": "capability"
+  }
+ ],
+ "Counts": {
+  "ahead": 4,
+  "parity": 3,
+  "behind": 0,
+  "measured, no competitor figure": 8,
+  "inconclusive": 1,
+  "unmeasured": 1
+ },
+ "Unsupported": 0
+}

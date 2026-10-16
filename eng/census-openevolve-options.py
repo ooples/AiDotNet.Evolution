@@ -22,8 +22,11 @@ Nested config objects are expanded the way the catalog names them (`llm.`, `prom
 where a run file sets them.
 """
 import argparse
+import hashlib
+import json
 import pathlib
 import re
+import subprocess
 import sys
 
 FIELD = re.compile(r"^    (?!else\b|elif\b|return\b|if\b)([a-z_][a-z0-9_]*)\s*:\s*[A-Za-z_\[\"]", re.M)
@@ -97,10 +100,24 @@ def catalog_keys(path):
     return keys
 
 
+def checkout_ref(checkout):
+    """Which OpenEvolve this was parsed from. A census that cannot say is worth little later."""
+    try:
+        described = subprocess.run(["git", "-C", str(checkout), "describe", "--tags", "--always"],
+                                   capture_output=True, text=True, timeout=30, check=False)
+        return described.stdout.strip() or None
+    except (OSError, subprocess.SubprocessError):
+        return None
+
+
 def main():
     parser = argparse.ArgumentParser(description=__doc__.splitlines()[0])
     parser.add_argument("checkout")
     parser.add_argument("--catalog", default=str(CATALOG))
+    # The census needs a checkout, so nothing offline - a test, a release report - can re-derive its
+    # numbers. Writing the result out makes the derived set itself the artifact: whoever reads a
+    # parity claim gets the key lists it was computed from, not a count somebody typed.
+    parser.add_argument("--output", help="write the derived key sets to this file as JSON")
     arguments = parser.parse_args()
     source = (pathlib.Path(arguments.checkout) / "openevolve" / "config.py").read_text(encoding="utf-8")
     upstream, catalog = upstream_keys(source), catalog_keys(pathlib.Path(arguments.catalog))
@@ -112,6 +129,21 @@ def main():
           % (len(unclassified), (" -> " + ", ".join(unclassified)) if unclassified else ""))
     print("catalog keys not in upstream:  %d%s"
           % (len(extra), (" -> " + ", ".join(extra)) if extra else ""))
+    if arguments.output:
+        with open(arguments.output, "x", encoding="utf-8", newline="\n") as handle:
+            handle.write(json.dumps({
+                "Schema": "openevolve-config-census-v1",
+                "Checkout": pathlib.Path(arguments.checkout).name,
+                "Ref": checkout_ref(arguments.checkout),
+                "ConfigSha256": hashlib.sha256(source.encode("utf-8")).hexdigest(),
+                "Catalog": arguments.catalog.replace(chr(92), "/"),
+                "UpstreamOptions": sorted(upstream),
+                "CatalogKeys": sorted(catalog),
+                "Unclassified": unclassified,
+                "CatalogNotUpstream": extra,
+            }, indent=1) + chr(10))
+        print("wrote " + arguments.output)
+
     # An unclassified upstream option is the failure this exists to catch. A catalog key upstream no
     # longer exposes is reported but not fatal: a private field counted as an option is untidy, not
     # a parity gap, and refusing it would make the tidy-up a breaking change.

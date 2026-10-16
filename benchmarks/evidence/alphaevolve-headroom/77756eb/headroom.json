@@ -1,0 +1,285 @@
+{
+ "Protocol": "alphaevolve-headroom-v4",
+ "Source": "google-deepmind/alphaevolve_results",
+ "SourceCommit": "4226acbf237ff9ad10ba7673a2af127a2d8a5971",
+ "RequestedIterations": 20000,
+ "Transcribed": 36,
+ "InScope": [
+  "c1-autocorrelation",
+  "c2-autocorrelation",
+  "c3-autocorrelation",
+  "c3prime-autocorrelation",
+  "c4-uncertainty-hermite",
+  "c5-erdos-overlap"
+ ],
+ "OutOfScope": [
+  {
+   "Problem": "tensor-245-0.5*Z",
+   "Kind": "tensor",
+   "Reason": "the candidate is a rank-R decomposition - three factor matrices over a ring - and not a vector of reals"
+  },
+  {
+   "Problem": "tensor-247-Z",
+   "Kind": "tensor",
+   "Reason": "the candidate is a rank-R decomposition - three factor matrices over a ring - and not a vector of reals"
+  },
+  {
+   "Problem": "tensor-248-Z",
+   "Kind": "tensor",
+   "Reason": "the candidate is a rank-R decomposition - three factor matrices over a ring - and not a vector of reals"
+  },
+  {
+   "Problem": "tensor-256-Z",
+   "Kind": "tensor",
+   "Reason": "the candidate is a rank-R decomposition - three factor matrices over a ring - and not a vector of reals"
+  },
+  {
+   "Problem": "tensor-333-Z",
+   "Kind": "tensor",
+   "Reason": "the candidate is a rank-R decomposition - three factor matrices over a ring - and not a vector of reals"
+  },
+  {
+   "Problem": "tensor-346-0.5*Z",
+   "Kind": "tensor",
+   "Reason": "the candidate is a rank-R decomposition - three factor matrices over a ring - and not a vector of reals"
+  },
+  {
+   "Problem": "tensor-347-0.5*C",
+   "Kind": "tensor",
+   "Reason": "the candidate is a rank-R decomposition - three factor matrices over a ring - and not a vector of reals"
+  },
+  {
+   "Problem": "tensor-348-Z",
+   "Kind": "tensor",
+   "Reason": "the candidate is a rank-R decomposition - three factor matrices over a ring - and not a vector of reals"
+  },
+  {
+   "Problem": "tensor-356-Z",
+   "Kind": "tensor",
+   "Reason": "the candidate is a rank-R decomposition - three factor matrices over a ring - and not a vector of reals"
+  },
+  {
+   "Problem": "tensor-357-Z",
+   "Kind": "tensor",
+   "Reason": "the candidate is a rank-R decomposition - three factor matrices over a ring - and not a vector of reals"
+  },
+  {
+   "Problem": "tensor-444-0.5*C",
+   "Kind": "tensor",
+   "Reason": "the candidate is a rank-R decomposition - three factor matrices over a ring - and not a vector of reals"
+  },
+  {
+   "Problem": "tensor-445-Z",
+   "Kind": "tensor",
+   "Reason": "the candidate is a rank-R decomposition - three factor matrices over a ring - and not a vector of reals"
+  },
+  {
+   "Problem": "tensor-447-Z",
+   "Kind": "tensor",
+   "Reason": "the candidate is a rank-R decomposition - three factor matrices over a ring - and not a vector of reals"
+  },
+  {
+   "Problem": "tensor-456-Z",
+   "Kind": "tensor",
+   "Reason": "the candidate is a rank-R decomposition - three factor matrices over a ring - and not a vector of reals"
+  },
+  {
+   "Problem": "tensor-555-Z",
+   "Kind": "tensor",
+   "Reason": "the candidate is a rank-R decomposition - three factor matrices over a ring - and not a vector of reals"
+  },
+  {
+   "Problem": "tensor-448-0.5*C",
+   "Kind": "tensor",
+   "Reason": "the candidate is a rank-R decomposition - three factor matrices over a ring - and not a vector of reals"
+  },
+  {
+   "Problem": "c6-sums-differences-2003",
+   "Kind": "analytic",
+   "Reason": "the candidate is a set of INTEGERS with minimum 0, so a float vector is refused by its own verifier, and a repair that rounded would quietly change the problem"
+  },
+  {
+   "Problem": "c6-sums-differences-54265",
+   "Kind": "analytic",
+   "Reason": "the candidate is a set of INTEGERS with minimum 0, so a float vector is refused by its own verifier, and a repair that rounded would quietly change the problem"
+  },
+  {
+   "Problem": "hexagons-11",
+   "Kind": "analytic",
+   "Reason": "the candidate is a point set, triangle, hexagon or set of sphere centres, whose shape and feasibility differ per problem"
+  },
+  {
+   "Problem": "hexagons-12",
+   "Kind": "analytic",
+   "Reason": "the candidate is a point set, triangle, hexagon or set of sphere centres, whose shape and feasibility differ per problem"
+  },
+  {
+   "Problem": "maxmin-ratio-2d-16",
+   "Kind": "analytic",
+   "Reason": "the candidate is a point set, triangle, hexagon or set of sphere centres, whose shape and feasibility differ per problem"
+  },
+  {
+   "Problem": "maxmin-ratio-3d-14",
+   "Kind": "analytic",
+   "Reason": "the candidate is a point set, triangle, hexagon or set of sphere centres, whose shape and feasibility differ per problem"
+  },
+  {
+   "Problem": "heilbronn-triangle-11",
+   "Kind": "analytic",
+   "Reason": "the candidate is a point set, triangle, hexagon or set of sphere centres, whose shape and feasibility differ per problem"
+  },
+  {
+   "Problem": "heilbronn-convex-13",
+   "Kind": "analytic",
+   "Reason": "the candidate is a point set, triangle, hexagon or set of sphere centres, whose shape and feasibility differ per problem"
+  },
+  {
+   "Problem": "heilbronn-convex-14",
+   "Kind": "analytic",
+   "Reason": "the candidate is a point set, triangle, hexagon or set of sphere centres, whose shape and feasibility differ per problem"
+  },
+  {
+   "Problem": "kissing-11",
+   "Kind": "analytic",
+   "Reason": "the candidate is a point set, triangle, hexagon or set of sphere centres, whose shape and feasibility differ per problem"
+  },
+  {
+   "Problem": "circles-square-26",
+   "Kind": "analytic",
+   "Reason": "the candidate is a point set, triangle, hexagon or set of sphere centres, whose shape and feasibility differ per problem"
+  },
+  {
+   "Problem": "circles-square-32",
+   "Kind": "analytic",
+   "Reason": "the candidate is a point set, triangle, hexagon or set of sphere centres, whose shape and feasibility differ per problem"
+  },
+  {
+   "Problem": "circles-rectangle-21",
+   "Kind": "analytic",
+   "Reason": "the candidate is a point set, triangle, hexagon or set of sphere centres, whose shape and feasibility differ per problem"
+  },
+  {
+   "Problem": "c4-uncertainty-laguerre",
+   "Kind": "analytic",
+   "Reason": "its verifier computes the bound from a construction it ASSUMES admissible and never checks that assumption: a random vector of twelve positive reals scores 0.101685 against the published 0.3216, so minimising it rewards an inadmissible candidate rather than a better one. Scoring a search against this would manufacture a win over AlphaEvolve out of an invalid construction"
+  }
+ ],
+ "Rows": [
+  {
+   "Problem": "c1-autocorrelation",
+   "Direction": "minimize",
+   "Published": 1.5053,
+   "FloorBest": 1.657840481821565,
+   "FloorLength": 32,
+   "GapFraction": 0.10133560208700258,
+   "FloorReachesPublished": false,
+   "Iterations": 20000,
+   "Capped": false,
+   "Seeds": 5,
+   "Lengths": [
+    8,
+    12,
+    16,
+    24,
+    32,
+    50
+   ]
+  },
+  {
+   "Problem": "c2-autocorrelation",
+   "Direction": "maximize",
+   "Published": 0.8962,
+   "FloorBest": 0.8274618934169404,
+   "FloorLength": 8,
+   "GapFraction": 0.07669951638368619,
+   "FloorReachesPublished": false,
+   "Iterations": 20000,
+   "Capped": false,
+   "Seeds": 5,
+   "Lengths": [
+    8,
+    12,
+    16,
+    24,
+    32,
+    50
+   ]
+  },
+  {
+   "Problem": "c3-autocorrelation",
+   "Direction": "minimize",
+   "Published": 1.4557,
+   "FloorBest": 1.6526994748105277,
+   "FloorLength": 16,
+   "GapFraction": 0.13532972096622087,
+   "FloorReachesPublished": false,
+   "Iterations": 20000,
+   "Capped": false,
+   "Seeds": 5,
+   "Lengths": [
+    8,
+    12,
+    16,
+    24,
+    32,
+    50
+   ]
+  },
+  {
+   "Problem": "c3prime-autocorrelation",
+   "Direction": "minimize",
+   "Published": 1.4688,
+   "FloorBest": 1.6526994748105277,
+   "FloorLength": 16,
+   "GapFraction": 0.12520389080237446,
+   "FloorReachesPublished": false,
+   "Iterations": 20000,
+   "Capped": false,
+   "Seeds": 5,
+   "Lengths": [
+    8,
+    12,
+    16,
+    24,
+    32,
+    50
+   ]
+  },
+  {
+   "Problem": "c5-erdos-overlap",
+   "Direction": "minimize",
+   "Published": 0.380924,
+   "FloorBest": 0.3949768592862828,
+   "FloorLength": 12,
+   "GapFraction": 0.036891504043543605,
+   "FloorReachesPublished": false,
+   "Iterations": 20000,
+   "Capped": false,
+   "Seeds": 5,
+   "Lengths": [
+    8,
+    12,
+    16,
+    24,
+    32
+   ]
+  },
+  {
+   "Problem": "c4-uncertainty-hermite",
+   "Direction": "minimize",
+   "Published": 0.3521,
+   "FloorBest": 0.3530492218393839,
+   "FloorLength": 3,
+   "GapFraction": 0.002695887075784992,
+   "FloorReachesPublished": false,
+   "Iterations": 1000,
+   "Capped": true,
+   "Seeds": 5,
+   "Lengths": [
+    1,
+    2,
+    3
+   ]
+  }
+ ]
+}
