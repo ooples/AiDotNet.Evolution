@@ -1,0 +1,121 @@
+{
+ "Schema": "evolution-release-report-v1",
+ "Campaign": "v1-07-pilot-rational_gain",
+ "Benchmark": [
+  "rational_gain"
+ ],
+ "Tasks": [
+  "rational_gain"
+ ],
+ "Models": [
+  "sonnet"
+ ],
+ "Arms": [
+  "aidotnet",
+  "openevolve-matched",
+  "openevolve-recommended"
+ ],
+ "Budget": {
+  "ModelTokens": 600000,
+  "ModelCalls": 10,
+  "WallSeconds": 1800
+ },
+ "Hardware": "not recorded by this bundle",
+ "Bundle": [
+  "README.md",
+  "power-analysis.json",
+  "ranked-losses.json",
+  "receipts-compact.json",
+  "registration.json",
+  "report.json",
+  "rows.json",
+  "summary.json"
+ ],
+ "Endpoints": [
+  {
+   "Family": "rational_gain",
+   "Config": "recommended",
+   "Metric": "nmse",
+   "Direction": "minimize",
+   "N": 6,
+   "MeanDifference": 0.33265074344296136,
+   "Interval95": [
+    -0.10200597788313837,
+    0.7215800645053836
+   ],
+   "OneSidedP": 0.08891108891108891,
+   "HolmAdjustedP": 0.17782217782217782,
+   "Superior": false,
+   "Verdict": "inconclusive",
+   "Evidence": "report.json"
+  },
+  {
+   "Family": "rational_gain",
+   "Config": "matched",
+   "Metric": "nmse",
+   "Direction": "minimize",
+   "N": 6,
+   "MeanDifference": 0.026001523364407683,
+   "Interval95": [
+    -0.1812572694723065,
+    0.2278408687386717
+   ],
+   "OneSidedP": 0.4115884115884116,
+   "HolmAdjustedP": 0.4115884115884116,
+   "Superior": false,
+   "Verdict": "inconclusive",
+   "Evidence": "report.json"
+  }
+ ],
+ "Claims": [
+  {
+   "Claim": "The campaign is pre-registered and its registration is committed.",
+   "Reading": "RegistrationSha256 abb44f490d86",
+   "Evidence": "registration.json",
+   "Supported": true
+  },
+  {
+   "Claim": "Every arm ran on the same declared per-cell budget.",
+   "Reading": "10 model calls, 600000 tokens, 1800 wall seconds per cell",
+   "Evidence": "registration.json",
+   "Supported": true
+  },
+  {
+   "Claim": "The scored partition was sealed before the run.",
+   "Reading": "TestPartitionHashes {\"rational_gain\": \"d857373eebc0\"}",
+   "Evidence": "registration.json",
+   "Supported": true
+  },
+  {
+   "Claim": "The report regenerates from the raw rows.",
+   "Reading": "RawSha256 6b56760fcb4e over 18 rows",
+   "Evidence": "report.json",
+   "Supported": true
+  },
+  {
+   "Claim": "The campaign's own spend is accounted per cell.",
+   "Reading": "180 model calls, 18 cells, statuses {\"completed\": 18}",
+   "Evidence": "summary.json",
+   "Supported": true
+  },
+  {
+   "Claim": "The sizing the next campaign needs comes from this one's measured variance.",
+   "Reading": "required N = 514",
+   "Evidence": "power-analysis.json",
+   "Supported": true
+  },
+  {
+   "Claim": "Cells lost to matched on rational_gain are published, worst margin first.",
+   "Reading": "3 of 6 comparable cells lost, worst margin +0.3565",
+   "Evidence": "ranked-losses.json",
+   "Supported": true
+  },
+  {
+   "Claim": "Cells lost to recommended on rational_gain are published, worst margin first.",
+   "Reading": "2 of 6 comparable cells lost, worst margin +0.4857",
+   "Evidence": "ranked-losses.json",
+   "Supported": true
+  }
+ ],
+ "Unsupported": 0
+}
