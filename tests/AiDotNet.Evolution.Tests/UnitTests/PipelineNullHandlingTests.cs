@@ -13,9 +13,9 @@ namespace AiDotNet.Evolution.Tests;
 /// could be violated and would only surface as a replay mismatch much later. The identity is now computed
 /// in the branch that has it, and absence throws where it happens.
 ///
-/// The guard is deliberately narrow. A sweep of `src/` finds the operator at roughly 86 further sites in 36
-/// other files, which is separate work on separate stories; pinning those two files is what keeps *this*
-/// story's fix from being undone by the next edit to it.
+/// The guard grows with the sweep rather than all at once. `src/` held 73 real sites across 37 files when
+/// this was written; the files listed below are the ones cleaned so far, and each is pinned as it lands so
+/// the next edit to it cannot quietly put a suppression back.
 /// </remarks>
 public sealed class PipelineNullHandlingTests
 {
@@ -29,6 +29,10 @@ public sealed class PipelineNullHandlingTests
     [Theory]
     [InlineData("src/AiDotNet.Evolution/Core/EvolutionEngine.Pipeline.cs")]
     [InlineData("src/AiDotNet.Evolution/Core/EvolutionEngine.Evaluation.cs")]
+    // Cleaned by the sweep this guard exists to make stick, one file at a time.
+    [InlineData("src/AiDotNet.Evolution/Core/DurableEvolutionWorkCoordinator.cs")]
+    [InlineData("src/AiDotNet.Evolution/Core/EvolutionEngine.Persistence.cs")]
+    [InlineData("src/AiDotNet.Evolution/Core/EvolutionIncumbentChallenge.cs")]
     public void TheseFilesSuppressNoNullWarnings(string relativePath)
     {
         string path = Path.Combine(Root, relativePath.Replace('/', Path.DirectorySeparatorChar));

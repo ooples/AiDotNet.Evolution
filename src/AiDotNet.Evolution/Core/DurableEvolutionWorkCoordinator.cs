@@ -501,7 +501,10 @@ public sealed partial class DurableEvolutionWorkCoordinator : IDisposable
     private static IEnumerable<WorkItemState> Unsettled(Mutation tx, string workerId) => tx.Jobs().Select(pair => pair.Value)
         .SelectMany(job => job.Leases.Where(lease => lease.WorkerId == workerId && lease.Actual is null).Select(_ => job));
     private static decimal Amount(Dictionary<string, decimal> values, string key) => values.TryGetValue(key, out decimal value) ? value : 0;
-    private static bool Equal(Dictionary<string, decimal> a, Dictionary<string, decimal> b) => a.Count == b.Count && a.All(p => b.TryGetValue(p.Key, out decimal value) && p.Value == value);
+    /// <summary>Equality of two optional resource maps. Absence is never equality, which is why this takes nullables.</summary>
+    private static bool Equal(Dictionary<string, decimal>? a, Dictionary<string, decimal>? b) =>
+        a is not null && b is not null && a.Count == b.Count &&
+        a.All(p => b.TryGetValue(p.Key, out decimal value) && p.Value == value);
     private static bool SameWorker(WorkerState a, WorkerState b) => a.CompatibilityHash == b.CompatibilityHash
         && a.MaximumConcurrentWork == b.MaximumConcurrentWork && a.Tags.SequenceEqual(b.Tags) && Equal(a.Capacity, b.Capacity);
     private static bool SameRequest(WorkItemState a, WorkItemState b) => a.SourceLeaseId == b.SourceLeaseId && a.CanonicalGenomeId == b.CanonicalGenomeId && a.Payload == b.Payload
@@ -526,8 +529,16 @@ public sealed partial class DurableEvolutionWorkCoordinator : IDisposable
     private EvolutionWorkIdentity Identity(WorkItemState job, WorkLeaseState lease) => new(RunId, job.EvaluationId, job.Attempt, lease.LeaseId);
     private EvolutionWorkLease Lease(WorkItemState job, WorkLeaseState lease) => new(Identity(job, lease), lease.WorkerId,
         job.CanonicalGenomeId, job.Payload, job.Leases.IndexOf(lease) + 1, lease.ExpiresUtcTicks);
-    private EvolutionCommittedWork Result(WorkItemState job, WorkLeaseState lease) => new(Identity(job, lease), lease.Result!, lease.Provenance!,
-        new EvolutionResources(lease.Actual!), lease.Outcome!.Value, lease.Accepted);
+    /// <summary>The committed form of a lease. Each part is bound, because a lease that reached this point
+    /// without one is a broken state machine rather than a case to suppress.</summary>
+    private EvolutionCommittedWork Result(WorkItemState job, WorkLeaseState lease)
+    {
+        string result = lease.Result ?? throw new InvalidOperationException("A committed lease carries no result.");
+        string provenance = lease.Provenance ?? throw new InvalidOperationException("A committed lease carries no provenance.");
+        Dictionary<string, decimal> actual = lease.Actual ?? throw new InvalidOperationException("A committed lease carries no charged resources.");
+        EvolutionResourceOutcome outcome = lease.Outcome ?? throw new InvalidOperationException("A committed lease carries no outcome.");
+        return new(Identity(job, lease), result, provenance, new EvolutionResources(actual), outcome, lease.Accepted);
+    }
 
     /// <summary>Copy-on-write view of the live state for one mutation. Reads see this mutation's own edits; the live
     /// state is replaced only after the mutation's record has been appended, so a refused mutation leaves no trace.</summary>
@@ -645,8 +656,11 @@ public sealed partial class DurableEvolutionWorkCoordinator : IDisposable
             || state.LastUtcTicks < 0 || state.LastUtcTicks > DateTime.MaxValue.Ticks)
             throw new InvalidDataException("Durable work state/configuration is incompatible or invalid.");
         EvolutionResourceLedger ledger = NewLedger(); ledger.RestoreState(state.Ledger);
-        EvolutionResourceLedger.State receipts = JsonSerializer.Deserialize(state.Ledger, EvolutionWorkJsonContext.Default.ResourceLedgerState)!;
-        var operations = receipts.Operations!.ToDictionary(o => o.Id, StringComparer.Ordinal);
+        EvolutionResourceLedger.State receipts =
+            JsonSerializer.Deserialize(state.Ledger, EvolutionWorkJsonContext.Default.ResourceLedgerState)
+            ?? throw new InvalidDataException("Durable work state carries no resource ledger.");
+        var operations = (receipts.Operations ?? throw new InvalidDataException("The restored ledger records no operations."))
+            .ToDictionary(o => o.Id, StringComparer.Ordinal);
         if (state.SourceSessionId is not null) _ = new EvolutionWorkIdentity(RunId, 0, 1, state.SourceSessionId);
         foreach (var worker in state.Workers)
         {
@@ -678,9 +692,9 @@ public sealed partial class DurableEvolutionWorkCoordinator : IDisposable
                     || lease.ExpiresUtcTicks < 1 || lease.ExpiresUtcTicks > DateTime.MaxValue.Ticks
                     || !operations.TryGetValue(lease.LeaseId, out EvolutionResourceLedger.OperationState? operation)
                     || operation.Stage != EvolutionResourceStage.Evaluation || operation.Attempt != job.Attempt
-                    || !Equal(operation.Estimated!, job.Estimated) || !Equal(operation.Maximum!, job.Maximum)
+                    || !Equal(operation.Estimated, job.Estimated) || !Equal(operation.Maximum, job.Maximum)
                     || operation.Outcome != lease.Outcome || (operation.Charged is null) != (lease.Actual is null)
-                    || (lease.Actual is not null && !Equal(operation.Charged!, lease.Actual)))
+                    || (lease.Actual is not null && !Equal(operation.Charged, lease.Actual)))
                     throw new InvalidDataException("Work lease and accounting state disagree.");
                 if (lease.Actual is null)
                 {
@@ -689,8 +703,13 @@ public sealed partial class DurableEvolutionWorkCoordinator : IDisposable
                 }
                 else
                 {
-                    EvolutionWorkValidation.Payload(lease.Result!, _options.MaximumPayloadBytes, nameof(lease.Result));
-                    EvolutionWorkValidation.Payload(lease.Provenance!, _options.MaximumPayloadBytes, nameof(lease.Provenance));
+                    // The same refusal the outcome check below makes, applied to the two payloads first.
+                    EvolutionWorkValidation.Payload(
+                        lease.Result ?? throw new InvalidDataException("A final worker receipt carries no result."),
+                        _options.MaximumPayloadBytes, nameof(lease.Result));
+                    EvolutionWorkValidation.Payload(
+                        lease.Provenance ?? throw new InvalidDataException("A final worker receipt carries no provenance."),
+                        _options.MaximumPayloadBytes, nameof(lease.Provenance));
                     if (lease.Outcome is null or EvolutionResourceOutcome.Unknown) throw new InvalidDataException("Invalid final worker receipt.");
                     if (lease.Accepted)
                     {
