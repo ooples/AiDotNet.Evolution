@@ -22,7 +22,19 @@ python benchmarks/external/symbolic_regression_headroom.py --budget 20000 --nois
 
 produces a file byte-identical to `headroom.json` - verified at `main` `0354e33`, nine commits and
 two months after the `e083c3b` the bundle is named for, which is what says the family, the splits,
-the seals and the search are all unchanged. That run takes about 56 seconds, so
+the seals and the search are all unchanged **on the platform that produced it**.
+
+**That qualifier is a defect, not a caveat.** `seal` digests each value to 16 significant digits and
+the closed forms go through libm (`exp`, `sin`, `cos`), whose last bits differ between platforms, so
+the committed seals rebuild on Windows - where they were measured - and not on CI's Linux. A sealed
+partition that only verifies where it was produced is weaker than it looks, and the same `seal`
+backs the pilot campaign's frozen `TestPartitionHashes`, so correcting it would move a hash a paid
+pre-registration already committed to. The test therefore skips the rebuild comparison with that
+reason where the platform cannot reproduce it, asserts everything portable regardless, and the
+exposure itself is measured by `test_the_seal_binds_more_precision_than_libm_agrees_on`. Tracked on
+#113.
+
+The 20,000-candidate run takes about 56 seconds, so
 `benchmarks/external/test_program_symbolic_regression_evidence.py` guards the cheap half of it in
 CI: every committed `test_seal` is rebuilt from the family module, the quoted aggregates are
 recomputed from the rows they summarise, `gap_closed` is re-derived from its two NMSE columns, and
