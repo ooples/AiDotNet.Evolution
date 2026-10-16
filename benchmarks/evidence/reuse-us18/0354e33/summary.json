@@ -1,0 +1,33 @@
+{
+ "Schema": "evolution-reuse-ablation-v1",
+ "SourceSha256": "9bf295a2e1c050318b25a2928350aecf1681804cd31c73c6a96a201d7236c31b",
+ "RequestHash": "13a42143a88229380a5d73564fc9e9587b2bc241ea4e2185809846d98ca23e3d",
+ "Pairs": 48,
+ "Budget": 64,
+ "SuppressedProposalRatePoints": {
+  "Mean": 27.245256695411825,
+  "LowerBound95": 21.280067156498298,
+  "UpperBound95": 33.19629114272293,
+  "Pairs": 48,
+  "Unit": "points"
+ },
+ "QualityDifference": {
+  "Mean": 0.012396844963915464,
+  "LowerBound95": -0.0021872312976476817,
+  "UpperBound95": 0.027223452189605025,
+  "Pairs": 48,
+  "Unit": "quality"
+ },
+ "CallsToTargetDifference": {
+  "Mean": 1.5294117647058822,
+  "LowerBound95": -0.20588235294117646,
+  "UpperBound95": 3.9411764705882355,
+  "Pairs": 34,
+  "Unit": "calls"
+ },
+ "PairsReachingTarget": 34,
+ "BaselineSuppressedRate": 0.10796386946357851,
+ "NoveltySuppressedRate": 0.3804164364176968,
+ "TokensMeasured": false,
+ "GeneratedDuplicateRateMeasured": false
+}

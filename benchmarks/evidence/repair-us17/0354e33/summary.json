@@ -1,0 +1,58 @@
+{
+ "Schema": "evolution-repair-ablation-v1",
+ "Protocol": "repair-ablation-v1",
+ "Seeds": 8,
+ "ProposalsPerSeed": 16,
+ "BrokenFirstReplyRate": 0.5,
+ "ValidProposalRatePoints": {
+  "Mean": 48.4375,
+  "LowerBound95": 39.84375,
+  "UpperBound95": 57.03125,
+  "Seeds": 8,
+  "PerSeed": [
+   31.25,
+   31.25,
+   56.25,
+   68.75,
+   50.0,
+   43.75,
+   43.75,
+   62.5
+  ]
+ },
+ "CallsPerValidCandidate": {
+  "Mean": -0.5927534271284272,
+  "LowerBound95": -0.9125514632936508,
+  "UpperBound95": -0.3089939574314574,
+  "Seeds": 8,
+  "PerSeed": [
+   -0.14204545454545459,
+   -0.14204545454545459,
+   -0.7232142857142856,
+   -1.5125000000000002,
+   -0.5,
+   -0.3402777777777777,
+   -0.3402777777777777,
+   -1.0416666666666665
+  ]
+ },
+ "ModelCalls": {
+  "Mean": 7.75,
+  "LowerBound95": 6.375,
+  "UpperBound95": 9.125,
+  "Seeds": 8,
+  "PerSeed": [
+   5.0,
+   5.0,
+   9.0,
+   11.0,
+   8.0,
+   7.0,
+   7.0,
+   10.0
+  ]
+ },
+ "NoRepairValidRate": 0.515625,
+ "RepairValidRate": 1.0,
+ "TokensMeasured": false
+}
