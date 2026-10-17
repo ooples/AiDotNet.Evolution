@@ -1,0 +1,5 @@
+{
+ "Schema": "evolution-power-analysis-v1",
+ "Unachievable": "Required N exceeds the cap; a campaign that large is a plan to change, not to run",
+ "TargetHalfWidth": 0.05
+}

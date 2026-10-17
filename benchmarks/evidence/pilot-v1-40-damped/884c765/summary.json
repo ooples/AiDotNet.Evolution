@@ -1,0 +1,69 @@
+{
+ "story": "V1-07 (#116)",
+ "task": "damped_oscillator",
+ "stub": false,
+ "registration_sha256": "3b1f33bb4c0542cde03f3af84b0025c823a8aaff5eacb07d3f30ee0b5c49bcb1",
+ "projection_sha256": "a9f657992a8137833fd129701bdda408166bcecfb357eee2bf668354be5a20aa",
+ "holdout_partition_sha256": "e4f8be2df3ca41b28ceaef2bfd84f4970a4f6fd1f2a7dc504914850b1f9b382b",
+ "iterations_per_cell": 10,
+ "wall_seconds": 1538.3,
+ "cells": 18,
+ "statuses": {
+  "completed": 16,
+  "failed": 2
+ },
+ "model_calls": 180,
+ "model_tokens": 471226,
+ "cells_with_unknown_spend": 0,
+ "canaries": {
+  "sonnet": 661
+ },
+ "receipt_coverage": {
+  "sonnet": 1.0
+ },
+ "endpoints": [
+  {
+   "Family": "damped_oscillator",
+   "Config": "recommended",
+   "Metric": "nmse",
+   "Direction": "minimize",
+   "N": 6,
+   "MeanDifference": -333333.03177138406,
+   "Interval95": [
+    -666666.0264186835,
+    -0.040517800849860675
+   ],
+   "OneSidedP": 1.0,
+   "Failures": {
+    "aidotnet": 2,
+    "openevolve-recommended": 0
+   },
+   "HolmAdjustedP": 1.0,
+   "Superior": false
+  },
+  {
+   "Family": "damped_oscillator",
+   "Config": "matched",
+   "Metric": "nmse",
+   "Direction": "minimize",
+   "N": 6,
+   "MeanDifference": -333333.0294314652,
+   "Interval95": [
+    -666666.0264186835,
+    -0.030356548827584467
+   ],
+   "OneSidedP": 1.0,
+   "Failures": {
+    "aidotnet": 2,
+    "openevolve-matched": 0
+   },
+   "HolmAdjustedP": 1.0,
+   "Superior": false
+  }
+ ],
+ "power_analysis": {
+  "Schema": "evolution-power-analysis-v1",
+  "Unachievable": "Required N exceeds the cap; a campaign that large is a plan to change, not to run",
+  "TargetHalfWidth": 0.05
+ }
+}
