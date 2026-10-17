@@ -22,8 +22,11 @@ Nested config objects are expanded the way the catalog names them (`llm.`, `prom
 where a run file sets them.
 """
 import argparse
+import hashlib
+import json
 import pathlib
 import re
+import subprocess
 import sys
 
 FIELD = re.compile(r"^    (?!else\b|elif\b|return\b|if\b)([a-z_][a-z0-9_]*)\s*:\s*[A-Za-z_\[\"]", re.M)
@@ -97,10 +100,52 @@ def catalog_keys(path):
     return keys
 
 
+def _git(checkout, *arguments):
+    try:
+        done = subprocess.run(["git", "-C", str(checkout), *arguments],
+                              capture_output=True, text=True, timeout=30, check=False)
+        return done.stdout if done.returncode == 0 else None
+    except (OSError, subprocess.SubprocessError):
+        return None
+
+
+def checkout_state(checkout):
+    """Which OpenEvolve this was parsed from, exactly.
+
+    The commit and not only the tag: `v0.3.2` is a mutable label, and a census that records it alone
+    cannot be re-taken against the same tree if the tag moves.
+
+    A checkout with a MODIFIED TRACKED FILE is refused outright - a census of locally edited sources
+    is not a census of OpenEvolve, and nothing downstream could tell the difference. Untracked files
+    are recorded instead of refused: they cannot change what `config.py` parses to, and tooling
+    leaves them behind (a `.token-optimizer/` directory, the first time this ran), so refusing them
+    would be a refusal about this machine rather than about OpenEvolve.
+    """
+    described, commit = _git(checkout, "describe", "--tags", "--always"), _git(checkout, "rev-parse", "HEAD")
+    status = _git(checkout, "status", "--porcelain")
+    if status is None or commit is None:
+        raise ValueError(
+            "The checkout at %s is not a readable git repository, so the census cannot say which "
+            "OpenEvolve it parsed. Point the checkout at a clone, not an extracted archive." % checkout)
+    entries = [line for line in status.splitlines() if line.strip()]
+    modified = [line for line in entries if not line.startswith("??")]
+    if modified:
+        raise ValueError(
+            "The checkout at %s has modified tracked file(s), so a census of it is not a census of "
+            "OpenEvolve:\n%s" % (checkout, "\n".join(modified)[:500]))
+    return {"Ref": (described or "").strip() or None, "Commit": commit.strip(),
+            "ModifiedTrackedFiles": 0,
+            "UntrackedPaths": sorted(line[3:] for line in entries)[:20]}
+
+
 def main():
     parser = argparse.ArgumentParser(description=__doc__.splitlines()[0])
     parser.add_argument("checkout")
     parser.add_argument("--catalog", default=str(CATALOG))
+    # The census needs a checkout, so nothing offline - a test, a release report - can re-derive its
+    # numbers. Writing the result out makes the derived set itself the artifact: whoever reads a
+    # parity claim gets the key lists it was computed from, not a count somebody typed.
+    parser.add_argument("--output", help="write the derived key sets to this file as JSON")
     arguments = parser.parse_args()
     source = (pathlib.Path(arguments.checkout) / "openevolve" / "config.py").read_text(encoding="utf-8")
     upstream, catalog = upstream_keys(source), catalog_keys(pathlib.Path(arguments.catalog))
@@ -112,6 +157,25 @@ def main():
           % (len(unclassified), (" -> " + ", ".join(unclassified)) if unclassified else ""))
     print("catalog keys not in upstream:  %d%s"
           % (len(extra), (" -> " + ", ".join(extra)) if extra else ""))
+    if arguments.output:
+        # The payload is built BEFORE the file is opened. Built inside the `with`, a refusal from
+        # `checkout_state` left a zero-byte file already created in exclusive mode - an artifact
+        # that looks like a census, and that the next attempt then refuses to overwrite.
+        payload = json.dumps({
+            "Schema": "openevolve-config-census-v1",
+            "Checkout": pathlib.Path(arguments.checkout).name,
+            **checkout_state(arguments.checkout),
+            "ConfigSha256": hashlib.sha256(source.encode("utf-8")).hexdigest(),
+            "Catalog": arguments.catalog.replace(chr(92), "/"),
+            "UpstreamOptions": sorted(upstream),
+            "CatalogKeys": sorted(catalog),
+            "Unclassified": unclassified,
+            "CatalogNotUpstream": extra,
+        }, indent=1) + chr(10)
+        with open(arguments.output, "x", encoding="utf-8", newline="\n") as handle:
+            handle.write(payload)
+        print("wrote " + arguments.output)
+
     # An unclassified upstream option is the failure this exists to catch. A catalog key upstream no
     # longer exposes is reported but not fatal: a private field counted as an option is untidy, not
     # a parity gap, and refusing it would make the tidy-up a breaking change.
