@@ -10,6 +10,7 @@ No model and no engine: every test here stops at or before the gate, so none of 
 import contextlib
 import io
 import json
+import os
 import sys
 import tempfile
 import unittest
@@ -90,6 +91,29 @@ class GateTests(unittest.TestCase):
             self.assertEqual(pilot_cells.holdout_seal(TASK, HOLDOUT),
                              frozen["Spec"]["TestPartitionHashes"][TASK])
             self.assertNotEqual("0" * 64, frozen["Spec"]["TestPartitionHashes"][TASK])
+
+    def test_a_relative_root_cannot_reach_a_subprocess(self):
+        """A relative --root resolves twice: once here, once in the cell's own working directory.
+
+        All 18 cells of a rehearsal failed with `Could not find file
+        '<cell>/<root>/.../cell_evaluator.py'` - the root doubled inside the cell directory - which
+        reads like a missing evaluator rather than a path the caller wrote relative to somewhere
+        else. The run must therefore absolutise it before anything is handed on.
+        """
+        with tempfile.TemporaryDirectory() as directory:
+            here = Path.cwd()
+            try:
+                os.chdir(directory)
+                code, output = invoke("campaign-relative")
+            finally:
+                os.chdir(here)
+        self.assertEqual(2, code, output)
+        label = "The registration is frozen at "
+        named = [line for line in output.splitlines() if label in line]
+        self.assertEqual(1, len(named), output)
+        path = named[0].split(label, 1)[1].strip()
+        self.assertTrue(Path(path).is_absolute(),
+                        "the gate named a relative registration path, so a cell would resolve it again: " + path)
 
     def test_an_existing_tree_without_a_registration_is_refused(self):
         with tempfile.TemporaryDirectory() as directory:
