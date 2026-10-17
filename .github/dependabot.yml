@@ -1,19 +1,37 @@
 version: 2
 updates:
+  # One pull request per ecosystem per week instead of one per package. Five separate
+  # dependabot PRs landed on 2026-10-17 (#317-#320, #322) and two more (#321, #323)
+  # conflicted with them, because every version lives in a csproj ItemGroup that the
+  # other PRs also touch: each merge makes the remaining branches dirty. Grouping the
+  # bumps into a single branch removes the conflicts rather than resolving them one at
+  # a time, and the whole week's upgrade is reviewed and CI'd once.
   - package-ecosystem: nuget
     directory: /
     schedule:
       interval: weekly
     open-pull-requests-limit: 5
     groups:
-      test-tooling:
+      nuget:
+        # Every package in every project file, across src/ and all five test projects.
         patterns:
-          - Microsoft.NET.Test.Sdk
-          - xunit
-          - xunit.runner.visualstudio
-          - coverlet.collector
+          - "*"
+        # Majors are deliberately left out so they still arrive on their own: a breaking
+        # bump that has to be held must not hold the week's patches hostage with it.
+        update-types:
+          - minor
+          - patch
   - package-ecosystem: github-actions
     directory: /
     schedule:
       interval: weekly
     open-pull-requests-limit: 5
+    groups:
+      github-actions:
+        # codeql-action/init and codeql-action/analyze move together on every release and
+        # arrived as two PRs (#317, #318) for the same 4.38.2 -> 4.38.3 bump.
+        patterns:
+          - "*"
+        update-types:
+          - minor
+          - patch
