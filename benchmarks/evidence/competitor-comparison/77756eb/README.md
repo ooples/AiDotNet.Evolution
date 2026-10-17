@@ -14,9 +14,19 @@ python benchmarks/analysis/competitor_report.py \
 
 `openevolve-config-census.json` is the other half of the parity claim and the only piece that cannot
 be re-derived offline, because it needs an OpenEvolve checkout. It is the derived key sets
-themselves - 102 upstream options and 103 catalog keys, listed, not counted - taken from `v0.3.2`
-(`411fb59`), with the SHA-256 of the `config.py` they were parsed out of. Re-take it with
+themselves - 102 upstream options and 103 catalog keys, listed, not counted - with the SHA-256 of
+the `config.py` they were parsed out of and the full commit they came from,
+`411fb59c886c18704caaffb611e17cf9e7d824d2`, not only the mutable `v0.3.2` tag. The census refuses a
+checkout with a modified tracked file, because a census of locally edited sources is not a census of
+OpenEvolve; untracked paths are recorded rather than refused, since they cannot change what
+`config.py` parses to. Re-take it with
 `python eng/census-openevolve-options.py <checkout> --output <file>`.
+
+The eight archive and scheduling defect classes are compared **per class**, joined on the id each
+card names, and not by counting: the local suite runs ten tests for those eight classes because
+`D7` is parameterised three ways, so a count on one side and a count on the other are different
+units. A class upstream reproduces with no test here is refused rather than quietly dropped from
+the denominator.
 
 ## What it says
 

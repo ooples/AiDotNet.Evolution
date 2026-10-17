@@ -2,6 +2,11 @@
  "Schema": "openevolve-config-census-v1",
  "Checkout": "oe",
  "Ref": "v0.3.2",
+ "Commit": "411fb59c886c18704caaffb611e17cf9e7d824d2",
+ "ModifiedTrackedFiles": 0,
+ "UntrackedPaths": [
+  ".token-optimizer/"
+ ],
  "ConfigSha256": "d8a8a49536e4502ac1302516113cd9a4ec1601998acd8a26fcb0dcff4b9315d4",
  "Catalog": "src/AiDotNet.Evolution.Cli/OpenEvolve/OpenEvolveConfigCatalog.cs",
  "UpstreamOptions": [

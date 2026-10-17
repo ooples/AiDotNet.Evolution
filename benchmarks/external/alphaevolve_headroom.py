@@ -8,8 +8,12 @@ v1 claim needs the distance to them measured, and measured the same way the symb
 family already is - by a deliberately weak search, so a task the floor already solves cannot carry a
 claim about a better searcher, and a task it cannot touch is where one would show.
 
-Scope, stated rather than implied: the five height-vector problems of section B (c1, c2, c3, c3' and c5). The rest of the 36 take point sets, triangles or sphere centres, whose candidate shapes differ
-per problem; they are listed as out of scope here rather than silently dropped. The objective is
+Scope, stated rather than implied: the six problems of section B whose candidate is a vector of
+reals - c1, c2, c3, c3prime (c3') and c5, which take a height vector, and c4-uncertainty-hermite,
+which takes a signed coefficient vector. Every one of them is a key of `IN_SCOPE`, and the test requires this list
+and that dictionary to agree. The other 30 of the 36 take tensor decompositions, point sets,
+triangles, sphere centres or integer sets; each is listed out of scope with its reason, derived from
+the manifest rather than written down, so none can be silently dropped. The objective is
 always the module's own independent verifier - the same one whose self-test reproduces the published
 value - so a candidate cannot be scored by the thing that produced it.
 

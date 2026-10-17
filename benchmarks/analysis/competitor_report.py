@@ -89,22 +89,65 @@ def row(dimension, competitor, ours, theirs, reading, verdict, evidence, *,
     }
 
 
+def defect_classes(ours, theirs):
+    """Joins the two cards on the defect-class id, so the comparison is per class and not per count.
+
+    The local suite runs ten TESTS for eight CLASSES - `D7_the_grid_has_exactly_the_requested_bins`
+    is parameterised three ways - while the upstream card counts classes, so `total - passed` and
+    `reproduced` are different units and subtracting one from the other compares nothing. Review
+    caught that; the fix is that the upstream card already NAMES the local test guarding each class
+    in its `ours` field, so the join is on the class itself.
+
+    A class upstream reproduces and nothing here guards is raised rather than counted: it would
+    otherwise shrink the denominator and read as a cleaner result.
+    """
+    held, broken, unguarded = [], [], []
+    for entry in theirs["results"]:
+        if not entry.get("reproduced"):
+            continue
+        tests = [item for item in ours["results"] if entry["ours"] in item["test"]]
+        if not tests:
+            unguarded.append(entry["id"])
+        elif all(item["outcome"] == "Passed" for item in tests):
+            held.append(entry["id"])
+        else:
+            broken.append(entry["id"])
+    if unguarded:
+        raise ValueError("Defect class(es) upstream reproduces with no test here: " + ", ".join(unguarded))
+    return held, broken
+
+
 def parity_rows(root, census):
     catalog = (Path(root) / CATALOG).read_text(encoding="utf-8")
     dispositions = collections.Counter(
         disposition for _, disposition in
         re.findall(r'new\("([^"]+)",\s*OpenEvolveKeyDisposition\.(\w+)', catalog))
     keys = sum(dispositions.values())
+    # A census that cannot say which OpenEvolve it read cannot support a parity claim, and `Ref` is
+    # null when the checkout has no describable ref - which `.get` with a fallback would have
+    # rendered as a hardcoded commit that was never checked.
+    reference = " ".join(str(census.get(key)) for key in ("Commit", "Ref") if census.get(key))
+    if not reference.strip():
+        raise ValueError("The census names no commit or ref for the checkout it was taken from")
     examples = sorted(path.parent.name for path in
                       (Path(root) / "benchmarks/evidence/openevolve-examples").glob("*/run.json")
                       if json.loads(path.read_text(encoding="utf-8")).get("openEvolveEvaluator"))
     manifest = read(root, AE_MANIFEST)
+    robust = read(root, OURS_ROBUST)
+    defects_032, defects_040 = read(root, DEFECTS_032), read(root, DEFECTS_040)
+    reproduced_032, reproduced_040 = defects_032["reproduced"], defects_040["reproduced"]
+    held, broken = defect_classes(robust, defects_040)
+    # The two upstream releases must have reproduced the same inventory, or "the same classes two
+    # releases apart" is a sentence about two different sets.
+    if {entry["id"] for entry in defects_032["results"] if entry.get("reproduced")} != \
+            {entry["id"] for entry in defects_040["results"] if entry.get("reproduced")}:
+        raise ValueError("The two upstream cards reproduce different defect classes")
 
     rows = [
         row("Configuration surface", OPENEVOLVE,
             "%d keys classified (%s)" % (keys, ", ".join(
                 "%d %s" % (count, name) for name, count in sorted(dispositions.items()))),
-            "%d options at %s" % (len(census["UpstreamOptions"]), census.get("Ref", "411fb59 (v0.3.2)")),
+            "%d options at %s" % (len(census["UpstreamOptions"]), reference),
             "%d upstream options are unclassified; %d catalog key(s) upstream does not expose (%s)"
             % (len(census["Unclassified"]), len(census["CatalogNotUpstream"]),
                ", ".join(census["CatalogNotUpstream"]) or "none"),
@@ -114,15 +157,18 @@ def parity_rows(root, census):
             "%d example evaluators" % len(examples),
             "run end to end against the upstream evaluator process, not a reimplementation: "
             + ", ".join(examples), PARITY, "benchmarks/evidence/openevolve-examples"),
-        row("Archive and scheduling defects", OPENEVOLVE, "%d of %d scenarios pass" % (
-            read(root, OURS_ROBUST)["passed"], read(root, OURS_ROBUST)["total"]),
-            "%d defect classes reproduced on 0.3.2 and %d on 0.4.0"
-            % (read(root, DEFECTS_032)["reproduced"], read(root, DEFECTS_040)["reproduced"]),
-            "each class is a probe that fails upstream and passes here; the same eight reproduce "
-            "two releases apart, so they are design, not a bad build",
+        row("Archive and scheduling defects", OPENEVOLVE,
+            "%d of %d defect classes hold here" % (len(held), len(held) + len(broken)),
+            "%d classes reproduced on 0.3.2 and %d on 0.4.0" % (reproduced_032, reproduced_040),
+            "joined on the class id each card names, not on a count: the upstream card names the "
+            "test guarding each class and the local suite runs %d tests for these %d classes (%s is "
+            "parameterised). %s. The same classes reproduce two releases apart, so they are design "
+            "and not a bad build"
+            % (len(robust["results"]), len(held) + len(broken), "D7",
+               "Every class holds" if not broken else "FAILING HERE: " + ", ".join(broken)),
             AHEAD, OURS_ROBUST,
-            ours_range=[0, 0], theirs_range=[read(root, DEFECTS_040)["reproduced"],
-                                            read(root, DEFECTS_032)["reproduced"]]),
+            ours_range=[len(broken), len(broken)],
+            theirs_range=[min(reproduced_032, reproduced_040), max(reproduced_032, reproduced_040)]),
         row("Published results transcribed", ALPHAEVOLVE,
             "%d of %d verified by an independent verifier, %d pending"
             % (manifest["verified"], manifest["problems"], manifest["pending"]),

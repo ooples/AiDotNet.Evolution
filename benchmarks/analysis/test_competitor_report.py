@@ -143,6 +143,54 @@ class CompetitorReportTests(unittest.TestCase):
         self.assertEqual(cr.BEHIND, next(item for item in report["Rows"]
                                          if item["Dimension"] == "Configuration surface")["Verdict"])
 
+    def test_a_census_that_cannot_name_its_checkout_is_refused(self):
+        # `Ref` is null when the checkout has no describable ref, and the first version rendered
+        # that as a hardcoded commit nobody had checked. Review caught it.
+        census = json.loads((ROOT / CENSUS).read_text(encoding="utf-8"))
+        census["Evidence"] = CENSUS
+        self.assertTrue(census["Commit"], "the census must record the commit, not only the tag")
+        self.assertIn(census["Commit"][:12], self.find("Configuration surface")["Theirs"])
+        for blanked in ({"Ref": None, "Commit": None}, {"Ref": "", "Commit": ""}):
+            with self.subTest(blanked=blanked):
+                with self.assertRaises(ValueError) as caught:
+                    cr.build(ROOT, dict(census, **blanked), HEADROOM)
+                self.assertIn("names no commit or ref", str(caught.exception))
+
+    def test_defect_classes_are_joined_on_the_class_and_not_on_a_count(self):
+        """The local suite runs ten TESTS for eight CLASSES, so counts are different units.
+
+        `total - passed` would have counted failing scenarios against upstream's reproduced
+        classes. The join is on the id the upstream card names, so a class that failed here is
+        attributed to that class and a class upstream reproduces with no test here is refused.
+        """
+        ours = json.loads((ROOT / cr.OURS_ROBUST).read_text(encoding="utf-8"))
+        theirs = json.loads((ROOT / cr.DEFECTS_040).read_text(encoding="utf-8"))
+        held, broken = cr.defect_classes(ours, theirs)
+        self.assertEqual(theirs["reproduced"], len(held) + len(broken))
+        self.assertEqual([], broken)
+        self.assertGreater(len(ours["results"]), len(held), "ten tests guard eight classes")
+
+        failed = dict(ours, results=[dict(item, outcome="Failed") if "D7_" in item["test"] else item
+                                     for item in ours["results"]])
+        held_after, broken_after = cr.defect_classes(failed, theirs)
+        self.assertEqual(["D7"], broken_after, "a failing scenario must fail its own class")
+        self.assertEqual(len(held) - 1, len(held_after))
+
+        unguarded = dict(ours, results=[item for item in ours["results"] if "D1_" not in item["test"]])
+        with self.assertRaises(ValueError) as caught:
+            cr.defect_classes(unguarded, theirs)
+        self.assertIn("no test here", str(caught.exception))
+
+    def test_a_defect_class_failing_here_cannot_still_read_as_ahead(self):
+        report = copy.deepcopy(self.report)
+        row = next(item for item in report["Rows"]
+                   if item["Dimension"] == "Archive and scheduling defects")
+        row["OursRange"] = [1, 1]  # one class fails here; the ranges no longer separate
+        row["TheirsRange"] = [0, 8]
+        with self.assertRaises(ValueError) as caught:
+            cr.lint(report, ROOT)
+        self.assertIn("does not separate the arms", str(caught.exception))
+
     def test_the_published_document_is_the_rendered_one(self):
         self.assertTrue(DOCUMENT.is_file(), "the comparison is published or it is not a report")
         self.assertEqual(cr.render(self.report), DOCUMENT.read_text(encoding="utf-8"),

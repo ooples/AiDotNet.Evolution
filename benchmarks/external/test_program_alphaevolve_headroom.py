@@ -147,6 +147,17 @@ class AlphaEvolveHeadroomEvidenceTests(unittest.TestCase):
         self.assertEqual(["c4-uncertainty-hermite"], capped,
                          "only the exact-arithmetic verifier is capped; a new cap needs stating")
 
+    def test_the_docstring_names_every_problem_the_module_actually_measures(self):
+        # The docstring said five and `IN_SCOPE` held six; review caught it, and prose that states a
+        # scope is worth nothing if it can disagree with the scope.
+        for name in headroom.IN_SCOPE:
+            with self.subTest(problem=name):
+                self.assertIn(name.split("-")[0], headroom.__doc__,
+                              "the module docstring does not mention " + name)
+        self.assertIn("six problems", headroom.__doc__,
+                      "the docstring states a count, so it must be the right one")
+        self.assertEqual(6, len(headroom.IN_SCOPE))
+
     def test_the_bundle_names_the_notebook_its_targets_came_from(self):
         self.assertEqual(math_family.SOURCE_COMMIT, self.report["SourceCommit"])
         self.assertEqual(math_family.SOURCE_REPOSITORY, self.report["Source"])

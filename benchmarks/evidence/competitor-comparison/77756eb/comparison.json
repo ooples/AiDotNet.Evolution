@@ -9,7 +9,7 @@
    "Dimension": "Configuration surface",
    "Competitor": "OpenEvolve",
    "Ours": "103 keys classified (65 Mapped, 23 NoEffect, 15 RefusedUnlessDefault)",
-   "Theirs": "102 options at v0.3.2",
+   "Theirs": "102 options at 411fb59c886c18704caaffb611e17cf9e7d824d2 v0.3.2",
    "Reading": "0 upstream options are unclassified; 1 catalog key(s) upstream does not expose (llm._manual_queue_dir)",
    "Verdict": "parity",
    "Evidence": "benchmarks/evidence/competitor-comparison/77756eb/openevolve-config-census.json",
@@ -40,9 +40,9 @@
   {
    "Dimension": "Archive and scheduling defects",
    "Competitor": "OpenEvolve",
-   "Ours": "10 of 10 scenarios pass",
-   "Theirs": "8 defect classes reproduced on 0.3.2 and 8 on 0.4.0",
-   "Reading": "each class is a probe that fails upstream and passes here; the same eight reproduce two releases apart, so they are design, not a bad build",
+   "Ours": "8 of 8 defect classes hold here",
+   "Theirs": "8 classes reproduced on 0.3.2 and 8 on 0.4.0",
+   "Reading": "joined on the class id each card names, not on a count: the upstream card names the test guarding each class and the local suite runs 10 tests for these 8 classes (D7 is parameterised). Every class holds. The same classes reproduce two releases apart, so they are design and not a bad build",
    "Verdict": "ahead",
    "Evidence": "benchmarks/evidence/robustness/c30c875/ours.json",
    "OursRange": [
