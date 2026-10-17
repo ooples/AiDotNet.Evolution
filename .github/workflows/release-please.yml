@@ -17,8 +17,9 @@ jobs:
       issues: write
     runs-on: ubuntu-latest
     outputs:
-      release_created: ${{ steps.release.outputs.release_created }}
-      tag_name: ${{ steps.release.outputs.tag_name }}
+      # Either attempt can be the one that produced them; see the retry below.
+      release_created: ${{ steps.release.outputs.release_created || steps.retry.outputs.release_created }}
+      tag_name: ${{ steps.release.outputs.tag_name || steps.retry.outputs.tag_name }}
     steps:
       - name: Validate release automation credentials
         env:
@@ -31,11 +32,39 @@ jobs:
             exit 1
           fi
       - id: release
+        # A secondary rate limit on this account's API quota failed this step on four of the
+        # last thirty merges to main, each time AFTER the credentials check above had passed
+        # seconds earlier - so it is not the token, and /rate_limit cannot predict it. The action
+        # is idempotent (the same release pull request, reconciled), so one retry recovers the
+        # merge instead of leaving main red and the release pull request a merge behind.
+        continue-on-error: true
         uses: googleapis/release-please-action@45996ed1f6d02564a971a2fa1b5860e934307cf7 # v5.0.0
         with:
           token: ${{ secrets.AUTOFIX_PAT || secrets.GITHUB_TOKEN }}
           config-file: release-please-config.json
           manifest-file: .release-please-manifest.json
+      - name: Wait out a secondary rate limit before retrying
+        if: steps.release.outcome == 'failure'
+        shell: bash
+        run: sleep 120
+      - id: retry
+        if: steps.release.outcome == 'failure'
+        uses: googleapis/release-please-action@45996ed1f6d02564a971a2fa1b5860e934307cf7 # v5.0.0
+        with:
+          token: ${{ secrets.AUTOFIX_PAT || secrets.GITHUB_TOKEN }}
+          config-file: release-please-config.json
+          manifest-file: .release-please-manifest.json
+      - name: Fail if neither attempt reconciled the release
+        # Without this the job is GREEN when both attempts fail, because the first is
+        # continue-on-error and the second is skipped by its own condition.
+        if: steps.release.outcome == 'failure' && steps.retry.outcome != 'success'
+        shell: bash
+        run: |
+          echo "::error::release-please failed twice, 120 s apart. If both attempts logged"
+          echo "::error::'API rate limit already exceeded', the API quota for this account is"
+          echo "::error::exhausted and the credentials are not at fault - the check in this job"
+          echo "::error::passed. Re-run this workflow once the quota resets."
+          exit 1
 
   publish:
     name: Build and publish release
