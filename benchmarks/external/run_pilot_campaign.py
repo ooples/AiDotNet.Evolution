@@ -57,10 +57,27 @@ MODEL = "sonnet"
 TOKENS_PER_CALL = 8_000
 
 
-STUB_DIFF = "\n".join(["<<<<<<< SEARCH", "def predict(*xs):", "    return 0.0", "=======",
-                       "def predict(*xs):", "    x = xs[0]", "    return (3.0 * x + 1.0) / (x * x + 2.0)",
-                       ">>>>>>> REPLACE"])
-STUB_FENCE = "```python\ndef predict(*xs):\n    x = xs[0]\n    return (3.0 * x + 1.0) / (x * x + 2.0)\n```"
+def stub_body(nudge):
+    """A candidate that differs from the last one, so proposals are not all the same genome."""
+    return ["    x = xs[0]", "    return (3.0 * x + 1.0) / (x * x + 2.0) + %.9f" % (nudge * 1e-6)]
+
+
+def stub_diff(nudge):
+    """A SEARCH/REPLACE edit that applies to WHATEVER the program currently is.
+
+    The anchor is the signature, which every candidate keeps, and not the seed's body. Anchoring on
+    the body - the obvious thing - made the edit apply exactly once: after the first proposal the
+    program no longer contained `return 0.0`, so every later diff failed to apply, the engine's
+    repair path re-prompted, and its ChatCalls counter ran past the broker's ceiling. The rehearsal
+    then failed all six of our cells with "the CLI reported 26 calls but the broker admitted 10" -
+    a defect in the stub that read exactly like a metering defect in the engine.
+    """
+    return "\n".join(["<<<<<<< SEARCH", "def predict(*xs):", "=======", "def predict(*xs):"]
+                     + stub_body(nudge) + [">>>>>>> REPLACE"])
+
+
+def stub_fence(nudge):
+    return "```python\n" + "\n".join(["def predict(*xs):"] + stub_body(nudge)) + "\n```"
 
 
 def stub_provider(calls):
@@ -74,7 +91,8 @@ def stub_provider(calls):
     def provider(system, messages, model=None):
         calls.append(model)
         text = (system or "") + " ".join(message.get("content", "") for message in messages)
-        return (STUB_DIFF if "SEARCH" in text else STUB_FENCE), 30
+        nudge = len(calls)
+        return (stub_diff(nudge) if "SEARCH" in text else stub_fence(nudge)), 30
 
     return provider
 

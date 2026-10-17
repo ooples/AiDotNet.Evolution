@@ -245,6 +245,32 @@ class StubProviderTests(unittest.TestCase):
         _, cost = runner.stub_provider([])("system", [{"content": "x"}])
         self.assertIs(int, type(cost))
 
+    def test_the_stub_edit_applies_to_whatever_the_program_has_become(self):
+        """Anchored on the seed's body, the stub edit applied exactly ONCE.
+
+        Every later proposal then failed to apply, the engine's repair path re-prompted, and the
+        rehearsal failed all six of our cells reporting 26 model calls against a ceiling of 10 -
+        which reads like a metering defect in the engine rather than a one-shot stub. The property
+        that makes it reapply is that the SEARCH text survives into the REPLACE text, so the next
+        edit still has its anchor.
+        """
+        diff = runner.stub_diff(1)
+        search = diff.split("<<<<<<< SEARCH\n")[1].split("\n=======")[0]
+        replace = diff.split("=======\n")[1].split("\n>>>>>>> REPLACE")[0]
+        self.assertEqual("def predict(*xs):", search, "the anchor is the signature, not the body")
+        self.assertIn(search, replace, "the anchor must survive the edit or it applies only once")
+        self.assertNotIn("return 0.0", search, "the seed's body is exactly what must not be the anchor")
+
+    def test_successive_stub_answers_are_different_candidates(self):
+        # Identical proposals are suppressed as duplicates, which would starve the path the
+        # rehearsal exists to exercise.
+        calls = []
+        provider = runner.stub_provider(calls)
+        answers = [provider("return SEARCH/REPLACE blocks", [{"content": "parent"}])[0] for _ in range(4)]
+        self.assertEqual(4, len(set(answers)), "the stub repeated itself")
+        for answer in answers:
+            self.assertIn("def predict(*xs):", answer)
+
 
 if __name__ == "__main__":
     unittest.main()
