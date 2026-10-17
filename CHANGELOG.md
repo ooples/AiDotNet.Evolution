@@ -1,5 +1,12 @@
 # Changelog
 
+## [0.6.0](https://github.com/ooples/AiDotNet.Evolution/compare/v0.5.0...v0.6.0) (2026-10-17)
+
+
+### Features
+
+* **bench:** publish where v1 stands against openevolve and alphaevolve ([#316](https://github.com/ooples/AiDotNet.Evolution/issues/316)) ([6833401](https://github.com/ooples/AiDotNet.Evolution/commit/68334010804b9ad024b3a376b153a86bc0eedada))
+
 ## [0.5.0](https://github.com/ooples/AiDotNet.Evolution/compare/v0.4.0...v0.5.0) (2026-10-16)
 
 
