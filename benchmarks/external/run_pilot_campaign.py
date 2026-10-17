@@ -269,7 +269,14 @@ def main():
         raise SystemExit("--model-tokens %d is below %d calls x ~%d tokens: the token ceiling would bind "
                          "first and silently shorten every cell instead of refusing a call"
                          % (arguments.model_tokens, arguments.model_calls, TOKENS_PER_CALL))
-    root = Path(arguments.root)
+    # Every one of these is handed to a subprocess that runs in a DIFFERENT working directory:
+    # the cell's own tree for our CLI, the checkout for the adapter. A relative path therefore
+    # resolves twice and names nothing - a relative --root made all 18 cells of a rehearsal fail
+    # with `Could not find file '<cell>/<root>/.../cell_evaluator.py'`, the root doubled inside the
+    # cell directory, which reads like a missing evaluator rather than a path the caller wrote.
+    root = Path(arguments.root).resolve()
+    arguments.upstream = str(Path(arguments.upstream).resolve())
+    arguments.python = str(Path(arguments.python).resolve())
     registration_path = root / "registration" / "registration.json"
     sizing_path = root / "registration" / "sizing.json"
     if registration_path.exists():
