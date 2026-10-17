@@ -76,11 +76,20 @@ def task(directory, *, config="max_iterations: 1\nllm:\n  models:\n    - name: \
 
 class UsageAccountingTests(unittest.TestCase):
     def test_variation_calls_alone_are_the_total_when_no_meta_prompt_ran(self):
-        self.assertEqual((7, 1234), pilot_searchers._usage({"ModelUsage": {"ChatCalls": 7, "TotalTokens": 1234}}))
+        self.assertEqual((7, 1234, 0),
+                         pilot_searchers._usage({"ModelUsage": {"ChatCalls": 7, "TotalTokens": 1234}}))
+
+    def test_refused_requests_are_reported_beside_the_calls_that_were_sent(self):
+        """`ChatCalls` counts what was SENT. Only the difference was served, and that is what the
+        broker counts, so the refusals have to travel with the pair or the two cannot be compared."""
+        self.assertEqual(
+            (13, 1234, 3),
+            pilot_searchers._usage({"ModelUsage": {"ChatCalls": 13, "TotalTokens": 1234,
+                                                   "ProviderErrors": 3}}))
 
     def test_meta_prompt_calls_are_added_rather_than_dropped(self):
         # The arm the CLI warns about: instruction evolution calls the model on its own cadence.
-        calls, tokens = pilot_searchers._usage({
+        calls, tokens, _ = pilot_searchers._usage({
             "ModelUsage": {"ChatCalls": 7, "TotalTokens": 1234},
             "MetaPrompt": {"ProposalCalls": 5, "RefusedProposals": 1},
         })
@@ -219,13 +228,40 @@ class OurArmTests(unittest.TestCase):
             self.assertEqual(4, outcome["reported_model_calls"], "and the self-report is kept beside it")
 
     def test_a_self_report_above_the_measurement_fails_the_cell(self):
-        # The broker is the ceiling: an arm cannot have made more calls than it was admitted for, so
+        # The broker is the ceiling: calls it SERVED that it never admitted are unmetered spend, so
         # this is a broken measurement, not a cheap cell, and it must not be reported as a result.
         with tempfile.TemporaryDirectory() as directory:
             error = self.run_capture(directory, FakeBroker(calls=2),
                                      stdout='{"ModelUsage": {"ChatCalls": 9, "TotalTokens": 0}}')["error"]
             self.assertIsInstance(error, pilot_searchers.SearchFailed)
             self.assertEqual(2, error.accounting["model_calls"])
+
+    def test_requests_the_provider_refused_are_not_unmetered_spend(self):
+        """The live damped_oscillator pilot failed 2 of our 6 cells at 13 sent / 3 refused / 10
+        admitted. Thirteen requests went out, the broker refused three of them at its ceiling, and
+        ten were served - which is exactly what the broker counted. Reading that as an accounting
+        fault penalises a cell for retrying an unusable answer, on precisely the tasks where answers
+        are unusable."""
+        with tempfile.TemporaryDirectory() as directory:
+            outcome = self.run_capture(
+                directory, FakeBroker(calls=10, tokens=500),
+                stdout='{"ModelUsage": {"ChatCalls": 13, "TotalTokens": 0, "ProviderErrors": 3}}',
+            )["outcome"]
+            self.assertEqual(10, outcome["model_calls"], "the broker's count is still the measurement")
+            self.assertEqual(13, outcome["reported_model_calls"])
+            self.assertEqual(3, outcome["reported_provider_errors"], "and the refusals are kept beside it")
+
+    def test_one_served_call_too_many_still_fails_even_with_refusals(self):
+        # The refusals explain a surplus; they must not absorb one. Twelve sent and one refused is
+        # eleven served against ten admitted, so one call was never metered.
+        with tempfile.TemporaryDirectory() as directory:
+            error = self.run_capture(
+                directory, FakeBroker(calls=10),
+                stdout='{"ModelUsage": {"ChatCalls": 12, "TotalTokens": 0, "ProviderErrors": 1}}',
+            )["error"]
+            self.assertIsInstance(error, pilot_searchers.SearchFailed)
+            self.assertIn("served 11", str(error))
+
 
     def test_a_cell_that_spent_and_then_failed_carries_its_spend_on_the_exception(self):
         with tempfile.TemporaryDirectory() as directory:
