@@ -30,11 +30,13 @@ Two cells in eighteen improved, by a fraction of a percent. On `rational_gain` o
 metric by 63-87%. The three tasks in this family are not three difficulties of one measurement; one of
 them admits search and two do not.
 
-## The sizing N = 2 is precision on a null effect
+## The sizing N = 2 answers only the width question
 
 Observed half widths 0.0186 and 0.0331, both inside the 0.10 target, so `power-analysis.json` reports
-`RequiredN: 2` with `PilotAlreadyMeetsTarget`. The differences are tiny and consistent because nothing
-is happening. **Do not read it as "this family is cheap to gate".**
+`RequiredN: 2` with `PilotAlreadyMeetsTarget`: the 0.10 width is already met at n = 6, which is all
+that number says. Here both intervals also straddle zero, so neither endpoint is a measured
+difference in either direction. **Do not read "N = 2" as "this family is cheap to gate"** - a campaign
+sized from it would be buying precision around differences this small.
 
 ## The family sweep, in one place
 
@@ -46,10 +48,17 @@ is happening. **Do not read it as "this family is cheap to gate".**
 | `damped_oscillator` | 25 / 35 | 1.002775 | 1 (+0.48%) | **-0.0281, CI excludes parity against us** | no |
 | `two_variable_ratio` | 25 / 35 | 1.003401 | 2 (0.27%, 1.06%) | -0.0150, straddles zero | no |
 
-**One of three tasks discriminates, and raising the budget 2.5x did not change which one.** The gate
-requires strict superiority on every family x config, so with this task set it cannot pass - not
-because of the engine but because two of the three tasks have nearly nothing to find. That is a
-decision about the gate's task set.
+**Of the five pilots run so far, one separated the arms, and raising the budget 2.5x did not change
+which task that was.** The gate requires strict superiority on every family x config, and **none of
+these six-seed pilots passed it except `rational_gain` at 25 / 35**.
+
+What that does *not* establish: that this task set can never pass, or that the engine played no part.
+Six seeds per endpoint, two budgets on one task and one budget on the others, is not enough to
+separate "the task has little to find" from "the engine did not find it" - the floor study says
+`two_variable_ratio` has very little available (0.1-4.1% of the gap at 20,000 evaluations) and that
+`damped_oscillator` has rather more (30.0-32.2%), which neither engine reached. Both readings are
+observations about these runs. **The task-set decision is the release owner's**, and this table is
+the input to it rather than the answer.
 
 ## Reproducing
 
