@@ -1,0 +1,41 @@
+{
+ "Schema": "evolution-power-analysis-v1",
+ "RegistrationSha256": "fe1fb5efa16f94a4270d8c800704ca3b1c25df22aa4a39f23d47ec6c34c0a644",
+ "TargetHalfWidth": 0.05,
+ "Confidence": 0.95,
+ "Endpoints": [
+  {
+   "Family": "rational_gain",
+   "Config": "recommended",
+   "PilotN": 6,
+   "MeanDifference": 0.6599420817002887,
+   "StandardDeviation": 0.4552398674757667,
+   "Variance": 0.20724333693935365,
+   "ObservedHalfWidth": 0.29818848969005346,
+   "TargetHalfWidth": 0.05,
+   "ScaledRequiredN": 214,
+   "NormalRequiredN": 319,
+   "RequiredN": 319,
+   "Agreement": 1.4906542056074767,
+   "Degenerate": false,
+   "PilotAlreadyMeetsTarget": false
+  },
+  {
+   "Family": "rational_gain",
+   "Config": "matched",
+   "PilotN": 6,
+   "MeanDifference": 0.22111151528883907,
+   "StandardDeviation": 0.29238885188833086,
+   "Variance": 0.08549124070857628,
+   "ObservedHalfWidth": 0.2122277543643819,
+   "TargetHalfWidth": 0.05,
+   "ScaledRequiredN": 109,
+   "NormalRequiredN": 132,
+   "RequiredN": 132,
+   "Agreement": 1.2110091743119267,
+   "Degenerate": false,
+   "PilotAlreadyMeetsTarget": false
+  }
+ ],
+ "RequiredN": 319
+}
