@@ -34,9 +34,11 @@ them admits search and two do not.
 
 Observed half widths 0.0186 and 0.0331, both inside the 0.10 target, so `power-analysis.json` reports
 `RequiredN: 2` with `PilotAlreadyMeetsTarget`: the 0.10 width is already met at n = 6, which is all
-that number says. Here both intervals also straddle zero, so neither endpoint is a measured
-difference in either direction. **Do not read "N = 2" as "this family is cheap to gate"** - a campaign
-sized from it would be buying precision around differences this small.
+that number says. Here both intervals also contain zero, so **neither interval establishes a
+difference in either direction** - which is not the same as the differences being zero: the sample
+means are -0.0150 and -0.0038, and this pilot simply does not settle their sign. **Do not read
+"N = 2" as "this family is cheap to gate"** - a campaign sized from it would be buying precision
+around differences this small.
 
 ## The family sweep, in one place
 

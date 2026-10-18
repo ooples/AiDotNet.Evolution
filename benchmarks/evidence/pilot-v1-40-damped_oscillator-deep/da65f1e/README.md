@@ -34,8 +34,21 @@ Of the 18 scored cells:
 So at 2.5x the budget, one cell in eighteen improved on the starting program, by half a percent. Set
 against `rational_gain`, where our arm moved 1.0790 -> 0.1435-0.3970, a **63-87%** improvement, this
 task is not behaving like a harder version of the same measurement: **at the budgets tested, neither
-engine moved it**, and the -0.0281 is our arm's attempts landing slightly below the seed more often
-than theirs do rather than a measured difference in how well either searched.
+engine moved it**, and the single improvement belongs to `openevolve-recommended`. **Neither our arm
+nor `openevolve-matched` beat the seed in any cell**, which is the pair the -0.0281 is computed over.
+
+Per arm, against the seed's 1.002775 (`rows.json`):
+
+| arm | better | equal | worse | the six values |
+| --- | ---: | ---: | ---: | --- |
+| `aidotnet` | 0 | 1 | 5 | 1.0028 1.0084 1.0132 1.0555 1.0915 1.1505 |
+| `openevolve-recommended` | 1 | 3 | 2 | 0.9980 1.0028 1.0028 1.0028 1.1117 1.1505 |
+| `openevolve-matched` | 0 | 3 | 3 | 1.0028 1.0028 1.0028 1.0395 1.0451 1.0605 |
+
+So the -0.0281 is a paired mean difference between two arms that both failed to improve on the seed,
+and arithmetically it comes out of ours sitting above the seed in five of six cells against three of
+six for theirs. **What six cells per arm cannot say is whether that is search quality or how the task
+behaves**, and this bundle does not claim to tell them apart.
 
 ## The sizing says N = 2, and it answers a narrower question than it looks
 
