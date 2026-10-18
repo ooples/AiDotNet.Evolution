@@ -1,0 +1,104 @@
+{
+ "story": "V1-07 (#116)",
+ "task": "damped_oscillator",
+ "stub": false,
+ "registration_sha256": "f473049885c730d8844359d869e46885a1df35f22e0d2c43311d731c49c5a736",
+ "projection_sha256": "46781d63c1bf2afa0f7e76456404e66b5bd4de5d448b09e4e32e4df3d076f13e",
+ "holdout_partition_sha256": "e4f8be2df3ca41b28ceaef2bfd84f4970a4f6fd1f2a7dc504914850b1f9b382b",
+ "iterations_per_cell": 25,
+ "wall_seconds": 3575.6,
+ "cells": 18,
+ "statuses": {
+  "completed": 18
+ },
+ "model_calls": 465,
+ "model_tokens": 1301825,
+ "cells_with_unknown_spend": 0,
+ "canaries": {
+  "sonnet": 661
+ },
+ "receipt_coverage": {
+  "sonnet": 1.0
+ },
+ "endpoints": [
+  {
+   "Family": "damped_oscillator",
+   "Config": "recommended",
+   "Metric": "nmse",
+   "Direction": "minimize",
+   "N": 6,
+   "MeanDifference": -0.008893548379198405,
+   "Interval95": [
+    -0.034014939181800874,
+    0.01912185602513246
+   ],
+   "OneSidedP": 0.7422577422577422,
+   "Failures": {
+    "aidotnet": 0,
+    "openevolve-recommended": 0
+   },
+   "HolmAdjustedP": 1.0,
+   "Superior": false
+  },
+  {
+   "Family": "damped_oscillator",
+   "Config": "matched",
+   "Metric": "nmse",
+   "Direction": "minimize",
+   "N": 6,
+   "MeanDifference": -0.02807951808904337,
+   "Interval95": [
+    -0.06334188065181483,
+    -0.0053340356322360005
+   ],
+   "OneSidedP": 1.0,
+   "Failures": {
+    "aidotnet": 0,
+    "openevolve-matched": 0
+   },
+   "HolmAdjustedP": 1.0,
+   "Superior": false
+  }
+ ],
+ "power_analysis": {
+  "Schema": "evolution-power-analysis-v1",
+  "RegistrationSha256": "f473049885c730d8844359d869e46885a1df35f22e0d2c43311d731c49c5a736",
+  "TargetHalfWidth": 0.1,
+  "Confidence": 0.95,
+  "Endpoints": [
+   {
+    "Family": "damped_oscillator",
+    "Config": "recommended",
+    "PilotN": 6,
+    "MeanDifference": -0.008893548379198405,
+    "StandardDeviation": 0.03862998078921453,
+    "Variance": 0.0014922754157750836,
+    "ObservedHalfWidth": 0.026568397603466666,
+    "TargetHalfWidth": 0.1,
+    "ScaledRequiredN": 2,
+    "NormalRequiredN": 2,
+    "RequiredN": 2,
+    "Agreement": 1.0,
+    "Degenerate": false,
+    "PilotAlreadyMeetsTarget": true
+   },
+   {
+    "Family": "damped_oscillator",
+    "Config": "matched",
+    "PilotN": 6,
+    "MeanDifference": -0.02807951808904337,
+    "StandardDeviation": 0.04196321430710674,
+    "Variance": 0.001760911354984168,
+    "ObservedHalfWidth": 0.029003922509789413,
+    "TargetHalfWidth": 0.1,
+    "ScaledRequiredN": 2,
+    "NormalRequiredN": 2,
+    "RequiredN": 2,
+    "Agreement": 1.0,
+    "Degenerate": false,
+    "PilotAlreadyMeetsTarget": true
+   }
+  ],
+  "RequiredN": 2
+ }
+}

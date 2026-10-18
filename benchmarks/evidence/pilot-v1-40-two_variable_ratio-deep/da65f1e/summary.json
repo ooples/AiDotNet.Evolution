@@ -1,0 +1,104 @@
+{
+ "story": "V1-07 (#116)",
+ "task": "two_variable_ratio",
+ "stub": false,
+ "registration_sha256": "884e9ad7305ab943aeea422cef3ac6da53550c290e86b73e1bf1a32f5ec79b94",
+ "projection_sha256": "17f270e9ff5d39a560d8c02b30f23bc33830c7dde772ba0a793892c813bf95ea",
+ "holdout_partition_sha256": "a038a1cbb5a22f980f68837b5e5d4735087c949ffac79d1ac18be6e5c45755f3",
+ "iterations_per_cell": 25,
+ "wall_seconds": 3689.3,
+ "cells": 18,
+ "statuses": {
+  "completed": 18
+ },
+ "model_calls": 466,
+ "model_tokens": 1277170,
+ "cells_with_unknown_spend": 0,
+ "canaries": {
+  "sonnet": 661
+ },
+ "receipt_coverage": {
+  "sonnet": 1.0
+ },
+ "endpoints": [
+  {
+   "Family": "two_variable_ratio",
+   "Config": "recommended",
+   "Metric": "nmse",
+   "Direction": "minimize",
+   "N": 6,
+   "MeanDifference": -0.015042335499872217,
+   "Interval95": [
+    -0.03623200823294689,
+    0.0009202356047382695
+   ],
+   "OneSidedP": 0.9200799200799201,
+   "Failures": {
+    "aidotnet": 0,
+    "openevolve-recommended": 0
+   },
+   "HolmAdjustedP": 1.0,
+   "Superior": false
+  },
+  {
+   "Family": "two_variable_ratio",
+   "Config": "matched",
+   "Metric": "nmse",
+   "Direction": "minimize",
+   "N": 6,
+   "MeanDifference": -0.003771785081337816,
+   "Interval95": [
+    -0.03431729189003503,
+    0.03184053393342325
+   ],
+   "OneSidedP": 0.6093906093906094,
+   "Failures": {
+    "aidotnet": 0,
+    "openevolve-matched": 0
+   },
+   "HolmAdjustedP": 1.0,
+   "Superior": false
+  }
+ ],
+ "power_analysis": {
+  "Schema": "evolution-power-analysis-v1",
+  "RegistrationSha256": "884e9ad7305ab943aeea422cef3ac6da53550c290e86b73e1bf1a32f5ec79b94",
+  "TargetHalfWidth": 0.1,
+  "Confidence": 0.95,
+  "Endpoints": [
+   {
+    "Family": "two_variable_ratio",
+    "Config": "recommended",
+    "PilotN": 6,
+    "MeanDifference": -0.015042335499872217,
+    "StandardDeviation": 0.026335018720988815,
+    "Variance": 0.0006935332110348314,
+    "ObservedHalfWidth": 0.01857612191884258,
+    "TargetHalfWidth": 0.1,
+    "ScaledRequiredN": 2,
+    "NormalRequiredN": 2,
+    "RequiredN": 2,
+    "Agreement": 1.0,
+    "Degenerate": false,
+    "PilotAlreadyMeetsTarget": true
+   },
+   {
+    "Family": "two_variable_ratio",
+    "Config": "matched",
+    "PilotN": 6,
+    "MeanDifference": -0.003771785081337816,
+    "StandardDeviation": 0.046401742602220256,
+    "Variance": 0.0021531217165227023,
+    "ObservedHalfWidth": 0.03307891291172914,
+    "TargetHalfWidth": 0.1,
+    "ScaledRequiredN": 2,
+    "NormalRequiredN": 2,
+    "RequiredN": 2,
+    "Agreement": 1.0,
+    "Degenerate": false,
+    "PilotAlreadyMeetsTarget": true
+   }
+  ],
+  "RequiredN": 2
+ }
+}
