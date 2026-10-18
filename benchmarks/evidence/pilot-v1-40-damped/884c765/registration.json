@@ -1,0 +1,53 @@
+{
+  "Schema": "evolution-campaign-registration-v1",
+  "Spec": {
+    "Campaign": "v1-07-pilot-damped_oscillator",
+    "Budget": {
+      "ModelTokens": 600000,
+      "ModelCalls": 10,
+      "WallSeconds": 1800
+    },
+    "Models": [
+      "sonnet"
+    ],
+    "SeedCount": 6,
+    "BootstrapSamples": 1000,
+    "BootstrapSeed": 11,
+    "FamilywiseAlpha": 0.05,
+    "Families": [
+      {
+        "Family": "damped_oscillator",
+        "Configs": [
+          "recommended",
+          "matched"
+        ],
+        "Endpoint": {
+          "Metric": "nmse",
+          "Direction": "minimize",
+          "FailureValue": 1000000.0
+        }
+      }
+    ],
+    "TestPartitionHashes": {
+      "damped_oscillator": "e4f8be2df3ca41b28ceaef2bfd84f4970a4f6fd1f2a7dc504914850b1f9b382b"
+    },
+    "Published": null
+  },
+  "Seeds": [
+    3927176509,
+    1653076365,
+    1198854388,
+    3892904201,
+    1197696667,
+    2623196786
+  ],
+  "Arms": [
+    "aidotnet",
+    "openevolve-recommended",
+    "openevolve-matched"
+  ],
+  "StoppingRule": "Fixed N = SeedCount per arm; no interim analysis, no extension, no re-run",
+  "DecisionRule": "Holm step-down over every family x config one-sided bootstrap p; all must reject; ties fail",
+  "PublishedRule": "Strict majority of pre-declared problems matched or beaten (assumption A1)",
+  "RegistrationSha256": "3b1f33bb4c0542cde03f3af84b0025c823a8aaff5eacb07d3f30ee0b5c49bcb1"
+}

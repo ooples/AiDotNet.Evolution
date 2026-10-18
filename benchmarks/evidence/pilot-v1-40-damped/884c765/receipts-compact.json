@@ -1,0 +1,2371 @@
+{
+ "calls": 182,
+ "receipts": [
+  {
+   "cli": "2.1.299 (Claude Code)",
+   "resolved_model": "claude-sonnet-5-5",
+   "status": "completed",
+   "api_key_calls": 0,
+   "usage": {
+    "input_tokens": 2,
+    "cache_creation_input_tokens": 659,
+    "cache_read_input_tokens": 0,
+    "output_tokens": 4
+   },
+   "retry_delay_seconds": 0.0
+  },
+  {
+   "cli": "2.1.299 (Claude Code)",
+   "resolved_model": "claude-sonnet-5-5",
+   "status": "completed",
+   "api_key_calls": 0,
+   "usage": {
+    "input_tokens": 2,
+    "cache_creation_input_tokens": 0,
+    "cache_read_input_tokens": 659,
+    "output_tokens": 4
+   },
+   "retry_delay_seconds": 0.0
+  },
+  {
+   "cli": "2.1.299 (Claude Code)",
+   "resolved_model": "claude-sonnet-5-5",
+   "status": "completed",
+   "api_key_calls": 0,
+   "usage": {
+    "input_tokens": 2,
+    "cache_creation_input_tokens": 1539,
+    "cache_read_input_tokens": 0,
+    "output_tokens": 1064
+   },
+   "retry_delay_seconds": 0.0
+  },
+  {
+   "cli": "2.1.299 (Claude Code)",
+   "resolved_model": "claude-sonnet-5-5",
+   "status": "completed",
+   "api_key_calls": 0,
+   "usage": {
+    "input_tokens": 2,
+    "cache_creation_input_tokens": 1607,
+    "cache_read_input_tokens": 0,
+    "output_tokens": 511
+   },
+   "retry_delay_seconds": 0.0
+  },
+  {
+   "cli": "2.1.299 (Claude Code)",
+   "resolved_model": "claude-sonnet-5-5",
+   "status": "completed",
+   "api_key_calls": 0,
+   "usage": {
+    "input_tokens": 2,
+    "cache_creation_input_tokens": 1720,
+    "cache_read_input_tokens": 0,
+    "output_tokens": 1276
+   },
+   "retry_delay_seconds": 0.0
+  },
+  {
+   "cli": "2.1.299 (Claude Code)",
+   "resolved_model": "claude-sonnet-5-5",
+   "status": "completed",
+   "api_key_calls": 0,
+   "usage": {
+    "input_tokens": 2,
+    "cache_creation_input_tokens": 1583,
+    "cache_read_input_tokens": 0,
+    "output_tokens": 1017
+   },
+   "retry_delay_seconds": 0.0
+  },
+  {
+   "cli": "2.1.299 (Claude Code)",
+   "resolved_model": "claude-sonnet-5-5",
+   "status": "completed",
+   "api_key_calls": 0,
+   "usage": {
+    "input_tokens": 2,
+    "cache_creation_input_tokens": 1371,
+    "cache_read_input_tokens": 0,
+    "output_tokens": 937
+   },
+   "retry_delay_seconds": 0.0
+  },
+  {
+   "cli": "2.1.299 (Claude Code)",
+   "resolved_model": "claude-sonnet-5-5",
+   "status": "completed",
+   "api_key_calls": 0,
+   "usage": {
+    "input_tokens": 2,
+    "cache_creation_input_tokens": 1699,
+    "cache_read_input_tokens": 0,
+    "output_tokens": 1107
+   },
+   "retry_delay_seconds": 0.0
+  },
+  {
+   "cli": "2.1.299 (Claude Code)",
+   "resolved_model": "claude-sonnet-5-5",
+   "status": "completed",
+   "api_key_calls": 0,
+   "usage": {
+    "input_tokens": 2,
+    "cache_creation_input_tokens": 1614,
+    "cache_read_input_tokens": 0,
+    "output_tokens": 500
+   },
+   "retry_delay_seconds": 0.0
+  },
+  {
+   "cli": "2.1.299 (Claude Code)",
+   "resolved_model": "claude-sonnet-5-5",
+   "status": "completed",
+   "api_key_calls": 0,
+   "usage": {
+    "input_tokens": 2,
+    "cache_creation_input_tokens": 1711,
+    "cache_read_input_tokens": 0,
+    "output_tokens": 581
+   },
+   "retry_delay_seconds": 0.0
+  },
+  {
+   "cli": "2.1.299 (Claude Code)",
+   "resolved_model": "claude-sonnet-5-5",
+   "status": "completed",
+   "api_key_calls": 0,
+   "usage": {
+    "input_tokens": 2,
+    "cache_creation_input_tokens": 1433,
+    "cache_read_input_tokens": 0,
+    "output_tokens": 908
+   },
+   "retry_delay_seconds": 0.0
+  },
+  {
+   "cli": "2.1.299 (Claude Code)",
+   "resolved_model": "claude-sonnet-5-5",
+   "status": "completed",
+   "api_key_calls": 0,
+   "usage": {
+    "input_tokens": 2,
+    "cache_creation_input_tokens": 1539,
+    "cache_read_input_tokens": 0,
+    "output_tokens": 791
+   },
+   "retry_delay_seconds": 0.0
+  },
+  {
+   "cli": "2.1.299 (Claude Code)",
+   "resolved_model": "claude-sonnet-5-5",
+   "status": "completed",
+   "api_key_calls": 0,
+   "usage": {
+    "input_tokens": 2,
+    "cache_creation_input_tokens": 1761,
+    "cache_read_input_tokens": 0,
+    "output_tokens": 868
+   },
+   "retry_delay_seconds": 0.0
+  },
+  {
+   "cli": "2.1.299 (Claude Code)",
+   "resolved_model": "claude-sonnet-5-5",
+   "status": "completed",
+   "api_key_calls": 0,
+   "usage": {
+    "input_tokens": 2,
+    "cache_creation_input_tokens": 0,
+    "cache_read_input_tokens": 1761,
+    "output_tokens": 814
+   },
+   "retry_delay_seconds": 0.0
+  },
+  {
+   "cli": "2.1.299 (Claude Code)",
+   "resolved_model": "claude-sonnet-5-5",
+   "status": "completed",
+   "api_key_calls": 0,
+   "usage": {
+    "input_tokens": 2,
+    "cache_creation_input_tokens": 0,
+    "cache_read_input_tokens": 1761,
+    "output_tokens": 838
+   },
+   "retry_delay_seconds": 0.0
+  },
+  {
+   "cli": "2.1.299 (Claude Code)",
+   "resolved_model": "claude-sonnet-5-5",
+   "status": "completed",
+   "api_key_calls": 0,
+   "usage": {
+    "input_tokens": 2,
+    "cache_creation_input_tokens": 0,
+    "cache_read_input_tokens": 1761,
+    "output_tokens": 932
+   },
+   "retry_delay_seconds": 0.0
+  },
+  {
+   "cli": "2.1.299 (Claude Code)",
+   "resolved_model": "claude-sonnet-5-5",
+   "status": "completed",
+   "api_key_calls": 0,
+   "usage": {
+    "input_tokens": 2,
+    "cache_creation_input_tokens": 0,
+    "cache_read_input_tokens": 1761,
+    "output_tokens": 919
+   },
+   "retry_delay_seconds": 0.0
+  },
+  {
+   "cli": "2.1.299 (Claude Code)",
+   "resolved_model": "claude-sonnet-5-5",
+   "status": "completed",
+   "api_key_calls": 0,
+   "usage": {
+    "input_tokens": 2,
+    "cache_creation_input_tokens": 0,
+    "cache_read_input_tokens": 1761,
+    "output_tokens": 666
+   },
+   "retry_delay_seconds": 0.0
+  },
+  {
+   "cli": "2.1.299 (Claude Code)",
+   "resolved_model": "claude-sonnet-5-5",
+   "status": "completed",
+   "api_key_calls": 0,
+   "usage": {
+    "input_tokens": 2,
+    "cache_creation_input_tokens": 0,
+    "cache_read_input_tokens": 1761,
+    "output_tokens": 725
+   },
+   "retry_delay_seconds": 0.0
+  },
+  {
+   "cli": "2.1.299 (Claude Code)",
+   "resolved_model": "claude-sonnet-5-5",
+   "status": "completed",
+   "api_key_calls": 0,
+   "usage": {
+    "input_tokens": 2,
+    "cache_creation_input_tokens": 0,
+    "cache_read_input_tokens": 1761,
+    "output_tokens": 1073
+   },
+   "retry_delay_seconds": 0.0
+  },
+  {
+   "cli": "2.1.299 (Claude Code)",
+   "resolved_model": "claude-sonnet-5-5",
+   "status": "completed",
+   "api_key_calls": 0,
+   "usage": {
+    "input_tokens": 2,
+    "cache_creation_input_tokens": 0,
+    "cache_read_input_tokens": 1761,
+    "output_tokens": 801
+   },
+   "retry_delay_seconds": 0.0
+  },
+  {
+   "cli": "2.1.299 (Claude Code)",
+   "resolved_model": "claude-sonnet-5-5",
+   "status": "completed",
+   "api_key_calls": 0,
+   "usage": {
+    "input_tokens": 2,
+    "cache_creation_input_tokens": 0,
+    "cache_read_input_tokens": 1761,
+    "output_tokens": 947
+   },
+   "retry_delay_seconds": 0.0
+  },
+  {
+   "cli": "2.1.299 (Claude Code)",
+   "resolved_model": "claude-sonnet-5-5",
+   "status": "completed",
+   "api_key_calls": 0,
+   "usage": {
+    "input_tokens": 2,
+    "cache_creation_input_tokens": 1411,
+    "cache_read_input_tokens": 0,
+    "output_tokens": 448
+   },
+   "retry_delay_seconds": 0.0
+  },
+  {
+   "cli": "2.1.299 (Claude Code)",
+   "resolved_model": "claude-sonnet-5-5",
+   "status": "completed",
+   "api_key_calls": 0,
+   "usage": {
+    "input_tokens": 2,
+    "cache_creation_input_tokens": 0,
+    "cache_read_input_tokens": 1411,
+    "output_tokens": 812
+   },
+   "retry_delay_seconds": 0.0
+  },
+  {
+   "cli": "2.1.299 (Claude Code)",
+   "resolved_model": "claude-sonnet-5-5",
+   "status": "completed",
+   "api_key_calls": 0,
+   "usage": {
+    "input_tokens": 2,
+    "cache_creation_input_tokens": 1828,
+    "cache_read_input_tokens": 0,
+    "output_tokens": 800
+   },
+   "retry_delay_seconds": 0.0
+  },
+  {
+   "cli": "2.1.299 (Claude Code)",
+   "resolved_model": "claude-sonnet-5-5",
+   "status": "completed",
+   "api_key_calls": 0,
+   "usage": {
+    "input_tokens": 2,
+    "cache_creation_input_tokens": 2145,
+    "cache_read_input_tokens": 0,
+    "output_tokens": 690
+   },
+   "retry_delay_seconds": 0.0
+  },
+  {
+   "cli": "2.1.299 (Claude Code)",
+   "resolved_model": "claude-sonnet-5-5",
+   "status": "completed",
+   "api_key_calls": 0,
+   "usage": {
+    "input_tokens": 2,
+    "cache_creation_input_tokens": 2680,
+    "cache_read_input_tokens": 0,
+    "output_tokens": 380
+   },
+   "retry_delay_seconds": 0.0
+  },
+  {
+   "cli": "2.1.299 (Claude Code)",
+   "resolved_model": "claude-sonnet-5-5",
+   "status": "completed",
+   "api_key_calls": 0,
+   "usage": {
+    "input_tokens": 2,
+    "cache_creation_input_tokens": 2599,
+    "cache_read_input_tokens": 0,
+    "output_tokens": 769
+   },
+   "retry_delay_seconds": 0.0
+  },
+  {
+   "cli": "2.1.299 (Claude Code)",
+   "resolved_model": "claude-sonnet-5-5",
+   "status": "completed",
+   "api_key_calls": 0,
+   "usage": {
+    "input_tokens": 2,
+    "cache_creation_input_tokens": 2448,
+    "cache_read_input_tokens": 0,
+    "output_tokens": 290
+   },
+   "retry_delay_seconds": 0.0
+  },
+  {
+   "cli": "2.1.299 (Claude Code)",
+   "resolved_model": "claude-sonnet-5-5",
+   "status": "completed",
+   "api_key_calls": 0,
+   "usage": {
+    "input_tokens": 2,
+    "cache_creation_input_tokens": 2367,
+    "cache_read_input_tokens": 0,
+    "output_tokens": 559
+   },
+   "retry_delay_seconds": 0.0
+  },
+  {
+   "cli": "2.1.299 (Claude Code)",
+   "resolved_model": "claude-sonnet-5-5",
+   "status": "completed",
+   "api_key_calls": 0,
+   "usage": {
+    "input_tokens": 2,
+    "cache_creation_input_tokens": 2828,
+    "cache_read_input_tokens": 0,
+    "output_tokens": 721
+   },
+   "retry_delay_seconds": 0.0
+  },
+  {
+   "cli": "2.1.299 (Claude Code)",
+   "resolved_model": "claude-sonnet-5-5",
+   "status": "completed",
+   "api_key_calls": 0,
+   "usage": {
+    "input_tokens": 2,
+    "cache_creation_input_tokens": 2952,
+    "cache_read_input_tokens": 0,
+    "output_tokens": 649
+   },
+   "retry_delay_seconds": 0.0
+  },
+  {
+   "cli": "2.1.299 (Claude Code)",
+   "resolved_model": "claude-sonnet-5-5",
+   "status": "completed",
+   "api_key_calls": 0,
+   "usage": {
+    "input_tokens": 2,
+    "cache_creation_input_tokens": 1761,
+    "cache_read_input_tokens": 0,
+    "output_tokens": 652
+   },
+   "retry_delay_seconds": 0.0
+  },
+  {
+   "cli": "2.1.299 (Claude Code)",
+   "resolved_model": "claude-sonnet-5-5",
+   "status": "completed",
+   "api_key_calls": 0,
+   "usage": {
+    "input_tokens": 2,
+    "cache_creation_input_tokens": 0,
+    "cache_read_input_tokens": 1761,
+    "output_tokens": 772
+   },
+   "retry_delay_seconds": 0.0
+  },
+  {
+   "cli": "2.1.299 (Claude Code)",
+   "resolved_model": "claude-sonnet-5-5",
+   "status": "completed",
+   "api_key_calls": 0,
+   "usage": {
+    "input_tokens": 2,
+    "cache_creation_input_tokens": 0,
+    "cache_read_input_tokens": 1761,
+    "output_tokens": 975
+   },
+   "retry_delay_seconds": 0.0
+  },
+  {
+   "cli": "2.1.299 (Claude Code)",
+   "resolved_model": "claude-sonnet-5-5",
+   "status": "completed",
+   "api_key_calls": 0,
+   "usage": {
+    "input_tokens": 2,
+    "cache_creation_input_tokens": 0,
+    "cache_read_input_tokens": 1761,
+    "output_tokens": 702
+   },
+   "retry_delay_seconds": 0.0
+  },
+  {
+   "cli": "2.1.299 (Claude Code)",
+   "resolved_model": "claude-sonnet-5-5",
+   "status": "completed",
+   "api_key_calls": 0,
+   "usage": {
+    "input_tokens": 2,
+    "cache_creation_input_tokens": 0,
+    "cache_read_input_tokens": 1761,
+    "output_tokens": 697
+   },
+   "retry_delay_seconds": 0.0
+  },
+  {
+   "cli": "2.1.299 (Claude Code)",
+   "resolved_model": "claude-sonnet-5-5",
+   "status": "completed",
+   "api_key_calls": 0,
+   "usage": {
+    "input_tokens": 2,
+    "cache_creation_input_tokens": 0,
+    "cache_read_input_tokens": 1761,
+    "output_tokens": 1081
+   },
+   "retry_delay_seconds": 0.0
+  },
+  {
+   "cli": "2.1.299 (Claude Code)",
+   "resolved_model": "claude-sonnet-5-5",
+   "status": "completed",
+   "api_key_calls": 0,
+   "usage": {
+    "input_tokens": 2,
+    "cache_creation_input_tokens": 0,
+    "cache_read_input_tokens": 1761,
+    "output_tokens": 742
+   },
+   "retry_delay_seconds": 0.0
+  },
+  {
+   "cli": "2.1.299 (Claude Code)",
+   "resolved_model": "claude-sonnet-5-5",
+   "status": "completed",
+   "api_key_calls": 0,
+   "usage": {
+    "input_tokens": 2,
+    "cache_creation_input_tokens": 0,
+    "cache_read_input_tokens": 1761,
+    "output_tokens": 922
+   },
+   "retry_delay_seconds": 0.0
+  },
+  {
+   "cli": "2.1.299 (Claude Code)",
+   "resolved_model": "claude-sonnet-5-5",
+   "status": "completed",
+   "api_key_calls": 0,
+   "usage": {
+    "input_tokens": 2,
+    "cache_creation_input_tokens": 0,
+    "cache_read_input_tokens": 1761,
+    "output_tokens": 964
+   },
+   "retry_delay_seconds": 0.0
+  },
+  {
+   "cli": "2.1.299 (Claude Code)",
+   "resolved_model": "claude-sonnet-5-5",
+   "status": "completed",
+   "api_key_calls": 0,
+   "usage": {
+    "input_tokens": 2,
+    "cache_creation_input_tokens": 0,
+    "cache_read_input_tokens": 1761,
+    "output_tokens": 762
+   },
+   "retry_delay_seconds": 0.0
+  },
+  {
+   "cli": "2.1.299 (Claude Code)",
+   "resolved_model": "claude-sonnet-5-5",
+   "status": "completed",
+   "api_key_calls": 0,
+   "usage": {
+    "input_tokens": 2,
+    "cache_creation_input_tokens": 1411,
+    "cache_read_input_tokens": 0,
+    "output_tokens": 772
+   },
+   "retry_delay_seconds": 0.0
+  },
+  {
+   "cli": "2.1.299 (Claude Code)",
+   "resolved_model": "claude-sonnet-5-5",
+   "status": "completed",
+   "api_key_calls": 0,
+   "usage": {
+    "input_tokens": 2,
+    "cache_creation_input_tokens": 0,
+    "cache_read_input_tokens": 1411,
+    "output_tokens": 791
+   },
+   "retry_delay_seconds": 0.0
+  },
+  {
+   "cli": "2.1.299 (Claude Code)",
+   "resolved_model": "claude-sonnet-5-5",
+   "status": "completed",
+   "api_key_calls": 0,
+   "usage": {
+    "input_tokens": 2,
+    "cache_creation_input_tokens": 1788,
+    "cache_read_input_tokens": 0,
+    "output_tokens": 685
+   },
+   "retry_delay_seconds": 0.0
+  },
+  {
+   "cli": "2.1.299 (Claude Code)",
+   "resolved_model": "claude-sonnet-5-5",
+   "status": "completed",
+   "api_key_calls": 0,
+   "usage": {
+    "input_tokens": 2,
+    "cache_creation_input_tokens": 2432,
+    "cache_read_input_tokens": 0,
+    "output_tokens": 622
+   },
+   "retry_delay_seconds": 0.0
+  },
+  {
+   "cli": "2.1.299 (Claude Code)",
+   "resolved_model": "claude-sonnet-5-5",
+   "status": "completed",
+   "api_key_calls": 0,
+   "usage": {
+    "input_tokens": 2,
+    "cache_creation_input_tokens": 2445,
+    "cache_read_input_tokens": 0,
+    "output_tokens": 478
+   },
+   "retry_delay_seconds": 0.0
+  },
+  {
+   "cli": "2.1.299 (Claude Code)",
+   "resolved_model": "claude-sonnet-5-5",
+   "status": "completed",
+   "api_key_calls": 0,
+   "usage": {
+    "input_tokens": 2,
+    "cache_creation_input_tokens": 3242,
+    "cache_read_input_tokens": 0,
+    "output_tokens": 550
+   },
+   "retry_delay_seconds": 0.0
+  },
+  {
+   "cli": "2.1.299 (Claude Code)",
+   "resolved_model": "claude-sonnet-5-5",
+   "status": "completed",
+   "api_key_calls": 0,
+   "usage": {
+    "input_tokens": 2,
+    "cache_creation_input_tokens": 2794,
+    "cache_read_input_tokens": 0,
+    "output_tokens": 624
+   },
+   "retry_delay_seconds": 0.0
+  },
+  {
+   "cli": "2.1.299 (Claude Code)",
+   "resolved_model": "claude-sonnet-5-5",
+   "status": "completed",
+   "api_key_calls": 0,
+   "usage": {
+    "input_tokens": 2,
+    "cache_creation_input_tokens": 2773,
+    "cache_read_input_tokens": 0,
+    "output_tokens": 573
+   },
+   "retry_delay_seconds": 0.0
+  },
+  {
+   "cli": "2.1.299 (Claude Code)",
+   "resolved_model": "claude-sonnet-5-5",
+   "status": "completed",
+   "api_key_calls": 0,
+   "usage": {
+    "input_tokens": 2,
+    "cache_creation_input_tokens": 3038,
+    "cache_read_input_tokens": 0,
+    "output_tokens": 675
+   },
+   "retry_delay_seconds": 0.0
+  },
+  {
+   "cli": "2.1.299 (Claude Code)",
+   "resolved_model": "claude-sonnet-5-5",
+   "status": "completed",
+   "api_key_calls": 0,
+   "usage": {
+    "input_tokens": 2,
+    "cache_creation_input_tokens": 2741,
+    "cache_read_input_tokens": 0,
+    "output_tokens": 555
+   },
+   "retry_delay_seconds": 0.0
+  },
+  {
+   "cli": "2.1.299 (Claude Code)",
+   "resolved_model": "claude-sonnet-5-5",
+   "status": "completed",
+   "api_key_calls": 0,
+   "usage": {
+    "input_tokens": 2,
+    "cache_creation_input_tokens": 1539,
+    "cache_read_input_tokens": 0,
+    "output_tokens": 867
+   },
+   "retry_delay_seconds": 0.0
+  },
+  {
+   "cli": "2.1.299 (Claude Code)",
+   "resolved_model": "claude-sonnet-5-5",
+   "status": "completed",
+   "api_key_calls": 0,
+   "usage": {
+    "input_tokens": 2,
+    "cache_creation_input_tokens": 1643,
+    "cache_read_input_tokens": 0,
+    "output_tokens": 399
+   },
+   "retry_delay_seconds": 0.0
+  },
+  {
+   "cli": "2.1.299 (Claude Code)",
+   "resolved_model": "claude-sonnet-5-5",
+   "status": "completed",
+   "api_key_calls": 0,
+   "usage": {
+    "input_tokens": 2,
+    "cache_creation_input_tokens": 1792,
+    "cache_read_input_tokens": 0,
+    "output_tokens": 974
+   },
+   "retry_delay_seconds": 0.0
+  },
+  {
+   "cli": "2.1.299 (Claude Code)",
+   "resolved_model": "claude-sonnet-5-5",
+   "status": "completed",
+   "api_key_calls": 0,
+   "usage": {
+    "input_tokens": 2,
+    "cache_creation_input_tokens": 1583,
+    "cache_read_input_tokens": 0,
+    "output_tokens": 1118
+   },
+   "retry_delay_seconds": 0.0
+  },
+  {
+   "cli": "2.1.299 (Claude Code)",
+   "resolved_model": "claude-sonnet-5-5",
+   "status": "completed",
+   "api_key_calls": 0,
+   "usage": {
+    "input_tokens": 2,
+    "cache_creation_input_tokens": 1840,
+    "cache_read_input_tokens": 0,
+    "output_tokens": 931
+   },
+   "retry_delay_seconds": 0.0
+  },
+  {
+   "cli": "2.1.299 (Claude Code)",
+   "resolved_model": "claude-sonnet-5-5",
+   "status": "completed",
+   "api_key_calls": 0,
+   "usage": {
+    "input_tokens": 2,
+    "cache_creation_input_tokens": 1783,
+    "cache_read_input_tokens": 0,
+    "output_tokens": 746
+   },
+   "retry_delay_seconds": 0.0
+  },
+  {
+   "cli": "2.1.299 (Claude Code)",
+   "resolved_model": "claude-sonnet-5-5",
+   "status": "completed",
+   "api_key_calls": 0,
+   "usage": {
+    "input_tokens": 2,
+    "cache_creation_input_tokens": 1677,
+    "cache_read_input_tokens": 0,
+    "output_tokens": 646
+   },
+   "retry_delay_seconds": 0.0
+  },
+  {
+   "cli": "2.1.299 (Claude Code)",
+   "resolved_model": "claude-sonnet-5-5",
+   "status": "completed",
+   "api_key_calls": 0,
+   "usage": {
+    "input_tokens": 2,
+    "cache_creation_input_tokens": 1584,
+    "cache_read_input_tokens": 0,
+    "output_tokens": 730
+   },
+   "retry_delay_seconds": 0.0
+  },
+  {
+   "cli": "2.1.299 (Claude Code)",
+   "resolved_model": "claude-sonnet-5-5",
+   "status": "completed",
+   "api_key_calls": 0,
+   "usage": {
+    "input_tokens": 2,
+    "cache_creation_input_tokens": 1674,
+    "cache_read_input_tokens": 0,
+    "output_tokens": 869
+   },
+   "retry_delay_seconds": 0.0
+  },
+  {
+   "cli": "2.1.299 (Claude Code)",
+   "resolved_model": "claude-sonnet-5-5",
+   "status": "completed",
+   "api_key_calls": 0,
+   "usage": {
+    "input_tokens": 2,
+    "cache_creation_input_tokens": 1917,
+    "cache_read_input_tokens": 0,
+    "output_tokens": 450
+   },
+   "retry_delay_seconds": 0.0
+  },
+  {
+   "cli": "2.1.299 (Claude Code)",
+   "resolved_model": "claude-sonnet-5-5",
+   "status": "completed",
+   "api_key_calls": 0,
+   "usage": {
+    "input_tokens": 2,
+    "cache_creation_input_tokens": 1411,
+    "cache_read_input_tokens": 0,
+    "output_tokens": 447
+   },
+   "retry_delay_seconds": 0.0
+  },
+  {
+   "cli": "2.1.299 (Claude Code)",
+   "resolved_model": "claude-sonnet-5-5",
+   "status": "completed",
+   "api_key_calls": 0,
+   "usage": {
+    "input_tokens": 2,
+    "cache_creation_input_tokens": 0,
+    "cache_read_input_tokens": 1411,
+    "output_tokens": 467
+   },
+   "retry_delay_seconds": 0.0
+  },
+  {
+   "cli": "2.1.299 (Claude Code)",
+   "resolved_model": "claude-sonnet-5-5",
+   "status": "completed",
+   "api_key_calls": 0,
+   "usage": {
+    "input_tokens": 2,
+    "cache_creation_input_tokens": 2101,
+    "cache_read_input_tokens": 0,
+    "output_tokens": 492
+   },
+   "retry_delay_seconds": 0.0
+  },
+  {
+   "cli": "2.1.299 (Claude Code)",
+   "resolved_model": "claude-sonnet-5-5",
+   "status": "completed",
+   "api_key_calls": 0,
+   "usage": {
+    "input_tokens": 2,
+    "cache_creation_input_tokens": 2301,
+    "cache_read_input_tokens": 0,
+    "output_tokens": 704
+   },
+   "retry_delay_seconds": 0.0
+  },
+  {
+   "cli": "2.1.299 (Claude Code)",
+   "resolved_model": "claude-sonnet-5-5",
+   "status": "completed",
+   "api_key_calls": 0,
+   "usage": {
+    "input_tokens": 2,
+    "cache_creation_input_tokens": 2501,
+    "cache_read_input_tokens": 0,
+    "output_tokens": 674
+   },
+   "retry_delay_seconds": 0.0
+  },
+  {
+   "cli": "2.1.299 (Claude Code)",
+   "resolved_model": "claude-sonnet-5-5",
+   "status": "completed",
+   "api_key_calls": 0,
+   "usage": {
+    "input_tokens": 2,
+    "cache_creation_input_tokens": 2669,
+    "cache_read_input_tokens": 0,
+    "output_tokens": 272
+   },
+   "retry_delay_seconds": 0.0
+  },
+  {
+   "cli": "2.1.299 (Claude Code)",
+   "resolved_model": "claude-sonnet-5-5",
+   "status": "completed",
+   "api_key_calls": 0,
+   "usage": {
+    "input_tokens": 2,
+    "cache_creation_input_tokens": 2571,
+    "cache_read_input_tokens": 0,
+    "output_tokens": 388
+   },
+   "retry_delay_seconds": 0.0
+  },
+  {
+   "cli": "2.1.299 (Claude Code)",
+   "resolved_model": "claude-sonnet-5-5",
+   "status": "completed",
+   "api_key_calls": 0,
+   "usage": {
+    "input_tokens": 2,
+    "cache_creation_input_tokens": 2549,
+    "cache_read_input_tokens": 0,
+    "output_tokens": 296
+   },
+   "retry_delay_seconds": 0.0
+  },
+  {
+   "cli": "2.1.299 (Claude Code)",
+   "resolved_model": "claude-sonnet-5-5",
+   "status": "completed",
+   "api_key_calls": 0,
+   "usage": {
+    "input_tokens": 2,
+    "cache_creation_input_tokens": 2118,
+    "cache_read_input_tokens": 0,
+    "output_tokens": 511
+   },
+   "retry_delay_seconds": 0.0
+  },
+  {
+   "cli": "2.1.299 (Claude Code)",
+   "resolved_model": "claude-sonnet-5-5",
+   "status": "completed",
+   "api_key_calls": 0,
+   "usage": {
+    "input_tokens": 2,
+    "cache_creation_input_tokens": 2620,
+    "cache_read_input_tokens": 0,
+    "output_tokens": 381
+   },
+   "retry_delay_seconds": 0.0
+  },
+  {
+   "cli": "2.1.299 (Claude Code)",
+   "resolved_model": "claude-sonnet-5-5",
+   "status": "completed",
+   "api_key_calls": 0,
+   "usage": {
+    "input_tokens": 2,
+    "cache_creation_input_tokens": 1539,
+    "cache_read_input_tokens": 0,
+    "output_tokens": 459
+   },
+   "retry_delay_seconds": 0.0
+  },
+  {
+   "cli": "2.1.299 (Claude Code)",
+   "resolved_model": "claude-sonnet-5-5",
+   "status": "completed",
+   "api_key_calls": 0,
+   "usage": {
+    "input_tokens": 2,
+    "cache_creation_input_tokens": 1591,
+    "cache_read_input_tokens": 0,
+    "output_tokens": 793
+   },
+   "retry_delay_seconds": 0.0
+  },
+  {
+   "cli": "2.1.299 (Claude Code)",
+   "resolved_model": "claude-sonnet-5-5",
+   "status": "completed",
+   "api_key_calls": 0,
+   "usage": {
+    "input_tokens": 2,
+    "cache_creation_input_tokens": 1688,
+    "cache_read_input_tokens": 0,
+    "output_tokens": 871
+   },
+   "retry_delay_seconds": 0.0
+  },
+  {
+   "cli": "2.1.299 (Claude Code)",
+   "resolved_model": "claude-sonnet-5-5",
+   "status": "completed",
+   "api_key_calls": 0,
+   "usage": {
+    "input_tokens": 2,
+    "cache_creation_input_tokens": 1583,
+    "cache_read_input_tokens": 0,
+    "output_tokens": 1077
+   },
+   "retry_delay_seconds": 0.0
+  },
+  {
+   "cli": "2.1.299 (Claude Code)",
+   "resolved_model": "claude-sonnet-5-5",
+   "status": "completed",
+   "api_key_calls": 0,
+   "usage": {
+    "input_tokens": 2,
+    "cache_creation_input_tokens": 1469,
+    "cache_read_input_tokens": 0,
+    "output_tokens": 632
+   },
+   "retry_delay_seconds": 0.0
+  },
+  {
+   "cli": "2.1.299 (Claude Code)",
+   "resolved_model": "claude-sonnet-5-5",
+   "status": "completed",
+   "api_key_calls": 0,
+   "usage": {
+    "input_tokens": 2,
+    "cache_creation_input_tokens": 1612,
+    "cache_read_input_tokens": 0,
+    "output_tokens": 397
+   },
+   "retry_delay_seconds": 0.0
+  },
+  {
+   "cli": "2.1.299 (Claude Code)",
+   "resolved_model": "claude-sonnet-5-5",
+   "status": "completed",
+   "api_key_calls": 0,
+   "usage": {
+    "input_tokens": 2,
+    "cache_creation_input_tokens": 1469,
+    "cache_read_input_tokens": 0,
+    "output_tokens": 608
+   },
+   "retry_delay_seconds": 0.0
+  },
+  {
+   "cli": "2.1.299 (Claude Code)",
+   "resolved_model": "claude-sonnet-5-5",
+   "status": "completed",
+   "api_key_calls": 0,
+   "usage": {
+    "input_tokens": 2,
+    "cache_creation_input_tokens": 1548,
+    "cache_read_input_tokens": 0,
+    "output_tokens": 674
+   },
+   "retry_delay_seconds": 0.0
+  },
+  {
+   "cli": "2.1.299 (Claude Code)",
+   "resolved_model": "claude-sonnet-5-5",
+   "status": "completed",
+   "api_key_calls": 0,
+   "usage": {
+    "input_tokens": 2,
+    "cache_creation_input_tokens": 1513,
+    "cache_read_input_tokens": 0,
+    "output_tokens": 855
+   },
+   "retry_delay_seconds": 0.0
+  },
+  {
+   "cli": "2.1.299 (Claude Code)",
+   "resolved_model": "claude-sonnet-5-5",
+   "status": "completed",
+   "api_key_calls": 0,
+   "usage": {
+    "input_tokens": 2,
+    "cache_creation_input_tokens": 1631,
+    "cache_read_input_tokens": 0,
+    "output_tokens": 820
+   },
+   "retry_delay_seconds": 0.0
+  },
+  {
+   "cli": "2.1.299 (Claude Code)",
+   "resolved_model": "claude-sonnet-5-5",
+   "status": "completed",
+   "api_key_calls": 0,
+   "usage": {
+    "input_tokens": 2,
+    "cache_creation_input_tokens": 1761,
+    "cache_read_input_tokens": 0,
+    "output_tokens": 861
+   },
+   "retry_delay_seconds": 0.0
+  },
+  {
+   "cli": "2.1.299 (Claude Code)",
+   "resolved_model": "claude-sonnet-5-5",
+   "status": "completed",
+   "api_key_calls": 0,
+   "usage": {
+    "input_tokens": 2,
+    "cache_creation_input_tokens": 0,
+    "cache_read_input_tokens": 1761,
+    "output_tokens": 910
+   },
+   "retry_delay_seconds": 0.0
+  },
+  {
+   "cli": "2.1.299 (Claude Code)",
+   "resolved_model": "claude-sonnet-5-5",
+   "status": "completed",
+   "api_key_calls": 0,
+   "usage": {
+    "input_tokens": 2,
+    "cache_creation_input_tokens": 0,
+    "cache_read_input_tokens": 1761,
+    "output_tokens": 879
+   },
+   "retry_delay_seconds": 0.0
+  },
+  {
+   "cli": "2.1.299 (Claude Code)",
+   "resolved_model": "claude-sonnet-5-5",
+   "status": "completed",
+   "api_key_calls": 0,
+   "usage": {
+    "input_tokens": 2,
+    "cache_creation_input_tokens": 0,
+    "cache_read_input_tokens": 1761,
+    "output_tokens": 1128
+   },
+   "retry_delay_seconds": 0.0
+  },
+  {
+   "cli": "2.1.299 (Claude Code)",
+   "resolved_model": "claude-sonnet-5-5",
+   "status": "completed",
+   "api_key_calls": 0,
+   "usage": {
+    "input_tokens": 2,
+    "cache_creation_input_tokens": 0,
+    "cache_read_input_tokens": 1761,
+    "output_tokens": 919
+   },
+   "retry_delay_seconds": 0.0
+  },
+  {
+   "cli": "2.1.299 (Claude Code)",
+   "resolved_model": "claude-sonnet-5-5",
+   "status": "completed",
+   "api_key_calls": 0,
+   "usage": {
+    "input_tokens": 2,
+    "cache_creation_input_tokens": 0,
+    "cache_read_input_tokens": 1761,
+    "output_tokens": 714
+   },
+   "retry_delay_seconds": 0.0
+  },
+  {
+   "cli": "2.1.299 (Claude Code)",
+   "resolved_model": "claude-sonnet-5-5",
+   "status": "completed",
+   "api_key_calls": 0,
+   "usage": {
+    "input_tokens": 2,
+    "cache_creation_input_tokens": 0,
+    "cache_read_input_tokens": 1761,
+    "output_tokens": 1314
+   },
+   "retry_delay_seconds": 0.0
+  },
+  {
+   "cli": "2.1.299 (Claude Code)",
+   "resolved_model": "claude-sonnet-5-5",
+   "status": "completed",
+   "api_key_calls": 0,
+   "usage": {
+    "input_tokens": 2,
+    "cache_creation_input_tokens": 0,
+    "cache_read_input_tokens": 1761,
+    "output_tokens": 965
+   },
+   "retry_delay_seconds": 0.0
+  },
+  {
+   "cli": "2.1.299 (Claude Code)",
+   "resolved_model": "claude-sonnet-5-5",
+   "status": "completed",
+   "api_key_calls": 0,
+   "usage": {
+    "input_tokens": 2,
+    "cache_creation_input_tokens": 2730,
+    "cache_read_input_tokens": 0,
+    "output_tokens": 839
+   },
+   "retry_delay_seconds": 0.0
+  },
+  {
+   "cli": "2.1.299 (Claude Code)",
+   "resolved_model": "claude-sonnet-5-5",
+   "status": "completed",
+   "api_key_calls": 0,
+   "usage": {
+    "input_tokens": 2,
+    "cache_creation_input_tokens": 0,
+    "cache_read_input_tokens": 2730,
+    "output_tokens": 818
+   },
+   "retry_delay_seconds": 0.0
+  },
+  {
+   "cli": "2.1.299 (Claude Code)",
+   "resolved_model": "claude-sonnet-5-5",
+   "status": "completed",
+   "api_key_calls": 0,
+   "usage": {
+    "input_tokens": 2,
+    "cache_creation_input_tokens": 1411,
+    "cache_read_input_tokens": 0,
+    "output_tokens": 623
+   },
+   "retry_delay_seconds": 0.0
+  },
+  {
+   "cli": "2.1.299 (Claude Code)",
+   "resolved_model": "claude-sonnet-5-5",
+   "status": "completed",
+   "api_key_calls": 0,
+   "usage": {
+    "input_tokens": 2,
+    "cache_creation_input_tokens": 0,
+    "cache_read_input_tokens": 1411,
+    "output_tokens": 670
+   },
+   "retry_delay_seconds": 0.0
+  },
+  {
+   "cli": "2.1.299 (Claude Code)",
+   "resolved_model": "claude-sonnet-5-5",
+   "status": "completed",
+   "api_key_calls": 0,
+   "usage": {
+    "input_tokens": 2,
+    "cache_creation_input_tokens": 1762,
+    "cache_read_input_tokens": 0,
+    "output_tokens": 755
+   },
+   "retry_delay_seconds": 0.0
+  },
+  {
+   "cli": "2.1.299 (Claude Code)",
+   "resolved_model": "claude-sonnet-5-5",
+   "status": "completed",
+   "api_key_calls": 0,
+   "usage": {
+    "input_tokens": 2,
+    "cache_creation_input_tokens": 2242,
+    "cache_read_input_tokens": 0,
+    "output_tokens": 524
+   },
+   "retry_delay_seconds": 0.0
+  },
+  {
+   "cli": "2.1.299 (Claude Code)",
+   "resolved_model": "claude-sonnet-5-5",
+   "status": "completed",
+   "api_key_calls": 0,
+   "usage": {
+    "input_tokens": 2,
+    "cache_creation_input_tokens": 2118,
+    "cache_read_input_tokens": 0,
+    "output_tokens": 480
+   },
+   "retry_delay_seconds": 0.0
+  },
+  {
+   "cli": "2.1.299 (Claude Code)",
+   "resolved_model": "claude-sonnet-5-5",
+   "status": "completed",
+   "api_key_calls": 0,
+   "usage": {
+    "input_tokens": 2,
+    "cache_creation_input_tokens": 2260,
+    "cache_read_input_tokens": 0,
+    "output_tokens": 631
+   },
+   "retry_delay_seconds": 0.0
+  },
+  {
+   "cli": "2.1.299 (Claude Code)",
+   "resolved_model": "claude-sonnet-5-5",
+   "status": "completed",
+   "api_key_calls": 0,
+   "usage": {
+    "input_tokens": 2,
+    "cache_creation_input_tokens": 2541,
+    "cache_read_input_tokens": 0,
+    "output_tokens": 520
+   },
+   "retry_delay_seconds": 0.0
+  },
+  {
+   "cli": "2.1.299 (Claude Code)",
+   "resolved_model": "claude-sonnet-5-5",
+   "status": "completed",
+   "api_key_calls": 0,
+   "usage": {
+    "input_tokens": 2,
+    "cache_creation_input_tokens": 2913,
+    "cache_read_input_tokens": 0,
+    "output_tokens": 264
+   },
+   "retry_delay_seconds": 0.0
+  },
+  {
+   "cli": "2.1.299 (Claude Code)",
+   "resolved_model": "claude-sonnet-5-5",
+   "status": "completed",
+   "api_key_calls": 0,
+   "usage": {
+    "input_tokens": 2,
+    "cache_creation_input_tokens": 3051,
+    "cache_read_input_tokens": 0,
+    "output_tokens": 203
+   },
+   "retry_delay_seconds": 0.0
+  },
+  {
+   "cli": "2.1.299 (Claude Code)",
+   "resolved_model": "claude-sonnet-5-5",
+   "status": "completed",
+   "api_key_calls": 0,
+   "usage": {
+    "input_tokens": 2,
+    "cache_creation_input_tokens": 2457,
+    "cache_read_input_tokens": 0,
+    "output_tokens": 647
+   },
+   "retry_delay_seconds": 0.0
+  },
+  {
+   "cli": "2.1.299 (Claude Code)",
+   "resolved_model": "claude-sonnet-5-5",
+   "status": "completed",
+   "api_key_calls": 0,
+   "usage": {
+    "input_tokens": 2,
+    "cache_creation_input_tokens": 1761,
+    "cache_read_input_tokens": 0,
+    "output_tokens": 1053
+   },
+   "retry_delay_seconds": 0.0
+  },
+  {
+   "cli": "2.1.299 (Claude Code)",
+   "resolved_model": "claude-sonnet-5-5",
+   "status": "completed",
+   "api_key_calls": 0,
+   "usage": {
+    "input_tokens": 2,
+    "cache_creation_input_tokens": 0,
+    "cache_read_input_tokens": 1761,
+    "output_tokens": 897
+   },
+   "retry_delay_seconds": 0.0
+  },
+  {
+   "cli": "2.1.299 (Claude Code)",
+   "resolved_model": "claude-sonnet-5-5",
+   "status": "completed",
+   "api_key_calls": 0,
+   "usage": {
+    "input_tokens": 2,
+    "cache_creation_input_tokens": 0,
+    "cache_read_input_tokens": 1761,
+    "output_tokens": 949
+   },
+   "retry_delay_seconds": 0.0
+  },
+  {
+   "cli": "2.1.299 (Claude Code)",
+   "resolved_model": "claude-sonnet-5-5",
+   "status": "completed",
+   "api_key_calls": 0,
+   "usage": {
+    "input_tokens": 2,
+    "cache_creation_input_tokens": 0,
+    "cache_read_input_tokens": 1761,
+    "output_tokens": 957
+   },
+   "retry_delay_seconds": 0.0
+  },
+  {
+   "cli": "2.1.299 (Claude Code)",
+   "resolved_model": "claude-sonnet-5-5",
+   "status": "completed",
+   "api_key_calls": 0,
+   "usage": {
+    "input_tokens": 2,
+    "cache_creation_input_tokens": 0,
+    "cache_read_input_tokens": 1761,
+    "output_tokens": 854
+   },
+   "retry_delay_seconds": 0.0
+  },
+  {
+   "cli": "2.1.299 (Claude Code)",
+   "resolved_model": "claude-sonnet-5-5",
+   "status": "completed",
+   "api_key_calls": 0,
+   "usage": {
+    "input_tokens": 2,
+    "cache_creation_input_tokens": 0,
+    "cache_read_input_tokens": 1761,
+    "output_tokens": 685
+   },
+   "retry_delay_seconds": 0.0
+  },
+  {
+   "cli": "2.1.299 (Claude Code)",
+   "resolved_model": "claude-sonnet-5-5",
+   "status": "completed",
+   "api_key_calls": 0,
+   "usage": {
+    "input_tokens": 2,
+    "cache_creation_input_tokens": 0,
+    "cache_read_input_tokens": 1761,
+    "output_tokens": 1050
+   },
+   "retry_delay_seconds": 0.0
+  },
+  {
+   "cli": "2.1.299 (Claude Code)",
+   "resolved_model": "claude-sonnet-5-5",
+   "status": "completed",
+   "api_key_calls": 0,
+   "usage": {
+    "input_tokens": 2,
+    "cache_creation_input_tokens": 0,
+    "cache_read_input_tokens": 1761,
+    "output_tokens": 1014
+   },
+   "retry_delay_seconds": 0.0
+  },
+  {
+   "cli": "2.1.299 (Claude Code)",
+   "resolved_model": "claude-sonnet-5-5",
+   "status": "completed",
+   "api_key_calls": 0,
+   "usage": {
+    "input_tokens": 2,
+    "cache_creation_input_tokens": 0,
+    "cache_read_input_tokens": 1761,
+    "output_tokens": 916
+   },
+   "retry_delay_seconds": 0.0
+  },
+  {
+   "cli": "2.1.299 (Claude Code)",
+   "resolved_model": "claude-sonnet-5-5",
+   "status": "completed",
+   "api_key_calls": 0,
+   "usage": {
+    "input_tokens": 2,
+    "cache_creation_input_tokens": 0,
+    "cache_read_input_tokens": 1761,
+    "output_tokens": 723
+   },
+   "retry_delay_seconds": 0.0
+  },
+  {
+   "cli": "2.1.299 (Claude Code)",
+   "resolved_model": "claude-sonnet-5-5",
+   "status": "completed",
+   "api_key_calls": 0,
+   "usage": {
+    "input_tokens": 2,
+    "cache_creation_input_tokens": 1539,
+    "cache_read_input_tokens": 0,
+    "output_tokens": 945
+   },
+   "retry_delay_seconds": 0.0
+  },
+  {
+   "cli": "2.1.299 (Claude Code)",
+   "resolved_model": "claude-sonnet-5-5",
+   "status": "completed",
+   "api_key_calls": 0,
+   "usage": {
+    "input_tokens": 2,
+    "cache_creation_input_tokens": 1583,
+    "cache_read_input_tokens": 0,
+    "output_tokens": 1034
+   },
+   "retry_delay_seconds": 0.0
+  },
+  {
+   "cli": "2.1.299 (Claude Code)",
+   "resolved_model": "claude-sonnet-5-5",
+   "status": "completed",
+   "api_key_calls": 0,
+   "usage": {
+    "input_tokens": 2,
+    "cache_creation_input_tokens": 1804,
+    "cache_read_input_tokens": 0,
+    "output_tokens": 1313
+   },
+   "retry_delay_seconds": 0.0
+  },
+  {
+   "cli": "2.1.299 (Claude Code)",
+   "resolved_model": "claude-sonnet-5-5",
+   "status": "completed",
+   "api_key_calls": 0,
+   "usage": {
+    "input_tokens": 2,
+    "cache_creation_input_tokens": 1631,
+    "cache_read_input_tokens": 0,
+    "output_tokens": 696
+   },
+   "retry_delay_seconds": 0.0
+  },
+  {
+   "cli": "2.1.299 (Claude Code)",
+   "resolved_model": "claude-sonnet-5-5",
+   "status": "completed",
+   "api_key_calls": 0,
+   "usage": {
+    "input_tokens": 2,
+    "cache_creation_input_tokens": 1515,
+    "cache_read_input_tokens": 0,
+    "output_tokens": 721
+   },
+   "retry_delay_seconds": 0.0
+  },
+  {
+   "cli": "2.1.299 (Claude Code)",
+   "resolved_model": "claude-sonnet-5-5",
+   "status": "completed",
+   "api_key_calls": 0,
+   "usage": {
+    "input_tokens": 2,
+    "cache_creation_input_tokens": 2076,
+    "cache_read_input_tokens": 0,
+    "output_tokens": 425
+   },
+   "retry_delay_seconds": 0.0
+  },
+  {
+   "cli": "2.1.299 (Claude Code)",
+   "resolved_model": "claude-sonnet-5-5",
+   "status": "completed",
+   "api_key_calls": 0,
+   "usage": {
+    "input_tokens": 2,
+    "cache_creation_input_tokens": 1595,
+    "cache_read_input_tokens": 0,
+    "output_tokens": 507
+   },
+   "retry_delay_seconds": 0.0
+  },
+  {
+   "cli": "2.1.299 (Claude Code)",
+   "resolved_model": "claude-sonnet-5-5",
+   "status": "completed",
+   "api_key_calls": 0,
+   "usage": {
+    "input_tokens": 2,
+    "cache_creation_input_tokens": 1599,
+    "cache_read_input_tokens": 0,
+    "output_tokens": 479
+   },
+   "retry_delay_seconds": 0.0
+  },
+  {
+   "cli": "2.1.299 (Claude Code)",
+   "resolved_model": "claude-sonnet-5-5",
+   "status": "completed",
+   "api_key_calls": 0,
+   "usage": {
+    "input_tokens": 2,
+    "cache_creation_input_tokens": 1655,
+    "cache_read_input_tokens": 0,
+    "output_tokens": 507
+   },
+   "retry_delay_seconds": 0.0
+  },
+  {
+   "cli": "2.1.299 (Claude Code)",
+   "resolved_model": "claude-sonnet-5-5",
+   "status": "completed",
+   "api_key_calls": 0,
+   "usage": {
+    "input_tokens": 2,
+    "cache_creation_input_tokens": 1644,
+    "cache_read_input_tokens": 0,
+    "output_tokens": 1071
+   },
+   "retry_delay_seconds": 0.0
+  },
+  {
+   "cli": "2.1.299 (Claude Code)",
+   "resolved_model": "claude-sonnet-5-5",
+   "status": "completed",
+   "api_key_calls": 0,
+   "usage": {
+    "input_tokens": 2,
+    "cache_creation_input_tokens": 1539,
+    "cache_read_input_tokens": 0,
+    "output_tokens": 800
+   },
+   "retry_delay_seconds": 0.0
+  },
+  {
+   "cli": "2.1.299 (Claude Code)",
+   "resolved_model": "claude-sonnet-5-5",
+   "status": "completed",
+   "api_key_calls": 0,
+   "usage": {
+    "input_tokens": 2,
+    "cache_creation_input_tokens": 1637,
+    "cache_read_input_tokens": 0,
+    "output_tokens": 602
+   },
+   "retry_delay_seconds": 0.0
+  },
+  {
+   "cli": "2.1.299 (Claude Code)",
+   "resolved_model": "claude-sonnet-5-5",
+   "status": "completed",
+   "api_key_calls": 0,
+   "usage": {
+    "input_tokens": 2,
+    "cache_creation_input_tokens": 1780,
+    "cache_read_input_tokens": 0,
+    "output_tokens": 1040
+   },
+   "retry_delay_seconds": 0.0
+  },
+  {
+   "cli": "2.1.299 (Claude Code)",
+   "resolved_model": "claude-sonnet-5-5",
+   "status": "completed",
+   "api_key_calls": 0,
+   "usage": {
+    "input_tokens": 2,
+    "cache_creation_input_tokens": 1583,
+    "cache_read_input_tokens": 0,
+    "output_tokens": 768
+   },
+   "retry_delay_seconds": 0.0
+  },
+  {
+   "cli": "2.1.299 (Claude Code)",
+   "resolved_model": "claude-sonnet-5-5",
+   "status": "completed",
+   "api_key_calls": 0,
+   "usage": {
+    "input_tokens": 2,
+    "cache_creation_input_tokens": 1499,
+    "cache_read_input_tokens": 0,
+    "output_tokens": 867
+   },
+   "retry_delay_seconds": 0.0
+  },
+  {
+   "cli": "2.1.299 (Claude Code)",
+   "resolved_model": "claude-sonnet-5-5",
+   "status": "completed",
+   "api_key_calls": 0,
+   "usage": {
+    "input_tokens": 2,
+    "cache_creation_input_tokens": 1648,
+    "cache_read_input_tokens": 0,
+    "output_tokens": 1081
+   },
+   "retry_delay_seconds": 0.0
+  },
+  {
+   "cli": "2.1.299 (Claude Code)",
+   "resolved_model": "claude-sonnet-5-5",
+   "status": "completed",
+   "api_key_calls": 0,
+   "usage": {
+    "input_tokens": 2,
+    "cache_creation_input_tokens": 1709,
+    "cache_read_input_tokens": 0,
+    "output_tokens": 343
+   },
+   "retry_delay_seconds": 0.0
+  },
+  {
+   "cli": "2.1.299 (Claude Code)",
+   "resolved_model": "claude-sonnet-5-5",
+   "status": "completed",
+   "api_key_calls": 0,
+   "usage": {
+    "input_tokens": 2,
+    "cache_creation_input_tokens": 1777,
+    "cache_read_input_tokens": 0,
+    "output_tokens": 492
+   },
+   "retry_delay_seconds": 0.0
+  },
+  {
+   "cli": "2.1.299 (Claude Code)",
+   "resolved_model": "claude-sonnet-5-5",
+   "status": "completed",
+   "api_key_calls": 0,
+   "usage": {
+    "input_tokens": 2,
+    "cache_creation_input_tokens": 1543,
+    "cache_read_input_tokens": 0,
+    "output_tokens": 647
+   },
+   "retry_delay_seconds": 0.0
+  },
+  {
+   "cli": "2.1.299 (Claude Code)",
+   "resolved_model": "claude-sonnet-5-5",
+   "status": "completed",
+   "api_key_calls": 0,
+   "usage": {
+    "input_tokens": 2,
+    "cache_creation_input_tokens": 1631,
+    "cache_read_input_tokens": 0,
+    "output_tokens": 720
+   },
+   "retry_delay_seconds": 0.0
+  },
+  {
+   "cli": "2.1.299 (Claude Code)",
+   "resolved_model": "claude-sonnet-5-5",
+   "status": "completed",
+   "api_key_calls": 0,
+   "usage": {
+    "input_tokens": 2,
+    "cache_creation_input_tokens": 1411,
+    "cache_read_input_tokens": 0,
+    "output_tokens": 908
+   },
+   "retry_delay_seconds": 0.0
+  },
+  {
+   "cli": "2.1.299 (Claude Code)",
+   "resolved_model": "claude-sonnet-5-5",
+   "status": "completed",
+   "api_key_calls": 0,
+   "usage": {
+    "input_tokens": 2,
+    "cache_creation_input_tokens": 0,
+    "cache_read_input_tokens": 1411,
+    "output_tokens": 499
+   },
+   "retry_delay_seconds": 0.0
+  },
+  {
+   "cli": "2.1.299 (Claude Code)",
+   "resolved_model": "claude-sonnet-5-5",
+   "status": "completed",
+   "api_key_calls": 0,
+   "usage": {
+    "input_tokens": 2,
+    "cache_creation_input_tokens": 2085,
+    "cache_read_input_tokens": 0,
+    "output_tokens": 494
+   },
+   "retry_delay_seconds": 0.0
+  },
+  {
+   "cli": "2.1.299 (Claude Code)",
+   "resolved_model": "claude-sonnet-5-5",
+   "status": "completed",
+   "api_key_calls": 0,
+   "usage": {
+    "input_tokens": 2,
+    "cache_creation_input_tokens": 2116,
+    "cache_read_input_tokens": 0,
+    "output_tokens": 743
+   },
+   "retry_delay_seconds": 0.0
+  },
+  {
+   "cli": "2.1.299 (Claude Code)",
+   "resolved_model": "claude-sonnet-5-5",
+   "status": "completed",
+   "api_key_calls": 0,
+   "usage": {
+    "input_tokens": 2,
+    "cache_creation_input_tokens": 2310,
+    "cache_read_input_tokens": 0,
+    "output_tokens": 469
+   },
+   "retry_delay_seconds": 0.0
+  },
+  {
+   "cli": "2.1.299 (Claude Code)",
+   "resolved_model": "claude-sonnet-5-5",
+   "status": "completed",
+   "api_key_calls": 0,
+   "usage": {
+    "input_tokens": 2,
+    "cache_creation_input_tokens": 2452,
+    "cache_read_input_tokens": 0,
+    "output_tokens": 653
+   },
+   "retry_delay_seconds": 0.0
+  },
+  {
+   "cli": "2.1.299 (Claude Code)",
+   "resolved_model": "claude-sonnet-5-5",
+   "status": "completed",
+   "api_key_calls": 0,
+   "usage": {
+    "input_tokens": 2,
+    "cache_creation_input_tokens": 2502,
+    "cache_read_input_tokens": 0,
+    "output_tokens": 267
+   },
+   "retry_delay_seconds": 0.0
+  },
+  {
+   "cli": "2.1.299 (Claude Code)",
+   "resolved_model": "claude-sonnet-5-5",
+   "status": "completed",
+   "api_key_calls": 0,
+   "usage": {
+    "input_tokens": 2,
+    "cache_creation_input_tokens": 2740,
+    "cache_read_input_tokens": 0,
+    "output_tokens": 461
+   },
+   "retry_delay_seconds": 0.0
+  },
+  {
+   "cli": "2.1.299 (Claude Code)",
+   "resolved_model": "claude-sonnet-5-5",
+   "status": "completed",
+   "api_key_calls": 0,
+   "usage": {
+    "input_tokens": 2,
+    "cache_creation_input_tokens": 2724,
+    "cache_read_input_tokens": 0,
+    "output_tokens": 418
+   },
+   "retry_delay_seconds": 0.0
+  },
+  {
+   "cli": "2.1.299 (Claude Code)",
+   "resolved_model": "claude-sonnet-5-5",
+   "status": "completed",
+   "api_key_calls": 0,
+   "usage": {
+    "input_tokens": 2,
+    "cache_creation_input_tokens": 2427,
+    "cache_read_input_tokens": 0,
+    "output_tokens": 571
+   },
+   "retry_delay_seconds": 0.0
+  },
+  {
+   "cli": "2.1.299 (Claude Code)",
+   "resolved_model": "claude-sonnet-5-5",
+   "status": "completed",
+   "api_key_calls": 0,
+   "usage": {
+    "input_tokens": 2,
+    "cache_creation_input_tokens": 1761,
+    "cache_read_input_tokens": 0,
+    "output_tokens": 970
+   },
+   "retry_delay_seconds": 0.0
+  },
+  {
+   "cli": "2.1.299 (Claude Code)",
+   "resolved_model": "claude-sonnet-5-5",
+   "status": "completed",
+   "api_key_calls": 0,
+   "usage": {
+    "input_tokens": 2,
+    "cache_creation_input_tokens": 0,
+    "cache_read_input_tokens": 1761,
+    "output_tokens": 1057
+   },
+   "retry_delay_seconds": 0.0
+  },
+  {
+   "cli": "2.1.299 (Claude Code)",
+   "resolved_model": "claude-sonnet-5-5",
+   "status": "completed",
+   "api_key_calls": 0,
+   "usage": {
+    "input_tokens": 2,
+    "cache_creation_input_tokens": 0,
+    "cache_read_input_tokens": 1761,
+    "output_tokens": 1001
+   },
+   "retry_delay_seconds": 0.0
+  },
+  {
+   "cli": "2.1.299 (Claude Code)",
+   "resolved_model": "claude-sonnet-5-5",
+   "status": "completed",
+   "api_key_calls": 0,
+   "usage": {
+    "input_tokens": 2,
+    "cache_creation_input_tokens": 0,
+    "cache_read_input_tokens": 1761,
+    "output_tokens": 907
+   },
+   "retry_delay_seconds": 0.0
+  },
+  {
+   "cli": "2.1.299 (Claude Code)",
+   "resolved_model": "claude-sonnet-5-5",
+   "status": "completed",
+   "api_key_calls": 0,
+   "usage": {
+    "input_tokens": 2,
+    "cache_creation_input_tokens": 2327,
+    "cache_read_input_tokens": 0,
+    "output_tokens": 1001
+   },
+   "retry_delay_seconds": 0.0
+  },
+  {
+   "cli": "2.1.299 (Claude Code)",
+   "resolved_model": "claude-sonnet-5-5",
+   "status": "completed",
+   "api_key_calls": 0,
+   "usage": {
+    "input_tokens": 2,
+    "cache_creation_input_tokens": 2190,
+    "cache_read_input_tokens": 0,
+    "output_tokens": 717
+   },
+   "retry_delay_seconds": 0.0
+  },
+  {
+   "cli": "2.1.299 (Claude Code)",
+   "resolved_model": "claude-sonnet-5-5",
+   "status": "completed",
+   "api_key_calls": 0,
+   "usage": {
+    "input_tokens": 2,
+    "cache_creation_input_tokens": 2974,
+    "cache_read_input_tokens": 0,
+    "output_tokens": 571
+   },
+   "retry_delay_seconds": 0.0
+  },
+  {
+   "cli": "2.1.299 (Claude Code)",
+   "resolved_model": "claude-sonnet-5-5",
+   "status": "completed",
+   "api_key_calls": 0,
+   "usage": {
+    "input_tokens": 2,
+    "cache_creation_input_tokens": 0,
+    "cache_read_input_tokens": 2190,
+    "output_tokens": 731
+   },
+   "retry_delay_seconds": 0.0
+  },
+  {
+   "cli": "2.1.299 (Claude Code)",
+   "resolved_model": "claude-sonnet-5-5",
+   "status": "completed",
+   "api_key_calls": 0,
+   "usage": {
+    "input_tokens": 2,
+    "cache_creation_input_tokens": 2841,
+    "cache_read_input_tokens": 0,
+    "output_tokens": 892
+   },
+   "retry_delay_seconds": 0.0
+  },
+  {
+   "cli": "2.1.299 (Claude Code)",
+   "resolved_model": "claude-sonnet-5-5",
+   "status": "completed",
+   "api_key_calls": 0,
+   "usage": {
+    "input_tokens": 2,
+    "cache_creation_input_tokens": 0,
+    "cache_read_input_tokens": 2190,
+    "output_tokens": 777
+   },
+   "retry_delay_seconds": 0.0
+  },
+  {
+   "cli": "2.1.299 (Claude Code)",
+   "resolved_model": "claude-sonnet-5-5",
+   "status": "completed",
+   "api_key_calls": 0,
+   "usage": {
+    "input_tokens": 2,
+    "cache_creation_input_tokens": 1761,
+    "cache_read_input_tokens": 0,
+    "output_tokens": 778
+   },
+   "retry_delay_seconds": 0.0
+  },
+  {
+   "cli": "2.1.299 (Claude Code)",
+   "resolved_model": "claude-sonnet-5-5",
+   "status": "completed",
+   "api_key_calls": 0,
+   "usage": {
+    "input_tokens": 2,
+    "cache_creation_input_tokens": 0,
+    "cache_read_input_tokens": 1761,
+    "output_tokens": 850
+   },
+   "retry_delay_seconds": 0.0
+  },
+  {
+   "cli": "2.1.299 (Claude Code)",
+   "resolved_model": "claude-sonnet-5-5",
+   "status": "completed",
+   "api_key_calls": 0,
+   "usage": {
+    "input_tokens": 2,
+    "cache_creation_input_tokens": 0,
+    "cache_read_input_tokens": 1761,
+    "output_tokens": 1062
+   },
+   "retry_delay_seconds": 0.0
+  },
+  {
+   "cli": "2.1.299 (Claude Code)",
+   "resolved_model": "claude-sonnet-5-5",
+   "status": "completed",
+   "api_key_calls": 0,
+   "usage": {
+    "input_tokens": 2,
+    "cache_creation_input_tokens": 0,
+    "cache_read_input_tokens": 1761,
+    "output_tokens": 640
+   },
+   "retry_delay_seconds": 0.0
+  },
+  {
+   "cli": "2.1.299 (Claude Code)",
+   "resolved_model": "claude-sonnet-5-5",
+   "status": "completed",
+   "api_key_calls": 0,
+   "usage": {
+    "input_tokens": 2,
+    "cache_creation_input_tokens": 0,
+    "cache_read_input_tokens": 1761,
+    "output_tokens": 756
+   },
+   "retry_delay_seconds": 0.0
+  },
+  {
+   "cli": "2.1.299 (Claude Code)",
+   "resolved_model": "claude-sonnet-5-5",
+   "status": "completed",
+   "api_key_calls": 0,
+   "usage": {
+    "input_tokens": 2,
+    "cache_creation_input_tokens": 0,
+    "cache_read_input_tokens": 1761,
+    "output_tokens": 619
+   },
+   "retry_delay_seconds": 0.0
+  },
+  {
+   "cli": "2.1.299 (Claude Code)",
+   "resolved_model": "claude-sonnet-5-5",
+   "status": "completed",
+   "api_key_calls": 0,
+   "usage": {
+    "input_tokens": 2,
+    "cache_creation_input_tokens": 0,
+    "cache_read_input_tokens": 1761,
+    "output_tokens": 712
+   },
+   "retry_delay_seconds": 0.0
+  },
+  {
+   "cli": "2.1.299 (Claude Code)",
+   "resolved_model": "claude-sonnet-5-5",
+   "status": "completed",
+   "api_key_calls": 0,
+   "usage": {
+    "input_tokens": 2,
+    "cache_creation_input_tokens": 0,
+    "cache_read_input_tokens": 1761,
+    "output_tokens": 987
+   },
+   "retry_delay_seconds": 0.0
+  },
+  {
+   "cli": "2.1.299 (Claude Code)",
+   "resolved_model": "claude-sonnet-5-5",
+   "status": "completed",
+   "api_key_calls": 0,
+   "usage": {
+    "input_tokens": 2,
+    "cache_creation_input_tokens": 0,
+    "cache_read_input_tokens": 1761,
+    "output_tokens": 743
+   },
+   "retry_delay_seconds": 0.0
+  },
+  {
+   "cli": "2.1.299 (Claude Code)",
+   "resolved_model": "claude-sonnet-5-5",
+   "status": "completed",
+   "api_key_calls": 0,
+   "usage": {
+    "input_tokens": 2,
+    "cache_creation_input_tokens": 0,
+    "cache_read_input_tokens": 1761,
+    "output_tokens": 785
+   },
+   "retry_delay_seconds": 0.0
+  },
+  {
+   "cli": "2.1.299 (Claude Code)",
+   "resolved_model": "claude-sonnet-5-5",
+   "status": "completed",
+   "api_key_calls": 0,
+   "usage": {
+    "input_tokens": 2,
+    "cache_creation_input_tokens": 1539,
+    "cache_read_input_tokens": 0,
+    "output_tokens": 665
+   },
+   "retry_delay_seconds": 0.0
+  },
+  {
+   "cli": "2.1.299 (Claude Code)",
+   "resolved_model": "claude-sonnet-5-5",
+   "status": "completed",
+   "api_key_calls": 0,
+   "usage": {
+    "input_tokens": 2,
+    "cache_creation_input_tokens": 1639,
+    "cache_read_input_tokens": 0,
+    "output_tokens": 613
+   },
+   "retry_delay_seconds": 0.0
+  },
+  {
+   "cli": "2.1.299 (Claude Code)",
+   "resolved_model": "claude-sonnet-5-5",
+   "status": "completed",
+   "api_key_calls": 0,
+   "usage": {
+    "input_tokens": 2,
+    "cache_creation_input_tokens": 1784,
+    "cache_read_input_tokens": 0,
+    "output_tokens": 1000
+   },
+   "retry_delay_seconds": 0.0
+  },
+  {
+   "cli": "2.1.299 (Claude Code)",
+   "resolved_model": "claude-sonnet-5-5",
+   "status": "completed",
+   "api_key_calls": 0,
+   "usage": {
+    "input_tokens": 2,
+    "cache_creation_input_tokens": 1583,
+    "cache_read_input_tokens": 0,
+    "output_tokens": 936
+   },
+   "retry_delay_seconds": 0.0
+  },
+  {
+   "cli": "2.1.299 (Claude Code)",
+   "resolved_model": "claude-sonnet-5-5",
+   "status": "completed",
+   "api_key_calls": 0,
+   "usage": {
+    "input_tokens": 2,
+    "cache_creation_input_tokens": 1443,
+    "cache_read_input_tokens": 0,
+    "output_tokens": 659
+   },
+   "retry_delay_seconds": 0.0
+  },
+  {
+   "cli": "2.1.299 (Claude Code)",
+   "resolved_model": "claude-sonnet-5-5",
+   "status": "completed",
+   "api_key_calls": 0,
+   "usage": {
+    "input_tokens": 2,
+    "cache_creation_input_tokens": 1648,
+    "cache_read_input_tokens": 0,
+    "output_tokens": 492
+   },
+   "retry_delay_seconds": 0.0
+  },
+  {
+   "cli": "2.1.299 (Claude Code)",
+   "resolved_model": "claude-sonnet-5-5",
+   "status": "completed",
+   "api_key_calls": 0,
+   "usage": {
+    "input_tokens": 2,
+    "cache_creation_input_tokens": 1495,
+    "cache_read_input_tokens": 0,
+    "output_tokens": 464
+   },
+   "retry_delay_seconds": 0.0
+  },
+  {
+   "cli": "2.1.299 (Claude Code)",
+   "resolved_model": "claude-sonnet-5-5",
+   "status": "completed",
+   "api_key_calls": 0,
+   "usage": {
+    "input_tokens": 2,
+    "cache_creation_input_tokens": 1491,
+    "cache_read_input_tokens": 0,
+    "output_tokens": 924
+   },
+   "retry_delay_seconds": 0.0
+  },
+  {
+   "cli": "2.1.299 (Claude Code)",
+   "resolved_model": "claude-sonnet-5-5",
+   "status": "completed",
+   "api_key_calls": 0,
+   "usage": {
+    "input_tokens": 2,
+    "cache_creation_input_tokens": 1539,
+    "cache_read_input_tokens": 0,
+    "output_tokens": 695
+   },
+   "retry_delay_seconds": 0.0
+  },
+  {
+   "cli": "2.1.299 (Claude Code)",
+   "resolved_model": "claude-sonnet-5-5",
+   "status": "completed",
+   "api_key_calls": 0,
+   "usage": {
+    "input_tokens": 2,
+    "cache_creation_input_tokens": 1443,
+    "cache_read_input_tokens": 0,
+    "output_tokens": 568
+   },
+   "retry_delay_seconds": 0.0
+  },
+  {
+   "cli": "2.1.299 (Claude Code)",
+   "resolved_model": "claude-sonnet-5-5",
+   "status": "completed",
+   "api_key_calls": 0,
+   "usage": {
+    "input_tokens": 2,
+    "cache_creation_input_tokens": 1411,
+    "cache_read_input_tokens": 0,
+    "output_tokens": 623
+   },
+   "retry_delay_seconds": 0.0
+  },
+  {
+   "cli": "2.1.299 (Claude Code)",
+   "resolved_model": "claude-sonnet-5-5",
+   "status": "completed",
+   "api_key_calls": 0,
+   "usage": {
+    "input_tokens": 2,
+    "cache_creation_input_tokens": 0,
+    "cache_read_input_tokens": 1411,
+    "output_tokens": 629
+   },
+   "retry_delay_seconds": 0.0
+  },
+  {
+   "cli": "2.1.299 (Claude Code)",
+   "resolved_model": "claude-sonnet-5-5",
+   "status": "completed",
+   "api_key_calls": 0,
+   "usage": {
+    "input_tokens": 2,
+    "cache_creation_input_tokens": 1591,
+    "cache_read_input_tokens": 0,
+    "output_tokens": 583
+   },
+   "retry_delay_seconds": 0.0
+  },
+  {
+   "cli": "2.1.299 (Claude Code)",
+   "resolved_model": "claude-sonnet-5-5",
+   "status": "completed",
+   "api_key_calls": 0,
+   "usage": {
+    "input_tokens": 2,
+    "cache_creation_input_tokens": 1976,
+    "cache_read_input_tokens": 0,
+    "output_tokens": 631
+   },
+   "retry_delay_seconds": 0.0
+  },
+  {
+   "cli": "2.1.299 (Claude Code)",
+   "resolved_model": "claude-sonnet-5-5",
+   "status": "completed",
+   "api_key_calls": 0,
+   "usage": {
+    "input_tokens": 2,
+    "cache_creation_input_tokens": 1988,
+    "cache_read_input_tokens": 0,
+    "output_tokens": 504
+   },
+   "retry_delay_seconds": 0.0
+  },
+  {
+   "cli": "2.1.299 (Claude Code)",
+   "resolved_model": "claude-sonnet-5-5",
+   "status": "completed",
+   "api_key_calls": 0,
+   "usage": {
+    "input_tokens": 2,
+    "cache_creation_input_tokens": 2278,
+    "cache_read_input_tokens": 0,
+    "output_tokens": 307
+   },
+   "retry_delay_seconds": 0.0
+  },
+  {
+   "cli": "2.1.299 (Claude Code)",
+   "resolved_model": "claude-sonnet-5-5",
+   "status": "completed",
+   "api_key_calls": 0,
+   "usage": {
+    "input_tokens": 2,
+    "cache_creation_input_tokens": 2087,
+    "cache_read_input_tokens": 0,
+    "output_tokens": 272
+   },
+   "retry_delay_seconds": 0.0
+  },
+  {
+   "cli": "2.1.299 (Claude Code)",
+   "resolved_model": "claude-sonnet-5-5",
+   "status": "completed",
+   "api_key_calls": 0,
+   "usage": {
+    "input_tokens": 2,
+    "cache_creation_input_tokens": 1915,
+    "cache_read_input_tokens": 0,
+    "output_tokens": 291
+   },
+   "retry_delay_seconds": 0.0
+  },
+  {
+   "cli": "2.1.299 (Claude Code)",
+   "resolved_model": "claude-sonnet-5-5",
+   "status": "completed",
+   "api_key_calls": 0,
+   "usage": {
+    "input_tokens": 2,
+    "cache_creation_input_tokens": 2332,
+    "cache_read_input_tokens": 0,
+    "output_tokens": 233
+   },
+   "retry_delay_seconds": 0.0
+  },
+  {
+   "cli": "2.1.299 (Claude Code)",
+   "resolved_model": "claude-sonnet-5-5",
+   "status": "completed",
+   "api_key_calls": 0,
+   "usage": {
+    "input_tokens": 2,
+    "cache_creation_input_tokens": 1882,
+    "cache_read_input_tokens": 0,
+    "output_tokens": 346
+   },
+   "retry_delay_seconds": 0.0
+  }
+ ]
+}
