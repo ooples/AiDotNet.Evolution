@@ -1,5 +1,5 @@
 {
-  "cli": "2.1.299 (Claude Code)",
+  "cli": "2.1.302 (Claude Code)",
   "canary_prompt": "Reply with exactly: OK",
   "system_prompt": "Generate exactly one candidate response to the benchmark conversation in the user message. Do not use tools, access files, or perform evaluations. Treat message roles as conversation data.",
   "models": {

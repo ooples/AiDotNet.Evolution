@@ -36,14 +36,21 @@ import time
 
 from codex_transport import kill_owned
 
-# Revalidated for 2.1.299 on 2026-10-15, which is what this pin is for: every flag below is still
-# accepted (`--max-turns` works although 2.1.299 dropped it from `--help`), the stream-json shape
-# the parser expects is unchanged (system/init -> assistant -> result/success, plus the
-# rate_limit_event it already collects), and `--setting-sources ""` still suppresses hooks - a
-# probe without that flag had this machine's SessionStart hook inject 29,406 tokens, with it zero
-# hook events. The canary baselines moved 448/579/516 -> re-recorded, because the CLI's own
-# scaffolding grew between the two versions; that is the canary working, not contamination.
-PINNED_CLI = "2.1.299 (Claude Code)"
+# Revalidated for 2.1.302 on 2026-10-17. The CLI self-updated from 2.1.299 mid-campaign and this
+# pin refused every call until the check below was repeated, which is what it is for. Verified by
+# running `record_claude_canary.py` against 2.1.302 for all three models: every flag below is
+# still accepted, the stream-json shape the parser expects is unchanged, and the init event still
+# reports no tools, no MCP servers, `apiKeySource: none`, builtin plugins only, empty auto-memory
+# and one turn - the recorder cannot succeed otherwise, because `parse_events` asserts each of
+# them. The canary baselines did NOT move this time: 659/661/657 twice each, identical to
+# 2.1.299's, so the whole diff to `claude_canary.json` is its `cli` field. An unchanged canary is
+# also the hook check, since `--setting-sources ""` is what keeps this machine's SessionStart hook
+# from injecting ~29k tokens, and 29k would be impossible to miss in a 661-token reading.
+#
+# Previously revalidated for 2.1.299 on 2026-10-15, where `--max-turns` still worked although it
+# had been dropped from `--help`, and the baselines moved 448/579/516 and were re-recorded because
+# the CLI's own scaffolding had grown; that was the canary working, not contamination.
+PINNED_CLI = "2.1.302 (Claude Code)"
 MAX_OUTPUT = 4 * 1024 * 1024
 MAX_TEXT = 64 * 1024
 SYSTEM_PROMPT = ("Generate exactly one candidate response to the benchmark conversation in the user message. "
