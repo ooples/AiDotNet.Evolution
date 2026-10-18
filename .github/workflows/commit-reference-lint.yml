@@ -1,0 +1,55 @@
+name: Lint Commit Issue References
+
+# release-please renders every issue reference it captures from a commit body under the word
+# "closes", whatever action word was actually written. That published "closes #122" - the decisive
+# v1 gate campaign - for a metering fix in 0.6.0. This check fails a pull request whose commits
+# would do that again. Mark it "required" in branch protection for it to block merges.
+
+on:
+  pull_request:
+    types: [opened, reopened, synchronize]
+  # Required checks must report on merge-queue entries too.
+  merge_group:
+    types: [checks_requested]
+
+concurrency:
+  group: commit-reference-lint-${{ github.event.pull_request.number || github.event.merge_group.head_sha }}
+  cancel-in-progress: true
+
+permissions:
+  contents: read
+
+jobs:
+  lint-references:
+    name: Validate commit issue references
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@08c6903cd8c0fde910a37f88322edcfb5dd907a8 # v5.0.0
+        with:
+          # The check reads the commit range, so the full history has to be present.
+          fetch-depth: 0
+      - uses: actions/setup-node@2028fbc5c25fe9cf00d9f06a71cc4710d4507903 # v5.0.0
+        with:
+          node-version: '22'
+      - name: Install the pinned release-please
+        shell: bash
+        run: |
+          set -euo pipefail
+          # The parser is the authority on which references get published, so the check uses
+          # release-please's own rather than a regex that only looks equivalent. Pinned to the
+          # version eng/Test-StableReleasePolicy.cjs already asserts.
+          mkdir -p "${RUNNER_TEMP}/rp-tools"
+          cd "${RUNNER_TEMP}/rp-tools"
+          npm install --silent --no-audit --no-fund release-please@17.6.0
+      - name: Self-test the rule
+        shell: bash
+        # A rule nobody has seen reject anything is not a rule; the self-test refuses to pass
+        # unless some of its cases reject.
+        run: node eng/Test-CommitIssueReferences.cjs "${RUNNER_TEMP}/rp-tools" --self-test
+      - name: Check this pull request's commits
+        if: github.event_name == 'pull_request'
+        shell: bash
+        env:
+          BASE_SHA: ${{ github.event.pull_request.base.sha }}
+          HEAD_SHA: ${{ github.event.pull_request.head.sha }}
+        run: node eng/Test-CommitIssueReferences.cjs "${RUNNER_TEMP}/rp-tools" "$BASE_SHA" "$HEAD_SHA"
