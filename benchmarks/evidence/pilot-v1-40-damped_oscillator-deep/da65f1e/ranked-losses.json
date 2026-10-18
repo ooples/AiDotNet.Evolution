@@ -1,0 +1,90 @@
+{
+ "Schema": "evolution-pilot-losses-v1",
+ "RegistrationSha256": "f473049885c730d8844359d869e46885a1df35f22e0d2c43311d731c49c5a736",
+ "Endpoints": [
+  {
+   "Family": "damped_oscillator",
+   "Config": "matched",
+   "Metric": "nmse",
+   "Direction": "minimize",
+   "ComparablePairs": 6,
+   "IncomparablePairs": 0,
+   "LostCells": 5,
+   "WorstMargin": 0.1110091864362941,
+   "Losses": [
+    {
+     "Seed": 1938674331,
+     "Ours": 1.1505312876073344,
+     "Theirs": 1.0395221011710403,
+     "Margin": 0.1110091864362941
+    },
+    {
+     "Seed": 4116047096,
+     "Ours": 1.0915131455265168,
+     "Theirs": 1.060463645537652,
+     "Margin": 0.03104949998886486
+    },
+    {
+     "Seed": 3948730438,
+     "Ours": 1.0132194484698958,
+     "Theirs": 1.0027752509739363,
+     "Margin": 0.010444197495959484
+    },
+    {
+     "Seed": 4008204524,
+     "Ours": 1.0555352178033988,
+     "Theirs": 1.0451467848745717,
+     "Margin": 0.010388432928827074
+    },
+    {
+     "Seed": 1414516046,
+     "Ours": 1.008361042658251,
+     "Theirs": 1.0027752509739363,
+     "Margin": 0.005585791684314723
+    }
+   ]
+  },
+  {
+   "Family": "damped_oscillator",
+   "Config": "recommended",
+   "Metric": "nmse",
+   "Direction": "minimize",
+   "ComparablePairs": 6,
+   "IncomparablePairs": 0,
+   "LostCells": 5,
+   "WorstMargin": 0.05275996682946249,
+   "Losses": [
+    {
+     "Seed": 4008204524,
+     "Ours": 1.0555352178033988,
+     "Theirs": 1.0027752509739363,
+     "Margin": 0.05275996682946249
+    },
+    {
+     "Seed": 1938674331,
+     "Ours": 1.1505312876073344,
+     "Theirs": 1.1117234728921608,
+     "Margin": 0.03880781471517358
+    },
+    {
+     "Seed": 3948730438,
+     "Ours": 1.0132194484698958,
+     "Theirs": 1.0027752509739363,
+     "Margin": 0.010444197495959484
+    },
+    {
+     "Seed": 1414516046,
+     "Ours": 1.008361042658251,
+     "Theirs": 1.0027752509739363,
+     "Margin": 0.005585791684314723
+    },
+    {
+     "Seed": 1163459673,
+     "Ours": 1.0027752509739363,
+     "Theirs": 0.9979935893428385,
+     "Margin": 0.004781661631097722
+    }
+   ]
+  }
+ ]
+}

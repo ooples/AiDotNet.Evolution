@@ -1,0 +1,41 @@
+{
+ "Schema": "evolution-power-analysis-v1",
+ "RegistrationSha256": "f473049885c730d8844359d869e46885a1df35f22e0d2c43311d731c49c5a736",
+ "TargetHalfWidth": 0.1,
+ "Confidence": 0.95,
+ "Endpoints": [
+  {
+   "Family": "damped_oscillator",
+   "Config": "recommended",
+   "PilotN": 6,
+   "MeanDifference": -0.008893548379198405,
+   "StandardDeviation": 0.03862998078921453,
+   "Variance": 0.0014922754157750836,
+   "ObservedHalfWidth": 0.026568397603466666,
+   "TargetHalfWidth": 0.1,
+   "ScaledRequiredN": 2,
+   "NormalRequiredN": 2,
+   "RequiredN": 2,
+   "Agreement": 1.0,
+   "Degenerate": false,
+   "PilotAlreadyMeetsTarget": true
+  },
+  {
+   "Family": "damped_oscillator",
+   "Config": "matched",
+   "PilotN": 6,
+   "MeanDifference": -0.02807951808904337,
+   "StandardDeviation": 0.04196321430710674,
+   "Variance": 0.001760911354984168,
+   "ObservedHalfWidth": 0.029003922509789413,
+   "TargetHalfWidth": 0.1,
+   "ScaledRequiredN": 2,
+   "NormalRequiredN": 2,
+   "RequiredN": 2,
+   "Agreement": 1.0,
+   "Degenerate": false,
+   "PilotAlreadyMeetsTarget": true
+  }
+ ],
+ "RequiredN": 2
+}
