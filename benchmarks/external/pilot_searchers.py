@@ -52,17 +52,23 @@ def _spend(broker):
 
 
 def _usage(summary):
-    """What the CLI says it spent, over every source it reports from, or None if it said nothing."""
+    """What the CLI says it spent, over every source it reports from, or None if it said nothing.
+
+    Three numbers, not two: `ChatCalls` counts requests the engine SENT, and a request the provider
+    refused is one of them. Only `ChatCalls - ProviderErrors` were served, and the broker counts
+    what it served - so comparing the two without the refusals compares different quantities.
+    """
     usage = summary.get("ModelUsage") or {}
     calls, tokens = usage.get("ChatCalls"), usage.get("TotalTokens")
     if calls is None or tokens is None:
         return None
+    refused = int(usage.get("ProviderErrors") or 0)
     meta = summary.get("MetaPrompt")
     if meta:
         # Documented in RunCommand: instruction evolution calls the model on its own cadence and
         # those calls are not the variation operator's, so ModelUsage does not include them.
         calls += meta.get("ProposalCalls", 0)
-    return int(calls), int(tokens)
+    return int(calls), int(tokens), refused
 
 
 def _refuse_if_closed(accounting):
@@ -160,10 +166,22 @@ def ours(cli, task_directory, python_executable, *, iterations, session, timeout
             raise SearchFailed("the CLI printed no run summary: " + str(error), accounting) from error
         reported = _usage(summary)
         if reported is not None:
-            accounting["reported_model_calls"], accounting["reported_model_tokens"] = reported
-            if reported[0] > accounting["model_calls"]:
-                raise SearchFailed("the CLI reported %d calls but the broker admitted %d"
-                                   % (reported[0], accounting["model_calls"]), accounting)
+            sent, tokens, refused = reported
+            accounting["reported_model_calls"], accounting["reported_model_tokens"] = sent, tokens
+            accounting["reported_provider_errors"] = refused
+            # The cross-check that matters is SERVED against admitted: a refused request is the
+            # broker's ceiling working, not spend nobody metered. Comparing sent against admitted
+            # failed 2 of our 6 cells in the damped_oscillator pilot at 13 sent / 3 refused / 10
+            # admitted - a cell penalised for retrying an unusable answer, on exactly the tasks
+            # where answers are unusable.
+            if sent - refused > accounting["model_calls"]:
+                raise SearchFailed(
+                    "the CLI served %d calls (%d sent, %d refused) but the broker admitted %d"
+                    % (sent - refused, sent, refused, accounting["model_calls"]), accounting)
+            # The other direction is deliberately NOT checked. `ModelUsage` is the variation
+            # operator's usage alone - an llmFeedback judge's calls go through the same broker and
+            # are not in it - so the broker legitimately serves more than the engine reports here.
+            # A reverse check failed the existing cross-check test, which is what caught it.
         best = output / "best.py"
         if not best.exists():
             raise SearchFailed("the run produced no best program at " + str(best), accounting)
