@@ -1,0 +1,104 @@
+{
+ "story": "V1-07 (#116)",
+ "task": "rational_gain",
+ "stub": false,
+ "registration_sha256": "fe1fb5efa16f94a4270d8c800704ca3b1c25df22aa4a39f23d47ec6c34c0a644",
+ "projection_sha256": "8f8c6c839007930bbd8624865f3aded3d0afd432e3dbffceebfdbc49de3954b2",
+ "holdout_partition_sha256": "d857373eebc0df7929dc3054fb76be8f55ff6ee1f0466700a804f0305b9b6dcd",
+ "iterations_per_cell": 25,
+ "wall_seconds": 3437.9,
+ "cells": 18,
+ "statuses": {
+  "completed": 18
+ },
+ "model_calls": 460,
+ "model_tokens": 1256643,
+ "cells_with_unknown_spend": 0,
+ "canaries": {
+  "sonnet": 661
+ },
+ "receipt_coverage": {
+  "sonnet": 1.0
+ },
+ "endpoints": [
+  {
+   "Family": "rational_gain",
+   "Config": "recommended",
+   "Metric": "nmse",
+   "Direction": "minimize",
+   "N": 6,
+   "MeanDifference": 0.6599420817002887,
+   "Interval95": [
+    0.28017835844036276,
+    0.8765553378204697
+   ],
+   "OneSidedP": 0.001998001998001998,
+   "Failures": {
+    "aidotnet": 0,
+    "openevolve-recommended": 0
+   },
+   "HolmAdjustedP": 0.003996003996003996,
+   "Superior": true
+  },
+  {
+   "Family": "rational_gain",
+   "Config": "matched",
+   "Metric": "nmse",
+   "Direction": "minimize",
+   "N": 6,
+   "MeanDifference": 0.22111151528883907,
+   "Interval95": [
+    0.010606282998584734,
+    0.43506179172734855
+   ],
+   "OneSidedP": 0.013986013986013986,
+   "Failures": {
+    "aidotnet": 0,
+    "openevolve-matched": 0
+   },
+   "HolmAdjustedP": 0.013986013986013986,
+   "Superior": true
+  }
+ ],
+ "power_analysis": {
+  "Schema": "evolution-power-analysis-v1",
+  "RegistrationSha256": "fe1fb5efa16f94a4270d8c800704ca3b1c25df22aa4a39f23d47ec6c34c0a644",
+  "TargetHalfWidth": 0.05,
+  "Confidence": 0.95,
+  "Endpoints": [
+   {
+    "Family": "rational_gain",
+    "Config": "recommended",
+    "PilotN": 6,
+    "MeanDifference": 0.6599420817002887,
+    "StandardDeviation": 0.4552398674757667,
+    "Variance": 0.20724333693935365,
+    "ObservedHalfWidth": 0.29818848969005346,
+    "TargetHalfWidth": 0.05,
+    "ScaledRequiredN": 214,
+    "NormalRequiredN": 319,
+    "RequiredN": 319,
+    "Agreement": 1.4906542056074767,
+    "Degenerate": false,
+    "PilotAlreadyMeetsTarget": false
+   },
+   {
+    "Family": "rational_gain",
+    "Config": "matched",
+    "PilotN": 6,
+    "MeanDifference": 0.22111151528883907,
+    "StandardDeviation": 0.29238885188833086,
+    "Variance": 0.08549124070857628,
+    "ObservedHalfWidth": 0.2122277543643819,
+    "TargetHalfWidth": 0.05,
+    "ScaledRequiredN": 109,
+    "NormalRequiredN": 132,
+    "RequiredN": 132,
+    "Agreement": 1.2110091743119267,
+    "Degenerate": false,
+    "PilotAlreadyMeetsTarget": false
+   }
+  ],
+  "RequiredN": 319
+ }
+}

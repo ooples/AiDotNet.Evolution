@@ -1,0 +1,42 @@
+{
+ "Schema": "evolution-pilot-losses-v1",
+ "RegistrationSha256": "fe1fb5efa16f94a4270d8c800704ca3b1c25df22aa4a39f23d47ec6c34c0a644",
+ "Endpoints": [
+  {
+   "Family": "rational_gain",
+   "Config": "recommended",
+   "Metric": "nmse",
+   "Direction": "minimize",
+   "ComparablePairs": 6,
+   "IncomparablePairs": 0,
+   "LostCells": 1,
+   "WorstMargin": 0.26424313860481263,
+   "Losses": [
+    {
+     "Seed": 3301637546,
+     "Ours": 0.39703579239921555,
+     "Theirs": 0.13279265379440294,
+     "Margin": 0.26424313860481263
+    }
+   ]
+  },
+  {
+   "Family": "rational_gain",
+   "Config": "matched",
+   "Metric": "nmse",
+   "Direction": "minimize",
+   "ComparablePairs": 6,
+   "IncomparablePairs": 0,
+   "LostCells": 1,
+   "WorstMargin": 0.10770436246320386,
+   "Losses": [
+    {
+     "Seed": 2769294546,
+     "Ours": 0.2365790298275638,
+     "Theirs": 0.12887466736435993,
+     "Margin": 0.10770436246320386
+    }
+   ]
+  }
+ ]
+}

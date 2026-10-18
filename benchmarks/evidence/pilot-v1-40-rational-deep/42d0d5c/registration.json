@@ -1,0 +1,53 @@
+{
+  "Schema": "evolution-campaign-registration-v1",
+  "Spec": {
+    "Campaign": "v1-07-pilot-rational_gain",
+    "Budget": {
+      "ModelTokens": 600000,
+      "ModelCalls": 35,
+      "WallSeconds": 2400
+    },
+    "Models": [
+      "sonnet"
+    ],
+    "SeedCount": 6,
+    "BootstrapSamples": 1000,
+    "BootstrapSeed": 11,
+    "FamilywiseAlpha": 0.05,
+    "Families": [
+      {
+        "Family": "rational_gain",
+        "Configs": [
+          "recommended",
+          "matched"
+        ],
+        "Endpoint": {
+          "Metric": "nmse",
+          "Direction": "minimize",
+          "FailureValue": 1000000.0
+        }
+      }
+    ],
+    "TestPartitionHashes": {
+      "rational_gain": "d857373eebc0df7929dc3054fb76be8f55ff6ee1f0466700a804f0305b9b6dcd"
+    },
+    "Published": null
+  },
+  "Seeds": [
+    1622683038,
+    2740129864,
+    2789894567,
+    314009189,
+    2769294546,
+    3301637546
+  ],
+  "Arms": [
+    "aidotnet",
+    "openevolve-recommended",
+    "openevolve-matched"
+  ],
+  "StoppingRule": "Fixed N = SeedCount per arm; no interim analysis, no extension, no re-run",
+  "DecisionRule": "Holm step-down over every family x config one-sided bootstrap p; all must reject; ties fail",
+  "PublishedRule": "Strict majority of pre-declared problems matched or beaten (assumption A1)",
+  "RegistrationSha256": "fe1fb5efa16f94a4270d8c800704ca3b1c25df22aa4a39f23d47ec6c34c0a644"
+}
