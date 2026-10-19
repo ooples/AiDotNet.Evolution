@@ -1,5 +1,19 @@
 # Changelog
 
+## [0.6.0](https://github.com/ooples/AiDotNet.Evolution/compare/v0.5.0...v0.6.0) (2026-10-19)
+
+
+### Features
+
+* **bench:** publish where v1 stands against openevolve and alphaevolve ([#316](https://github.com/ooples/AiDotNet.Evolution/issues/316)) ([6833401](https://github.com/ooples/AiDotNet.Evolution/commit/68334010804b9ad024b3a376b153a86bc0eedada))
+
+
+### Bug Fixes
+
+* **bench:** absolutise the paths the pilot hands to its subprocesses ([#330](https://github.com/ooples/AiDotNet.Evolution/issues/330)) ([be9d252](https://github.com/ooples/AiDotNet.Evolution/commit/be9d2528b054ba22662ba088b9f11cc1f78ff86a))
+* **bench:** compare served model calls, not attempted ones, against the broker ([#333](https://github.com/ooples/AiDotNet.Evolution/issues/333)) ([42b456e](https://github.com/ooples/AiDotNet.Evolution/commit/42b456e8fdd929c7ad0b6c10c1b1ab8ae8a919b8)), closes [#122](https://github.com/ooples/AiDotNet.Evolution/issues/122)
+* **ci:** retry release-please once when the account's api quota is exhausted ([#332](https://github.com/ooples/AiDotNet.Evolution/issues/332)) ([3845875](https://github.com/ooples/AiDotNet.Evolution/commit/3845875242c93e89b98032db8c2b794a0d94b4a4)), closes [#183](https://github.com/ooples/AiDotNet.Evolution/issues/183)
+
 ## [0.5.0](https://github.com/ooples/AiDotNet.Evolution/compare/v0.4.0...v0.5.0) (2026-10-16)
 
 
