@@ -28,7 +28,7 @@ jobs:
         with:
           # The check reads the commit range, so the full history has to be present.
           fetch-depth: 0
-      - uses: actions/setup-node@2028fbc5c25fe9cf00d9f06a71cc4710d4507903 # v5.0.0
+      - uses: actions/setup-node@949feb2413d6458794dcd2491c4babbbce0c15c1 # v5.0.0
         with:
           node-version: '22'
       - name: Install the pinned release-please
