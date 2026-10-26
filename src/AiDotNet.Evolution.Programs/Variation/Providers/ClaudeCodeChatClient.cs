@@ -16,6 +16,15 @@ public sealed class ClaudeCodeChatClientOptions
     public string Model { get; set; } = "sonnet";
     /// <summary>Gets or sets the per-call spending cap passed as <c>--max-budget-usd</c>, or <c>null</c> for none.</summary>
     public decimal? MaxBudgetUsd { get; set; }
+    /// <summary>
+    /// Gets or sets a spending cap across every call and retry this client makes, or <c>null</c> for none. Each call
+    /// reserves its <c>--max-budget-usd</c> out of what remains (the smaller of <see cref="MaxBudgetUsd"/> and the
+    /// remainder) before it starts, so concurrent calls cannot jointly overspend. It is then charged the CLI's
+    /// reported <c>total_cost_usd</c>, or its whole reservation when no cost is reported. Once nothing remains, a call
+    /// throws <see cref="InvalidOperationException"/> without starting the CLI. The CLI checks its own cap between
+    /// turns, so a single call may run past its share by the cost of one turn.
+    /// </summary>
+    public decimal? TotalBudgetUsd { get; set; }
     /// <summary>Gets or sets the per-call timeout.</summary>
     public TimeSpan Timeout { get; set; } = TimeSpan.FromMinutes(5);
     /// <summary>Gets or sets how many times a failed or timed-out call is retried.</summary>
@@ -44,6 +53,7 @@ public sealed class ClaudeCodeChatClientOptions
         if (ExecutablePrefixArguments is null) throw new ArgumentException("Prefix arguments cannot be null.", nameof(ExecutablePrefixArguments));
         if (string.IsNullOrWhiteSpace(Model) || Model.Any(char.IsWhiteSpace)) throw new ArgumentException("Model must be a single word.", nameof(Model));
         if (MaxBudgetUsd is <= 0) throw new ArgumentOutOfRangeException(nameof(MaxBudgetUsd));
+        if (TotalBudgetUsd is <= 0) throw new ArgumentOutOfRangeException(nameof(TotalBudgetUsd));
         if (Timeout <= TimeSpan.Zero) throw new ArgumentOutOfRangeException(nameof(Timeout));
         if (MaxRetries is < 0 or > 20) throw new ArgumentOutOfRangeException(nameof(MaxRetries));
         if (MaxTurns is < 1 or > 50) throw new ArgumentOutOfRangeException(nameof(MaxTurns));
@@ -70,6 +80,15 @@ public sealed class ClaudeCodeChatClient : IProgramChatClient
 
     private static readonly string[] ScrubbedPrefixes = { "ANTHROPIC_", "CLAUDE_CODE_", "CLAUDECODE", "TOKEN_OPTIMIZER_" };
     private readonly ClaudeCodeChatClientOptions _options;
+    private readonly object _budgetLock = new();
+    private decimal _spentUsd;
+    private decimal _reservedUsd;
+
+    /// <summary>
+    /// Gets the dollars charged so far: each finished call's reported <c>total_cost_usd</c>, or its whole per-call cap
+    /// when the CLI reported none. Calls still running are not included.
+    /// </summary>
+    public decimal SpentUsd { get { lock (_budgetLock) return _spentUsd; } }
 
     /// <summary>Creates a client; the options are copied.</summary>
     public ClaudeCodeChatClient(ClaudeCodeChatClientOptions options)
@@ -82,6 +101,7 @@ public sealed class ClaudeCodeChatClient : IProgramChatClient
             ExecutablePrefixArguments = new List<string>(options.ExecutablePrefixArguments),
             Model = options.Model.Trim(),
             MaxBudgetUsd = options.MaxBudgetUsd,
+            TotalBudgetUsd = options.TotalBudgetUsd,
             Timeout = options.Timeout,
             MaxRetries = options.MaxRetries,
             MaxTurns = options.MaxTurns,
@@ -117,7 +137,18 @@ public sealed class ClaudeCodeChatClient : IProgramChatClient
         {
             try
             {
-                return await RunOnceAsync(system, conversation, cancellationToken).ConfigureAwait(false);
+                // Reserved inside the try, but an exhausted budget is an InvalidOperationException, which the retry
+                // filter below does not take: it surfaces at once instead of being retried.
+                decimal? cap = ReserveCallBudget();
+                var cost = new CallCost();
+                try
+                {
+                    return await RunOnceAsync(system, conversation, cap, cost, cancellationToken).ConfigureAwait(false);
+                }
+                finally
+                {
+                    SettleCallBudget(cap, cost.ReportedUsd);
+                }
             }
             catch (Exception exception) when (exception is TimeoutException or InvalidDataException or IOException &&
                 attempt < _options.MaxRetries && !cancellationToken.IsCancellationRequested)
@@ -128,7 +159,58 @@ public sealed class ClaudeCodeChatClient : IProgramChatClient
         }
     }
 
-    private async Task<ProgramChatResponse> RunOnceAsync(string system, string conversation, CancellationToken cancellationToken)
+    private sealed class CallCost
+    {
+        public decimal? ReportedUsd;
+    }
+
+    // The --max-budget-usd for the next call: the per-call cap, or with a total budget the smaller of that and what is
+    // neither spent nor reserved by calls still running, which is then reserved for this call.
+    private decimal? ReserveCallBudget()
+    {
+        if (_options.TotalBudgetUsd is not { } total) return _options.MaxBudgetUsd;
+        lock (_budgetLock)
+        {
+            decimal remaining = total - _spentUsd - _reservedUsd;
+            if (remaining <= 0)
+                throw new InvalidOperationException("The Claude Code total budget of $" +
+                    total.ToString(CultureInfo.InvariantCulture) + " is spent or reserved by calls in flight ($" +
+                    _spentUsd.ToString(CultureInfo.InvariantCulture) + " charged); no further call is made.");
+            decimal cap = _options.MaxBudgetUsd is { } perCall ? Math.Min(perCall, remaining) : remaining;
+            _reservedUsd += cap;
+            return cap;
+        }
+    }
+
+    // Charges a finished call (successful or not) its reported cost, or its whole cap when the CLI reported none.
+    private void SettleCallBudget(decimal? cap, decimal? reportedUsd)
+    {
+        lock (_budgetLock)
+        {
+            if (_options.TotalBudgetUsd.HasValue && cap is { } reserved) _reservedUsd -= reserved;
+            _spentUsd += reportedUsd ?? cap ?? 0m;
+        }
+    }
+
+    // total_cost_usd from the CLI's JSON result, which it reports for failed generations as well as successful ones.
+    private static decimal? ReadReportedCost(string text)
+    {
+        try
+        {
+            using JsonDocument document = JsonDocument.Parse(text);
+            return document.RootElement.ValueKind == JsonValueKind.Object &&
+                document.RootElement.TryGetProperty("total_cost_usd", out JsonElement cost) &&
+                cost.ValueKind == JsonValueKind.Number && cost.TryGetDecimal(out decimal usd) && usd >= 0
+                ? usd : null;
+        }
+        catch (JsonException)
+        {
+            return null;
+        }
+    }
+
+    private async Task<ProgramChatResponse> RunOnceAsync(string system, string conversation, decimal? capUsd, CallCost cost,
+        CancellationToken cancellationToken)
     {
         string workspace = Path.Combine(Path.GetTempPath(), "aidotnet-claude-" + Guid.NewGuid().ToString("N", CultureInfo.InvariantCulture));
         Directory.CreateDirectory(workspace);
@@ -149,7 +231,7 @@ public sealed class ClaudeCodeChatClient : IProgramChatClient
                 _options.MaxTurns.ToString(CultureInfo.InvariantCulture) })
                 start.ArgumentList.Add(argument);
             if (system.Length > 0) { start.ArgumentList.Add("--system-prompt"); start.ArgumentList.Add(system); }
-            if (_options.MaxBudgetUsd is { } budget) { start.ArgumentList.Add("--max-budget-usd"); start.ArgumentList.Add(budget.ToString(CultureInfo.InvariantCulture)); }
+            if (capUsd is { } budget) { start.ArgumentList.Add("--max-budget-usd"); start.ArgumentList.Add(budget.ToString(CultureInfo.InvariantCulture)); }
             if (_options.Isolate)
             {
                 string mcp = Path.Combine(workspace, "no-mcp.json");
@@ -177,6 +259,7 @@ public sealed class ClaudeCodeChatClient : IProgramChatClient
                 string text = await output.ConfigureAwait(false);
                 await errors.ConfigureAwait(false);
                 if (text.Length > MaxOutputBytes) throw new InvalidDataException("Claude Code output exceeds its bound.");
+                cost.ReportedUsd = ReadReportedCost(text);
                 if (process.ExitCode != 0) throw new IOException("Claude Code exited with code " + process.ExitCode.ToString(CultureInfo.InvariantCulture) + ".");
                 return Parse(text);
             }
