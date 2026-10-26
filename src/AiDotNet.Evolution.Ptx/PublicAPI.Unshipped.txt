@@ -282,7 +282,7 @@
 [AIDEVO005]AiDotNet.Evolution.Ptx.PtxProgramEvolutionOptions.InputTokenCostUnits.set -> void
 [AIDEVO005]AiDotNet.Evolution.Ptx.PtxProgramEvolutionOptions.MaxEdits.get -> int
 [AIDEVO005]AiDotNet.Evolution.Ptx.PtxProgramEvolutionOptions.MaxEdits.set -> void
-[AIDEVO005]AiDotNet.Evolution.Ptx.PtxProgramEvolutionOptions.MaxEditableLines.get -> int
+[AIDEVO005]AiDotNet.Evolution.Ptx.PtxProgramEvolutionOptions.MaxEditableLines.get -> int?
 [AIDEVO005]AiDotNet.Evolution.Ptx.PtxProgramEvolutionOptions.MaxEditableLines.set -> void
 [AIDEVO005]AiDotNet.Evolution.Ptx.PtxProgramEvolutionOptions.MaxInputTokens.get -> int
 [AIDEVO005]AiDotNet.Evolution.Ptx.PtxProgramEvolutionOptions.MaxInputTokens.set -> void

@@ -124,15 +124,42 @@ public sealed class PtxProposalSourceTests
         Directory.Delete(options.AuditDirectory, recursive: true);
     }
 
+    // An explicit bound the prompt budget cannot carry would pass the catalog and then be refused by the prompt check on
+    // every proposal, so it is rejected at configuration time instead: 682 lines fit the default 131,072-byte budget.
     [Theory]
-    [InlineData(0)]
-    [InlineData(65_537)]
-    public void The_editable_line_bound_is_validated(int value)
+    [InlineData(0, 131_072)]
+    [InlineData(683, 131_072)]
+    [InlineData(10_923, 2_097_152)]
+    public void An_editable_line_bound_the_prompt_budget_cannot_carry_is_refused(int lines, int inputTokens)
     {
         var options = Options();
-        options.MaxEditableLines = value;
+        options.MaxEditableLines = lines;
+        options.MaxInputTokens = inputTokens;
         Assert.Throws<ArgumentOutOfRangeException>(() =>
             PtxProposalSource.Create(new ScriptedChatClient(), new PtxProgramCompiler(Axpy.Contract(), new FakeWorkerTransport()), options, Ledger()));
+    }
+
+    // The derived bound must be usable, not merely accepted: the largest parent the source limit admits (262,144
+    // characters of realistic PTX lines), given just the budget its line count demands, reaches the model rather than
+    // failing the prompt check.
+    [Fact]
+    public async Task A_parent_given_the_budget_its_line_count_demands_fits_the_prompt_and_reaches_the_model()
+    {
+        int padding = (262_144 - Axpy.Source.Length) / (Axpy.Fma.Length + 1);
+        string parent = Axpy.Source.Replace(Axpy.Fma, string.Join("\n", Enumerable.Repeat(Axpy.Fma, padding + 1)), StringComparison.Ordinal);
+        int lines = parent.Split('\n').Count(line => line.Trim().Length > 0);
+        var (source, client, _, ledger, options) = Setup(o => o.MaxInputTokens = lines * 192);
+        client.Reply = (_, messages) =>
+        {
+            using JsonDocument data = JsonDocument.Parse(messages[1].Text);
+            return ScriptedChatClient.Rewrite(data.RootElement.GetProperty("parentId").GetString() ?? string.Empty, Axpy.Source,
+                new { blockX = 128, blockY = 1, blockZ = 1 });
+        };
+        await Meter(source, ledger).ProposeAsync(Context(new ProgramGenome(parent)));
+        Assert.Equal(1, source.GetUsage().ChatCalls);
+        using (JsonDocument data = JsonDocument.Parse(Assert.Single(client.Conversations)[1].Text))
+            Assert.True(data.RootElement.GetProperty("catalog").GetArrayLength() > 7_000);
+        Directory.Delete(options.AuditDirectory, recursive: true);
     }
 
     [Fact]
