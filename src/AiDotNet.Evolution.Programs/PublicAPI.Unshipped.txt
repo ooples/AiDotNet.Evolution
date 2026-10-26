@@ -3,6 +3,7 @@ AiDotNet.Evolution.Programs.ClaudeCodeChatClient
 AiDotNet.Evolution.Programs.ClaudeCodeChatClient.ClaudeCodeChatClient(AiDotNet.Evolution.Programs.ClaudeCodeChatClientOptions! options) -> void
 AiDotNet.Evolution.Programs.ClaudeCodeChatClient.GetResponseAsync(System.Collections.Generic.IReadOnlyList<AiDotNet.Evolution.Programs.ProgramChatMessage!>! messages, AiDotNet.Evolution.Programs.ProgramChatOptions? options = null, System.Threading.CancellationToken cancellationToken = default(System.Threading.CancellationToken)) -> System.Threading.Tasks.Task<AiDotNet.Evolution.Programs.ProgramChatResponse!>!
 AiDotNet.Evolution.Programs.ClaudeCodeChatClient.ModelId.get -> string!
+AiDotNet.Evolution.Programs.ClaudeCodeChatClient.SpentUsd.get -> decimal
 AiDotNet.Evolution.Programs.ClaudeCodeChatClientOptions
 AiDotNet.Evolution.Programs.ClaudeCodeChatClientOptions.ClaudeCodeChatClientOptions() -> void
 AiDotNet.Evolution.Programs.ClaudeCodeChatClientOptions.Executable.get -> string!
@@ -23,6 +24,8 @@ AiDotNet.Evolution.Programs.ClaudeCodeChatClientOptions.RetryDelay.get -> System
 AiDotNet.Evolution.Programs.ClaudeCodeChatClientOptions.RetryDelay.set -> void
 AiDotNet.Evolution.Programs.ClaudeCodeChatClientOptions.Timeout.get -> System.TimeSpan
 AiDotNet.Evolution.Programs.ClaudeCodeChatClientOptions.Timeout.set -> void
+AiDotNet.Evolution.Programs.ClaudeCodeChatClientOptions.TotalBudgetUsd.get -> decimal?
+AiDotNet.Evolution.Programs.ClaudeCodeChatClientOptions.TotalBudgetUsd.set -> void
 AiDotNet.Evolution.Programs.CompilationDiagnostic
 AiDotNet.Evolution.Programs.CompilationDiagnostic.Code.get -> string?
 AiDotNet.Evolution.Programs.CompilationDiagnostic.Code.init -> void

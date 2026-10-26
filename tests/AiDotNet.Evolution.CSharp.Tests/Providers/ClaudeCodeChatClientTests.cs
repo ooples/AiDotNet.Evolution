@@ -19,7 +19,7 @@ public sealed class ClaudeCodeChatClientTests : IDisposable
     }
 
     // Records its arguments, standard input and whether inherited credentials leaked, then answers like `claude -p --output-format json`.
-    private ClaudeCodeChatClient Client(bool isolate, int failFirst = 0)
+    private ClaudeCodeChatClient Client(bool isolate, int failFirst = 0, decimal? totalBudgetUsd = null, decimal? reportedCostUsd = null)
     {
         string script = Path.Combine(_directory, "claude_stub.py");
         File.WriteAllText(script, """
@@ -30,17 +30,23 @@ public sealed class ClaudeCodeChatClientTests : IDisposable
             open(counter, "w").write(str(calls + 1))
             stdin = sys.stdin.read()
             json.dump({"args": args, "stdin": stdin, "leaked": "ANTHROPIC_API_KEY" in os.environ, "cwd_empty": sorted(os.listdir(".")) in ([], ["no-mcp.json"])}, open(record, "w"))
+            reply = {"type": "result", "subtype": "success", "is_error": False, "result": "print('hi')", "usage": {"input_tokens": 12, "output_tokens": 5}}
+            if os.environ.get("STUB_COST"):
+                reply["total_cost_usd"] = float(os.environ["STUB_COST"])
+            # A failed attempt still reports what it cost, as the real CLI does, and then exits nonzero.
+            print(json.dumps(reply))
             if calls < int(os.environ.get("STUB_FAIL_FIRST", "0")):
                 sys.exit(3)
-            print(json.dumps({"type": "result", "subtype": "success", "is_error": False, "result": "print('hi')", "usage": {"input_tokens": 12, "output_tokens": 5}}))
             """);
         Environment.SetEnvironmentVariable("STUB_FAIL_FIRST", failFirst.ToString(System.Globalization.CultureInfo.InvariantCulture));
+        Environment.SetEnvironmentVariable("STUB_COST", reportedCostUsd?.ToString(System.Globalization.CultureInfo.InvariantCulture));
         return new ClaudeCodeChatClient(new ClaudeCodeChatClientOptions
         {
             Executable = Python,
             ExecutablePrefixArguments = { script, Path.Combine(_directory, "record.json"), Path.Combine(_directory, "count.txt") },
             Model = "sonnet",
             MaxBudgetUsd = 0.5m,
+            TotalBudgetUsd = totalBudgetUsd,
             Isolate = isolate,
             MaxRetries = 2,
             RetryDelay = TimeSpan.Zero,
@@ -99,6 +105,126 @@ public sealed class ClaudeCodeChatClientTests : IDisposable
         Assert.Equal("3", File.ReadAllText(Path.Combine(_directory, "count.txt")));
         File.Delete(Path.Combine(_directory, "count.txt"));
         await Assert.ThrowsAsync<IOException>(() => Client(isolate: true, failFirst: 5).GetResponseAsync(new[] { ProgramChatMessage.User("x") }));
+    }
+
+    private string BudgetArgument() =>
+        Record().GetProperty("args").EnumerateArray().Select(a => a.GetString() ?? "").SkipWhile(a => a != "--max-budget-usd").Skip(1).First();
+
+    private int CallCount() => int.Parse(File.ReadAllText(Path.Combine(_directory, "count.txt")), System.Globalization.CultureInfo.InvariantCulture);
+
+    // MaxBudgetUsd caps each `claude -p` process, and every attempt and retry is a new process, so a campaign of N calls
+    // could spend N times the cap. A total budget is shared by every call: each one is given at most what remains,
+    // charged what the CLI reports, and none starts once it is gone.
+    [Fact]
+    public async Task A_total_budget_shrinks_each_call_to_what_remains_and_stops_before_starting_another()
+    {
+        var client = Client(isolate: true, totalBudgetUsd: 1.0m, reportedCostUsd: 0.3m);
+        var expectedCaps = new[] { "0.5", "0.5", "0.4", "0.1" };
+        foreach (string cap in expectedCaps)
+        {
+            await client.GetResponseAsync(new[] { ProgramChatMessage.User("x") });
+            Assert.Equal(cap, BudgetArgument());
+        }
+        // The CLI may overrun its cap by one turn, and the reported cost is what is charged.
+        Assert.Equal(1.2m, client.SpentUsd);
+        var refused = await Assert.ThrowsAsync<InvalidOperationException>(() => client.GetResponseAsync(new[] { ProgramChatMessage.User("x") }));
+        Assert.Contains("total budget", refused.Message, StringComparison.Ordinal);
+        Assert.Equal(expectedCaps.Length, CallCount());
+    }
+
+    [Fact]
+    public async Task A_call_that_reports_no_cost_is_charged_its_whole_cap_failed_retries_included()
+    {
+        // Two failed attempts and a success, none reporting a cost: each is charged its 0.5 cap.
+        var client = Client(isolate: true, failFirst: 2, totalBudgetUsd: 1.6m);
+        await client.GetResponseAsync(new[] { ProgramChatMessage.User("x") });
+        Assert.Equal(3, CallCount());
+        Assert.Equal(1.5m, client.SpentUsd);
+        // 0.1 remains, so the next call is capped at it; after that nothing is left and no process starts.
+        await client.GetResponseAsync(new[] { ProgramChatMessage.User("x") });
+        Assert.Equal("0.1", BudgetArgument());
+        await Assert.ThrowsAsync<InvalidOperationException>(() => client.GetResponseAsync(new[] { ProgramChatMessage.User("x") }));
+        Assert.Equal(4, CallCount());
+    }
+
+    [Fact]
+    public async Task A_failed_attempt_that_reports_its_cost_is_charged_that_cost_not_its_cap()
+    {
+        // Two attempts exit nonzero after reporting 0.2 each, then one succeeds: 0.6, not 0.5 + 0.5 + 0.2.
+        var client = Client(isolate: true, failFirst: 2, totalBudgetUsd: 5m, reportedCostUsd: 0.2m);
+        await client.GetResponseAsync(new[] { ProgramChatMessage.User("x") });
+        Assert.Equal(3, CallCount());
+        Assert.Equal(0.6m, client.SpentUsd);
+    }
+
+    // Calls made at the same time must not reserve the same remainder. Each stub process writes its own marker (no
+    // shared counter, so overlapping processes cannot race) and holds for a while so every call is in flight together.
+    [Fact]
+    public async Task Overlapping_calls_reserve_disjoint_shares_and_never_jointly_exceed_the_total()
+    {
+        string markers = Path.Combine(_directory, "markers");
+        Directory.CreateDirectory(markers);
+        string script = Path.Combine(_directory, "overlap_stub.py");
+        File.WriteAllText(script, """
+            import json, os, sys, time, uuid
+            markers, args = sys.argv[1], sys.argv[2:]
+            sys.stdin.read()
+            cap = args[args.index("--max-budget-usd") + 1]
+            open(os.path.join(markers, uuid.uuid4().hex), "w").write(cap)
+            time.sleep(1.5)
+            print(json.dumps({"type": "result", "subtype": "success", "is_error": False, "result": "ok", "usage": {"input_tokens": 1, "output_tokens": 1}}))
+            """);
+        var client = new ClaudeCodeChatClient(new ClaudeCodeChatClientOptions
+        {
+            Executable = Python,
+            ExecutablePrefixArguments = { script, markers },
+            MaxBudgetUsd = 0.5m,
+            TotalBudgetUsd = 1.2m,
+            MaxRetries = 0,
+            Timeout = TimeSpan.FromSeconds(60)
+        });
+
+        // Four calls against room for 0.5 + 0.5 + 0.2: three start, the fourth finds nothing left.
+        Task<ProgramChatResponse>[] calls = Enumerable.Range(0, 4)
+            .Select(_ => Task.Run(() => client.GetResponseAsync(new[] { ProgramChatMessage.User("x") })))
+            .ToArray();
+        try { await Task.WhenAll(calls); }
+        catch (InvalidOperationException) { /* asserted per call below */ }
+
+        Assert.Equal(3, calls.Count(c => c.Status == TaskStatus.RanToCompletion));
+        Assert.IsType<InvalidOperationException>(Assert.Single(calls, c => c.IsFaulted).Exception?.InnerException);
+        decimal[] caps = Directory.GetFiles(markers)
+            .Select(f => decimal.Parse(File.ReadAllText(f), System.Globalization.CultureInfo.InvariantCulture))
+            .OrderBy(c => c).ToArray();
+        Assert.Equal(new[] { 0.2m, 0.5m, 0.5m }, caps);
+        // No cost was reported, so each started call is charged its whole share: exactly the total, never more.
+        Assert.Equal(1.2m, client.SpentUsd);
+    }
+
+    [Fact]
+    public async Task A_call_whose_process_never_starts_is_not_charged()
+    {
+        // A missing executable fails in Process.Start; nothing was billed, so the budget must stay whole and the
+        // real fault must surface rather than a "budget spent" error after the budget drains.
+        var client = new ClaudeCodeChatClient(new ClaudeCodeChatClientOptions
+        {
+            Executable = Path.Combine(_directory, "no-such-claude-" + Guid.NewGuid().ToString("N")),
+            MaxBudgetUsd = 0.5m,
+            TotalBudgetUsd = 1.0m,
+            MaxRetries = 0
+        });
+        for (int i = 0; i < 3; i++)
+        {
+            Exception error = await Assert.ThrowsAnyAsync<Exception>(() => client.GetResponseAsync(new[] { ProgramChatMessage.User("x") }));
+            Assert.IsNotType<InvalidOperationException>(error);
+        }
+        Assert.Equal(0m, client.SpentUsd);
+    }
+
+    [Fact]
+    public void A_nonpositive_total_budget_is_refused()
+    {
+        Assert.Throws<ArgumentOutOfRangeException>(() => new ClaudeCodeChatClient(new ClaudeCodeChatClientOptions { TotalBudgetUsd = 0m }));
     }
 
     [Fact]

@@ -39,12 +39,14 @@ public sealed class PtxProposalSourceTests
         return new(entry, Array.Empty<EvolutionArchiveEntry<ProgramGenome>>(), new StableRandom(1234UL, 7UL), 1, 0);
     }
 
-    private static (PtxProposalSource Source, ScriptedChatClient Client, FakeWorkerTransport Worker, EvolutionResourceLedger Ledger, PtxProgramEvolutionOptions Options) Setup()
+    private static (PtxProposalSource Source, ScriptedChatClient Client, FakeWorkerTransport Worker, EvolutionResourceLedger Ledger, PtxProgramEvolutionOptions Options) Setup(
+        Action<PtxProgramEvolutionOptions>? configure = null)
     {
         var worker = new FakeWorkerTransport();
         var client = new ScriptedChatClient();
         var ledger = Ledger();
         PtxProgramEvolutionOptions options = Options();
+        configure?.Invoke(options);
         return (PtxProposalSource.Create(client, new PtxProgramCompiler(Axpy.Contract(), worker), options, ledger), client, worker, ledger, options);
     }
 
@@ -86,6 +88,77 @@ public sealed class PtxProposalSourceTests
         Assert.Single(Directory.GetFiles(options.AuditDirectory, "*.json"));
         Assert.Equal(1, ledger.Snapshot().Spent["model_calls"]);
         Assert.Equal(1, ledger.Snapshot().Spent["build_calls"]);
+        Directory.Delete(options.AuditDirectory, recursive: true);
+    }
+
+    // Generated kernels with unrolled register tiles run to thousands of lines; a fixed 1,024-line catalog bound refused
+    // a 3,248-line SGEMM before any model call. The bound is now the caller's, and a rewrite-only run has none.
+    [Fact]
+    public async Task A_parent_over_the_editable_line_bound_is_refused_before_any_model_call_and_names_the_option()
+    {
+        var (source, client, _, ledger, options) = Setup(o => o.MaxEditableLines = 5);
+        // A refused proposal reports Failed, which the meter surfaces; the engine discards it and moves on.
+        await Assert.ThrowsAsync<InvalidOperationException>(() =>
+            Meter(source, ledger).ProposeAsync(Context(new ProgramGenome(Axpy.Source))).AsTask());
+        Assert.Empty(client.Conversations);
+        Assert.Equal(0, source.GetUsage().ChatCalls);
+        string evidence = File.ReadAllText(Assert.Single(Directory.GetFiles(options.AuditDirectory, "*.json")));
+        Assert.Contains(nameof(PtxProgramEvolutionOptions.MaxEditableLines), evidence, StringComparison.Ordinal);
+        Directory.Delete(options.AuditDirectory, recursive: true);
+    }
+
+    [Fact]
+    public async Task A_rewrite_only_run_evolves_a_parent_of_any_length_without_a_catalog()
+    {
+        var (source, client, _, ledger, options) = Setup(o => { o.MaxEditableLines = 5; o.AllowPatches = false; });
+        client.Reply = (_, messages) =>
+        {
+            using JsonDocument data = JsonDocument.Parse(messages[1].Text);
+            return ScriptedChatClient.Rewrite(data.RootElement.GetProperty("parentId").GetString() ?? string.Empty, Axpy.Source,
+                new { blockX = 128, blockY = 1, blockZ = 1 });
+        };
+        ProgramGenome proposed = await Meter(source, ledger).ProposeAsync(Context(new ProgramGenome(Axpy.Source)));
+        Assert.Equal(Axpy.Block128, proposed.Source);
+        using (JsonDocument data = JsonDocument.Parse(Assert.Single(client.Conversations)[1].Text))
+            Assert.Equal(JsonValueKind.Null, data.RootElement.GetProperty("catalog").ValueKind);
+        Directory.Delete(options.AuditDirectory, recursive: true);
+    }
+
+    // An explicit bound the prompt budget cannot carry would pass the catalog and then be refused by the prompt check on
+    // every proposal, so it is rejected at configuration time instead: 682 lines fit the default 131,072-byte budget.
+    [Theory]
+    [InlineData(0, 131_072)]
+    [InlineData(683, 131_072)]
+    [InlineData(10_923, 2_097_152)]
+    public void An_editable_line_bound_the_prompt_budget_cannot_carry_is_refused(int lines, int inputTokens)
+    {
+        var options = Options();
+        options.MaxEditableLines = lines;
+        options.MaxInputTokens = inputTokens;
+        Assert.Throws<ArgumentOutOfRangeException>(() =>
+            PtxProposalSource.Create(new ScriptedChatClient(), new PtxProgramCompiler(Axpy.Contract(), new FakeWorkerTransport()), options, Ledger()));
+    }
+
+    // The derived bound must be usable, not merely accepted: the largest parent the source limit admits (262,144
+    // characters of realistic PTX lines), given just the budget its line count demands, reaches the model rather than
+    // failing the prompt check.
+    [Fact]
+    public async Task A_parent_given_the_budget_its_line_count_demands_fits_the_prompt_and_reaches_the_model()
+    {
+        int padding = (262_144 - Axpy.Source.Length) / (Axpy.Fma.Length + 1);
+        string parent = Axpy.Source.Replace(Axpy.Fma, string.Join("\n", Enumerable.Repeat(Axpy.Fma, padding + 1)), StringComparison.Ordinal);
+        int lines = parent.Split('\n').Count(line => line.Trim().Length > 0);
+        var (source, client, _, ledger, options) = Setup(o => o.MaxInputTokens = lines * 192);
+        client.Reply = (_, messages) =>
+        {
+            using JsonDocument data = JsonDocument.Parse(messages[1].Text);
+            return ScriptedChatClient.Rewrite(data.RootElement.GetProperty("parentId").GetString() ?? string.Empty, Axpy.Source,
+                new { blockX = 128, blockY = 1, blockZ = 1 });
+        };
+        await Meter(source, ledger).ProposeAsync(Context(new ProgramGenome(parent)));
+        Assert.Equal(1, source.GetUsage().ChatCalls);
+        using (JsonDocument data = JsonDocument.Parse(Assert.Single(client.Conversations)[1].Text))
+            Assert.True(data.RootElement.GetProperty("catalog").GetArrayLength() > 7_000);
         Directory.Delete(options.AuditDirectory, recursive: true);
     }
 
