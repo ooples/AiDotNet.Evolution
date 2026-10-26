@@ -147,7 +147,7 @@ public sealed class ClaudeCodeChatClient : IProgramChatClient
                 }
                 finally
                 {
-                    SettleCallBudget(cap, cost.ReportedUsd);
+                    SettleCallBudget(cap, cost);
                 }
             }
             catch (Exception exception) when (exception is TimeoutException or InvalidDataException or IOException &&
@@ -161,6 +161,7 @@ public sealed class ClaudeCodeChatClient : IProgramChatClient
 
     private sealed class CallCost
     {
+        public bool Started;
         public decimal? ReportedUsd;
     }
 
@@ -182,13 +183,15 @@ public sealed class ClaudeCodeChatClient : IProgramChatClient
         }
     }
 
-    // Charges a finished call (successful or not) its reported cost, or its whole cap when the CLI reported none.
-    private void SettleCallBudget(decimal? cap, decimal? reportedUsd)
+    // Charges a finished call (successful or not) its reported cost, or its whole cap when the CLI reported none. A call
+    // whose process never started (a missing executable, an unwritable workspace) cost nothing and is charged nothing,
+    // so a configuration fault surfaces as itself rather than draining the budget into a misleading "spent" error.
+    private void SettleCallBudget(decimal? cap, CallCost cost)
     {
         lock (_budgetLock)
         {
             if (_options.TotalBudgetUsd.HasValue && cap is { } reserved) _reservedUsd -= reserved;
-            _spentUsd += reportedUsd ?? cap ?? 0m;
+            if (cost.Started) _spentUsd += cost.ReportedUsd ?? cap ?? 0m;
         }
     }
 
@@ -243,6 +246,7 @@ public sealed class ClaudeCodeChatClient : IProgramChatClient
             }
 
             using var process = Process.Start(start) ?? throw new IOException("The Claude Code CLI did not start.");
+            cost.Started = true;
             try
             {
                 await process.StandardInput.WriteAsync(conversation).ConfigureAwait(false);
