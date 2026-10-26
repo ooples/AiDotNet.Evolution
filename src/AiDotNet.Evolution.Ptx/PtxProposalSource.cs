@@ -85,7 +85,10 @@ internal sealed class PtxProposalSource : ICostedProgramProposalSource
         try
         {
             if (inspection.HasErrors) throw new ArgumentException("The parent fails the static PTX checks.");
-            catalog = PtxSourceEditor.Catalog(parent.Source, inspection);
+            // A rewrite needs no line addresses, so a rewrite-only run never refuses a parent for its length.
+            catalog = _options.AllowPatches
+                ? PtxSourceEditor.Catalog(parent.Source, inspection, _options.MaxEditableLines)
+                : Array.Empty<PtxLineTarget>();
         }
         catch (ArgumentException exception)
         {

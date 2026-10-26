@@ -8,11 +8,22 @@ internal sealed record PtxLineTarget(int Line, int Start, int Length, string Kin
 /// <summary>Line-addressed patching of a kernel body. Addresses always refer to the unchanged parent.</summary>
 internal static class PtxSourceEditor
 {
-    internal const int MaximumTargets = 1024;
+    /// <summary>
+    /// The default bound on a catalog's editable lines. Generated kernels with unrolled register tiles run to thousands of
+    /// lines (a 128x128 SGEMM is ~3,250), so the old fixed 1,024 refused exactly the kernels worth evolving. What a large
+    /// catalog really costs is prompt bytes, which <see cref="PtxProgramEvolutionOptions.MaxInputTokens"/> already bounds.
+    /// </summary>
+    internal const int DefaultMaximumTargets = 16_384;
+
+    /// <summary>The largest catalog any configuration may request.</summary>
+    internal const int MaximumTargetsCeiling = 65_536;
+
     private static readonly string[] ProtectedDirectives = { ".entry", ".version", ".target", ".address_size", ".visible", "aidotnet-launch" };
 
-    internal static IReadOnlyList<PtxLineTarget> Catalog(string source, PtxSourceInspection inspection)
+    internal static IReadOnlyList<PtxLineTarget> Catalog(string source, PtxSourceInspection inspection,
+        int maximumTargets = DefaultMaximumTargets)
     {
+        if (maximumTargets is < 1 or > MaximumTargetsCeiling) throw new ArgumentOutOfRangeException(nameof(maximumTargets));
         var targets = new List<PtxLineTarget>();
         string[] lines = source.Split('\n');
         int offset = 0;
@@ -22,7 +33,10 @@ internal static class PtxSourceEditor
             string text = lines[index].TrimEnd('\r');
             string trimmed = text.Trim();
             if (trimmed.Length == 0 || trimmed.StartsWith("//", StringComparison.Ordinal)) continue;
-            if (targets.Count == MaximumTargets) throw new ArgumentException("The kernel body exceeds " + MaximumTargets + " editable lines.");
+            if (targets.Count == maximumTargets)
+                throw new ArgumentException("The kernel body exceeds " + maximumTargets + " editable lines; raise " +
+                    nameof(PtxProgramEvolutionOptions) + "." + nameof(PtxProgramEvolutionOptions.MaxEditableLines) +
+                    " (and MaxInputTokens, since the catalog is sent in the prompt), or disable patches to evolve by rewrite.");
             string kind = trimmed.EndsWith(':') ? "label" : trimmed.StartsWith('.') ? "declaration" : trimmed is "{" or "}" ? "scope" : "instruction";
             targets.Add(new PtxLineTarget(index + 1, offset, text.Length, kind, ProgramSnapshot.Digest(text), text));
         }

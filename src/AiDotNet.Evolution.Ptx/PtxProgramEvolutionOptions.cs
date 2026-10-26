@@ -77,6 +77,13 @@ public sealed class PtxProgramEvolutionOptions
     public bool AllowPatches { get; set; } = true;
     /// <summary>Gets or sets the most line edits in one patch, 1 to 256. Default: 32.</summary>
     public int MaxEdits { get; set; } = 32;
+    /// <summary>
+    /// Gets or sets the most editable kernel-body lines a parent may have when patches are allowed, 1 to 65,536.
+    /// Default: 16,384. Every editable line is catalogued in the prompt (about 100 bytes each), so a large kernel also
+    /// needs <see cref="MaxInputTokens"/> raised to match. Not consulted when <see cref="AllowPatches"/> is false: a
+    /// rewrite needs no line addresses.
+    /// </summary>
+    public int MaxEditableLines { get; set; } = PtxSourceEditor.DefaultMaximumTargets;
     /// <summary>Gets or sets repairs after the first attempt, 0 to 7. Default: 2.</summary>
     public int MaxRepairs { get; set; } = 2;
     /// <summary>Gets or sets the response bound in characters, 256 to 524,288. Default: 262,144.</summary>
@@ -119,7 +126,7 @@ public sealed class PtxProgramEvolutionOptions
         if (string.IsNullOrWhiteSpace(AuditDirectory)) throw new ArgumentException("An audit directory is required.");
         copy.AuditDirectory = Path.GetFullPath(AuditDirectory);
         if (!AllowRewrites && !AllowPatches) throw new ArgumentException("Allow rewrites, patches, or both.");
-        if (MaxEdits is < 1 or > 256 || MaxRepairs is < 0 or > 7 || MaxResponseChars is < 256 or > 524_288 ||
+        if (MaxEdits is < 1 or > 256 || MaxEditableLines is < 1 or > PtxSourceEditor.MaximumTargetsCeiling || MaxRepairs is < 0 or > 7 || MaxResponseChars is < 256 or > 524_288 ||
             MaxInputTokens is < 1 or > 2_097_152 || MaxOutputTokens is < 1 or > 131_072 || !double.IsFinite(Temperature) || Temperature is < 0 or > 2)
             throw new ArgumentOutOfRangeException(nameof(PtxProgramEvolutionOptions), "A proposal bound is outside its supported range.");
         foreach (decimal price in new[] { SetupCostUnits, ModelCallCostUnits, CompilationCostUnits, ParseCostUnits, AuditCostUnits })
@@ -131,8 +138,9 @@ public sealed class PtxProgramEvolutionOptions
 
     internal string ConfigurationHash => EvolutionHash.Combine(new[]
     {
-        "ptx-proposal-options-v1", Id, ModelVersionIdentity, CostUnitVersionHash, AllowRewrites ? "rewrite" : "-", AllowPatches ? "patch" : "-",
-        MaxEdits.ToString(CultureInfo.InvariantCulture), MaxRepairs.ToString(CultureInfo.InvariantCulture),
+        "ptx-proposal-options-v2", Id, ModelVersionIdentity, CostUnitVersionHash, AllowRewrites ? "rewrite" : "-", AllowPatches ? "patch" : "-",
+        MaxEdits.ToString(CultureInfo.InvariantCulture), MaxEditableLines.ToString(CultureInfo.InvariantCulture),
+        MaxRepairs.ToString(CultureInfo.InvariantCulture),
         MaxResponseChars.ToString(CultureInfo.InvariantCulture), MaxInputTokens.ToString(CultureInfo.InvariantCulture),
         MaxOutputTokens.ToString(CultureInfo.InvariantCulture), Temperature.ToString("R", CultureInfo.InvariantCulture),
         IncumbentProfile?.Identity ?? "-", SetupCostUnits.ToString(CultureInfo.InvariantCulture),
