@@ -19,10 +19,13 @@ public sealed class ClaudeCodeChatClientOptions
     /// <summary>
     /// Gets or sets a spending cap across every call and retry this client makes, or <c>null</c> for none. Each call
     /// reserves its <c>--max-budget-usd</c> out of what remains (the smaller of <see cref="MaxBudgetUsd"/> and the
-    /// remainder) before it starts, so concurrent calls cannot jointly overspend. It is then charged the CLI's
-    /// reported <c>total_cost_usd</c>, or its whole reservation when no cost is reported. Once nothing remains, a call
-    /// throws <see cref="InvalidOperationException"/> without starting the CLI. The CLI checks its own cap between
-    /// turns, so a single call may run past its share by the cost of one turn.
+    /// remainder) before it starts, so the caps handed to calls, concurrent ones included, never add up to more than
+    /// this total. It is then charged the CLI's reported <c>total_cost_usd</c>, or its whole reservation when no cost
+    /// is reported. Once nothing remains, a call throws <see cref="InvalidOperationException"/> without starting the
+    /// CLI. The guarantee is on reservations, not on charges: the CLI checks its own cap between turns, so each call
+    /// may run past its share by the cost of one turn, and overruns of calls in flight together add up. Actual spend
+    /// can therefore exceed this total by up to one turn per call; <see cref="ClaudeCodeChatClient.SpentUsd"/> reports
+    /// what was charged.
     /// </summary>
     public decimal? TotalBudgetUsd { get; set; }
     /// <summary>Gets or sets the per-call timeout.</summary>
