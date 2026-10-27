@@ -1,5 +1,12 @@
 # Changelog
 
+## [0.7.0](https://github.com/ooples/AiDotNet.Evolution/compare/v0.6.0...v0.7.0) (2026-10-26)
+
+
+### Features
+
+* **ptx:** make the editable-line bound configurable ([#342](https://github.com/ooples/AiDotNet.Evolution/issues/342)) ([f152e12](https://github.com/ooples/AiDotNet.Evolution/commit/f152e12461f1c4e91bd10512525769f18865c993))
+
 ## [0.6.0](https://github.com/ooples/AiDotNet.Evolution/compare/v0.5.0...v0.6.0) (2026-10-19)
 
 
