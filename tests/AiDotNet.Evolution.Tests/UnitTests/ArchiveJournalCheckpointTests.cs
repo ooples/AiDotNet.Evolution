@@ -344,8 +344,8 @@ public sealed class ArchiveJournalCheckpointTests
         island0.Remove("EntriesInSegments");
         island0["Entries"] = new JsonArray(cells.Values.ToArray());
         payload["SchemaVersion"] = Value<int>(payload["SchemaVersion"]) - 4;
-        payload["Segments"] = new JsonArray(new JsonObject { ["Id"] = 0, ["IsBase"] = true, ["Sha256"] = "" });
-        payload["NextSegmentId"] = 1;
+        payload["Segments"] = new JsonArray(new JsonObject { ["Id"] = 0L, ["IsBase"] = true, ["Sha256"] = "" });
+        payload["NextSegmentId"] = 1L;
         await RewriteSegment(to, payload, 0, baseSegment);
         return new EvolutionCheckpoint(saved.RunId, saved.Sequence, saved.CompatibilityHash, payload.ToJsonString(),
             saved.SchemaVersion, saved.Quality, saved.QualityDirection).WithSegmentIds(new long[] { 0 });
