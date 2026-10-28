@@ -178,14 +178,14 @@ internal static class EvolutionEngineDocuments
         // between boundaries never serializes an unchanged genome twice (E-1).
         public static ArchiveDocument From<TGenome>(IEvolutionArchive<TGenome> archive, List<ArchiveEntryDocument> orderedEntries,
             Func<EvolutionArchiveEntry<TGenome>, ArchiveEntryDocument> document) => new()
-        {
-            Version = archive.Version,
-            Pareto = (archive as IEvolutionParetoArchiveView<TGenome>)?.ParetoDefinition is { } definition ? ParetoDocument.From(definition) : null,
-            InfeasibleEntries = (archive as IEvolutionParetoArchiveView<TGenome>)?.InfeasibleEntries?
-                .OrderBy(entry => entry.Cell.StableKey, StringComparer.Ordinal).Select(document).ToList(),
-            Descriptors = archive.Descriptors.Select(DescriptorDocument.From).ToList(),
-            Entries = orderedEntries
-        };
+            {
+                Version = archive.Version,
+                Pareto = (archive as IEvolutionParetoArchiveView<TGenome>)?.ParetoDefinition is { } definition ? ParetoDocument.From(definition) : null,
+                InfeasibleEntries = (archive as IEvolutionParetoArchiveView<TGenome>)?.InfeasibleEntries?
+                    .OrderBy(entry => entry.Cell.StableKey, StringComparer.Ordinal).Select(document).ToList(),
+                Descriptors = archive.Descriptors.Select(DescriptorDocument.From).ToList(),
+                Entries = orderedEntries
+            };
     }
 
     internal sealed class ParetoDocument
