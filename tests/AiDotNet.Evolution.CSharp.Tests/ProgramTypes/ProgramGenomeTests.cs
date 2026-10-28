@@ -168,18 +168,15 @@ public sealed class ProgramGenomeTests
     [Fact]
     public void IdentityIsTheSameWhetherReadBeforeOrAfterASnapshot()
     {
-        var unread = new ProgramGenome("print(1)
-", ProgramLanguage.Python);
+        var unread = new ProgramGenome("print(1)\n", ProgramLanguage.Python);
         ProgramGenome snapshotBeforeRead = unread.CreateOwnedSnapshot();
-        string expected = new ProgramGenome("print(1)
-", ProgramLanguage.Python).Id;
+        string expected = new ProgramGenome("print(1)\n", ProgramLanguage.Python).Id;
 
         Assert.Equal(expected, snapshotBeforeRead.Id);
         Assert.Equal(expected, unread.Id);
         Assert.Same(unread.Id, unread.Id);
         Assert.Equal(expected, unread.CreateOwnedSnapshot().Id);
-        Assert.NotEqual(expected, new ProgramGenome("print(1)
-", ProgramLanguage.CSharp).Id);
+        Assert.NotEqual(expected, new ProgramGenome("print(1)\n", ProgramLanguage.CSharp).Id);
     }
 
     [Fact]
