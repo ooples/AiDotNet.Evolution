@@ -55,7 +55,6 @@ public sealed class ProgramGenome : IEquatable<ProgramGenome>, IImmutableEvoluti
         Language = language;
         Description = description;
         ValidateSourceEncoding(source);
-        Id = ComputeIdCore(source, language);
         _hashCode = ComputeHashCode(source, language);
     }
 
@@ -65,7 +64,7 @@ public sealed class ProgramGenome : IEquatable<ProgramGenome>, IImmutableEvoluti
         _normalizedSource = source._normalizedSource;
         Language = source.Language;
         Description = source.Description;
-        Id = source.Id;
+        _id = source._id;
         _hashCode = source._hashCode;
     }
 
@@ -101,9 +100,23 @@ public sealed class ProgramGenome : IEquatable<ProgramGenome>, IImmutableEvoluti
     /// <remarks>
     /// Two genomes share this value exactly when <see cref="Equals(ProgramGenome)"/> reports them equal, so the
     /// engine's duplicate set and evaluation cache can key on it safely. <see cref="Description"/> is excluded, so a
-    /// description-only edit is the same candidate and is not evaluated twice.
+    /// description-only edit is the same candidate and is not evaluated twice. It is computed on first read, like
+    /// <see cref="NormalizedSource"/>: a resume restores every archived genome with the identity its checkpoint recorded,
+    /// so hashing each source again there was wasted (E-1).
     /// </remarks>
-    public string Id { get; }
+    public string Id
+    {
+        get
+        {
+            string? id = Volatile.Read(ref _id);
+            if (id is not null) return id;
+            id = ComputeIdCore(Source, Language);
+            Volatile.Write(ref _id, id);
+            return id;
+        }
+    }
+
+    private string? _id;
 
     /// <inheritdoc/>
     public ProgramGenome CreateOwnedSnapshot() => new(this);

@@ -163,6 +163,25 @@ public sealed class ProgramGenomeTests
         Assert.Same(normalized, genome.CreateOwnedSnapshot().NormalizedSource);
     }
 
+    // E-1 computes Id on first read. A snapshot taken before anyone read it, and one taken after, must carry the identity
+    // a freshly built genome computes, and a genome's identity must not change once read.
+    [Fact]
+    public void IdentityIsTheSameWhetherReadBeforeOrAfterASnapshot()
+    {
+        var unread = new ProgramGenome("print(1)
+", ProgramLanguage.Python);
+        ProgramGenome snapshotBeforeRead = unread.CreateOwnedSnapshot();
+        string expected = new ProgramGenome("print(1)
+", ProgramLanguage.Python).Id;
+
+        Assert.Equal(expected, snapshotBeforeRead.Id);
+        Assert.Equal(expected, unread.Id);
+        Assert.Same(unread.Id, unread.Id);
+        Assert.Equal(expected, unread.CreateOwnedSnapshot().Id);
+        Assert.NotEqual(expected, new ProgramGenome("print(1)
+", ProgramLanguage.CSharp).Id);
+    }
+
     [Fact]
     public void NullSourceIsRejected()
     {

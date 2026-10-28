@@ -585,7 +585,12 @@ public sealed partial class EvolutionEngine<TGenome>
         if (expected > EvolutionCollectionLimits.MaximumCheckpointBytes)
             throw new InvalidDataException($"Checkpoint segment {id} exceeds the package limit.");
 
+        // Every byte is overwritten before it is read, so on runtimes that allow it the array is not zeroed first.
+#if NET5_0_OR_GREATER
+        byte[] bytes = GC.AllocateUninitializedArray<byte>((int)(expected > 0 ? expected : SegmentFlushBytes));
+#else
         byte[] bytes = new byte[expected > 0 ? expected : SegmentFlushBytes];
+#endif
         int length = 0;
         while (true)
         {
