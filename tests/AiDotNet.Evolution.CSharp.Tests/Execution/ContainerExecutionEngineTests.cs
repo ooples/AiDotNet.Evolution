@@ -71,6 +71,37 @@ public sealed class ContainerExecutionEngineTests
         Assert.Throws<ArgumentOutOfRangeException>(() => new ContainerExecutionEngine(Sandbox(memoryLimitMb: 8), Container()));
     }
 
+    [Fact]
+    public void Every_container_knob_is_range_checked_and_survives_a_clone()
+    {
+        Assert.Throws<ArgumentException>(() => new ContainerExecutionOptions { Image = "x", DockerExecutable = " " }.Validate());
+        Assert.Throws<ArgumentException>(() => new ContainerExecutionOptions { Image = "x", SupervisorPython = "python3 -S" }.Validate());
+        Assert.Throws<ArgumentOutOfRangeException>(() => new ContainerExecutionOptions { Image = "x", RecycleAfter = 0 }.Validate());
+        Assert.Throws<ArgumentOutOfRangeException>(
+            () => new ContainerExecutionOptions { Image = "x", RecycleAfter = ContainerExecutionOptions.MaxRecycleAfter + 1 }.Validate());
+        Assert.Throws<ArgumentOutOfRangeException>(() => new ContainerExecutionOptions { Image = "x", PidsLimit = 7 }.Validate());
+        Assert.Throws<ArgumentOutOfRangeException>(() => new ContainerExecutionOptions { Image = "x", WorkspaceSizeMb = 0 }.Validate());
+        Assert.Throws<ArgumentOutOfRangeException>(() => new ContainerExecutionOptions { Image = "x", StartupTimeoutSeconds = 0 }.Validate());
+
+        var copy = new ContainerExecutionOptions
+        {
+            Image = "x",
+            DockerExecutable = "/usr/bin/docker",
+            RecycleAfter = 7,
+            PidsLimit = 32,
+            WorkspaceSizeMb = 16,
+            SupervisorPython = "/usr/local/bin/python3",
+            StartupTimeoutSeconds = 5
+        }.Clone();
+        copy.Validate();
+        Assert.Equal("/usr/bin/docker", copy.DockerExecutable);
+        Assert.Equal(7, copy.RecycleAfter);
+        Assert.Equal(32, copy.PidsLimit);
+        Assert.Equal(16, copy.WorkspaceSizeMb);
+        Assert.Equal("/usr/local/bin/python3", copy.SupervisorPython);
+        Assert.Equal(5, copy.StartupTimeoutSeconds);
+    }
+
     [DockerFact]
     public void Every_container_starts_with_the_hardening_flags()
     {
@@ -213,7 +244,9 @@ public sealed class ContainerExecutionEngineTests
     {
         using var engine = new ContainerExecutionEngine(Sandbox(timeLimitSeconds: 2), Container());
         var clock = Stopwatch.StartNew();
-        ProgramExecuteResponse hung = await Run(engine, "while True:\n    pass\n");
+        // Sleeps rather than spins: a spinning loop spends its derived CPU-time budget (also 2 s) at the same instant and
+        // is reported, correctly, as CpuTimeLimitExceeded. This one can only be stopped by the wall clock.
+        ProgramExecuteResponse hung = await Run(engine, "import time\nwhile True:\n    time.sleep(1)\n");
         Assert.Equal(ProgramExecuteErrorCode.TimeoutOrCanceled, hung.ErrorCode);
         Assert.True(clock.Elapsed < TimeSpan.FromSeconds(30), "the timeout took " + clock.Elapsed);
 

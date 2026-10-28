@@ -209,7 +209,9 @@ public sealed class DeclaredSandboxEnvironmentTests
         // The three flags are value types the filter above lets through; their copies are asserted directly.
         var flags = new ProgramSandboxOptions
         {
-            Mode = ProgramSandboxMode.Container, AllowUnsafeInProcessExecution = true, AllowUnsandboxedExecution = true
+            Mode = ProgramSandboxMode.Container,
+            AllowUnsafeInProcessExecution = true,
+            AllowUnsandboxedExecution = true
         }.Clone();
         Assert.Equal(ProgramSandboxMode.Container, flags.Mode);
         Assert.True(flags.AllowUnsafeInProcessExecution);
