@@ -17,6 +17,12 @@ internal sealed class EvolutionHashStream : IDisposable
 {
     // The builder is drained once it holds this many characters, so it stays small whatever the state size.
     private const int FlushChars = 16 * 1024;
+
+    /// <summary>
+    /// A capacity that keeps a builder flushed through this stream in one chunk. Clearing a builder that grew past its
+    /// first chunk drops the chunk, so an unsized one reallocated its blocks after every flush (E-1).
+    /// </summary>
+    internal const int BuilderCapacity = 2 * FlushChars;
     private const string Digits = "0123456789abcdef";
     private readonly IncrementalHash _hash = IncrementalHash.CreateHash(HashAlgorithmName.SHA256);
     private readonly Encoder _encoder = new UTF8Encoding(false).GetEncoder();

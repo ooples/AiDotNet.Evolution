@@ -1,4 +1,5 @@
 using System.Runtime.CompilerServices;
+using System.Runtime.ExceptionServices;
 using System.Globalization;
 using System.Text;
 using System.Text.Json;
@@ -461,12 +462,15 @@ public sealed partial class EvolutionEngine<TGenome>
             if (archiveDocument.Version < 0) throw new InvalidDataException("Checkpoint archive version is invalid.");
             IReadOnlyList<EvolutionDescriptorDefinition> restoredDescriptors =
                 ReadArchiveDescriptors(restorable, archiveDocument);
-            var entries = new List<EvolutionArchiveEntry<TGenome>>();
+            ArchiveEntryDocument[] entryDocuments = (archiveDocument.Entries ?? new List<ArchiveEntryDocument>())
+                .Concat(archiveDocument.InfeasibleEntries ?? new List<ArchiveEntryDocument>()).ToArray();
+            EvolutionArchiveEntry<TGenome>[] restoredEntries = RestoreArchiveEntries(entryDocuments);
+            var entries = new List<EvolutionArchiveEntry<TGenome>>(entryDocuments.Length);
             var islandGenomeIds = new HashSet<string>(StringComparer.Ordinal);
-            foreach (ArchiveEntryDocument entryDocument in (archiveDocument.Entries ?? new List<ArchiveEntryDocument>())
-                .Concat(archiveDocument.InfeasibleEntries ?? new List<ArchiveEntryDocument>()))
+            for (int index = 0; index < entryDocuments.Length; index++)
             {
-                EvolutionArchiveEntry<TGenome> entry = RestoreArchiveEntry(entryDocument);
+                ArchiveEntryDocument entryDocument = entryDocuments[index];
+                EvolutionArchiveEntry<TGenome> entry = restoredEntries[index];
                 // The document just read is this entry's serialization, so the next boundary reuses it rather than
                 // serializing every restored genome again, and a segmented save after a resume writes no unchanged entry.
                 RememberEntryDocument(entry.Evaluation, entryDocument);
@@ -1245,6 +1249,33 @@ public sealed partial class EvolutionEngine<TGenome>
         return new EvolutionArchiveEntry<TGenome>(new EvolutionCellKey(document.CellBins), candidate, evaluation);
     }
 
+    // Below this many entries the rebuild stays on the calling thread; scheduling would cost more than it saves.
+    private const int ParallelRestoreThreshold = 256;
+
+    // Rebuilds an island's entries concurrently. One at a time, a 10,000-elite resume spent about 400 ms here, most of it
+    // decoding genomes and copying evaluations, while every other core sat idle (E-1). Codecs are thread-safe by
+    // contract. A failure is reported for the first failing entry in document order, as the sequential loop did.
+    private EvolutionArchiveEntry<TGenome>[] RestoreArchiveEntries(ArchiveEntryDocument[] documents)
+    {
+        var restored = new EvolutionArchiveEntry<TGenome>[documents.Length];
+        if (documents.Length < ParallelRestoreThreshold)
+        {
+            for (int index = 0; index < documents.Length; index++) restored[index] = RestoreArchiveEntry(documents[index]);
+            return restored;
+        }
+        var failures = new Exception?[documents.Length];
+        // Capped like the segment decode: the rebuild allocates per entry, so past a few threads every gen0 collection
+        // stalls all of them and an uncapped loop on a wide host burned more CPU than it saved.
+        Parallel.For(0, documents.Length, new ParallelOptions { MaxDegreeOfParallelism = DecodeWindow }, index =>
+        {
+            try { restored[index] = RestoreArchiveEntry(documents[index]); }
+            catch (Exception exception) { failures[index] = exception; }
+        });
+        foreach (Exception? failure in failures)
+            if (failure is not null) ExceptionDispatchInfo.Capture(failure).Throw();
+        return restored;
+    }
+
     // Fully optimized from the first call, like the checkpoint preflight: a resume runs this once per restored elite, all
     // within about a second, before tiered compilation would promote it (E-1).
 #if NETCOREAPP3_0_OR_GREATER
@@ -1283,7 +1314,7 @@ public sealed partial class EvolutionEngine<TGenome>
     {
         // Streamed: the text covers every seen identity and cached result, so it grows with the run.
         using var stream = new EvolutionHashStream();
-        var builder = new StringBuilder();
+        var builder = new StringBuilder(EvolutionHashStream.BuilderCapacity);
         Append(builder, _compatibilityHash);
         Append(builder, _nextEvaluationId);
         Append(builder, _proposals);
@@ -1346,6 +1377,7 @@ public sealed partial class EvolutionEngine<TGenome>
             {
                 Append(builder, entry.Cell.StableKey);
                 AppendEvaluation(builder, entry.Evaluation);
+                stream.Flush(builder);
             }
             if ((_islands[island] as IEvolutionParetoArchiveView<TGenome>)?.InfeasibleEntries is { } exploration)
             {
@@ -1355,6 +1387,7 @@ public sealed partial class EvolutionEngine<TGenome>
                 {
                     Append(builder, entry.Cell.StableKey);
                     AppendEvaluation(builder, entry.Evaluation);
+                    stream.Flush(builder);
                 }
             }
         }
@@ -1369,6 +1402,7 @@ public sealed partial class EvolutionEngine<TGenome>
             Append(builder, record.Island);
             Append(builder, record.Entry.Cell.StableKey);
             AppendEvaluation(builder, record.Entry.Evaluation);
+            stream.Flush(builder);
         }
         Append(builder, "island-histories");
         for (int island = 0; island < _histories.Length; island++)
@@ -1381,6 +1415,7 @@ public sealed partial class EvolutionEngine<TGenome>
             {
                 Append(builder, entry.Cell.StableKey);
                 AppendEvaluation(builder, entry.Evaluation);
+                stream.Flush(builder);
             }
         }
         // Abandonment depends on wall-clock timing, so its counter is reported but deliberately never hashed.

@@ -2,6 +2,7 @@ using System.Security.Cryptography;
 using System.Globalization;
 using System.Text;
 using System.Text.Json;
+using System.Text.Json.Serialization;
 
 namespace AiDotNet.Evolution;
 
@@ -34,7 +35,7 @@ namespace AiDotNet.Evolution;
 /// the newest good save. If a save file is damaged, the store quietly moves on to the previous one instead of failing,
 /// and <see cref="ListCheckpoints"/> shows you which files exist and how good each of them was.</para>
 /// </remarks>
-public sealed class DirectoryEvolutionCheckpointStore : IEvolutionCheckpointSegmentStore
+public sealed partial class DirectoryEvolutionCheckpointStore : IEvolutionCheckpointSegmentStore
 {
     /// <summary>The prefix every snapshot file name starts with.</summary>
     public const string FileNamePrefix = "checkpoint-";
@@ -511,7 +512,7 @@ public sealed class DirectoryEvolutionCheckpointStore : IEvolutionCheckpointSegm
         SnapshotDocument document = SnapshotDocument.From(checkpoint);
         string placeholder = "payload-" + Guid.NewGuid().ToString("N");
         document.Payload = placeholder;
-        string outline = JsonSerializer.Serialize(document, EvolutionJson.Indented);
+        string outline = JsonSerializer.Serialize(document, SnapshotJsonContext.Default.SnapshotDocument);
         int at = outline.IndexOf("\"" + placeholder + "\"", StringComparison.Ordinal);
         if (at < 0 || outline.IndexOf(placeholder, at + placeholder.Length + 2, StringComparison.Ordinal) >= 0)
             throw new InvalidOperationException("The checkpoint snapshot outline is malformed.");
@@ -652,7 +653,7 @@ public sealed class DirectoryEvolutionCheckpointStore : IEvolutionCheckpointSegm
                 json = reader.ReadToEnd();
             }
             if (Encoding.UTF8.GetByteCount(json) > _maxCheckpointBytes) return null;
-            SnapshotDocument? document = JsonSerializer.Deserialize<SnapshotDocument>(json, EvolutionJson.Compact);
+            SnapshotDocument? document = JsonSerializer.Deserialize(json, SnapshotJsonContext.Default.SnapshotDocument);
             if (document is null || !document.IsIntact()) return null;
             EvolutionCheckpoint checkpoint = document.ToCheckpoint();
             checkpoint.Validate();
@@ -732,6 +733,13 @@ public sealed class DirectoryEvolutionCheckpointStore : IEvolutionCheckpointSegm
             int bySequence = first.Sequence.CompareTo(second.Sequence);
             return bySequence != 0 ? bySequence : string.CompareOrdinal(first.FileName, second.FileName);
         });
+
+    // Source-generated, like the engine's state documents. The reflection resolver emitted IL accessors for this type on
+    // the first load, so every resume paid for code generation and the finalizer then spent the run tearing it down (E-1).
+    // The same options as EvolutionJson.Indented, so a snapshot's bytes are unchanged.
+    [JsonSourceGenerationOptions(WriteIndented = true)]
+    [JsonSerializable(typeof(SnapshotDocument))]
+    private sealed partial class SnapshotJsonContext : JsonSerializerContext;
 
     /// <summary>Serialization shape of one on-disk snapshot, with a checksum over its own fields.</summary>
     private sealed class SnapshotDocument
