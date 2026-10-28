@@ -433,6 +433,50 @@ jobs:
             TestResults/upstream-evaluator-worker
           if-no-files-found: warn
 
+  # ContainerExecutionEngine's isolation contract (no network, no writes outside /work, the memory cap, a clean warm
+  # workdir) against the hosted Linux runner's Docker. AIDOTNET_EVOLUTION_REQUIRE_DOCKER turns every "Docker
+  # unavailable" skip into a failure, and the TRX count fails the step if the filter selected fewer tests than exist
+  # (a rename can make it select none, and dotnet test still exits 0), so this lane cannot pass without running them.
+  container-isolation:
+    name: Container execution isolation
+    if: "${{ !(github.event_name == 'push' && startsWith(github.event.head_commit.message, 'chore(main): release')) && !startsWith(github.head_ref, 'release-please--') }}"
+    runs-on: ubuntu-latest
+    timeout-minutes: 20
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+      - uses: actions/setup-dotnet@a98b56852c35b8e3190ac28c8c2271da59106c68 # v6.0.0
+        with:
+          dotnet-version: '10.0.x'
+          dotnet-quality: preview
+      - name: Pull the test image
+        run: docker pull python:3.12-slim
+      - name: Verify container isolation on net10.0 and net8.0
+        env:
+          AIDOTNET_EVOLUTION_REQUIRE_DOCKER: '1'
+          AIDOTNET_EVOLUTION_TEST_IMAGE: python:3.12-slim
+        run: |
+          for framework in net10.0 net8.0; do
+            dotnet test tests/AiDotNet.Evolution.CSharp.Tests/AiDotNet.Evolution.CSharp.Tests.csproj -c Release -f "$framework" \
+              --filter "FullyQualifiedName~ContainerExecutionEngineTests" --blame-hang --blame-hang-timeout 300s \
+              --logger "trx;LogFileName=container-$framework.trx" --results-directory TestResults/container-isolation
+            trx="TestResults/container-isolation/container-$framework.trx"
+            executed="$(grep -o 'executed="[0-9]*"' "$trx" | head -1 | grep -o '[0-9]*')"
+            skipped="$(grep -o 'notExecuted="[0-9]*"' "$trx" | head -1 | grep -o '[0-9]*')"
+            echo "$framework: container tests executed ${executed:-0}, not executed ${skipped:-0}"
+            [ "${executed:-0}" -ge 12 ] || { echo "::error::expected at least 12 container tests on $framework, ran ${executed:-0}"; exit 1; }
+            [ "${skipped:-0}" -eq 0 ] || { echo "::error::$framework skipped ${skipped} container tests on a Linux runner with Docker"; exit 1; }
+          done
+      - name: No container left behind
+        if: always()
+        run: |
+          left="$(docker ps --all --quiet --filter label=org.aidotnet.evolution.container)"
+          [ -z "$left" ] || { echo "::error::containers left behind: $left"; docker ps --all --filter label=org.aidotnet.evolution.container; exit 1; }
+      - uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9 # v7.0.2
+        if: always()
+        with:
+          name: container-isolation
+          path: TestResults/container-isolation
+
   legacy:
     name: Build and test .NET Framework (net471, net462)
     if: "${{ !(github.event_name == 'push' && startsWith(github.event.head_commit.message, 'chore(main): release')) && !startsWith(github.head_ref, 'release-please--') }}"
@@ -519,7 +563,7 @@ jobs:
 
   ci-gate:
     name: CI Gate
-    needs: [modern, legacy, package, representative-suite, external-baseline, program-comparison, noisy-reuse, archive-resources]
+    needs: [modern, legacy, package, representative-suite, external-baseline, program-comparison, noisy-reuse, archive-resources, container-isolation]
     if: "${{ always() && !startsWith(github.head_ref, 'release-please--') && !(github.event_name == 'push' && startsWith(github.event.head_commit.message, 'chore(main): release')) }}"
     runs-on: ubuntu-latest
     timeout-minutes: 5
@@ -534,6 +578,7 @@ jobs:
           PROGRAM_RESULT: ${{ needs.program-comparison.result }}
           REUSE_RESULT: ${{ needs.noisy-reuse.result }}
           ARCHIVE_RESULT: ${{ needs.archive-resources.result }}
+          CONTAINER_RESULT: ${{ needs.container-isolation.result }}
         shell: bash
         run: |
           set -euo pipefail
@@ -546,7 +591,8 @@ jobs:
             "external-baseline:$EXTERNAL_RESULT" \
             "program-comparison:$PROGRAM_RESULT" \
             "noisy-reuse:$REUSE_RESULT" \
-            "archive-resources:$ARCHIVE_RESULT"; do
+            "archive-resources:$ARCHIVE_RESULT" \
+            "container-isolation:$CONTAINER_RESULT"; do
             job="${result%%:*}"
             conclusion="${result#*:}"
             if [ "$conclusion" != success ]; then
