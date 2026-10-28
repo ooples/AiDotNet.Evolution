@@ -73,6 +73,7 @@ AiDotNet.Evolution.Programs.ContainerExecutionOptions.PidsLimit.get -> int
 AiDotNet.Evolution.Programs.ContainerExecutionOptions.PidsLimit.set -> void
 AiDotNet.Evolution.Programs.ContainerExecutionOptions.PythonLaunch.get -> AiDotNet.Evolution.Programs.ContainerPythonLaunch
 AiDotNet.Evolution.Programs.ContainerExecutionOptions.PythonLaunch.set -> void
+AiDotNet.Evolution.Programs.ContainerExecutionOptions.ReadOnlyMounts.get -> System.Collections.Generic.IDictionary<string!, string!>!
 AiDotNet.Evolution.Programs.ContainerExecutionOptions.RecycleAfter.get -> int
 AiDotNet.Evolution.Programs.ContainerExecutionOptions.RecycleAfter.set -> void
 AiDotNet.Evolution.Programs.ContainerExecutionOptions.SeccompProfilePath.get -> string?

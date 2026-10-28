@@ -7,7 +7,8 @@ namespace AiDotNet.Evolution.Programs;
 /// <para>
 /// The isolation itself is not configurable: every container runs with <c>--network none</c>, a read-only root
 /// filesystem, <c>--cap-drop ALL</c>, <c>no-new-privileges</c>, the daemon's seccomp profile (or the one named by
-/// <see cref="SeccompProfilePath"/>), no IPC namespace sharing, no host mounts, and a non-root user. What is
+/// <see cref="SeccompProfilePath"/>), no IPC namespace sharing, no host mounts other than the read-only directories named in
+/// <see cref="ReadOnlyMounts"/>, and a non-root user. What is
 /// configurable is the image, the reuse policy and the sizes. Time, memory, CPU and output limits come from
 /// <see cref="ProgramSandboxOptions.Limits"/>, so one limits object describes a run whichever engine executes it.
 /// </para>
@@ -21,7 +22,14 @@ public sealed class ContainerExecutionOptions
     /// <summary>The largest <see cref="RecycleAfter"/> accepted.</summary>
     public const int MaxRecycleAfter = 1_000_000;
 
+    // Paths a mount may not cover: the workdir is the engine's, and the kernel interfaces are Docker's.
+    private static readonly string[] ReservedMountRoots = { "/work", "/proc", "/sys", "/dev" };
+
+    // `--mount` is a comma-separated list of key=value fields, so these would end or re-quote the source field.
+    private static readonly char[] MountSourceSeparators = { ',', '"', '\n', '\r' };
+
     private readonly Dictionary<ProgramLanguage, ProgramInterpreterSpecification> _interpreters;
+    private readonly Dictionary<string, string> _readOnlyMounts = new(StringComparer.Ordinal);
 
     /// <summary>Initializes options with the default interpreter table and hardening sizes.</summary>
     public ContainerExecutionOptions()
@@ -95,6 +103,26 @@ public sealed class ContainerExecutionOptions
     /// </remarks>
     public IDictionary<ProgramLanguage, ProgramInterpreterSpecification> Interpreters => _interpreters;
 
+    /// <summary>Gets the host directories mounted read-only into every container, keyed by their absolute path inside it.</summary>
+    /// <remarks>
+    /// <para>
+    /// Empty by default, so a container sees no host path. Use it for files an evaluator needs and cannot carry in its
+    /// own source, such as the helpers an OpenEvolve evaluator imports from beside it. Each entry is passed as a
+    /// <c>--mount type=bind,...,readonly</c> and the engine reads every mount back from the daemon, refusing a
+    /// container in which any host path is writable or a mount it did not declare appears.
+    /// </para>
+    /// <para>
+    /// Read-only is not private: the candidate runs as the same user as the evaluator, so it can read everything in a
+    /// mounted directory. Keep credentials, held-out answers and anything else a candidate must not see out of it.
+    /// The directory must be readable by <see cref="UserId"/>. Keys must be absolute paths of letters, digits,
+    /// <c>.</c>, <c>_</c>, <c>-</c> and <c>/</c>, and must not be or lie under <c>/work</c>, <c>/proc</c>,
+    /// <c>/sys</c> or <c>/dev</c>; values must be rooted host paths without a comma or a quote. The mounts are part of
+    /// <see cref="ContainerExecutionEngine.VersionHash"/>; the files in them are not, so a caller that needs a
+    /// changed file to change results should hash it into its own identity.
+    /// </para>
+    /// </remarks>
+    public IDictionary<string, string> ReadOnlyMounts => _readOnlyMounts;
+
     /// <summary>Builds the default in-image interpreter table.</summary>
     /// <returns>Python as <c>python3</c> and JavaScript as <c>node</c>.</returns>
     public static Dictionary<ProgramLanguage, ProgramInterpreterSpecification> CreateDefaultInterpreters() => new()
@@ -125,6 +153,8 @@ public sealed class ContainerExecutionOptions
         clone._interpreters.Clear();
         foreach (KeyValuePair<ProgramLanguage, ProgramInterpreterSpecification> entry in _interpreters)
             clone._interpreters[entry.Key] = entry.Value;
+        foreach (KeyValuePair<string, string> mount in _readOnlyMounts)
+            clone._readOnlyMounts[mount.Key] = mount.Value;
         return clone;
     }
 
@@ -173,6 +203,35 @@ public sealed class ContainerExecutionOptions
                     nameof(Interpreters));
             }
         }
+
+        foreach (KeyValuePair<string, string> mount in _readOnlyMounts)
+        {
+            if (!IsMountTarget(mount.Key))
+            {
+                throw new ArgumentException(
+                    "The read-only mount target '" + mount.Key + "' must be an absolute path of letters, digits, '.', '_', '-' and '/' " +
+                    "that is not, and is not under, /work, /proc, /sys or /dev.",
+                    nameof(ReadOnlyMounts));
+            }
+
+            if (string.IsNullOrWhiteSpace(mount.Value) || !Path.IsPathRooted(mount.Value) || mount.Value.IndexOfAny(MountSourceSeparators) >= 0)
+            {
+                throw new ArgumentException(
+                    "The host directory for " + mount.Key + " must be a rooted path without a comma, a quote or a line break.",
+                    nameof(ReadOnlyMounts));
+            }
+        }
+    }
+
+    private static bool IsMountTarget(string path)
+    {
+        if (path.Length < 2 || path[0] != '/' || path[path.Length - 1] == '/') return false;
+        if (path.Any(c => !(c is (>= 'a' and <= 'z') or (>= 'A' and <= 'Z') or (>= '0' and <= '9') or '.' or '_' or '-' or '/')))
+            return false;
+        string[] segments = path.Substring(1).Split('/');
+        if (segments.Any(segment => segment.Length == 0 || segment == "." || segment == "..")) return false;
+        return !ReservedMountRoots.Any(root =>
+            string.Equals(path, root, StringComparison.Ordinal) || path.StartsWith(root + "/", StringComparison.Ordinal));
     }
 
     private static void Require(bool condition, string name, object value, string message)

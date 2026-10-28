@@ -16,8 +16,9 @@ namespace AiDotNet.Evolution.Programs;
 /// Every container is started with <c>--network none</c> (loopback only), <c>--read-only</c> (no writable path but an
 /// in-memory <c>/work</c>), <c>--cap-drop ALL</c>, <c>--security-opt no-new-privileges=true</c>, the daemon's default
 /// seccomp profile, <c>--ipc none</c>, <c>--pids-limit</c>, <c>--memory</c> with no swap, <c>--cpus</c>, a non-root
-/// numeric user and no host mounts. The candidate's source and standard input travel over the container's attached
-/// standard input, so nothing on the host filesystem is shared with it. Before a container is used, the engine reads
+/// numeric user and no host mounts beyond the read-only directories named in
+/// <see cref="ContainerExecutionOptions.ReadOnlyMounts"/> (none by default). The candidate's source and standard input
+/// travel over the container's attached standard input, so no host file needs to be shared with it. Before a container is used, the engine reads
 /// the configuration back from <c>docker inspect</c> and has the supervisor inside report its own seccomp mode,
 /// <c>no_new_privs</c> flag, effective capabilities and user, and refuses the container if any of them differs from what
 /// was asked for.
@@ -113,6 +114,9 @@ public sealed class ContainerExecutionEngine : IProgramExecutionEngine, IProgram
             JsonSerializer.Serialize(_container.Interpreters.OrderBy(pair => pair.Key)
                 .Select(pair => new { pair.Key, pair.Value.Executable, pair.Value.RunArgumentTemplate })),
             EvolutionHash.Compute(_script),
+            // What a candidate can read beyond the image; the files' contents are the caller's to identify.
+            string.Join("\u001f", _container.ReadOnlyMounts.OrderBy(pair => pair.Key, StringComparer.Ordinal)
+                .Select(pair => pair.Key + "=" + pair.Value)),
             // A declared module search path changes what a candidate can import, so it changes what a result means.
             string.Join("\u001f", _options.DeclaredEnvironment.OrderBy(pair => pair.Key, StringComparer.Ordinal)
                 .Select(pair => pair.Key + "=" + pair.Value))
@@ -380,6 +384,13 @@ public sealed class ContainerExecutionEngine : IProgramExecutionEngine, IProgram
             "--env", "HOME=" + Workdir, "--env", "TMPDIR=" + Workdir, "--env", "LANG=C.UTF-8",
             "--env", "PYTHONIOENCODING=utf-8", "--env", "PYTHONDONTWRITEBYTECODE=1"
         };
+        // Declared host directories only, each read-only; VerifyConfigurationAsync refuses anything else the daemon mounted.
+        foreach (KeyValuePair<string, string> mount in _container.ReadOnlyMounts.OrderBy(pair => pair.Key, StringComparer.Ordinal))
+        {
+            arguments.Add("--mount");
+            arguments.Add("type=bind,source=" + mount.Value + ",target=" + mount.Key + ",readonly");
+        }
+
         if (_container.SeccompProfilePath is { } profile)
         {
             arguments.Add("--security-opt");
@@ -487,8 +498,18 @@ public sealed class ContainerExecutionEngine : IProgramExecutionEngine, IProgram
         if (host["PidsLimit"]?.GetValue<long>() != _container.PidsLimit) return "the process limit is not applied";
         if (host["Memory"]?.GetValue<long>() != memory || host["MemorySwap"]?.GetValue<long>() != memory) return "the memory limit is not applied";
         if (host["NanoCpus"]?.GetValue<long>() != cpus) return "the CPU limit is not applied";
-        bool mounted = (root["Mounts"] as JsonArray)?.Any(mount => mount?["Type"]?.GetValue<string>() != "tmpfs") == true;
-        if (Strings(host["Binds"]).Count != 0 || mounted) return "host paths or volumes are mounted";
+        if (Strings(host["Binds"]).Count != 0) return "host paths are bound";
+        var declared = new HashSet<string>(_container.ReadOnlyMounts.Keys, StringComparer.Ordinal);
+        foreach (JsonNode? mount in root["Mounts"] as JsonArray ?? new JsonArray())
+        {
+            string? type = mount?["Type"]?.GetValue<string>();
+            if (type == "tmpfs") continue;
+            string destination = mount?["Destination"]?.GetValue<string>() ?? string.Empty;
+            if (type != "bind" || !declared.Remove(destination)) return "an undeclared host path or volume is mounted at " + destination;
+            if (mount?["RW"]?.GetValue<bool>() != false) return "the host path mounted at " + destination + " is writable";
+        }
+
+        if (declared.Count != 0) return "a declared read-only mount is missing: " + string.Join(", ", declared);
         if (host["Tmpfs"]?[Workdir] is null) return "the workdir is not a tmpfs";
         return null;
     }

@@ -82,6 +82,20 @@ public sealed class ContainerExecutionEngineTests
         Assert.Throws<ArgumentOutOfRangeException>(() => new ContainerExecutionOptions { Image = "x", PidsLimit = 7 }.Validate());
         Assert.Throws<ArgumentOutOfRangeException>(() => new ContainerExecutionOptions { Image = "x", WorkspaceSizeMb = 0 }.Validate());
         Assert.Throws<ArgumentOutOfRangeException>(() => new ContainerExecutionOptions { Image = "x", StartupTimeoutSeconds = 0 }.Validate());
+        string hostDirectory = Path.GetFullPath(Path.GetTempPath());
+        foreach (string target in new[] { "relative", "/", "/work", "/work/x", "/proc", "/sys/fs", "/dev", "/a/../work", "/a//b", "/a/", "/a b", "/a,b" })
+        {
+            var mounted = new ContainerExecutionOptions { Image = "x" };
+            mounted.ReadOnlyMounts[target] = hostDirectory;
+            Assert.Throws<ArgumentException>(() => mounted.Validate());
+        }
+
+        foreach (string source in new[] { "", "relative/dir", hostDirectory + ",readonly=false", hostDirectory + "\"x" })
+        {
+            var mounted = new ContainerExecutionOptions { Image = "x" };
+            mounted.ReadOnlyMounts["/opt/evaluator"] = source;
+            Assert.Throws<ArgumentException>(() => mounted.Validate());
+        }
 
         var copy = new ContainerExecutionOptions
         {
@@ -92,8 +106,11 @@ public sealed class ContainerExecutionEngineTests
             WorkspaceSizeMb = 16,
             SupervisorPython = "/usr/local/bin/python3",
             StartupTimeoutSeconds = 5
-        }.Clone();
+        };
+        copy.ReadOnlyMounts["/opt/evaluator"] = hostDirectory;
+        copy = copy.Clone();
         copy.Validate();
+        Assert.Equal(hostDirectory, Assert.Single(copy.ReadOnlyMounts, pair => pair.Key == "/opt/evaluator").Value);
         Assert.Equal("/usr/bin/docker", copy.DockerExecutable);
         Assert.Equal(7, copy.RecycleAfter);
         Assert.Equal(32, copy.PidsLimit);
@@ -107,6 +124,17 @@ public sealed class ContainerExecutionEngineTests
     {
         using var engine = new ContainerExecutionEngine(Sandbox(), Container());
         string arguments = string.Join(" ", engine.BuildRunArguments("probe"));
+        ContainerExecutionOptions mounting = Container();
+        string hostDirectory = Path.GetFullPath(Path.GetTempPath()).TrimEnd('/');
+        mounting.ReadOnlyMounts["/opt/evaluator"] = hostDirectory;
+        using (var mounted = new ContainerExecutionEngine(Sandbox(), mounting))
+        {
+            Assert.Contains("--mount type=bind,source=" + hostDirectory + ",target=/opt/evaluator,readonly",
+                string.Join(" ", mounted.BuildRunArguments("probe")), StringComparison.Ordinal);
+            // What a candidate can read is part of what a result means.
+            Assert.NotEqual(engine.VersionHash, mounted.VersionHash);
+        }
+
         foreach (string flag in new[]
                  {
                      "--network none", "--read-only", "--cap-drop ALL", "--security-opt no-new-privileges=true", "--ipc none",
@@ -185,6 +213,50 @@ public sealed class ContainerExecutionEngineTests
             ?? throw new InvalidOperationException("no result: " + response.StdOut);
         Assert.Equal("written", result["/work/probe"]);
         Assert.All(result.Where(entry => entry.Key != "/work/probe"), entry => Assert.Equal("refused", entry.Value));
+    }
+
+    [DockerFact]
+    public async Task A_declared_host_directory_is_readable_and_cannot_be_written()
+    {
+        string host = Path.Combine(Path.GetTempPath(), "aidotnet-container-mount-" + Guid.NewGuid().ToString("N"));
+        Directory.CreateDirectory(host);
+        try
+        {
+            File.WriteAllText(Path.Combine(host, "helper.txt"), "from the host");
+            // The container runs as nobody, so the directory must be readable by others whatever the runner's umask is.
+            if (!OperatingSystem.IsWindows())
+            {
+                File.SetUnixFileMode(host, (UnixFileMode)0b111_101_101);
+                File.SetUnixFileMode(Path.Combine(host, "helper.txt"), (UnixFileMode)0b110_100_100);
+            }
+
+            ContainerExecutionOptions container = Container();
+            container.ReadOnlyMounts["/opt/evaluator"] = host;
+            using var engine = new ContainerExecutionEngine(Sandbox(), container);
+            const string Probe = "import json, os\n" +
+                                 "result = {'read': open('/opt/evaluator/helper.txt').read()}\n" +
+                                 "for path in ['/opt/evaluator/helper.txt', '/opt/evaluator/new.txt']:\n" +
+                                 "    try:\n" +
+                                 "        with open(path, 'a') as f:\n" +
+                                 "            f.write('x')\n" +
+                                 "        result[path] = 'written'\n" +
+                                 "    except OSError:\n" +
+                                 "        result[path] = 'refused'\n" +
+                                 "print(json.dumps(result))\n";
+            ProgramExecuteResponse response = await Run(engine, Probe);
+            Assert.True(response.Success, response.Error + " " + response.StdErr);
+            Dictionary<string, string> result = JsonSerializer.Deserialize<Dictionary<string, string>>(response.StdOut.Trim())
+                ?? throw new InvalidOperationException("no result: " + response.StdOut);
+            Assert.Equal("from the host", result["read"]);
+            Assert.Equal("refused", result["/opt/evaluator/helper.txt"]);
+            Assert.Equal("refused", result["/opt/evaluator/new.txt"]);
+            Assert.Equal("from the host", File.ReadAllText(Path.Combine(host, "helper.txt")));
+            Assert.False(File.Exists(Path.Combine(host, "new.txt")));
+        }
+        finally
+        {
+            Directory.Delete(host, recursive: true);
+        }
     }
 
     [DockerFact]
