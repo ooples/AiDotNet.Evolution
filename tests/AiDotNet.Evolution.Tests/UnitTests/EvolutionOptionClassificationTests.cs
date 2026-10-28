@@ -25,7 +25,8 @@ public sealed class EvolutionOptionClassificationTests
         nameof(EvolutionEngineOptions.TimeProvider),
         // How checkpoints store the deduplication set and cache, never what is in them: a run resumes under either format.
         nameof(EvolutionEngineOptions.CheckpointFormat),
-        nameof(EvolutionEngineOptions.CheckpointSegmentThreshold)
+        nameof(EvolutionEngineOptions.CheckpointSegmentThreshold),
+        nameof(EvolutionEngineOptions.CheckpointCompactionInterval)
     };
 
     // The third category, and the only one allowed to appear in NEITHER canonical string. A derived option does not

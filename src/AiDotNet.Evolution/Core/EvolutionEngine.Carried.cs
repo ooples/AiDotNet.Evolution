@@ -57,8 +57,9 @@ public sealed partial class EvolutionEngine<TGenome>
 
     private void RecordCall(long evaluationId, int stage, int attempt, EvolutionTaskResult result, bool abandoned)
     {
-        // A cancelled call says nothing about what the evaluator returns, so it is never replayed.
-        if (result.Status == EvolutionEvaluationStatus.Canceled) return;
+        // A cancelled call says nothing about what the evaluator returns, so it is never replayed. Carried calls only
+        // ever reach a checkpoint, so without a store there is nothing to record (a document per call otherwise, E-1).
+        if (_checkpointStore is null || result.Status == EvolutionEvaluationStatus.Canceled) return;
         lock (_callGate)
             _batchCalls.Add(new CarriedEvaluationDocument
             {
@@ -70,6 +71,10 @@ public sealed partial class EvolutionEngine<TGenome>
             });
     }
 
+    // What a miss reports. It is never committed (a miss calls the evaluator), so one immutable instance serves every miss
+    // instead of a result allocated per evaluation.
+    private static readonly EvolutionTaskResult NotCarried = new(EvolutionEvaluationStatus.Canceled);
+
     private bool TryTakeCarried(long evaluationId, int stage, int attempt, out EvolutionTaskResult result)
     {
         CarriedEvaluationDocument? call;
@@ -77,7 +82,7 @@ public sealed partial class EvolutionEngine<TGenome>
         {
             if (!_carriedCalls.TryGetValue((evaluationId, stage, attempt), out call))
             {
-                result = new EvolutionTaskResult(EvolutionEvaluationStatus.Canceled);
+                result = NotCarried;
                 return false;
             }
             _carriedCalls.Remove((evaluationId, stage, attempt));
@@ -160,10 +165,9 @@ public sealed partial class EvolutionEngine<TGenome>
         if (carried.Any(call => call.Result?.MeasurementOriginJson is not null) &&
             node["SchemaVersion"] is System.Text.Json.Nodes.JsonValue value && value.TryGetValue(out int version))
         {
-            bool segmented = version >= EngineSegmentedSchemaVersion;
-            int feature = segmented ? version - SegmentedSchemaOffset : version;
-            if (feature < EngineMeasurementOriginSchemaVersion)
-                node["SchemaVersion"] = EngineMeasurementOriginSchemaVersion + (segmented ? SegmentedSchemaOffset : 0);
+            int offset = SchemaOffsetOf(version);
+            if (version - offset < EngineMeasurementOriginSchemaVersion)
+                node["SchemaVersion"] = EngineMeasurementOriginSchemaVersion + offset;
         }
         return node.ToJsonString();
     }

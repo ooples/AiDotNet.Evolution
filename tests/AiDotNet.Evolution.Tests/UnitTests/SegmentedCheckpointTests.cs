@@ -87,10 +87,10 @@ public sealed class SegmentedCheckpointTests
     }
 
     [Fact]
-    public async Task A_segmented_payload_leaves_out_exactly_the_deduplication_set_and_cache()
+    public async Task A_segmented_payload_leaves_out_exactly_the_deduplication_set_cache_and_archive_entries()
     {
-        // The two structures that grow with every distinct genome are the whole difference; everything else, bounded by
-        // the archive, is identical apart from the segment list and the version.
+        // The two structures that grow with every distinct genome, and the archive entries (E-1), are the whole
+        // difference; everything else is identical apart from the segment list and the version.
         async Task<JsonObject> Saved(EvolutionCheckpointFormat format)
         {
             var store = new InMemoryEvolutionCheckpointStore();
@@ -108,7 +108,22 @@ public sealed class SegmentedCheckpointTests
             if (field.Key is "SeenGenomeIds" or "Cache" or "SchemaVersion" or "BudgetOptions" or "Islands") continue;
             Assert.Equal(field.Value?.ToJsonString(), segmented[field.Key]?.ToJsonString());
         }
-        Assert.Equal(inline["SchemaVersion"]!.GetValue<int>() + 4, segmented["SchemaVersion"]!.GetValue<int>());
+        // The archive offset, not the deduplication-only one, so an engine that predates archive segments refuses it.
+        Assert.Equal(Assert.IsAssignableFrom<JsonValue>(inline["SchemaVersion"]).GetValue<int>() + 8,
+            Assert.IsAssignableFrom<JsonValue>(segmented["SchemaVersion"]).GetValue<int>());
+        JsonArray inlineIslands = Assert.IsType<JsonArray>(inline["Islands"]);
+        JsonArray segmentedIslands = Assert.IsType<JsonArray>(segmented["Islands"]);
+        Assert.Equal(inlineIslands.Count, segmentedIslands.Count);
+        for (int island = 0; island < inlineIslands.Count; island++)
+        {
+            JsonObject full = Assert.IsType<JsonObject>(inlineIslands[island]);
+            JsonObject journaled = Assert.IsType<JsonObject>(segmentedIslands[island]);
+            Assert.NotEmpty(Assert.IsType<JsonArray>(full["Entries"]));
+            Assert.Null(journaled["Entries"]);
+            Assert.True(Assert.IsAssignableFrom<System.Text.Json.Nodes.JsonValue>(journaled["EntriesInSegments"]).GetValue<bool>());
+            Assert.Equal(full["Version"]?.ToJsonString(), journaled["Version"]?.ToJsonString());
+            Assert.Equal(full["Descriptors"]?.ToJsonString(), journaled["Descriptors"]?.ToJsonString());
+        }
         Assert.NotEmpty(Assert.IsType<JsonArray>(segmented["Segments"]));
         // An inline payload names no segments at all, so it is what engines before segments wrote.
         Assert.False(inline.ContainsKey("Segments"));

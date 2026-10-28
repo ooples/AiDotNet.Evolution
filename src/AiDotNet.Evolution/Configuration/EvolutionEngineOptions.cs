@@ -272,13 +272,15 @@ public sealed class EvolutionEngineOptions
     /// </remarks>
     public int DeduplicationCapacity { get; set; }
 
-    /// <summary>Gets or sets how checkpoints store the deduplication set and evaluation cache.</summary>
+    /// <summary>Gets or sets how checkpoints store the deduplication set, evaluation cache and island archives.</summary>
     /// <remarks>
     /// <see cref="EvolutionCheckpointFormat.Auto"/>, the default, keeps self-contained checkpoints until the run holds
     /// <see cref="CheckpointSegmentThreshold"/> deduplication and cache entries together (with the evaluation cache on,
-    /// each distinct evaluated genome is one of each) and then switches to store segments, so a save costs
-    /// what changed instead of everything the run has seen. The format changes how state is stored, not what the search
-    /// does, so it is not part of the compatibility hash and a run can resume under a different one.
+    /// each distinct evaluated genome is one of each), or until an inline checkpoint payload reaches about a megabyte, and
+    /// then switches to store segments: an append-only journal in which each save writes only what changed, with a
+    /// compacted base segment every <see cref="CheckpointCompactionInterval"/> segments. The format changes how state is
+    /// stored, not what the search does, so it is not part of the compatibility hash and a run can resume under a
+    /// different one.
     /// </remarks>
     public EvolutionCheckpointFormat CheckpointFormat { get; set; } = EvolutionCheckpointFormat.Auto;
 
@@ -287,6 +289,19 @@ public sealed class EvolutionEngineOptions
     /// inline before it switches to segments. The default is 50,000.
     /// </summary>
     public int CheckpointSegmentThreshold { get; set; } = 50_000;
+
+    /// <summary>
+    /// Gets or sets how many segments a segmented checkpoint chains before the next save writes a compacted base segment
+    /// that restates the whole state. The default is 32.
+    /// </summary>
+    /// <remarks>
+    /// Every save between bases writes only what changed, and a resume replays the base and every delta after it, so a
+    /// smaller interval makes resume read less and makes more saves pay for a full base; a larger one does the opposite.
+    /// The value must be between 1 (every save is a base) and one less than
+    /// <see cref="EvolutionCheckpoint.MaximumSegmentCount"/>. Like the format, it changes how state is stored and not
+    /// what the search does, so it is not part of the compatibility hash.
+    /// </remarks>
+    public int CheckpointCompactionInterval { get; set; } = 32;
 
     /// <summary>Gets or sets whether final failed/timed-out identities remain permanently deduplicated.</summary>
     public bool DeduplicateFailedCandidates { get; set; }
@@ -589,6 +604,8 @@ public sealed class EvolutionEngineOptions
         if (!Enum.IsDefined(typeof(EvolutionCheckpointFormat), CheckpointFormat))
             throw new ArgumentOutOfRangeException(nameof(CheckpointFormat));
         if (CheckpointSegmentThreshold < 1) throw new ArgumentOutOfRangeException(nameof(CheckpointSegmentThreshold));
+        if (CheckpointCompactionInterval < 1 || CheckpointCompactionInterval >= EvolutionCheckpoint.MaximumSegmentCount)
+            throw new ArgumentOutOfRangeException(nameof(CheckpointCompactionInterval));
         Guard.Positive(MaxRetainedFailures);
         if (MaxRetainedFailures > EvolutionCollectionLimits.MaximumResultEntries)
             throw new ArgumentOutOfRangeException(nameof(MaxRetainedFailures));
@@ -720,6 +737,7 @@ public sealed class EvolutionEngineOptions
             DeduplicationCapacity = DeduplicationCapacity,
             CheckpointFormat = CheckpointFormat,
             CheckpointSegmentThreshold = CheckpointSegmentThreshold,
+            CheckpointCompactionInterval = CheckpointCompactionInterval,
             DeduplicateFailedCandidates = DeduplicateFailedCandidates,
             IslandCount = IslandCount,
             MigrationInterval = MigrationInterval,
@@ -822,7 +840,10 @@ public sealed class EvolutionEngineOptions
             : new[] { Field("checkpoint-format", CheckpointFormat.ToString()) })
         .Concat(CheckpointSegmentThreshold == 50_000
             ? Array.Empty<KeyValuePair<string, string>>()
-            : new[] { Field("checkpoint-segment-threshold", CheckpointSegmentThreshold.ToString(CultureInfo.InvariantCulture)) }).ToArray();
+            : new[] { Field("checkpoint-segment-threshold", CheckpointSegmentThreshold.ToString(CultureInfo.InvariantCulture)) })
+        .Concat(CheckpointCompactionInterval == 32
+            ? Array.Empty<KeyValuePair<string, string>>()
+            : new[] { Field("checkpoint-compaction-interval", CheckpointCompactionInterval.ToString(CultureInfo.InvariantCulture)) }).ToArray();
 
     /// <summary>Encodes the semantic options into the string the configuration hash is computed from.</summary>
     internal string ToSemanticCanonicalString() => Encode(SemanticFields());

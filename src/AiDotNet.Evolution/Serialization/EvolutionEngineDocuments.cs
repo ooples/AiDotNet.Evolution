@@ -133,6 +133,21 @@ internal static class EvolutionEngineDocuments
         public List<string>? RemovedGenomeIds { get; set; }
         public List<CacheDocument>? Cache { get; set; }
         public List<string>? RemovedCacheIds { get; set; }
+
+        // Segment schema 2 (E-1): the island archives as well. A base lists every island's whole archive; a delta lists
+        // only the islands whose archive changed. Absent from schema 1 segments, which hold no archive.
+        [JsonIgnore(Condition = JsonIgnoreCondition.WhenWritingNull)]
+        public List<ArchiveSegmentDocument>? Islands { get; set; }
+    }
+
+    // One island's archive in a segment: the entries written (keyed by cell, in ordinal cell order) and, in a delta, the
+    // cells emptied since the previous segment.
+    internal sealed class ArchiveSegmentDocument
+    {
+        public int Island { get; set; }
+        public List<ArchiveEntryDocument>? Entries { get; set; }
+        [JsonIgnore(Condition = JsonIgnoreCondition.WhenWritingNull)]
+        public List<string>? RemovedCells { get; set; }
     }
 
     internal sealed class CacheDocument
@@ -155,15 +170,21 @@ internal static class EvolutionEngineDocuments
         [JsonIgnore(Condition = JsonIgnoreCondition.WhenWritingNull)]
         public List<ArchiveEntryDocument>? InfeasibleEntries { get; set; }
 
-        public static ArchiveDocument From<TGenome>(IEvolutionArchive<TGenome> archive, Func<TGenome, string> serializeGenome) => new()
+        /// <summary>Set when this island's entries are in the checkpoint's store segments rather than in <see cref="Entries"/>.</summary>
+        [JsonIgnore(Condition = JsonIgnoreCondition.WhenWritingDefault)]
+        public bool EntriesInSegments { get; set; }
+
+        // The entries come in already ordered by cell, with their documents, so a caller that keeps each entry's document
+        // between boundaries never serializes an unchanged genome twice (E-1).
+        public static ArchiveDocument From<TGenome>(IEvolutionArchive<TGenome> archive, List<ArchiveEntryDocument> orderedEntries,
+            Func<EvolutionArchiveEntry<TGenome>, ArchiveEntryDocument> document) => new()
         {
             Version = archive.Version,
             Pareto = (archive as IEvolutionParetoArchiveView<TGenome>)?.ParetoDefinition is { } definition ? ParetoDocument.From(definition) : null,
             InfeasibleEntries = (archive as IEvolutionParetoArchiveView<TGenome>)?.InfeasibleEntries?
-                .OrderBy(entry => entry.Cell.StableKey, StringComparer.Ordinal).Select(entry => ArchiveEntryDocument.From(entry, serializeGenome)).ToList(),
+                .OrderBy(entry => entry.Cell.StableKey, StringComparer.Ordinal).Select(document).ToList(),
             Descriptors = archive.Descriptors.Select(DescriptorDocument.From).ToList(),
-            Entries = archive.Entries.OrderBy(item => item.Cell.StableKey, StringComparer.Ordinal)
-                .Select(entry => ArchiveEntryDocument.From(entry, serializeGenome)).ToList()
+            Entries = orderedEntries
         };
     }
 

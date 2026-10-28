@@ -386,6 +386,8 @@ AiDotNet.Evolution.EvolutionEngineOptions.CheckpointInterval.get -> int
 AiDotNet.Evolution.EvolutionEngineOptions.CheckpointInterval.set -> void
 AiDotNet.Evolution.EvolutionEngineOptions.CheckpointSegmentThreshold.get -> int
 AiDotNet.Evolution.EvolutionEngineOptions.CheckpointSegmentThreshold.set -> void
+AiDotNet.Evolution.EvolutionEngineOptions.CheckpointCompactionInterval.get -> int
+AiDotNet.Evolution.EvolutionEngineOptions.CheckpointCompactionInterval.set -> void
 AiDotNet.Evolution.EvolutionEngineOptions.Copy() -> AiDotNet.Evolution.EvolutionEngineOptions!
 AiDotNet.Evolution.EvolutionEngineOptions.DeduplicateFailedCandidates.get -> bool
 AiDotNet.Evolution.EvolutionEngineOptions.DeduplicateFailedCandidates.set -> void
@@ -2204,6 +2206,7 @@ static AiDotNet.Evolution.EvolutionDescriptorCalibration.CalibrateAsync<TGenome>
 static AiDotNet.Evolution.EvolutionDescriptorCalibration.FromObservations(System.Collections.Generic.IReadOnlyList<System.Collections.Generic.IReadOnlyDictionary<string!, double>!>! observations, System.Collections.Generic.IReadOnlyList<string!>? names = null, AiDotNet.Evolution.EvolutionDescriptorCalibrationOptions? options = null) -> System.Collections.Generic.IReadOnlyList<AiDotNet.Evolution.EvolutionDescriptorDefinition!>!
 static AiDotNet.Evolution.EvolutionDurableEvaluationPayload.FromJson(string! json) -> AiDotNet.Evolution.EvolutionDurableEvaluationPayload!
 static AiDotNet.Evolution.EvolutionEngine<TGenome>.ReadCheckpoint(AiDotNet.Evolution.EvolutionCheckpoint! checkpoint, AiDotNet.Evolution.IEvolutionGenomeCodec<TGenome>! genomeCodec) -> AiDotNet.Evolution.EvolutionCheckpointContents<TGenome>!
+static AiDotNet.Evolution.EvolutionEngine<TGenome>.ReadCheckpointAsync(AiDotNet.Evolution.EvolutionCheckpoint! checkpoint, AiDotNet.Evolution.IEvolutionGenomeCodec<TGenome>! genomeCodec, AiDotNet.Evolution.IEvolutionCheckpointSegmentStore! segmentStore, System.Threading.CancellationToken cancellationToken = default(System.Threading.CancellationToken)) -> System.Threading.Tasks.Task<AiDotNet.Evolution.EvolutionCheckpointContents<TGenome>!>!
 static AiDotNet.Evolution.EvolutionEngineOptions.CreateOpenEvolveDefaults() -> AiDotNet.Evolution.EvolutionEngineOptions!
 static AiDotNet.Evolution.EvolutionEvaluationCacheKey.CreateAsync<TGenome>(AiDotNet.Evolution.EvolutionCanonicalGenome<TGenome>! candidate, AiDotNet.Evolution.IEvolutionTask<TGenome>! task, AiDotNet.Evolution.IEvolutionGenomeCodec<TGenome>! codec, AiDotNet.Evolution.EvolutionReuseScope! scope, string! measurementVersion, System.Threading.CancellationToken cancellationToken = default(System.Threading.CancellationToken)) -> System.Threading.Tasks.ValueTask<AiDotNet.Evolution.EvolutionEvaluationCacheKey!>
 static AiDotNet.Evolution.EvolutionEvaluationCacheRecord.FromJson(string! json) -> AiDotNet.Evolution.EvolutionEvaluationCacheRecord!
