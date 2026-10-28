@@ -125,6 +125,20 @@ public sealed class ProgramGenomeCodecTests
     [InlineData("{\"v\":1,\"language\":\"Python\",\"source\":\"x\",}")]
     [InlineData("  {\"v\":1,\"language\":\"Python\",\"source\":\"x\"}  ")]
     [InlineData("{\"v\":1,\"language\":\"Python\",\"source\":\"tab\\there\\nnew \\\"quoted\\\" \\\\ back\"}")]
+    [InlineData("{\"v\":1,\"language\":\"Python\",\"source\":\"\\b\\f\\/\\r \\u0041\\u00E9\\u00e9\"}")]
+    [InlineData("{\"v\":1,\"language\":\"Python\",\"source\":\"\\u0031 starts with a digit once unescaped\"}")]
+    [InlineData("{\"v\":1,\"language\":\"Python\",\"source\":\"\\/ starts with a slash once unescaped\"}")]
+    [InlineData("{\"v\":1,\"language\":\"Python\",\"source\":\"bad \\x escape\"}")]
+    [InlineData("{\"v\":1,\"language\":\"Python\",\"source\":\"single \\u12 hex\"}")]
+    [InlineData("{\"v\":1,\"language\":\"Python\",\"source\":\"apostrophe \\u0027 and \\\' escape\"}")]
+    [InlineData("{\"v\":1,\"language\":\"Python\",\"source\":\"raw\ttab and raw\nnewline\"}")]
+    [InlineData("{\"v\": 1, \"language\": \"Python\", \"source\": \"x\"}")]
+    [InlineData("{\"v\":12,\"language\":\"Python\",\"source\":\"x\"}")]
+    [InlineData("{\"v\":1,\"language\":\"Python\",\"source\":\"unterminated")]
+    [InlineData("{\"v\":1,\"language\":\"Python\",\"source\":\"x\"}}")]
+    [InlineData("{\"v\":1,\"lang\\u0075age\":\"Python\",\"source\":\"x\"}")]
+    [InlineData("{\"v\":1,\"language\":\"Python\",\"source\":\"x\",\"description\":\"\"}")]
+    [InlineData("{\"v\":1,\"language\":\"Python\",\"source\":\"\"}")]
     public void EveryPayloadDecodesAsJsonNetReadsIt(string payload)
     {
         (string? Language, string? Source, string? Description)? expected;

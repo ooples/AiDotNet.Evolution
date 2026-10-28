@@ -1,6 +1,6 @@
 // Source: ooples/AiDotNet 66d7602c92101e5ab2bd9db8cfa7f7526fa2c75d:src/Evolution/Programs/ProgramGenomeCodec.cs; original BSL license retained in src/AiDotNet.Evolution.Programs/AIDOTNET-LICENSE.txt.
 using System.IO;
-using System.Text;
+using System.Runtime.CompilerServices;
 using Newtonsoft.Json;
 using Newtonsoft.Json.Linq;
 
@@ -68,91 +68,160 @@ public sealed class ProgramGenomeCodec : IEvolutionGenomeCodec<ProgramGenome>
         return parsed;
     }
 
-    private static readonly UTF8Encoding StrictUtf8 = new(encoderShouldEmitUTF8Identifier: false, throwOnInvalidBytes: true);
-
-    // The payloads Serialize writes, read without building a JObject: a resume decodes every archived genome, and the
-    // general reader was most of its decoding time (E-1). This accepts only text whose meaning under the general path is
-    // certain: strict JSON, one object whose properties are exactly v (the integer 1), language, source and optionally
-    // description, each once and each a plain string. Anything else - comments, other properties, repeats, other
-    // types, a string Json.NET would read as a date, a lone surrogate - returns false and takes the general path, so a
-    // payload decodes, or is refused, exactly as before.
+    // The payloads Serialize writes, read straight from the text without building a JObject: a resume decodes every
+    // archived genome, and the general reader was most of its decoding time (E-1). This accepts only text whose meaning
+    // under the general path is certain: the compact form Serialize writes, one object with no white space or comments
+    // outside its strings, whose properties are exactly v (the integer 1), language, source and optionally description,
+    // each once, each name unescaped and each value a plain string. Anything else - other properties, repeats, other
+    // types, a raw control character, an escaped surrogate, a string Json.NET would read as a date - returns false and
+    // takes the general path, so a payload decodes, or is refused, exactly as before.
+    // Fully optimized from the first call: a resume decodes every archived genome within about a second, before tiered
+    // compilation would promote this (E-1).
+    [MethodImpl(MethodImplOptions.AggressiveOptimization)]
     private static bool TryReadCanonical(string payload, out string? language, out string? source, out string? description)
     {
         language = null;
         source = null;
         description = null;
-        byte[] utf8;
-        try
+        ReadOnlySpan<char> text = payload.AsSpan();
+        if (text.Length == 0 || text[0] != '{') return false;
+        int position = 1;
+        bool sawVersion = false;
+        while (true)
         {
-            utf8 = StrictUtf8.GetBytes(payload);
-        }
-        catch (EncoderFallbackException)
-        {
-            return false;
-        }
+            if (position >= text.Length || text[position] != '"') return false;
+            int nameLength = text.Slice(position + 1).IndexOf('"');
+            if (nameLength < 0) return false;
+            ReadOnlySpan<char> name = text.Slice(position + 1, nameLength);
+            position += nameLength + 2;
+            if (position >= text.Length || text[position] != ':') return false;
+            position++;
 
-        try
-        {
-            var reader = new System.Text.Json.Utf8JsonReader(utf8, new System.Text.Json.JsonReaderOptions
+            if (name.SequenceEqual("v".AsSpan()))
             {
-                CommentHandling = System.Text.Json.JsonCommentHandling.Disallow
-            });
-            if (!reader.Read() || reader.TokenType != System.Text.Json.JsonTokenType.StartObject) return false;
-            bool sawVersion = false;
-            while (true)
+                if (sawVersion || position >= text.Length || text[position] != '1') return false;
+                sawVersion = true;
+                position++;
+            }
+            else if (name.SequenceEqual("language".AsSpan()))
             {
-                if (!reader.Read()) return false;
-                if (reader.TokenType == System.Text.Json.JsonTokenType.EndObject) break;
-                if (reader.TokenType != System.Text.Json.JsonTokenType.PropertyName) return false;
-                if (reader.ValueTextEquals("v"u8))
-                {
-                    if (sawVersion || !reader.Read() || reader.TokenType != System.Text.Json.JsonTokenType.Number ||
-                        reader.HasValueSequence || reader.ValueSpan.Length != 1 || reader.ValueSpan[0] != (byte)'1')
-                        return false;
-                    sawVersion = true;
-                }
-                else if (reader.ValueTextEquals("language"u8))
-                {
-                    if (language is not null || !TryReadPlainString(ref reader, out language)) return false;
-                }
-                else if (reader.ValueTextEquals("source"u8))
-                {
-                    if (source is not null || !TryReadPlainString(ref reader, out source)) return false;
-                }
-                else if (reader.ValueTextEquals("description"u8))
-                {
-                    if (description is not null || !TryReadPlainString(ref reader, out description)) return false;
-                }
-                else
-                {
-                    return false;
-                }
+                if (language is not null || !TryReadPlainString(payload, ref position, out language)) return false;
+            }
+            else if (name.SequenceEqual("source".AsSpan()))
+            {
+                if (source is not null || !TryReadPlainString(payload, ref position, out source)) return false;
+            }
+            else if (name.SequenceEqual("description".AsSpan()))
+            {
+                if (description is not null || !TryReadPlainString(payload, ref position, out description)) return false;
+            }
+            else
+            {
+                // Includes any name holding an escape, which can equal none of the four.
+                return false;
             }
 
-            // Only white space may follow the object.
-            if (reader.Read()) return false;
-            return sawVersion && language is not null && source is not null;
+            if (position >= text.Length) return false;
+            char separator = text[position++];
+            if (separator == '}') break;
+            if (separator != ',') return false;
         }
-        catch (System.Text.Json.JsonException)
-        {
-            return false;
-        }
-        catch (InvalidOperationException)
-        {
-            return false;
-        }
+
+        return position == text.Length && sawVersion && language is not null && source is not null;
     }
 
-    // A string value that Json.NET would also read as that exact string. With its default date handling, Json.NET turns
-    // strings that look like ISO or Microsoft JSON dates into dates, which begin with a digit or a slash.
-    private static bool TryReadPlainString(ref System.Text.Json.Utf8JsonReader reader, out string? value)
+    // A JSON string value at position that Json.NET would also read as that exact string; on success position is just
+    // past its closing quote. With its default date handling, Json.NET turns strings that look like ISO or Microsoft JSON
+    // dates into dates, and those begin with a digit or a slash.
+    [MethodImpl(MethodImplOptions.AggressiveOptimization)]
+    private static bool TryReadPlainString(string payload, ref int position, out string? value)
     {
         value = null;
-        if (!reader.Read() || reader.TokenType != System.Text.Json.JsonTokenType.String) return false;
-        string text = reader.GetString() ?? string.Empty;
-        if (text.Length > 0 && (char.IsDigit(text[0]) || text[0] == '/')) return false;
-        value = text;
+        ReadOnlySpan<char> text = payload.AsSpan();
+        if (position >= text.Length || text[position] != '"') return false;
+        int start = position + 1;
+        int run = text.Slice(start).IndexOfAny('"', '\\');
+        if (run < 0) return false;
+        string read;
+        int end;
+        if (text[start + run] == '"')
+        {
+            // No escapes: the value is the text itself.
+            if (text.Slice(start, run).IndexOfAnyInRange('\u0000', '\u001F') >= 0) return false;
+            read = payload.Substring(start, run);
+            end = start + run;
+        }
+        else if (!TryUnescape(text, start, out read, out end))
+        {
+            return false;
+        }
+
+        if (read.Length > 0 && (char.IsDigit(read[0]) || read[0] == '/')) return false;
+        value = read;
+        position = end + 1;
         return true;
+    }
+
+    // Unescapes a string that holds at least one escape, from start to its closing quote, which end is set to.
+    [MethodImpl(MethodImplOptions.AggressiveOptimization)]
+    private static bool TryUnescape(ReadOnlySpan<char> text, int start, out string value, out int end)
+    {
+        value = string.Empty;
+        end = -1;
+        char[] buffer = System.Buffers.ArrayPool<char>.Shared.Rent(text.Length - start);
+        try
+        {
+            int length = 0;
+            int index = start;
+            while (true)
+            {
+                int run = text.Slice(index).IndexOfAny('"', '\\');
+                if (run < 0) return false;
+                ReadOnlySpan<char> plain = text.Slice(index, run);
+                if (plain.IndexOfAnyInRange('\u0000', '\u001F') >= 0) return false;
+                plain.CopyTo(buffer.AsSpan(length));
+                length += run;
+                index += run;
+                if (text[index] == '"') break;
+
+                if (index + 1 >= text.Length) return false;
+                char escaped = text[index + 1];
+                index += 2;
+                char unescaped;
+                switch (escaped)
+                {
+                    case '"': unescaped = '"'; break;
+                    case '\\': unescaped = '\\'; break;
+                    case '/': unescaped = '/'; break;
+                    case 'b': unescaped = '\b'; break;
+                    case 'f': unescaped = '\f'; break;
+                    case 'n': unescaped = '\n'; break;
+                    case 'r': unescaped = '\r'; break;
+                    case 't': unescaped = '\t'; break;
+                    case 'u':
+                        if (index + 4 > text.Length ||
+                            !ushort.TryParse(text.Slice(index, 4), System.Globalization.NumberStyles.AllowHexSpecifier,
+                                System.Globalization.CultureInfo.InvariantCulture, out ushort code) ||
+                            char.IsSurrogate((char)code))
+                            return false;
+                        unescaped = (char)code;
+                        index += 4;
+                        break;
+                    default:
+                        return false;
+                }
+
+                buffer[length++] = unescaped;
+            }
+
+            value = new string(buffer, 0, length);
+            end = index;
+            return true;
+        }
+        finally
+        {
+            System.Buffers.ArrayPool<char>.Shared.Return(buffer);
+        }
     }
 
     private sealed class SharedCharPool : IArrayPool<char>
