@@ -1,3 +1,4 @@
+using System.Buffers;
 using System.Security.Cryptography;
 using System.Text;
 using System.Text.Json;
@@ -540,35 +541,44 @@ public sealed partial class EvolutionEngine<TGenome>
     private static async Task<StateSegmentDocument> ReadSegmentAsync(IEvolutionCheckpointSegmentStore store, string runId,
         SegmentReferenceDocument reference, CancellationToken cancellationToken)
     {
-        byte[] bytes;
+        SegmentBytes bytes;
         using (Stream stream = await store.OpenSegmentAsync(runId, reference.Id, cancellationToken).ConfigureAwait(false)
                    ?? throw new InvalidDataException($"Checkpoint segment {reference.Id} is missing from the store."))
             bytes = await ReadSegmentBytesAsync(stream, reference.Id, cancellationToken).ConfigureAwait(false);
 
-        using (IncrementalHash hash = IncrementalHash.CreateHash(HashAlgorithmName.SHA256))
-        {
-            hash.AppendData(bytes);
-            if (!string.Equals(ToHex(hash.GetHashAndReset()), reference.Sha256, StringComparison.Ordinal))
-                throw new InvalidDataException($"Checkpoint segment {reference.Id} failed its SHA-256 check.");
-        }
-
-        EvolutionCheckpointJsonPreflight.Validate(bytes);
         try
         {
-            return JsonSerializer.Deserialize(bytes, EvolutionStateJsonContext.Default.StateSegmentDocument)
-                ?? throw new InvalidDataException($"Checkpoint segment {reference.Id} is empty.");
+            using (IncrementalHash hash = IncrementalHash.CreateHash(HashAlgorithmName.SHA256))
+            {
+                hash.AppendData(bytes.Buffer, 0, bytes.Length);
+                if (!string.Equals(ToHex(hash.GetHashAndReset()), reference.Sha256, StringComparison.Ordinal))
+                    throw new InvalidDataException($"Checkpoint segment {reference.Id} failed its SHA-256 check.");
+            }
+
+            var span = new ReadOnlySpan<byte>(bytes.Buffer, 0, bytes.Length);
+            EvolutionCheckpointJsonPreflight.Validate(span);
+            try
+            {
+                return JsonSerializer.Deserialize(span, EvolutionStateJsonContext.Default.StateSegmentDocument)
+                    ?? throw new InvalidDataException($"Checkpoint segment {reference.Id} is empty.");
+            }
+            catch (JsonException exception)
+            {
+                throw new InvalidDataException($"Checkpoint segment {reference.Id} is invalid.", exception);
+            }
         }
-        catch (JsonException exception)
+        finally
         {
-            throw new InvalidDataException($"Checkpoint segment {reference.Id} is invalid.", exception);
+            ArrayPool<byte>.Shared.Return(bytes.Buffer);
         }
     }
 
-    // A segment's bytes, read straight into an array of the stream's length when it reports one: growing a MemoryStream
-    // and copying it out allocated about three times each segment, the largest share of a resume's allocation (E-1). A
-    // stream that turns out longer or shorter than it reported still yields exactly the bytes it holds, so the SHA-256
-    // check sees what the store returned.
-    private static async Task<byte[]> ReadSegmentBytesAsync(Stream stream, long id, CancellationToken cancellationToken)
+    // A segment's bytes, in a buffer rented from the shared pool: growing a MemoryStream and copying it out allocated
+    // about three times each segment, and a fresh array per segment is a large-object allocation that pushes the
+    // collector into full collections of the state being rebuilt (E-1). The first buffer is sized from the length the
+    // stream reports, one byte over, so a full buffer always means the stream holds more; a stream that reports no
+    // length, or the wrong one, still yields exactly the bytes it holds, which the SHA-256 check then judges.
+    private static async Task<SegmentBytes> ReadSegmentBytesAsync(Stream stream, long id, CancellationToken cancellationToken)
     {
         long expected = -1;
         if (stream.CanSeek)
@@ -585,34 +595,39 @@ public sealed partial class EvolutionEngine<TGenome>
         if (expected > EvolutionCollectionLimits.MaximumCheckpointBytes)
             throw new InvalidDataException($"Checkpoint segment {id} exceeds the package limit.");
 
-        // Every byte is overwritten before it is read, so on runtimes that allow it the array is not zeroed first.
-#if NET5_0_OR_GREATER
-        byte[] bytes = GC.AllocateUninitializedArray<byte>((int)(expected > 0 ? expected : SegmentFlushBytes));
-#else
-        byte[] bytes = new byte[expected > 0 ? expected : SegmentFlushBytes];
-#endif
+        byte[] buffer = ArrayPool<byte>.Shared.Rent((int)Math.Max(expected + 1, SegmentFlushBytes));
         int length = 0;
-        while (true)
+        try
         {
-            if (length == bytes.Length)
+            while (true)
             {
-                // Full: either the reported length was exact (the next read returns nothing) or the stream holds more.
-                var probe = new byte[1];
-                if (await stream.ReadAsync(probe, 0, 1, cancellationToken).ConfigureAwait(false) == 0) break;
-                if ((long)length + 1 > EvolutionCollectionLimits.MaximumCheckpointBytes)
+                if (length == buffer.Length)
+                {
+                    long grown = Math.Min((long)buffer.Length * 2, EvolutionCollectionLimits.MaximumCheckpointBytes + 1);
+                    byte[] larger = ArrayPool<byte>.Shared.Rent((int)grown);
+                    Buffer.BlockCopy(buffer, 0, larger, 0, length);
+                    ArrayPool<byte>.Shared.Return(buffer);
+                    buffer = larger;
+                }
+                int read = await stream.ReadAsync(buffer, length, buffer.Length - length, cancellationToken).ConfigureAwait(false);
+                if (read == 0) break;
+                length += read;
+                if (length > EvolutionCollectionLimits.MaximumCheckpointBytes)
                     throw new InvalidDataException($"Checkpoint segment {id} exceeds the package limit.");
-                long grown = Math.Min(Math.Max((long)bytes.Length * 2, SegmentFlushBytes),
-                    (long)EvolutionCollectionLimits.MaximumCheckpointBytes);
-                Array.Resize(ref bytes, (int)Math.Max(grown, (long)length + 1));
-                bytes[length++] = probe[0];
-                continue;
             }
-            int read = await stream.ReadAsync(bytes, length, bytes.Length - length, cancellationToken).ConfigureAwait(false);
-            if (read == 0) break;
-            length += read;
         }
-        if (length != bytes.Length) Array.Resize(ref bytes, length);
-        return bytes;
+        catch
+        {
+            ArrayPool<byte>.Shared.Return(buffer);
+            throw;
+        }
+        return new SegmentBytes(buffer, length);
+    }
+
+    private readonly struct SegmentBytes(byte[] buffer, int length)
+    {
+        public byte[] Buffer { get; } = buffer;
+        public int Length { get; } = length;
     }
 
     // The version an inline payload of this document would carry: measurement origins, then Pareto, then constraints.

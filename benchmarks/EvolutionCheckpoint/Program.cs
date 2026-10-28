@@ -50,6 +50,7 @@ if (resumeOnly)
     {
         long allocatedBefore = GC.GetTotalAllocatedBytes(precise: true);
         TimeSpan cpuBefore = Process.GetCurrentProcess().TotalProcessorTime;
+        int[] collectionsBefore = Enumerable.Range(0, 3).Select(GC.CollectionCount).ToArray();
         var only = Stopwatch.StartNew();
         var restored = await new EvolutionEngine<ProgramGenome>(task, new Distinct4kPrograms(), _ => new MapElitesArchive<ProgramGenome>(descriptors),
             Options(true), checkpointStore: new DirectoryEvolutionCheckpointStore(directory), genomeCodec: new ProgramGenomeCodec()).RunAsync(seeds);
@@ -59,7 +60,9 @@ if (resumeOnly)
             Format = format.ToString(), Repeat = repeat, Elites = restored.Islands.Sum(island => island.Count),
             ResumeMs = only.Elapsed.TotalMilliseconds,
             CpuMs = (Process.GetCurrentProcess().TotalProcessorTime - cpuBefore).TotalMilliseconds,
-            AllocatedBytes = GC.GetTotalAllocatedBytes(precise: true) - allocatedBefore, restored.StateHash
+            AllocatedBytes = GC.GetTotalAllocatedBytes(precise: true) - allocatedBefore,
+            Collections = Enumerable.Range(0, 3).Select(generation => GC.CollectionCount(generation) - collectionsBefore[generation]).ToArray(),
+            restored.StateHash
         }));
     }
     return 0;
