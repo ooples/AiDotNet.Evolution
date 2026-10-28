@@ -123,16 +123,50 @@ them), and the store must keep every segment a retained checkpoint names. `Direc
 stores them under its `segments` subdirectory and deletes those no retained snapshot names;
 `InMemoryEvolutionCheckpointStore` keeps those of its latest checkpoint.
 
-`EvolutionEngineOptions.CheckpointFormat` decides whether the engine uses them. The deduplication set and
-evaluation cache grow with every distinct genome a run evaluates, so an inline checkpoint repeats all of
-them on every save. With `EvolutionCheckpointFormat.Auto`, the default, checkpoints stay inline, self-contained
-and readable by older engines until the two together reach `CheckpointSegmentThreshold` entries (50,000 by
-default). After that each save writes one segment with only what changed, and every 32 segments a base
-segment restates both. `Inline` always writes self-contained checkpoints; `Segmented` always uses segments and
-requires a segment store. A segmented checkpoint needs its store: copy a `DirectoryEvolutionCheckpointStore`
-directory whole to move the run, or choose `Inline` when checkpoints must travel on their own. On resume the
-engine checks each segment's SHA-256, and the format is not part of the compatibility hash, so a run can resume
-under a different one.
+`EvolutionEngineOptions.CheckpointFormat` decides whether the engine uses them. The deduplication set, the
+evaluation cache and the island archives grow as a run goes on, so an inline checkpoint rewrites all of them on
+every save: at 10,000 elites of 4 KB programs that was a 46 MB file per save. Segments are an append-only journal
+of that state instead:
+
+- **Each save appends one delta segment** with only what changed since the previous save: genomes added to or
+  forgotten from the deduplication set, cache entries set or removed, and, per island, the archive cells that
+  gained or replaced an elite and the cells that were emptied. An unchanged elite is never written again.
+- **Every `CheckpointCompactionInterval` segments (32 by default) the next save writes a base segment** that
+  restates the whole state, and the checkpoint stops naming the older chain. The interval bounds how many deltas a
+  resume replays; a smaller one makes resume read less and more saves pay for a full base.
+- **The checkpoint payload names its chain**: each segment's identifier, whether it is the base, and its SHA-256.
+  The payload keeps everything else (counters, random state, global elites, island histories, each island's
+  version and descriptor grid). It records where the archives are, so a resume knows what to rebuild.
+- **Resume reads the payload, then the base, then each delta in order**, checking every segment against its
+  SHA-256 and applying it strictly: a delta that adds a genome twice, removes one that is absent or empties a cell
+  that holds nothing is refused as corrupt. The rebuilt state lists each island's elites in cell order, exactly as
+  an inline payload does, and then goes through the same validation, so a segmented resume reaches the same state
+  hash as an inline one.
+
+A crash cannot leave a half-written record that a resume reads. A store writes each segment atomically
+(`DirectoryEvolutionCheckpointStore` writes a temporary file, flushes it and renames it into place), and a segment
+counts only once a saved checkpoint names it with its digest. A process killed after a segment reached the store
+but before its checkpoint was saved leaves an orphan that nothing names: resume uses the previous checkpoint, never
+reads the orphan, and the next save reuses its identifier and replaces it. A named segment that is missing or
+altered fails its SHA-256 check and the resume is refused rather than reinterpreted.
+
+With `EvolutionCheckpointFormat.Auto`, the default, checkpoints stay inline, self-contained and readable by older
+engines while they are small: until the deduplication set and cache together reach `CheckpointSegmentThreshold`
+entries (50,000 by default), or an inline payload reaches about a megabyte. After that the run uses segments for
+the rest of its life. `Inline` always writes self-contained checkpoints; `Segmented` always uses segments and
+requires a segment store. A Pareto archive's front is bounded and stays in the payload in either format. A segmented
+checkpoint needs its store: copy a `DirectoryEvolutionCheckpointStore` directory whole to move the run, or choose
+`Inline` when checkpoints must travel on their own. Neither the format nor the compaction interval is part of the
+compatibility hash, so a run can resume under a different one.
+
+**Formats and versions.** The payload's schema version says which layout it uses. Inline payloads are versions 6
+to 9. A segmented payload whose segments hold only the deduplication set and cache adds 4 (10 to 13), the layout
+engines wrote before the archive journal; its segments are segment schema 1. A payload whose archives are in the segments as well
+adds 8 (14 to 17), with segment schema 2. All three still load. A run resumed from a version 10 to 13 checkpoint
+writes a new base at its next save and continues in the current layout. Engines that predate the archive journal
+refuse versions 14 to 17 as "written by a different engine version" instead of resuming with empty archives, so a
+run that has moved to the current layout cannot be resumed by an older engine. Keep that run with an engine at
+least as new, or write it with `Inline`.
 
 For a long run on .NET 6 or later, also let the garbage collector return memory it no longer needs:
 set `DOTNET_GCConserveMemory=7` in the environment, or add it to the application's runtime configuration:
@@ -157,7 +191,9 @@ deployable and exploratory populations separately. A checkpoint that does not ma
 compatibility hash is refused with `InvalidDataException` rather than silently forking the run.
 
 To inspect a checkpoint without resuming it, call
-`EvolutionEngine<TGenome>.ReadCheckpoint(checkpoint, genomeCodec)`. Each recovered candidate is an
+`EvolutionEngine<TGenome>.ReadCheckpoint(checkpoint, genomeCodec)`, or, for a segmented checkpoint,
+`ReadCheckpointAsync(checkpoint, genomeCodec, store)` with the store that wrote it, which replays its segments
+first. `ReadCheckpoint` refuses a checkpoint whose archives are in segments rather than report it as empty. Each recovered candidate is an
 `EvolutionCheckpointEntry<TGenome>` giving the island, the archive entry, and where it was held
 (`EvolutionCheckpointEntrySource`: the island archive, the global elite index, the island history
 or the infeasible-exploration pool).
