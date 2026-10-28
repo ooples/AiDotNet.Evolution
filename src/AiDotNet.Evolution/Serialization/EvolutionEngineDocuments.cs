@@ -1,3 +1,4 @@
+using System.Runtime.CompilerServices;
 using System.Text.Json.Serialization;
 
 namespace AiDotNet.Evolution;
@@ -378,6 +379,11 @@ internal static class EvolutionEngineDocuments
             MeasurementOriginJson = evaluation.MeasurementOrigin?.ToJson()
         };
 
+        // Fully optimized from the first call, like the checkpoint preflight: a resume runs this once per restored elite, all
+        // within about a second, before tiered compilation would promote it (E-1).
+#if NETCOREAPP3_0_OR_GREATER
+        [MethodImpl(MethodImplOptions.AggressiveOptimization)]
+#endif
         public EvolutionEvaluation ToEvaluation(long evaluationId, string genomeId, EvolutionLineage lineage)
         {
             var result = new EvolutionEvaluation(

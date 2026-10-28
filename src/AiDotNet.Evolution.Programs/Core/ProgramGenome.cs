@@ -35,6 +35,7 @@ public sealed class ProgramGenome : IEquatable<ProgramGenome>, IImmutableEvoluti
     /// <paramref name="source"/> exceeds <see cref="MaxSourceLength"/> characters, or <paramref name="language"/> is
     /// not a defined enumeration value.
     /// </exception>
+    [System.Runtime.CompilerServices.MethodImpl(System.Runtime.CompilerServices.MethodImplOptions.AggressiveOptimization)]
     public ProgramGenome(string source, ProgramLanguage language = ProgramLanguage.Generic, string? description = null)
     {
         ProgramGuard.NotNull(source);
@@ -207,6 +208,7 @@ public sealed class ProgramGenome : IEquatable<ProgramGenome>, IImmutableEvoluti
     private static string ComputeIdCore(string source, ProgramLanguage language) =>
         EvolutionHash.Combine(new[] { "program-genome-v2-exact-source", language.ToString(), source });
 
+    [System.Runtime.CompilerServices.MethodImpl(System.Runtime.CompilerServices.MethodImplOptions.AggressiveOptimization)]
     private static bool IsBlank(string source)
     {
         int start = source.Length > 0 && source[0] == '﻿' ? 1 : 0;
@@ -215,6 +217,7 @@ public sealed class ProgramGenome : IEquatable<ProgramGenome>, IImmutableEvoluti
         return true;
     }
 
+    [System.Runtime.CompilerServices.MethodImpl(System.Runtime.CompilerServices.MethodImplOptions.AggressiveOptimization)]
     private static void ValidateSourceEncoding(string source)
     {
         for (int i = 0; i < source.Length; i++)

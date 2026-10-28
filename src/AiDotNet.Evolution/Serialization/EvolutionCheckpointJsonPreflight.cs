@@ -1,3 +1,4 @@
+using System.Runtime.CompilerServices;
 using System.Text.Json;
 
 namespace AiDotNet.Evolution;
@@ -8,6 +9,11 @@ namespace AiDotNet.Evolution;
 /// </summary>
 internal static class EvolutionCheckpointJsonPreflight
 {
+    // Fully optimized from the first call: a resume runs this once per segment over every token the checkpoint holds, and
+    // with tiered compilation those few long calls ran mostly as unoptimized code, three to four times slower (E-1).
+#if NETCOREAPP3_0_OR_GREATER
+    [MethodImpl(MethodImplOptions.AggressiveOptimization)]
+#endif
     internal static void Validate(ReadOnlySpan<byte> utf8Json)
     {
         var reader = new Utf8JsonReader(utf8Json, new JsonReaderOptions
@@ -142,6 +148,9 @@ internal static class EvolutionCheckpointJsonPreflight
 
     // UTF-8 literals: the string overload transcodes its argument on every call, and this runs for every property name
     // in a checkpoint and its segments, which made it a measurable part of a resume (E-1).
+#if NETCOREAPP3_0_OR_GREATER
+    [MethodImpl(MethodImplOptions.AggressiveOptimization)]
+#endif
     private static CheckpointCollectionKind ClassifyProperty(ref Utf8JsonReader reader)
     {
         if (reader.ValueTextEquals("SemanticOptions"u8)) return CheckpointCollectionKind.SemanticOptions;

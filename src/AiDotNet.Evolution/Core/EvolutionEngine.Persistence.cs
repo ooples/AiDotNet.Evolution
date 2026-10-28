@@ -1245,6 +1245,11 @@ public sealed partial class EvolutionEngine<TGenome>
         return new EvolutionArchiveEntry<TGenome>(new EvolutionCellKey(document.CellBins), candidate, evaluation);
     }
 
+    // Fully optimized from the first call, like the checkpoint preflight: a resume runs this once per restored elite, all
+    // within about a second, before tiered compilation would promote it (E-1).
+#if NETCOREAPP3_0_OR_GREATER
+    [MethodImpl(MethodImplOptions.AggressiveOptimization)]
+#endif
     private EvolutionArchiveEntry<TGenome> RestoreArchiveEntry(ArchiveEntryDocument document)
     {
         if (document.GenomePayload is null || string.IsNullOrWhiteSpace(document.GenomeId) || document.Lineage is null ||
