@@ -102,14 +102,22 @@ a `FencedCodeExtractionResult`. It keeps every `FencedCodeBlock` it considered, 
 
 ## Running candidates
 
-`IProgramExecutionEngine` is the execution boundary. `ProcessProgramExecutionEngine` runs each
-candidate in a separate process with the limits in `ProgramSandboxLimitOptions`: wall clock, memory,
-CPU, source and output sizes, and concurrency. `ProgramSandboxMode` names the requested boundary. The
-process runner implements only `OutOfProcessWorker` and refuses options naming another mode, so a
-request for `Serving` (a caller-provisioned remote boundary) or `InProcessUnsafe` is never silently
-weakened. A separate process does not isolate the filesystem, network or identity; run hostile
-programs inside a container or VM you provision.
+`IProgramExecutionEngine` is the execution boundary, and `ProgramSandboxMode` names the one a
+configuration asks for. Every engine applies the limits in `ProgramSandboxLimitOptions`: wall clock,
+memory, CPU, source and output sizes, and concurrency. An engine refuses options naming a mode it does
+not implement, so a request is never silently weakened.
 
+`ContainerExecutionEngine` (`ProgramSandboxMode.Container`) runs each candidate inside a Docker
+container configured by `ContainerExecutionOptions`: no network, a read-only root with an in-memory
+`/work` as the only writable path, a non-root user, no capabilities, `no-new-privileges`, the default
+seccomp profile, and memory, CPU and process caps. It checks all of that before using a container, from
+`docker inspect` and from inside the container. `ContainerLifecycle.Warm` reuses a container: a
+supervisor inside it runs each candidate as a fresh process, then kills every process it left and
+empties `/work` before the next one. `ContainerLifecycle.Cold` starts and removes a container per
+candidate. `ContainerPythonLaunch` chooses whether a Python candidate is forked from the supervisor
+(the default, no interpreter start) or starts a fresh interpreter.
+
+`ProcessProgramExecutionEngine` (`OutOfProcessWorker`) runs each candidate in a separate host process.
 `WarmPythonExecutionEngine` removes most of the per-candidate process start for Python.
 `ProgramSandboxMode.WarmForkWorker` (Linux and macOS) keeps one interpreter warm and forks a fresh child
 for each candidate, so every candidate is still a separate process with its own memory and CPU-time
@@ -118,6 +126,37 @@ limits, reported as `MemoryLimitExceeded` and `CpuTimeLimitExceeded` like the pr
 in a fresh namespace. They share a process, so it requires `AllowUnsafeInProcessExecution`, and the
 worker is replaced after a timeout, after a failure and every `RecycleAfter` candidates. The
 `sandbox-overhead` workflow measures what each mode adds per evaluation.
+
+### Choosing an execution mode
+
+| Mode | Engine | Isolates the host's files, network and system calls | Opt-in | Added latency (Linux p50) |
+|---|---|---|---|---|
+| `Container`, warm | `ContainerExecutionEngine` | Yes | None | Target 30 ms; see `benchmarks/evidence/sandbox-overhead` |
+| `Container`, cold | `ContainerExecutionEngine` | Yes | None | A container start per candidate |
+| `WarmForkWorker` | `WarmPythonExecutionEngine` | No | `AllowUnsandboxedExecution` | 2.785 ms |
+| `WarmReusedWorker` | `WarmPythonExecutionEngine` | No, and candidates share one interpreter | `AllowUnsandboxedExecution` and `AllowUnsafeInProcessExecution` | Under 3 ms |
+| `OutOfProcessWorker` | `ProcessProgramExecutionEngine` | No | `AllowUnsandboxedExecution` | 45 to 62 ms |
+
+Use a `Container` mode whenever a language model writes the code. Choose warm for search, where the
+per-candidate cost decides how many candidates a budget buys, and cold when even state the kernel
+keeps for a user between processes must not carry from one candidate to the next.
+
+**The risk of the unsandboxed modes.** `OutOfProcessWorker`, `WarmForkWorker` and `WarmReusedWorker`
+bound a candidate's time, output and (best effort) memory, and start it with an empty environment, but
+it still runs as your user on your machine. Code a model wrote can read any file you can, including SSH
+keys, cloud credentials and tokens stored on disk; reach the network, including your intranet and
+cloud metadata endpoints; delete or rewrite your files; and start processes that outlive the
+evaluation. A model does not need to be malicious for this to matter: a confidently wrong cleanup step
+or a prompt-injected instruction in a task description is enough. So the engines for these modes refuse
+to start unless `ProgramSandboxOptions.AllowUnsandboxedExecution` is `true`, and the refusal names the
+setting and the container alternative. Set it only for code you trust, or when the whole process
+already runs inside a VM or container provisioned for the purpose. The CLI asks for the same decision
+in the run file (`allowUnsandboxedExecution`, or a `container` section); see [CLI.md](CLI.md).
+
+The container boundary is the Docker daemon and the host kernel. A container shares the kernel, so an
+adversary able to exploit a kernel bug reachable through the seccomp profile is outside what it stops;
+keep the host patched, point the Docker client only at a daemon you trust, and add a VM boundary for
+that threat. Candidates still return output, an exit code and timing to the caller, as they must.
 
 A run is a `ProgramExecuteRequest` (language, source, standard input, allowed languages) and returns
 a `ProgramExecuteResponse`: success, exit code, captured output with truncation flags, and on failure

@@ -28,6 +28,7 @@ run file's directory. Unknown fields are refused, and enums are written as names
 {
   "schema": "aidotnet-evolve-run-v1",
   "runId": "circle-packing",
+  "container": { "image": "python:3.12-slim", "lifecycle": "Warm" },
   "initialProgram": "initial.py",
   "evaluator": "evaluator.py",
   "model": {
@@ -73,6 +74,9 @@ run file's directory. Unknown fields are refused, and enums are written as names
 | `output` | yes | Holds `checkpoints/`, one `trace-NNN.jsonl` per run or resume session, and `best.<ext>`. |
 | `direction` | no (`Maximize`) | `Maximize` or `Minimize` the evaluator's `quality`. |
 | `warmStart` | no | A `repertoire-NNN.json` written by an earlier run. Its programs join the seeds and are evaluated afresh; see [Warm start](#warm-start). `run` uses it and `resume` ignores it. |
+| `container.image` | one of `container` or `allowUnsandboxedExecution` | Runs the evaluator, and the programs it executes, in a locked-down Docker container from this image (no network, read-only root, non-root user, no capabilities, default seccomp profile, memory, CPU and process caps). The image must already be pulled and must hold the evaluator's interpreter and every package it imports; nothing from the host is mounted. Not available with `openEvolveEvaluator`, whose shim imports the evaluator from its host path. |
+| `container.lifecycle` | no (`Warm`) | `Warm` reuses one container per concurrent evaluation, with every process killed and the workdir emptied between evaluations; `Cold` starts and removes a container per evaluation. |
+| `allowUnsandboxedExecution` | one of `container` or `allowUnsandboxedExecution` | `true` runs the evaluator as a host process instead. That bounds time and output but not what the code can touch: it runs as you, with your files, credentials and network. A run file with neither is refused. `run --openevolve-config` writes `true`, because OpenEvolve runs evaluators the same way, and says so in a note. See [Choosing an execution mode](PROGRAM_EVOLUTION.md#choosing-an-execution-mode). |
 | `runtimeVersion` | no | The interpreter image identity. It is part of the checkpoint compatibility hash, so it must not change between `run` and `resume`. Change it when the interpreter or its packages change, and the old checkpoint is then refused rather than silently mixed. |
 
 A minimal evaluator:
