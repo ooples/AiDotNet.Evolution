@@ -40,20 +40,46 @@ public sealed class EvolutionCellKey : IEquatable<EvolutionCellKey>, IComparable
     public EvolutionCellKey(IEnumerable<int> bins)
     {
         Guard.NotNull(bins);
-        var bounded = new List<int>(EvolutionCollectionLimits.MaximumArchiveDimensions);
-        foreach (int value in bins)
+        // Every completed evaluation builds a key, so an indexed input (archives pass arrays) is copied exactly;
+        // presizing a list to the 64-dimension bound cost a 256-byte buffer per key (E-1).
+        if (bins is IReadOnlyList<int> list)
         {
-            if (bounded.Count == EvolutionCollectionLimits.MaximumArchiveDimensions)
-                throw new ArgumentException(
-                    $"A cell key may contain at most {EvolutionCollectionLimits.MaximumArchiveDimensions} dimensions.",
-                    nameof(bins));
-            bounded.Add(value);
+            if (list.Count > EvolutionCollectionLimits.MaximumArchiveDimensions) throw TooManyDimensions(nameof(bins));
+            _bins = new int[list.Count];
+            for (int i = 0; i < _bins.Length; i++) _bins[i] = list[i];
         }
-        _bins = bounded.ToArray();
+        else
+        {
+            var bounded = new List<int>();
+            foreach (int value in bins)
+            {
+                if (bounded.Count == EvolutionCollectionLimits.MaximumArchiveDimensions) throw TooManyDimensions(nameof(bins));
+                bounded.Add(value);
+            }
+            _bins = bounded.ToArray();
+        }
         if (_bins.Length == 0) throw new ArgumentException("A cell key requires at least one bin.", nameof(bins));
-        if (_bins.Any(value => value < 0)) throw new ArgumentOutOfRangeException(nameof(bins));
+        foreach (int value in _bins)
+            if (value < 0) throw new ArgumentOutOfRangeException(nameof(bins));
         _view = Array.AsReadOnly(_bins);
-        StableKey = string.Join(",", _bins.Select(value => value.ToString(CultureInfo.InvariantCulture)));
+        StableKey = FormatKey(_bins);
+    }
+
+    private static ArgumentException TooManyDimensions(string parameterName) =>
+        new($"A cell key may contain at most {EvolutionCollectionLimits.MaximumArchiveDimensions} dimensions.", parameterName);
+
+    // The same text string.Join(",", invariant bins) produces, without an iterator and a string per bin.
+    private static string FormatKey(int[] bins)
+    {
+        if (bins.Length == 1) return bins[0].ToString(CultureInfo.InvariantCulture);
+        var text = new System.Text.StringBuilder(bins.Length * 4);
+        for (int i = 0; i < bins.Length; i++)
+        {
+            if (i > 0) text.Append(',');
+            // Bins are validated nonnegative, and a nonnegative int formats as the same ASCII digits in every culture.
+            text.Append(bins[i]);
+        }
+        return text.ToString();
     }
 
     /// <summary>Gets a read-only view of the bin indices.</summary>
