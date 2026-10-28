@@ -49,7 +49,8 @@ internal static class Arm
         Directory.CreateDirectory(workspace);
         try
         {
-            var sandbox = new ProgramSandboxOptions { RuntimeVersion = "meta-prompt-ablation-v1" };
+            // The ablation evaluates model-written programs on the measurement host, as it always has; the opt-in says so.
+            var sandbox = new ProgramSandboxOptions { RuntimeVersion = "meta-prompt-ablation-v1", AllowUnsandboxedExecution = true };
             sandbox.Limits.TimeLimitSeconds = 60;
             sandbox.Limits.MaxConcurrentExecutions = 1;
             sandbox.SetInterpreter(ProgramLanguage.Python, new ProgramInterpreterSpecification(python, "{source}"));

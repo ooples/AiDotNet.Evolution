@@ -50,7 +50,11 @@ internal static class OpenEvolveConfigImporter
                 errors.Add(key + " = " + Show(value) + ": not supported (" + known.Ours + ")");
             merged[key] = value;
         }
-        var notes = new List<string>();
+        var notes = new List<string>
+        {
+            "allowUnsandboxedExecution is true: like OpenEvolve, the evaluator and the programs it runs execute as host " +
+            "processes, with this machine's files and network. Run on a machine provisioned for that."
+        };
         foreach (string key in unknown)
             notes.Add(key + " is not an OpenEvolve 0.3.2 config key; OpenEvolve ignores it, and so does this import.");
         if (!config.ContainsKey("llm.api_base") && Environment.GetEnvironmentVariable("OPENAI_API_BASE") is { Length: > 0 } apiBase)
@@ -118,6 +122,8 @@ internal static class OpenEvolveConfigImporter
             InitialProgram = Path.GetFullPath(initialProgram),
             Evaluator = Path.GetFullPath(evaluator),
             Output = ".",
+            // OpenEvolve runs evaluators as host processes; the import keeps that and writes the opt-in where it can be read.
+            AllowUnsandboxedExecution = true,
             Model = models[0],
             AdditionalModels = models.Skip(1).ToList(),
             Language = language is null ? ProgramLanguage.Python : ParseLanguage(language, notes),

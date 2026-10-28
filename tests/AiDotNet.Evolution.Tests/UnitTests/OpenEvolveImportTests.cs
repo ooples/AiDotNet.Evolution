@@ -609,6 +609,7 @@ public sealed class OpenEvolveImportTests
         var run = new
         {
             schema = "aidotnet-evolve-run-v1",
+            allowUnsandboxedExecution = true,
             runId = "judge-rubric-" + why,
             initialProgram = Path.Combine(directory.Path, "initial_program.py"),
             evaluator = Path.Combine(directory.Path, "evaluator.py"),
@@ -642,6 +643,7 @@ public sealed class OpenEvolveImportTests
         var run = new
         {
             schema = "aidotnet-evolve-run-v1",
+            allowUnsandboxedExecution = true,
             runId = "judge-prefix",
             initialProgram = Path.Combine(directory.Path, "initial_program.py"),
             evaluator = Path.Combine(directory.Path, "evaluator.py"),
@@ -754,6 +756,7 @@ public sealed class OpenEvolveImportTests
         {
             writer.WriteStartObject();
             writer.WriteString("schema", "aidotnet-evolve-run-v1");
+            writer.WriteBoolean("allowUnsandboxedExecution", true);
             writer.WriteString("runId", "null-list");
             writer.WriteString("initialProgram", Path.Combine(directory.Path, "initial_program.py"));
             writer.WriteString("evaluator", Path.Combine(directory.Path, "evaluator.py"));
@@ -795,6 +798,7 @@ public sealed class OpenEvolveImportTests
         var run = new
         {
             schema = "aidotnet-evolve-run-v1",
+            allowUnsandboxedExecution = true,
             runId = "judge-blend",
             initialProgram = Path.Combine(directory.Path, "initial_program.py"),
             evaluator = Path.Combine(directory.Path, "evaluator.py"),
@@ -850,6 +854,7 @@ public sealed class OpenEvolveImportTests
         var run = new
         {
             schema = "aidotnet-evolve-run-v1",
+            allowUnsandboxedExecution = true,
             runId = "meta-prompt-cli",
             initialProgram = Path.Combine(directory.Path, "initial_program.py"),
             evaluator = Path.Combine(directory.Path, "evaluator.py"),
@@ -908,6 +913,7 @@ public sealed class OpenEvolveImportTests
         var run = new
         {
             schema = "aidotnet-evolve-run-v1",
+            allowUnsandboxedExecution = true,
             runId = "meta-null-models",
             initialProgram = Path.Combine(directory.Path, "initial_program.py"),
             evaluator = Path.Combine(directory.Path, "evaluator.py"),
@@ -944,6 +950,7 @@ public sealed class OpenEvolveImportTests
         var run = new
         {
             schema = "aidotnet-evolve-run-v1",
+            allowUnsandboxedExecution = true,
             runId = "meta-prompt-invalid",
             initialProgram = Path.Combine(directory.Path, "initial_program.py"),
             evaluator = Path.Combine(directory.Path, "evaluator.py"),

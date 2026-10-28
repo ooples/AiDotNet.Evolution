@@ -40,6 +40,7 @@ public sealed class CliRunTests
         File.WriteAllText(path, $$"""
             {
               "schema": "aidotnet-evolve-run-v1",
+              "allowUnsandboxedExecution": true,
               "runId": "cli-run",
               "initialProgram": "initial.py",
               "evaluator": "evaluator.py",

@@ -51,7 +51,7 @@ internal static class ProgramSandboxTestEnvironment
     /// <summary>Creates sandbox options whose Python entry runs the supplied shell command template.</summary>
     internal static ProgramSandboxOptions Options(string template, string? compileTemplate = null)
     {
-        var options = new ProgramSandboxOptions();
+        var options = new ProgramSandboxOptions { AllowUnsandboxedExecution = true };
         options.SetInterpreter(
             ProgramLanguage.Python,
             new ProgramInterpreterSpecification(ShellPath, template, compileTemplate));

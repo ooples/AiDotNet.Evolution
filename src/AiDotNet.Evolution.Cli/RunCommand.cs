@@ -50,6 +50,24 @@ internal sealed class RunFile
     /// <c>meta_prompt_weight</c> exist and its own config comment says "not implemented".
     /// </remarks>
     public RunMetaPrompt? MetaPrompt { get; init; }
+    /// <summary>Runs the evaluator, and the candidates it executes, in a Docker container; <c>null</c> runs them as host processes.</summary>
+    public RunContainer? Container { get; init; }
+    /// <summary>Must be <c>true</c> when <see cref="Container"/> is <c>null</c>.</summary>
+    /// <remarks>A host process bounds time and output, but the evaluator and the model-written programs it runs keep
+    /// this machine's filesystem, network and user. A run without a container is refused unless this says so.</remarks>
+    public bool AllowUnsandboxedExecution { get; init; }
+}
+
+/// <summary>The container the evaluator runs in (see <see cref="ContainerExecutionEngine"/>).</summary>
+/// <remarks>The image must hold the evaluator's interpreter and every package it imports, and must already be pulled.
+/// Nothing from the host is mounted, so the evaluator receives the candidate on standard input as usual and cannot
+/// read files beside the run file.</remarks>
+internal sealed class RunContainer
+{
+    /// <summary>The image, already present on the Docker host; a <c>name@sha256:...</c> digest pins it.</summary>
+    public required string Image { get; init; }
+    /// <summary>Reuse one container per concurrent evaluation (<c>Warm</c>, the default) or start one per evaluation (<c>Cold</c>).</summary>
+    public ContainerLifecycle Lifecycle { get; init; } = ContainerLifecycle.Warm;
 }
 
 /// <summary>Instruction evolution: candidate system instructions, scored by the programs they produce.</summary>
@@ -367,7 +385,8 @@ internal static class RunCommand
         string tracePath = NextTracePath(outputDirectory);
         using var marker = RunMarker.Create(outputDirectory, run.RunId, tracePath);
 
-        using var execution = CreateExecution(run, baseDirectory);
+        IProgramExecutionEngine execution = CreateExecution(run, baseDirectory);
+        using var ownedExecution = (IDisposable)execution;
         IProgramChatClient model = CreateModels(new[] { run.Model }.Concat(run.AdditionalModels).ToList(), baseDirectory);
         using var ownedModel = model as IDisposable;
 
@@ -748,7 +767,8 @@ internal static class RunCommand
         ProbeWritable(outputDirectory);
 
         EvolutionTaskResult seed;
-        using (var execution = CreateExecution(run, baseDirectory))
+        IProgramExecutionEngine execution = CreateExecution(run, baseDirectory);
+        using (var ownedExecution = (IDisposable)execution)
         {
             var fitness = CreateFitness(run, execution, evaluator);
             seed = fitness.EvaluateAsync(new ProgramGenome(initial, run.Language),
@@ -789,9 +809,15 @@ internal static class RunCommand
     /// <summary>Returned when preflight finds the seed does not pass the evaluator.</summary>
     public const int PreflightFailedExitCode = 4;
 
-    internal static ProcessProgramExecutionEngine CreateExecution(RunFile run, string baseDirectory)
+    internal static IProgramExecutionEngine CreateExecution(RunFile run, string baseDirectory)
     {
-        var sandbox = new ProgramSandboxOptions { RuntimeVersion = run.RuntimeVersion };
+        var sandbox = new ProgramSandboxOptions
+        {
+            RuntimeVersion = run.RuntimeVersion,
+            Mode = run.Container is null ? ProgramSandboxMode.OutOfProcessWorker : ProgramSandboxMode.Container,
+            // Load refuses a run without a container unless the run file opted in, so this restates that decision.
+            AllowUnsandboxedExecution = run.AllowUnsandboxedExecution
+        };
         sandbox.Limits.TimeLimitSeconds = run.Budget.EvaluationTimeLimitSeconds;
         sandbox.Limits.MaxConcurrentExecutions = run.Budget.Parallelism;
         if (run.Search.EvaluationMemoryLimitMb is int memory) sandbox.Limits.MemoryLimitMb = memory;
@@ -811,6 +837,15 @@ internal static class RunCommand
                     openEvolve.PythonPath.Select(entry => Path.GetFullPath(Path.Combine(baseDirectory, entry))));
             }
         }
+        if (run.Container is { } container)
+        {
+            return new ContainerExecutionEngine(sandbox, new ContainerExecutionOptions
+            {
+                Image = container.Image,
+                Lifecycle = container.Lifecycle
+            });
+        }
+
         return new ProcessProgramExecutionEngine(sandbox);
     }
 
@@ -850,7 +885,7 @@ internal static class RunCommand
         return run.OpenEvolveEvaluator is { } openEvolve ? OpenEvolveEvaluatorShim.Build(path, openEvolve) : source;
     }
 
-    private static ScriptProgramFitnessEvaluator CreateFitness(RunFile run, ProcessProgramExecutionEngine execution, string evaluator)
+    private static ScriptProgramFitnessEvaluator CreateFitness(RunFile run, IProgramExecutionEngine execution, string evaluator)
         => new(execution, evaluator,
             new ScriptProgramEvaluationOptions
             {
@@ -890,6 +925,24 @@ internal static class RunCommand
         if (string.IsNullOrWhiteSpace(run.RunId)) throw new InvalidDataException("runId is required.");
         // System.Text.Json does not enforce non-nullable required members, so an explicit null arrives here.
         if (run.Model is null) throw new InvalidDataException("model is required.");
+        if (run.Container is null && !run.AllowUnsandboxedExecution)
+        {
+            throw new InvalidDataException(
+                "This run would execute the evaluator and the model-written programs it runs as host processes, which are " +
+                "not isolated from this machine's files, credentials or network. Add a \"container\" section (an image " +
+                "holding the evaluator's interpreter and packages) to run them in a locked-down Docker container, or set " +
+                "\"allowUnsandboxedExecution\": true to accept the risk for code you trust or on a machine provisioned for it.");
+        }
+
+        if (run.Container is { } container)
+        {
+            if (string.IsNullOrWhiteSpace(container.Image)) throw new InvalidDataException("container.image is required.");
+            if (!Enum.IsDefined(container.Lifecycle)) throw new InvalidDataException("container.lifecycle must be Warm or Cold.");
+            // The OpenEvolve shim imports the evaluator from its host path, which a container cannot see.
+            if (run.OpenEvolveEvaluator is not null)
+                throw new InvalidDataException("container cannot run an openEvolveEvaluator: its shim imports the evaluator from a host path.");
+        }
+
         // The same gap applies to every collection in the file: an explicit null deserializes over the
         // initializer, and the first thing that reads .Count throws NullReferenceException - a stack trace
         // on the console instead of the named refusal this surface promises for every other bad value.

@@ -122,7 +122,7 @@ public sealed class ExecutionAdversarialTests
     [Fact]
     public void RunnerConfigurationAndProvisionedRuntimeInvalidateFitnessIdentity()
     {
-        var options = new ProgramSandboxOptions { RuntimeVersion = "fixture-v1" };
+        var options = new ProgramSandboxOptions { AllowUnsandboxedExecution = true, RuntimeVersion = "fixture-v1" };
         using var first = new ProcessProgramExecutionEngine(options);
         using var same = new ProcessProgramExecutionEngine(options);
         Assert.Equal(first.VersionHash, same.VersionHash);

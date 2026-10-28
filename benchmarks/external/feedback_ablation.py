@@ -47,6 +47,7 @@ def run_file(output, seed, feedback_weight, evaluations, model, executable, budg
     """The two arms differ in `llmFeedback` and nothing else; every other key is shared."""
     run = {
         "schema": "aidotnet-evolve-run-v1",
+        "allowUnsandboxedExecution": True,
         "runId": "feedback-ablation-s%d-%s" % (seed, arm or ("on" if feedback_weight is not None else "off")),
         "initialProgram": str(TASK / "initial_program.py"),
         "evaluator": str(TASK / "evaluator.py"),

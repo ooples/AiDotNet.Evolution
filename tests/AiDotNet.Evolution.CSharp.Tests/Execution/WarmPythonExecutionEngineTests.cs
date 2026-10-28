@@ -12,7 +12,7 @@ public sealed class WarmPythonExecutionEngineTests
 
     private static ProgramSandboxOptions Options(ProgramSandboxMode mode, int timeLimitSeconds = 10)
     {
-        var options = new ProgramSandboxOptions { Mode = mode, AllowUnsafeInProcessExecution = mode == ProgramSandboxMode.WarmReusedWorker };
+        var options = new ProgramSandboxOptions { AllowUnsandboxedExecution = true, Mode = mode, AllowUnsafeInProcessExecution = mode == ProgramSandboxMode.WarmReusedWorker };
         options.SetInterpreter(ProgramLanguage.Python, new ProgramInterpreterSpecification(Python, "{source}"));
         options.Limits.TimeLimitSeconds = timeLimitSeconds;
         options.Limits.MaxConcurrentExecutions = 2;
