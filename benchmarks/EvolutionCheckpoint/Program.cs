@@ -5,16 +5,25 @@ using AiDotNet.Evolution.Programs;
 
 // V1-74: checkpoint write and resume cost at realistic archive sizes.
 // Usage: EvolutionCheckpoint <elites> <directory> [auto|inline|segmented]
-// The format defaults to Auto, what a run gets without configuring anything (E-1 measured it at 10,000 elites).
+//        EvolutionCheckpoint resume <elites> <directory> [auto|inline|segmented]
+// The format defaults to Auto, what a run gets without configuring anything (E-1 measured it at 10,000 elites). The
+// resume form only resumes a directory an earlier run left, so a resume can be timed and profiled on its own (E-1). Each
+// resume saves a checkpoint of its own, so time it against a fresh copy of the directory every launch.
+bool resumeOnly = args.Length > 0 && args[0] == "resume";
+string[] arguments = resumeOnly ? args[1..] : args;
 EvolutionCheckpointFormat format = EvolutionCheckpointFormat.Auto;
-if (args.Length is < 2 or > 3 || !int.TryParse(args[0], out int elites) || elites is < 16 or > 40_000 ||
-    (args.Length == 3 && !Enum.TryParse(args[2], ignoreCase: true, out format)))
+if (arguments.Length is < 2 or > 3 || !int.TryParse(arguments[0], out int elites) || elites is < 16 or > 40_000 ||
+    (arguments.Length == 3 && !Enum.TryParse(arguments[2], ignoreCase: true, out format)))
 {
-    Console.Error.WriteLine("Usage: EvolutionCheckpoint <elites 16..40000> <new-directory> [auto|inline|segmented]");
+    Console.Error.WriteLine("Usage: EvolutionCheckpoint [resume] <elites 16..40000> <directory> [auto|inline|segmented]");
     return 2;
 }
-string directory = Path.GetFullPath(args[1]);
-if (Directory.Exists(directory)) { Console.Error.WriteLine("The directory must not exist."); return 2; }
+string directory = Path.GetFullPath(arguments[1]);
+if (Directory.Exists(directory) != resumeOnly)
+{
+    Console.Error.WriteLine(resumeOnly ? "The directory must hold an earlier run." : "The directory must not exist.");
+    return 2;
+}
 int side = (int)Math.Ceiling(Math.Sqrt(elites));
 var descriptors = new[] { new EvolutionDescriptorDefinition("a", 0, side, side), new EvolutionDescriptorDefinition("b", 0, side, side) };
 
@@ -26,7 +35,6 @@ var task = new ProgramEvolutionTask(new DelegateProgramFitnessEvaluator((genome,
     return new ValueTask<EvolutionTaskResult>(EvolutionTaskResult.Completed(k,
         new Dictionary<string, double> { ["a"] = k % side + 0.5, ["b"] = k / side + 0.5 }, costUnits: 1));
 }, "checkpoint-bench", "checkpoint-bench-v1"));
-var store = new TimedStore(new DirectoryEvolutionCheckpointStore(directory));
 EvolutionEngineOptions Options(bool resume) => new()
 {
     RunId = "checkpoint-bench", Seed = 7, MaxEvaluationAttempts = elites, MaxProposals = elites * 2, MaxGenerations = elites,
@@ -34,6 +42,25 @@ EvolutionEngineOptions Options(bool resume) => new()
     CheckpointFormat = format
 };
 var seeds = new[] { Program4k(0) };
+if (resumeOnly)
+{
+    // Three resumes in one process: the first also pays for JIT compilation of the restore path, the later ones show
+    // the steady cost a profile should attribute.
+    for (int repeat = 0; repeat < 3; repeat++)
+    {
+        var only = Stopwatch.StartNew();
+        var restored = await new EvolutionEngine<ProgramGenome>(task, new Distinct4kPrograms(), _ => new MapElitesArchive<ProgramGenome>(descriptors),
+            Options(true), checkpointStore: new DirectoryEvolutionCheckpointStore(directory), genomeCodec: new ProgramGenomeCodec()).RunAsync(seeds);
+        only.Stop();
+        Console.WriteLine(JsonSerializer.Serialize(new
+        {
+            Format = format.ToString(), Repeat = repeat, Elites = restored.Islands.Sum(island => island.Count),
+            ResumeMs = only.Elapsed.TotalMilliseconds, restored.StateHash
+        }));
+    }
+    return 0;
+}
+var store = new TimedStore(new DirectoryEvolutionCheckpointStore(directory));
 var run = await new EvolutionEngine<ProgramGenome>(task, new Distinct4kPrograms(), _ => new MapElitesArchive<ProgramGenome>(descriptors),
     Options(false), checkpointStore: store, genomeCodec: new ProgramGenomeCodec()).RunAsync(seeds);
 int archived = run.Islands.Sum(island => island.Count);
