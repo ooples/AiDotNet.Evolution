@@ -299,6 +299,111 @@ public sealed class ArchiveJournalCheckpointTests
         Assert.Contains("unknown archive cell", refused.Message, StringComparison.Ordinal);
     }
 
+    // E-1 reads a segment straight into an array of the length its stream reports. A store's stream may not report one,
+    // or may report the wrong one; the resume must still see exactly the bytes the stream holds, which the SHA-256 check
+    // then accepts, and reach the same state as reading the store directly.
+    [Theory]
+    [InlineData(SegmentStreamShape.Unseekable)]
+    [InlineData(SegmentStreamShape.ReportsTooFew)]
+    [InlineData(SegmentStreamShape.ReportsTooMany)]
+    [InlineData(SegmentStreamShape.ReadsOneByteAtATime)]
+    public async Task A_segment_stream_of_any_shape_resumes_to_the_same_state(SegmentStreamShape shape)
+    {
+        var store = new InMemoryEvolutionCheckpointStore();
+        await Engine(Options(60, EvolutionCheckpointFormat.Segmented), store).RunAsync(Seeds());
+        EvolutionCheckpoint saved = await Latest(store);
+        var copy = new InMemoryEvolutionCheckpointStore();
+        foreach (long id in saved.SegmentIds)
+        {
+            using Stream source = Assert.IsAssignableFrom<Stream>(await store.OpenSegmentAsync(RunId, id));
+            using var bytes = new MemoryStream();
+            await source.CopyToAsync(bytes);
+            byte[] data = bytes.ToArray();
+            await copy.WriteSegmentAsync(RunId, id, (target, token) => target.WriteAsync(data, 0, data.Length, token));
+        }
+        await copy.SaveAsync(saved);
+
+        EvolutionEngineOptions direct = Options(120, EvolutionCheckpointFormat.Segmented);
+        direct.Resume = true;
+        string expected = (await Engine(direct, store).RunAsync(Seeds())).StateHash;
+        EvolutionEngineOptions shaped = Options(120, EvolutionCheckpointFormat.Segmented);
+        shaped.Resume = true;
+        string actual = (await Engine(shaped, new ShapedSegmentStore(copy, shape)).RunAsync(Seeds())).StateHash;
+        Assert.Equal(expected, actual);
+    }
+
+    public enum SegmentStreamShape
+    {
+        Unseekable,
+        ReportsTooFew,
+        ReportsTooMany,
+        ReadsOneByteAtATime
+    }
+
+    // Serves each segment through a stream of the given shape; everything else goes to the inner store.
+    private sealed class ShapedSegmentStore(InMemoryEvolutionCheckpointStore inner, SegmentStreamShape shape) : IEvolutionCheckpointSegmentStore
+    {
+        public Task SaveAsync(EvolutionCheckpoint checkpoint, CancellationToken cancellationToken = default) =>
+            inner.SaveAsync(checkpoint, cancellationToken);
+
+        public Task<EvolutionCheckpoint?> LoadLatestAsync(string runId, CancellationToken cancellationToken = default) =>
+            inner.LoadLatestAsync(runId, cancellationToken);
+
+        public Task WriteSegmentAsync(string runId, long segmentId, Func<Stream, CancellationToken, Task> write,
+            CancellationToken cancellationToken = default) => inner.WriteSegmentAsync(runId, segmentId, write, cancellationToken);
+
+        public async Task<Stream?> OpenSegmentAsync(string runId, long segmentId, CancellationToken cancellationToken = default)
+        {
+            Stream? stream = await inner.OpenSegmentAsync(runId, segmentId, cancellationToken);
+            if (stream is null) return null;
+            using (stream)
+            {
+                using var bytes = new MemoryStream();
+                await stream.CopyToAsync(bytes);
+                return new ShapedStream(bytes.ToArray(), shape);
+            }
+        }
+    }
+
+    private sealed class ShapedStream(byte[] data, SegmentStreamShape shape) : Stream
+    {
+        private int _position;
+
+        public override bool CanRead => true;
+        public override bool CanSeek => shape is SegmentStreamShape.ReportsTooFew or SegmentStreamShape.ReportsTooMany;
+        public override bool CanWrite => false;
+
+        public override long Length => shape switch
+        {
+            SegmentStreamShape.ReportsTooFew => data.Length / 2,
+            SegmentStreamShape.ReportsTooMany => data.Length * 2L,
+            _ => throw new NotSupportedException()
+        };
+
+        public override long Position
+        {
+            get => CanSeek ? _position : throw new NotSupportedException();
+            set => throw new NotSupportedException();
+        }
+
+        public override int Read(byte[] buffer, int offset, int count)
+        {
+            int available = Math.Min(count, data.Length - _position);
+            if (shape == SegmentStreamShape.ReadsOneByteAtATime) available = Math.Min(available, 1);
+            Array.Copy(data, _position, buffer, offset, available);
+            _position += available;
+            return available;
+        }
+
+        public override void Flush()
+        {
+        }
+
+        public override long Seek(long offset, SeekOrigin origin) => throw new NotSupportedException();
+        public override void SetLength(long value) => throw new NotSupportedException();
+        public override void Write(byte[] buffer, int offset, int count) => throw new NotSupportedException();
+    }
+
     [Fact]
     public void The_compaction_interval_is_bounded()
     {

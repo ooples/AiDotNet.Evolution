@@ -52,6 +52,33 @@ public sealed class ProgramGenomeCodec : IEvolutionGenomeCodec<ProgramGenome>
         return payload.ToString(Formatting.None);
     }
 
+    // JObject.Parse(string), with the reader's buffers rented instead of allocated: a resume decodes every archived genome,
+    // and at 4 KB a genome the reader's growing buffers were about 34 KB of garbage each, most of a resume's allocation
+    // (E-1). The reader and settings are otherwise JObject.Parse's own, so what parses, and how, is unchanged.
+    private static JObject Parse(string payload)
+    {
+        using var reader = new JsonTextReader(new StringReader(payload)) { ArrayPool = SharedCharPool.Instance };
+        JObject parsed = JObject.Load(reader);
+        // As in JObject.Parse: anything after the object other than a comment makes the reader throw.
+        while (reader.Read())
+        {
+        }
+
+        return parsed;
+    }
+
+    private sealed class SharedCharPool : IArrayPool<char>
+    {
+        internal static readonly SharedCharPool Instance = new();
+
+        public char[] Rent(int minimumLength) => System.Buffers.ArrayPool<char>.Shared.Rent(minimumLength);
+
+        public void Return(char[]? array)
+        {
+            if (array is not null) System.Buffers.ArrayPool<char>.Shared.Return(array);
+        }
+    }
+
     /// <inheritdoc/>
     public ProgramGenome Deserialize(string payload)
     {
@@ -60,7 +87,7 @@ public sealed class ProgramGenomeCodec : IEvolutionGenomeCodec<ProgramGenome>
         JObject parsed;
         try
         {
-            parsed = JObject.Parse(payload);
+            parsed = Parse(payload);
         }
         catch (JsonException exception)
         {

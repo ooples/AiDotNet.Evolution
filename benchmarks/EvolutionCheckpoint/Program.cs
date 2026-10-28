@@ -48,6 +48,8 @@ if (resumeOnly)
     // the steady cost a profile should attribute.
     for (int repeat = 0; repeat < 3; repeat++)
     {
+        long allocatedBefore = GC.GetTotalAllocatedBytes(precise: true);
+        TimeSpan cpuBefore = Process.GetCurrentProcess().TotalProcessorTime;
         var only = Stopwatch.StartNew();
         var restored = await new EvolutionEngine<ProgramGenome>(task, new Distinct4kPrograms(), _ => new MapElitesArchive<ProgramGenome>(descriptors),
             Options(true), checkpointStore: new DirectoryEvolutionCheckpointStore(directory), genomeCodec: new ProgramGenomeCodec()).RunAsync(seeds);
@@ -55,7 +57,9 @@ if (resumeOnly)
         Console.WriteLine(JsonSerializer.Serialize(new
         {
             Format = format.ToString(), Repeat = repeat, Elites = restored.Islands.Sum(island => island.Count),
-            ResumeMs = only.Elapsed.TotalMilliseconds, restored.StateHash
+            ResumeMs = only.Elapsed.TotalMilliseconds,
+            CpuMs = (Process.GetCurrentProcess().TotalProcessorTime - cpuBefore).TotalMilliseconds,
+            AllocatedBytes = GC.GetTotalAllocatedBytes(precise: true) - allocatedBefore, restored.StateHash
         }));
     }
     return 0;

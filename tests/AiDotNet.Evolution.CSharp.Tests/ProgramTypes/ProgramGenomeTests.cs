@@ -138,8 +138,30 @@ public sealed class ProgramGenomeTests
     [InlineData("   ")]
     [InlineData("\r\n\r\n")]
     [InlineData("\t \n \t")]
+    [InlineData("\uFEFF")]
+    [InlineData("\uFEFF \r\n\t")]
+    [InlineData("\u00A0\u2028\r")]
     public void BlankSourcesAreRejected(string source) =>
         Assert.Throws<ArgumentException>(() => new ProgramGenome(source));
+
+    // E-1 builds NormalizedSource on first read and decides blankness without it, so the decision must agree with the
+    // normalized text for every source: accepted exactly when normalization leaves something.
+    [Theory]
+    [InlineData("\uFEFFx")]
+    [InlineData(" \u00A0x\u00A0 ")]
+    [InlineData("\r\n\tx")]
+    [InlineData("\uFEFF\uFEFF")]
+    [InlineData("x\r\n\r\n   ")]
+    public void AcceptedSourcesNormalizeToTheSameNonEmptyTextOnEveryRead(string source)
+    {
+        var genome = new ProgramGenome(source, ProgramLanguage.Python);
+        string normalized = genome.NormalizedSource;
+
+        Assert.NotEmpty(normalized);
+        Assert.Equal(ProgramText.Normalize(source), normalized);
+        Assert.Same(normalized, genome.NormalizedSource);
+        Assert.Same(normalized, genome.CreateOwnedSnapshot().NormalizedSource);
+    }
 
     [Fact]
     public void NullSourceIsRejected()

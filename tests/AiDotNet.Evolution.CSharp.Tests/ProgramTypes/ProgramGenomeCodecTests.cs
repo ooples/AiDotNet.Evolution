@@ -69,8 +69,37 @@ public sealed class ProgramGenomeCodecTests
     [InlineData("{\"v\":2,\"language\":\"Python\",\"source\":\"x\"}")]
     [InlineData("{\"v\":\"one\",\"language\":\"Python\",\"source\":\"x\"}")]
     [InlineData("{\"v\":1,\"language\":\"Python\",\"source\":\"   \"}")]
+    [InlineData("{\"v\":1,\"language\":\"Python\",\"source\":\"x\"} 1")]
+    [InlineData("{\"v\":1,\"language\":\"Python\",\"source\":\"x\"}{}")]
+    [InlineData("{\"v\":1,\"language\":\"Python\",\"source\":\"x\"")]
     public void MalformedPayloadsRaiseInvalidData(string payload) =>
         Assert.Throws<InvalidDataException>(() => Codec.Deserialize(payload));
+
+    // E-1 reads payloads through pooled reader buffers. A source far longer than the reader's first buffer, with escapes
+    // throughout, must still come back exactly, and decoding many in a row must not let one payload's text leak into the
+    // next through a reused buffer.
+    [Fact]
+    public void LongEscapedSourcesRoundTripExactlyThroughReusedBuffers()
+    {
+        for (int round = 0; round < 64; round++)
+        {
+            string source = "# candidate " + round + "\r\n" + string.Concat(Enumerable.Range(0, 300)
+                .Select(line => "value_" + line + " = \"\\t" + (round * 300 + line) + "\"\t# caf\u00E9 \uD83D\uDE80\n"));
+            var genome = new ProgramGenome(source, ProgramLanguage.Python, round % 2 == 0 ? null : "d" + round);
+            ProgramGenome restored = Codec.Deserialize(Codec.Serialize(genome));
+            Assert.Equal(genome.Source, restored.Source);
+            Assert.Equal(genome.Description, restored.Description);
+            Assert.Equal(genome.Id, restored.Id);
+        }
+    }
+
+    // JObject.Parse accepts a trailing comment and white space after the object; the pooled reader keeps that.
+    [Fact]
+    public void TrailingCommentsAndWhiteSpaceAreStillAccepted()
+    {
+        ProgramGenome restored = Codec.Deserialize("{\"v\":1,\"language\":\"Python\",\"source\":\"x\"} /* note */ \n");
+        Assert.Equal("x", restored.Source);
+    }
 
     [Fact]
     public void NullArgumentsAreRejected()

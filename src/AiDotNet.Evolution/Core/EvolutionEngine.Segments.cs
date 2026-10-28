@@ -543,18 +543,7 @@ public sealed partial class EvolutionEngine<TGenome>
         byte[] bytes;
         using (Stream stream = await store.OpenSegmentAsync(runId, reference.Id, cancellationToken).ConfigureAwait(false)
                    ?? throw new InvalidDataException($"Checkpoint segment {reference.Id} is missing from the store."))
-        using (var buffer = new MemoryStream())
-        {
-            byte[] chunk = new byte[SegmentFlushBytes];
-            int read;
-            while ((read = await stream.ReadAsync(chunk, 0, chunk.Length, cancellationToken).ConfigureAwait(false)) > 0)
-            {
-                if (buffer.Length + read > EvolutionCollectionLimits.MaximumCheckpointBytes)
-                    throw new InvalidDataException($"Checkpoint segment {reference.Id} exceeds the package limit.");
-                buffer.Write(chunk, 0, read);
-            }
-            bytes = buffer.ToArray();
-        }
+            bytes = await ReadSegmentBytesAsync(stream, reference.Id, cancellationToken).ConfigureAwait(false);
 
         using (IncrementalHash hash = IncrementalHash.CreateHash(HashAlgorithmName.SHA256))
         {
@@ -573,6 +562,52 @@ public sealed partial class EvolutionEngine<TGenome>
         {
             throw new InvalidDataException($"Checkpoint segment {reference.Id} is invalid.", exception);
         }
+    }
+
+    // A segment's bytes, read straight into an array of the stream's length when it reports one: growing a MemoryStream
+    // and copying it out allocated about three times each segment, the largest share of a resume's allocation (E-1). A
+    // stream that turns out longer or shorter than it reported still yields exactly the bytes it holds, so the SHA-256
+    // check sees what the store returned.
+    private static async Task<byte[]> ReadSegmentBytesAsync(Stream stream, long id, CancellationToken cancellationToken)
+    {
+        long expected = -1;
+        if (stream.CanSeek)
+        {
+            try
+            {
+                expected = stream.Length - stream.Position;
+            }
+            catch (NotSupportedException)
+            {
+                expected = -1;
+            }
+        }
+        if (expected > EvolutionCollectionLimits.MaximumCheckpointBytes)
+            throw new InvalidDataException($"Checkpoint segment {id} exceeds the package limit.");
+
+        byte[] bytes = new byte[expected > 0 ? expected : SegmentFlushBytes];
+        int length = 0;
+        while (true)
+        {
+            if (length == bytes.Length)
+            {
+                // Full: either the reported length was exact (the next read returns nothing) or the stream holds more.
+                var probe = new byte[1];
+                if (await stream.ReadAsync(probe, 0, 1, cancellationToken).ConfigureAwait(false) == 0) break;
+                if ((long)length + 1 > EvolutionCollectionLimits.MaximumCheckpointBytes)
+                    throw new InvalidDataException($"Checkpoint segment {id} exceeds the package limit.");
+                long grown = Math.Min(Math.Max((long)bytes.Length * 2, SegmentFlushBytes),
+                    (long)EvolutionCollectionLimits.MaximumCheckpointBytes);
+                Array.Resize(ref bytes, (int)Math.Max(grown, (long)length + 1));
+                bytes[length++] = probe[0];
+                continue;
+            }
+            int read = await stream.ReadAsync(bytes, length, bytes.Length - length, cancellationToken).ConfigureAwait(false);
+            if (read == 0) break;
+            length += read;
+        }
+        if (length != bytes.Length) Array.Resize(ref bytes, length);
+        return bytes;
     }
 
     // The version an inline payload of this document would carry: measurement origins, then Pareto, then constraints.
