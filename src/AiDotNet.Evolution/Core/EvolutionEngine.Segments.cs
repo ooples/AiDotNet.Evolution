@@ -1,4 +1,5 @@
 using System.Buffers;
+using System.Runtime.CompilerServices;
 using System.Security.Cryptography;
 using System.Text;
 using System.Text.Json;
@@ -450,24 +451,40 @@ public sealed partial class EvolutionEngine<TGenome>
 
         var seen = new HashSet<string>(StringComparer.Ordinal);
         var cache = new Dictionary<string, CacheDocument>(StringComparer.Ordinal);
-        foreach (SegmentReferenceDocument reference in manifest)
+        var pending = new Queue<Task<StateSegmentDocument>>();
+        int window = DecodeWindow;
+        int read = 0;
+        try
         {
-            StateSegmentDocument segment = await ReadSegmentAsync(store, runId, reference, cancellationToken).ConfigureAwait(false);
-            if (segment.SchemaVersion != expectedSchema || segment.IsBase != reference.IsBase)
-                throw new InvalidDataException("A checkpoint segment has an unexpected schema or kind.");
-            foreach (string id in segment.RemovedGenomeIds ?? new List<string>())
-                if (id is null || !seen.Remove(id)) throw new InvalidDataException("A checkpoint segment removes an unknown genome.");
-            foreach (string id in segment.SeenGenomeIds ?? new List<string>())
-                if (string.IsNullOrWhiteSpace(id) || !seen.Add(id)) throw new InvalidDataException("A checkpoint segment adds a genome twice.");
-            foreach (string id in segment.RemovedCacheIds ?? new List<string>())
-                if (id is null || !cache.Remove(id)) throw new InvalidDataException("A checkpoint segment removes an unknown cache entry.");
-            foreach (CacheDocument entry in segment.Cache ?? new List<CacheDocument>())
+            for (int applied = 0; applied < manifest.Count; applied++)
             {
-                if (entry is null || string.IsNullOrWhiteSpace(entry.GenomeId) || (reference.IsBase && cache.ContainsKey(entry.GenomeId)))
-                    throw new InvalidDataException("A checkpoint segment has an invalid cache entry.");
-                cache[entry.GenomeId] = entry;
+                while (read < manifest.Count && pending.Count < window)
+                {
+                    SegmentReferenceDocument next = manifest[read++];
+                    Task<StateSegmentDocument> decode;
+                    try
+                    {
+                        SegmentBytes bytes = await ReadSegmentAsync(store, runId, next, cancellationToken).ConfigureAwait(false);
+                        decode = Task.Run(() => DecodeSegment(bytes, next), CancellationToken.None);
+                    }
+                    catch (Exception exception)
+                    {
+                        // Queued, not thrown: an earlier segment still being decoded may fail too, and its failure is
+                        // the one to report. Nothing after this segment is read.
+                        decode = Task.FromException<StateSegmentDocument>(exception);
+                        read = manifest.Count;
+                    }
+                    pending.Enqueue(decode);
+                }
+
+                StateSegmentDocument segment = await pending.Dequeue().ConfigureAwait(false);
+                ApplySegment(segment, manifest[applied], expectedSchema, seen, cache, cells);
             }
-            ApplyArchiveSegment(segment, reference.IsBase, cells);
+        }
+        catch
+        {
+            await DrainAsync(pending).ConfigureAwait(false);
+            throw;
         }
 
         state.SeenGenomeIds = seen.ToList();
@@ -494,6 +511,11 @@ public sealed partial class EvolutionEngine<TGenome>
 
     // Applies one segment's archive changes. A base restates every island; a delta writes cells (an entry replaces what
     // its cell held) and empties cells that must already hold an entry.
+    // Fully optimized from the first call, like the checkpoint preflight: a resume runs this once per restored elite, all
+    // within about a second, before tiered compilation would promote it (E-1).
+#if NETCOREAPP3_0_OR_GREATER
+    [MethodImpl(MethodImplOptions.AggressiveOptimization)]
+#endif
     private static void ApplyArchiveSegment(StateSegmentDocument segment, bool isBase, Dictionary<string, ArchiveEntryDocument>[] cells)
     {
         if (segment.Islands is not { } islands)
@@ -538,14 +560,43 @@ public sealed partial class EvolutionEngine<TGenome>
         }
     }
 
-    private static async Task<StateSegmentDocument> ReadSegmentAsync(IEvolutionCheckpointSegmentStore store, string runId,
+    private static void ApplySegment(StateSegmentDocument segment, SegmentReferenceDocument reference, int expectedSchema,
+        HashSet<string> seen, Dictionary<string, CacheDocument> cache, Dictionary<string, ArchiveEntryDocument>[] cells)
+    {
+        if (segment.SchemaVersion != expectedSchema || segment.IsBase != reference.IsBase)
+            throw new InvalidDataException("A checkpoint segment has an unexpected schema or kind.");
+        foreach (string id in segment.RemovedGenomeIds ?? new List<string>())
+            if (id is null || !seen.Remove(id)) throw new InvalidDataException("A checkpoint segment removes an unknown genome.");
+        foreach (string id in segment.SeenGenomeIds ?? new List<string>())
+            if (string.IsNullOrWhiteSpace(id) || !seen.Add(id)) throw new InvalidDataException("A checkpoint segment adds a genome twice.");
+        foreach (string id in segment.RemovedCacheIds ?? new List<string>())
+            if (id is null || !cache.Remove(id)) throw new InvalidDataException("A checkpoint segment removes an unknown cache entry.");
+        foreach (CacheDocument entry in segment.Cache ?? new List<CacheDocument>())
+        {
+            if (entry is null || string.IsNullOrWhiteSpace(entry.GenomeId) || (reference.IsBase && cache.ContainsKey(entry.GenomeId)))
+                throw new InvalidDataException("A checkpoint segment has an invalid cache entry.");
+            cache[entry.GenomeId] = entry;
+        }
+        ApplyArchiveSegment(segment, reference.IsBase, cells);
+    }
+
+    // A segment's bytes are read from the store in manifest order, one at a time, since a store need not serve concurrent
+    // reads; checking and decoding them shares no state, so that runs on the thread pool, up to DecodeWindow segments
+    // ahead of the one being applied. Decoding was most of a resume's time and grows with the state (E-1). Segments are
+    // still applied strictly in order, and the first failure in manifest order is the one reported.
+    private static int DecodeWindow => Math.Max(1, Math.Min(Environment.ProcessorCount, 8));
+
+    private static async Task<SegmentBytes> ReadSegmentAsync(IEvolutionCheckpointSegmentStore store, string runId,
         SegmentReferenceDocument reference, CancellationToken cancellationToken)
     {
-        SegmentBytes bytes;
-        using (Stream stream = await store.OpenSegmentAsync(runId, reference.Id, cancellationToken).ConfigureAwait(false)
-                   ?? throw new InvalidDataException($"Checkpoint segment {reference.Id} is missing from the store."))
-            bytes = await ReadSegmentBytesAsync(stream, reference.Id, cancellationToken).ConfigureAwait(false);
+        using Stream stream = await store.OpenSegmentAsync(runId, reference.Id, cancellationToken).ConfigureAwait(false)
+                              ?? throw new InvalidDataException($"Checkpoint segment {reference.Id} is missing from the store.");
+        return await ReadSegmentBytesAsync(stream, reference.Id, cancellationToken).ConfigureAwait(false);
+    }
 
+    // Checks and decodes one segment's bytes, returning the buffer to the pool whatever happens.
+    private static StateSegmentDocument DecodeSegment(SegmentBytes bytes, SegmentReferenceDocument reference)
+    {
         try
         {
             using (IncrementalHash hash = IncrementalHash.CreateHash(HashAlgorithmName.SHA256))
@@ -570,6 +621,24 @@ public sealed partial class EvolutionEngine<TGenome>
         finally
         {
             ArrayPool<byte>.Shared.Return(bytes.Buffer);
+        }
+    }
+
+    // Waits out decodes that will not be applied, so none outlives the resume that started it. Their own failures are
+    // not reported: the resume is already failing with the earlier one, which is first in manifest order.
+    private static async Task DrainAsync(Queue<Task<StateSegmentDocument>> pending)
+    {
+        while (pending.Count > 0)
+        {
+            Task<StateSegmentDocument> decode = pending.Dequeue();
+            try
+            {
+                await decode.ConfigureAwait(false);
+            }
+            catch (Exception exception) when (exception is not OutOfMemoryException)
+            {
+                // Superseded by the failure being reported.
+            }
         }
     }
 

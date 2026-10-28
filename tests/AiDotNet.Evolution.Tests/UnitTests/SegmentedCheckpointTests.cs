@@ -148,6 +148,58 @@ public sealed class SegmentedCheckpointTests
         Assert.Contains("SHA-256", refused.Message, StringComparison.Ordinal);
     }
 
+    // E-1 decodes segments concurrently, ahead of the one being applied. When several are bad, the resume must still
+    // report the first bad one in the checkpoint's order, as a one-at-a-time resume does, whichever decode fails first.
+    [Fact]
+    public async Task With_several_bad_segments_the_first_in_order_is_the_one_reported()
+    {
+        var store = new InMemoryEvolutionCheckpointStore();
+        await Engine(Options(40, EvolutionCheckpointFormat.Segmented, 0), store).RunAsync(Seeds());
+        EvolutionCheckpoint saved = Assert.IsType<EvolutionCheckpoint>(await store.LoadLatestAsync("segmented"));
+        Assert.True(saved.SegmentIds.Count >= 3, "the run should leave a base segment and at least two deltas");
+
+        // The first is tampered so only its SHA-256 check fails, which takes a full decode's worth of work; every later
+        // one is missing, which fails at once and is seen before the first decode can finish.
+        long first = saved.SegmentIds[0];
+        var bad = new BadSegmentStore(store, first, new HashSet<long>(saved.SegmentIds.Skip(1)));
+        EvolutionEngineOptions resume = Options(60, EvolutionCheckpointFormat.Segmented, 0);
+        resume.Resume = true;
+        InvalidDataException refused = await Assert.ThrowsAsync<InvalidDataException>(() => Engine(resume, bad).RunAsync(Seeds()));
+        Assert.Contains("SHA-256", refused.Message, StringComparison.Ordinal);
+        Assert.Contains($"segment {first} ", refused.Message, StringComparison.Ordinal);
+    }
+
+    // Serves one segment with a byte changed and reports others missing; everything else goes to the inner store.
+    private sealed class BadSegmentStore(InMemoryEvolutionCheckpointStore inner, long tampered, ISet<long> missing)
+        : IEvolutionCheckpointSegmentStore
+    {
+        public Task SaveAsync(EvolutionCheckpoint checkpoint, CancellationToken cancellationToken = default) =>
+            inner.SaveAsync(checkpoint, cancellationToken);
+
+        public Task<EvolutionCheckpoint?> LoadLatestAsync(string runId, CancellationToken cancellationToken = default) =>
+            inner.LoadLatestAsync(runId, cancellationToken);
+
+        public Task WriteSegmentAsync(string runId, long segmentId, Func<Stream, CancellationToken, Task> write,
+            CancellationToken cancellationToken = default) => inner.WriteSegmentAsync(runId, segmentId, write, cancellationToken);
+
+        public async Task<Stream?> OpenSegmentAsync(string runId, long segmentId, CancellationToken cancellationToken = default)
+        {
+            if (missing.Contains(segmentId)) return null;
+            Stream? stream = await inner.OpenSegmentAsync(runId, segmentId, cancellationToken);
+            if (stream is null || segmentId != tampered) return stream;
+            using (stream)
+            {
+                using var bytes = new MemoryStream();
+                await stream.CopyToAsync(bytes);
+                // Still valid JSON with the same meaning, so only the SHA-256 check can catch it.
+                string text = System.Text.Encoding.UTF8.GetString(bytes.ToArray());
+                string changed = text.Replace("\"IsBase\":true", "\"IsBase\": true");
+                Assert.NotEqual(text, changed);
+                return new MemoryStream(System.Text.Encoding.UTF8.GetBytes(changed));
+            }
+        }
+    }
+
     [Fact]
     public async Task A_segmented_checkpoint_copied_without_its_segments_says_what_it_needs()
     {
