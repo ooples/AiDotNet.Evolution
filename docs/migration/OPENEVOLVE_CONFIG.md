@@ -172,6 +172,24 @@ killed on a timeout and a memory cap enforced. A bundled shim reproduces OpenEvo
 The shim records the evaluator's SHA-256. Editing the evaluator therefore changes the run's identity, and a changed file
 is refused rather than mixed into an ongoing run.
 
+### Running the evaluator in a container
+
+The importer writes `"allowUnsandboxedExecution": true` into the generated `run.json`, because OpenEvolve itself runs
+evaluators as host processes and an imported run should behave the same way first; the generated notes say so. That
+process sandbox does not keep a model-written program away from your files, credentials or network. To run the evaluator
+and every candidate in a locked-down Docker container instead, replace that line with a `container` section naming an
+image that holds the evaluator's packages (numpy, and `openevolve` when the evaluator imports it):
+
+```json
+"container": { "image": "my-evaluator-image:1" }
+```
+
+The evaluator's directory is then mounted read-only at `/aidotnet/evaluator`, so the shim imports the unmodified file and
+any helper beside it, and each `openEvolveEvaluator.pythonPath` directory is mounted read-only and put on the container's
+`PYTHONPATH`. Remove `openEvolveEvaluator.python` (from `--python`): it names a host interpreter, and the image's
+`python3` runs the evaluator. See [Choosing an execution mode](../PROGRAM_EVOLUTION.md#choosing-an-execution-mode) and
+[CLI.md](../CLI.md).
+
 ## What differs, and is reported
 
 - **Prompts.** OpenEvolve's prompt keys map onto our prompt options: templates, changes-description mode, template

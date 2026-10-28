@@ -832,18 +832,26 @@ internal static class RunCommand
             {
                 // Declared rather than inherited: the sandbox clears the environment, so an evaluator that imports
                 // openevolve itself sees exactly the directories named in the run file and nothing else the host holds.
-                sandbox.DeclaredEnvironment["PYTHONPATH"] = string.Join(
-                    Path.PathSeparator.ToString(),
-                    openEvolve.PythonPath.Select(entry => Path.GetFullPath(Path.Combine(baseDirectory, entry))));
+                // In a container each directory is mounted read-only, so the path is the one inside the container.
+                sandbox.DeclaredEnvironment["PYTHONPATH"] = run.Container is null
+                    ? string.Join(Path.PathSeparator.ToString(), HostPythonPath(openEvolve, baseDirectory))
+                    : string.Join(":", openEvolve.PythonPath.Select((_, index) => ContainerPythonPathEntry(index)));
             }
         }
         if (run.Container is { } container)
         {
-            return new ContainerExecutionEngine(sandbox, new ContainerExecutionOptions
+            var options = new ContainerExecutionOptions
             {
                 Image = container.Image,
                 Lifecycle = container.Lifecycle
-            });
+            };
+            if (run.OpenEvolveEvaluator is not null)
+            {
+                foreach (KeyValuePair<string, string> mount in ContainerMounts(run, baseDirectory))
+                    options.ReadOnlyMounts[mount.Key] = mount.Value;
+            }
+
+            return new ContainerExecutionEngine(sandbox, options);
         }
 
         return new ProcessProgramExecutionEngine(sandbox);
@@ -877,12 +885,66 @@ internal static class RunCommand
         if (source.ComprehensiveImplementationMinLines is int comprehensive) prompt.ComprehensiveImplementationMinLines = comprehensive;
     }
 
+    /// <summary>Where a container sees the OpenEvolve evaluator's directory, mounted read-only.</summary>
+    internal const string ContainerEvaluatorDirectory = "/aidotnet/evaluator";
+
+    /// <summary>Where a container sees the <paramref name="index"/>th <c>openEvolveEvaluator.pythonPath</c> directory.</summary>
+    internal static string ContainerPythonPathEntry(int index) =>
+        "/aidotnet/pythonpath/" + index.ToString(System.Globalization.CultureInfo.InvariantCulture);
+
+    private static List<string> HostPythonPath(RunOpenEvolveEvaluator openEvolve, string baseDirectory) =>
+        openEvolve.PythonPath.Select(entry => Path.GetFullPath(Path.Combine(baseDirectory, entry))).ToList();
+
+    /// <summary>
+    /// The host directories an OpenEvolve evaluator needs inside a container, keyed by where the container sees them:
+    /// the evaluator's own directory (the shim imports it and the helpers beside it) and each <c>pythonPath</c> entry.
+    /// </summary>
+    /// <remarks>
+    /// Every candidate can read what is mounted, and its output reaches the archive and the model's prompts, so a
+    /// filesystem root or the home directory - where SSH keys and cloud credentials live - is refused rather than
+    /// mounted. Move the evaluator into a directory of its own instead.
+    /// </remarks>
+    private static Dictionary<string, string> ContainerMounts(RunFile run, string baseDirectory)
+    {
+        var mounts = new Dictionary<string, string>(StringComparer.Ordinal)
+        {
+            [ContainerEvaluatorDirectory] = RequireMountable(
+                Path.GetDirectoryName(Path.GetFullPath(Path.Combine(baseDirectory, run.Evaluator))), "the evaluator's directory")
+        };
+        List<string> pythonPath = run.OpenEvolveEvaluator is { } openEvolve ? HostPythonPath(openEvolve, baseDirectory) : new List<string>();
+        for (int index = 0; index < pythonPath.Count; index++)
+            mounts[ContainerPythonPathEntry(index)] = RequireMountable(pythonPath[index], "openEvolveEvaluator.pythonPath[" + index + "]");
+        return mounts;
+    }
+
+    private static string RequireMountable(string? directory, string what)
+    {
+        string trimmed = directory?.TrimEnd(Path.DirectorySeparatorChar, Path.AltDirectorySeparatorChar) ?? string.Empty;
+        string home = Environment.GetFolderPath(Environment.SpecialFolder.UserProfile)
+            .TrimEnd(Path.DirectorySeparatorChar, Path.AltDirectorySeparatorChar);
+        StringComparison comparison = OperatingSystem.IsWindows() ? StringComparison.OrdinalIgnoreCase : StringComparison.Ordinal;
+        bool root = directory is null || trimmed.Length == 0
+            || string.Equals(trimmed, (Path.GetPathRoot(directory) ?? string.Empty).TrimEnd(Path.DirectorySeparatorChar, Path.AltDirectorySeparatorChar), comparison);
+        if (root || (home.Length > 0 && string.Equals(trimmed, home, comparison)))
+        {
+            throw new InvalidDataException(
+                what + " (" + (directory ?? "none") + ") would be mounted read-only into the container, where every candidate can "
+                + "read it; a filesystem root or the home directory is refused. Move the evaluator and its helpers into a "
+                + "directory of their own.");
+        }
+
+        return directory ?? string.Empty;
+    }
+
     /// <summary>The evaluator script to run: the file itself, or the OpenEvolve shim that imports it.</summary>
     private static string LoadEvaluator(RunFile run, string baseDirectory)
     {
         string path = Path.GetFullPath(Path.Combine(baseDirectory, run.Evaluator));
         string source = ReadBounded(path, MaxRunFileBytes); // bounds and existence, whichever form runs
-        return run.OpenEvolveEvaluator is { } openEvolve ? OpenEvolveEvaluatorShim.Build(path, openEvolve) : source;
+        if (run.OpenEvolveEvaluator is not { } openEvolve) return source;
+        // The shim hashes the host file and, in a container, imports the same file through the read-only mount.
+        string runtimePath = run.Container is null ? path : ContainerEvaluatorDirectory + "/" + Path.GetFileName(path);
+        return OpenEvolveEvaluatorShim.Build(path, runtimePath, openEvolve);
     }
 
     private static ScriptProgramFitnessEvaluator CreateFitness(RunFile run, IProgramExecutionEngine execution, string evaluator)
@@ -938,9 +1000,13 @@ internal static class RunCommand
         {
             if (string.IsNullOrWhiteSpace(container.Image)) throw new InvalidDataException("container.image is required.");
             if (!Enum.IsDefined(container.Lifecycle)) throw new InvalidDataException("container.lifecycle must be Warm or Cold.");
-            // The OpenEvolve shim imports the evaluator from its host path, which a container cannot see.
-            if (run.OpenEvolveEvaluator is not null)
-                throw new InvalidDataException("container cannot run an openEvolveEvaluator: its shim imports the evaluator from a host path.");
+            // A host interpreter path means nothing inside the image, whose own python3 runs the evaluator there.
+            if (run.OpenEvolveEvaluator?.Python is not null)
+            {
+                throw new InvalidDataException(
+                    "openEvolveEvaluator.python names a host interpreter, which a container cannot run; the image's python3 runs "
+                    + "the evaluator in a container, so remove the field or drop the container section.");
+            }
         }
 
         // The same gap applies to every collection in the file: an explicit null deserializes over the
@@ -995,6 +1061,10 @@ internal static class RunCommand
             default:
                 throw new InvalidDataException("model.provider is not supported.");
         }
+
+        // Refused here, before anything is created, rather than when the container starts.
+        if (run.Container is not null && run.OpenEvolveEvaluator is not null)
+            _ = ContainerMounts(run, Path.GetDirectoryName(Path.GetFullPath(path)) ?? ".");
         return run;
     }
 

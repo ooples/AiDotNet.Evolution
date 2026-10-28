@@ -68,12 +68,22 @@ public sealed class CliRunTests
         Assert.Contains("\"container\"", error, StringComparison.Ordinal);
         Assert.False(Directory.Exists(Path.Combine(directory.Path, "out")), "the refused run created its output directory");
 
-        // A container cannot run the OpenEvolve shim, which imports the evaluator from a host path.
+        // A container runs the image's interpreter, so a host interpreter path for the OpenEvolve shim is refused by
+        // name rather than silently ignored.
         string shim = WriteRun(directory.Path, "http://127.0.0.1:9/v1", maxEvaluations: 1,
-            extra: ", \"container\": { \"image\": \"python:3.12-slim\" }, \"openEvolveEvaluator\": { }");
+            extra: ", \"container\": { \"image\": \"python:3.12-slim\" }, \"openEvolveEvaluator\": { \"python\": \"/usr/bin/python3\" }");
         (code, _, error) = Run("run", shim);
         Assert.NotEqual(0, code);
-        Assert.Contains("openEvolveEvaluator", error, StringComparison.Ordinal);
+        Assert.Contains("openEvolveEvaluator.python", error, StringComparison.Ordinal);
+
+        // Every candidate can read what a container mounts, so a filesystem root is refused before anything starts.
+        string root = JsonSerializer.Serialize(Path.GetPathRoot(Path.GetFullPath(directory.Path)));
+        string rooted = WriteRun(directory.Path, "http://127.0.0.1:9/v1", maxEvaluations: 1,
+            extra: ", \"container\": { \"image\": \"python:3.12-slim\" }, \"openEvolveEvaluator\": { \"pythonPath\": [ " + root + " ] }");
+        (code, _, error) = Run("run", rooted);
+        Assert.NotEqual(0, code);
+        Assert.Contains("openEvolveEvaluator.pythonPath[0]", error, StringComparison.Ordinal);
+        Assert.False(Directory.Exists(Path.Combine(directory.Path, "out")), "the refused run created its output directory");
     }
 
     [Fact]

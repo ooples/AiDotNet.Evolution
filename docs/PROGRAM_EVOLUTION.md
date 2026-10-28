@@ -153,6 +153,13 @@ setting and the container alternative. Set it only for code you trust, or when t
 already runs inside a VM or container provisioned for the purpose. The CLI asks for the same decision
 in the run file (`allowUnsandboxedExecution`, or a `container` section); see [CLI.md](CLI.md).
 
+A container sees no host path unless `ContainerExecutionOptions.ReadOnlyMounts` names one. An entry
+mounts a host directory read-only, for files an evaluator needs and cannot carry in its source (the CLI
+uses it for an OpenEvolve evaluator's directory and its `pythonPath`). The engine reads every mount back
+from the daemon and refuses a container in which a host path is writable or an undeclared one appears.
+Read-only is not private: candidates can read a mounted directory, so keep credentials and held-out data
+out of it.
+
 The container boundary is the Docker daemon and the host kernel. A container shares the kernel, so an
 adversary able to exploit a kernel bug reachable through the seccomp profile is outside what it stops;
 keep the host patched, point the Docker client only at a daemon you trust, and add a VM boundary for

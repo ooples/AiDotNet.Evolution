@@ -18,11 +18,15 @@ internal static class OpenEvolveEvaluatorShim
 {
     private const string ResourceName = "AiDotNet.Evolution.Cli.OpenEvolve.openevolve_evaluator_shim.py";
 
-    public static string Build(string evaluatorPath, RunOpenEvolveEvaluator options)
+    /// <param name="evaluatorPath">The evaluator file on this machine; its bytes are hashed here.</param>
+    /// <param name="runtimePath">Where the shim finds the same file when it runs: <paramref name="evaluatorPath"/> for a
+    /// host process, or its path through a read-only mount inside a container.</param>
+    /// <param name="options">The run file's <c>openEvolveEvaluator</c> section.</param>
+    public static string Build(string evaluatorPath, string runtimePath, RunOpenEvolveEvaluator options)
     {
         var settings = new Dictionary<string, object>(StringComparer.Ordinal)
         {
-            ["evaluator_path"] = evaluatorPath,
+            ["evaluator_path"] = runtimePath,
             // Raw bytes, as the shim hashes them, so line endings cannot make the two disagree.
             ["evaluator_sha256"] = Sha256(File.ReadAllBytes(evaluatorPath)),
             ["cascade_evaluation"] = options.Cascade,

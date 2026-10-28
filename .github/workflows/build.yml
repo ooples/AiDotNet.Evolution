@@ -441,7 +441,7 @@ jobs:
     name: Container execution isolation
     if: "${{ !(github.event_name == 'push' && startsWith(github.event.head_commit.message, 'chore(main): release')) && !startsWith(github.head_ref, 'release-please--') }}"
     runs-on: ubuntu-latest
-    timeout-minutes: 20
+    timeout-minutes: 35
     steps:
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
       - uses: actions/setup-dotnet@a98b56852c35b8e3190ac28c8c2271da59106c68 # v6.0.0
@@ -463,8 +463,26 @@ jobs:
             executed="$(grep -o 'executed="[0-9]*"' "$trx" | head -1 | grep -o '[0-9]*')"
             skipped="$(grep -o 'notExecuted="[0-9]*"' "$trx" | head -1 | grep -o '[0-9]*')"
             echo "$framework: container tests executed ${executed:-0}, not executed ${skipped:-0}"
-            [ "${executed:-0}" -ge 13 ] || { echo "::error::expected at least 13 container tests on $framework, ran ${executed:-0}"; exit 1; }
+            [ "${executed:-0}" -ge 14 ] || { echo "::error::expected at least 14 container tests on $framework, ran ${executed:-0}"; exit 1; }
             [ "${skipped:-0}" -eq 0 ] || { echo "::error::$framework skipped ${skipped} container tests on a Linux runner with Docker"; exit 1; }
+          done
+      # The CLI end to end: an OpenEvolve evaluator, its helper and a pythonPath module reached through the read-only
+      # mounts, scored inside the container in both lifecycles. The same skip-is-failure and count rules apply.
+      - name: Run an OpenEvolve evaluator through the CLI in a container on net10.0 and net8.0
+        env:
+          AIDOTNET_EVOLUTION_REQUIRE_DOCKER: '1'
+          AIDOTNET_EVOLUTION_TEST_IMAGE: python:3.12-slim
+        run: |
+          for framework in net10.0 net8.0; do
+            dotnet test tests/AiDotNet.Evolution.Tests/AiDotNet.Evolution.Tests.csproj -c Release -f "$framework" \
+              --filter "FullyQualifiedName~ContainerOpenEvolveEvaluatorTests" --blame-hang --blame-hang-timeout 300s \
+              --logger "trx;LogFileName=cli-container-$framework.trx" --results-directory TestResults/container-isolation
+            trx="TestResults/container-isolation/cli-container-$framework.trx"
+            executed="$(grep -o 'executed="[0-9]*"' "$trx" | head -1 | grep -o '[0-9]*')"
+            skipped="$(grep -o 'notExecuted="[0-9]*"' "$trx" | head -1 | grep -o '[0-9]*')"
+            echo "$framework: CLI container tests executed ${executed:-0}, not executed ${skipped:-0}"
+            [ "${executed:-0}" -ge 2 ] || { echo "::error::expected at least 2 CLI container tests on $framework, ran ${executed:-0}"; exit 1; }
+            [ "${skipped:-0}" -eq 0 ] || { echo "::error::$framework skipped ${skipped} CLI container tests on a Linux runner with Docker"; exit 1; }
           done
       - name: No container left behind
         if: always()
