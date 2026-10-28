@@ -74,10 +74,14 @@ int archived = run.Islands.Sum(island => island.Count);
 
 // Resume: a fresh engine restores the final checkpoint; with its budget already spent it stops at once, so the
 // elapsed time is the restore itself (reading, validating and rebuilding the archive).
+int[] resumeCollectionsBefore = Enumerable.Range(0, 3).Select(GC.CollectionCount).ToArray();
+long resumeAllocatedBefore = GC.GetTotalAllocatedBytes(precise: true);
 var resume = Stopwatch.StartNew();
 var resumed = await new EvolutionEngine<ProgramGenome>(task, new Distinct4kPrograms(), _ => new MapElitesArchive<ProgramGenome>(descriptors),
     Options(true), checkpointStore: new DirectoryEvolutionCheckpointStore(directory), genomeCodec: new ProgramGenomeCodec()).RunAsync(seeds);
 resume.Stop();
+long resumeAllocated = GC.GetTotalAllocatedBytes(precise: true) - resumeAllocatedBefore;
+int[] resumeCollections = Enumerable.Range(0, 3).Select(generation => GC.CollectionCount(generation) - resumeCollectionsBefore[generation]).ToArray();
 
 double[] writes = store.WriteMilliseconds.OrderBy(value => value).ToArray();
 // What a resume reads: the newest snapshot of the uninterrupted run (before the resumed run saved again) and the segments
@@ -91,6 +95,7 @@ Console.WriteLine(JsonSerializer.Serialize(new
     FinalWriteMs = store.WriteMilliseconds[^1], FinalCheckpointBytes = bytes, FinalSegmentBytes = segmentBytes,
     FinalSegments = store.FinalSegmentCount,
     BytesPerElite = (double)(bytes + segmentBytes) / Math.Max(1, archived), ResumeMs = resume.Elapsed.TotalMilliseconds,
+    ResumeAllocatedBytes = resumeAllocated, ResumeCollections = resumeCollections,
     ResumedStateMatches = resumed.StateHash == run.StateHash
 }));
 return resumed.StateHash == run.StateHash ? 0 : 1;

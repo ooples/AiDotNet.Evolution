@@ -1,5 +1,6 @@
 // Source: ooples/AiDotNet 66d7602c92101e5ab2bd9db8cfa7f7526fa2c75d:src/Evolution/Programs/ProgramGenomeCodec.cs; original BSL license retained in src/AiDotNet.Evolution.Programs/AIDOTNET-LICENSE.txt.
 using System.IO;
+using System.Text;
 using Newtonsoft.Json;
 using Newtonsoft.Json.Linq;
 
@@ -67,6 +68,93 @@ public sealed class ProgramGenomeCodec : IEvolutionGenomeCodec<ProgramGenome>
         return parsed;
     }
 
+    private static readonly UTF8Encoding StrictUtf8 = new(encoderShouldEmitUTF8Identifier: false, throwOnInvalidBytes: true);
+
+    // The payloads Serialize writes, read without building a JObject: a resume decodes every archived genome, and the
+    // general reader was most of its decoding time (E-1). This accepts only text whose meaning under the general path is
+    // certain: strict JSON, one object whose properties are exactly v (the integer 1), language, source and optionally
+    // description, each once and each a plain string. Anything else - comments, other properties, repeats, other
+    // types, a string Json.NET would read as a date, a lone surrogate - returns false and takes the general path, so a
+    // payload decodes, or is refused, exactly as before.
+    private static bool TryReadCanonical(string payload, out string? language, out string? source, out string? description)
+    {
+        language = null;
+        source = null;
+        description = null;
+        byte[] utf8;
+        try
+        {
+            utf8 = StrictUtf8.GetBytes(payload);
+        }
+        catch (EncoderFallbackException)
+        {
+            return false;
+        }
+
+        try
+        {
+            var reader = new System.Text.Json.Utf8JsonReader(utf8, new System.Text.Json.JsonReaderOptions
+            {
+                CommentHandling = System.Text.Json.JsonCommentHandling.Disallow
+            });
+            if (!reader.Read() || reader.TokenType != System.Text.Json.JsonTokenType.StartObject) return false;
+            bool sawVersion = false;
+            while (true)
+            {
+                if (!reader.Read()) return false;
+                if (reader.TokenType == System.Text.Json.JsonTokenType.EndObject) break;
+                if (reader.TokenType != System.Text.Json.JsonTokenType.PropertyName) return false;
+                if (reader.ValueTextEquals("v"u8))
+                {
+                    if (sawVersion || !reader.Read() || reader.TokenType != System.Text.Json.JsonTokenType.Number ||
+                        reader.HasValueSequence || reader.ValueSpan.Length != 1 || reader.ValueSpan[0] != (byte)'1')
+                        return false;
+                    sawVersion = true;
+                }
+                else if (reader.ValueTextEquals("language"u8))
+                {
+                    if (language is not null || !TryReadPlainString(ref reader, out language)) return false;
+                }
+                else if (reader.ValueTextEquals("source"u8))
+                {
+                    if (source is not null || !TryReadPlainString(ref reader, out source)) return false;
+                }
+                else if (reader.ValueTextEquals("description"u8))
+                {
+                    if (description is not null || !TryReadPlainString(ref reader, out description)) return false;
+                }
+                else
+                {
+                    return false;
+                }
+            }
+
+            // Only white space may follow the object.
+            if (reader.Read()) return false;
+            return sawVersion && language is not null && source is not null;
+        }
+        catch (System.Text.Json.JsonException)
+        {
+            return false;
+        }
+        catch (InvalidOperationException)
+        {
+            return false;
+        }
+    }
+
+    // A string value that Json.NET would also read as that exact string. With its default date handling, Json.NET turns
+    // strings that look like ISO or Microsoft JSON dates into dates, which begin with a digit or a slash.
+    private static bool TryReadPlainString(ref System.Text.Json.Utf8JsonReader reader, out string? value)
+    {
+        value = null;
+        if (!reader.Read() || reader.TokenType != System.Text.Json.JsonTokenType.String) return false;
+        string text = reader.GetString() ?? string.Empty;
+        if (text.Length > 0 && (char.IsDigit(text[0]) || text[0] == '/')) return false;
+        value = text;
+        return true;
+    }
+
     private sealed class SharedCharPool : IArrayPool<char>
     {
         internal static readonly SharedCharPool Instance = new();
@@ -84,25 +172,33 @@ public sealed class ProgramGenomeCodec : IEvolutionGenomeCodec<ProgramGenome>
     {
         if (payload is null) throw new ArgumentNullException(nameof(payload));
 
-        JObject parsed;
-        try
+        string? languageName;
+        string? source;
+        string? description;
+        if (!TryReadCanonical(payload, out languageName, out source, out description))
         {
-            parsed = Parse(payload);
-        }
-        catch (JsonException exception)
-        {
-            throw new InvalidDataException("The program genome payload is not valid JSON.", exception);
+            JObject parsed;
+            try
+            {
+                parsed = Parse(payload);
+            }
+            catch (JsonException exception)
+            {
+                throw new InvalidDataException("The program genome payload is not valid JSON.", exception);
+            }
+
+            JToken? versionToken = parsed["v"];
+            if (versionToken is null || versionToken.Type != JTokenType.Integer)
+                throw new InvalidDataException("The program genome payload is missing its integer version field.");
+            int version = versionToken.Value<int>();
+            if (version != PayloadVersion)
+                throw new InvalidDataException($"Unsupported program genome payload version {version}.");
+
+            languageName = parsed["language"]?.Value<string>();
+            source = parsed["source"]?.Value<string>();
+            description = parsed["description"]?.Value<string>();
         }
 
-        JToken? versionToken = parsed["v"];
-        if (versionToken is null || versionToken.Type != JTokenType.Integer)
-            throw new InvalidDataException("The program genome payload is missing its integer version field.");
-        int version = versionToken.Value<int>();
-        if (version != PayloadVersion)
-            throw new InvalidDataException($"Unsupported program genome payload version {version}.");
-
-        JToken? languageToken = parsed["language"];
-        string? languageName = languageToken?.Value<string>();
         if (string.IsNullOrWhiteSpace(languageName))
             throw new InvalidDataException("The program genome payload is missing its language field.");
 
@@ -116,11 +212,7 @@ public sealed class ProgramGenomeCodec : IEvolutionGenomeCodec<ProgramGenome>
             throw new InvalidDataException($"Unknown program language '{languageName}'.", exception);
         }
 
-        JToken? sourceToken = parsed["source"];
-        string? source = sourceToken?.Value<string>();
         if (source is null) throw new InvalidDataException("The program genome payload is missing its source field.");
-
-        string? description = parsed["description"]?.Value<string>();
 
         try
         {
