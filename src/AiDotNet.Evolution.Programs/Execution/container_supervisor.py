@@ -138,6 +138,9 @@ def child(request, path, in_read, out_write, err_write):
         os.chdir(WORK)
         argv = request["argv"]
         if argv:
+            # Python ignores these two; an exec'd program must start with the defaults, as it would from a shell.
+            signal.signal(signal.SIGPIPE, signal.SIG_DFL)
+            signal.signal(signal.SIGXFSZ, signal.SIG_DFL)
             try:
                 os.execvp(argv[0], argv)
             except OSError as error:
