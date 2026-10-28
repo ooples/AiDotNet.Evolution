@@ -126,7 +126,8 @@ stores them under its `segments` subdirectory and deletes those no retained snap
 `EvolutionEngineOptions.CheckpointFormat` decides whether the engine uses them. The deduplication set, the
 evaluation cache and the island archives grow as a run goes on, so an inline checkpoint rewrites all of them on
 every save: at 10,000 elites of 4 KB programs that was a 46 MB file per save. Segments are an append-only journal
-of that state instead:
+of that state instead. In [the E-1 measurement](../benchmarks/evidence/checkpoint/e1/README.md), save p95 at 10,000
+elites went from 2,339 ms to 99 ms and resume from 4.1 s to 1.7 s.
 
 - **Each save appends one delta segment** with only what changed since the previous save: genomes added to or
   forgotten from the deduplication set, cache entries set or removed, and, per island, the archive cells that
