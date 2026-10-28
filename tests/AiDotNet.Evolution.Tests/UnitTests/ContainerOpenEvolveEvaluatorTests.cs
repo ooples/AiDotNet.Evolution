@@ -18,6 +18,9 @@ public sealed class ContainerOpenEvolveEvaluatorTests
     // helper from beside it and a module from openEvolveEvaluator.pythonPath, the two imports that need the host's files.
     // It scores -1 unless it is really inside the container: user nobody, its own directory where the CLI mounts it and
     // not writable, and no network. A run that escaped the container therefore cannot reach the expected best score.
+    // Like upstream evaluators, it runs the candidate in a fresh interpreter before reading what it defines. (No Python
+    // comments inside the literal: on .NET Framework this file is an inactive #if region, where a line starting with
+    // '#' is read as a preprocessor directive.)
     private const string Evaluator = """
         import os, re, socket, subprocess, sys
         import pathbonus
@@ -40,7 +43,6 @@ public sealed class ContainerOpenEvolveEvaluatorTests
                 return True
 
         def evaluate(program_path):
-            # As upstream evaluators do: run the candidate in a fresh interpreter, then read what it defines.
             ran = subprocess.run([sys.executable, program_path], capture_output=True, text=True, timeout=30)
             if ran.returncode != 0:
                 return {"combined_score": -2.0}
