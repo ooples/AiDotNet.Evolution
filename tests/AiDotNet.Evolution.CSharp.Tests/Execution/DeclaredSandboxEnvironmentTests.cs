@@ -204,7 +204,16 @@ public sealed class DeclaredSandboxEnvironmentTests
                 nameof(ProgramSandboxOptions.TimeProvider), nameof(ProgramSandboxOptions.WorkingDirectory)
             },
             copied.Where(name => name != nameof(ProgramSandboxOptions.Mode)
-                && name != nameof(ProgramSandboxOptions.AllowUnsafeInProcessExecution)).ToArray());
+                && name != nameof(ProgramSandboxOptions.AllowUnsafeInProcessExecution)
+                && name != nameof(ProgramSandboxOptions.AllowUnsandboxedExecution)).ToArray());
+        // The three flags are value types the filter above lets through; their copies are asserted directly.
+        var flags = new ProgramSandboxOptions
+        {
+            Mode = ProgramSandboxMode.Container, AllowUnsafeInProcessExecution = true, AllowUnsandboxedExecution = true
+        }.Clone();
+        Assert.Equal(ProgramSandboxMode.Container, flags.Mode);
+        Assert.True(flags.AllowUnsafeInProcessExecution);
+        Assert.True(flags.AllowUnsandboxedExecution);
     }
 
     [Fact]
