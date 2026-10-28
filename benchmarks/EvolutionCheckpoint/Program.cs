@@ -3,10 +3,14 @@ using System.Text.Json;
 using AiDotNet.Evolution;
 using AiDotNet.Evolution.Programs;
 
-// V1-74: checkpoint write and resume cost at realistic archive sizes. Usage: EvolutionCheckpoint <elites> <directory>
-if (args.Length != 2 || !int.TryParse(args[0], out int elites) || elites is < 16 or > 40_000)
+// V1-74: checkpoint write and resume cost at realistic archive sizes.
+// Usage: EvolutionCheckpoint <elites> <directory> [auto|inline|segmented]
+// The format defaults to Auto, what a run gets without configuring anything (E-1 measured it at 10,000 elites).
+EvolutionCheckpointFormat format = EvolutionCheckpointFormat.Auto;
+if (args.Length is < 2 or > 3 || !int.TryParse(args[0], out int elites) || elites is < 16 or > 40_000 ||
+    (args.Length == 3 && !Enum.TryParse(args[2], ignoreCase: true, out format)))
 {
-    Console.Error.WriteLine("Usage: EvolutionCheckpoint <elites 16..40000> <new-directory>");
+    Console.Error.WriteLine("Usage: EvolutionCheckpoint <elites 16..40000> <new-directory> [auto|inline|segmented]");
     return 2;
 }
 string directory = Path.GetFullPath(args[1]);
@@ -26,7 +30,8 @@ var store = new TimedStore(new DirectoryEvolutionCheckpointStore(directory));
 EvolutionEngineOptions Options(bool resume) => new()
 {
     RunId = "checkpoint-bench", Seed = 7, MaxEvaluationAttempts = elites, MaxProposals = elites * 2, MaxGenerations = elites,
-    ProposalBatchSize = 64, MaxDegreeOfParallelism = 1, MigrationInterval = 0, CheckpointInterval = Math.Max(1, elites / 16), Resume = resume
+    ProposalBatchSize = 64, MaxDegreeOfParallelism = 1, MigrationInterval = 0, CheckpointInterval = Math.Max(1, elites / 16), Resume = resume,
+    CheckpointFormat = format
 };
 var seeds = new[] { Program4k(0) };
 var run = await new EvolutionEngine<ProgramGenome>(task, new Distinct4kPrograms(), _ => new MapElitesArchive<ProgramGenome>(descriptors),
@@ -41,13 +46,17 @@ var resumed = await new EvolutionEngine<ProgramGenome>(task, new Distinct4kProgr
 resume.Stop();
 
 double[] writes = store.WriteMilliseconds.OrderBy(value => value).ToArray();
-long bytes = new DirectoryInfo(directory).EnumerateFiles("checkpoint-*.json").OrderBy(file => file.Name).Last().Length;
+// What a resume reads: the newest snapshot of the uninterrupted run (before the resumed run saved again) and the segments
+// it names. The segment directory also holds the resumed run's own segments, so only the named ones are counted.
+long bytes = store.FinalSnapshotBytes;
+long segmentBytes = store.FinalSegmentBytes;
 Console.WriteLine(JsonSerializer.Serialize(new
 {
-    Elites = archived, Checkpoints = writes.Length,
+    Format = format.ToString(), Elites = archived, Checkpoints = writes.Length,
     WriteP50Ms = writes[writes.Length / 2], WriteP95Ms = writes[(int)Math.Ceiling(writes.Length * 0.95) - 1],
-    FinalWriteMs = store.WriteMilliseconds[^1], FinalCheckpointBytes = bytes,
-    BytesPerElite = (double)bytes / Math.Max(1, archived), ResumeMs = resume.Elapsed.TotalMilliseconds,
+    FinalWriteMs = store.WriteMilliseconds[^1], FinalCheckpointBytes = bytes, FinalSegmentBytes = segmentBytes,
+    FinalSegments = store.FinalSegmentCount,
+    BytesPerElite = (double)(bytes + segmentBytes) / Math.Max(1, archived), ResumeMs = resume.Elapsed.TotalMilliseconds,
     ResumedStateMatches = resumed.StateHash == run.StateHash
 }));
 return resumed.StateHash == run.StateHash ? 0 : 1;
@@ -65,15 +74,46 @@ internal sealed class Distinct4kPrograms : IVariationOperator<ProgramGenome>
             .Select(i => "value_" + i + " = " + (context.Generation * 64 + i) + "  # padding to about 4 KB\n")), ProgramLanguage.Python));
 }
 
-internal sealed class TimedStore(IEvolutionCheckpointStore inner) : IEvolutionCheckpointStore
+// A save's write latency is the store's SaveAsync plus every segment written for it: a segmented save streams its
+// changes into a segment before it saves the checkpoint that names the segment, so both are the save's I/O.
+internal sealed class TimedStore(DirectoryEvolutionCheckpointStore inner) : IEvolutionCheckpointSegmentStore
 {
+    private double _segmentMilliseconds;
+    private readonly Dictionary<long, long> _segmentBytes = new();
     public List<double> WriteMilliseconds { get; } = new();
+    public long FinalSnapshotBytes { get; private set; }
+    public long FinalSegmentBytes { get; private set; }
+    public int FinalSegmentCount { get; private set; }
+
     public async Task SaveAsync(EvolutionCheckpoint checkpoint, CancellationToken cancellationToken = default)
     {
         long started = Stopwatch.GetTimestamp();
         await inner.SaveAsync(checkpoint, cancellationToken).ConfigureAwait(false);
-        WriteMilliseconds.Add(Stopwatch.GetElapsedTime(started).TotalMilliseconds);
+        WriteMilliseconds.Add(Stopwatch.GetElapsedTime(started).TotalMilliseconds + _segmentMilliseconds);
+        _segmentMilliseconds = 0;
+        FinalSnapshotBytes = new FileInfo(Path.Combine(inner.DirectoryPath,
+            DirectoryEvolutionCheckpointStore.FileNameFor(checkpoint.Sequence))).Length;
+        FinalSegmentBytes = checkpoint.SegmentIds.Sum(id => _segmentBytes[id]);
+        FinalSegmentCount = checkpoint.SegmentIds.Count;
     }
+
     public Task<EvolutionCheckpoint?> LoadLatestAsync(string runId, CancellationToken cancellationToken = default) =>
         inner.LoadLatestAsync(runId, cancellationToken);
+
+    public async Task WriteSegmentAsync(string runId, long segmentId, Func<Stream, CancellationToken, Task> write,
+        CancellationToken cancellationToken = default)
+    {
+        long started = Stopwatch.GetTimestamp();
+        long length = 0;
+        await inner.WriteSegmentAsync(runId, segmentId, async (stream, token) =>
+        {
+            await write(stream, token).ConfigureAwait(false);
+            length = stream.Length;
+        }, cancellationToken).ConfigureAwait(false);
+        _segmentMilliseconds += Stopwatch.GetElapsedTime(started).TotalMilliseconds;
+        _segmentBytes[segmentId] = length;
+    }
+
+    public Task<Stream?> OpenSegmentAsync(string runId, long segmentId, CancellationToken cancellationToken = default) =>
+        inner.OpenSegmentAsync(runId, segmentId, cancellationToken);
 }
