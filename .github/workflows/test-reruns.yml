@@ -35,6 +35,9 @@ jobs:
           RERUNS: ${{ inputs.reruns }}
         run: |
           case "$RERUNS" in ''|*[!0-9]*) echo "reruns must be a positive integer, got '$RERUNS'"; exit 1;; esac
+          # More than three digits is over the limit; rejecting it here keeps an oversized value from
+          # overflowing the shell's integer comparison below and reaching seq.
+          if [ "${#RERUNS}" -gt 3 ]; then echo "reruns must be 1..256, got $RERUNS"; exit 1; fi
           if [ "$RERUNS" -lt 1 ] || [ "$RERUNS" -gt 256 ]; then echo "reruns must be 1..256, got $RERUNS"; exit 1; fi
           echo "attempts=$(seq -s, 1 "$RERUNS" | sed 's/^/[/; s/$/]/')" >> "$GITHUB_OUTPUT"
 
@@ -60,7 +63,14 @@ jobs:
         run: dotnet test AiDotNet.Evolution.slnx --configuration Release --framework net10.0 --no-build --blame-hang --blame-hang-timeout 120s
       - name: Test net8.0
         if: ${{ !cancelled() }}
-        run: dotnet test AiDotNet.Evolution.slnx --configuration Release --framework net8.0 --no-build --blame-hang --blame-hang-timeout 120s
+        # Not the solution: AiDotNet.Evolution.Performance.Tests targets net10.0 only, and `--framework` does not
+        # filter projects, so a solution-wide net8.0 run fails on it. These are the projects that target net8.0.
+        run: |
+          status=0
+          for project in tests/AiDotNet.Evolution.Tests tests/AiDotNet.Evolution.CSharp.Tests tests/AiDotNet.Evolution.Deployment.Tests tests/AiDotNet.Evolution.Ptx.Tests; do
+            dotnet test "$project" --configuration Release --framework net8.0 --no-build --blame-hang --blame-hang-timeout 120s || status=1
+          done
+          exit $status
 
   legacy:
     name: Rerun ${{ matrix.attempt }} (net471, net462)
