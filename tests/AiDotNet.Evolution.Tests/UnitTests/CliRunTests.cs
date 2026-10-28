@@ -53,6 +53,30 @@ public sealed class CliRunTests
     }
 
     [Fact]
+    public void A_run_file_with_neither_a_container_nor_the_unsandboxed_opt_in_is_refused_before_anything_runs()
+    {
+        using var directory = new TemporaryDirectory();
+        File.WriteAllText(Path.Combine(directory.Path, "initial.py"), "X = 0\n");
+        File.WriteAllText(Path.Combine(directory.Path, "evaluator.py"), Evaluator);
+        string runFile = WriteRun(directory.Path, "http://127.0.0.1:9/v1", maxEvaluations: 1);
+        File.WriteAllText(runFile, File.ReadAllText(runFile).Replace("\"allowUnsandboxedExecution\": true,", "", StringComparison.Ordinal));
+
+        var (code, _, error) = Run("run", runFile);
+
+        Assert.NotEqual(0, code);
+        Assert.Contains("allowUnsandboxedExecution", error, StringComparison.Ordinal);
+        Assert.Contains("\"container\"", error, StringComparison.Ordinal);
+        Assert.False(Directory.Exists(Path.Combine(directory.Path, "out")), "the refused run created its output directory");
+
+        // A container cannot run the OpenEvolve shim, which imports the evaluator from a host path.
+        string shim = WriteRun(directory.Path, "http://127.0.0.1:9/v1", maxEvaluations: 1,
+            extra: ", \"container\": { \"image\": \"python:3.12-slim\" }, \"openEvolveEvaluator\": { }");
+        (code, _, error) = Run("run", shim);
+        Assert.NotEqual(0, code);
+        Assert.Contains("openEvolveEvaluator", error, StringComparison.Ordinal);
+    }
+
+    [Fact]
     public void Run_then_resume_continues_the_same_run_and_never_overwrites()
     {
         using var directory = new TemporaryDirectory();
