@@ -238,8 +238,8 @@ public sealed class EvolutionTaskResult
             throw new ArgumentException($"At most {maximum} values may be attached to one result.", parameterName);
 
         // Sized from the reported count but filled by enumeration, as EvolutionCollection.ToBoundedArray does.
-        int known = values is ICollection<T> sized ? sized.Count : values is IReadOnlyCollection<T> readOnly ? readOnly.Count : 4;
-        var result = new T[Math.Max(0, Math.Min(maximum, known))];
+        int known = values is ICollection<T> sized ? sized.Count : values is IReadOnlyCollection<T> readOnly ? readOnly.Count : 0;
+        T[] result = known <= 0 ? Array.Empty<T>() : new T[Math.Min(maximum, known)];
         int count = 0;
         foreach (T value in values)
         {
@@ -248,6 +248,7 @@ public sealed class EvolutionTaskResult
             if (count == result.Length) Array.Resize(ref result, Math.Min(maximum, Math.Max(4, result.Length * 2)));
             result[count++] = value;
         }
+        if (count == 0) return Array.Empty<T>();
         if (count != result.Length) Array.Resize(ref result, count);
         return result;
     }

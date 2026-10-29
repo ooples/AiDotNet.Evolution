@@ -1012,7 +1012,7 @@ public sealed partial class EvolutionEngine<TGenome>
                     throw new InvalidDataException("Incomplete Pareto checkpoint entry.");
                 var lineage = document.Lineage.ToLineage();
                 var candidate = new EvolutionCandidate<string>(document.EvaluationId,
-                    new EvolutionCanonicalGenome<string>(document.GenomePayload, document.GenomeId), lineage);
+                    new EvolutionCanonicalGenome<string>(document.GenomePayload.Text, document.GenomeId), lineage);
                 return new EvolutionArchiveEntry<string>(new EvolutionCellKey(document.CellBins), candidate,
                     document.Evaluation.ToEvaluation(document.EvaluationId, document.GenomeId, lineage));
             }).ToArray();
@@ -1320,7 +1320,7 @@ public sealed partial class EvolutionEngine<TGenome>
         TGenome genome;
         try
         {
-            genome = genomeCodec.Deserialize(document.GenomePayload);
+            genome = DecodeGenome(genomeCodec, document.GenomePayload);
         }
         catch (Exception exception) when (EvolutionExceptionPolicy.IsRecoverable(exception))
         {
@@ -1397,6 +1397,20 @@ public sealed partial class EvolutionEngine<TGenome>
         if (genome is null) throw new InvalidDataException("The genome codec deserialized a null genome.");
         return genome;
     }
+
+    private TGenome DeserializeGenome(EvolutionGenomePayload payload)
+    {
+        if (_codec is null) throw new InvalidOperationException("Checkpoint deserialization requires a genome codec.");
+        TGenome genome = DecodeGenome(_codec, payload);
+        if (genome is null) throw new InvalidDataException("The genome codec deserialized a null genome.");
+        return genome;
+    }
+
+    // A payload read from a checkpoint goes to a UTF-8 codec as its bytes, never built as a string (E-1).
+    private static TGenome DecodeGenome(IEvolutionGenomeCodec<TGenome> codec, EvolutionGenomePayload payload) =>
+        payload.Utf8 is { } utf8 && codec is IEvolutionUtf8GenomeCodec<TGenome> utf8Codec
+            ? utf8Codec.Deserialize(new ReadOnlySpan<byte>(utf8))
+            : codec.Deserialize(payload.Text);
 
     private string ComputeStateHash()
     {
