@@ -224,7 +224,7 @@ public sealed class ProgramGenomeCodecTests
     {
 #pragma warning disable CS8600, CS8625
         Assert.Throws<ArgumentNullException>(() => Codec.Serialize(null));
-        Assert.Throws<ArgumentNullException>(() => Codec.Deserialize(null));
+        Assert.Throws<ArgumentNullException>(() => Codec.Deserialize((string)null));
 #pragma warning restore CS8600, CS8625
     }
 }
