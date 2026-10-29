@@ -7,12 +7,13 @@ on:
   push:
     branches: [main]
   pull_request:
-    branches: [main, feat/competitive-evolution-platform, 'feat/evolution-us-*', feat/evolution-us02-efficacy, feat/evolution-us05-campaign-budget, feat/evolution-us07-ablation-integration, feat/evolution-us08-portfolio-integration]
   schedule:
     - cron: '0 8 * * 1'
 
 concurrency:
-  group: codeql-${{ github.ref }}
+  group: codeql-${{ github.event_name == 'push' && github.sha || github.ref }}
+  # Each push to main gets its own group. GitHub cancels a PENDING run when a newer one joins the same group, even
+  # with cancel-in-progress off, so one group per ref left the middle of three quick merges uncertified.
   # Cancel a superseded run on a branch, never on main: every push to main shares one ref, so
   # cancel-in-progress there means each merge kills the previous merge's run. A story's
   # "hosted CI green on the merged head" box then cannot be ticked, and main-red-alert has
