@@ -12,9 +12,9 @@
     <PackageReadmeFile>README.md</PackageReadmeFile>
     <!-- The whole package is experimental (AIDEVO005) until its first release; this assembly uses its own types. -->
     <NoWarn>$(NoWarn);AIDEVO005</NoWarn>
-    <!-- A new package: there is no published baseline to validate against until its first release, so package
-         validation (and its PackageValidationBaselineVersion) is switched on with that release. -->
-    <EnablePackageValidation>false</EnablePackageValidation>
+    <!-- Validated against its first published release (E-5), like the other packages against theirs. -->
+    <EnablePackageValidation>true</EnablePackageValidation>
+    <PackageValidationBaselineVersion>0.7.0</PackageValidationBaselineVersion>
   </PropertyGroup>
   <ItemGroup>
     <None Include="../AiDotNet.Evolution.Programs/AIDOTNET-LICENSE.txt" Pack="true" PackagePath="AIDOTNET-LICENSE.txt"/>
