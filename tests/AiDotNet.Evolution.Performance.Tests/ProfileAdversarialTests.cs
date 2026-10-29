@@ -21,7 +21,7 @@ public sealed partial class ProfileTests
     {
         var measurement = Valid(Case() with { MixedDuration = true }) with
         {
-            DelayBuckets = [new(0, 6, 0, 0, 0), new(1, 5, 1.4, minimum, maximum), new(8, 5, 8.4, 8.1, 9.1)]
+            DelayBuckets = [new(0, 6, 0, 0, 0, 0), new(1, 5, 1.4, minimum, maximum, 1.4), new(8, 5, 8.4, 8.1, 9.1, 8.3)]
         };
         Assert.Throws<InvalidDataException>(() => ProfileValidation.Validate(measurement));
     }

@@ -63,7 +63,7 @@ public static class ProfileEvidence
                 measurement?.StateHash, measurement?.BestQuality, measurement?.CheckpointSaves ?? 0, measurement?.CheckpointPayloadBytes ?? 0,
                 Round(measurement?.CheckpointStoreMilliseconds ?? 0, 4),
                 (measurement?.DelayBuckets ?? Array.Empty<ProfileDelayBucket>())
-                    .Select(bucket => bucket with { MeanMilliseconds = Round(bucket.MeanMilliseconds, 4), MinimumMilliseconds = Round(bucket.MinimumMilliseconds, 4), MaximumMilliseconds = Round(bucket.MaximumMilliseconds, 4) }).ToArray(),
+                    .Select(bucket => bucket with { MeanMilliseconds = Round(bucket.MeanMilliseconds, 4), MinimumMilliseconds = Round(bucket.MinimumMilliseconds, 4), MaximumMilliseconds = Round(bucket.MaximumMilliseconds, 4), MedianMilliseconds = Round(bucket.MedianMilliseconds, 4) }).ToArray(),
                 attempt.Contention is { } contention ? Round(contention.ForeignBusyFraction, 6) : null,
                 attempt.Error is null ? null : Truncate(attempt.Error, 2000));
         }).ToArray();

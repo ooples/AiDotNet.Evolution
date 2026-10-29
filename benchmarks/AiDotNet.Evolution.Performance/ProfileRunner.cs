@@ -234,10 +234,18 @@ public static class ProfileRunner
                     long delayStarted = Stopwatch.GetTimestamp();
                     // Task.Delay measures its due time against the runtime's integer-millisecond tick, so a
                     // 1 ms delay started mid-tick can complete after a fraction of a millisecond. The declared
-                    // schedule has to be observed and not merely requested, so wait until the clock agrees.
-                    for (double remaining = delay; remaining > 0;
+                    // schedule has to be observed and not merely requested, so wait until the clock agrees: whole
+                    // milliseconds on the timer, then the sub-millisecond remainder against the clock. Rounding the
+                    // remainder up to another timer wait overran a 1 ms request to about 2 ms, and to 3 ms on a busy runner.
+                    for (double remaining = delay; remaining >= 1;
                          remaining = delay - Stopwatch.GetElapsedTime(delayStarted).TotalMilliseconds)
-                        await Task.Delay((int)Math.Ceiling(remaining), token).ConfigureAwait(false);
+                        await Task.Delay((int)remaining, token).ConfigureAwait(false);
+                    var spinner = new SpinWait();
+                    while (Stopwatch.GetElapsedTime(delayStarted).TotalMilliseconds < delay)
+                    {
+                        token.ThrowIfCancellationRequested();
+                        spinner.SpinOnce(sleep1Threshold: -1);
+                    }
                     observed = Stopwatch.GetElapsedTime(delayStarted).TotalMilliseconds;
                 }
                 probe.RecordDelay(bucket, observed);
@@ -254,6 +262,7 @@ public static class ProfileRunner
         private readonly double[] _delaySum = new double[ProfileDelaySchedule.Milliseconds.Count];
         private readonly double[] _delayMinimum = Enumerable.Repeat(double.PositiveInfinity, ProfileDelaySchedule.Milliseconds.Count).ToArray();
         private readonly double[] _delayMaximum = new double[ProfileDelaySchedule.Milliseconds.Count];
+        private readonly List<double>[] _delaySamples = ProfileDelaySchedule.Milliseconds.Select(_ => new List<double>()).ToArray();
         private readonly object _delayLock = new();
         public readonly int Workers = workers;
         public long Started = Stopwatch.GetTimestamp();
@@ -273,6 +282,7 @@ public static class ProfileRunner
                 _delaySum[bucket] += observedMilliseconds;
                 _delayMinimum[bucket] = Math.Min(_delayMinimum[bucket], observedMilliseconds);
                 _delayMaximum[bucket] = Math.Max(_delayMaximum[bucket], observedMilliseconds);
+                _delaySamples[bucket].Add(observedMilliseconds);
             }
         }
 
@@ -286,10 +296,17 @@ public static class ProfileRunner
                     if (_delayCount[bucket] == 0) continue;
                     buckets.Add(new ProfileDelayBucket(ProfileDelaySchedule.Milliseconds[bucket], _delayCount[bucket],
                         _delaySum[bucket] / _delayCount[bucket], double.IsPositiveInfinity(_delayMinimum[bucket]) ? 0 : _delayMinimum[bucket],
-                        _delayMaximum[bucket]));
+                        _delayMaximum[bucket], Median(_delaySamples[bucket])));
                 }
                 return buckets;
             }
+        }
+
+        private static double Median(List<double> samples)
+        {
+            double[] sorted = samples.Order().ToArray();
+            int middle = sorted.Length / 2;
+            return sorted.Length % 2 == 1 ? sorted[middle] : (sorted[middle - 1] + sorted[middle]) / 2;
         }
 
         public ValueTask OnEventAsync(EvolutionEvent<EvolutionSearchGenome> evolutionEvent, CancellationToken cancellationToken = default)

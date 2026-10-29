@@ -272,7 +272,7 @@ public sealed partial class ProfileTests
         yield return new object[] { value with { QualityByElapsed = value.QualityByElapsed.Select((p, i) => i == 1 ? p with { EvaluationId = 0 } : p).ToArray() } };
         yield return new object[] { value with { Case = value.Case with { Kind = "archive-snapshot", Cells = 256, Dimensions = 1 } } };
         // A cheap case must not claim simulated delays.
-        yield return new object[] { value with { DelayBuckets = [new ProfileDelayBucket(1, 16, 1.4, 1.1, 2.0)] } };
+        yield return new object[] { value with { DelayBuckets = [new ProfileDelayBucket(1, 16, 1.4, 1.1, 2.0, 1.3)] } };
     }
 
     [Theory]
@@ -282,14 +282,18 @@ public sealed partial class ProfileTests
     public static IEnumerable<object[]> CorruptDelayEvidence()
     {
         var mixed = Valid(Case() with { MixedDuration = true });
-        ProfileDelayBucket[] honest = [new(0, 6, 0, 0, 0), new(1, 5, 1.4, 1.05, 2.4), new(8, 5, 8.4, 8.1, 9.1)];
+        ProfileDelayBucket[] honest = [new(0, 6, 0, 0, 0, 0), new(1, 5, 1.4, 1.05, 2.4, 1.2), new(8, 5, 8.4, 8.1, 9.1, 8.3)];
         yield return new object[] { mixed with { DelayBuckets = Array.Empty<ProfileDelayBucket>() } };
         // The Windows default 15.6 ms timer tick: the schedule says 1 and 8 ms.
-        yield return new object[] { mixed with { DelayBuckets = [honest[0], honest[1] with { MeanMilliseconds = 15.6 }, honest[2] with { MeanMilliseconds = 15.6 }] } };
-        yield return new object[] { mixed with { DelayBuckets = [honest[0], honest[1] with { MeanMilliseconds = 3.5 }, honest[2]] } };
-        yield return new object[] { mixed with { DelayBuckets = [honest[0], honest[1] with { MeanMilliseconds = 0.2 }, honest[2]] } };
+        ProfileDelayBucket tick = new(1, 5, 15.6, 15.5, 15.7, 15.6);
+        yield return new object[] { mixed with { DelayBuckets = [honest[0], tick, tick with { RequestedMilliseconds = 8 }] } };
+        yield return new object[] { mixed with { DelayBuckets = [honest[0], new(1, 5, 3.5, 3.2, 3.9, 3.5), honest[2]] } };
+        yield return new object[] { mixed with { DelayBuckets = [honest[0], new(1, 5, 0.2, 0.1, 0.3, 0.2), honest[2]] } };
+        // A median the samples could not have produced.
+        yield return new object[] { mixed with { DelayBuckets = [honest[0], honest[1] with { MedianMilliseconds = 15.6 }, honest[2]] } };
+        yield return new object[] { mixed with { DelayBuckets = [honest[0], honest[1] with { MedianMilliseconds = double.NaN }, honest[2]] } };
         // Delays collapsed onto a single bucket, or a bucket that was never observed.
-        yield return new object[] { mixed with { DelayBuckets = [new ProfileDelayBucket(1, 16, 1.4, 1.1, 2.0)] } };
+        yield return new object[] { mixed with { DelayBuckets = [new ProfileDelayBucket(1, 16, 1.4, 1.1, 2.0, 1.3)] } };
         yield return new object[] { mixed with { DelayBuckets = [honest[0], honest[1]] } };
         yield return new object[] { mixed with { DelayBuckets = [honest[0], honest[1], honest[2] with { Count = 1 }] } };
     }
@@ -304,8 +308,21 @@ public sealed partial class ProfileTests
     {
         var mixed = Valid(Case() with { MixedDuration = true }) with
         {
-            DelayBuckets = [new ProfileDelayBucket(0, 6, 0, 0, 0), new ProfileDelayBucket(1, 5, 1.42, 1.05, 2.6),
-                new ProfileDelayBucket(8, 5, 8.41, 8.10, 9.30)]
+            DelayBuckets = [new ProfileDelayBucket(0, 6, 0, 0, 0, 0), new ProfileDelayBucket(1, 5, 1.42, 1.05, 2.6, 1.3),
+                new ProfileDelayBucket(8, 5, 8.41, 8.10, 9.30, 8.3)]
+        };
+        ProfileValidation.Validate(mixed);
+    }
+
+    [Fact]
+    public void OnePreemptedWakeOnABusyHostDoesNotFailTheSchedule()
+    {
+        // A shared CI runner: eight 1 ms delays held to the clock, one of which the scheduler woke 15 ms late. The mean
+        // is 3.07 ms, outside the tolerance; the timer itself honoured every request, as the median shows.
+        var mixed = Valid(Case() with { MixedDuration = true }) with
+        {
+            DelayBuckets = [new ProfileDelayBucket(0, 3, 0, 0, 0, 0), new ProfileDelayBucket(1, 8, 3.07, 1.0, 16.6, 1.05),
+                new ProfileDelayBucket(8, 5, 8.41, 8.10, 9.30, 8.3)]
         };
         ProfileValidation.Validate(mixed);
     }
@@ -341,7 +358,7 @@ public sealed partial class ProfileTests
         var cheap = Case() with { Id = "engine-w1-Batch-cheap-cp0" };
         var mixedMeasurement = Valid(mixed) with
         {
-            DelayBuckets = [new ProfileDelayBucket(0, 6, 0, 0, 0), new ProfileDelayBucket(1, 5, 1.4, 1.05, 2.6), new ProfileDelayBucket(8, 5, 8.4, 8.1, 9.3)]
+            DelayBuckets = [new ProfileDelayBucket(0, 6, 0, 0, 0, 0), new ProfileDelayBucket(1, 5, 1.4, 1.05, 2.6, 1.3), new ProfileDelayBucket(8, 5, 8.4, 8.1, 9.3, 8.3)]
         };
         var report = Report([cheap, mixed], [Attempt(Valid(cheap)), Attempt(mixedMeasurement)]);
         var summary = ProfileEvidence.Compact(report, new ProfileEvidenceRaw("raw.json", 123, "abc", "https://example.invalid/raw.json"));

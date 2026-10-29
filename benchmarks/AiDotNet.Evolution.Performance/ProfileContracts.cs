@@ -147,8 +147,10 @@ public sealed record ProfileCase(string Id, string Kind, int Cells, int Dimensio
 public sealed record ProfileQualityPoint(long EvaluationId, long Completed, double ElapsedMilliseconds, double BestQuality);
 
 /// <summary>Observed cost of one requested asynchronous delay bucket, so a collapsed OS timer cannot pass as the schedule.</summary>
+/// <remarks>The median is what is held to the schedule: a collapsed timer moves every delay, so it moves the median, while
+/// one wake the scheduler preempted on a busy host moves only the mean.</remarks>
 public sealed record ProfileDelayBucket(int RequestedMilliseconds, long Count, double MeanMilliseconds,
-    double MinimumMilliseconds, double MaximumMilliseconds);
+    double MinimumMilliseconds, double MaximumMilliseconds, double MedianMilliseconds);
 
 /// <summary>Busy time on the pinned CPUs during one attempt, separating this worker from every other process.</summary>
 public sealed record ProfileContention(string AffinityHex, int PinnedProcessors, double ElapsedMilliseconds,
@@ -254,13 +256,15 @@ public static class ProfileValidation
             if (bucket.Count <= 0 || !double.IsFinite(bucket.MeanMilliseconds) || bucket.MeanMilliseconds < 0 ||
                 !double.IsFinite(bucket.MinimumMilliseconds) || !double.IsFinite(bucket.MaximumMilliseconds) ||
                 bucket.MinimumMilliseconds < 0 || bucket.MaximumMilliseconds < bucket.MinimumMilliseconds ||
-                bucket.MeanMilliseconds < bucket.MinimumMilliseconds || bucket.MeanMilliseconds > bucket.MaximumMilliseconds)
+                bucket.MeanMilliseconds < bucket.MinimumMilliseconds || bucket.MeanMilliseconds > bucket.MaximumMilliseconds ||
+                !double.IsFinite(bucket.MedianMilliseconds) || bucket.MedianMilliseconds < bucket.MinimumMilliseconds ||
+                bucket.MedianMilliseconds > bucket.MaximumMilliseconds)
                 throw new InvalidDataException("A declared delay bucket recorded no or impossible observations.");
             if (bucket.RequestedMilliseconds == 0) continue;
-            if (bucket.MeanMilliseconds < bucket.RequestedMilliseconds - 0.25 ||
-                bucket.MeanMilliseconds > bucket.RequestedMilliseconds + ProfileProtocol.DelayToleranceMilliseconds)
+            if (bucket.MedianMilliseconds < bucket.RequestedMilliseconds - 0.25 ||
+                bucket.MedianMilliseconds > bucket.RequestedMilliseconds + ProfileProtocol.DelayToleranceMilliseconds)
                 throw new InvalidDataException(
-                    $"Simulated {bucket.RequestedMilliseconds} ms delays actually took {bucket.MeanMilliseconds:F3} ms on average, " +
+                    $"Simulated {bucket.RequestedMilliseconds} ms delays actually took {bucket.MedianMilliseconds:F3} ms at the median, " +
                     $"outside the declared +{ProfileProtocol.DelayToleranceMilliseconds} ms tolerance (raise the platform timer resolution).");
         }
     }
