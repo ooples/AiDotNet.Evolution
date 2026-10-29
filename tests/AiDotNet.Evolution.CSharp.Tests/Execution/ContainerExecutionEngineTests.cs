@@ -297,7 +297,8 @@ public sealed class ContainerExecutionEngineTests
         const string Inspect = "import json, os, socket, time\n" +
                                "time.sleep(6)\n" +
                                "print(json.dumps({'host': socket.gethostname(), 'files': sorted(os.listdir('/work')),\n" +
-                               "                  'pids': sorted(int(p) for p in os.listdir('/proc') if p.isdigit()), 'self': os.getpid()}))\n";
+                               "                  'pids': sorted(int(p) for p in os.listdir('/proc') if p.isdigit()), 'self': os.getpid(),\n" +
+                               "                  'zygote': os.getppid()}))\n";
         ProgramExecuteResponse first = await Run(engine, Litter);
         Assert.True(first.Success, first.Error + " " + first.StdErr);
         ProgramExecuteResponse second = await Run(engine, Inspect);
@@ -308,7 +309,60 @@ public sealed class ContainerExecutionEngineTests
         Assert.Equal(first.StdOut.Trim(), seen.RootElement.GetProperty("host").GetString());
         Assert.Equal(new[] { "candidate.py" }, seen.RootElement.GetProperty("files").EnumerateArray().Select(file => file.GetString()).ToArray());
         int self = seen.RootElement.GetProperty("self").GetInt32();
-        Assert.Equal(new[] { 1, self }, seen.RootElement.GetProperty("pids").EnumerateArray().Select(pid => pid.GetInt32()).ToArray());
+        int zygote = seen.RootElement.GetProperty("zygote").GetInt32();
+        // The supervisor, the zygote that forked this candidate, and the candidate; nothing the first one started.
+        Assert.Equal(new[] { 1, zygote, self }.OrderBy(pid => pid).ToArray(),
+            seen.RootElement.GetProperty("pids").EnumerateArray().Select(pid => pid.GetInt32()).ToArray());
+    }
+
+    [DockerFact]
+    public async Task A_warm_candidate_finds_nothing_of_an_earlier_candidate_in_its_memory()
+    {
+        using var engine = new ContainerExecutionEngine(Sandbox(), Container(ContainerLifecycle.Warm));
+        // The marker is spelled out at run time, so neither source holds it; the scan's own needle is the one copy.
+        const string Marker = "chr(72) + 'IDDEN-TEST-INPUT-' + chr(55) + 'f3a91'";
+        ProgramExecuteResponse first = await Run(engine, "import sys\nprint(len(sys.stdin.read()))\n",
+            string.Concat(Enumerable.Repeat("HIDDEN-TEST-INPUT-7f3a91 ", 2700)));
+        Assert.True(first.Success, first.Error + " " + first.StdErr);
+        string scan = "import ctypes, re\n" +
+                      "needle = (" + Marker + ").encode()\n" +
+                      "hits = 0\n" +
+                      "for line in open('/proc/self/maps').read().splitlines():\n" +
+                      "    m = re.match(r'([0-9a-f]+)-([0-9a-f]+) rw-p 00000000 00:00 0\\s*(\\[heap\\])?\\s*$', line)\n" +
+                      "    if m:\n" +
+                      "        lo, hi = int(m.group(1), 16), int(m.group(2), 16)\n" +
+                      "        hits += ctypes.string_at(lo, hi - lo).count(needle)\n" +
+                      "print(hits)\n";
+        ProgramExecuteResponse second = await Run(engine, scan);
+        Assert.True(second.Success, second.Error + " " + second.StdErr);
+        // A candidate forked from the supervisor inherits its heap, which held the first request: hundreds of copies.
+        Assert.Equal("1", second.StdOut.Trim());
+    }
+
+    [DockerFact]
+    public async Task A_candidate_that_kills_stops_or_limits_its_zygote_does_not_cost_the_warm_container()
+    {
+        using var engine = new ContainerExecutionEngine(Sandbox(), Container(ContainerLifecycle.Warm));
+        const string Host = "import socket\nprint(socket.gethostname())\n";
+        ProgramExecuteResponse before = await Run(engine, Host);
+        Assert.True(before.Success, before.Error + " " + before.StdErr);
+        string[] attacks =
+        {
+            "import os, signal\nos.kill(os.getppid(), signal.SIGKILL)\n",
+            "import os, signal\nos.kill(os.getppid(), signal.SIGSTOP)\n",
+            "import os, resource\nresource.prlimit(os.getppid(), resource.RLIMIT_AS, (50 << 20, 50 << 20))\n"
+        };
+        foreach (string attack in attacks)
+        {
+            var clock = Stopwatch.StartNew();
+            await Run(engine, attack);
+            Assert.True(clock.Elapsed < TimeSpan.FromSeconds(10), attack + " took " + clock.Elapsed);
+            // Allocates past the limit the last attack set, so a zygote that kept it fails here.
+            ProgramExecuteResponse next = await Run(engine, "x = bytearray(100 << 20)\nimport socket\nprint(socket.gethostname())\n");
+            Assert.True(next.Success, attack + ": " + next.Error + " " + next.StdErr);
+            // The same container: the supervisor recovered by itself and reported clean, so it was not replaced.
+            Assert.Equal(before.StdOut.Trim(), next.StdOut.Trim());
+        }
     }
 
     [DockerFact]

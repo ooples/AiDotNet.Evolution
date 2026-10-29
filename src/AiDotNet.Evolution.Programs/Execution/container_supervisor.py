@@ -2,7 +2,7 @@
 # framed on standard input and output: a 4-byte big-endian length, then UTF-8 JSON.
 #   ready:    {"ready", "pid", "uid", "seccomp", "no_new_privs", "cap_eff", "hardened"}
 #   request:  {"source", "stdin", "file", "argv", "time_limit", "cpu_seconds", "max_stdout", "max_stderr"}
-#             argv null runs a Python candidate in a forked child of this interpreter; otherwise argv is exec'd.
+#             argv null runs a Python candidate in a forked child of the zygote (below); otherwise argv is exec'd.
 #   response: {"exit", "stdout", "stderr", "stdout_truncated", "stderr_truncated", "timed_out", "memory_exceeded",
 #              "cpu_exceeded", "clean"}
 # Between candidates every other process in the container is killed and the workdir is emptied; "clean" reports
@@ -12,10 +12,19 @@
 # candidate (same user) cannot kill the supervisor; the only handler Python installs, SIGINT, is reset below. The
 # supervisor also makes itself undumpable, so a same-user candidate cannot open /proc/1/fd to read requests or forge
 # replies.
+#
+# Candidates are not forked from the supervisor: its memory holds every earlier request (sources, stdin that may be
+# hidden test inputs) and output, and a fork copies all of it, so a later candidate could read an earlier one's data
+# out of its own address space (E-2 review: 721 copies of a 64 KB stdin). They are forked from a zygote, a fresh
+# interpreter (fork and exec of this same script) that never reads a request: each candidate receives its own request
+# over a pipe of its own. The zygote is spared by the sweep, and replaced whenever a candidate could have tampered
+# with it (it died, was stopped, or its limits, priority or affinity changed). A zygote stopped while a candidate runs is killed at once,
+import array
 import json
 import os
 import select
 import signal
+import socket
 import struct
 import sys
 import threading
@@ -118,14 +127,17 @@ def run_python(path, source):
         return 1
 
 
-def child(request, path, in_read, out_write, err_write):
+def child(in_read, out_write, err_write, request_read):
     code = 1
     try:
         os.setsid()
+        with os.fdopen(request_read, "rb") as source:
+            request = json.loads(source.read().decode("utf-8"))
+        path = os.path.join(WORK, request["file"])
         os.dup2(in_read, 0)
         os.dup2(out_write, 1)
         os.dup2(err_write, 2)
-        # fork() copies every descriptor, including the protocol's; close them so the candidate cannot reach them.
+        # fork() copies every descriptor, including the zygote's socket; close them so the candidate cannot reach them.
         os.closerange(3, max_descriptor())
         try:
             with open("/proc/self/oom_score_adj", "w", encoding="ascii") as adj:
@@ -182,17 +194,21 @@ def reap():
             return
 
 
-def sweep():
-    """Kills every process in the container except this one; True once none is left."""
+def sweep(spare):
+    """Kills every process in the container but this one and the zygote; True once none is left."""
     deadline = time.monotonic() + 5
     while time.monotonic() < deadline:
-        try:
-            os.kill(-1, signal.SIGKILL)  # every process this user may signal, which is all of them but PID 1
-        except ProcessLookupError:
+        others = [pid for pid in (int(name) for name in os.listdir("/proc") if name.isdigit()) if pid not in (1, os.getpid(), spare)]
+        if not others:
             reap()
             return True
-        except OSError:
-            return False
+        for pid in others:
+            try:
+                os.kill(pid, signal.SIGKILL)
+            except ProcessLookupError:
+                pass
+            except OSError:
+                return False
         reap()
         time.sleep(0.001)
     return False
@@ -224,7 +240,151 @@ def wipe():
         return False  # a tree too deep or too locked to empty: the engine replaces the container
 
 
-def run(request):
+ZYGOTE = "--zygote"
+
+
+def zygote_main(descriptor):
+    """The zygote's loop: one fork per candidate, then that candidate's pid and exit status back to the supervisor."""
+    harden()  # exec made it dumpable again
+    channel = socket.socket(fileno=descriptor)
+    import resource  # noqa: F401  imported once here, so every candidate's fork starts with it loaded
+    import traceback  # noqa: F401
+    while True:
+        try:
+            message, descriptors = receive_descriptors(channel)
+        except OSError:
+            os._exit(0)
+        if not message or len(descriptors) != 4:
+            os._exit(0)
+        pid = os.fork()
+        if pid == 0:
+            channel.close()
+            child(*descriptors)
+        for fd in descriptors:
+            os.close(fd)
+        channel.sendall(struct.pack(">i", pid))
+        try:
+            _, status = os.waitpid(pid, 0)
+        except ChildProcessError:
+            status = 9
+        channel.sendall(struct.pack(">i", status))
+
+
+def send_descriptors(channel, descriptors):
+    # SCM_RIGHTS by hand rather than socket.send_fds, which needs Python 3.9; any image's python3 runs this.
+    channel.sendmsg([b"F"], [(socket.SOL_SOCKET, socket.SCM_RIGHTS, array.array("i", descriptors))])
+
+
+def receive_descriptors(channel):
+    descriptors = array.array("i")
+    message, ancillary, _, _ = channel.recvmsg(1, socket.CMSG_LEN(16 * descriptors.itemsize))
+    for level, kind, data in ancillary:
+        if level == socket.SOL_SOCKET and kind == socket.SCM_RIGHTS:
+            descriptors.frombytes(data[:len(data) - len(data) % descriptors.itemsize])
+    return message, list(descriptors)
+
+
+def own_script():
+    # Started as `python -u -c <script>`; the zygote is this script run again, so its memory starts empty.
+    with open("/proc/self/cmdline", "rb") as cmdline:
+        argv = cmdline.read().split(b"\0")
+    return argv[argv.index(b"-c") + 1].decode("utf-8")
+
+
+def zygote_identity(pid):
+    """What a same-user candidate could change about the zygote: its state, priority, limits and affinity."""
+    try:
+        with open("/proc/%d/stat" % pid, encoding="ascii") as stat:
+            fields = stat.read().rsplit(")", 1)[1].split()
+        with open("/proc/%d/limits" % pid, encoding="ascii") as limits:
+            limit_text = limits.read()
+        with open("/proc/%d/status" % pid, encoding="ascii") as status:
+            allowed = [line for line in status if line.startswith(("Cpus_allowed:", "Mems_allowed:"))]
+    except OSError:
+        return None
+    # fields[0] is the state, [16] the nice value.
+    return (fields[0], fields[16], limit_text, tuple(allowed))
+
+
+class Zygote:
+    def __init__(self):
+        self.script = own_script()
+        self.pid = 0
+        self.channel = None
+        self.identity = None
+        self.start()
+
+    def start(self):
+        ours, theirs = socket.socketpair(socket.AF_UNIX, socket.SOCK_STREAM)
+        pid = os.fork()
+        if pid == 0:
+            try:
+                # Nothing of the supervisor's but the zygote's own socket crosses the exec, not even the request stream.
+                quiet = os.open(os.devnull, os.O_RDWR)
+                for standard in (0, 1, 2):
+                    os.dup2(quiet, standard)
+                os.set_inheritable(theirs.fileno(), True)  # sockets are close-on-exec by default
+                os.closerange(3, theirs.fileno())
+                os.closerange(theirs.fileno() + 1, max_descriptor())
+                os.execv(sys.executable, [sys.executable, "-u", "-c", self.script, ZYGOTE, str(theirs.fileno())])
+            finally:
+                os._exit(127)
+        theirs.close()
+        self.pid, self.channel = pid, ours
+        self.identity = None
+
+    def stop(self):
+        try:
+            os.kill(self.pid, signal.SIGKILL)
+        except OSError:
+            pass
+        try:
+            os.waitpid(self.pid, 0)
+        except ChildProcessError:
+            pass
+        self.channel.close()
+
+    def check(self):
+        """Replaces the zygote if it died or anything about it changed since it last forked a candidate cleanly."""
+        identity = zygote_identity(self.pid)
+        alive = identity is not None and identity[0] not in ("T", "t", "Z", "X", "x")
+        if alive and (self.identity is None or identity == self.identity):
+            self.identity = identity
+            return
+        self.stop()
+        self.start()
+
+    def stalled(self):
+        identity = zygote_identity(self.pid)
+        return identity is None or identity[0] in ("T", "t", "Z", "X", "x")
+
+    def kill(self):
+        try:
+            os.kill(self.pid, signal.SIGKILL)
+            os.waitpid(self.pid, 0)  # reaped, so its children are this process's before they are waited on
+        except (ProcessLookupError, ChildProcessError):
+            pass
+
+    def spawn(self, descriptors):
+        """Asks the zygote to fork a candidate; returns its pid, or None when the zygote is gone."""
+        try:
+            send_descriptors(self.channel, descriptors)
+            return struct.unpack(">i", read_socket(self.channel, 4))[0]
+        except (OSError, struct.error, TypeError):
+            return None
+
+
+def read_socket(channel, count):
+    data = b""
+    while len(data) < count:
+        block = channel.recv(count - len(data))
+        if not block:
+            return None
+        data += block
+    return data
+
+
+def run(request, zygote):
     path = os.path.join(WORK, request["file"])
     with open(path, "w", encoding="utf-8") as source:
         source.write(request["source"])
@@ -232,12 +392,27 @@ def run(request):
     in_read, in_write = os.pipe()
     out_read, out_write = os.pipe()
     err_read, err_write = os.pipe()
-    pid = os.fork()
-    if pid == 0:
-        child(request, path, in_read, out_write, err_write)
-    for fd in (in_read, out_write, err_write):
+    request_read, request_write = os.pipe()
+    zygote.check()
+    pid = zygote.spawn([in_read, out_write, err_write, request_read])
+    if pid is None:  # the zygote failed between its check and this fork; one fresh zygote, then give up
+        zygote.stop()
+        zygote.start()
+        pid = zygote.spawn([in_read, out_write, err_write, request_read])
+    for fd in (in_read, out_write, err_write, request_read):
         os.close(fd)
-    writer = threading.Thread(target=feed, args=(in_write, request["stdin"].encode("utf-8")), daemon=True)
+    if pid is None:
+        for fd in (in_write, out_read, err_read, request_write):
+            os.close(fd)
+        return 1, "", "the candidate could not be started\n", False, False, False, False
+    payload = json.dumps({key: request[key] for key in ("source", "file", "argv", "cpu_seconds")}).encode("utf-8")
+    stdin = request["stdin"].encode("utf-8")
+
+    def write_all():
+        feed(request_write, payload)
+        feed(in_write, stdin)
+
+    writer = threading.Thread(target=write_all, daemon=True)
     writer.start()
 
     chunks = {out_read: [], err_read: []}
@@ -261,10 +436,34 @@ def run(request):
         return bool(ready)
 
     # Wait for the candidate to exit, not for its pipes to close: a descendant can hold them open after it finished.
+    # The zygote reports the exit; a candidate that killed the zygote is this process's child instead, and is waited
+    # on directly.
+    channel = zygote.channel
+    orphaned = False
+    probed = time.monotonic()
     while True:
-        waited, exit_status = os.waitpid(pid, os.WNOHANG)
-        if waited:
-            status = exit_status
+        if not orphaned and time.monotonic() - probed >= 0.02:
+            probed = time.monotonic()
+            if zygote.stalled():
+                # A stopped zygote never reaps or reports; killing it hands the candidate to this process.
+                zygote.kill()
+                orphaned = True
+        if orphaned:
+            try:
+                waited, exit_status = os.waitpid(pid, os.WNOHANG)
+            except ChildProcessError:
+                waited, exit_status = pid, 9
+            if waited:
+                status = exit_status
+        else:
+            ready, _, _ = select.select([channel], [], [], 0)
+            if ready:
+                reply = read_socket(channel, 4)
+                if reply is None:
+                    orphaned = True
+                    continue
+                status = struct.unpack(">i", reply)[0]
+        if status is not None:
             while open_fds and drain(0):
                 pass
             break
@@ -273,16 +472,18 @@ def run(request):
             timed_out = True
             break
         if open_fds:
-            drain(min(remaining, 0.05))
+            drain(min(remaining, 0.05 if orphaned else 0.001))
         else:
             time.sleep(min(remaining, 0.001))
 
-    clean = sweep()
+    clean = sweep(zygote.pid)
+    if status is None and not orphaned:
+        # Killed by the sweep: the zygote reaps it and reports.
+        ready, _, _ = select.select([channel], [], [], 2)
+        reply = read_socket(channel, 4) if ready else None
+        status = struct.unpack(">i", reply)[0] if reply else 9
     if status is None:
-        try:
-            _, status = os.waitpid(pid, 0)
-        except ChildProcessError:
-            status = 9  # already reaped by the sweep; it was killed
+        status = 9  # an orphan already reaped by the sweep; it was killed
     writer.join(timeout=1)
     for fd in (out_read, err_read):
         os.close(fd)
@@ -304,6 +505,9 @@ def run(request):
 
 
 def main():
+    if len(sys.argv) == 3 and sys.argv[1] == ZYGOTE:
+        zygote_main(int(sys.argv[2]))
+        return
     signal.signal(signal.SIGINT, signal.SIG_DFL)
     requests = sys.stdin.buffer
     replies = os.fdopen(os.dup(1), "wb")
@@ -311,6 +515,7 @@ def main():
     os.dup2(null, 1)
     os.dup2(null, 2)
     hardened = harden()
+    zygote = Zygote()
     write_frame(replies, {
         "ready": True, "pid": os.getpid(), "uid": os.getuid(), "hardened": hardened,
         "seccomp": status_field("Seccomp"), "no_new_privs": status_field("NoNewPrivs"), "cap_eff": status_field("CapEff"),
@@ -320,7 +525,7 @@ def main():
         request = read_frame(requests)
         if request is None:
             return
-        code, stdout, stderr, timed_out, memory, cpu, clean = run(request)
+        code, stdout, stderr, timed_out, memory, cpu, clean = run(request, zygote)
         stdout, stdout_cut = bound(stdout, request["max_stdout"])
         stderr, stderr_cut = bound(stderr, request["max_stderr"])
         write_frame(replies, {
