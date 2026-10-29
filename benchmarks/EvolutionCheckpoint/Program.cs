@@ -9,6 +9,7 @@ using AiDotNet.Evolution.Programs;
 // The format defaults to Auto, what a run gets without configuring anything (E-1 measured it at 10,000 elites). The
 // resume form only resumes a directory an earlier run left, so a resume can be timed and profiled on its own (E-1). Each
 // resume saves a checkpoint of its own, so time it against a fresh copy of the directory every launch.
+// EVOLUTION_CHECKPOINT_COLLECT=1 keeps garbage collection running during the resume, to measure it without the no-GC region.
 bool resumeOnly = args.Length > 0 && args[0] == "resume";
 string[] arguments = resumeOnly ? args[1..] : args;
 EvolutionCheckpointFormat format = EvolutionCheckpointFormat.Auto;
@@ -39,7 +40,8 @@ EvolutionEngineOptions Options(bool resume) => new()
 {
     RunId = "checkpoint-bench", Seed = 7, MaxEvaluationAttempts = elites, MaxProposals = elites * 2, MaxGenerations = elites,
     ProposalBatchSize = 64, MaxDegreeOfParallelism = 1, MigrationInterval = 0, CheckpointInterval = Math.Max(1, elites / 16), Resume = resume,
-    CheckpointFormat = format
+    CheckpointFormat = format,
+    SuspendGarbageCollectionDuringResume = Environment.GetEnvironmentVariable("EVOLUTION_CHECKPOINT_COLLECT") != "1"
 };
 var seeds = new[] { Program4k(0) };
 if (resumeOnly)

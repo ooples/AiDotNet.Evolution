@@ -454,6 +454,7 @@ public sealed partial class EvolutionEngine<TGenome>
         var pending = new Queue<Task<StateSegmentDocument>>();
         int window = DecodeWindow;
         int read = 0;
+        using var buffers = new SegmentBufferPool();
         try
         {
             for (int applied = 0; applied < manifest.Count; applied++)
@@ -464,8 +465,8 @@ public sealed partial class EvolutionEngine<TGenome>
                     Task<StateSegmentDocument> decode;
                     try
                     {
-                        SegmentBytes bytes = await ReadSegmentAsync(store, runId, next, cancellationToken).ConfigureAwait(false);
-                        decode = Task.Run(() => DecodeSegment(bytes, next), CancellationToken.None);
+                        SegmentBytes bytes = await ReadSegmentAsync(store, runId, next, buffers, cancellationToken).ConfigureAwait(false);
+                        decode = Task.Run(() => DecodeSegment(bytes, next, buffers), CancellationToken.None);
                     }
                     catch (Exception exception)
                     {
@@ -587,15 +588,15 @@ public sealed partial class EvolutionEngine<TGenome>
     private static int DecodeWindow => Math.Max(1, Math.Min(Environment.ProcessorCount, 8));
 
     private static async Task<SegmentBytes> ReadSegmentAsync(IEvolutionCheckpointSegmentStore store, string runId,
-        SegmentReferenceDocument reference, CancellationToken cancellationToken)
+        SegmentReferenceDocument reference, SegmentBufferPool buffers, CancellationToken cancellationToken)
     {
         using Stream stream = await store.OpenSegmentAsync(runId, reference.Id, cancellationToken).ConfigureAwait(false)
                               ?? throw new InvalidDataException($"Checkpoint segment {reference.Id} is missing from the store.");
-        return await ReadSegmentBytesAsync(stream, reference.Id, cancellationToken).ConfigureAwait(false);
+        return await ReadSegmentBytesAsync(stream, reference.Id, buffers, cancellationToken).ConfigureAwait(false);
     }
 
     // Checks and decodes one segment's bytes, returning the buffer to the pool whatever happens.
-    private static StateSegmentDocument DecodeSegment(SegmentBytes bytes, SegmentReferenceDocument reference)
+    private static StateSegmentDocument DecodeSegment(SegmentBytes bytes, SegmentReferenceDocument reference, SegmentBufferPool buffers)
     {
         try
         {
@@ -620,7 +621,7 @@ public sealed partial class EvolutionEngine<TGenome>
         }
         finally
         {
-            ArrayPool<byte>.Shared.Return(bytes.Buffer);
+            buffers.Return(bytes.Buffer);
         }
     }
 
@@ -647,7 +648,8 @@ public sealed partial class EvolutionEngine<TGenome>
     // collector into full collections of the state being rebuilt (E-1). The first buffer is sized from the length the
     // stream reports, one byte over, so a full buffer always means the stream holds more; a stream that reports no
     // length, or the wrong one, still yields exactly the bytes it holds, which the SHA-256 check then judges.
-    private static async Task<SegmentBytes> ReadSegmentBytesAsync(Stream stream, long id, CancellationToken cancellationToken)
+    private static async Task<SegmentBytes> ReadSegmentBytesAsync(Stream stream, long id, SegmentBufferPool buffers,
+        CancellationToken cancellationToken)
     {
         long expected = -1;
         if (stream.CanSeek)
@@ -664,7 +666,7 @@ public sealed partial class EvolutionEngine<TGenome>
         if (expected > EvolutionCollectionLimits.MaximumCheckpointBytes)
             throw new InvalidDataException($"Checkpoint segment {id} exceeds the package limit.");
 
-        byte[] buffer = ArrayPool<byte>.Shared.Rent((int)Math.Max(expected + 1, SegmentFlushBytes));
+        byte[] buffer = buffers.Rent((int)Math.Max(expected + 1, SegmentFlushBytes));
         int length = 0;
         try
         {
@@ -673,9 +675,9 @@ public sealed partial class EvolutionEngine<TGenome>
                 if (length == buffer.Length)
                 {
                     long grown = Math.Min((long)buffer.Length * 2, EvolutionCollectionLimits.MaximumCheckpointBytes + 1);
-                    byte[] larger = ArrayPool<byte>.Shared.Rent((int)grown);
+                    byte[] larger = buffers.Rent((int)grown);
                     Buffer.BlockCopy(buffer, 0, larger, 0, length);
-                    ArrayPool<byte>.Shared.Return(buffer);
+                    buffers.Return(buffer);
                     buffer = larger;
                 }
                 int read = await stream.ReadAsync(buffer, length, buffer.Length - length, cancellationToken).ConfigureAwait(false);
@@ -687,10 +689,48 @@ public sealed partial class EvolutionEngine<TGenome>
         }
         catch
         {
-            ArrayPool<byte>.Shared.Return(buffer);
+            buffers.Return(buffer);
             throw;
         }
         return new SegmentBytes(buffer, length);
+    }
+
+    // One resume's segment buffers. The shared pool keeps a returned array in the returning thread's cache first, and
+    // decodes return theirs on pool threads while the next read rents on another, so every segment rented a fresh
+    // multi-megabyte array: 66 MB of large-object allocation at 10,000 elites (E-1). Here a returned buffer goes to the
+    // next read whatever thread it runs on; the buffers go back to the shared pool when the resume is done.
+    private sealed class SegmentBufferPool : IDisposable
+    {
+        private readonly List<byte[]> _free = new();
+
+        public byte[] Rent(int minimumLength)
+        {
+            lock (_free)
+            {
+                for (int index = 0; index < _free.Count; index++)
+                {
+                    if (_free[index].Length < minimumLength) continue;
+                    byte[] buffer = _free[index];
+                    _free.RemoveAt(index);
+                    return buffer;
+                }
+            }
+            return ArrayPool<byte>.Shared.Rent(minimumLength);
+        }
+
+        public void Return(byte[] buffer)
+        {
+            lock (_free) _free.Add(buffer);
+        }
+
+        public void Dispose()
+        {
+            lock (_free)
+            {
+                foreach (byte[] buffer in _free) ArrayPool<byte>.Shared.Return(buffer);
+                _free.Clear();
+            }
+        }
     }
 
     private readonly struct SegmentBytes(byte[] buffer, int length)
