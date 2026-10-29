@@ -61,11 +61,18 @@ $everShipped = @($shippedBy.Values | ForEach-Object { $_ })
 $conflict = @($buildOnly | Where-Object { $_ -in $everShipped })
 if ($conflict.Count) { throw "Build-only in one project and shipped by another, so the SBOM cannot exclude it: $($conflict -join ', ')" }
 
+# The tool comes from the manifest beside this script, the one the caller restored; the release job runs this script from
+# a separate tooling checkout while the source tree being described is elsewhere.
+$toolRoot = Split-Path -Parent $PSScriptRoot
 foreach ($id in $ids) {
     $file = "$id.$Version.cdx.json"
-    dotnet tool run dotnet-CycloneDX "$root/src/$id/$id.csproj" --recursive --disable-package-restore --output-format Json `
-        --output $packages --filename $file --set-name $id --set-version $Version --set-type Library --exclude-filter ($buildOnly -join ',')
-    if ($LASTEXITCODE -ne 0) { throw "SBOM generation failed: $id" }
+    Push-Location -LiteralPath $toolRoot
+    try {
+        dotnet tool run dotnet-CycloneDX "$root/src/$id/$id.csproj" --recursive --disable-package-restore --output-format Json `
+            --output $packages --filename $file --set-name $id --set-version $Version --set-type Library --exclude-filter ($buildOnly -join ',')
+        if ($LASTEXITCODE -ne 0) { throw "SBOM generation failed: $id" }
+    }
+    finally { Pop-Location }
     $bom = Get-Content -LiteralPath (Join-Path $packages $file) -Raw | ConvertFrom-Json
     if ($bom.bomFormat -cne 'CycloneDX' -or $bom.metadata.component.name -cne $id -or $bom.metadata.component.version -cne $Version) {
         throw "SBOM does not describe $id $Version."
