@@ -101,7 +101,7 @@ def _environment(broker):
                 EVOLUTION_BROKER_CAPABILITY=broker.capability)
 
 
-def ours(cli, task_directory, python_executable, *, iterations, session, timeout=1800):
+def ours(cli, task_directory, python_executable, *, iterations, session, timeout=1800, champion_standard_errors=None):
     """Returns a searcher that runs our CLI over the task's unmodified OpenEvolve config.
 
     `cli` is a command prefix, not just an executable: a string for an installed
@@ -134,6 +134,10 @@ def ours(cli, task_directory, python_executable, *, iterations, session, timeout
         if resume and output.exists():
             shutil.rmtree(output)  # a resumed cell re-runs: the engine owns its own resume, not this
         prefix = [cli] if isinstance(cli, (str, Path)) else list(cli)
+        # The champion must beat the seed by this many standard errors of the broker's quality, or the seed stands.
+        champion = ([] if champion_standard_errors is None else
+                    ["--champion-standard-errors", repr(float(champion_standard_errors)),
+                     "--standard-error-metric", "quality_standard_error"])
         with session(cell) as broker:
             # The CLI scrubs its evaluator's environment, so the broker is written into the
             # evaluator file rather than passed through it.
@@ -147,7 +151,7 @@ def ours(cli, task_directory, python_executable, *, iterations, session, timeout
                 completed = subprocess.run(
                     [*[str(part) for part in prefix], "run", "--openevolve-config", str(config), str(initial),
                      str(evaluator), "--iterations", str(iterations), "--output", str(output),
-                     "--python", python_executable],
+                     "--python", python_executable, *champion],
                     capture_output=True, text=True, timeout=timeout, env=environment, cwd=str(directory),
                     check=False)
             except subprocess.TimeoutExpired as error:

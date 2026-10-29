@@ -12,6 +12,23 @@ import symbolic_regression_family as family
 
 
 class SymbolicRegressionFamilyTests(unittest.TestCase):
+    def test_nmse_and_error_is_nmse_with_the_standard_error_of_its_mean(self):
+        # E-4: the error is the squared errors' sample standard deviation over sqrt(n), over the targets' variance.
+        rows = [((0.0,), 0.0), ((1.0,), 1.0), ((2.0,), 4.0), ((3.0,), 2.0)]
+        predict = lambda x: x  # noqa: E731 - errors 0, 0, -2, 1
+        squares = [0.0, 0.0, 4.0, 1.0]
+        mean = sum(squares) / 4
+        variance = sum((y - 1.75) ** 2 for _, y in rows) / 4
+        expected = math.sqrt(sum((v - mean) ** 2 for v in squares) / 3) / 2 / variance
+        score, error = family.nmse_and_error(predict, rows)
+        self.assertEqual(family.nmse(predict, rows), score)
+        self.assertAlmostEqual(expected, error, places=12)
+
+    def test_nmse_and_error_is_infinite_wherever_nmse_is(self):
+        rows = [((0.0,), 0.0), ((1.0,), 1.0), ((2.0,), 4.0), ((3.0,), 2.0)]
+        for predict in (lambda x: float("nan"), lambda x: 1 / 0):
+            self.assertEqual((math.inf, math.inf), family.nmse_and_error(predict, rows))
+
     def test_the_ground_truth_scores_zero_on_every_split(self):
         for task in family.TASKS:
             with self.subTest(task=task):

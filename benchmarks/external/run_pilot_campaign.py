@@ -112,10 +112,11 @@ def transport(executable, evidence, max_calls, *, timeout):
     return models, models.verify_canaries()
 
 
-def searchers_for(session, *, cli, upstream, python_executable, iterations, timeout):
+def searchers_for(session, *, cli, upstream, python_executable, iterations, timeout, champion_standard_errors=None):
     return {
         "aidotnet": pilot_searchers.ours(cli, TASK_DIRECTORY, python_executable,
-                                         iterations=iterations, session=session, timeout=timeout),
+                                         iterations=iterations, session=session, timeout=timeout,
+                                         champion_standard_errors=champion_standard_errors),
         "openevolve-recommended": pilot_searchers.openevolve(ADAPTER, upstream, TASK_DIRECTORY, session,
                                                              mode="recommended", model=MODEL,
                                                              iterations=iterations, timeout=timeout),
@@ -155,6 +156,8 @@ def summarise(rows, report, *, task, arguments, frozen, projection, wall, canari
         "projection_sha256": projection["ProjectionSha256"],
         "holdout_partition_sha256": frozen["Spec"]["TestPartitionHashes"][task],
         "iterations_per_cell": arguments.iterations,
+        "selection_rows": {"train": arguments.selection_rows[0], "validation": arguments.selection_rows[1]},
+        "champion_standard_errors": arguments.champion_standard_errors,
         "wall_seconds": round(wall, 1),
         "cells": len(rows),
         "statuses": {status: sum(1 for row in rows if row["Status"] == status)
@@ -195,6 +198,10 @@ def describe(projection, arguments):
         "rough cost           ~%d tokens if every call is served, at ~%dk per call"
         % (projection["MaxModelCalls"] * TOKENS_PER_CALL, TOKENS_PER_CALL // 1000),
         "sizing target        CI half width %.4g, frozen with the seeds" % arguments.target_half_width,
+        "selection            %d train + %d validation rows; our champion rule: %s"
+        % (arguments.selection_rows[0], arguments.selection_rows[1],
+           "none" if arguments.champion_standard_errors is None
+           else "beat the seed by %g standard errors" % arguments.champion_standard_errors),
         "ProjectionSha256     " + projection["ProjectionSha256"],
     ]
 
@@ -213,6 +220,12 @@ def build_parser():
                         help="the endpoint's seed; never reaches a search process")
     parser.add_argument("--seed-count", type=int, default=6, help="a multiple of 6 keeps positions balanced")
     parser.add_argument("--iterations", type=int, default=10)
+    # E-4: at 60 + 20 rows a constant and the seed program trade places on the row draw alone (sd 0.112 of their
+    # NMSE difference); 600 + 200 brings that to 0.029.
+    parser.add_argument("--selection-rows", type=int, nargs=2, default=[60, 20], metavar=("TRAIN", "VALIDATION"),
+                        help="rows every arm's candidates are selected on")
+    parser.add_argument("--champion-standard-errors", type=float, default=None,
+                        help="our arm's champion must beat the seed by this many standard errors, or the seed stands")
     # 10 x 18 cells = 180 calls, which is what the authorised envelope buys at this account's rate.
     parser.add_argument("--model-calls", type=int, default=10, help="per cell; the broker's ceiling")
     parser.add_argument("--model-tokens", type=int, default=600_000,
@@ -375,10 +388,16 @@ def main():
         provider = models.generate
         print("canaries             " + json.dumps(canaries))
 
-    session = pilot_campaign.cell_broker(frozen, provider, arguments.task, initial)
+    if min(arguments.selection_rows) < 4:
+        parser.error("--selection-rows needs at least 4 rows in each split")
+    if arguments.champion_standard_errors is not None and not arguments.champion_standard_errors >= 0:
+        parser.error("--champion-standard-errors must be non-negative")
+    session = pilot_campaign.cell_broker(frozen, provider, arguments.task, initial,
+                                         selection_rows=tuple(arguments.selection_rows))
     searchers = searchers_for(session, cli=arguments.cli, upstream=arguments.upstream,
                               python_executable=arguments.python, iterations=arguments.iterations,
-                              timeout=arguments.cell_timeout)
+                              timeout=arguments.cell_timeout,
+                              champion_standard_errors=arguments.champion_standard_errors)
     started = time.monotonic()
     rows, report = pilot_campaign.run(frozen, registration_path, projection, root / "state",
                                       arguments.task, searchers, holdout_seed=arguments.holdout_seed,

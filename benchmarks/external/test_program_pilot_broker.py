@@ -5,6 +5,7 @@ candidate - so the wrapper's job is to turn a provider's or a candidate's bad be
 something the broker can accept, and to refuse only what it genuinely cannot.
 """
 import sys
+import tempfile
 import unittest
 from pathlib import Path
 
@@ -12,6 +13,7 @@ ROOT = Path(__file__).resolve().parent
 sys.path.insert(0, str(ROOT))
 
 import pilot_broker  # noqa: E402
+import pilot_task_evaluator  # noqa: E402
 from program_broker import COST_METRICS, ProgramBroker  # noqa: E402
 import symbolic_regression_family as family  # noqa: E402
 
@@ -84,6 +86,29 @@ class ModelCallbackTests(unittest.TestCase):
 
 
 class EvaluateCallbackTests(unittest.TestCase):
+    def test_every_valid_reply_carries_the_qualitys_standard_error(self):
+        # E-4: the delta method through quality = 1 / (1 + score), from the two splits' own errors.
+        evaluate = pilot_broker.evaluate_callback(TASK, SEED)
+        rows = family.selection(TASK, SEED)
+        predict = lambda x: 0.0  # noqa: E731 - CONSTANT, as a function
+        train, train_error = family.nmse_and_error(predict, rows["train"])
+        validation, validation_error = family.nmse_and_error(predict, rows["validation"])
+        score = (train + validation) / 2.0
+        expected = ((train_error ** 2 + validation_error ** 2) ** 0.5 / 2.0) / (1.0 + score) ** 2
+        reply = evaluate(CONSTANT)
+        self.assertAlmostEqual(score, reply["selection_nmse"], places=12)
+        self.assertAlmostEqual(expected, reply["quality_standard_error"], places=12)
+        self.assertGreater(reply["quality_standard_error"], 0.0)
+
+    def test_the_selection_rows_are_the_ones_asked_for(self):
+        # More rows is the other half of E-4's fix: the reply must score on exactly them.
+        rows = family.selection(TASK, SEED, train=600, validation=200)
+        expected = (family.nmse(lambda x: 0.0, rows["train"]) + family.nmse(lambda x: 0.0, rows["validation"])) / 2.0
+        reply = pilot_broker.evaluate_callback(TASK, SEED, train=600, validation=200)(CONSTANT)
+        self.assertAlmostEqual(expected, reply["selection_nmse"], places=12)
+        self.assertNotAlmostEqual(pilot_broker.evaluate_callback(TASK, SEED)(CONSTANT)["selection_nmse"],
+                                  reply["selection_nmse"], places=6)
+
     def test_quality_is_higher_is_better_and_the_truth_tops_it(self):
         evaluate = pilot_broker.evaluate_callback(TASK, SEED)
         truth, constant = evaluate(TRUTH), evaluate(CONSTANT)
@@ -184,6 +209,25 @@ class SessionTests(unittest.TestCase):
         with self.session()({"Family": TASK, "Seed": SEED}) as broker:
             endpoint = broker.endpoint
         self.assertTrue(broker.shut, "a cell's broker must not outlive the cell: " + endpoint)
+
+
+
+class TaskEvaluatorTests(unittest.TestCase):
+    def test_the_standard_error_reaches_the_search_with_the_score(self):
+        # Our CLI reads it from the evaluator's metrics; without it a champion rule refuses the run.
+        replies = [{"status": "valid", "quality": 0.5, "selection_nmse": 1.0, "quality_standard_error": 0.01},
+                   {"status": "valid", "quality": 0.5, "selection_nmse": 1.0}]
+        genuine = pilot_task_evaluator.request
+        try:
+            pilot_task_evaluator.request = lambda endpoint, capability, operation, payload: replies.pop(0)
+            with tempfile.TemporaryDirectory() as directory:
+                path = Path(directory) / "candidate.py"
+                path.write_text(CONSTANT, encoding="utf-8")
+                evaluate = pilot_task_evaluator.bind("http://127.0.0.1:1", "capability")
+                self.assertEqual(0.01, evaluate(str(path))["quality_standard_error"])
+                self.assertNotIn("quality_standard_error", evaluate(str(path)))
+        finally:
+            pilot_task_evaluator.request = genuine
 
 
 if __name__ == "__main__":

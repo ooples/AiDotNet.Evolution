@@ -52,7 +52,10 @@ def bind(endpoint, capability):
         result = request(endpoint, capability, "evaluate", {"code": code})
         if result["status"] != "valid":
             return {"combined_score": 0.0, "status": result["status"]}
-        return {"combined_score": result["quality"], "status": "valid",
-                "selection_nmse": result.get("selection_nmse")}
+        scored = {"combined_score": result["quality"], "status": "valid",
+                  "selection_nmse": result.get("selection_nmse")}
+        if result.get("quality_standard_error") is not None:
+            scored["quality_standard_error"] = result["quality_standard_error"]
+        return scored
 
     return evaluate

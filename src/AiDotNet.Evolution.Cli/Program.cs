@@ -2,6 +2,7 @@ using System.Globalization;
 using System.Runtime.InteropServices;
 using System.Text;
 using System.Text.Json;
+using System.Text.Json.Nodes;
 using AiDotNet.Evolution;
 using AiDotNet.Evolution.Programs;
 
@@ -15,6 +16,7 @@ public static class Program
           aidotnet-evolve run     <run.json>
           aidotnet-evolve run --openevolve-config <config.yaml> <initial_program> <evaluator.py> [--iterations N] [--output DIR] [--python EXE]
                                                                                               [--python-path DIR]...
+                                                                                              [--champion-standard-errors K --standard-error-metric NAME]
           aidotnet-evolve resume  <run.json>
           aidotnet-evolve preflight <run.json>
           aidotnet-evolve inspect <trace>
@@ -77,6 +79,8 @@ public static class Program
         string output = "openevolve_output";
         string? python = null;
         var pythonPath = new List<string>();
+        double? championStandardErrors = null;
+        string? standardErrorMetric = null;
         for (int i = 0; i < rest.Length; i += 2)
         {
             if (i + 1 >= rest.Length) return Fail("error: " + rest[i] + " needs a value.");
@@ -96,6 +100,14 @@ public static class Program
                 case "--python-path":
                     pythonPath.Add(rest[i + 1]);
                     break;
+                // OpenEvolve has no counterpart, so these are set on the translated run as search.championStandardErrors
+                // and search.standardErrorMetric; RunCommand refuses one without the other.
+                case "--champion-standard-errors" when double.TryParse(rest[i + 1], NumberStyles.Float, CultureInfo.InvariantCulture, out double k):
+                    championStandardErrors = k;
+                    break;
+                case "--standard-error-metric":
+                    standardErrorMetric = rest[i + 1];
+                    break;
                 default:
                     return Fail("error: unknown or invalid option " + rest[i] + " " + rest[i + 1] + "." + Environment.NewLine + Usage);
             }
@@ -103,7 +115,17 @@ public static class Program
         OpenEvolveImport imported = OpenEvolveConfigImporter.Import(config, initial, evaluator, iterations, python, pythonPath);
         Directory.CreateDirectory(output);
         string runFile = Path.Combine(output, "run.json");
-        File.WriteAllText(runFile, JsonSerializer.Serialize(imported.Run, RunCommand.RunFileJson));
+        string translated = JsonSerializer.Serialize(imported.Run, RunCommand.RunFileJson);
+        if (championStandardErrors is not null || standardErrorMetric is not null)
+        {
+            JsonObject node = JsonNode.Parse(translated)!.AsObject();
+            JsonObject search = node["search"] as JsonObject ?? new JsonObject();
+            node["search"] = search;
+            if (championStandardErrors is double k) search["championStandardErrors"] = k;
+            if (standardErrorMetric is not null) search["standardErrorMetric"] = standardErrorMetric;
+            translated = node.ToJsonString(RunCommand.RunFileJson);
+        }
+        File.WriteAllText(runFile, translated);
         File.WriteAllText(Path.Combine(output, "openevolve-import.json"), JsonSerializer.Serialize(new
         {
             Source = Path.GetFullPath(config),

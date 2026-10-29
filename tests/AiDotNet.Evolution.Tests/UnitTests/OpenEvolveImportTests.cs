@@ -960,5 +960,62 @@ public sealed class OpenEvolveImportTests
         Assert.NotEqual(0, code);
         Assert.Contains("ExplorationProbability", error, StringComparison.Ordinal);
     }
+    // E-4: OpenEvolve has no champion rule, so the pilot passes ours on the command line. Seed X = 0 and the model's X = 1,
+    // each with standard error 0.6: at k = 3 the gain of 1 is short of 3 * sqrt(0.72), so best.py stays the seed.
+    [Fact]
+    public void A_champion_rule_on_the_command_line_reaches_the_translated_run()
+    {
+        using var directory = new TemporaryDirectory();
+        using var model = new CliRunTests.FakeChatModel();
+        File.WriteAllText(Path.Combine(directory.Path, "initial_program.py"), "X = 0\n");
+        File.WriteAllText(Path.Combine(directory.Path, "evaluator.py"), """
+            import re
+
+            def evaluate(path):
+                with open(path) as handle:
+                    x = int(re.search(r"X = (\d+)", handle.read()).group(1))
+                return {"combined_score": float(x), "quality_se": 0.6}
+            """);
+        File.WriteAllText(Path.Combine(directory.Path, "config.yaml"), $"""
+            max_iterations: 1
+            random_seed: 7
+            diff_based_evolution: false
+            llm:
+              api_base: {model.Endpoint}
+              models:
+                - name: fake-model
+              timeout: 20
+              retries: 0
+            database:
+              num_islands: 1
+            evaluator:
+              timeout: 30
+            """);
+        string output = Path.Combine(directory.Path, "out");
+
+        string? previousKey = Environment.GetEnvironmentVariable("OPENAI_API_KEY");
+        Environment.SetEnvironmentVariable("OPENAI_API_KEY", "unused-by-the-fake");
+        try
+        {
+            var (code, stdout, error) = CliRunTests.Run("run", "--openevolve-config", Path.Combine(directory.Path, "config.yaml"),
+                Path.Combine(directory.Path, "initial_program.py"), Path.Combine(directory.Path, "evaluator.py"),
+                "--python", Python, "--output", output, "--champion-standard-errors", "3", "--standard-error-metric", "quality_se");
+
+            Assert.True(code == 0, error);
+            using (JsonDocument run = JsonDocument.Parse(File.ReadAllText(Path.Combine(output, "run.json"))))
+            {
+                JsonElement search = run.RootElement.GetProperty("search");
+                Assert.Equal(3, search.GetProperty("championStandardErrors").GetDouble());
+                Assert.Equal("quality_se", search.GetProperty("standardErrorMetric").GetString());
+            }
+            using JsonDocument report = JsonDocument.Parse(stdout);
+            Assert.False(report.RootElement.GetProperty("Champion").GetProperty("BeatSeed").GetBoolean());
+            Assert.Equal("X = 0", File.ReadAllText(Path.Combine(output, "best.py")).TrimEnd());
+        }
+        finally
+        {
+            Environment.SetEnvironmentVariable("OPENAI_API_KEY", previousKey);
+        }
+    }
 }
 #endif

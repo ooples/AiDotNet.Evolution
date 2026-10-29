@@ -76,7 +76,7 @@ def model_callback(provider, *, cost_metric=COST_METRICS[1]):
     return generate
 
 
-def evaluate_callback(task, seed):
+def evaluate_callback(task, seed, *, train=60, validation=20):
     """Scores candidate code on the selection rows, in the broker's `evaluate` shape.
 
     Invalid is a status, not an exception: a candidate that will not import, has no `predict`, or
@@ -93,7 +93,7 @@ def evaluate_callback(task, seed):
     """
     if task not in family.TASKS:
         raise KeyError("Unknown task: " + task)
-    rows = family.selection(task, seed)
+    rows = family.selection(task, seed, train=train, validation=validation)
 
     def evaluate(code):
         reply = {"candidate_hash": candidate_hash(code), "unknown_work": False}
@@ -103,7 +103,10 @@ def evaluate_callback(task, seed):
             path.write_text(code, encoding="utf-8")
             try:
                 predict = _load(path)
-                score = (family.nmse(predict, rows["train"]) + family.nmse(predict, rows["validation"])) / 2.0
+                train_score, train_error = family.nmse_and_error(predict, rows["train"])
+                validation_score, validation_error = family.nmse_and_error(predict, rows["validation"])
+                score = (train_score + validation_score) / 2.0
+                score_error = math.sqrt(train_error * train_error + validation_error * validation_error) / 2.0
             except Exception:  # noqa: BLE001 - a broken candidate is invalid, never a closed broker
                 score = math.nan
         reply["work_units"] = time.perf_counter() - started
@@ -112,6 +115,10 @@ def evaluate_callback(task, seed):
             return reply
         # Minimising NMSE, and the broker's quality is higher-is-better.
         reply.update(status="valid", quality=1.0 / (1.0 + score), selection_nmse=score)
+        # The quality's standard error, by the delta method through 1 / (1 + score). Every arm receives it; ours
+        # can require a champion to beat the seed by more than it (--champion-standard-errors).
+        if math.isfinite(score_error):
+            reply["quality_standard_error"] = score_error / ((1.0 + score) * (1.0 + score))
         return reply
 
     return evaluate
@@ -130,7 +137,7 @@ def _load(path):
 
 
 def session(provider, task, *, model_calls, evaluations, seconds, initial, model_tokens,
-            cost_metric=COST_METRICS[1]):
+            cost_metric=COST_METRICS[1], selection_rows=(60, 20)):
     """Returns `open_for(cell)`: a context manager holding one broker for exactly one cell.
 
     **A cell is the largest thing a broker can be.** `ProgramBroker` refuses a budget above 64 model
@@ -147,7 +154,8 @@ def session(provider, task, *, model_calls, evaluations, seconds, initial, model
     @contextlib.contextmanager
     def open_for(cell):
         with ProgramBroker(model_callback(provider, cost_metric=cost_metric),
-                           evaluate_callback(str(cell["Family"]), int(cell["Seed"])),
+                           evaluate_callback(str(cell["Family"]), int(cell["Seed"]),
+                                             train=selection_rows[0], validation=selection_rows[1]),
                            model_calls=model_calls, evaluations=evaluations, seconds=seconds,
                            initial=initial, model_tokens=model_tokens) as broker:
             yield broker
