@@ -294,6 +294,10 @@ public sealed partial class ProfileTests
         yield return new object[] { mixed with { DelayBuckets = [honest[0], honest[1] with { MedianMilliseconds = double.NaN }, honest[2]] } };
         // Two observations have their mean as their median; this one claims an in-tolerance median beside a 2.9 ms mean.
         yield return new object[] { mixed with { DelayBuckets = [honest[0] with { Count = 9 }, new(1, 2, 2.9, 1.0, 4.8, 1.05), honest[2]] } };
+        // Three observations: 1.0, m and 4.8 average to 2.9 only when m is 2.9, so this in-tolerance median is invented.
+        yield return new object[] { mixed with { DelayBuckets = [honest[0] with { Count = 8 }, new(1, 3, 2.9, 1.0, 4.8, 1.05), honest[2]] } };
+        // Five: at most 1.0 + 1.0 + 1.05 + 4.8 + 4.8 = 12.65 ms in all, so a 3.0 ms mean cannot have a 1.05 ms median.
+        yield return new object[] { mixed with { DelayBuckets = [honest[0] with { Count = 6 }, new(1, 5, 3.0, 1.0, 4.8, 1.05), honest[2]] } };
         // Delays collapsed onto a single bucket, or a bucket that was never observed.
         yield return new object[] { mixed with { DelayBuckets = [new ProfileDelayBucket(1, 16, 1.4, 1.1, 2.0, 1.3)] } };
         yield return new object[] { mixed with { DelayBuckets = [honest[0], honest[1]] } };
@@ -310,8 +314,8 @@ public sealed partial class ProfileTests
     {
         var mixed = Valid(Case() with { MixedDuration = true }) with
         {
-            DelayBuckets = [new ProfileDelayBucket(0, 6, 0, 0, 0, 0), new ProfileDelayBucket(1, 5, 1.42, 1.05, 2.6, 1.3),
-                new ProfileDelayBucket(8, 5, 8.41, 8.10, 9.30, 8.3)]
+            DelayBuckets = [new ProfileDelayBucket(0, 6, 0, 0, 0, 0), new ProfileDelayBucket(1, 5, 1.48, 1.05, 2.6, 1.3),
+                new ProfileDelayBucket(8, 5, 8.44, 8.10, 9.30, 8.3)]
         };
         ProfileValidation.Validate(mixed);
     }
@@ -324,7 +328,7 @@ public sealed partial class ProfileTests
         var mixed = Valid(Case() with { MixedDuration = true }) with
         {
             DelayBuckets = [new ProfileDelayBucket(0, 3, 0, 0, 0, 0), new ProfileDelayBucket(1, 8, 3.07, 1.0, 16.6, 1.05),
-                new ProfileDelayBucket(8, 5, 8.41, 8.10, 9.30, 8.3)]
+                new ProfileDelayBucket(8, 5, 8.44, 8.10, 9.30, 8.3)]
         };
         ProfileValidation.Validate(mixed);
     }
@@ -360,7 +364,7 @@ public sealed partial class ProfileTests
         var cheap = Case() with { Id = "engine-w1-Batch-cheap-cp0" };
         var mixedMeasurement = Valid(mixed) with
         {
-            DelayBuckets = [new ProfileDelayBucket(0, 6, 0, 0, 0, 0), new ProfileDelayBucket(1, 5, 1.4, 1.05, 2.6, 1.3), new ProfileDelayBucket(8, 5, 8.4, 8.1, 9.3, 8.3)]
+            DelayBuckets = [new ProfileDelayBucket(0, 6, 0, 0, 0, 0), new ProfileDelayBucket(1, 5, 1.48, 1.05, 2.6, 1.3), new ProfileDelayBucket(8, 5, 8.44, 8.1, 9.3, 8.3)]
         };
         var report = Report([cheap, mixed], [Attempt(Valid(cheap)), Attempt(mixedMeasurement)]);
         var summary = ProfileEvidence.Compact(report, new ProfileEvidenceRaw("raw.json", 123, "abc", "https://example.invalid/raw.json"));
@@ -378,6 +382,21 @@ public sealed partial class ProfileTests
         Assert.Contains("Batch / 1", tables, StringComparison.Ordinal);
         var restored = JsonSerializer.Deserialize<ProfileEvidenceSummary>(JsonSerializer.Serialize(summary, ProfileCampaign.JsonOptions), ProfileCampaign.JsonOptions)!;
         Assert.Equal(tables, ProfileEvidence.RenderTables(restored));
+    }
+
+    [Theory]
+    [InlineData(new[] { 1.2 })]
+    [InlineData(new[] { 1.0, 1.4 })]
+    [InlineData(new[] { 1.0, 1.1, 4.8 })]
+    [InlineData(new[] { 1.0, 1.0, 1.0, 9.0 })]
+    [InlineData(new[] { 1.0, 1.05, 1.05, 1.1, 16.6 })]
+    [InlineData(new[] { 1.0, 4.0, 4.0, 4.0, 4.0, 4.1 })]
+    public void EveryRealSampleSetHasAConsistentMedian(double[] samples)
+    {
+        var sorted = samples.OrderBy(sample => sample).ToArray();
+        int n = sorted.Length;
+        double median = n % 2 == 1 ? sorted[n / 2] : (sorted[n / 2 - 1] + sorted[n / 2]) / 2;
+        Assert.True(ProfileValidation.MedianIsConsistent(new ProfileDelayBucket(1, n, sorted.Average(), sorted[0], sorted[^1], median)));
     }
 
     [Fact]

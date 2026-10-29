@@ -260,9 +260,8 @@ public static class ProfileValidation
                 !double.IsFinite(bucket.MedianMilliseconds) || bucket.MedianMilliseconds < bucket.MinimumMilliseconds ||
                 bucket.MedianMilliseconds > bucket.MaximumMilliseconds)
                 throw new InvalidDataException("A declared delay bucket recorded no or impossible observations.");
-            // With one or two observations the median is the mean, so a disagreement is a fabricated or stale median.
-            if (bucket.Count <= 2 && Math.Abs(bucket.MedianMilliseconds - bucket.MeanMilliseconds) > 1e-9 * Math.Max(1, bucket.MeanMilliseconds))
-                throw new InvalidDataException("A delay bucket of at most two observations records a median that is not its mean.");
+            if (!MedianIsConsistent(bucket))
+                throw new InvalidDataException("A delay bucket's median, mean and extremes could not come from the same observations.");
             if (bucket.RequestedMilliseconds == 0) continue;
             if (bucket.MedianMilliseconds < bucket.RequestedMilliseconds - 0.25 ||
                 bucket.MedianMilliseconds > bucket.RequestedMilliseconds + ProfileProtocol.DelayToleranceMilliseconds)
@@ -270,6 +269,27 @@ public static class ProfileValidation
                     $"Simulated {bucket.RequestedMilliseconds} ms delays actually took {bucket.MedianMilliseconds:F3} ms at the median, " +
                     $"outside the declared +{ProfileProtocol.DelayToleranceMilliseconds} ms tolerance (raise the platform timer resolution).");
         }
+    }
+
+    /// <summary>Whether some <see cref="ProfileDelayBucket.Count"/> observations have exactly this minimum, maximum and
+    /// median and a mean that is the recorded one: the extremes and median pin some samples and bound the rest, which
+    /// bounds their sum. With one or two observations the median is the mean; with three the bounds meet, so the mean
+    /// determines the median.</summary>
+    public static bool MedianIsConsistent(ProfileDelayBucket bucket)
+    {
+        double low = bucket.MinimumMilliseconds, high = bucket.MaximumMilliseconds, median = bucket.MedianMilliseconds;
+        long n = bucket.Count;
+        double sum = bucket.MeanMilliseconds * n;
+        double slack = 1e-9 * n * Math.Max(1, high);
+        if (n == 1) return Math.Abs(low - high) <= slack && Math.Abs(median - low) <= slack;
+        if (n == 2) return Math.Abs(median - (low + high) / 2) <= slack;
+        // n = 2k + 1: k samples at or below the median, one of them the minimum, and k at or above it, one the maximum.
+        // n = 2k: the middle pair averages to the median; the sums are extreme when both equal it.
+        long k = n / 2;
+        long lowCount = n % 2 == 1 ? k : k - 1;
+        double smallest = lowCount * low + k * median + high;
+        double largest = low + k * median + lowCount * high;
+        return sum >= smallest - slack && sum <= largest + slack;
     }
 
     private static void ValidateEngineEvidence(ProfileMeasurement measurement)
