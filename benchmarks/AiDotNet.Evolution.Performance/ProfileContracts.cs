@@ -12,7 +12,8 @@ public static class ProfileProtocol
     /// <summary>An upper bound on repetitions inside one measured phase; exceeding it fails instead of reporting a sub-resolution time.</summary>
     public const int MaximumIterations = 1_000_000;
 
-    /// <summary>A simulated asynchronous delay may exceed its request by this much on average before the attempt fails.</summary>
+    /// <summary>How far the median of a simulated asynchronous delay bucket may exceed its request before the attempt fails;
+    /// the mean is not held to it, since one preempted wake on a busy host moves the mean but not the median.</summary>
     public const double DelayToleranceMilliseconds = 2.0;
 
     /// <summary>Foreign (non-worker) busy time on the pinned CPUs above this share of their capacity fails the attempt.</summary>
@@ -147,8 +148,10 @@ public sealed record ProfileCase(string Id, string Kind, int Cells, int Dimensio
 public sealed record ProfileQualityPoint(long EvaluationId, long Completed, double ElapsedMilliseconds, double BestQuality);
 
 /// <summary>Observed cost of one requested asynchronous delay bucket, so a collapsed OS timer cannot pass as the schedule.</summary>
+/// <remarks>The median is what is held to the schedule: a collapsed timer moves every delay, so it moves the median, while
+/// one wake the scheduler preempted on a busy host moves only the mean.</remarks>
 public sealed record ProfileDelayBucket(int RequestedMilliseconds, long Count, double MeanMilliseconds,
-    double MinimumMilliseconds, double MaximumMilliseconds);
+    double MinimumMilliseconds, double MaximumMilliseconds, double MedianMilliseconds);
 
 /// <summary>Busy time on the pinned CPUs during one attempt, separating this worker from every other process.</summary>
 public sealed record ProfileContention(string AffinityHex, int PinnedProcessors, double ElapsedMilliseconds,
@@ -237,7 +240,7 @@ public static class ProfileValidation
     }
 
     /// <summary>Requires the declared delay schedule to have been observed, not merely requested.</summary>
-    private static void ValidateDelays(ProfileMeasurement measurement)
+    public static void ValidateDelays(ProfileMeasurement measurement)
     {
         if (!measurement.Case.MixedDuration)
         {
@@ -254,15 +257,40 @@ public static class ProfileValidation
             if (bucket.Count <= 0 || !double.IsFinite(bucket.MeanMilliseconds) || bucket.MeanMilliseconds < 0 ||
                 !double.IsFinite(bucket.MinimumMilliseconds) || !double.IsFinite(bucket.MaximumMilliseconds) ||
                 bucket.MinimumMilliseconds < 0 || bucket.MaximumMilliseconds < bucket.MinimumMilliseconds ||
-                bucket.MeanMilliseconds < bucket.MinimumMilliseconds || bucket.MeanMilliseconds > bucket.MaximumMilliseconds)
+                bucket.MeanMilliseconds < bucket.MinimumMilliseconds || bucket.MeanMilliseconds > bucket.MaximumMilliseconds ||
+                !double.IsFinite(bucket.MedianMilliseconds) || bucket.MedianMilliseconds < bucket.MinimumMilliseconds ||
+                bucket.MedianMilliseconds > bucket.MaximumMilliseconds)
                 throw new InvalidDataException("A declared delay bucket recorded no or impossible observations.");
+            if (!MedianIsConsistent(bucket))
+                throw new InvalidDataException("A delay bucket's median, mean and extremes could not come from the same observations.");
             if (bucket.RequestedMilliseconds == 0) continue;
-            if (bucket.MeanMilliseconds < bucket.RequestedMilliseconds - 0.25 ||
-                bucket.MeanMilliseconds > bucket.RequestedMilliseconds + ProfileProtocol.DelayToleranceMilliseconds)
+            if (bucket.MedianMilliseconds < bucket.RequestedMilliseconds - 0.25 ||
+                bucket.MedianMilliseconds > bucket.RequestedMilliseconds + ProfileProtocol.DelayToleranceMilliseconds)
                 throw new InvalidDataException(
-                    $"Simulated {bucket.RequestedMilliseconds} ms delays actually took {bucket.MeanMilliseconds:F3} ms on average, " +
+                    $"Simulated {bucket.RequestedMilliseconds} ms delays actually took {bucket.MedianMilliseconds:F3} ms at the median, " +
                     $"outside the declared +{ProfileProtocol.DelayToleranceMilliseconds} ms tolerance (raise the platform timer resolution).");
         }
+    }
+
+    /// <summary>Whether some <see cref="ProfileDelayBucket.Count"/> observations have exactly this minimum, maximum and
+    /// median and a mean that is the recorded one: the extremes and median pin some samples and bound the rest, which
+    /// bounds their sum. With one or two observations the median is the mean; with three the bounds meet, so the mean
+    /// determines the median.</summary>
+    public static bool MedianIsConsistent(ProfileDelayBucket bucket)
+    {
+        double low = bucket.MinimumMilliseconds, high = bucket.MaximumMilliseconds, median = bucket.MedianMilliseconds;
+        long n = bucket.Count;
+        double sum = bucket.MeanMilliseconds * n;
+        double slack = 1e-9 * n * Math.Max(1, high);
+        if (n == 1) return Math.Abs(low - high) <= slack && Math.Abs(median - low) <= slack;
+        if (n == 2) return Math.Abs(median - (low + high) / 2) <= slack;
+        // n = 2k + 1: k samples at or below the median, one of them the minimum, and k at or above it, one the maximum.
+        // n = 2k: the middle pair averages to the median; the sums are extreme when both equal it.
+        long k = n / 2;
+        long lowCount = n % 2 == 1 ? k : k - 1;
+        double smallest = lowCount * low + k * median + high;
+        double largest = low + k * median + lowCount * high;
+        return sum >= smallest - slack && sum <= largest + slack;
     }
 
     private static void ValidateEngineEvidence(ProfileMeasurement measurement)

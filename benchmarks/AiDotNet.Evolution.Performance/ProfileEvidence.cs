@@ -47,6 +47,15 @@ public static class ProfileEvidence
     public static ProfileEvidenceSummary Compact(ProfileReport report, ProfileEvidenceRaw? raw)
     {
         ArgumentNullException.ThrowIfNull(report);
+        // Delay evidence is revalidated before it is published: a raw report written before medians were measured
+        // deserializes with every median at zero and would otherwise be compacted as if they had been.
+        foreach (var attempt in report.Attempts)
+            if (attempt is { Status: "passed" or "contended", Measurement: { } measured })
+                try { ProfileValidation.ValidateDelays(measured); }
+                catch (InvalidDataException exception)
+                {
+                    throw new InvalidDataException($"Attempt {attempt.CaseId} #{attempt.Repetition} does not validate: {exception.Message}", exception);
+                }
         var attempts = report.Attempts.Select(attempt =>
         {
             var measurement = attempt.Measurement;
@@ -63,7 +72,7 @@ public static class ProfileEvidence
                 measurement?.StateHash, measurement?.BestQuality, measurement?.CheckpointSaves ?? 0, measurement?.CheckpointPayloadBytes ?? 0,
                 Round(measurement?.CheckpointStoreMilliseconds ?? 0, 4),
                 (measurement?.DelayBuckets ?? Array.Empty<ProfileDelayBucket>())
-                    .Select(bucket => bucket with { MeanMilliseconds = Round(bucket.MeanMilliseconds, 4), MinimumMilliseconds = Round(bucket.MinimumMilliseconds, 4), MaximumMilliseconds = Round(bucket.MaximumMilliseconds, 4) }).ToArray(),
+                    .Select(bucket => bucket with { MeanMilliseconds = Round(bucket.MeanMilliseconds, 4), MinimumMilliseconds = Round(bucket.MinimumMilliseconds, 4), MaximumMilliseconds = Round(bucket.MaximumMilliseconds, 4), MedianMilliseconds = Round(bucket.MedianMilliseconds, 4) }).ToArray(),
                 attempt.Contention is { } contention ? Round(contention.ForeignBusyFraction, 6) : null,
                 attempt.Error is null ? null : Truncate(attempt.Error, 2000));
         }).ToArray();

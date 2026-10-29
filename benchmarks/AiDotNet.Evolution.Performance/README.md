@@ -164,9 +164,11 @@ For mixed durations, deterministic genome-dependent 0/1/8 ms asynchronous delays
 Windows rounds `Task.Delay` to the current timer tick, which is 15.6 ms by default: the 0/1/8 ms schedule would
 silently become 0/15.6/15.6 ms. The owned worker therefore raises the platform timer resolution
 (`timeBeginPeriod(1)`), records the resolution actually in force (`timerResolutionMilliseconds`, validated to be
-1 ms or finer), **measures every simulated delay it awaits**, and reports per-bucket count, mean, minimum and
-maximum. A bucket whose mean falls outside its request −0.25 ms to +2.0 ms fails the attempt, so a collapsed timer
-cannot be published as the declared schedule.
+1 ms or finer), **measures every simulated delay it awaits**, and reports per-bucket count, mean, median, minimum
+and maximum. A bucket whose median falls outside its request −0.25 ms to +2.0 ms fails the attempt (the 0 ms bucket
+requests no wait, so it is checked only for consistent observations, not against a tolerance), so a collapsed
+timer cannot be published as the declared schedule. The median, not the mean, is held to the schedule: a collapsed
+timer moves every delay, while one wake a busy host preempted moves only the mean.
 
 `evaluatorSlotUtilization` is summed occupied evaluator time divided by workers times elapsed time, not CPU
 utilization. Every completed evaluation records best-so-far quality and elapsed time. Compare both fields for
