@@ -142,7 +142,10 @@ class BudgetConsistencyTests(unittest.TestCase):
 
     def test_a_budget_the_broker_would_refuse_is_refused_before_anything_is_frozen(self):
         # A projection used to print and accept a budget the broker then refused in every cell.
-        for flag, value in (("--model-calls", runner.program_broker.MAX_MODEL_CALLS + 1), ("--wall-seconds", runner.program_broker.MAX_SECONDS + 1)):
+        # 64 calls passes the broker's call cap but not its evaluation cap, which a cell sets at calls + 2.
+        most = runner.program_broker.MAX_EVALUATIONS - runner.pilot_campaign.EVALUATION_HEADROOM
+        for flag, value in (("--model-calls", most + 1), ("--model-calls", runner.program_broker.MAX_MODEL_CALLS + 1),
+                            ("--wall-seconds", runner.program_broker.MAX_SECONDS + 1)):
             with tempfile.TemporaryDirectory() as directory:
                 root = Path(directory) / "campaign"
                 code, _ = invoke(root, flag, str(value), "--model-tokens", "10000000")

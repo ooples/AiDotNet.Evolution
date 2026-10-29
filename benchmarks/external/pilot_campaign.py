@@ -32,6 +32,9 @@ import pilot_cells  # noqa: E402
 import power_analysis  # noqa: E402
 
 
+# Evaluations a cell may spend beyond its model calls: the seed's own score, and one more than it proposed.
+EVALUATION_HEADROOM = 2
+
 def spec(task, *, seed_count, model, model_calls, model_tokens, wall_seconds,
          bootstrap_samples=1000, bootstrap_seed=11, familywise_alpha=0.05, partition_hash=None):
     """The campaign as declared, in the shape `register` validates.
@@ -79,7 +82,7 @@ def cell_broker(frozen, provider, task, initial, **options):
     """
     budget = frozen["Spec"]["Budget"]
     return pilot_broker.session(provider, task, model_calls=budget["ModelCalls"],
-                                evaluations=budget["ModelCalls"] + 2, seconds=budget["WallSeconds"],
+                                evaluations=budget["ModelCalls"] + EVALUATION_HEADROOM, seconds=budget["WallSeconds"],
                                 initial=initial, model_tokens=budget["ModelTokens"], **options)
 
 

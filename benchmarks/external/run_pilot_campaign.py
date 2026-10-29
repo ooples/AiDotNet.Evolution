@@ -267,8 +267,9 @@ def main():
         raise SystemExit("--target-half-width must be a positive, finite number; it sizes the gate campaign")
     # The broker refuses these per cell, after the confirmation: a 90-call, 7,200 s projection printed and was
     # confirmed, then every one of its 18 cells failed with "Invalid broker budget" (E-4 pilot, 2026-10-29).
-    if not 1 <= arguments.model_calls <= program_broker.MAX_MODEL_CALLS:
-        raise SystemExit("--model-calls %d is outside the broker's 1..%d per cell" % (arguments.model_calls, program_broker.MAX_MODEL_CALLS))
+    most_calls = min(program_broker.MAX_MODEL_CALLS, program_broker.MAX_EVALUATIONS - pilot_campaign.EVALUATION_HEADROOM)
+    if not 1 <= arguments.model_calls <= most_calls:
+        raise SystemExit("--model-calls %d is outside the broker's 1..%d per cell" % (arguments.model_calls, most_calls))
     if not 0 < arguments.wall_seconds <= program_broker.MAX_SECONDS:
         raise SystemExit("--wall-seconds %r is outside the broker's (0, %d] per cell" % (arguments.wall_seconds, program_broker.MAX_SECONDS))
     budget_tokens = arguments.model_calls * TOKENS_PER_CALL
