@@ -1,0 +1,49 @@
+{
+ "Schema": "evolution-campaign-report-v1",
+ "Campaign": "v1-07-pilot-damped_oscillator",
+ "RegistrationSha256": "174465551aa890840b6a5ca3ced8848b3f45a4ab100b065f9a6f53c894b49709",
+ "RawSha256": "0645892c96536080d5d890809084e67b3b5e2f5ab316430154b9721fd726c844",
+ "FamilywiseAlpha": 0.05,
+ "Endpoints": [
+  {
+   "Family": "damped_oscillator",
+   "Config": "recommended",
+   "Metric": "nmse",
+   "Direction": "minimize",
+   "N": 6,
+   "MeanDifference": -0.004961794876170711,
+   "Interval95": [
+    -0.06033889861835785,
+    0.041391451420371095
+   ],
+   "OneSidedP": 0.5874125874125874,
+   "Failures": {
+    "aidotnet": 0,
+    "openevolve-recommended": 0
+   },
+   "HolmAdjustedP": 0.8271728271728271,
+   "Superior": false
+  },
+  {
+   "Family": "damped_oscillator",
+   "Config": "matched",
+   "Metric": "nmse",
+   "Direction": "minimize",
+   "N": 6,
+   "MeanDifference": 0.0064489853007305515,
+   "Interval95": [
+    -0.026121200470458555,
+    0.04740943914046345
+   ],
+   "OneSidedP": 0.41358641358641357,
+   "Failures": {
+    "aidotnet": 0,
+    "openevolve-matched": 0
+   },
+   "HolmAdjustedP": 0.8271728271728271,
+   "Superior": false
+  }
+ ],
+ "OpenEvolveGate": false,
+ "IntervalNote": "Interval95 is descriptive and unadjusted; the decision is Holm on one-sided bootstrap p"
+}
