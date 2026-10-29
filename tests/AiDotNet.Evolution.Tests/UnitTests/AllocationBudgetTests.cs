@@ -8,17 +8,17 @@ namespace AiDotNet.Evolution.Tests;
 public sealed class AllocationBudgetCollection { }
 
 /// <summary>
-/// V1-71: the engine's allocation per evaluation on a null task. The committed figure is 13.1 KB on net10.0 (19.3 KB
+/// V1-71: the engine's allocation per evaluation on a null task. The committed figure is 12.5 KB on net10.0 (19.3 KB
 /// before E-1, 34.8 KB before V1-71); the test fails if a change raises it more than 20%, so a regression is caught where
 /// it is introduced. E-1 removed about 6.2 KB of fixed per-evaluation allocations (presized lineage and cell-key lists,
 /// a carried-call document recorded with no checkpoint store, a result allocated per carried-call miss): the same
-/// workload measured 16,759 bytes per evaluation before and 10,573 after (benchmarks/evidence/allocation/e1), so the
-/// figure is the old one less that saving.
+/// workload measured 16,759 bytes per evaluation before and 10,573 after, then 9,979 once bounded copies stopped
+/// building a list per result (benchmarks/evidence/allocation/e1), so the figure is the old one less those savings.
 /// </summary>
 [Collection(nameof(AllocationBudgetCollection))]
 public sealed class AllocationBudgetTests
 {
-    private const double CommittedBytesPerEvaluation = 13_100;
+    private const double CommittedBytesPerEvaluation = 12_500;
 
     [Fact]
     public async Task A_null_evaluation_stays_within_its_allocation_budget()
