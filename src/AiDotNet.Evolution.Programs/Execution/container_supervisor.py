@@ -312,7 +312,10 @@ class Zygote:
         self.pid = 0
         self.channel = None
         self.identity = None
-        self.start()
+
+    @property
+    def started(self):
+        return self.pid != 0
 
     def start(self):
         ours, theirs = socket.socketpair(socket.AF_UNIX, socket.SOCK_STREAM)
@@ -393,12 +396,23 @@ def run(request, zygote):
     out_read, out_write = os.pipe()
     err_read, err_write = os.pipe()
     request_read, request_write = os.pipe()
-    zygote.check()
-    pid = zygote.spawn([in_read, out_write, err_write, request_read])
-    if pid is None:  # the zygote failed between its check and this fork; one fresh zygote, then give up
-        zygote.stop()
-        zygote.start()
+    # The container's first candidate is forked from this process: its memory then holds no request but this one, so the
+    # candidate inherits nothing it was not sent. A cold container runs only that one and never pays for a zygote.
+    direct = not zygote.started
+    if direct:
+        pid = os.fork()
+        if pid == 0:
+            # This process's ends, or the request pipe never reaches end of file for the child that reads it.
+            for fd in (in_write, out_read, err_read, request_write):
+                os.close(fd)
+            child(in_read, out_write, err_write, request_read)
+    else:
+        zygote.check()
         pid = zygote.spawn([in_read, out_write, err_write, request_read])
+        if pid is None:  # the zygote failed between its check and this fork; one fresh zygote, then give up
+            zygote.stop()
+            zygote.start()
+            pid = zygote.spawn([in_read, out_write, err_write, request_read])
     for fd in (in_read, out_write, err_write, request_read):
         os.close(fd)
     if pid is None:
@@ -439,7 +453,7 @@ def run(request, zygote):
     # The zygote reports the exit; a candidate that killed the zygote is this process's child instead, and is waited
     # on directly.
     channel = zygote.channel
-    orphaned = False
+    orphaned = direct  # a directly forked candidate is this process's child, waited on directly
     probed = time.monotonic()
     while True:
         if not orphaned and time.monotonic() - probed >= 0.02:
@@ -516,6 +530,9 @@ def main():
     os.dup2(null, 2)
     hardened = harden()
     zygote = Zygote()
+    # A candidate runs as this user, so it can prlimit, renice or re-pin this process, and a zygote started later would
+    # inherit the change. Nothing but a candidate changes them, so a difference costs the container.
+    baseline = zygote_identity(os.getpid())[1:]
     write_frame(replies, {
         "ready": True, "pid": os.getpid(), "uid": os.getuid(), "hardened": hardened,
         "seccomp": status_field("Seccomp"), "no_new_privs": status_field("NoNewPrivs"), "cap_eff": status_field("CapEff"),
@@ -526,6 +543,8 @@ def main():
         if request is None:
             return
         code, stdout, stderr, timed_out, memory, cpu, clean = run(request, zygote)
+        identity = zygote_identity(os.getpid())
+        clean = clean and identity is not None and identity[1:] == baseline
         stdout, stdout_cut = bound(stdout, request["max_stdout"])
         stderr, stderr_cut = bound(stderr, request["max_stderr"])
         write_frame(replies, {
@@ -533,6 +552,8 @@ def main():
             "stdout_truncated": stdout_cut, "stderr_truncated": stderr_cut,
             "timed_out": timed_out, "memory_exceeded": memory, "cpu_exceeded": cpu, "clean": clean,
         })
+        if not zygote.started:
+            zygote.start()  # after the reply, so the first candidate's latency does not include it
 
 
 main()

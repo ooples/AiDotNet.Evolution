@@ -365,6 +365,22 @@ public sealed class ContainerExecutionEngineTests
         }
     }
 
+    [DockerTheory]
+    [InlineData("import resource\nresource.prlimit(1, resource.RLIMIT_NOFILE, (64, 64))\n")]
+    [InlineData("import os\nos.sched_setaffinity(1, {0})\n")]
+    public async Task A_candidate_that_changes_the_supervisors_limits_or_affinity_costs_it_the_container(string attack)
+    {
+        using var engine = new ContainerExecutionEngine(Sandbox(), Container(ContainerLifecycle.Warm));
+        const string Host = "import socket\nprint(socket.gethostname())\n";
+        ProgramExecuteResponse before = await Run(engine, Host);
+        Assert.True(before.Success, before.Error + " " + before.StdErr);
+        // Same user as the supervisor, so the kernel allows it; a zygote started afterwards would inherit the change.
+        ProgramExecuteResponse tamper = await Run(engine, attack);
+        Assert.True(tamper.Success, tamper.Error + " " + tamper.StdErr);
+        ProgramExecuteResponse after = await Run(engine, Host);
+        Assert.True(after.Success, after.Error + " " + after.StdErr);
+        Assert.NotEqual(before.StdOut.Trim(), after.StdOut.Trim());
+    }
     [DockerFact]
     public async Task A_hung_candidate_times_out_and_the_container_keeps_serving()
     {
