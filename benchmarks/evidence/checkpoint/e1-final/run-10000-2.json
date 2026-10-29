@@ -1,0 +1,1 @@
+{"Format":"Auto","Elites":10000,"Checkpoints":16,"WriteP50Ms":57.6231,"WriteP95Ms":117.112,"FinalWriteMs":34.3344,"FinalCheckpointBytes":12529,"FinalSegmentBytes":43679649,"FinalSegments":15,"BytesPerElite":4369.2178,"ResumeMs":546.8156,"ResumeAllocatedBytes":255401816,"ResumeCollections":[1,1,1],"ResumedStateMatches":true}

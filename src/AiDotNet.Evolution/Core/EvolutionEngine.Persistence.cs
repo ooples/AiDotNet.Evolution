@@ -1,3 +1,6 @@
+using System.Runtime;
+using System.Runtime.CompilerServices;
+using System.Runtime.ExceptionServices;
 using System.Globalization;
 using System.Text;
 using System.Text.Json;
@@ -17,6 +20,11 @@ public sealed partial class EvolutionEngine<TGenome>
     // offset (10 to 13), so every reader that predates segments refuses it instead of resuming with an empty set.
     private const int SegmentedSchemaOffset = 4;
     private const int EngineSegmentedSchemaVersion = EngineStateSchemaVersion + SegmentedSchemaOffset;
+    // A segmented payload whose island archives are in the segments too (E-1) uses this offset instead (14 to 17). A
+    // reader that knows only the first offset reads 14 to 17 as feature versions 10 to 13 and refuses them, rather than
+    // resuming with empty archives because the payload lists no entries.
+    private const int ArchiveSegmentedSchemaOffset = 8;
+    private const int EngineArchiveSegmentedSchemaVersion = EngineStateSchemaVersion + ArchiveSegmentedSchemaOffset;
     private string? _safePayload;
     private long _safeSequence;
     // The last safe boundary's document, minus the seen set and the cache. Those two grow with every evaluation, so
@@ -24,6 +32,37 @@ public sealed partial class EvolutionEngine<TGenome>
     // here (V1-73). They are recovered when a save needs them, by undoing the changes logged since the boundary.
     private EngineStateDocument? _safeDocument;
     private readonly List<SafeChange> _safeChanges = new();
+
+    // Each archived evaluation's document, built once: a boundary used to serialize every genome in every archive, which
+    // at 10,000 elites of 4 KB programs was 46 MB of codec output per boundary (E-1). Keyed by the evaluation, which an
+    // entry keeps when an archive re-keys or restores it; a document is reused only while its cell still matches.
+    private readonly ConditionalWeakTable<EvolutionEvaluation, ArchiveEntryDocument> _entryDocuments = new();
+    // The last captured boundary's archives: each island's cell keys in ordinal order, beside the entry documents.
+    private ArchiveState? _safeArchive;
+
+    private ArchiveEntryDocument EntryDocument(EvolutionArchiveEntry<TGenome> entry)
+    {
+        if (_entryDocuments.TryGetValue(entry.Evaluation, out ArchiveEntryDocument? cached) &&
+            cached.EvaluationId == entry.Evaluation.EvaluationId && SameBins(cached.CellBins, entry.Cell.Bins))
+            return cached;
+        ArchiveEntryDocument document = ArchiveEntryDocument.From(entry, SerializeGenome);
+        RememberEntryDocument(entry.Evaluation, document);
+        return document;
+    }
+
+    private void RememberEntryDocument(EvolutionEvaluation evaluation, ArchiveEntryDocument document)
+    {
+        _entryDocuments.Remove(evaluation);
+        _entryDocuments.Add(evaluation, document);
+    }
+
+    private static bool SameBins(int[]? stored, IReadOnlyList<int> bins)
+    {
+        if (stored is null || stored.Length != bins.Count) return false;
+        for (int i = 0; i < stored.Length; i++)
+            if (stored[i] != bins[i]) return false;
+        return true;
+    }
 
     private void CaptureSafeState(TGenome[] seeds, int seedIndex)
     {
@@ -49,10 +88,10 @@ public sealed partial class EvolutionEngine<TGenome>
             GlobalElites = _globalElites.Entries.Select(record => new EliteRecordDocument
             {
                 Island = record.Island,
-                Entry = ArchiveEntryDocument.From(record.Entry, SerializeGenome)
+                Entry = EntryDocument(record.Entry)
             }).ToList(),
             IslandHistories = _histories.Select(history => history.Entries
-                .Select(entry => ArchiveEntryDocument.From(entry, SerializeGenome)).ToList()).ToList(),
+                .Select(EntryDocument).ToList()).ToList(),
             SelectionState = (_selection as IOutcomeAwareEvolutionSelectionPolicy<TGenome>)?.CaptureState(),
             VariationState = (_variation as ICheckpointableVariationOperator<TGenome>)?.CaptureState(),
             StatusCounts = _statusCounts.OrderBy(pair => pair.Key).Select(pair => new StatusCountDocument
@@ -77,8 +116,24 @@ public sealed partial class EvolutionEngine<TGenome>
                     GenomeId = genomeId,
                     Artifacts = _pendingArtifacts[genomeId].Select(ArtifactDocument.From).ToList()
                 }).ToList(),
-            Islands = _islands.Select(archive => ArchiveDocument.From(archive, SerializeGenome)).ToList()
+            Islands = new List<ArchiveDocument>(_islands.Length)
         };
+        var keys = new string[_islands.Length][];
+        var islandEntries = new List<ArchiveEntryDocument>[_islands.Length];
+        for (int island = 0; island < _islands.Length; island++)
+        {
+            EvolutionArchiveEntry<TGenome>[] ordered = _islands[island].Entries
+                .OrderBy(item => item.Cell.StableKey, StringComparer.Ordinal).ToArray();
+            keys[island] = new string[ordered.Length];
+            islandEntries[island] = new List<ArchiveEntryDocument>(ordered.Length);
+            for (int index = 0; index < ordered.Length; index++)
+            {
+                keys[island][index] = ordered[index].Cell.StableKey;
+                islandEntries[island].Add(EntryDocument(ordered[index]));
+            }
+            document.Islands.Add(ArchiveDocument.From(_islands[island], islandEntries[island], EntryDocument));
+        }
+        _safeArchive = new ArchiveState(keys, islandEntries);
         // Changes between the previous boundary and this one are what the next segment must add.
         if (_segmentManifest.Count > 0) _unsavedChanges.AddRange(_safeChanges);
         _safeDocument = document;
@@ -214,6 +269,7 @@ public sealed partial class EvolutionEngine<TGenome>
         }
         _safePayload = payload;
         _safeDocument = null;
+        _safeArchive = null;
         _safeChanges.Clear();
         return payload;
     }
@@ -249,6 +305,7 @@ public sealed partial class EvolutionEngine<TGenome>
             // Switching to inline (an Inline run resuming a segmented checkpoint) drops the segment bookkeeping.
             if (_segmentManifest.Count > 0) ResetSegments();
             if (SafePayload() is not { } payload) return;
+            _lastInlinePayloadLength = payload.Length;
             checkpoint = new EvolutionCheckpoint(_options.RunId, _safeSequence, _compatibilityHash, payload,
                 EvolutionCheckpoint.CurrentSchemaVersion, BestQualityAcrossIslands(), _islands[0].Direction);
         }
@@ -259,7 +316,92 @@ public sealed partial class EvolutionEngine<TGenome>
             message: $"checkpoint {_safeSequence}"), cancellationToken).ConfigureAwait(false);
     }
 
+    // A resume allocates about this many bytes per byte of segment it reads (6.4 measured at 10,000 elites, E-1).
+    private const long ResumeAllocationPerSegmentByte = 8;
+    // Below this a resume's collections are cheap, and committing a region would cost more than it saves.
+    private const long MinimumSuspendedResumeBytes = 16L * 1024 * 1024;
+    // A region is committed up front, so it never takes more than this share of the memory the process may use: a
+    // checkpoint of several gigabytes would otherwise commit eight times its size before reading a byte.
+    private const long ResumeRegionMemoryShare = 4;
+#if !NETCOREAPP3_0_OR_GREATER
+    // .NET Framework reports no memory limit to size against, so a region there stays small.
+    private const long MaximumSuspendedResumeBytesWithoutMemoryInfo = 256L * 1024 * 1024;
+#endif
+    // Set while this engine holds the no-GC region it opened for a resume.
+    private bool _collectionSuspended;
+
     private async Task<RestoredSeeds> RestoreCheckpointAsync(TGenome[] suppliedSeeds, CancellationToken cancellationToken)
+    {
+        try
+        {
+            return await RestoreCheckpointCoreAsync(suppliedSeeds, cancellationToken).ConfigureAwait(false);
+        }
+        finally
+        {
+            EndResumeCollectionSuspension();
+        }
+    }
+
+    // See EvolutionEngineOptions.SuspendGarbageCollectionDuringResume.
+    private void SuspendCollectionForResume(EvolutionCheckpoint checkpoint)
+    {
+        if (!_options.SuspendGarbageCollectionDuringResume || checkpoint.SegmentIds.Count == 0 ||
+            _checkpointStore is not DirectoryEvolutionCheckpointStore store || GCSettings.LatencyMode == GCLatencyMode.NoGCRegion)
+            return;
+        long segmentBytes = store.SegmentBytes(_options.RunId, checkpoint.SegmentIds);
+        if (segmentBytes <= 0) return;
+        // Halved when the runtime refuses the size; a smaller region still removes most of the collections.
+        for (long budget = ResumeRegionBudget(segmentBytes, AvailableMemoryBytes()); budget >= MinimumSuspendedResumeBytes; budget /= 2)
+        {
+            try
+            {
+                _collectionSuspended = GC.TryStartNoGCRegion(budget);
+                return;
+            }
+            catch (ArgumentOutOfRangeException)
+            {
+                // More than this runtime allows in one region.
+            }
+            catch (InvalidOperationException)
+            {
+                return; // Another region opened in the meantime.
+            }
+        }
+    }
+
+    // What a resume reading this many segment bytes asks to allocate without a collection.
+    internal static long ResumeRegionBudget(long segmentBytes, long availableBytes)
+    {
+        long wanted = segmentBytes > long.MaxValue / ResumeAllocationPerSegmentByte
+            ? long.MaxValue
+            : segmentBytes * ResumeAllocationPerSegmentByte;
+        return Math.Min(wanted, Math.Max(0, availableBytes) / ResumeRegionMemoryShare);
+    }
+
+    private static long AvailableMemoryBytes() =>
+#if NETCOREAPP3_0_OR_GREATER
+        GC.GetGCMemoryInfo().TotalAvailableMemoryBytes;
+#else
+        MaximumSuspendedResumeBytesWithoutMemoryInfo * ResumeRegionMemoryShare;
+#endif
+
+    private void EndResumeCollectionSuspension()
+    {
+        if (!_collectionSuspended) return;
+        _collectionSuspended = false;
+        // An outgrown region has already ended with a collection.
+        if (GCSettings.LatencyMode != GCLatencyMode.NoGCRegion) return;
+        try
+        {
+            GC.EndNoGCRegion();
+        }
+        catch (InvalidOperationException)
+        {
+            // Ended by a collection between the check and the call.
+        }
+    }
+
+    private async Task<RestoredSeeds> RestoreCheckpointCoreAsync(TGenome[] suppliedSeeds, CancellationToken cancellationToken)
     {
         if (_checkpointStore is null || _codec is null) throw new InvalidOperationException("Resume is not configured.");
         EvolutionCheckpoint? checkpoint = await _checkpointStore.LoadLatestAsync(_options.RunId, cancellationToken).ConfigureAwait(false);
@@ -268,6 +410,7 @@ public sealed partial class EvolutionEngine<TGenome>
         if (!string.Equals(checkpoint.CompatibilityHash, _compatibilityHash, StringComparison.Ordinal))
             throw new InvalidDataException(DescribeIncompatibility(checkpoint));
 
+        SuspendCollectionForResume(checkpoint);
         EngineStateDocument state = ReadStateDocument(checkpoint);
         await LoadSegmentsAsync(checkpoint, state, cancellationToken).ConfigureAwait(false);
         ValidateConfiguredCheckpointBounds(state);
@@ -406,12 +549,18 @@ public sealed partial class EvolutionEngine<TGenome>
             if (archiveDocument.Version < 0) throw new InvalidDataException("Checkpoint archive version is invalid.");
             IReadOnlyList<EvolutionDescriptorDefinition> restoredDescriptors =
                 ReadArchiveDescriptors(restorable, archiveDocument);
-            var entries = new List<EvolutionArchiveEntry<TGenome>>();
+            ArchiveEntryDocument[] entryDocuments = (archiveDocument.Entries ?? new List<ArchiveEntryDocument>())
+                .Concat(archiveDocument.InfeasibleEntries ?? new List<ArchiveEntryDocument>()).ToArray();
+            EvolutionArchiveEntry<TGenome>[] restoredEntries = RestoreArchiveEntries(entryDocuments);
+            var entries = new List<EvolutionArchiveEntry<TGenome>>(entryDocuments.Length);
             var islandGenomeIds = new HashSet<string>(StringComparer.Ordinal);
-            foreach (ArchiveEntryDocument entryDocument in (archiveDocument.Entries ?? new List<ArchiveEntryDocument>())
-                .Concat(archiveDocument.InfeasibleEntries ?? new List<ArchiveEntryDocument>()))
+            for (int index = 0; index < entryDocuments.Length; index++)
             {
-                EvolutionArchiveEntry<TGenome> entry = RestoreArchiveEntry(entryDocument);
+                ArchiveEntryDocument entryDocument = entryDocuments[index];
+                EvolutionArchiveEntry<TGenome> entry = restoredEntries[index];
+                // The document just read is this entry's serialization, so the next boundary reuses it rather than
+                // serializing every restored genome again, and a segmented save after a resume writes no unchanged entry.
+                RememberEntryDocument(entry.Evaluation, entryDocument);
                 // Naming which invariant broke, and on which entry, is what turns a failed resume from a dead end into
                 // something diagnosable: the three causes need completely different fixes.
                 if (entry.Evaluation.EvaluationId >= state.NextEvaluationId)
@@ -693,7 +842,51 @@ public sealed partial class EvolutionEngine<TGenome>
         checkpoint.Validate();
 
         EngineStateDocument state = ReadStateDocument(checkpoint);
+        // Reading on with the archives absent would report a run that found nothing.
+        if ((state.Islands ?? new List<ArchiveDocument>()).Any(island => island.EntriesInSegments))
+            throw new InvalidDataException(
+                "This checkpoint keeps its island archives in segments of the store that wrote it. Read it with " +
+                "ReadCheckpointAsync and that store, or write portable checkpoints with EvolutionCheckpointFormat.Inline.");
+        return ReadContents(checkpoint, state, genomeCodec);
+    }
 
+    /// <summary>Reads the candidates a checkpoint holds, including any it keeps in store segments.</summary>
+    /// <param name="checkpoint">The checkpoint to read.</param>
+    /// <param name="genomeCodec">The codec that wrote the checkpoint's genomes.</param>
+    /// <param name="segmentStore">
+    /// The store that wrote the checkpoint. A segmented checkpoint keeps its deduplication set, evaluation cache and
+    /// island archives in this store's segments, and each segment is checked against the SHA-256 the checkpoint records.
+    /// </param>
+    /// <param name="cancellationToken">Cancels reading the segments.</param>
+    /// <returns>Every recovered candidate, as <see cref="ReadCheckpoint"/> returns them for an inline checkpoint.</returns>
+    /// <exception cref="ArgumentNullException">An argument is <c>null</c>.</exception>
+    /// <exception cref="InvalidDataException">
+    /// The checkpoint payload or one of its segments is not a readable engine state, or a segment is missing or altered.
+    /// </exception>
+    public static async Task<EvolutionCheckpointContents<TGenome>> ReadCheckpointAsync(EvolutionCheckpoint checkpoint,
+        IEvolutionGenomeCodec<TGenome> genomeCodec, IEvolutionCheckpointSegmentStore segmentStore,
+        CancellationToken cancellationToken = default)
+    {
+        Guard.NotNull(checkpoint);
+        Guard.NotNull(genomeCodec);
+        Guard.NotNull(segmentStore);
+        checkpoint.Validate();
+        EngineStateDocument state = ReadStateDocument(checkpoint);
+        if (state.Segments is not null)
+        {
+            await ReadSegmentStateAsync(segmentStore, checkpoint.RunId, checkpoint, state, cancellationToken).ConfigureAwait(false);
+            ValidatePackageCheckpointBounds(state);
+        }
+        else if (checkpoint.SegmentIds.Count > 0 || state.NextSegmentId is not null)
+        {
+            throw new InvalidDataException("The checkpoint names segments its engine state does not list.");
+        }
+        return ReadContents(checkpoint, state, genomeCodec);
+    }
+
+    private static EvolutionCheckpointContents<TGenome> ReadContents(EvolutionCheckpoint checkpoint, EngineStateDocument state,
+        IEvolutionGenomeCodec<TGenome> genomeCodec)
+    {
         var entries = new List<EvolutionCheckpointEntry<TGenome>>();
         List<ArchiveDocument> islands = state.Islands ??
             throw new InvalidDataException("Checkpoint islands are missing.");
@@ -771,7 +964,9 @@ public sealed partial class EvolutionEngine<TGenome>
         int featureVersion = state is null ? 0 : FeatureVersionOf(state);
         if (state is null || (featureVersion != EngineStateSchemaVersion && featureVersion != EngineMeasurementOriginSchemaVersion &&
             featureVersion != EngineParetoSchemaVersion && featureVersion != EngineParetoConstraintSchemaVersion) ||
-            (state.SchemaVersion >= EngineSegmentedSchemaVersion) != (state.Segments is not null))
+            (state.SchemaVersion >= EngineSegmentedSchemaVersion) != (state.Segments is not null) ||
+            (state.SchemaVersion >= EngineArchiveSegmentedSchemaVersion) !=
+                (state.Islands?.Any(island => island is not null && island.EntriesInSegments) ?? false))
             throw new InvalidDataException(
                 "The evolution engine state schema is invalid; the checkpoint was written by a different engine version.");
 
@@ -883,8 +1078,12 @@ public sealed partial class EvolutionEngine<TGenome>
                 throw new InvalidDataException("A checkpoint island contains too many descriptor dimensions.");
             if (archive.Descriptors.Any(descriptor => descriptor is null))
                 throw new InvalidDataException("A checkpoint descriptor definition is missing.");
-            List<ArchiveEntryDocument> archiveEntries = archive.Entries ??
-                throw new InvalidDataException("Checkpoint archive entries are missing.");
+            if (archive.EntriesInSegments && (archive.Entries is not null || archive.InfeasibleEntries is not null || archive.Pareto is not null))
+                throw new InvalidDataException("A checkpoint island lists entries that it also keeps in segments.");
+            // Entries kept in segments are absent until the segments are read; this check runs again on the rebuilt state.
+            List<ArchiveEntryDocument> archiveEntries = archive.Entries ?? (archive.EntriesInSegments
+                ? new List<ArchiveEntryDocument>()
+                : throw new InvalidDataException("Checkpoint archive entries are missing."));
             if (archiveEntries.Any(entry => entry is null))
                 throw new InvalidDataException("A checkpoint archive entry is missing.");
             foreach (ArchiveEntryDocument entry in archiveEntries)
@@ -1137,6 +1336,39 @@ public sealed partial class EvolutionEngine<TGenome>
         return new EvolutionArchiveEntry<TGenome>(new EvolutionCellKey(document.CellBins), candidate, evaluation);
     }
 
+    // Below this many entries the rebuild stays on the calling thread; scheduling would cost more than it saves.
+    private const int ParallelRestoreThreshold = 256;
+
+    // Rebuilds an island's entries concurrently. One at a time, a 10,000-elite resume spent about 400 ms here, most of it
+    // decoding genomes and copying evaluations, while every other core sat idle (E-1). Codecs are thread-safe by
+    // contract. A failure is reported for the first failing entry in document order, as the sequential loop did.
+    private EvolutionArchiveEntry<TGenome>[] RestoreArchiveEntries(ArchiveEntryDocument[] documents)
+    {
+        var restored = new EvolutionArchiveEntry<TGenome>[documents.Length];
+        if (documents.Length < ParallelRestoreThreshold)
+        {
+            for (int index = 0; index < documents.Length; index++) restored[index] = RestoreArchiveEntry(documents[index]);
+            return restored;
+        }
+        var failures = new Exception?[documents.Length];
+        // Capped like the segment decode: the rebuild allocates per entry, so past a few threads every gen0 collection
+        // stalls all of them and an uncapped loop on a wide host burned more CPU than it saved.
+        Parallel.For(0, documents.Length, new ParallelOptions { MaxDegreeOfParallelism = DecodeWindow }, index =>
+        {
+            try { restored[index] = RestoreArchiveEntry(documents[index]); }
+            // Recorded, not thrown, so the report names the first failing entry; running out of memory reports itself.
+            catch (Exception exception) when (exception is not OutOfMemoryException) { failures[index] = exception; }
+        });
+        foreach (Exception? failure in failures)
+            if (failure is not null) ExceptionDispatchInfo.Capture(failure).Throw();
+        return restored;
+    }
+
+    // Fully optimized from the first call, like the checkpoint preflight: a resume runs this once per restored elite, all
+    // within about a second, before tiered compilation would promote it (E-1).
+#if NETCOREAPP3_0_OR_GREATER
+    [MethodImpl(MethodImplOptions.AggressiveOptimization)]
+#endif
     private EvolutionArchiveEntry<TGenome> RestoreArchiveEntry(ArchiveEntryDocument document)
     {
         if (document.GenomePayload is null || string.IsNullOrWhiteSpace(document.GenomeId) || document.Lineage is null ||
@@ -1170,7 +1402,7 @@ public sealed partial class EvolutionEngine<TGenome>
     {
         // Streamed: the text covers every seen identity and cached result, so it grows with the run.
         using var stream = new EvolutionHashStream();
-        var builder = new StringBuilder();
+        var builder = new StringBuilder(EvolutionHashStream.BuilderCapacity);
         Append(builder, _compatibilityHash);
         Append(builder, _nextEvaluationId);
         Append(builder, _proposals);
@@ -1233,6 +1465,7 @@ public sealed partial class EvolutionEngine<TGenome>
             {
                 Append(builder, entry.Cell.StableKey);
                 AppendEvaluation(builder, entry.Evaluation);
+                stream.Flush(builder);
             }
             if ((_islands[island] as IEvolutionParetoArchiveView<TGenome>)?.InfeasibleEntries is { } exploration)
             {
@@ -1242,6 +1475,7 @@ public sealed partial class EvolutionEngine<TGenome>
                 {
                     Append(builder, entry.Cell.StableKey);
                     AppendEvaluation(builder, entry.Evaluation);
+                    stream.Flush(builder);
                 }
             }
         }
@@ -1256,6 +1490,7 @@ public sealed partial class EvolutionEngine<TGenome>
             Append(builder, record.Island);
             Append(builder, record.Entry.Cell.StableKey);
             AppendEvaluation(builder, record.Entry.Evaluation);
+            stream.Flush(builder);
         }
         Append(builder, "island-histories");
         for (int island = 0; island < _histories.Length; island++)
@@ -1268,6 +1503,7 @@ public sealed partial class EvolutionEngine<TGenome>
             {
                 Append(builder, entry.Cell.StableKey);
                 AppendEvaluation(builder, entry.Evaluation);
+                stream.Flush(builder);
             }
         }
         // Abandonment depends on wall-clock timing, so its counter is reported but deliberately never hashed.

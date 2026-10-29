@@ -1,0 +1,57 @@
+{
+  "definition": "serve(maxLeases: 1) wall time minus the evaluator's own time",
+  "evaluations": 950,
+  "evaluator": {
+    "count": 950,
+    "max_ms": 0.001813,
+    "mean_ms": 0.00042742421052631636,
+    "min_ms": 0.00016,
+    "p50_ms": 0.000361,
+    "p95_ms": 0.000851,
+    "p99_ms": 0.001091
+  },
+  "gate_p95_ms": null,
+  "ipc_round_trip": {
+    "count": 950,
+    "max_ms": 3.057515,
+    "mean_ms": 0.053976454736842025,
+    "min_ms": 0.034132,
+    "p50_ms": 0.047351,
+    "p95_ms": 0.067883,
+    "p99_ms": 0.115304
+  },
+  "machine": "x64",
+  "node": "22.23.3",
+  "overhead": {
+    "count": 950,
+    "max_ms": 17.843654,
+    "mean_ms": 0.85576283368421,
+    "min_ms": 0.628711,
+    "p50_ms": 0.741803,
+    "p95_ms": 1.03179,
+    "p99_ms": 2.134729
+  },
+  "overhead_first_tenth": {
+    "count": 95,
+    "max_ms": 1.22313,
+    "mean_ms": 0.7947358105263154,
+    "min_ms": 0.678717,
+    "p50_ms": 0.778898,
+    "p95_ms": 0.913061,
+    "p99_ms": 1.22313
+  },
+  "overhead_last_tenth": {
+    "count": 95,
+    "max_ms": 12.731418,
+    "mean_ms": 0.9265747473684209,
+    "min_ms": 0.640118,
+    "p50_ms": 0.717816,
+    "p95_ms": 1.117792,
+    "p99_ms": 12.731418
+  },
+  "platform": "linux-6.17.0-1022-azure",
+  "schema": "aidotnet-worker-overhead-v1",
+  "settled": 1000,
+  "warmup": 50,
+  "worker": "typescript"
+}

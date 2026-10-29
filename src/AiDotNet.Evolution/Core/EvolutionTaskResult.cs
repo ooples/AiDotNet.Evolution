@@ -202,12 +202,12 @@ public sealed class EvolutionTaskResult
     private static Dictionary<string, double> CopyNamedValues(IReadOnlyDictionary<string, double>? values,
         string parameterName, string label)
     {
-        var copy = new Dictionary<string, double>(StringComparer.Ordinal);
-        if (values is null) return copy;
+        if (values is null) return new Dictionary<string, double>(StringComparer.Ordinal);
         KeyValuePair<string, double>[] snapshot = EvolutionCollection.ToBoundedArray(
             values,
             MaximumNamedValues,
             parameterName);
+        var copy = new Dictionary<string, double>(snapshot.Length, StringComparer.Ordinal);
         foreach (KeyValuePair<string, double> value in snapshot)
         {
             Guard.NotNullOrWhiteSpace(value.Key);
@@ -223,8 +223,9 @@ public sealed class EvolutionTaskResult
     private static double[] CopyFinite(IEnumerable<double>? values, string parameterName, bool nonnegative)
     {
         double[] result = ToBoundedArray(values, MaximumVectorValues, parameterName);
-        if (result.Any(value => !EvolutionDescriptorDefinition.IsFinite(value) || (nonnegative && value < 0)))
-            throw new ArgumentOutOfRangeException(parameterName);
+        foreach (double value in result)
+            if (!EvolutionDescriptorDefinition.IsFinite(value) || (nonnegative && value < 0))
+                throw new ArgumentOutOfRangeException(parameterName);
         return result;
     }
 
@@ -236,13 +237,18 @@ public sealed class EvolutionTaskResult
         if (values is IReadOnlyCollection<T> readOnlyCollection && readOnlyCollection.Count > maximum)
             throw new ArgumentException($"At most {maximum} values may be attached to one result.", parameterName);
 
-        var result = new List<T>(Math.Min(maximum, values is ICollection<T> known ? known.Count : 4));
+        // Sized from the reported count but filled by enumeration, as EvolutionCollection.ToBoundedArray does.
+        int known = values is ICollection<T> sized ? sized.Count : values is IReadOnlyCollection<T> readOnly ? readOnly.Count : 4;
+        var result = new T[Math.Max(0, Math.Min(maximum, known))];
+        int count = 0;
         foreach (T value in values)
         {
-            if (result.Count == maximum)
+            if (count == maximum)
                 throw new ArgumentException($"At most {maximum} values may be attached to one result.", parameterName);
-            result.Add(value);
+            if (count == result.Length) Array.Resize(ref result, Math.Min(maximum, Math.Max(4, result.Length * 2)));
+            result[count++] = value;
         }
-        return result.ToArray();
+        if (count != result.Length) Array.Resize(ref result, count);
+        return result;
     }
 }

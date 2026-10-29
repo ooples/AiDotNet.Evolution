@@ -272,13 +272,15 @@ public sealed class EvolutionEngineOptions
     /// </remarks>
     public int DeduplicationCapacity { get; set; }
 
-    /// <summary>Gets or sets how checkpoints store the deduplication set and evaluation cache.</summary>
+    /// <summary>Gets or sets how checkpoints store the deduplication set, evaluation cache and island archives.</summary>
     /// <remarks>
     /// <see cref="EvolutionCheckpointFormat.Auto"/>, the default, keeps self-contained checkpoints until the run holds
     /// <see cref="CheckpointSegmentThreshold"/> deduplication and cache entries together (with the evaluation cache on,
-    /// each distinct evaluated genome is one of each) and then switches to store segments, so a save costs
-    /// what changed instead of everything the run has seen. The format changes how state is stored, not what the search
-    /// does, so it is not part of the compatibility hash and a run can resume under a different one.
+    /// each distinct evaluated genome is one of each), or until an inline checkpoint payload reaches about a megabyte, and
+    /// then switches to store segments: an append-only journal in which each save writes only what changed, with a
+    /// compacted base segment every <see cref="CheckpointCompactionInterval"/> segments. The format changes how state is
+    /// stored, not what the search does, so it is not part of the compatibility hash and a run can resume under a
+    /// different one.
     /// </remarks>
     public EvolutionCheckpointFormat CheckpointFormat { get; set; } = EvolutionCheckpointFormat.Auto;
 
@@ -287,6 +289,33 @@ public sealed class EvolutionEngineOptions
     /// inline before it switches to segments. The default is 50,000.
     /// </summary>
     public int CheckpointSegmentThreshold { get; set; } = 50_000;
+
+    /// <summary>
+    /// Gets or sets how many segments a segmented checkpoint chains before the next save writes a compacted base segment
+    /// that restates the whole state. The default is 32.
+    /// </summary>
+    /// <remarks>
+    /// Every save between bases writes only what changed, and a resume replays the base and every delta after it, so a
+    /// smaller interval makes resume read less and makes more saves pay for a full base; a larger one does the opposite.
+    /// The value must be between 1 (every save is a base) and one less than
+    /// <see cref="EvolutionCheckpoint.MaximumSegmentCount"/>. Like the format, it changes how state is stored and not
+    /// what the search does, so it is not part of the compatibility hash.
+    /// </remarks>
+    public int CheckpointCompactionInterval { get; set; } = 32;
+
+    /// <summary>Gets or sets whether a resume suspends garbage collection while it rebuilds the checkpointed state.</summary>
+    /// <remarks>
+    /// Nearly everything a resume allocates is the restored state itself, so a collection during it only copies live
+    /// objects; at 10,000 elites collections were about a sixth of the resume (E-1). When enabled, the engine opens a
+    /// no-GC region sized from the checkpoint's segment files and closes it as soon as the restore ends. The region is
+    /// process-wide: allocations on other threads count against it, and outgrowing it ends it with an ordinary
+    /// collection, so it never changes results. It is skipped for small checkpoints, for stores that cannot report
+    /// segment sizes, when another region is already open, and when the runtime refuses the size. Turn it off in a host
+    /// that must keep collecting while a resume runs, for example one serving latency-sensitive requests on other threads.
+    /// Like the checkpoint format, it changes how state is restored and not what the search does, so it is not part of
+    /// the compatibility hash.
+    /// </remarks>
+    public bool SuspendGarbageCollectionDuringResume { get; set; } = true;
 
     /// <summary>Gets or sets whether final failed/timed-out identities remain permanently deduplicated.</summary>
     public bool DeduplicateFailedCandidates { get; set; }
@@ -589,6 +618,8 @@ public sealed class EvolutionEngineOptions
         if (!Enum.IsDefined(typeof(EvolutionCheckpointFormat), CheckpointFormat))
             throw new ArgumentOutOfRangeException(nameof(CheckpointFormat));
         if (CheckpointSegmentThreshold < 1) throw new ArgumentOutOfRangeException(nameof(CheckpointSegmentThreshold));
+        if (CheckpointCompactionInterval < 1 || CheckpointCompactionInterval >= EvolutionCheckpoint.MaximumSegmentCount)
+            throw new ArgumentOutOfRangeException(nameof(CheckpointCompactionInterval));
         Guard.Positive(MaxRetainedFailures);
         if (MaxRetainedFailures > EvolutionCollectionLimits.MaximumResultEntries)
             throw new ArgumentOutOfRangeException(nameof(MaxRetainedFailures));
@@ -720,6 +751,8 @@ public sealed class EvolutionEngineOptions
             DeduplicationCapacity = DeduplicationCapacity,
             CheckpointFormat = CheckpointFormat,
             CheckpointSegmentThreshold = CheckpointSegmentThreshold,
+            CheckpointCompactionInterval = CheckpointCompactionInterval,
+            SuspendGarbageCollectionDuringResume = SuspendGarbageCollectionDuringResume,
             DeduplicateFailedCandidates = DeduplicateFailedCandidates,
             IslandCount = IslandCount,
             MigrationInterval = MigrationInterval,
@@ -822,7 +855,13 @@ public sealed class EvolutionEngineOptions
             : new[] { Field("checkpoint-format", CheckpointFormat.ToString()) })
         .Concat(CheckpointSegmentThreshold == 50_000
             ? Array.Empty<KeyValuePair<string, string>>()
-            : new[] { Field("checkpoint-segment-threshold", CheckpointSegmentThreshold.ToString(CultureInfo.InvariantCulture)) }).ToArray();
+            : new[] { Field("checkpoint-segment-threshold", CheckpointSegmentThreshold.ToString(CultureInfo.InvariantCulture)) })
+        .Concat(CheckpointCompactionInterval == 32
+            ? Array.Empty<KeyValuePair<string, string>>()
+            : new[] { Field("checkpoint-compaction-interval", CheckpointCompactionInterval.ToString(CultureInfo.InvariantCulture)) })
+        .Concat(SuspendGarbageCollectionDuringResume
+            ? Array.Empty<KeyValuePair<string, string>>()
+            : new[] { Field("resume-collection", "collecting") }).ToArray();
 
     /// <summary>Encodes the semantic options into the string the configuration hash is computed from.</summary>
     internal string ToSemanticCanonicalString() => Encode(SemanticFields());

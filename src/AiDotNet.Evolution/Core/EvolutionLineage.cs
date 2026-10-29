@@ -109,7 +109,26 @@ public sealed class EvolutionLineage
     private static string[] CopyIds(IEnumerable<string>? values, string parameterName)
     {
         if (values is null) return Array.Empty<string>();
-        var result = new List<string>(EvolutionCollectionLimits.MaximumLineageIdentities);
+        // Every proposal builds a lineage, so the common indexed inputs (the engine passes arrays) are copied into an
+        // exactly sized array. Presizing a list to the 256-identity bound cost two 2 KB buffers per proposal (E-1).
+        if (values is IReadOnlyList<string> list)
+        {
+            if (list.Count > EvolutionCollectionLimits.MaximumLineageIdentities)
+                throw new ArgumentException(
+                    $"A lineage may contain at most {EvolutionCollectionLimits.MaximumLineageIdentities} identities.",
+                    parameterName);
+            if (list.Count == 0) return Array.Empty<string>();
+            var copy = new string[list.Count];
+            for (int i = 0; i < copy.Length; i++)
+            {
+                string value = list[i];
+                if (string.IsNullOrWhiteSpace(value))
+                    throw new ArgumentException("Identity collections cannot contain empty values.", parameterName);
+                copy[i] = value.Trim();
+            }
+            return copy;
+        }
+        var result = new List<string>();
         foreach (string value in values)
         {
             if (result.Count == EvolutionCollectionLimits.MaximumLineageIdentities)

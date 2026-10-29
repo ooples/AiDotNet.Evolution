@@ -25,6 +25,11 @@ namespace AiDotNet.Evolution;
 /// checkpoint fault. Payloads should be culture-independent and free of machine-specific paths so checkpoints
 /// remain portable between hosts.
 /// </para>
+/// <para>
+/// Thread safety: a resume calls <see cref="Deserialize"/> concurrently from several threads, one call per archived
+/// elite, so it must be safe to call in parallel. A codec that only reads its own configuration is; one that caches or
+/// reuses buffers must guard them or keep them per thread.
+/// </para>
 /// </remarks>
 public interface IEvolutionGenomeCodec<TGenome>
 {

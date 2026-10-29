@@ -1,0 +1,57 @@
+{
+  "definition": "serve(max_leases=1) wall time minus the evaluator's own time",
+  "evaluations": 950,
+  "evaluator": {
+    "count": 950,
+    "max_ms": 0.0221,
+    "mean_ms": 0.0012674736842105164,
+    "min_ms": 0.0009,
+    "p50_ms": 0.0011,
+    "p95_ms": 0.002,
+    "p99_ms": 0.0027
+  },
+  "gate_p95_ms": null,
+  "ipc_round_trip": {
+    "count": 950,
+    "max_ms": 1.6339,
+    "mean_ms": 0.49524736842105255,
+    "min_ms": 0.3795,
+    "p50_ms": 0.4791,
+    "p95_ms": 0.6233,
+    "p99_ms": 0.774
+  },
+  "machine": "AMD64",
+  "overhead": {
+    "count": 950,
+    "max_ms": 626.1475,
+    "mean_ms": 23.897581789473673,
+    "min_ms": 7.0314,
+    "p50_ms": 9.1714,
+    "p95_ms": 68.2151,
+    "p99_ms": 260.1937
+  },
+  "overhead_first_tenth": {
+    "count": 95,
+    "max_ms": 148.5224,
+    "mean_ms": 22.010755789473684,
+    "min_ms": 7.2395,
+    "p50_ms": 10.9243,
+    "p95_ms": 60.686,
+    "p99_ms": 148.5224
+  },
+  "overhead_last_tenth": {
+    "count": 95,
+    "max_ms": 44.4579,
+    "mean_ms": 10.20896736842105,
+    "min_ms": 7.2785,
+    "p50_ms": 8.5358,
+    "p95_ms": 16.4508,
+    "p99_ms": 44.4579
+  },
+  "platform": "Windows-10-10.0.26100-SP0",
+  "python": "3.10.11",
+  "schema": "aidotnet-worker-overhead-v1",
+  "settled": 1000,
+  "warmup": 50,
+  "worker": "python"
+}

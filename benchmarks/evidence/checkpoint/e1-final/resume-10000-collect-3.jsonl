@@ -1,0 +1,3 @@
+{"Format":"Auto","Repeat":0,"Elites":10000,"ResumeMs":1051.0539,"CpuMs":1531.25,"AllocatedBytes":272927456,"Collections":[33,28,5],"StateHash":"71b4407d158e44b94e140e89ceaa38fc710a34e6f4974a66f55b9ae19645340c"}
+{"Format":"Auto","Repeat":1,"Elites":10000,"ResumeMs":667.1563,"CpuMs":1625,"AllocatedBytes":238465424,"Collections":[29,21,1],"StateHash":"71b4407d158e44b94e140e89ceaa38fc710a34e6f4974a66f55b9ae19645340c"}
+{"Format":"Auto","Repeat":2,"Elites":10000,"ResumeMs":701.7944,"CpuMs":2500,"AllocatedBytes":233156456,"Collections":[29,23,2],"StateHash":"71b4407d158e44b94e140e89ceaa38fc710a34e6f4974a66f55b9ae19645340c"}

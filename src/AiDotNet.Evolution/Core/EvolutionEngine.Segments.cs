@@ -1,3 +1,5 @@
+using System.Buffers;
+using System.Runtime.CompilerServices;
 using System.Security.Cryptography;
 using System.Text;
 using System.Text.Json;
@@ -5,16 +7,23 @@ using static AiDotNet.Evolution.EvolutionEngineDocuments;
 
 namespace AiDotNet.Evolution;
 
-// Segmented checkpoints (V1-73, #178). With a store that implements IEvolutionCheckpointSegmentStore, the deduplication
-// set and the evaluation cache leave the checkpoint payload. Each save writes one segment holding only what changed
-// since the previous save, and every SegmentCompactionInterval segments a base segment restates both, so a save costs
-// what changed rather than everything the run has seen. The payload names the segments, with their SHA-256, that rebuild
-// the two structures on resume. Segments are streamed through a small buffer, so no save holds the whole state at once.
+// Segmented checkpoints (V1-73, #178; archives E-1). With a store that implements IEvolutionCheckpointSegmentStore, the
+// deduplication set, the evaluation cache and the island archives leave the checkpoint payload. The segments are an
+// append-only journal of the run's state: each save appends one segment holding only what changed since the previous
+// save, and every CheckpointCompactionInterval segments a base segment restates everything, so a save costs what
+// changed rather than everything the run holds. The payload names the segments, with their SHA-256, that rebuild the
+// state on resume: the base, then each delta replayed in order. Segments are streamed through a small buffer, so no save
+// holds the whole state at once.
 public sealed partial class EvolutionEngine<TGenome>
 {
-    private const int SegmentCompactionInterval = 32;
+    // Schema 1 segments hold the deduplication set and cache; schema 2 segments hold the island archives as well. Every
+    // segment of one checkpoint has the same schema, so a payload says which one to expect.
     private const int SegmentSchemaVersion = 1;
+    private const int ArchiveSegmentSchemaVersion = 2;
     private const int SegmentFlushBytes = 64 * 1024;
+    // Under Auto, an inline payload at least this long (in UTF-16 characters, about a megabyte of JSON) moves the run to
+    // segments: below it a whole-state save is cheap, above it every save rewrites everything the archives hold.
+    internal const int AutoSegmentPayloadCharacters = 1024 * 1024;
 
     // The segments the last saved checkpoint names (a base first) and the identifier the next segment takes.
     private List<SegmentReferenceDocument> _segmentManifest = new();
@@ -28,9 +37,13 @@ public sealed partial class EvolutionEngine<TGenome>
     private PendingSegments? _pendingSegments;
     private long _savedSegmentBoundary = -1;
     private EvolutionCheckpoint? _savedSegmentedCheckpoint;
+    // The archives the saved segments rebuild, which the next delta is taken against; null when they hold none.
+    private ArchiveState? _savedArchive;
+    // The length of the last inline payload, which Auto compares with AutoSegmentPayloadCharacters.
+    private long _lastInlinePayloadLength;
 
     // The segment store to save through, or null for an inline checkpoint. Auto switches once the run remembers enough
-    // genomes for a full save to cost more than a delta, and stays segmented for the rest of the run.
+    // genomes, or its payload is large enough, for a full save to cost more than a delta, and stays segmented after that.
     private IEvolutionCheckpointSegmentStore? SegmentStoreForSave()
     {
         var store = _checkpointStore as IEvolutionCheckpointSegmentStore;
@@ -43,7 +56,8 @@ public sealed partial class EvolutionEngine<TGenome>
                     "EvolutionCheckpointFormat.Segmented needs a checkpoint store that implements IEvolutionCheckpointSegmentStore.");
             default:
                 return store is not null &&
-                       (_segmentManifest.Count > 0 || (long)_seen.Count + _cache.Count >= _options.CheckpointSegmentThreshold)
+                       (_segmentManifest.Count > 0 || (long)_seen.Count + _cache.Count >= _options.CheckpointSegmentThreshold ||
+                        _lastInlinePayloadLength >= AutoSegmentPayloadCharacters)
                     ? store
                     : null;
         }
@@ -56,6 +70,7 @@ public sealed partial class EvolutionEngine<TGenome>
         _pendingSegments = null;
         _savedSegmentBoundary = -1;
         _savedSegmentedCheckpoint = null;
+        _savedArchive = null;
     }
 
     private async Task<EvolutionCheckpoint?> PrepareSegmentedCheckpointAsync(IEvolutionCheckpointSegmentStore store,
@@ -64,21 +79,31 @@ public sealed partial class EvolutionEngine<TGenome>
         // A boundary that was already saved is saved again as the same checkpoint, which a store treats as a no-op.
         if (_savedSegmentBoundary == _safeSequence && _savedSegmentedCheckpoint is not null) return _savedSegmentedCheckpoint;
         if (_safeDocument is not { } document) return null;
+        List<ArchiveDocument> islands = document.Islands
+            ?? throw new InvalidOperationException("The checkpoint boundary has no island archives.");
+        // The archives go into the segments whenever their cells identify their entries; a Pareto front stays inline.
+        ArchiveState? archive = _safeArchive is { } boundary && CanSegmentArchives(islands, boundary) ? boundary : null;
 
-        // Everything a segment needs is taken before the first await: evaluations may add to the live set meanwhile.
-        bool writeBase = _segmentManifest.Count == 0 || _segmentManifest.Count >= SegmentCompactionInterval;
+        // Everything a segment needs is taken before the first await: evaluations may add to the live set meanwhile. A
+        // change of whether the archives are in the segments starts a new chain, so one chain never mixes the two.
+        bool writeBase = _segmentManifest.Count == 0 || _segmentManifest.Count >= _options.CheckpointCompactionInterval ||
+                         (archive is null) != (_savedArchive is null);
         var manifest = writeBase ? new List<SegmentReferenceDocument>() : new List<SegmentReferenceDocument>(_segmentManifest);
         long nextId = _nextSegmentId;
         Func<SegmentWriter, Task>? write = null;
         if (writeBase)
         {
             BaseSnapshot snapshot = BoundarySnapshot();
-            write = segment => WriteBase(segment, snapshot);
+            write = segment => WriteBase(segment, snapshot, archive);
         }
         else
         {
             StateDelta delta = StateDelta.From(_unsavedChanges);
-            if (!delta.IsEmpty) write = segment => WriteDelta(segment, delta);
+            List<ArchiveSegmentDocument>? archiveDelta = archive is not null && _savedArchive is { } saved
+                ? ArchiveDelta(saved, archive)
+                : null;
+            if (!delta.IsEmpty || archiveDelta is { Count: > 0 })
+                write = segment => WriteDelta(segment, delta, archive is not null, archiveDelta);
         }
 
         if (write is not null)
@@ -97,8 +122,31 @@ public sealed partial class EvolutionEngine<TGenome>
         // The cache was just taken out of the document, so its measurement origins no longer show in it.
         if (_cacheHeldMeasurementOrigin && featureVersion < EngineMeasurementOriginSchemaVersion)
             featureVersion = EngineMeasurementOriginSchemaVersion;
-        document.SchemaVersion = featureVersion + SegmentedSchemaOffset;
-        string payload = JsonSerializer.Serialize(document, EvolutionStateJsonContext.Default.EngineStateDocument);
+        document.SchemaVersion = featureVersion + (archive is null ? SegmentedSchemaOffset : ArchiveSegmentedSchemaOffset);
+        string payload;
+        if (archive is null)
+        {
+            payload = JsonSerializer.Serialize(document, EvolutionStateJsonContext.Default.EngineStateDocument);
+        }
+        else
+        {
+            // The payload keeps each island's version and grid; its entries are in the segments. The boundary document
+            // itself keeps them, because a later inline save (after a failed store write, say) still serializes it.
+            document.Islands = islands.Select(island => new ArchiveDocument
+            {
+                Version = island.Version,
+                Descriptors = island.Descriptors,
+                EntriesInSegments = true
+            }).ToList();
+            try
+            {
+                payload = JsonSerializer.Serialize(document, EvolutionStateJsonContext.Default.EngineStateDocument);
+            }
+            finally
+            {
+                document.Islands = islands;
+            }
+        }
         if (payload.Length > EvolutionCollectionLimits.MaximumCheckpointBytes ||
             Encoding.UTF8.GetByteCount(payload) > EvolutionCollectionLimits.MaximumCheckpointBytes)
             throw new InvalidDataException(
@@ -107,7 +155,7 @@ public sealed partial class EvolutionEngine<TGenome>
         EvolutionCheckpoint checkpoint = new EvolutionCheckpoint(_options.RunId, _safeSequence, _compatibilityHash, payload,
                 EvolutionCheckpoint.CurrentSchemaVersion, BestQualityAcrossIslands(), _islands[0].Direction)
             .WithSegmentIds(manifest.Select(segment => segment.Id).ToList());
-        _pendingSegments = new PendingSegments(checkpoint, manifest, nextId, _safeSequence);
+        _pendingSegments = new PendingSegments(checkpoint, manifest, nextId, _safeSequence, archive);
         return checkpoint;
     }
 
@@ -120,9 +168,73 @@ public sealed partial class EvolutionEngine<TGenome>
         _unsavedChanges.Clear();
         _savedSegmentBoundary = pending.Boundary;
         _savedSegmentedCheckpoint = saved;
+        _savedArchive = pending.Archive;
         _pendingSegments = null;
         // The payload no longer needs the boundary document; changes keep being recorded for the next delta.
         _safeDocument = null;
+        _safeArchive = null;
+    }
+
+    // An island's archive can be journaled by cell only when each cell holds one entry, which is the archive contract
+    // (IEvolutionArchiveView.Get returns one entry per cell). A Pareto front, with its exploration pool, is bounded at a
+    // few thousand entries and stays in the payload, and so does any archive that breaks the contract.
+    private static bool CanSegmentArchives(List<ArchiveDocument> islands, ArchiveState boundary)
+    {
+        if (boundary.Keys.Length != islands.Count) return false;
+        for (int island = 0; island < islands.Count; island++)
+        {
+            ArchiveDocument document = islands[island];
+            if (document.Pareto is not null || document.InfeasibleEntries is not null ||
+                !ReferenceEquals(document.Entries, boundary.Entries[island]))
+                return false;
+            string[] keys = boundary.Keys[island];
+            for (int index = 1; index < keys.Length; index++)
+                if (string.CompareOrdinal(keys[index - 1], keys[index]) >= 0) return false;
+        }
+        return true;
+    }
+
+    // What each island's archive gained, replaced and lost since the saved archives: a merge of the two ordinal-ordered
+    // key lists, so nothing is serialized for an entry that did not change.
+    private static List<ArchiveSegmentDocument> ArchiveDelta(ArchiveState saved, ArchiveState current)
+    {
+        var changes = new List<ArchiveSegmentDocument>();
+        for (int island = 0; island < current.Keys.Length; island++)
+        {
+            string[] beforeKeys = saved.Keys[island], afterKeys = current.Keys[island];
+            List<ArchiveEntryDocument> before = saved.Entries[island], after = current.Entries[island];
+            var written = new List<ArchiveEntryDocument>();
+            var removed = new List<string>();
+            int left = 0, right = 0;
+            while (left < beforeKeys.Length || right < afterKeys.Length)
+            {
+                int order = left == beforeKeys.Length ? 1
+                    : right == afterKeys.Length ? -1
+                    : string.CompareOrdinal(beforeKeys[left], afterKeys[right]);
+                if (order < 0)
+                {
+                    removed.Add(beforeKeys[left++]);
+                }
+                else if (order > 0)
+                {
+                    written.Add(after[right++]);
+                }
+                else
+                {
+                    if (!ReferenceEquals(before[left], after[right])) written.Add(after[right]);
+                    left++;
+                    right++;
+                }
+            }
+            if (written.Count > 0 || removed.Count > 0)
+                changes.Add(new ArchiveSegmentDocument
+                {
+                    Island = island,
+                    Entries = written,
+                    RemovedCells = removed.Count == 0 ? null : removed
+                });
+        }
+        return changes;
     }
 
     private async Task<string> WriteSegmentAsync(IEvolutionCheckpointSegmentStore store, long id,
@@ -177,11 +289,11 @@ public sealed partial class EvolutionEngine<TGenome>
         return order;
     }
 
-    private static async Task WriteBase(SegmentWriter segment, BaseSnapshot snapshot)
+    private static async Task WriteBase(SegmentWriter segment, BaseSnapshot snapshot, ArchiveState? archive)
     {
         Utf8JsonWriter json = segment.Json;
         json.WriteStartObject();
-        json.WriteNumber(nameof(StateSegmentDocument.SchemaVersion), SegmentSchemaVersion);
+        json.WriteNumber(nameof(StateSegmentDocument.SchemaVersion), archive is null ? SegmentSchemaVersion : ArchiveSegmentSchemaVersion);
         json.WriteBoolean(nameof(StateSegmentDocument.IsBase), true);
         json.WriteStartArray(nameof(StateSegmentDocument.SeenGenomeIds));
         foreach (string id in snapshot.Seen)
@@ -197,14 +309,22 @@ public sealed partial class EvolutionEngine<TGenome>
             await segment.FlushIfFullAsync().ConfigureAwait(false);
         }
         json.WriteEndArray();
+        if (archive is not null)
+        {
+            json.WriteStartArray(nameof(StateSegmentDocument.Islands));
+            for (int island = 0; island < archive.Entries.Length; island++)
+                await WriteIsland(segment, island, archive.Entries[island], null).ConfigureAwait(false);
+            json.WriteEndArray();
+        }
         json.WriteEndObject();
     }
 
-    private static async Task WriteDelta(SegmentWriter segment, StateDelta delta)
+    private static async Task WriteDelta(SegmentWriter segment, StateDelta delta, bool archiveSchema,
+        List<ArchiveSegmentDocument>? archive)
     {
         Utf8JsonWriter json = segment.Json;
         json.WriteStartObject();
-        json.WriteNumber(nameof(StateSegmentDocument.SchemaVersion), SegmentSchemaVersion);
+        json.WriteNumber(nameof(StateSegmentDocument.SchemaVersion), archiveSchema ? ArchiveSegmentSchemaVersion : SegmentSchemaVersion);
         json.WriteBoolean(nameof(StateSegmentDocument.IsBase), false);
         await WriteIds(nameof(StateSegmentDocument.SeenGenomeIds), delta.Seen.Where(pair => !pair.Value.Prior && pair.Value.Final)).ConfigureAwait(false);
         await WriteIds(nameof(StateSegmentDocument.RemovedGenomeIds), delta.Seen.Where(pair => pair.Value.Prior && !pair.Value.Final)).ConfigureAwait(false);
@@ -218,6 +338,14 @@ public sealed partial class EvolutionEngine<TGenome>
         json.WriteEndArray();
         await WriteIds(nameof(StateSegmentDocument.RemovedCacheIds),
             delta.Cache.Where(pair => pair.Value.Final is null && pair.Value.Prior is not null)).ConfigureAwait(false);
+        if (archive is { Count: > 0 })
+        {
+            json.WriteStartArray(nameof(StateSegmentDocument.Islands));
+            foreach (ArchiveSegmentDocument island in archive)
+                await WriteIsland(segment, island.Island, island.Entries ?? new List<ArchiveEntryDocument>(), island.RemovedCells)
+                    .ConfigureAwait(false);
+            json.WriteEndArray();
+        }
         json.WriteEndObject();
 
         async Task WriteIds<TValue>(string name, IEnumerable<KeyValuePair<string, TValue>> ids)
@@ -232,15 +360,37 @@ public sealed partial class EvolutionEngine<TGenome>
         }
     }
 
+    private static async Task WriteIsland(SegmentWriter segment, int island, List<ArchiveEntryDocument> entries,
+        List<string>? removedCells)
+    {
+        Utf8JsonWriter json = segment.Json;
+        json.WriteStartObject();
+        json.WriteNumber(nameof(ArchiveSegmentDocument.Island), island);
+        json.WriteStartArray(nameof(ArchiveSegmentDocument.Entries));
+        foreach (ArchiveEntryDocument entry in entries)
+        {
+            JsonSerializer.Serialize(json, entry, EvolutionStateJsonContext.Default.ArchiveEntryDocument);
+            await segment.FlushIfFullAsync().ConfigureAwait(false);
+        }
+        json.WriteEndArray();
+        if (removedCells is not null)
+        {
+            json.WriteStartArray(nameof(ArchiveSegmentDocument.RemovedCells));
+            foreach (string cell in removedCells) json.WriteStringValue(cell);
+            json.WriteEndArray();
+        }
+        json.WriteEndObject();
+    }
+
     private static void WriteCacheEntry(Utf8JsonWriter json, string id, EvolutionTaskResult result) =>
         JsonSerializer.Serialize(json, new CacheDocument { GenomeId = id, Result = TaskResultDocument.From(result) },
             EvolutionStateJsonContext.Default.CacheDocument);
 
-    /// <summary>Rebuilds the deduplication set and cache of a segmented checkpoint into <paramref name="state"/>.</summary>
+    /// <summary>Rebuilds the state a segmented checkpoint keeps in segments into <paramref name="state"/>.</summary>
     /// <remarks>
     /// The segments are read in the order the payload lists them, each checked against its recorded SHA-256 and applied
-    /// strictly: a delta that adds a genome already present or removes one that is absent is refused. The result goes
-    /// through the same validation as an inline deduplication set and cache.
+    /// strictly: a delta that adds a genome already present, removes one that is absent or empties an unknown cell is
+    /// refused. The result goes through the same validation as an inline checkpoint.
     /// </remarks>
     private async Task LoadSegmentsAsync(EvolutionCheckpoint checkpoint, EngineStateDocument state,
         CancellationToken cancellationToken)
@@ -259,7 +409,23 @@ public sealed partial class EvolutionEngine<TGenome>
                 "This checkpoint keeps its deduplication set and cache in segments of the store that wrote it, and the configured " +
                 "store cannot read segments. Resume from that store (copy its whole directory to move it), or write portable " +
                 "checkpoints with EvolutionCheckpointFormat.Inline.");
-        List<SegmentReferenceDocument> manifest = state.Segments;
+        LoadedSegments loaded = await ReadSegmentStateAsync(store, _options.RunId, checkpoint, state, cancellationToken)
+            .ConfigureAwait(false);
+        // The inline checks ran before the segments were read, when the collections were still absent.
+        ValidatePackageCheckpointBounds(state);
+        if (HasMeasurementOrigins(state) && FeatureVersionOf(state) < EngineMeasurementOriginSchemaVersion)
+            throw new InvalidDataException("Measurement-origin metadata requires the versioned checkpoint schema.");
+        _segmentManifest = loaded.Manifest;
+        _nextSegmentId = loaded.NextId;
+        _savedArchive = loaded.Archive;
+    }
+
+    // Replays a checkpoint's segments into its state document: the base, then each delta in order.
+    private static async Task<LoadedSegments> ReadSegmentStateAsync(IEvolutionCheckpointSegmentStore store, string runId,
+        EvolutionCheckpoint checkpoint, EngineStateDocument state, CancellationToken cancellationToken)
+    {
+        List<SegmentReferenceDocument> manifest = state.Segments
+            ?? throw new InvalidDataException("The checkpoint segment list is invalid.");
         if (state.SeenGenomeIds is not null || state.Cache is not null)
             throw new InvalidDataException("A segmented checkpoint also carries an inline deduplication set or cache.");
         if (checkpoint.SegmentIds.Count == 0)
@@ -274,73 +440,303 @@ public sealed partial class EvolutionEngine<TGenome>
             state.NextSegmentId is not { } nextId || nextId <= manifest[manifest.Count - 1].Id)
             throw new InvalidDataException("The checkpoint segment list is invalid.");
 
+        List<ArchiveDocument> islands = state.Islands ?? throw new InvalidDataException("Checkpoint islands are missing.");
+        bool archiveInSegments = islands.Any(island => island is not null && island.EntriesInSegments);
+        if (archiveInSegments && islands.Any(island => island is null || !island.EntriesInSegments))
+            throw new InvalidDataException("Only some of the checkpoint's island archives are in its segments.");
+        int expectedSchema = archiveInSegments ? ArchiveSegmentSchemaVersion : SegmentSchemaVersion;
+        Dictionary<string, ArchiveEntryDocument>[] cells = archiveInSegments
+            ? islands.Select(_ => new Dictionary<string, ArchiveEntryDocument>(StringComparer.Ordinal)).ToArray()
+            : Array.Empty<Dictionary<string, ArchiveEntryDocument>>();
+
         var seen = new HashSet<string>(StringComparer.Ordinal);
         var cache = new Dictionary<string, CacheDocument>(StringComparer.Ordinal);
-        foreach (SegmentReferenceDocument reference in manifest)
+        var pending = new Queue<Task<StateSegmentDocument>>();
+        int window = DecodeWindow;
+        int read = 0;
+        using var buffers = new SegmentBufferPool();
+        try
         {
-            StateSegmentDocument segment = await ReadSegmentAsync(store, reference, cancellationToken).ConfigureAwait(false);
-            if (segment.SchemaVersion != SegmentSchemaVersion || segment.IsBase != reference.IsBase)
-                throw new InvalidDataException("A checkpoint segment has an unexpected schema or kind.");
-            foreach (string id in segment.RemovedGenomeIds ?? new List<string>())
-                if (id is null || !seen.Remove(id)) throw new InvalidDataException("A checkpoint segment removes an unknown genome.");
-            foreach (string id in segment.SeenGenomeIds ?? new List<string>())
-                if (string.IsNullOrWhiteSpace(id) || !seen.Add(id)) throw new InvalidDataException("A checkpoint segment adds a genome twice.");
-            foreach (string id in segment.RemovedCacheIds ?? new List<string>())
-                if (id is null || !cache.Remove(id)) throw new InvalidDataException("A checkpoint segment removes an unknown cache entry.");
-            foreach (CacheDocument entry in segment.Cache ?? new List<CacheDocument>())
+            for (int applied = 0; applied < manifest.Count; applied++)
             {
-                if (entry is null || string.IsNullOrWhiteSpace(entry.GenomeId) || (reference.IsBase && cache.ContainsKey(entry.GenomeId)))
-                    throw new InvalidDataException("A checkpoint segment has an invalid cache entry.");
-                cache[entry.GenomeId] = entry;
+                while (read < manifest.Count && pending.Count < window)
+                {
+                    SegmentReferenceDocument next = manifest[read++];
+                    Task<StateSegmentDocument> decode;
+                    try
+                    {
+                        SegmentBytes bytes = await ReadSegmentAsync(store, runId, next, buffers, cancellationToken).ConfigureAwait(false);
+                        decode = Task.Run(() => DecodeSegment(bytes, next, buffers), CancellationToken.None);
+                    }
+                    catch (Exception exception) when (exception is not OutOfMemoryException)
+                    {
+                        // Queued, not thrown: an earlier segment still being decoded may fail too, and its failure is
+                        // the one to report. Nothing after this segment is read. Running out of memory reports itself.
+                        decode = Task.FromException<StateSegmentDocument>(exception);
+                        read = manifest.Count;
+                    }
+                    pending.Enqueue(decode);
+                }
+
+                StateSegmentDocument segment = await pending.Dequeue().ConfigureAwait(false);
+                ApplySegment(segment, manifest[applied], expectedSchema, seen, cache, cells);
             }
+        }
+        catch
+        {
+            await DrainAsync(pending).ConfigureAwait(false);
+            throw;
         }
 
         state.SeenGenomeIds = seen.ToList();
         state.Cache = cache.Values.ToList();
-        // The inline checks ran before the segments were read, when both collections were still absent.
-        ValidatePackageCheckpointBounds(state);
-        if (HasMeasurementOrigins(state) && FeatureVersionOf(state) < EngineMeasurementOriginSchemaVersion)
-            throw new InvalidDataException("Measurement-origin metadata requires the versioned checkpoint schema.");
-        _segmentManifest = new List<SegmentReferenceDocument>(manifest);
-        _nextSegmentId = nextId;
+        ArchiveState? archive = null;
+        if (archiveInSegments)
+        {
+            // Ordinal cell order is the order an inline payload lists entries in, so the rebuilt state is the same document.
+            var keys = new string[cells.Length][];
+            var entries = new List<ArchiveEntryDocument>[cells.Length];
+            for (int island = 0; island < cells.Length; island++)
+            {
+                keys[island] = cells[island].Keys.ToArray();
+                Array.Sort(keys[island], StringComparer.Ordinal);
+                entries[island] = new List<ArchiveEntryDocument>(keys[island].Length);
+                foreach (string key in keys[island]) entries[island].Add(cells[island][key]);
+                islands[island].Entries = entries[island];
+                islands[island].EntriesInSegments = false;
+            }
+            archive = new ArchiveState(keys, entries);
+        }
+        return new LoadedSegments(new List<SegmentReferenceDocument>(manifest), nextId, archive);
     }
 
-    private async Task<StateSegmentDocument> ReadSegmentAsync(IEvolutionCheckpointSegmentStore store,
-        SegmentReferenceDocument reference, CancellationToken cancellationToken)
+    // Applies one segment's archive changes. A base restates every island; a delta writes cells (an entry replaces what
+    // its cell held) and empties cells that must already hold an entry.
+    // Fully optimized from the first call, like the checkpoint preflight: a resume runs this once per restored elite, all
+    // within about a second, before tiered compilation would promote it (E-1).
+#if NETCOREAPP3_0_OR_GREATER
+    [MethodImpl(MethodImplOptions.AggressiveOptimization)]
+#endif
+    private static void ApplyArchiveSegment(StateSegmentDocument segment, bool isBase, Dictionary<string, ArchiveEntryDocument>[] cells)
     {
-        byte[] bytes;
-        using (Stream stream = await store.OpenSegmentAsync(_options.RunId, reference.Id, cancellationToken).ConfigureAwait(false)
-                   ?? throw new InvalidDataException($"Checkpoint segment {reference.Id} is missing from the store."))
-        using (var buffer = new MemoryStream())
+        if (segment.Islands is not { } islands)
         {
-            byte[] chunk = new byte[SegmentFlushBytes];
-            int read;
-            while ((read = await stream.ReadAsync(chunk, 0, chunk.Length, cancellationToken).ConfigureAwait(false)) > 0)
+            if (isBase && cells.Length > 0) throw new InvalidDataException("A checkpoint base segment is missing its island archives.");
+            return;
+        }
+        if (cells.Length == 0)
+            throw new InvalidDataException("A checkpoint segment carries island archives its payload does not expect.");
+        if (isBase && islands.Count != cells.Length)
+            throw new InvalidDataException("A checkpoint base segment does not list every island archive.");
+        var touched = new HashSet<int>();
+        foreach (ArchiveSegmentDocument island in islands)
+        {
+            if (island is null || island.Island < 0 || island.Island >= cells.Length || !touched.Add(island.Island))
+                throw new InvalidDataException("A checkpoint segment names an invalid island archive.");
+            Dictionary<string, ArchiveEntryDocument> map = cells[island.Island];
+            if (isBase && island.RemovedCells is not null)
+                throw new InvalidDataException("A checkpoint base segment empties archive cells.");
+            foreach (string cell in island.RemovedCells ?? new List<string>())
+                if (cell is null || !map.Remove(cell)) throw new InvalidDataException("A checkpoint segment empties an unknown archive cell.");
+            foreach (ArchiveEntryDocument entry in island.Entries ?? new List<ArchiveEntryDocument>())
             {
-                if (buffer.Length + read > EvolutionCollectionLimits.MaximumCheckpointBytes)
-                    throw new InvalidDataException($"Checkpoint segment {reference.Id} exceeds the package limit.");
-                buffer.Write(chunk, 0, read);
+                if (entry?.CellBins is null) throw new InvalidDataException("An archive entry is incomplete.");
+                string key = CellKeyOf(entry.CellBins);
+                if (isBase && map.ContainsKey(key))
+                    throw new InvalidDataException("A checkpoint segment fills one archive cell twice.");
+                map[key] = entry;
             }
-            bytes = buffer.ToArray();
         }
+    }
 
-        using (IncrementalHash hash = IncrementalHash.CreateHash(HashAlgorithmName.SHA256))
-        {
-            hash.AppendData(bytes);
-            if (!string.Equals(ToHex(hash.GetHashAndReset()), reference.Sha256, StringComparison.Ordinal))
-                throw new InvalidDataException($"Checkpoint segment {reference.Id} failed its SHA-256 check.");
-        }
-
-        EvolutionCheckpointJsonPreflight.Validate(bytes);
+    private static string CellKeyOf(int[] bins)
+    {
         try
         {
-            return JsonSerializer.Deserialize(bytes, EvolutionStateJsonContext.Default.StateSegmentDocument)
-                ?? throw new InvalidDataException($"Checkpoint segment {reference.Id} is empty.");
+            return new EvolutionCellKey(bins).StableKey;
         }
-        catch (JsonException exception)
+        catch (ArgumentException exception)
         {
-            throw new InvalidDataException($"Checkpoint segment {reference.Id} is invalid.", exception);
+            throw new InvalidDataException("A checkpoint archive entry has an invalid cell.", exception);
         }
+    }
+
+    private static void ApplySegment(StateSegmentDocument segment, SegmentReferenceDocument reference, int expectedSchema,
+        HashSet<string> seen, Dictionary<string, CacheDocument> cache, Dictionary<string, ArchiveEntryDocument>[] cells)
+    {
+        if (segment.SchemaVersion != expectedSchema || segment.IsBase != reference.IsBase)
+            throw new InvalidDataException("A checkpoint segment has an unexpected schema or kind.");
+        foreach (string id in segment.RemovedGenomeIds ?? new List<string>())
+            if (id is null || !seen.Remove(id)) throw new InvalidDataException("A checkpoint segment removes an unknown genome.");
+        foreach (string id in segment.SeenGenomeIds ?? new List<string>())
+            if (string.IsNullOrWhiteSpace(id) || !seen.Add(id)) throw new InvalidDataException("A checkpoint segment adds a genome twice.");
+        foreach (string id in segment.RemovedCacheIds ?? new List<string>())
+            if (id is null || !cache.Remove(id)) throw new InvalidDataException("A checkpoint segment removes an unknown cache entry.");
+        foreach (CacheDocument entry in segment.Cache ?? new List<CacheDocument>())
+        {
+            if (entry is null || string.IsNullOrWhiteSpace(entry.GenomeId) || (reference.IsBase && cache.ContainsKey(entry.GenomeId)))
+                throw new InvalidDataException("A checkpoint segment has an invalid cache entry.");
+            cache[entry.GenomeId] = entry;
+        }
+        ApplyArchiveSegment(segment, reference.IsBase, cells);
+    }
+
+    // A segment's bytes are read from the store in manifest order, one at a time, since a store need not serve concurrent
+    // reads; checking and decoding them shares no state, so that runs on the thread pool, up to DecodeWindow segments
+    // ahead of the one being applied. Decoding was most of a resume's time and grows with the state (E-1). Segments are
+    // still applied strictly in order, and the first failure in manifest order is the one reported.
+    private static int DecodeWindow => Math.Max(1, Math.Min(Environment.ProcessorCount, 8));
+
+    private static async Task<SegmentBytes> ReadSegmentAsync(IEvolutionCheckpointSegmentStore store, string runId,
+        SegmentReferenceDocument reference, SegmentBufferPool buffers, CancellationToken cancellationToken)
+    {
+        using Stream stream = await store.OpenSegmentAsync(runId, reference.Id, cancellationToken).ConfigureAwait(false)
+                              ?? throw new InvalidDataException($"Checkpoint segment {reference.Id} is missing from the store.");
+        return await ReadSegmentBytesAsync(stream, reference.Id, buffers, cancellationToken).ConfigureAwait(false);
+    }
+
+    // Checks and decodes one segment's bytes, returning the buffer to the pool whatever happens.
+    private static StateSegmentDocument DecodeSegment(SegmentBytes bytes, SegmentReferenceDocument reference, SegmentBufferPool buffers)
+    {
+        try
+        {
+            using (IncrementalHash hash = IncrementalHash.CreateHash(HashAlgorithmName.SHA256))
+            {
+                hash.AppendData(bytes.Buffer, 0, bytes.Length);
+                if (!string.Equals(ToHex(hash.GetHashAndReset()), reference.Sha256, StringComparison.Ordinal))
+                    throw new InvalidDataException($"Checkpoint segment {reference.Id} failed its SHA-256 check.");
+            }
+
+            var span = new ReadOnlySpan<byte>(bytes.Buffer, 0, bytes.Length);
+            EvolutionCheckpointJsonPreflight.Validate(span);
+            try
+            {
+                return JsonSerializer.Deserialize(span, EvolutionStateJsonContext.Default.StateSegmentDocument)
+                    ?? throw new InvalidDataException($"Checkpoint segment {reference.Id} is empty.");
+            }
+            catch (JsonException exception)
+            {
+                throw new InvalidDataException($"Checkpoint segment {reference.Id} is invalid.", exception);
+            }
+        }
+        finally
+        {
+            buffers.Return(bytes.Buffer);
+        }
+    }
+
+    // Waits out decodes that will not be applied, so none outlives the resume that started it. Their own failures are
+    // not reported: the resume is already failing with the earlier one, which is first in manifest order.
+    private static async Task DrainAsync(Queue<Task<StateSegmentDocument>> pending)
+    {
+        while (pending.Count > 0)
+        {
+            Task<StateSegmentDocument> decode = pending.Dequeue();
+            try
+            {
+                await decode.ConfigureAwait(false);
+            }
+            catch (Exception exception) when (exception is not OutOfMemoryException)
+            {
+                // Superseded by the failure being reported.
+            }
+        }
+    }
+
+    // A segment's bytes, in a buffer rented from the shared pool: growing a MemoryStream and copying it out allocated
+    // about three times each segment, and a fresh array per segment is a large-object allocation that pushes the
+    // collector into full collections of the state being rebuilt (E-1). The first buffer is sized from the length the
+    // stream reports, one byte over, so a full buffer always means the stream holds more; a stream that reports no
+    // length, or the wrong one, still yields exactly the bytes it holds, which the SHA-256 check then judges.
+    private static async Task<SegmentBytes> ReadSegmentBytesAsync(Stream stream, long id, SegmentBufferPool buffers,
+        CancellationToken cancellationToken)
+    {
+        long expected = -1;
+        if (stream.CanSeek)
+        {
+            try
+            {
+                expected = stream.Length - stream.Position;
+            }
+            catch (NotSupportedException)
+            {
+                expected = -1;
+            }
+        }
+        if (expected > EvolutionCollectionLimits.MaximumCheckpointBytes)
+            throw new InvalidDataException($"Checkpoint segment {id} exceeds the package limit.");
+
+        byte[] buffer = buffers.Rent((int)Math.Max(expected + 1, SegmentFlushBytes));
+        int length = 0;
+        try
+        {
+            while (true)
+            {
+                if (length == buffer.Length)
+                {
+                    long grown = Math.Min((long)buffer.Length * 2, EvolutionCollectionLimits.MaximumCheckpointBytes + 1);
+                    byte[] larger = buffers.Rent((int)grown);
+                    Buffer.BlockCopy(buffer, 0, larger, 0, length);
+                    buffers.Return(buffer);
+                    buffer = larger;
+                }
+                int read = await stream.ReadAsync(buffer, length, buffer.Length - length, cancellationToken).ConfigureAwait(false);
+                if (read == 0) break;
+                length += read;
+                if (length > EvolutionCollectionLimits.MaximumCheckpointBytes)
+                    throw new InvalidDataException($"Checkpoint segment {id} exceeds the package limit.");
+            }
+        }
+        catch
+        {
+            buffers.Return(buffer);
+            throw;
+        }
+        return new SegmentBytes(buffer, length);
+    }
+
+    // One resume's segment buffers. The shared pool keeps a returned array in the returning thread's cache first, and
+    // decodes return theirs on pool threads while the next read rents on another, so every segment rented a fresh
+    // multi-megabyte array: 66 MB of large-object allocation at 10,000 elites (E-1). Here a returned buffer goes to the
+    // next read whatever thread it runs on; the buffers go back to the shared pool when the resume is done.
+    private sealed class SegmentBufferPool : IDisposable
+    {
+        private readonly List<byte[]> _free = new();
+
+        public byte[] Rent(int minimumLength)
+        {
+            lock (_free)
+            {
+                for (int index = 0; index < _free.Count; index++)
+                {
+                    if (_free[index].Length < minimumLength) continue;
+                    byte[] buffer = _free[index];
+                    _free.RemoveAt(index);
+                    return buffer;
+                }
+            }
+            return ArrayPool<byte>.Shared.Rent(minimumLength);
+        }
+
+        public void Return(byte[] buffer)
+        {
+            lock (_free) _free.Add(buffer);
+        }
+
+        public void Dispose()
+        {
+            lock (_free)
+            {
+                foreach (byte[] buffer in _free) ArrayPool<byte>.Shared.Return(buffer);
+                _free.Clear();
+            }
+        }
+    }
+
+    private readonly struct SegmentBytes(byte[] buffer, int length)
+    {
+        public byte[] Buffer { get; } = buffer;
+        public int Length { get; } = length;
     }
 
     // The version an inline payload of this document would carry: measurement origins, then Pareto, then constraints.
@@ -353,8 +749,13 @@ public sealed partial class EvolutionEngine<TGenome>
         return version;
     }
 
-    private static int FeatureVersionOf(EngineStateDocument document) =>
-        document.SchemaVersion >= EngineSegmentedSchemaVersion ? document.SchemaVersion - SegmentedSchemaOffset : document.SchemaVersion;
+    private static int FeatureVersionOf(EngineStateDocument document) => document.SchemaVersion - SchemaOffsetOf(document.SchemaVersion);
+
+    // The offset a payload version carries: none inline, one for segments, a larger one when the archives are in them too.
+    private static int SchemaOffsetOf(int schemaVersion) =>
+        schemaVersion >= EngineArchiveSegmentedSchemaVersion ? ArchiveSegmentedSchemaOffset
+        : schemaVersion >= EngineSegmentedSchemaVersion ? SegmentedSchemaOffset
+        : 0;
 
     private static string ToHex(byte[] bytes)
     {
@@ -364,7 +765,12 @@ public sealed partial class EvolutionEngine<TGenome>
     }
 
     private sealed record PendingSegments(EvolutionCheckpoint Checkpoint, List<SegmentReferenceDocument> Manifest, long NextId,
-        long Boundary);
+        long Boundary, ArchiveState? Archive);
+
+    private sealed record LoadedSegments(List<SegmentReferenceDocument> Manifest, long NextId, ArchiveState? Archive);
+
+    // Each island's archive at one boundary: its cell keys in ordinal order, and the entry documents in the same order.
+    private sealed record ArchiveState(string[][] Keys, List<ArchiveEntryDocument>[] Entries);
 
     private sealed record BaseSnapshot(List<string> Seen, List<KeyValuePair<string, EvolutionTaskResult>> Cache);
 

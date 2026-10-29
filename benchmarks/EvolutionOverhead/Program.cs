@@ -18,6 +18,20 @@ if (args.Length == 4 && args[0] == "ensemble")
     return EnsembleOverhead.Run(ensembleProposals, ensembleModels, ensembleRepeats);
 }
 
+// E-1: AllocationBudgetTests' exact workload outside a test host, at any length. A 500-evaluation warm-up run, then
+// one measured run; prints GC.GetTotalAllocatedBytes per completed evaluation of the measured run.
+// Usage: EvolutionOverhead allocation <evaluations>
+if (args.Length == 2 && args[0] == "allocation")
+{
+    if (!int.TryParse(args[1], out int measured) || measured is < 8 or > 1_000_000)
+    {
+        Console.Error.WriteLine("Usage: EvolutionOverhead allocation <evaluations 8..1e6>");
+        return 2;
+    }
+
+    return await AllocationBudget.RunAsync(measured);
+}
+
 // V1-30: one null-evaluator run per process. Usage: EvolutionOverhead <evaluations> <workers> <islands>
 if (args.Length != 3 || !int.TryParse(args[0], out int budget) || !int.TryParse(args[1], out int workers) ||
     !int.TryParse(args[2], out int islands) || budget is < 8 or > 1_000_000 || workers is < 1 or > 64 || islands is < 1 or > 64)

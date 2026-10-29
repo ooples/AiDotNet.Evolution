@@ -6,6 +6,7 @@ namespace AiDotNet.Evolution;
 [JsonSerializable(typeof(List<EvolutionEngineDocuments.CarriedEvaluationDocument>), TypeInfoPropertyName = "ListCarriedEvaluationDocument")]
 [JsonSerializable(typeof(EvolutionEngineDocuments.StateSegmentDocument))]
 [JsonSerializable(typeof(EvolutionEngineDocuments.CacheDocument))]
+[JsonSerializable(typeof(EvolutionEngineDocuments.ArchiveEntryDocument))]
 [JsonSerializable(typeof(Dictionary<string, double>), TypeInfoPropertyName = "NumericMap")]
 [JsonSerializable(typeof(ResourceMeteredVariationDocuments.State), TypeInfoPropertyName = "MeteredVariationState")]
 [JsonSerializable(typeof(MeasurementOriginDocument))]

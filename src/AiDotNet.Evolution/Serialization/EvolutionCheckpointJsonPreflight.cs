@@ -1,3 +1,4 @@
+using System.Runtime.CompilerServices;
 using System.Text.Json;
 
 namespace AiDotNet.Evolution;
@@ -8,6 +9,11 @@ namespace AiDotNet.Evolution;
 /// </summary>
 internal static class EvolutionCheckpointJsonPreflight
 {
+    // Fully optimized from the first call: a resume runs this once per segment over every token the checkpoint holds, and
+    // with tiered compilation those few long calls ran mostly as unoptimized code, three to four times slower (E-1).
+#if NETCOREAPP3_0_OR_GREATER
+    [MethodImpl(MethodImplOptions.AggressiveOptimization)]
+#endif
     internal static void Validate(ReadOnlySpan<byte> utf8Json)
     {
         var reader = new Utf8JsonReader(utf8Json, new JsonReaderOptions
@@ -140,33 +146,38 @@ internal static class EvolutionCheckpointJsonPreflight
         frames.RemoveAt(frames.Count - 1);
     }
 
+    // UTF-8 literals: the string overload transcodes its argument on every call, and this runs for every property name
+    // in a checkpoint and its segments, which made it a measurable part of a resume (E-1).
+#if NETCOREAPP3_0_OR_GREATER
+    [MethodImpl(MethodImplOptions.AggressiveOptimization)]
+#endif
     private static CheckpointCollectionKind ClassifyProperty(ref Utf8JsonReader reader)
     {
-        if (reader.ValueTextEquals("SemanticOptions")) return CheckpointCollectionKind.SemanticOptions;
-        if (reader.ValueTextEquals("BudgetOptions")) return CheckpointCollectionKind.BudgetOptions;
-        if (reader.ValueTextEquals("SeedPayloads")) return CheckpointCollectionKind.SeedPayloads;
-        if (reader.ValueTextEquals("IslandGenerations")) return CheckpointCollectionKind.IslandGenerations;
-        if (reader.ValueTextEquals("GlobalElites")) return CheckpointCollectionKind.GlobalElites;
-        if (reader.ValueTextEquals("IslandHistories")) return CheckpointCollectionKind.IslandHistories;
-        if (reader.ValueTextEquals("StatusCounts")) return CheckpointCollectionKind.StatusCounts;
-        if (reader.ValueTextEquals("SeenGenomeIds")) return CheckpointCollectionKind.SeenGenomeIds;
-        if (reader.ValueTextEquals("Cache")) return CheckpointCollectionKind.Cache;
-        if (reader.ValueTextEquals("Failures")) return CheckpointCollectionKind.Failures;
-        if (reader.ValueTextEquals("PendingArtifacts")) return CheckpointCollectionKind.PendingArtifacts;
-        if (reader.ValueTextEquals("Islands")) return CheckpointCollectionKind.Islands;
-        if (reader.ValueTextEquals("Entries")) return CheckpointCollectionKind.ArchiveEntries;
-        if (reader.ValueTextEquals("InfeasibleEntries")) return CheckpointCollectionKind.ArchiveEntries;
-        if (reader.ValueTextEquals("Descriptors")) return CheckpointCollectionKind.Descriptors;
-        if (reader.ValueTextEquals("CellBins")) return CheckpointCollectionKind.CellBins;
-        if (reader.ValueTextEquals("ParentIds")) return CheckpointCollectionKind.ParentIds;
-        if (reader.ValueTextEquals("InspirationIds")) return CheckpointCollectionKind.InspirationIds;
-        if (reader.ValueTextEquals("Objectives")) return CheckpointCollectionKind.Objectives;
-        if (reader.ValueTextEquals("ConstraintViolations")) return CheckpointCollectionKind.ConstraintViolations;
-        if (reader.ValueTextEquals("StageCostUnits")) return CheckpointCollectionKind.StageCostUnits;
-        if (reader.ValueTextEquals("Diagnostics")) return CheckpointCollectionKind.Diagnostics;
-        if (reader.ValueTextEquals("Metrics")) return CheckpointCollectionKind.Metrics;
-        if (reader.ValueTextEquals("Artifacts")) return CheckpointCollectionKind.Artifacts;
-        if (reader.ValueTextEquals("Data")) return CheckpointCollectionKind.DiagnosticData;
+        if (reader.ValueTextEquals("SemanticOptions"u8)) return CheckpointCollectionKind.SemanticOptions;
+        if (reader.ValueTextEquals("BudgetOptions"u8)) return CheckpointCollectionKind.BudgetOptions;
+        if (reader.ValueTextEquals("SeedPayloads"u8)) return CheckpointCollectionKind.SeedPayloads;
+        if (reader.ValueTextEquals("IslandGenerations"u8)) return CheckpointCollectionKind.IslandGenerations;
+        if (reader.ValueTextEquals("GlobalElites"u8)) return CheckpointCollectionKind.GlobalElites;
+        if (reader.ValueTextEquals("IslandHistories"u8)) return CheckpointCollectionKind.IslandHistories;
+        if (reader.ValueTextEquals("StatusCounts"u8)) return CheckpointCollectionKind.StatusCounts;
+        if (reader.ValueTextEquals("SeenGenomeIds"u8)) return CheckpointCollectionKind.SeenGenomeIds;
+        if (reader.ValueTextEquals("Cache"u8)) return CheckpointCollectionKind.Cache;
+        if (reader.ValueTextEquals("Failures"u8)) return CheckpointCollectionKind.Failures;
+        if (reader.ValueTextEquals("PendingArtifacts"u8)) return CheckpointCollectionKind.PendingArtifacts;
+        if (reader.ValueTextEquals("Islands"u8)) return CheckpointCollectionKind.Islands;
+        if (reader.ValueTextEquals("Entries"u8)) return CheckpointCollectionKind.ArchiveEntries;
+        if (reader.ValueTextEquals("InfeasibleEntries"u8)) return CheckpointCollectionKind.ArchiveEntries;
+        if (reader.ValueTextEquals("Descriptors"u8)) return CheckpointCollectionKind.Descriptors;
+        if (reader.ValueTextEquals("CellBins"u8)) return CheckpointCollectionKind.CellBins;
+        if (reader.ValueTextEquals("ParentIds"u8)) return CheckpointCollectionKind.ParentIds;
+        if (reader.ValueTextEquals("InspirationIds"u8)) return CheckpointCollectionKind.InspirationIds;
+        if (reader.ValueTextEquals("Objectives"u8)) return CheckpointCollectionKind.Objectives;
+        if (reader.ValueTextEquals("ConstraintViolations"u8)) return CheckpointCollectionKind.ConstraintViolations;
+        if (reader.ValueTextEquals("StageCostUnits"u8)) return CheckpointCollectionKind.StageCostUnits;
+        if (reader.ValueTextEquals("Diagnostics"u8)) return CheckpointCollectionKind.Diagnostics;
+        if (reader.ValueTextEquals("Metrics"u8)) return CheckpointCollectionKind.Metrics;
+        if (reader.ValueTextEquals("Artifacts"u8)) return CheckpointCollectionKind.Artifacts;
+        if (reader.ValueTextEquals("Data"u8)) return CheckpointCollectionKind.DiagnosticData;
         return CheckpointCollectionKind.None;
     }
 

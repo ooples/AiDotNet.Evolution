@@ -17,13 +17,19 @@ internal static class EvolutionCollection
             knownCount = ValidateReportedCount(readOnly.Count, maximum, parameterName);
         }
 
-        var result = new List<T>(Math.Min(maximum, knownCount));
+        // Enumerated, not copied by count: a collection may report a count it does not hold. Sized from the reported
+        // count, so a truthful collection costs its one array rather than a list and a copy (E-1: a resume runs this for
+        // every restored result).
+        var result = new T[Math.Min(maximum, knownCount)];
+        int count = 0;
         foreach (T value in values)
         {
-            if (result.Count == maximum) throw TooMany(maximum, parameterName);
-            result.Add(value);
+            if (count == maximum) throw TooMany(maximum, parameterName);
+            if (count == result.Length) Array.Resize(ref result, Math.Min(maximum, Math.Max(4, result.Length * 2)));
+            result[count++] = value;
         }
-        return result.ToArray();
+        if (count != result.Length) Array.Resize(ref result, count);
+        return result;
     }
 
     internal static T[] CopyBounded<T>(IReadOnlyList<T> values, int maximum, string parameterName)

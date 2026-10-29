@@ -35,6 +35,7 @@ public sealed class ProgramGenome : IEquatable<ProgramGenome>, IImmutableEvoluti
     /// <paramref name="source"/> exceeds <see cref="MaxSourceLength"/> characters, or <paramref name="language"/> is
     /// not a defined enumeration value.
     /// </exception>
+    [System.Runtime.CompilerServices.MethodImpl(System.Runtime.CompilerServices.MethodImplOptions.AggressiveOptimization)]
     public ProgramGenome(string source, ProgramLanguage language = ProgramLanguage.Generic, string? description = null)
     {
         ProgramGuard.NotNull(source);
@@ -43,29 +44,28 @@ public sealed class ProgramGenome : IEquatable<ProgramGenome>, IImmutableEvoluti
                 $"Program sources cannot exceed {MaxSourceLength} characters.");
         if (!Enum.IsDefined(typeof(ProgramLanguage), language)) throw new ArgumentOutOfRangeException(nameof(language));
 
-        string normalized = ProgramText.Normalize(source);
-        if (normalized.Length == 0)
+        // Normalization trims every line and drops line breaks at the end, so it leaves nothing exactly when everything
+        // after a leading byte-order mark is white space; the normalized text itself is built on first use.
+        if (IsBlank(source))
             throw new ArgumentException("Program sources cannot be empty or white space.", nameof(source));
         if (description is not null && description.Length > MaxDescriptionLength)
             throw new ArgumentException(
                 $"Program descriptions cannot exceed {MaxDescriptionLength} characters.", nameof(description));
 
         Source = source;
-        NormalizedSource = normalized;
         Language = language;
         Description = description;
         ValidateSourceEncoding(source);
-        Id = ComputeIdCore(source, language);
         _hashCode = ComputeHashCode(source, language);
     }
 
     private ProgramGenome(ProgramGenome source)
     {
         Source = source.Source;
-        NormalizedSource = source.NormalizedSource;
+        _normalizedSource = source._normalizedSource;
         Language = source.Language;
         Description = source.Description;
-        Id = source.Id;
+        _id = source._id;
         _hashCode = source._hashCode;
     }
 
@@ -73,7 +73,23 @@ public sealed class ProgramGenome : IEquatable<ProgramGenome>, IImmutableEvoluti
     public string Source { get; }
 
     /// <summary>Gets the source after byte-order-mark removal, line-ending normalization, and trailing-space trimming.</summary>
-    public string NormalizedSource { get; }
+    /// <remarks>
+    /// Built on first read rather than in the constructor: a resume decodes every archived genome, and most of them are
+    /// never measured again (E-1). The value is the same whichever thread builds it first.
+    /// </remarks>
+    public string NormalizedSource
+    {
+        get
+        {
+            string? normalized = Volatile.Read(ref _normalizedSource);
+            if (normalized is not null) return normalized;
+            normalized = ProgramText.Normalize(Source);
+            Volatile.Write(ref _normalizedSource, normalized);
+            return normalized;
+        }
+    }
+
+    private string? _normalizedSource;
 
     /// <summary>Gets the language the source is written in.</summary>
     public ProgramLanguage Language { get; }
@@ -85,9 +101,23 @@ public sealed class ProgramGenome : IEquatable<ProgramGenome>, IImmutableEvoluti
     /// <remarks>
     /// Two genomes share this value exactly when <see cref="Equals(ProgramGenome)"/> reports them equal, so the
     /// engine's duplicate set and evaluation cache can key on it safely. <see cref="Description"/> is excluded, so a
-    /// description-only edit is the same candidate and is not evaluated twice.
+    /// description-only edit is the same candidate and is not evaluated twice. It is computed on first read, like
+    /// <see cref="NormalizedSource"/>: a resume restores every archived genome with the identity its checkpoint recorded,
+    /// so hashing each source again there was wasted (E-1).
     /// </remarks>
-    public string Id { get; }
+    public string Id
+    {
+        get
+        {
+            string? id = Volatile.Read(ref _id);
+            if (id is not null) return id;
+            id = ComputeIdCore(Source, Language);
+            Volatile.Write(ref _id, id);
+            return id;
+        }
+    }
+
+    private string? _id;
 
     /// <inheritdoc/>
     public ProgramGenome CreateOwnedSnapshot() => new(this);
@@ -178,6 +208,16 @@ public sealed class ProgramGenome : IEquatable<ProgramGenome>, IImmutableEvoluti
     private static string ComputeIdCore(string source, ProgramLanguage language) =>
         EvolutionHash.Combine(new[] { "program-genome-v2-exact-source", language.ToString(), source });
 
+    [System.Runtime.CompilerServices.MethodImpl(System.Runtime.CompilerServices.MethodImplOptions.AggressiveOptimization)]
+    private static bool IsBlank(string source)
+    {
+        int start = source.Length > 0 && source[0] == '﻿' ? 1 : 0;
+        for (int index = start; index < source.Length; index++)
+            if (!char.IsWhiteSpace(source[index])) return false;
+        return true;
+    }
+
+    [System.Runtime.CompilerServices.MethodImpl(System.Runtime.CompilerServices.MethodImplOptions.AggressiveOptimization)]
     private static void ValidateSourceEncoding(string source)
     {
         for (int i = 0; i < source.Length; i++)

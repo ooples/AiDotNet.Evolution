@@ -55,7 +55,7 @@ CHECKPOINT = "benchmarks/evidence/checkpoint/86d56c9/re-measurement.json"
 AE_MANIFEST = "benchmarks/evidence/alphaevolve-math/manifest.json"
 SR_HEADROOM = "benchmarks/evidence/symbolic-regression/e083c3b/headroom.json"
 PILOT = "benchmarks/evidence/pilot-v1-07/aafd609/report.json"
-WORKER = "benchmarks/evidence/worker-overhead/3f73e03-ci/linux-x64-python.json"
+WORKER = "benchmarks/evidence/worker-overhead/4323954-ci/linux-x64-python.json"
 ENSEMBLE = "benchmarks/evidence/ensemble-overhead/34c117c/models-%d.json"
 SOAK = "benchmarks/evidence/soak/segmented-a1d5d2f/memory-capped-10000-conserve.json"
 DISTRIBUTED = "benchmarks/evidence/distributed-v1-61/818b642"
@@ -273,9 +273,9 @@ def performance_rows(root):
         row("Evaluation worker round trip", None,
             "%.3f ms p50 IPC round trip, %.3f ms p95" % (worker["ipc_round_trip"]["p50_ms"],
                                                          worker["ipc_round_trip"]["p95_ms"]), None,
-            "over %d evaluations on %s. The per-lease overhead around it DEGRADES over the run - p50 "
-            "%.1f ms in the first tenth against %.1f ms in the last, %.1f ms overall - which is "
-            "measured here and not yet explained"
+            "over %d evaluations on %s. The per-lease overhead around it is flat over the run - p50 "
+            "%.2f ms in the first tenth against %.2f ms in the last, %.2f ms overall - since the "
+            "host's work journal appends a record per claim and commit instead of rewriting its state"
             % (worker["evaluations"], worker["platform"], worker["overhead_first_tenth"]["p50_ms"],
                worker["overhead_last_tenth"]["p50_ms"], worker["overhead"]["p50_ms"]),
             MEASURED, WORKER),

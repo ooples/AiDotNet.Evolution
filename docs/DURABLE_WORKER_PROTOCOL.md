@@ -162,7 +162,9 @@ acknowledged `claim`, `heartbeat`, `cancel` or `commit` therefore survives a cra
 host. The endpoint waits for that flush after releasing its command lock, so commands from
 other connections can share one flush (group commit). They still take effect in arrival
 order. If the flush fails, the reply is an error: reopen the store and reconcile, as for any
-other storage failure. See the storage boundary in
+other storage failure. Each acknowledged command appends one record sized by what it
+changed, so the cost of an acknowledgement does not grow with the number of leases the
+host has served. See the storage boundary in
 [durable accounting and engine bridge](DURABLE_EXTERNAL_WORK.md#storage-boundary).
 
 An accepted delivery result still requires the caller's pinned decoder and independent

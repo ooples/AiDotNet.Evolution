@@ -1,6 +1,7 @@
 // Source: ooples/AiDotNet 66d7602c92101e5ab2bd9db8cfa7f7526fa2c75d:tests/AiDotNet.Tests/UnitTests/Evolution/Programs/ProgramGenomeCodecTests.cs; original BSL license retained in src/AiDotNet.Evolution.Programs/AIDOTNET-LICENSE.txt.
 using System.IO;
 using AiDotNet.Evolution.Programs;
+using Newtonsoft.Json.Linq;
 using Xunit;
 
 namespace AiDotNetTests.UnitTests.Evolution.Programs;
@@ -69,8 +70,116 @@ public sealed class ProgramGenomeCodecTests
     [InlineData("{\"v\":2,\"language\":\"Python\",\"source\":\"x\"}")]
     [InlineData("{\"v\":\"one\",\"language\":\"Python\",\"source\":\"x\"}")]
     [InlineData("{\"v\":1,\"language\":\"Python\",\"source\":\"   \"}")]
+    [InlineData("{\"v\":1,\"language\":\"Python\",\"source\":\"x\"} 1")]
+    [InlineData("{\"v\":1,\"language\":\"Python\",\"source\":\"x\"}{}")]
+    [InlineData("{\"v\":1,\"language\":\"Python\",\"source\":\"x\"")]
     public void MalformedPayloadsRaiseInvalidData(string payload) =>
         Assert.Throws<InvalidDataException>(() => Codec.Deserialize(payload));
+
+    // E-1 reads payloads through pooled reader buffers. A source far longer than the reader's first buffer, with escapes
+    // throughout, must still come back exactly, and decoding many in a row must not let one payload's text leak into the
+    // next through a reused buffer.
+    [Fact]
+    public void LongEscapedSourcesRoundTripExactlyThroughReusedBuffers()
+    {
+        for (int round = 0; round < 64; round++)
+        {
+            string source = "# candidate " + round + "\r\n" + string.Concat(Enumerable.Range(0, 300)
+                .Select(line => "value_" + line + " = \"\\t" + (round * 300 + line) + "\"\t# caf\u00E9 \uD83D\uDE80\n"));
+            var genome = new ProgramGenome(source, ProgramLanguage.Python, round % 2 == 0 ? null : "d" + round);
+            ProgramGenome restored = Codec.Deserialize(Codec.Serialize(genome));
+            Assert.Equal(genome.Source, restored.Source);
+            Assert.Equal(genome.Description, restored.Description);
+            Assert.Equal(genome.Id, restored.Id);
+        }
+    }
+
+    // JObject.Parse accepts a trailing comment and white space after the object; the pooled reader keeps that.
+    [Fact]
+    public void TrailingCommentsAndWhiteSpaceAreStillAccepted()
+    {
+        ProgramGenome restored = Codec.Deserialize("{\"v\":1,\"language\":\"Python\",\"source\":\"x\"} /* note */ \n");
+        Assert.Equal("x", restored.Source);
+    }
+
+    // E-1 reads canonical payloads without Json.NET and sends everything else to it. Whichever path a payload takes, it
+    // must decode to what Json.NET's JObject reading gives, or be refused when that reading is refused.
+    [Theory]
+    [InlineData("{\"v\":1,\"language\":\"Python\",\"source\":\"x = 1\"}")]
+    [InlineData("{\"v\":1,\"language\":\"Python\",\"source\":\"x = 1\",\"description\":\"d\"}")]
+    [InlineData("{\"source\":\"x\",\"description\":\"d\",\"language\":\"Python\",\"v\":1}")]
+    [InlineData("{\"v\":1,\"language\":\"Python\",\"source\":\"2020-01-01T00:00:00Z\"}")]
+    [InlineData("{\"v\":1,\"language\":\"Python\",\"source\":\"x\",\"description\":\"2020-01-01T00:00:00\"}")]
+    [InlineData("{\"v\":1,\"language\":\"Python\",\"source\":\"\\/Date(1234567890000)\\/\"}")]
+    [InlineData("{\"v\":1,\"language\":\"Python\",\"source\":\"first\",\"source\":\"second\"}")]
+    [InlineData("{\"v\":1,\"language\":\"Python\",\"source\":\"x\",\"extra\":[1,2]}")]
+    [InlineData("{\"v\":1,\"language\":\"Python\",\"source\":\"x\",\"description\":null}")]
+    [InlineData("{\"v\":1,\"language\":\"1\",\"source\":\"x\"}")]
+    [InlineData("{\"v\":1,\"language\":\"Python, CSharp\",\"source\":\"x\"}")]
+    [InlineData("{\"v\":1,\"language\":\"Python\",\"source\":\"caf\\u00e9 \\ud83d\\ude80\"}")]
+    [InlineData("{\"v\":1,\"language\":\"Python\",\"source\":\"lone \\ud800 surrogate\"}")]
+    [InlineData("{\"\\u0076\":1,\"language\":\"Python\",\"source\":\"x\"}")]
+    [InlineData("{\"v\":1.0,\"language\":\"Python\",\"source\":\"x\"}")]
+    [InlineData("{\"v\":1,\"language\":\"Python\",\"source\":\"x\"} // trailing")]
+    [InlineData("{'v':1,'language':'Python','source':'x'}")]
+    [InlineData("{\"v\":1,\"language\":\"Python\",\"source\":\"x\",}")]
+    [InlineData("  {\"v\":1,\"language\":\"Python\",\"source\":\"x\"}  ")]
+    [InlineData("{\"v\":1,\"language\":\"Python\",\"source\":\"tab\\there\\nnew \\\"quoted\\\" \\\\ back\"}")]
+    [InlineData("{\"v\":1,\"language\":\"Python\",\"source\":\"\\b\\f\\/\\r \\u0041\\u00E9\\u00e9\"}")]
+    [InlineData("{\"v\":1,\"language\":\"Python\",\"source\":\"\\u0031 starts with a digit once unescaped\"}")]
+    [InlineData("{\"v\":1,\"language\":\"Python\",\"source\":\"\\/ starts with a slash once unescaped\"}")]
+    [InlineData("{\"v\":1,\"language\":\"Python\",\"source\":\"bad \\x escape\"}")]
+    [InlineData("{\"v\":1,\"language\":\"Python\",\"source\":\"single \\u12 hex\"}")]
+    [InlineData("{\"v\":1,\"language\":\"Python\",\"source\":\"apostrophe \\u0027 and \\\' escape\"}")]
+    [InlineData("{\"v\":1,\"language\":\"Python\",\"source\":\"raw\ttab and raw\nnewline\"}")]
+    [InlineData("{\"v\": 1, \"language\": \"Python\", \"source\": \"x\"}")]
+    [InlineData("{\"v\":12,\"language\":\"Python\",\"source\":\"x\"}")]
+    [InlineData("{\"v\":1,\"language\":\"Python\",\"source\":\"unterminated")]
+    [InlineData("{\"v\":1,\"language\":\"Python\",\"source\":\"x\"}}")]
+    [InlineData("{\"v\":1,\"lang\\u0075age\":\"Python\",\"source\":\"x\"}")]
+    [InlineData("{\"v\":1,\"language\":\"Python\",\"source\":\"x\",\"description\":\"\"}")]
+    [InlineData("{\"v\":1,\"language\":\"Python\",\"source\":\"\"}")]
+    public void EveryPayloadDecodesAsJsonNetReadsIt(string payload)
+    {
+        (string? Language, string? Source, string? Description)? expected;
+        try
+        {
+            JObject parsed = JObject.Parse(payload);
+            JToken? version = parsed["v"];
+            expected = version is { Type: JTokenType.Integer } && version.Value<int>() == ProgramGenomeCodec.PayloadVersion
+                ? (parsed["language"]?.Value<string>(), parsed["source"]?.Value<string>(), parsed["description"]?.Value<string>())
+                : null;
+        }
+        catch (Newtonsoft.Json.JsonException)
+        {
+            expected = null;
+        }
+
+        ProgramGenome? decoded;
+        try
+        {
+            decoded = Codec.Deserialize(payload);
+        }
+        catch (InvalidDataException)
+        {
+            decoded = null;
+        }
+
+        if (decoded is null)
+        {
+            // Refused: Json.NET either refused it too, or read something that is not a valid genome.
+            if (expected is { } value && value.Source is { } source && !string.IsNullOrWhiteSpace(value.Language) &&
+                Enum.TryParse(value.Language, out ProgramLanguage language) && Enum.IsDefined(typeof(ProgramLanguage), language))
+                Assert.Throws<ArgumentException>(() => new ProgramGenome(source, language, value.Description));
+            return;
+        }
+
+        Assert.True(expected.HasValue, "the codec accepted a payload Json.NET refuses");
+        (string? Language, string? Source, string? Description) read = expected.GetValueOrDefault();
+        Assert.Equal(read.Source, decoded.Source);
+        Assert.Equal(read.Description, decoded.Description);
+        Assert.Equal((ProgramLanguage)Enum.Parse(typeof(ProgramLanguage), read.Language ?? string.Empty), decoded.Language);
+    }
 
     [Fact]
     public void NullArgumentsAreRejected()

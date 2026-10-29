@@ -87,10 +87,10 @@ public sealed class SegmentedCheckpointTests
     }
 
     [Fact]
-    public async Task A_segmented_payload_leaves_out_exactly_the_deduplication_set_and_cache()
+    public async Task A_segmented_payload_leaves_out_exactly_the_deduplication_set_cache_and_archive_entries()
     {
-        // The two structures that grow with every distinct genome are the whole difference; everything else, bounded by
-        // the archive, is identical apart from the segment list and the version.
+        // The two structures that grow with every distinct genome, and the archive entries (E-1), are the whole
+        // difference; everything else is identical apart from the segment list and the version.
         async Task<JsonObject> Saved(EvolutionCheckpointFormat format)
         {
             var store = new InMemoryEvolutionCheckpointStore();
@@ -108,7 +108,22 @@ public sealed class SegmentedCheckpointTests
             if (field.Key is "SeenGenomeIds" or "Cache" or "SchemaVersion" or "BudgetOptions" or "Islands") continue;
             Assert.Equal(field.Value?.ToJsonString(), segmented[field.Key]?.ToJsonString());
         }
-        Assert.Equal(inline["SchemaVersion"]!.GetValue<int>() + 4, segmented["SchemaVersion"]!.GetValue<int>());
+        // The archive offset, not the deduplication-only one, so an engine that predates archive segments refuses it.
+        Assert.Equal(Assert.IsAssignableFrom<JsonValue>(inline["SchemaVersion"]).GetValue<int>() + 8,
+            Assert.IsAssignableFrom<JsonValue>(segmented["SchemaVersion"]).GetValue<int>());
+        JsonArray inlineIslands = Assert.IsType<JsonArray>(inline["Islands"]);
+        JsonArray segmentedIslands = Assert.IsType<JsonArray>(segmented["Islands"]);
+        Assert.Equal(inlineIslands.Count, segmentedIslands.Count);
+        for (int island = 0; island < inlineIslands.Count; island++)
+        {
+            JsonObject full = Assert.IsType<JsonObject>(inlineIslands[island]);
+            JsonObject journaled = Assert.IsType<JsonObject>(segmentedIslands[island]);
+            Assert.NotEmpty(Assert.IsType<JsonArray>(full["Entries"]));
+            Assert.Null(journaled["Entries"]);
+            Assert.True(Assert.IsAssignableFrom<System.Text.Json.Nodes.JsonValue>(journaled["EntriesInSegments"]).GetValue<bool>());
+            Assert.Equal(full["Version"]?.ToJsonString(), journaled["Version"]?.ToJsonString());
+            Assert.Equal(full["Descriptors"]?.ToJsonString(), journaled["Descriptors"]?.ToJsonString());
+        }
         Assert.NotEmpty(Assert.IsType<JsonArray>(segmented["Segments"]));
         // An inline payload names no segments at all, so it is what engines before segments wrote.
         Assert.False(inline.ContainsKey("Segments"));
@@ -131,6 +146,58 @@ public sealed class SegmentedCheckpointTests
         resume.Resume = true;
         InvalidDataException refused = await Assert.ThrowsAsync<InvalidDataException>(() => Engine(resume, store).RunAsync(Seeds()));
         Assert.Contains("SHA-256", refused.Message, StringComparison.Ordinal);
+    }
+
+    // E-1 decodes segments concurrently, ahead of the one being applied. When several are bad, the resume must still
+    // report the first bad one in the checkpoint's order, as a one-at-a-time resume does, whichever decode fails first.
+    [Fact]
+    public async Task With_several_bad_segments_the_first_in_order_is_the_one_reported()
+    {
+        var store = new InMemoryEvolutionCheckpointStore();
+        await Engine(Options(40, EvolutionCheckpointFormat.Segmented, 0), store).RunAsync(Seeds());
+        EvolutionCheckpoint saved = Assert.IsType<EvolutionCheckpoint>(await store.LoadLatestAsync("segmented"));
+        Assert.True(saved.SegmentIds.Count >= 3, "the run should leave a base segment and at least two deltas");
+
+        // The first is tampered so only its SHA-256 check fails, which takes a full decode's worth of work; every later
+        // one is missing, which fails at once and is seen before the first decode can finish.
+        long first = saved.SegmentIds[0];
+        var bad = new BadSegmentStore(store, first, new HashSet<long>(saved.SegmentIds.Skip(1)));
+        EvolutionEngineOptions resume = Options(60, EvolutionCheckpointFormat.Segmented, 0);
+        resume.Resume = true;
+        InvalidDataException refused = await Assert.ThrowsAsync<InvalidDataException>(() => Engine(resume, bad).RunAsync(Seeds()));
+        Assert.Contains("SHA-256", refused.Message, StringComparison.Ordinal);
+        Assert.Contains($"segment {first} ", refused.Message, StringComparison.Ordinal);
+    }
+
+    // Serves one segment with a byte changed and reports others missing; everything else goes to the inner store.
+    private sealed class BadSegmentStore(InMemoryEvolutionCheckpointStore inner, long tampered, ISet<long> missing)
+        : IEvolutionCheckpointSegmentStore
+    {
+        public Task SaveAsync(EvolutionCheckpoint checkpoint, CancellationToken cancellationToken = default) =>
+            inner.SaveAsync(checkpoint, cancellationToken);
+
+        public Task<EvolutionCheckpoint?> LoadLatestAsync(string runId, CancellationToken cancellationToken = default) =>
+            inner.LoadLatestAsync(runId, cancellationToken);
+
+        public Task WriteSegmentAsync(string runId, long segmentId, Func<Stream, CancellationToken, Task> write,
+            CancellationToken cancellationToken = default) => inner.WriteSegmentAsync(runId, segmentId, write, cancellationToken);
+
+        public async Task<Stream?> OpenSegmentAsync(string runId, long segmentId, CancellationToken cancellationToken = default)
+        {
+            if (missing.Contains(segmentId)) return null;
+            Stream? stream = await inner.OpenSegmentAsync(runId, segmentId, cancellationToken);
+            if (stream is null || segmentId != tampered) return stream;
+            using (stream)
+            {
+                using var bytes = new MemoryStream();
+                await stream.CopyToAsync(bytes);
+                // Still valid JSON with the same meaning, so only the SHA-256 check can catch it.
+                string text = System.Text.Encoding.UTF8.GetString(bytes.ToArray());
+                string changed = text.Replace("\"IsBase\":true", "\"IsBase\": true");
+                Assert.NotEqual(text, changed);
+                return new MemoryStream(System.Text.Encoding.UTF8.GetBytes(changed));
+            }
+        }
     }
 
     [Fact]

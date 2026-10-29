@@ -140,6 +140,15 @@ The store holds an exclusive `work.owner` handle. It keeps two files:
   holds the work items, worker profiles and ledger operations that mutation changed. Its
   size depends on that change, not on how much work is retained (#119).
 
+Each record is framed as a magic number, its sequence number, its payload length, a hash
+of those header fields and the payload's SHA-256, followed by the payload. The length says
+where the record ends without reading the payload; the two checksums say whether what is
+there is what was written. Because a record's size no longer grows with the run, per-lease
+worker overhead stays flat over a run: in the
+[CI measurement at `4323954`](../benchmarks/evidence/worker-overhead/4323954-ci/README.md) the
+linux-x64 Python worker's median is 0.90 ms in the first tenth of 950 leases and 0.95 ms in
+the last, where the earlier whole-state rewrite went from 18.7 ms to 44.0 ms.
+
 Resource and delivery changes from one mutation are one record. A call returns only after
 its record, and every earlier record, has been flushed to disk. Concurrent callers share a
 flush (group commit): the first waiter writes every buffered record with one write and one
