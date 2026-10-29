@@ -252,6 +252,12 @@ class SummaryTests(unittest.TestCase):
         self.assertEqual(5, summary["model_calls"])
         self.assertEqual(0, summary["cells_with_unknown_spend"], "a failed cell that accounted for itself is known")
 
+    def test_the_summary_names_the_hardware_the_report_publishes(self):
+        # V1-43 (#123) names the hardware; without this the report could only say "not recorded by this bundle".
+        hardware = self.summary([{"Status": "completed", "ModelCalls": 1, "ModelTokens": 1}])["hardware"]
+        self.assertIn("logical processors", hardware)
+        self.assertNotIn("CPU not readable", hardware)
+        self.assertNotIn("memory not readable", hardware)
 
 class TransportDirectoryTests(unittest.TestCase):
     def test_a_second_attempt_gets_a_directory_of_its_own(self):

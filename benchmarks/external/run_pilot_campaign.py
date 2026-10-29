@@ -163,6 +163,7 @@ def summarise(rows, report, *, task, arguments, frozen, projection, wall, canari
         "model_tokens": sum(row["ModelTokens"] or 0 for row in rows),
         "cells_with_unknown_spend": sum(1 for row in rows if row["ModelCalls"] is None),
         "canaries": canaries,
+        "hardware": describe_hardware(),
         # Coverage below 1.0 means an admitted call left no receipt, so the bill cannot be reconciled.
         "receipt_coverage": {name: record["coverage"] for name, record in receipts.items()},
         "endpoints": report["Endpoints"],
@@ -256,6 +257,46 @@ def exit_status(failed, analysis):
     """
     return 1 if failed or "Unachievable" in analysis else 0
 
+
+
+def describe_hardware():
+    """The machine the campaign ran on, as the V1-43 report names it (#123): CPU, logical processors, memory, OS.
+
+    Each part is read from the operating system; a part that cannot be read says so instead of being guessed.
+    """
+    import os
+    import platform
+    import subprocess
+    cpu = None
+    memory = None
+    try:
+        if sys.platform == "win32":
+            import ctypes
+            import winreg
+            with winreg.OpenKey(winreg.HKEY_LOCAL_MACHINE, r"HARDWARE\DESCRIPTION\System\CentralProcessor\0") as key:
+                cpu = winreg.QueryValueEx(key, "ProcessorNameString")[0]
+
+            class Status(ctypes.Structure):
+                _fields_ = [("length", ctypes.c_ulong), ("load", ctypes.c_ulong), ("total", ctypes.c_ulonglong),
+                            ("available", ctypes.c_ulonglong), ("total_page", ctypes.c_ulonglong),
+                            ("available_page", ctypes.c_ulonglong), ("total_virtual", ctypes.c_ulonglong),
+                            ("available_virtual", ctypes.c_ulonglong), ("available_extended", ctypes.c_ulonglong)]
+            status = Status(length=ctypes.sizeof(Status))
+            if ctypes.windll.kernel32.GlobalMemoryStatusEx(ctypes.byref(status)):
+                memory = status.total
+        elif sys.platform == "darwin":
+            cpu = subprocess.check_output(["sysctl", "-n", "machdep.cpu.brand_string"], text=True).strip()
+            memory = int(subprocess.check_output(["sysctl", "-n", "hw.memsize"], text=True))
+        else:
+            with open("/proc/cpuinfo", encoding="utf-8") as info:
+                cpu = next((line.split(":", 1)[1].strip() for line in info if line.startswith("model name")), None)
+            memory = os.sysconf("SC_PAGE_SIZE") * os.sysconf("SC_PHYS_PAGES")
+    except (OSError, ValueError, subprocess.SubprocessError):
+        pass
+    return "%s; %s logical processors; %s; %s %s (%s); Python %s" % (
+        (cpu or "CPU not readable").strip(), os.cpu_count() or "unknown",
+        "%.0f GB memory" % (memory / 2**30) if memory else "memory not readable",
+        platform.system(), platform.release(), platform.machine(), platform.python_version())
 
 def main():
     parser = build_parser()
