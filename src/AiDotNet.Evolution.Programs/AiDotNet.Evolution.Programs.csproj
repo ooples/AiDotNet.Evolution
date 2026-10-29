@@ -1,6 +1,7 @@
 <Project Sdk="Microsoft.NET.Sdk">
   <PropertyGroup>
     <TargetFrameworks>net10.0;net8.0</TargetFrameworks>
+    <EvoReadyToRunPackage>true</EvoReadyToRunPackage>
     <ImplicitUsings>enable</ImplicitUsings>
     <Nullable>enable</Nullable>
     <TreatWarningsAsErrors>true</TreatWarningsAsErrors>
@@ -33,10 +34,10 @@
     compile reference for consumers. The project reference only orders the build; the target embeds its output.
   -->
   <ItemGroup>
-    <ProjectReference Include="../AiDotNet.Evolution.Sandbox.Guardian/AiDotNet.Evolution.Sandbox.Guardian.csproj" ReferenceOutputAssembly="false" Private="false" SetTargetFramework="TargetFramework=net8.0"/>
+    <ProjectReference Include="../AiDotNet.Evolution.Sandbox.Guardian/AiDotNet.Evolution.Sandbox.Guardian.csproj" ReferenceOutputAssembly="false" Private="false" SetTargetFramework="TargetFramework=net8.0" GlobalPropertiesToRemove="RuntimeIdentifier;SelfContained;PublishReadyToRun;NoBuild;AppendRuntimeIdentifierToOutputPath;EvoReadyToRunCompile;PublishDir"/>
   </ItemGroup>
   <Target Name="EmbedSandboxGuardian" BeforeTargets="AssignTargetPaths" DependsOnTargets="ResolveProjectReferences">
-    <MSBuild Projects="../AiDotNet.Evolution.Sandbox.Guardian/AiDotNet.Evolution.Sandbox.Guardian.csproj" Targets="Build" Properties="Configuration=$(Configuration);TargetFramework=net8.0">
+    <MSBuild Projects="../AiDotNet.Evolution.Sandbox.Guardian/AiDotNet.Evolution.Sandbox.Guardian.csproj" Targets="Build" Properties="Configuration=$(Configuration);TargetFramework=net8.0" RemoveProperties="RuntimeIdentifier;SelfContained;PublishReadyToRun;NoBuild;AppendRuntimeIdentifierToOutputPath;EvoReadyToRunCompile;PublishDir">
       <Output TaskParameter="TargetOutputs" ItemName="_SandboxGuardianAssembly"/>
     </MSBuild>
     <ItemGroup>

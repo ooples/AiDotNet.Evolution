@@ -25,7 +25,21 @@ try {
 }
 if (-not $missingTagRejected) { throw 'Release accepted a missing tag.' }
 Write-Host 'PR package passed before tagging; release package rejected missing tag.'
-$cases = @('missing-package', 'extra-package', 'dependency-version', 'missing-assembly', 'missing-license', 'missing-dependency', 'single-group-dependency', 'missing-group')
+$cases = @('missing-package', 'extra-package', 'dependency-version', 'missing-assembly', 'missing-license', 'missing-dependency', 'single-group-dependency', 'missing-group',
+    'missing-readytorun', 'wrong-machine-readytorun', 'foreign-readytorun')
+$readyToRunMessages = @{
+    'missing-readytorun' = 'Missing ReadyToRun image:*'
+    'wrong-machine-readytorun' = 'Not a linux-arm64 ReadyToRun image:*'
+    'foreign-readytorun' = 'ReadyToRun image was not compiled from the packaged IL:*'
+}
+function Set-PackageEntry([IO.Compression.ZipArchive] $Archive, [string] $Name, [string] $From) {
+    $buffer = [IO.MemoryStream]::new()
+    $stream = $Archive.GetEntry($From).Open()
+    try { $stream.CopyTo($buffer) } finally { $stream.Dispose() }
+    $Archive.GetEntry($Name).Delete()
+    $stream = $Archive.CreateEntry($Name).Open()
+    try { $buffer.Position = 0; $buffer.CopyTo($stream) } finally { $stream.Dispose() }
+}
 foreach ($case in $cases) {
     $fixture = Join-Path ([IO.Path]::GetTempPath()) ('evolution-release-negative-' + [Guid]::NewGuid().ToString('N'))
     New-Item -ItemType Directory -Path $fixture | Out-Null
@@ -38,6 +52,14 @@ foreach ($case in $cases) {
             $archive = [IO.Compression.ZipFile]::Open($target, [IO.Compression.ZipArchiveMode]::Update)
             try {
                 if ($case -eq 'missing-assembly') { $archive.GetEntry('lib/net8.0/AiDotNet.Evolution.Programs.dll').Delete() }
+                elseif ($case -eq 'missing-readytorun') { $archive.GetEntry('runtimes/linux-arm64/lib/net8.0/AiDotNet.Evolution.Programs.dll').Delete() }
+                # An x64 image where the arm64 one belongs, and an image compiled from the other framework's IL.
+                elseif ($case -eq 'wrong-machine-readytorun') {
+                    Set-PackageEntry $archive 'runtimes/linux-arm64/lib/net8.0/AiDotNet.Evolution.Programs.dll' 'runtimes/linux-x64/lib/net8.0/AiDotNet.Evolution.Programs.dll'
+                }
+                elseif ($case -eq 'foreign-readytorun') {
+                    Set-PackageEntry $archive 'runtimes/win-x64/lib/net8.0/AiDotNet.Evolution.Programs.dll' 'runtimes/win-x64/lib/net10.0/AiDotNet.Evolution.Programs.dll'
+                }
                 elseif ($case -eq 'missing-license') { $archive.GetEntry('AIDOTNET-LICENSE.txt').Delete() }
                 else {
                     $entry = $archive.GetEntry('AiDotNet.Evolution.Programs.nuspec')
@@ -64,6 +86,7 @@ foreach ($case in $cases) {
     try { & $validator -PackageDirectory $fixture -ExpectedVersion $Version } catch {
         if ($case -eq 'single-group-dependency' -and $_.Exception.Message -notlike 'Missing internal dependency:*') { throw }
         if ($case -eq 'missing-group' -and $_.Exception.Message -notlike 'Missing dependency group:*') { throw }
+        if ($readyToRunMessages.ContainsKey($case) -and $_.Exception.Message -notlike $readyToRunMessages[$case]) { throw }
         $rejected = $true
     }
     if (-not $rejected) { throw "Invalid release accepted: $case" }

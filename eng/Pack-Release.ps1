@@ -27,7 +27,7 @@ foreach ($project in $projects) {
     # Version must reach ProjectReferences too, not only the top-level nuspec.
     # GeneratePackageOnBuild otherwise makes Pack skip building on clean runners.
     dotnet pack "$root/src/$project/$project.csproj" -c Release -o $output `
-        "-p:Version=$Version" "-p:PackageVersion=$Version" -p:GeneratePackageOnBuild=false
+        "-p:Version=$Version" "-p:PackageVersion=$Version" -p:GeneratePackageOnBuild=false -p:EvoReadyToRun=true
     if ($LASTEXITCODE -ne 0) { throw "Release pack failed: $project" }
 }
 & "$PSScriptRoot/Test-ReleasePackages.ps1" -PackageDirectory $output -ExpectedVersion $Version

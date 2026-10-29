@@ -12,7 +12,8 @@ param(
 
 $ErrorActionPreference = 'Stop'
 $resolvedPackage = (Resolve-Path -LiteralPath $PackagePath).Path
-$maximumPackageBytes = 5MB
+# About 20 MB since E-1: the IL for five frameworks plus ReadyToRun images for six runtimes on net8.0 and net10.0.
+$maximumPackageBytes = 32MB
 
 $packageInfo = Get-Item -LiteralPath $resolvedPackage
 if ($packageInfo.Length -gt $maximumPackageBytes) {
