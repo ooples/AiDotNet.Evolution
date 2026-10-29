@@ -57,6 +57,14 @@ public sealed class ResumeRestoreTests
         Assert.NotEqual(GCLatencyMode.NoGCRegion, GCSettings.LatencyMode);
     }
 
+    [Theory]
+    [InlineData(10L << 20, 64L << 30, 80L << 20)] // Small checkpoint: eight times its segments.
+    [InlineData(4L << 30, 16L << 30, 4L << 30)] // Large checkpoint: a quarter of the memory the process may use.
+    [InlineData(long.MaxValue / 2, 16L << 30, 4L << 30)] // No overflow past the cap.
+    [InlineData(10L << 20, 0, 0)] // Nothing known to size against: no region.
+    public void A_resume_region_never_commits_more_than_a_quarter_of_available_memory(long segmentBytes, long availableBytes, long expected) =>
+        Assert.Equal(expected, EvolutionEngine<TestGenome>.ResumeRegionBudget(segmentBytes, availableBytes));
+
     [Fact]
     public async Task Turning_the_option_off_keeps_collection_running_during_a_resume()
     {

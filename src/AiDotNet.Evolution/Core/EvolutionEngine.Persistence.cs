@@ -320,6 +320,13 @@ public sealed partial class EvolutionEngine<TGenome>
     private const long ResumeAllocationPerSegmentByte = 8;
     // Below this a resume's collections are cheap, and committing a region would cost more than it saves.
     private const long MinimumSuspendedResumeBytes = 16L * 1024 * 1024;
+    // A region is committed up front, so it never takes more than this share of the memory the process may use: a
+    // checkpoint of several gigabytes would otherwise commit eight times its size before reading a byte.
+    private const long ResumeRegionMemoryShare = 4;
+#if !NETCOREAPP3_0_OR_GREATER
+    // .NET Framework reports no memory limit to size against, so a region there stays small.
+    private const long MaximumSuspendedResumeBytesWithoutMemoryInfo = 256L * 1024 * 1024;
+#endif
     // Set while this engine holds the no-GC region it opened for a resume.
     private bool _collectionSuspended;
 
@@ -344,7 +351,7 @@ public sealed partial class EvolutionEngine<TGenome>
         long segmentBytes = store.SegmentBytes(_options.RunId, checkpoint.SegmentIds);
         if (segmentBytes <= 0) return;
         // Halved when the runtime refuses the size; a smaller region still removes most of the collections.
-        for (long budget = segmentBytes * ResumeAllocationPerSegmentByte; budget >= MinimumSuspendedResumeBytes; budget /= 2)
+        for (long budget = ResumeRegionBudget(segmentBytes, AvailableMemoryBytes()); budget >= MinimumSuspendedResumeBytes; budget /= 2)
         {
             try
             {
@@ -361,6 +368,22 @@ public sealed partial class EvolutionEngine<TGenome>
             }
         }
     }
+
+    // What a resume reading this many segment bytes asks to allocate without a collection.
+    internal static long ResumeRegionBudget(long segmentBytes, long availableBytes)
+    {
+        long wanted = segmentBytes > long.MaxValue / ResumeAllocationPerSegmentByte
+            ? long.MaxValue
+            : segmentBytes * ResumeAllocationPerSegmentByte;
+        return Math.Min(wanted, Math.Max(0, availableBytes) / ResumeRegionMemoryShare);
+    }
+
+    private static long AvailableMemoryBytes() =>
+#if NETCOREAPP3_0_OR_GREATER
+        GC.GetGCMemoryInfo().TotalAvailableMemoryBytes;
+#else
+        MaximumSuspendedResumeBytesWithoutMemoryInfo * ResumeRegionMemoryShare;
+#endif
 
     private void EndResumeCollectionSuspension()
     {
