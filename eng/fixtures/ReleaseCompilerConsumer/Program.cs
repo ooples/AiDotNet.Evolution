@@ -19,3 +19,25 @@ if (PtxKernelContract.FromJson(contract.ToJson()).Fingerprint != contract.Finger
 if (typeof(PtxProgramCompiler).Assembly.GetManifestResourceInfo("AiDotNet.Evolution.Ptx.Worker.dll") is null)
     throw new InvalidOperationException("Packaged PTX module is missing its isolated worker.");
 Console.WriteLine("Packaged PTX module round-tripped a contract and carries its worker.");
+
+// The release packages carry ReadyToRun images (E-1): on a runtime they cover, a portable app must load the image for
+// that runtime, not the IL beside it.
+string runtime = System.Runtime.InteropServices.RuntimeInformation.RuntimeIdentifier;
+if (new[] { "win-x64", "win-arm64", "linux-x64", "linux-arm64", "osx-x64", "osx-arm64" }.Contains(runtime))
+{
+    foreach (string name in new[] { "AiDotNet.Evolution", "AiDotNet.Evolution.Programs", "AiDotNet.Evolution.CSharp", "AiDotNet.Evolution.Ptx" })
+    {
+        string location = System.Reflection.Assembly.Load(name).Location;
+        string expected = Path.Combine("runtimes", runtime, "lib");
+        if (!location.Contains(expected, StringComparison.Ordinal))
+            throw new InvalidOperationException($"{name} loaded from {location}, not its {runtime} ReadyToRun image.");
+        using var image = new System.Reflection.PortableExecutable.PEReader(File.OpenRead(location));
+        if (image.PEHeaders.CorHeader is not { ManagedNativeHeaderDirectory.Size: > 0 })
+            throw new InvalidOperationException($"{name} at {location} is not precompiled.");
+    }
+    Console.WriteLine($"Packaged assemblies loaded as {runtime} ReadyToRun images.");
+}
+else
+{
+    Console.WriteLine($"No ReadyToRun images ship for {runtime}; the IL was loaded.");
+}

@@ -12,4 +12,50 @@
       <Analyzer Remove="@(Analyzer)" Condition="'%(Filename)' == 'AiDotNet.Generators'" />
     </ItemGroup>
   </Target>
+  <!--
+    ReadyToRun packages (E-1). A resume of 10,000 elites spends a large share of its first second in the JIT, so the
+    .NET packages also carry precompiled images for every common runtime under runtimes/<rid>/lib/<tfm>/. A portable
+    app lists them as runtimeTargets and the host loads the one for the machine it runs on; any other runtime, and
+    every compile, uses the IL in lib/<tfm>/. A project opts in with EvoReadyToRunPackage; eng/Pack-Release.ps1 turns
+    it on with EvoReadyToRun, so ordinary restores and builds never download the runtime packs it compiles against.
+  -->
+  <PropertyGroup Condition="'$(EvoReadyToRun)' == 'true' and '$(EvoReadyToRunPackage)' == 'true' and '$([MSBuild]::GetTargetFrameworkIdentifier($(TargetFramework)))' == '.NETCoreApp'">
+    <EvoReadyToRunRuntimeIdentifiers Condition="'$(EvoReadyToRunRuntimeIdentifiers)' == ''">win-x64;win-arm64;linux-x64;linux-arm64;osx-x64;osx-arm64</EvoReadyToRunRuntimeIdentifiers>
+    <RuntimeIdentifiers>$(EvoReadyToRunRuntimeIdentifiers)</RuntimeIdentifiers>
+    <PublishReadyToRun>true</PublishReadyToRun>
+    <!-- Only Microsoft.NETCore.App is referenced; without this, restore also fetches ASP.NET Core and desktop runtime packs. -->
+    <DisableTransitiveFrameworkReferenceDownloads>true</DisableTransitiveFrameworkReferenceDownloads>
+    <TargetsForTfmSpecificContentInPackage>$(TargetsForTfmSpecificContentInPackage);EvoReadyToRunPackageFiles</TargetsForTfmSpecificContentInPackage>
+  </PropertyGroup>
+
+  <Target Name="EvoReadyToRunPackageFiles" Condition="'$(EvoReadyToRunRuntimeIdentifiers)' != ''">
+    <ItemGroup>
+      <_EvoReadyToRunRid Include="$(EvoReadyToRunRuntimeIdentifiers)" />
+    </ItemGroup>
+    <!--
+      Compiles the IL this package ships rather than rebuilding it per runtime: NoBuild with the runtime-agnostic output
+      paths, so each image carries the packaged assembly's identity and its symbols.
+    -->
+    <MSBuild Projects="$(MSBuildProjectFullPath)" Targets="Publish"
+             Properties="TargetFramework=$(TargetFramework);RuntimeIdentifier=%(_EvoReadyToRunRid.Identity);SelfContained=false;PublishReadyToRun=true;GeneratePackageOnBuild=false;NoBuild=true;BuildProjectReferences=false;AppendRuntimeIdentifierToOutputPath=false;EvoReadyToRunCompile=true;PublishDir=$(MSBuildProjectDirectory)/$(IntermediateOutputPath)readytorun/%(_EvoReadyToRunRid.Identity)/" />
+    <ItemGroup>
+      <TfmSpecificPackageFile Include="$(MSBuildProjectDirectory)/$(IntermediateOutputPath)readytorun/%(_EvoReadyToRunRid.Identity)/$(TargetFileName)"
+                              PackagePath="runtimes/%(_EvoReadyToRunRid.Identity)/lib/$(TargetFramework)" />
+    </ItemGroup>
+  </Target>
+
+  <!--
+    Every runtime compiles into the same intermediate directory (the SDK fixes it), and the compile is skipped when the
+    image there is newer than the IL, so the first runtime's image would be published for all of them. Start each clean.
+    Only this project's assembly is packed, so only it is compiled: publish would otherwise precompile every dependency
+    as well (Roslyn for CSharp, 46 packages for Deployment) twelve times over, and the pack job ran past its timeout.
+  -->
+  <Target Name="EvoReadyToRunCleanCompile" BeforeTargets="_PrepareForReadyToRunCompilation" Condition="'$(EvoReadyToRunCompile)' == 'true'">
+    <RemoveDir Directories="$(IntermediateOutputPath)R2R" />
+    <ItemGroup>
+      <PublishReadyToRunExclude Include="%(ResolvedFileToPublish.Filename)%(ResolvedFileToPublish.Extension)"
+                                Condition="'%(ResolvedFileToPublish.Extension)' == '.dll' and '%(ResolvedFileToPublish.Filename)%(ResolvedFileToPublish.Extension)' != '$(TargetFileName)'" />
+    </ItemGroup>
+  </Target>
+
 </Project>

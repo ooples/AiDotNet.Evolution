@@ -14,6 +14,26 @@ if (Compare-Object ($expectedNames | Sort-Object) (@($packages.Name) | Sort-Obje
     throw 'Release package inventory is missing, unexpected, or version-mismatched.'
 }
 Add-Type -AssemblyName System.IO.Compression.FileSystem
+# Every library ships ReadyToRun images for these runtimes beside its IL (E-1); a portable app loads the one that matches.
+$readyToRunRuntimes = @('win-x64', 'win-arm64', 'linux-x64', 'linux-arm64', 'osx-x64', 'osx-arm64')
+$readyToRunMachines = @{ 'x64' = [Reflection.PortableExecutable.Machine]::Amd64; 'arm64' = [Reflection.PortableExecutable.Machine]::Arm64 }
+# crossgen2 marks a non-Windows image by XOR-ing the machine with an OS constant.
+$readyToRunOs = @{ 'win' = 0; 'linux' = 0x7B79; 'osx' = 0x4644 }
+function Read-PackageImage([IO.Compression.ZipArchiveEntry] $Entry) {
+    $buffer = [IO.MemoryStream]::new()
+    $stream = $Entry.Open()
+    try { $stream.CopyTo($buffer) } finally { $stream.Dispose() }
+    $buffer.Position = 0
+    $pe = [Reflection.PortableExecutable.PEReader]::new($buffer)
+    try {
+        $metadata = [Reflection.Metadata.PEReaderExtensions]::GetMetadataReader($pe)
+        [pscustomobject] @{
+            Mvid = $metadata.GetGuid($metadata.GetModuleDefinition().Mvid)
+            Machine = [int] $pe.PEHeaders.CoffHeader.Machine
+            ReadyToRun = $pe.PEHeaders.CorHeader.ManagedNativeHeaderDirectory.Size -gt 0
+        }
+    } finally { $pe.Dispose() }
+}
 foreach ($id in $ids) {
     $archive = [IO.Compression.ZipFile]::OpenRead((Join-Path $PackageDirectory "$id.$ExpectedVersion.nupkg"))
     try {
@@ -28,6 +48,21 @@ foreach ($id in $ids) {
         foreach ($framework in $frameworks) {
             $assembly = if ($tools.ContainsKey($id)) { "tools/$framework/any/$($tools[$id]).dll" } else { "lib/$framework/$id.dll" }
             if ($null -eq $archive.GetEntry($assembly)) { throw "Missing $framework assembly: $id" }
+        }
+        if (-not $tools.ContainsKey($id)) {
+            foreach ($framework in @('net8.0', 'net10.0')) {
+                $il = Read-PackageImage $archive.GetEntry("lib/$framework/$id.dll")
+                if ($il.ReadyToRun) { throw "IL assembly is precompiled: $id [$framework]" }
+                foreach ($runtime in $readyToRunRuntimes) {
+                    $entry = $archive.GetEntry("runtimes/$runtime/lib/$framework/$id.dll")
+                    if ($null -eq $entry) { throw "Missing ReadyToRun image: $id [$runtime/$framework]" }
+                    $image = Read-PackageImage $entry
+                    $os, $architecture = $runtime -split '-'
+                    $machine = [int] $readyToRunMachines[$architecture] -bxor $readyToRunOs[$os]
+                    if (-not $image.ReadyToRun -or $image.Machine -ne $machine) { throw "Not a $runtime ReadyToRun image: $id [$framework]" }
+                    if ($image.Mvid -ne $il.Mvid) { throw "ReadyToRun image was not compiled from the packaged IL: $id [$runtime/$framework]" }
+                }
+            }
         }
         if ($tools.ContainsKey($id) -and 'DotnetTool' -notin @($spec.SelectNodes('//*[local-name()="packageType"]').name)) {
             throw "Not a dotnet tool package: $id"

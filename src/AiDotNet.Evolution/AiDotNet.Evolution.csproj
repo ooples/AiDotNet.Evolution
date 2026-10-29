@@ -33,6 +33,7 @@
     <SymbolPackageFormat>snupkg</SymbolPackageFormat>
     <EnablePackageValidation>true</EnablePackageValidation>
     <PackageValidationBaselineVersion>0.2.0</PackageValidationBaselineVersion>
+    <EvoReadyToRunPackage>true</EvoReadyToRunPackage>
   </PropertyGroup>
 
   <ItemGroup>

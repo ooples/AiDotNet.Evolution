@@ -1,6 +1,7 @@
 <Project Sdk="Microsoft.NET.Sdk">
   <PropertyGroup>
     <TargetFrameworks>net10.0;net8.0</TargetFrameworks>
+    <EvoReadyToRunPackage>true</EvoReadyToRunPackage>
     <ImplicitUsings>enable</ImplicitUsings>
     <Nullable>enable</Nullable>
     <TreatWarningsAsErrors>true</TreatWarningsAsErrors>
@@ -29,10 +30,10 @@
     target builds and embeds the worker explicitly, so a clean net10.0 build never embeds a file that does not exist yet.
   -->
   <ItemGroup>
-    <ProjectReference Include="../AiDotNet.Evolution.Ptx.Worker/AiDotNet.Evolution.Ptx.Worker.csproj" ReferenceOutputAssembly="false" Private="false" SetTargetFramework="TargetFramework=net8.0"/>
+    <ProjectReference Include="../AiDotNet.Evolution.Ptx.Worker/AiDotNet.Evolution.Ptx.Worker.csproj" ReferenceOutputAssembly="false" Private="false" SetTargetFramework="TargetFramework=net8.0" GlobalPropertiesToRemove="RuntimeIdentifier;SelfContained;PublishReadyToRun;NoBuild;AppendRuntimeIdentifierToOutputPath;EvoReadyToRunCompile;PublishDir"/>
   </ItemGroup>
   <Target Name="EmbedPtxWorker" BeforeTargets="AssignTargetPaths" DependsOnTargets="ResolveProjectReferences">
-    <MSBuild Projects="../AiDotNet.Evolution.Ptx.Worker/AiDotNet.Evolution.Ptx.Worker.csproj" Targets="Build" Properties="Configuration=$(Configuration);TargetFramework=net8.0">
+    <MSBuild Projects="../AiDotNet.Evolution.Ptx.Worker/AiDotNet.Evolution.Ptx.Worker.csproj" Targets="Build" Properties="Configuration=$(Configuration);TargetFramework=net8.0" RemoveProperties="RuntimeIdentifier;SelfContained;PublishReadyToRun;NoBuild;AppendRuntimeIdentifierToOutputPath;EvoReadyToRunCompile;PublishDir">
       <Output TaskParameter="TargetOutputs" ItemName="_PtxWorkerAssembly"/>
     </MSBuild>
     <ItemGroup>
