@@ -12,7 +12,8 @@ public static class ProfileProtocol
     /// <summary>An upper bound on repetitions inside one measured phase; exceeding it fails instead of reporting a sub-resolution time.</summary>
     public const int MaximumIterations = 1_000_000;
 
-    /// <summary>A simulated asynchronous delay may exceed its request by this much on average before the attempt fails.</summary>
+    /// <summary>How far the median of a simulated asynchronous delay bucket may exceed its request before the attempt fails;
+    /// the mean is not held to it, since one preempted wake on a busy host moves the mean but not the median.</summary>
     public const double DelayToleranceMilliseconds = 2.0;
 
     /// <summary>Foreign (non-worker) busy time on the pinned CPUs above this share of their capacity fails the attempt.</summary>
