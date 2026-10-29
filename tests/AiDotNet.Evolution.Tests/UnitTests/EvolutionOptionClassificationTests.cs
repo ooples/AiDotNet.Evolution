@@ -26,7 +26,9 @@ public sealed class EvolutionOptionClassificationTests
         // How checkpoints store the deduplication set and cache, never what is in them: a run resumes under either format.
         nameof(EvolutionEngineOptions.CheckpointFormat),
         nameof(EvolutionEngineOptions.CheckpointSegmentThreshold),
-        nameof(EvolutionEngineOptions.CheckpointCompactionInterval)
+        nameof(EvolutionEngineOptions.CheckpointCompactionInterval),
+        // How the resume schedules garbage collection, never what it restores: the state hash is identical either way.
+        nameof(EvolutionEngineOptions.SuspendGarbageCollectionDuringResume)
     };
 
     // The third category, and the only one allowed to appear in NEITHER canonical string. A derived option does not
