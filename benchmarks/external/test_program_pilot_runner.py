@@ -140,6 +140,16 @@ class BudgetConsistencyTests(unittest.TestCase):
             self.assertIsInstance(code, str)
             self.assertIn("token ceiling would bind", code)
 
+    def test_a_budget_the_broker_would_refuse_is_refused_before_anything_is_frozen(self):
+        # A projection used to print and accept a budget the broker then refused in every cell.
+        for flag, value in (("--model-calls", runner.program_broker.MAX_MODEL_CALLS + 1), ("--wall-seconds", runner.program_broker.MAX_SECONDS + 1)):
+            with tempfile.TemporaryDirectory() as directory:
+                root = Path(directory) / "campaign"
+                code, _ = invoke(root, flag, str(value), "--model-tokens", "10000000")
+                self.assertIsInstance(code, str)
+                self.assertIn("outside the broker", code)
+                self.assertFalse(root.exists())
+
     def test_the_defaults_leave_the_call_ceiling_binding(self):
         # Read from the parser itself, so a default cannot be asserted from memory.
         defaults = {action.dest: action.default for action in runner.build_parser()._actions}

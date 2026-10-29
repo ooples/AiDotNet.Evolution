@@ -34,6 +34,7 @@ from claude_transport import ClaudeModelSet, reconcile_receipts  # noqa: E402
 import campaign_registration as registration  # noqa: E402
 import campaign_runner as runner  # noqa: E402
 import pilot_broker  # noqa: E402
+import program_broker  # noqa: E402
 import pilot_campaign  # noqa: E402
 import pilot_cells  # noqa: E402
 import pilot_searchers  # noqa: E402
@@ -264,6 +265,12 @@ def main():
 
     if not (math.isfinite(arguments.target_half_width) and arguments.target_half_width > 0):
         raise SystemExit("--target-half-width must be a positive, finite number; it sizes the gate campaign")
+    # The broker refuses these per cell, after the confirmation: a 90-call, 7,200 s projection printed and was
+    # confirmed, then every one of its 18 cells failed with "Invalid broker budget" (E-4 pilot, 2026-10-29).
+    if not 1 <= arguments.model_calls <= program_broker.MAX_MODEL_CALLS:
+        raise SystemExit("--model-calls %d is outside the broker's 1..%d per cell" % (arguments.model_calls, program_broker.MAX_MODEL_CALLS))
+    if not 0 < arguments.wall_seconds <= program_broker.MAX_SECONDS:
+        raise SystemExit("--wall-seconds %r is outside the broker's (0, %d] per cell" % (arguments.wall_seconds, program_broker.MAX_SECONDS))
     budget_tokens = arguments.model_calls * TOKENS_PER_CALL
     if arguments.model_tokens < budget_tokens:
         raise SystemExit("--model-tokens %d is below %d calls x ~%d tokens: the token ceiling would bind "
