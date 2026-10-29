@@ -476,6 +476,9 @@ jobs:
           ./eng/Pack-Release.ps1 -Version $version -OutputDirectory artifacts
           ./eng/Test-ReleasePackageFailures.ps1 -PackageDirectory artifacts -Version $version
           ./eng/Test-ReleaseConsumers.ps1 -Version $version -PackageDirectory artifacts
+          dotnet tool restore
+          if ($LASTEXITCODE -ne 0) { throw 'Tool restore failed.' }
+          ./eng/New-ReleaseSbom.ps1 -Version $version -PackageDirectory artifacts
       - name: Validate package contents and dependency boundary
         shell: pwsh
         run: |
@@ -489,6 +492,7 @@ jobs:
           path: |
             artifacts/*.nupkg
             artifacts/*.snupkg
+            artifacts/*.cdx.json
           if-no-files-found: error
 
   noisy-reuse:

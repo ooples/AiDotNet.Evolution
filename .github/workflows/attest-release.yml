@@ -27,3 +27,4 @@ jobs:
           subject-path: |
             out/*.nupkg
             out/*.snupkg
+            out/*.cdx.json

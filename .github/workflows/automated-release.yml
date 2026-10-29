@@ -145,6 +145,15 @@ jobs:
         env:
           RELEASE_VERSION: ${{ needs.validate.outputs.version }}
         run: ./.release-tooling/eng/Test-ReleaseConsumers.ps1 -Version $env:RELEASE_VERSION -PackageDirectory out
+      # One CycloneDX SBOM per package (E-5), from the restored release tree, checked against what each package ships.
+      - name: Generate package SBOMs
+        shell: pwsh
+        env:
+          RELEASE_VERSION: ${{ needs.validate.outputs.version }}
+        run: |
+          dotnet tool restore --tool-manifest ./.release-tooling/.config/dotnet-tools.json
+          if ($LASTEXITCODE -ne 0) { throw 'Tool restore failed.' }
+          ./.release-tooling/eng/New-ReleaseSbom.ps1 -Version $env:RELEASE_VERSION -PackageDirectory out -SourceDirectory .
       - name: Sign NuGet packages when certificate is configured
         shell: pwsh
         env:
@@ -179,6 +188,7 @@ jobs:
           path: |
             out/*.nupkg
             out/*.snupkg
+            out/*.cdx.json
           if-no-files-found: error
           retention-days: 30
 
@@ -263,4 +273,4 @@ jobs:
           set -euo pipefail
           # The release report and the complete declared bundle are published beside the packages (US-12).
           (cd evidence && zip -qr ../release-evidence-bundle.zip .)
-          gh release upload "$RELEASE_TAG" out/*.nupkg out/*.snupkg evidence/release-evidence.json release-evidence-bundle.zip --clobber --repo "$REPOSITORY"
+          gh release upload "$RELEASE_TAG" out/*.nupkg out/*.snupkg out/*.cdx.json evidence/release-evidence.json release-evidence-bundle.zip --clobber --repo "$REPOSITORY"
