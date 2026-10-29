@@ -1,0 +1,123 @@
+name: Test reruns
+
+# V1-80 (#182): "the full test suite, run 200 times on CI (all TFMs), has zero timing failures". #182 closed with that
+# row "not measured" because no rerun job existed. This is that job: dispatch it on main, then commit the summary
+# artifact under benchmarks/evidence/test-reruns/<sha>/.
+on:
+  workflow_dispatch:
+    inputs:
+      reruns:
+        description: Number of reruns per lane (a matrix holds at most 256 jobs)
+        required: true
+        default: '200'
+
+permissions:
+  contents: read
+
+concurrency:
+  group: test-reruns-${{ github.sha }}
+  cancel-in-progress: false
+
+env:
+  DOTNET_SKIP_FIRST_TIME_EXPERIENCE: true
+  DOTNET_CLI_TELEMETRY_OPTOUT: true
+  DOTNET_NOLOGO: true
+
+jobs:
+  plan:
+    name: Plan reruns
+    runs-on: ubuntu-latest
+    outputs:
+      attempts: ${{ steps.range.outputs.attempts }}
+    steps:
+      - id: range
+        env:
+          RERUNS: ${{ inputs.reruns }}
+        run: |
+          case "$RERUNS" in ''|*[!0-9]*) echo "reruns must be a positive integer, got '$RERUNS'"; exit 1;; esac
+          # More than three digits is over the limit; rejecting it here keeps an oversized value from
+          # overflowing the shell's integer comparison below and reaching seq.
+          if [ "${#RERUNS}" -gt 3 ]; then echo "reruns must be 1..256, got $RERUNS"; exit 1; fi
+          if [ "$RERUNS" -lt 1 ] || [ "$RERUNS" -gt 256 ]; then echo "reruns must be 1..256, got $RERUNS"; exit 1; fi
+          echo "attempts=$(seq -s, 1 "$RERUNS" | sed 's/^/[/; s/$/]/')" >> "$GITHUB_OUTPUT"
+
+  modern:
+    name: Rerun ${{ matrix.attempt }} (net10.0, net8.0)
+    needs: plan
+    runs-on: ubuntu-latest
+    timeout-minutes: 20
+    strategy:
+      fail-fast: false
+      max-parallel: 20
+      matrix:
+        attempt: ${{ fromJSON(needs.plan.outputs.attempts) }}
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+      - uses: actions/setup-dotnet@a98b56852c35b8e3190ac28c8c2271da59106c68 # v6.0.0
+        with:
+          dotnet-version: '10.0.x'
+          dotnet-quality: preview
+      - run: dotnet restore AiDotNet.Evolution.slnx
+      - run: dotnet build AiDotNet.Evolution.slnx --configuration Release --no-restore
+      - name: Test net10.0
+        run: dotnet test AiDotNet.Evolution.slnx --configuration Release --framework net10.0 --no-build --blame-hang --blame-hang-timeout 120s
+      - name: Test net8.0
+        if: ${{ !cancelled() }}
+        # Not the solution: AiDotNet.Evolution.Performance.Tests targets net10.0 only, and `--framework` does not
+        # filter projects, so a solution-wide net8.0 run fails on it. These are the projects that target net8.0.
+        run: |
+          status=0
+          for project in tests/AiDotNet.Evolution.Tests tests/AiDotNet.Evolution.CSharp.Tests tests/AiDotNet.Evolution.Deployment.Tests tests/AiDotNet.Evolution.Ptx.Tests; do
+            dotnet test "$project" --configuration Release --framework net8.0 --no-build --blame-hang --blame-hang-timeout 120s || status=1
+          done
+          exit $status
+
+  legacy:
+    name: Rerun ${{ matrix.attempt }} (net471, net462)
+    needs: plan
+    runs-on: windows-latest
+    timeout-minutes: 30
+    strategy:
+      fail-fast: false
+      max-parallel: 20
+      matrix:
+        attempt: ${{ fromJSON(needs.plan.outputs.attempts) }}
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+      - uses: actions/setup-dotnet@a98b56852c35b8e3190ac28c8c2271da59106c68 # v6.0.0
+        with:
+          dotnet-version: '10.0.x'
+          dotnet-quality: preview
+      - run: dotnet restore AiDotNet.Evolution.slnx
+      - run: dotnet build tests/AiDotNet.Evolution.Tests/AiDotNet.Evolution.Tests.csproj --configuration Release --framework net471 --no-restore
+      - run: dotnet test tests/AiDotNet.Evolution.Tests/AiDotNet.Evolution.Tests.csproj --configuration Release --framework net471 --no-build --blame-hang --blame-hang-timeout 120s --blame-crash
+      - run: dotnet build tests/AiDotNet.Evolution.Tests/AiDotNet.Evolution.Tests.csproj --configuration Release --framework net462 --no-restore
+        if: ${{ !cancelled() }}
+      - run: dotnet test tests/AiDotNet.Evolution.Tests/AiDotNet.Evolution.Tests.csproj --configuration Release --framework net462 --no-build --blame-hang --blame-hang-timeout 120s --blame-crash
+        if: ${{ !cancelled() }}
+
+  summary:
+    name: Summarise reruns
+    needs: [modern, legacy]
+    if: ${{ always() }}
+    runs-on: ubuntu-latest
+    permissions:
+      actions: read
+    steps:
+      - name: Count job outcomes
+        env:
+          GH_TOKEN: ${{ github.token }}
+          REPO: ${{ github.repository }}
+          RUN_ID: ${{ github.run_id }}
+          SHA: ${{ github.sha }}
+        run: |
+          gh api --paginate "repos/$REPO/actions/runs/$RUN_ID/jobs?per_page=100" --jq '.jobs[] | select(.name | startswith("Rerun ")) | {name, conclusion, url: .html_url}' \
+            | jq -s --arg sha "$SHA" --arg run "$RUN_ID" '{sha: $sha, run_id: $run, jobs: length,
+                outcomes: (group_by(.conclusion) | map({key: (.[0].conclusion // "none"), value: length}) | from_entries),
+                not_success: map(select(.conclusion != "success"))}' > test-reruns.json
+          jq '{jobs, outcomes}' test-reruns.json
+          jq -r '"| outcome | jobs |\n| --- | --- |", (.outcomes | to_entries[] | "| \(.key) | \(.value) |")' test-reruns.json >> "$GITHUB_STEP_SUMMARY"
+      - uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9 # v7.0.2
+        with:
+          name: test-reruns-${{ github.sha }}
+          path: test-reruns.json

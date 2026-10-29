@@ -81,13 +81,23 @@ test('evaluation context retains every seed bit and refuses lossy numeric seeds'
 test('durable handshake rejects a downgraded host', async () => {
   await assert.rejects(() => DurableWorkClient.open(fake('downgrade')), /downgrade/);
 });
-for (const [mode, message] of [['invalid-claim', /Invalid claim/], ['uncorrelated', /Uncorrelated/], ['oversized', /Oversized/], ['timeout', /timed out/]]) {
+for (const [mode, message] of [['invalid-claim', /Invalid claim/], ['uncorrelated', /Uncorrelated/], ['oversized', /Oversized/], ['oversized-bytes', /Oversized/], ['timeout', /timed out/]]) {
   test(`durable transport fails closed on ${mode}`, async () => {
     const client = await DurableWorkClient.open(fake(mode));
     await assert.rejects(() => client.claim(worker('one')), message);
     await assert.rejects(() => client.close());
   });
 }
+test('durable transport reassembles a response whose UTF-8 characters straddle chunks', async () => {
+  const client = await DurableWorkClient.open({ ...fake('split-utf8'), runId: 'run-\u20ac\u{1F600}\u00e9' });
+  // open() resolves only if the echoed run id decoded to exactly the id that was sent.
+  await client.close();
+});
+test('durable transport delivers two responses that arrive in one chunk', async () => {
+  const client = await DurableWorkClient.open(fake('two-frames'));
+  assert.deepEqual(await Promise.all([client.claim(worker('one')), client.claim(worker('two'))]), [null, null]);
+  await client.close();
+});
 test('resource numbers and overflowing timers are rejected before process creation', async () => {
   await assert.rejects(() => DurableWorkClient.open({ ...fake('timeout'), limits: { cost: 100 } }), /decimal-string/);
   await assert.rejects(() => DurableWorkClient.open({ ...fake('timeout'), requestTimeoutMs: 2147483648 }), /Int32/);

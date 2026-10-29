@@ -14,7 +14,6 @@ on:
       - 'src/AiDotNet.Evolution/**'
       - '.github/workflows/typescript-binding.yml'
   pull_request:
-    branches: [main, feat/competitive-evolution-platform]
     paths:
       - 'bindings/typescript/**'
       - 'bindings/python/**'
