@@ -303,6 +303,20 @@ public sealed class EvolutionEngineOptions
     /// </remarks>
     public int CheckpointCompactionInterval { get; set; } = 32;
 
+    /// <summary>Gets or sets whether a resume suspends garbage collection while it rebuilds the checkpointed state.</summary>
+    /// <remarks>
+    /// Nearly everything a resume allocates is the restored state itself, so a collection during it only copies live
+    /// objects; at 10,000 elites collections were about a sixth of the resume (E-1). When enabled, the engine opens a
+    /// no-GC region sized from the checkpoint's segment files and closes it as soon as the restore ends. The region is
+    /// process-wide: allocations on other threads count against it, and outgrowing it ends it with an ordinary
+    /// collection, so it never changes results. It is skipped for small checkpoints, for stores that cannot report
+    /// segment sizes, when another region is already open, and when the runtime refuses the size. Turn it off in a host
+    /// that must keep collecting while a resume runs, for example one serving latency-sensitive requests on other threads.
+    /// Like the checkpoint format, it changes how state is restored and not what the search does, so it is not part of
+    /// the compatibility hash.
+    /// </remarks>
+    public bool SuspendGarbageCollectionDuringResume { get; set; } = true;
+
     /// <summary>Gets or sets whether final failed/timed-out identities remain permanently deduplicated.</summary>
     public bool DeduplicateFailedCandidates { get; set; }
 
@@ -738,6 +752,7 @@ public sealed class EvolutionEngineOptions
             CheckpointFormat = CheckpointFormat,
             CheckpointSegmentThreshold = CheckpointSegmentThreshold,
             CheckpointCompactionInterval = CheckpointCompactionInterval,
+            SuspendGarbageCollectionDuringResume = SuspendGarbageCollectionDuringResume,
             DeduplicateFailedCandidates = DeduplicateFailedCandidates,
             IslandCount = IslandCount,
             MigrationInterval = MigrationInterval,
@@ -843,7 +858,10 @@ public sealed class EvolutionEngineOptions
             : new[] { Field("checkpoint-segment-threshold", CheckpointSegmentThreshold.ToString(CultureInfo.InvariantCulture)) })
         .Concat(CheckpointCompactionInterval == 32
             ? Array.Empty<KeyValuePair<string, string>>()
-            : new[] { Field("checkpoint-compaction-interval", CheckpointCompactionInterval.ToString(CultureInfo.InvariantCulture)) }).ToArray();
+            : new[] { Field("checkpoint-compaction-interval", CheckpointCompactionInterval.ToString(CultureInfo.InvariantCulture)) })
+        .Concat(SuspendGarbageCollectionDuringResume
+            ? Array.Empty<KeyValuePair<string, string>>()
+            : new[] { Field("resume-collection", "collecting") }).ToArray();
 
     /// <summary>Encodes the semantic options into the string the configuration hash is computed from.</summary>
     internal string ToSemanticCanonicalString() => Encode(SemanticFields());

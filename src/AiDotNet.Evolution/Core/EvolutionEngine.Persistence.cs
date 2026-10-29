@@ -1,3 +1,4 @@
+using System.Runtime;
 using System.Runtime.CompilerServices;
 using System.Runtime.ExceptionServices;
 using System.Globalization;
@@ -315,7 +316,69 @@ public sealed partial class EvolutionEngine<TGenome>
             message: $"checkpoint {_safeSequence}"), cancellationToken).ConfigureAwait(false);
     }
 
+    // A resume allocates about this many bytes per byte of segment it reads (6.4 measured at 10,000 elites, E-1).
+    private const long ResumeAllocationPerSegmentByte = 8;
+    // Below this a resume's collections are cheap, and committing a region would cost more than it saves.
+    private const long MinimumSuspendedResumeBytes = 16L * 1024 * 1024;
+    // Set while this engine holds the no-GC region it opened for a resume.
+    private bool _collectionSuspended;
+
     private async Task<RestoredSeeds> RestoreCheckpointAsync(TGenome[] suppliedSeeds, CancellationToken cancellationToken)
+    {
+        try
+        {
+            return await RestoreCheckpointCoreAsync(suppliedSeeds, cancellationToken).ConfigureAwait(false);
+        }
+        finally
+        {
+            EndResumeCollectionSuspension();
+        }
+    }
+
+    // See EvolutionEngineOptions.SuspendGarbageCollectionDuringResume.
+    private void SuspendCollectionForResume(EvolutionCheckpoint checkpoint)
+    {
+        if (!_options.SuspendGarbageCollectionDuringResume || checkpoint.SegmentIds.Count == 0 ||
+            _checkpointStore is not DirectoryEvolutionCheckpointStore store || GCSettings.LatencyMode == GCLatencyMode.NoGCRegion)
+            return;
+        long segmentBytes = store.SegmentBytes(_options.RunId, checkpoint.SegmentIds);
+        if (segmentBytes <= 0) return;
+        // Halved when the runtime refuses the size; a smaller region still removes most of the collections.
+        for (long budget = segmentBytes * ResumeAllocationPerSegmentByte; budget >= MinimumSuspendedResumeBytes; budget /= 2)
+        {
+            try
+            {
+                _collectionSuspended = GC.TryStartNoGCRegion(budget);
+                return;
+            }
+            catch (ArgumentOutOfRangeException)
+            {
+                // More than this runtime allows in one region.
+            }
+            catch (InvalidOperationException)
+            {
+                return; // Another region opened in the meantime.
+            }
+        }
+    }
+
+    private void EndResumeCollectionSuspension()
+    {
+        if (!_collectionSuspended) return;
+        _collectionSuspended = false;
+        // An outgrown region has already ended with a collection.
+        if (GCSettings.LatencyMode != GCLatencyMode.NoGCRegion) return;
+        try
+        {
+            GC.EndNoGCRegion();
+        }
+        catch (InvalidOperationException)
+        {
+            // Ended by a collection between the check and the call.
+        }
+    }
+
+    private async Task<RestoredSeeds> RestoreCheckpointCoreAsync(TGenome[] suppliedSeeds, CancellationToken cancellationToken)
     {
         if (_checkpointStore is null || _codec is null) throw new InvalidOperationException("Resume is not configured.");
         EvolutionCheckpoint? checkpoint = await _checkpointStore.LoadLatestAsync(_options.RunId, cancellationToken).ConfigureAwait(false);
@@ -324,6 +387,7 @@ public sealed partial class EvolutionEngine<TGenome>
         if (!string.Equals(checkpoint.CompatibilityHash, _compatibilityHash, StringComparison.Ordinal))
             throw new InvalidDataException(DescribeIncompatibility(checkpoint));
 
+        SuspendCollectionForResume(checkpoint);
         EngineStateDocument state = ReadStateDocument(checkpoint);
         await LoadSegmentsAsync(checkpoint, state, cancellationToken).ConfigureAwait(false);
         ValidateConfiguredCheckpointBounds(state);

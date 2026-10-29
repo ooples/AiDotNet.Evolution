@@ -388,6 +388,8 @@ AiDotNet.Evolution.EvolutionEngineOptions.CheckpointSegmentThreshold.get -> int
 AiDotNet.Evolution.EvolutionEngineOptions.CheckpointSegmentThreshold.set -> void
 AiDotNet.Evolution.EvolutionEngineOptions.CheckpointCompactionInterval.get -> int
 AiDotNet.Evolution.EvolutionEngineOptions.CheckpointCompactionInterval.set -> void
+AiDotNet.Evolution.EvolutionEngineOptions.SuspendGarbageCollectionDuringResume.get -> bool
+AiDotNet.Evolution.EvolutionEngineOptions.SuspendGarbageCollectionDuringResume.set -> void
 AiDotNet.Evolution.EvolutionEngineOptions.Copy() -> AiDotNet.Evolution.EvolutionEngineOptions!
 AiDotNet.Evolution.EvolutionEngineOptions.DeduplicateFailedCandidates.get -> bool
 AiDotNet.Evolution.EvolutionEngineOptions.DeduplicateFailedCandidates.set -> void

@@ -167,6 +167,20 @@ public sealed partial class DirectoryEvolutionCheckpointStore : IEvolutionCheckp
     private string SegmentDirectory(string runId) =>
         EvolutionPath.Join(EvolutionPath.Join(_directory, SegmentDirectoryName), EvolutionHash.Compute(runId).Substring(0, 32));
 
+    // The bytes the named segments occupy, or -1 when one is missing; a resume sizes its no-GC region from it (E-1).
+    internal long SegmentBytes(string runId, IEnumerable<long> segmentIds)
+    {
+        string directory = SegmentDirectory(runId);
+        long total = 0;
+        foreach (long id in segmentIds)
+        {
+            var file = new FileInfo(EvolutionPath.Join(directory, SegmentFileName(id)));
+            if (!file.Exists) return -1;
+            total += file.Length;
+        }
+        return total;
+    }
+
     private static string SegmentFileName(long segmentId) =>
         "segment-" + segmentId.ToString("D20", CultureInfo.InvariantCulture) + ".json";
 
