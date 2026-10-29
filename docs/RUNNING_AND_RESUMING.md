@@ -81,6 +81,15 @@ could never measure anything did not observe a plateau.
 
 ## What the run produced
 
+### Choosing the champion when quality is noisy
+
+`result.Best` is the entry with the highest measured quality. When quality comes from a small sample, that is often
+the program that fit the sample's noise: in E-4's pilot, on 80 selection rows, the measured best was worse than the
+seed on 400 held-out rows in 3 of 6 cells. `EvolutionChampionSelection.SelectSignificant` picks the best entry whose
+gain over a reference (usually the seed) exceeds `k` combined standard errors, reading each entry's standard error
+from an evaluator metric, and returns `null` when none does, so the reference stands. The CLI applies it when
+`search.championStandardErrors` and `search.standardErrorMetric` are set.
+
 Besides the island archives, the result exposes:
 
 - `GlobalElites`: when `EvolutionEngineOptions.GlobalEliteCount` is positive, the engine maintains an

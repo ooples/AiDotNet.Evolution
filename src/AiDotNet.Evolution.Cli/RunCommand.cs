@@ -188,6 +188,18 @@ internal sealed class RunSearch
     public double EarlyStoppingMinimumImprovement { get; init; }
     /// <summary>A fitness at which the run stops as soon as any program reaches it; null for none.</summary>
     public double? TargetQuality { get; init; }
+    /// <summary>
+    /// When set, best.py is the best program whose fitness beats the seed's by more than this many combined standard
+    /// errors, or the seed itself when none does; null keeps the highest fitness. Requires <see cref="StandardErrorMetric"/>.
+    /// </summary>
+    /// <remarks>
+    /// A fitness measured on a small sample rewards fitting its noise: in E-4's pilot, on 80 selection rows, the
+    /// highest-fitness program was worse than the seed held-out in 3 of 6 cells. See
+    /// <c>EvolutionChampionSelection.SelectSignificant</c>.
+    /// </remarks>
+    public double? ChampionStandardErrors { get; init; }
+    /// <summary>The evaluator metric that reports each fitness's standard error, for <see cref="ChampionStandardErrors"/>.</summary>
+    public string? StandardErrorMetric { get; init; }
     /// <summary>Retries for an evaluation that failed or timed out (OpenEvolve's <c>evaluator.max_retries</c>).</summary>
     public int EvaluationRetries { get; init; }
     /// <summary>A memory cap per evaluation in MiB, enforced by the sandbox; null for none.</summary>
@@ -531,6 +543,10 @@ internal static class RunCommand
             options.EarlyStopping.MinimumImprovement = run.Search.EarlyStoppingMinimumImprovement;
         }
         if (run.Search.TargetQuality is double target) options.TargetQuality = target;
+        if ((run.Search.ChampionStandardErrors is null) != string.IsNullOrWhiteSpace(run.Search.StandardErrorMetric))
+            throw new InvalidDataException("search.championStandardErrors and search.standardErrorMetric are set together or not at all.");
+        if (run.Search.ChampionStandardErrors is double sigmas && (double.IsNaN(sigmas) || double.IsInfinity(sigmas) || sigmas < 0))
+            throw new InvalidDataException("search.championStandardErrors must be a finite, non-negative number.");
         options.Artifacts.Enabled = run.Search.CollectArtifacts;
         options.Artifacts.DeliverToNextProposal = run.Search.IncludeArtifacts;
         options.GlobalEliteCount = run.Search.EliteArchiveSize;
@@ -570,6 +586,10 @@ internal static class RunCommand
         }
 
         EvolutionArchiveEntry<ProgramGenome>? best = result.Best;
+        ChampionChoice? champion = run.Search.ChampionStandardErrors is double standardErrors
+            ? ChooseChampion(result, outputDirectory, run.Search.StandardErrorMetric!, standardErrors)
+            : null;
+        if (champion is not null) best = champion.Entry;
         string? repertoirePath = ExportRepertoire(result, task, codec, scope, run, tracePath, cancellationToken);
         output.WriteLine(JsonSerializer.Serialize(new
         {
@@ -577,7 +597,17 @@ internal static class RunCommand
             Resumed = resume,
             StopReason = result.StopReason.ToString(),
             result.Counters.CompletedEvaluations,
-            BestQuality = best?.Evaluation.Quality,
+            BestQuality = champion is { Entry: null } ? champion.ReferenceQuality : best?.Evaluation.Quality,
+            Champion = champion is null
+                ? null
+                : new
+                {
+                    champion.StandardErrors,
+                    champion.ReferenceQuality,
+                    champion.ReferenceStandardError,
+                    // False when no program beat the seed by enough, so best.py is the seed.
+                    BeatSeed = champion.Entry is not null
+                },
             Fitness = fitnessBasis.Report(),
             Trace = tracePath,
             Checkpoints = Path.Combine(outputDirectory, "checkpoints"),
@@ -626,10 +656,10 @@ internal static class RunCommand
             // one; a run that recovers may report none.
             FailureOutput = FailureOutputOf(result)
         }, Program.Json));
-        if (best is not null)
+        if (best is not null || champion is not null)
         {
             string bestPath = Path.Combine(outputDirectory, "best" + Extension(run.Language));
-            File.WriteAllText(bestPath, best.Candidate.CanonicalGenome.Genome.Source, new UTF8Encoding(false));
+            File.WriteAllText(bestPath, best?.Candidate.CanonicalGenome.Genome.Source ?? initial, new UTF8Encoding(false));
         }
         // A run whose every candidate scored zero, including the seed. "Produced no candidate" does not
         // cover it - there IS a best entry, it is just worthless - so without this the run reports a best
@@ -699,6 +729,32 @@ internal static class RunCommand
 
     /// <summary>Writes the session's archive elites, best first, as <c>repertoire-NNN.json</c> beside its trace.</summary>
     /// <remarks>No evaluator or model call is made. The prior cost is the run's evaluation attempts so far.</remarks>
+    private sealed record ChampionChoice(EvolutionArchiveEntry<ProgramGenome>? Entry, double StandardErrors,
+        double ReferenceQuality, double ReferenceStandardError);
+
+    // The seed's quality and standard error come from the run's traces, which every segment of a resumed run appends
+    // to: the seed was evaluated once, by the first segment, and may since have left the archive.
+    private static ChampionChoice ChooseChampion(EvolutionRunResult<ProgramGenome> result, string outputDirectory,
+        string standardErrorMetric, double standardErrors)
+    {
+        EvolutionTraceRecord? seed = null;
+        foreach (string trace in Directory.GetFiles(outputDirectory, "trace-*.jsonl").OrderBy(path => path, StringComparer.Ordinal))
+            foreach (EvolutionTraceRecord record in EvolutionTraceFile.ReadRecords(trace))
+                if (record.VariationOperatorId == "seed" && record.Status == EvolutionEvaluationStatus.Completed &&
+                    record.Quality is double quality && (seed is null || Better(quality, seed.Quality!.Value, record.Direction)))
+                    seed = record;
+        if (seed is null)
+            throw new InvalidDataException("search.championStandardErrors needs the seed's evaluation, and the run's traces record no completed one.");
+        if (!seed.Metrics.TryGetValue(standardErrorMetric, out double seedError))
+            throw new InvalidDataException("search.standardErrorMetric names '" + standardErrorMetric + "', which the seed's evaluation did not report.");
+        EvolutionArchiveEntry<ProgramGenome>? entry = EvolutionChampionSelection.SelectSignificant(
+            result.Islands.SelectMany(island => island.Entries), seed.Quality!.Value, seedError, standardErrorMetric, standardErrors);
+        return new ChampionChoice(entry, standardErrors, seed.Quality.Value, seedError);
+    }
+
+    private static bool Better(double quality, double than, EvolutionOptimizationDirection direction) =>
+        direction == EvolutionOptimizationDirection.Maximize ? quality > than : quality < than;
+
     private static string? ExportRepertoire(EvolutionRunResult<ProgramGenome> result, ProgramEvolutionTask task, ProgramGenomeCodec codec,
         EvolutionReuseScope scope, RunFile run, string tracePath, CancellationToken cancellationToken)
     {

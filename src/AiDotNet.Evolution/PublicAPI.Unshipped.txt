@@ -2252,3 +2252,5 @@ static AiDotNet.Evolution.StableRandom.CreateStream(ulong rootSeed, ulong stream
 static AiDotNet.Evolution.StableRandom.Restore(AiDotNet.Evolution.StableRandomState state) -> AiDotNet.Evolution.StableRandom!
 static AiDotNet.Evolution.TopologyMigrationPolicy<TGenome>.DestinationsFor(AiDotNet.Evolution.EvolutionMigrationTopology topology, int source, int islandCount) -> System.Collections.Generic.IReadOnlyList<int>!
 static AiDotNet.Evolution.TopologyMigrationPolicy<TGenome>.ResolveMigrantCount(int eliteCount, int migrantsPerIsland, double migrationRate) -> int
+AiDotNet.Evolution.EvolutionChampionSelection
+static AiDotNet.Evolution.EvolutionChampionSelection.SelectSignificant<TGenome>(System.Collections.Generic.IEnumerable<AiDotNet.Evolution.EvolutionArchiveEntry<TGenome>!>! entries, double referenceQuality, double referenceStandardError, string! standardErrorMetric, double standardErrors) -> AiDotNet.Evolution.EvolutionArchiveEntry<TGenome>?

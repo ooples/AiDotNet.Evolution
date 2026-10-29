@@ -51,6 +51,55 @@ public sealed class CliRunTests
         return path;
     }
 
+    // E-4: with a standard error on every fitness, best.py is the seed unless a program beats it by more than k combined
+    // standard errors. Seed X = 0, then X = 1 and X = 2, each with standard error 0.6: the combined error is
+    // sqrt(0.72) = 0.849, so k = 2 needs a gain over 1.697 (X = 2 has 2) and k = 3 needs one over 2.546 (none has).
+    [Theory]
+    [InlineData(2.0, "X = 2", 2.0, true)]
+    [InlineData(3.0, "X = 0", 0.0, false)]
+    public void A_champion_must_beat_the_seed_by_more_than_its_standard_errors(double standardErrors, string expectedBest,
+        double expectedQuality, bool beatSeed)
+    {
+        using var directory = new TemporaryDirectory();
+        using var model = new FakeChatModel();
+        File.WriteAllText(Path.Combine(directory.Path, "initial.py"), "X = 0\n");
+        File.WriteAllText(Path.Combine(directory.Path, "evaluator.py"), Evaluator.Replace(
+            "return {\"quality\": float(match.group(1)) if match else 0.0}",
+            "return {\"quality\": float(match.group(1)) if match else 0.0, \"quality_se\": 0.6}"));
+        string runFile = WriteRun(directory.Path, model.Endpoint, maxEvaluations: 3, extra: $$"""
+            ,
+              "search": { "championStandardErrors": {{standardErrors.ToString(System.Globalization.CultureInfo.InvariantCulture)}}, "standardErrorMetric": "quality_se" }
+            """);
+
+        var (code, output, error) = Run("run", runFile);
+
+        Assert.True(code == 0, error);
+        using JsonDocument report = JsonDocument.Parse(output);
+        Assert.Equal(expectedQuality, report.RootElement.GetProperty("BestQuality").GetDouble());
+        JsonElement champion = report.RootElement.GetProperty("Champion");
+        Assert.Equal(beatSeed, champion.GetProperty("BeatSeed").GetBoolean());
+        Assert.Equal(0.6, champion.GetProperty("ReferenceStandardError").GetDouble());
+        Assert.Equal(expectedBest, File.ReadAllText(Path.Combine(directory.Path, "out", "best.py")).TrimEnd());
+    }
+
+    [Theory]
+    [InlineData("\"championStandardErrors\": 2")]
+    [InlineData("\"standardErrorMetric\": \"quality_se\"")]
+    [InlineData("\"championStandardErrors\": -1, \"standardErrorMetric\": \"quality_se\"")]
+    public void A_champion_rule_without_both_settings_or_with_a_negative_k_is_refused(string search)
+    {
+        using var directory = new TemporaryDirectory();
+        using var model = new FakeChatModel();
+        File.WriteAllText(Path.Combine(directory.Path, "initial.py"), "X = 0\n");
+        File.WriteAllText(Path.Combine(directory.Path, "evaluator.py"), Evaluator);
+        string runFile = WriteRun(directory.Path, model.Endpoint, maxEvaluations: 3, extra: ",\n  \"search\": { " + search + " }");
+
+        var (code, _, error) = Run("run", runFile);
+
+        Assert.NotEqual(0, code);
+        Assert.Contains("search.championStandardErrors", error);
+    }
+
     [Fact]
     public void Run_then_resume_continues_the_same_run_and_never_overwrites()
     {
