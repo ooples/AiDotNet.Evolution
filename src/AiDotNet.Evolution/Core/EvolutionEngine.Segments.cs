@@ -468,10 +468,10 @@ public sealed partial class EvolutionEngine<TGenome>
                         SegmentBytes bytes = await ReadSegmentAsync(store, runId, next, buffers, cancellationToken).ConfigureAwait(false);
                         decode = Task.Run(() => DecodeSegment(bytes, next, buffers), CancellationToken.None);
                     }
-                    catch (Exception exception)
+                    catch (Exception exception) when (exception is not OutOfMemoryException)
                     {
                         // Queued, not thrown: an earlier segment still being decoded may fail too, and its failure is
-                        // the one to report. Nothing after this segment is read.
+                        // the one to report. Nothing after this segment is read. Running out of memory reports itself.
                         decode = Task.FromException<StateSegmentDocument>(exception);
                         read = manifest.Count;
                     }

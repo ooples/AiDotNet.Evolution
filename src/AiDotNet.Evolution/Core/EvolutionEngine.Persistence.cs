@@ -1333,7 +1333,8 @@ public sealed partial class EvolutionEngine<TGenome>
         Parallel.For(0, documents.Length, new ParallelOptions { MaxDegreeOfParallelism = DecodeWindow }, index =>
         {
             try { restored[index] = RestoreArchiveEntry(documents[index]); }
-            catch (Exception exception) { failures[index] = exception; }
+            // Recorded, not thrown, so the report names the first failing entry; running out of memory reports itself.
+            catch (Exception exception) when (exception is not OutOfMemoryException) { failures[index] = exception; }
         });
         foreach (Exception? failure in failures)
             if (failure is not null) ExceptionDispatchInfo.Capture(failure).Throw();
