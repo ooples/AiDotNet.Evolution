@@ -47,6 +47,15 @@ public static class ProfileEvidence
     public static ProfileEvidenceSummary Compact(ProfileReport report, ProfileEvidenceRaw? raw)
     {
         ArgumentNullException.ThrowIfNull(report);
+        // Delay evidence is revalidated before it is published: a raw report written before medians were measured
+        // deserializes with every median at zero and would otherwise be compacted as if they had been.
+        foreach (var attempt in report.Attempts)
+            if (attempt is { Status: "passed" or "contended", Measurement: { } measured })
+                try { ProfileValidation.ValidateDelays(measured); }
+                catch (InvalidDataException exception)
+                {
+                    throw new InvalidDataException($"Attempt {attempt.CaseId} #{attempt.Repetition} does not validate: {exception.Message}", exception);
+                }
         var attempts = report.Attempts.Select(attempt =>
         {
             var measurement = attempt.Measurement;

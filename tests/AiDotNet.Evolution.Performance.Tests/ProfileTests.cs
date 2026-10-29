@@ -292,6 +292,8 @@ public sealed partial class ProfileTests
         // A median the samples could not have produced.
         yield return new object[] { mixed with { DelayBuckets = [honest[0], honest[1] with { MedianMilliseconds = 15.6 }, honest[2]] } };
         yield return new object[] { mixed with { DelayBuckets = [honest[0], honest[1] with { MedianMilliseconds = double.NaN }, honest[2]] } };
+        // Two observations have their mean as their median; this one claims an in-tolerance median beside a 2.9 ms mean.
+        yield return new object[] { mixed with { DelayBuckets = [honest[0] with { Count = 9 }, new(1, 2, 2.9, 1.0, 4.8, 1.05), honest[2]] } };
         // Delays collapsed onto a single bucket, or a bucket that was never observed.
         yield return new object[] { mixed with { DelayBuckets = [new ProfileDelayBucket(1, 16, 1.4, 1.1, 2.0, 1.3)] } };
         yield return new object[] { mixed with { DelayBuckets = [honest[0], honest[1]] } };
@@ -376,6 +378,20 @@ public sealed partial class ProfileTests
         Assert.Contains("Batch / 1", tables, StringComparison.Ordinal);
         var restored = JsonSerializer.Deserialize<ProfileEvidenceSummary>(JsonSerializer.Serialize(summary, ProfileCampaign.JsonOptions), ProfileCampaign.JsonOptions)!;
         Assert.Equal(tables, ProfileEvidence.RenderTables(restored));
+    }
+
+    [Fact]
+    public void EvidenceRejectsARawReportWrittenBeforeDelayMediansWereMeasured()
+    {
+        var mixed = Case() with { Id = "engine-w1-Batch-mixed-cp0", MixedDuration = true };
+        // An older report deserializes with every median at zero.
+        var stale = Valid(mixed) with
+        {
+            DelayBuckets = [new ProfileDelayBucket(0, 6, 0, 0, 0, 0), new ProfileDelayBucket(1, 5, 1.4, 1.05, 2.6, 0), new ProfileDelayBucket(8, 5, 8.4, 8.1, 9.3, 0)]
+        };
+        var report = Report([mixed], [Attempt(stale)]);
+        var error = Assert.Throws<InvalidDataException>(() => ProfileEvidence.Compact(report, null));
+        Assert.Contains(mixed.Id, error.Message, StringComparison.Ordinal);
     }
 
     [Fact]
@@ -471,9 +487,13 @@ public sealed partial class ProfileTests
         Assert.Equal(measurement.EvaluationCalls, measurement.DelayBuckets.Sum(bucket => bucket.Count));
         // A measured delay waits the clock out, so it can overrun the request but never fall short of it.
         // The validator keeps a shortfall allowance for supplied evidence; what we measure here has none.
+        // Only the median is held to the tolerance: one wake the scheduler preempted moves the mean, not the median.
         foreach (var bucket in measurement.DelayBuckets.Where(bucket => bucket.RequestedMilliseconds > 0))
-            Assert.InRange(bucket.MeanMilliseconds, bucket.RequestedMilliseconds,
+        {
+            Assert.True(bucket.MeanMilliseconds >= bucket.RequestedMilliseconds, bucket.ToString());
+            Assert.InRange(bucket.MedianMilliseconds, bucket.RequestedMilliseconds,
                 bucket.RequestedMilliseconds + ProfileProtocol.DelayToleranceMilliseconds);
+        }
         Assert.InRange(measurement.Environment.TimerResolutionMilliseconds, 0, 1);
     }
 

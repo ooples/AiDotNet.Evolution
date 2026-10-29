@@ -239,7 +239,7 @@ public static class ProfileValidation
     }
 
     /// <summary>Requires the declared delay schedule to have been observed, not merely requested.</summary>
-    private static void ValidateDelays(ProfileMeasurement measurement)
+    public static void ValidateDelays(ProfileMeasurement measurement)
     {
         if (!measurement.Case.MixedDuration)
         {
@@ -260,6 +260,9 @@ public static class ProfileValidation
                 !double.IsFinite(bucket.MedianMilliseconds) || bucket.MedianMilliseconds < bucket.MinimumMilliseconds ||
                 bucket.MedianMilliseconds > bucket.MaximumMilliseconds)
                 throw new InvalidDataException("A declared delay bucket recorded no or impossible observations.");
+            // With one or two observations the median is the mean, so a disagreement is a fabricated or stale median.
+            if (bucket.Count <= 2 && Math.Abs(bucket.MedianMilliseconds - bucket.MeanMilliseconds) > 1e-9 * Math.Max(1, bucket.MeanMilliseconds))
+                throw new InvalidDataException("A delay bucket of at most two observations records a median that is not its mean.");
             if (bucket.RequestedMilliseconds == 0) continue;
             if (bucket.MedianMilliseconds < bucket.RequestedMilliseconds - 0.25 ||
                 bucket.MedianMilliseconds > bucket.RequestedMilliseconds + ProfileProtocol.DelayToleranceMilliseconds)
