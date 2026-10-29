@@ -13,6 +13,8 @@ on:
       - 'src/AiDotNet.Evolution.Host/**'
       - 'src/AiDotNet.Evolution/**'
       - '.github/workflows/typescript-binding.yml'
+      - 'eng/Test-RegistryConsumers.ps1'
+      - 'eng/fixtures/RegistryConsumers/**'
   pull_request:
     paths:
       - 'bindings/typescript/**'
@@ -24,6 +26,8 @@ on:
       - 'src/AiDotNet.Evolution.Host/**'
       - 'src/AiDotNet.Evolution/**'
       - '.github/workflows/typescript-binding.yml'
+      - 'eng/Test-RegistryConsumers.ps1'
+      - 'eng/fixtures/RegistryConsumers/**'
 
 concurrency:
   group: ${{ github.workflow }}-${{ github.ref }}
@@ -187,6 +191,24 @@ jobs:
         working-directory: bindings/typescript
         run: npm run package -- ${{ matrix.rid }}
 
+      # E-5: the packages exactly as the release publishes them, packed and installed into fresh npm and Python
+      # consumers on this platform (the release runs the same script before publishing and again from the registries).
+      - name: Install the packed npm and Python packages as fresh consumers
+        if: matrix.node == '22'
+        shell: pwsh
+        run: |
+          $version = (Get-Content bindings/typescript/package.json -Raw | ConvertFrom-Json).version
+          $out = Join-Path $env:RUNNER_TEMP 'registry-packages'
+          New-Item -ItemType Directory -Force (Join-Path $out 'npm'), (Join-Path $out 'python') | Out-Null
+          Push-Location bindings/typescript
+          npm pack "./packages/${{ matrix.rid }}" --pack-destination (Join-Path $out 'npm')
+          if ($LASTEXITCODE -ne 0) { exit $LASTEXITCODE }
+          npm pack --pack-destination (Join-Path $out 'npm')
+          if ($LASTEXITCODE -ne 0) { exit $LASTEXITCODE }
+          Pop-Location
+          python -m pip wheel --no-deps -w (Join-Path $out 'python') bindings/python
+          if ($LASTEXITCODE -ne 0) { exit $LASTEXITCODE }
+          ./eng/Test-RegistryConsumers.ps1 -Version $version -NpmDirectory (Join-Path $out 'npm') -PythonDirectory (Join-Path $out 'python')
       - uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9 # v7.0.2
         if: matrix.node == '22'
         with:

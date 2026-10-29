@@ -36,6 +36,30 @@ token cannot satisfy the trusted-publishing policy for `automated-release.yml`; 
 workflow can obtain a NuGet credential. Verified package artifacts are immutable and retained for 30 days so a
 publication outage can be retried without rebuilding different package bytes.
 
+## npm and PyPI trusted publishing (E-5)
+
+`automated-release.yml` also publishes `@aidotnet/evolution`, its three platform hosts
+(`@aidotnet/evolution-host-win-x64`, `-linux-x64`, `-osx-arm64`) and `aidotnet-evolution-worker`, at the same
+version as the NuGet packages. Both registries use OIDC; no token is stored. Configure once, then turn it on:
+
+1. **npm.** For each of the four package names, add a trusted publisher on npmjs.com (package settings, *Trusted
+   publishing*, GitHub Actions): organization or user `ooples`, repository `AiDotNet.Evolution`, workflow filename
+   `automated-release.yml`, no environment. A package that does not exist yet needs its first version published
+   by hand or the name reserved, since npm attaches trusted publishers to existing packages; the `@aidotnet` scope
+   must exist and allow public packages.
+2. **PyPI.** Add a *pending* trusted publisher at pypi.org (Account, *Publishing*): project
+   `aidotnet-evolution-worker`, owner `ooples`, repository `AiDotNet.Evolution`, workflow `automated-release.yml`,
+   environment `pypi`. Create the `pypi` environment in this repository (Settings, Environments); adding a required
+   reviewer there makes each PyPI upload wait for approval.
+3. Set the repository variable `PUBLISH_REGISTRIES` to `true` (Settings, Secrets and variables, Actions, Variables).
+   Until it is set, every npm and PyPI job in the release workflow is skipped and only NuGet publishes.
+
+The registry jobs build the hosts on Windows, Linux and macOS, pack the npm tarballs and the Python wheel and sdist,
+check that every version equals the tag, and install them into fresh consumers (`eng/Test-RegistryConsumers.ps1`)
+before anything is published. The two publish jobs only download those files and upload them; they never check out
+the repository, because any job of this workflow holding an OIDC token could also obtain a NuGet key
+(`ReleaseWorkflowSecurityContractTests` enforces this). After publishing, the same consumers install from npmjs.org
+and pypi.org on all three operating systems.
 ## Repository services
 
 1. Create the SonarCloud project with key `ooples_AiDotNet.Evolution`, then add its token as `SONAR_TOKEN`.
