@@ -44,15 +44,8 @@ internal sealed class EvolutionGenomePayloadConverter : JsonConverter<EvolutionG
             byte[] buffer = ArrayPool<byte>.Shared.Rent(raw.Length);
             try
             {
-                int written;
-                try
-                {
-                    written = reader.CopyString(buffer);
-                }
-                catch (InvalidOperationException exception)
-                {
-                    throw new JsonException("A genome payload holds an invalid escape.", exception);
-                }
+                // An escape that is not valid UTF-16 makes the reader throw, which the serializer reports as a JsonException.
+                int written = reader.CopyString(buffer);
                 utf8 = buffer.AsSpan(0, written).ToArray();
             }
             finally
