@@ -61,7 +61,7 @@ public static class EvolutionChampionSelection
                 ? quality - referenceQuality
                 : referenceQuality - quality;
             double noise = standardErrors * Math.Sqrt(standardError * standardError + referenceStandardError * referenceStandardError);
-            if (!(gain > noise)) continue;
+            if (gain <= noise) continue; // finite: a completed evaluation's quality is validated finite
             order ??= EvolutionEntryOrdering.BestFirst<TGenome>(evaluation.Direction);
             if (champion is null || order.Compare(entry, champion) < 0) champion = entry;
         }
