@@ -30,6 +30,8 @@ from program_broker import COST_METRICS, ProgramBroker  # noqa: E402
 from program_controls import candidate_hash  # noqa: E402
 
 MAX_TEXT_BYTES = 64 * 1024
+# Training rows shown to the model per evaluation, with the candidate's prediction and residual.
+FEEDBACK_ROWS = 8
 
 
 def model_callback(provider, *, cost_metric=COST_METRICS[1]):
@@ -76,7 +78,7 @@ def model_callback(provider, *, cost_metric=COST_METRICS[1]):
     return generate
 
 
-def evaluate_callback(task, seed, *, train=60, validation=20):
+def evaluate_callback(task, seed, *, train=60, validation=20, feedback_rows=FEEDBACK_ROWS):
     """Scores candidate code on the selection rows, in the broker's `evaluate` shape.
 
     Invalid is a status, not an exception: a candidate that will not import, has no `predict`, or
@@ -90,6 +92,11 @@ def evaluate_callback(task, seed, *, train=60, validation=20):
     omitted them and would have closed the broker on the first candidate of the first cell.
     `work_units` is the evaluation's own wall time, which is what the broker's evaluation-seconds
     budget is denominated in.
+
+    **A valid reply also carries `artifacts`**: the task's inputs and ranges, and `feedback_rows` training rows
+    with the candidate's prediction and residual (`feedback`). E-4's pilots gave the model a scalar score alone,
+    and every arm's candidates stayed within 0.21 standard errors of the seed. Both arms read the same reply,
+    so both see the same rows; the rows are training rows only, never validation or held-out.
     """
     if task not in family.TASKS:
         raise KeyError("Unknown task: " + task)
@@ -98,6 +105,7 @@ def evaluate_callback(task, seed, *, train=60, validation=20):
     def evaluate(code):
         reply = {"candidate_hash": candidate_hash(code), "unknown_work": False}
         started = time.perf_counter()
+        shown = None
         with tempfile.TemporaryDirectory(prefix="pilot-candidate-") as directory:
             path = Path(directory) / "candidate.py"
             path.write_text(code, encoding="utf-8")
@@ -107,6 +115,7 @@ def evaluate_callback(task, seed, *, train=60, validation=20):
                 validation_score, validation_error = family.nmse_and_error(predict, rows["validation"])
                 score = (train_score + validation_score) / 2.0
                 score_error = math.sqrt(train_error * train_error + validation_error * validation_error) / 2.0
+                shown = feedback(predict, task, rows["train"], feedback_rows) if math.isfinite(score) else None
             except Exception:  # noqa: BLE001 - a broken candidate is invalid, never a closed broker
                 score = math.nan
         reply["work_units"] = time.perf_counter() - started
@@ -119,9 +128,25 @@ def evaluate_callback(task, seed, *, train=60, validation=20):
         # can require a champion to beat the seed by more than it (--champion-standard-errors).
         if math.isfinite(score_error):
             reply["quality_standard_error"] = score_error / ((1.0 + score) * (1.0 + score))
+        if shown is not None:
+            reply["artifacts"] = {"training_rows": shown}
         return reply
 
     return evaluate
+
+
+def feedback(predict, task, rows, count):
+    """The task's inputs and ranges, then the first `count` of `rows` sorted by input: inputs, target, prediction, residual."""
+    specification = family.TASKS[task]
+    names = list(specification["variables"])
+    lines = ["inputs: " + ", ".join("%s = xs[%d] in [%g, %g]" % (name, index, low, high)
+                                    for index, (name, (low, high)) in enumerate(zip(names, specification["ranges"]))),
+             "training rows (your prediction and residual = prediction - target):",
+             " ".join(names + ["target", "prediction", "residual"])]
+    for xs, y in sorted(rows[:count]):
+        prediction = float(predict(*xs))
+        lines.append(" ".join(["%.4f" % x for x in xs] + ["%.4f" % y, "%.4f" % prediction, "%+.4f" % (prediction - y)]))
+    return "\n".join(lines)
 
 
 def _load(path):

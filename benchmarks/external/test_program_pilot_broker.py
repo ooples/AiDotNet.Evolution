@@ -127,6 +127,24 @@ class EvaluateCallbackTests(unittest.TestCase):
                 result = evaluate(code)
                 self.assertEqual("invalid", result["status"])
                 self.assertNotIn("quality", result, "an invalid candidate must carry no quality")
+                self.assertNotIn("artifacts", result)
+
+    def test_a_valid_reply_shows_the_inputs_and_training_rows_with_the_candidates_residuals(self):
+        # E-4: the model saw a scalar score alone; the rows are training rows only, and the candidate's own predictions.
+        rows = family.selection(TASK, SEED)
+        train = {round(xs[0], 4) for xs, _ in rows["train"]}
+        validation = {round(xs[0], 4) for xs, _ in rows["validation"]}
+        text = pilot_broker.evaluate_callback(TASK, SEED)(TRUTH.replace("+ 1.0)/", "+ 2.0)/"))["artifacts"]["training_rows"]
+        lines = text.splitlines()
+        self.assertEqual("inputs: x = xs[0] in [-3, 3]", lines[0])
+        self.assertEqual("x target prediction residual", lines[2])
+        self.assertEqual(pilot_broker.FEEDBACK_ROWS, len(lines) - 3)
+        for line in lines[3:]:
+            x, target, prediction, residual = (float(value) for value in line.split())
+            self.assertIn(x, train - validation)
+            self.assertAlmostEqual((3.0 * x + 1.0) / (x * x + 2.0), target, places=3)
+            self.assertAlmostEqual((3.0 * x + 2.0) / (x * x + 2.0), prediction, places=3)
+            self.assertAlmostEqual(1.0 / (x * x + 2.0), residual, places=3)
 
     def test_scoring_uses_selection_rows_only(self):
         # The endpoint belongs to pilot_cells, from a holdout seed this process never sees. If this
@@ -224,8 +242,23 @@ class TaskEvaluatorTests(unittest.TestCase):
                 path = Path(directory) / "candidate.py"
                 path.write_text(CONSTANT, encoding="utf-8")
                 evaluate = pilot_task_evaluator.bind("http://127.0.0.1:1", "capability")
-                self.assertEqual(0.01, evaluate(str(path))["quality_standard_error"])
-                self.assertNotIn("quality_standard_error", evaluate(str(path)))
+                self.assertEqual(0.01, evaluate(str(path)).metrics["quality_standard_error"])
+                self.assertNotIn("quality_standard_error", evaluate(str(path)).metrics)
+        finally:
+            pilot_task_evaluator.request = genuine
+
+    def test_the_brokers_artifacts_reach_the_search_as_artifacts(self):
+        # Our shim reads `.artifacts` from the result, as OpenEvolve does from its EvaluationResult.
+        genuine = pilot_task_evaluator.request
+        try:
+            pilot_task_evaluator.request = lambda endpoint, capability, operation, payload: {
+                "status": "valid", "quality": 0.5, "selection_nmse": 1.0, "artifacts": {"training_rows": "rows"}}
+            with tempfile.TemporaryDirectory() as directory:
+                path = Path(directory) / "candidate.py"
+                path.write_text(CONSTANT, encoding="utf-8")
+                result = pilot_task_evaluator.bind("http://127.0.0.1:1", "capability")(str(path))
+                self.assertEqual({"training_rows": "rows"}, result.artifacts)
+                self.assertEqual(0.5, result.metrics["combined_score"])
         finally:
             pilot_task_evaluator.request = genuine
 

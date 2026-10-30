@@ -1,4 +1,5 @@
 #if NET8_0_OR_GREATER
+using System.Collections.Concurrent;
 using System.Net;
 using System.Net.Sockets;
 using System.Text;
@@ -863,6 +864,8 @@ public sealed class CliRunTests
 
         public string Endpoint { get; }
         public int Calls => Volatile.Read(ref _calls);
+        /// <summary>Every request body received, in arrival order.</summary>
+        public ConcurrentQueue<string> Requests { get; } = new();
         /// <summary>Runs with the call number before the response is sent.</summary>
         public Action<int>? OnCall { get; set; }
 
@@ -884,6 +887,7 @@ public sealed class CliRunTests
             using (var reader = new StreamReader(context.Request.InputStream, Encoding.UTF8))
             using (JsonDocument request = JsonDocument.Parse(await reader.ReadToEndAsync()))
             {
+                Requests.Enqueue(request.RootElement.GetRawText());
                 bool valid = context.Request.Url?.AbsolutePath == "/v1/chat/completions" &&
                     request.RootElement.GetProperty("model").GetString() == "fake-model" &&
                     request.RootElement.GetProperty("messages").GetArrayLength() > 0;

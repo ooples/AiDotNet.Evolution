@@ -151,7 +151,10 @@ def ours(cli, task_directory, python_executable, *, iterations, session, timeout
                 completed = subprocess.run(
                     [*[str(part) for part in prefix], "run", "--openevolve-config", str(config), str(initial),
                      str(evaluator), "--iterations", str(iterations), "--output", str(output),
-                     "--python", python_executable, *champion],
+                     "--python", python_executable, *champion,
+                     # OpenEvolve feeds the evaluator's artifacts (the training rows) to the model by default; ours withholds
+                     # their text unless told otherwise.
+                     "--retain-artifact-text", "true"],
                     capture_output=True, text=True, timeout=timeout, env=environment, cwd=str(directory),
                     check=False)
             except subprocess.TimeoutExpired as error:

@@ -17,6 +17,7 @@ public static class Program
           aidotnet-evolve run --openevolve-config <config.yaml> <initial_program> <evaluator.py> [--iterations N] [--output DIR] [--python EXE]
                                                                                               [--python-path DIR]...
                                                                                               [--champion-standard-errors K --standard-error-metric NAME]
+                                                                                              [--retain-artifact-text true|false]
           aidotnet-evolve resume  <run.json>
           aidotnet-evolve preflight <run.json>
           aidotnet-evolve inspect <trace>
@@ -81,6 +82,7 @@ public static class Program
         var pythonPath = new List<string>();
         double? championStandardErrors = null;
         string? standardErrorMetric = null;
+        bool? retainArtifactText = null;
         for (int i = 0; i < rest.Length; i += 2)
         {
             if (i + 1 >= rest.Length) return Fail("error: " + rest[i] + " needs a value.");
@@ -108,6 +110,11 @@ public static class Program
                 case "--standard-error-metric":
                     standardErrorMetric = rest[i + 1];
                     break;
+                // OpenEvolve puts artifact text in the next prompt; ours withholds it unless the run says otherwise
+                // (search.retainArtifactText), so a comparison with upstream has to say so.
+                case "--retain-artifact-text" when bool.TryParse(rest[i + 1], out bool retain):
+                    retainArtifactText = retain;
+                    break;
                 default:
                     return Fail("error: unknown or invalid option " + rest[i] + " " + rest[i + 1] + "." + Environment.NewLine + Usage);
             }
@@ -116,13 +123,14 @@ public static class Program
         Directory.CreateDirectory(output);
         string runFile = Path.Combine(output, "run.json");
         string translated = JsonSerializer.Serialize(imported.Run, RunCommand.RunFileJson);
-        if (championStandardErrors is not null || standardErrorMetric is not null)
+        if (championStandardErrors is not null || standardErrorMetric is not null || retainArtifactText is not null)
         {
             JsonObject node = JsonNode.Parse(translated)!.AsObject();
             JsonObject search = node["search"] as JsonObject ?? new JsonObject();
             node["search"] = search;
             if (championStandardErrors is double k) search["championStandardErrors"] = k;
             if (standardErrorMetric is not null) search["standardErrorMetric"] = standardErrorMetric;
+            if (retainArtifactText is bool retainText) search["retainArtifactText"] = retainText;
             translated = node.ToJsonString(RunCommand.RunFileJson);
         }
         File.WriteAllText(runFile, translated);

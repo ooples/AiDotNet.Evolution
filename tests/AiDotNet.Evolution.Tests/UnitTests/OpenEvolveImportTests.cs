@@ -1017,5 +1017,65 @@ public sealed class OpenEvolveImportTests
             Environment.SetEnvironmentVariable("OPENAI_API_KEY", previousKey);
         }
     }
+
+    // E-4: the pilot's evaluator returns training rows as artifacts, and OpenEvolve puts artifact text in the next prompt.
+    // Ours withholds it unless search.retainArtifactText is set, which the imported run can only get from the command line.
+    [Theory]
+    [InlineData(true)]
+    [InlineData(false)]
+    public void Retain_artifact_text_on_the_command_line_decides_whether_artifact_text_reaches_the_prompt(bool retain)
+    {
+        using var directory = new TemporaryDirectory();
+        using var model = new CliRunTests.FakeChatModel();
+        File.WriteAllText(Path.Combine(directory.Path, "initial_program.py"), "X = 0\n");
+        File.WriteAllText(Path.Combine(directory.Path, "evaluator.py"), """
+            import re
+
+            class Result:
+                def __init__(self, metrics, artifacts):
+                    self.metrics, self.artifacts = metrics, artifacts
+
+            def evaluate(path):
+                with open(path) as handle:
+                    x = int(re.search(r"X = (\d+)", handle.read()).group(1))
+                return Result({"combined_score": float(x)}, {"training_rows": "ROWS-MARKER-" + str(x)})
+            """);
+        File.WriteAllText(Path.Combine(directory.Path, "config.yaml"), $"""
+            max_iterations: 2
+            random_seed: 7
+            diff_based_evolution: false
+            llm:
+              api_base: {model.Endpoint}
+              models:
+                - name: fake-model
+              timeout: 20
+              retries: 0
+            database:
+              num_islands: 1
+            evaluator:
+              timeout: 30
+            """);
+        string output = Path.Combine(directory.Path, "out");
+
+        string? previousKey = Environment.GetEnvironmentVariable("OPENAI_API_KEY");
+        Environment.SetEnvironmentVariable("OPENAI_API_KEY", "unused-by-the-fake");
+        try
+        {
+            var (code, _, error) = CliRunTests.Run("run", "--openevolve-config", Path.Combine(directory.Path, "config.yaml"),
+                Path.Combine(directory.Path, "initial_program.py"), Path.Combine(directory.Path, "evaluator.py"),
+                "--python", Python, "--output", output, "--retain-artifact-text", retain ? "true" : "false");
+
+            Assert.True(code == 0, error);
+            using (JsonDocument run = JsonDocument.Parse(File.ReadAllText(Path.Combine(output, "run.json"))))
+                Assert.Equal(retain, run.RootElement.GetProperty("search").GetProperty("retainArtifactText").GetBoolean());
+            string prompts = string.Join("\n", model.Requests);
+            Assert.Equal(retain, prompts.Contains("ROWS-MARKER-", StringComparison.Ordinal));
+            Assert.Equal(!retain, prompts.Contains("artifact content withheld", StringComparison.Ordinal));
+        }
+        finally
+        {
+            Environment.SetEnvironmentVariable("OPENAI_API_KEY", previousKey);
+        }
+    }
 }
 #endif
