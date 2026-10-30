@@ -95,7 +95,20 @@ def ours(cli, directory, work, python, endpoint, iterations):
     if run.returncode != 0:
         return {"status": "failed", "reason": (run.stderr.strip() or run.stdout.strip()).splitlines()[-1:]}
     result = json.loads(run.stdout)
-    return {"status": "ran", "completed": result.get("CompletedEvaluations"), "best": result.get("BestQuality")}
+    outcome = {"status": "ran", "completed": result.get("CompletedEvaluations"), "best": result.get("BestQuality")}
+    if not outcome["completed"]:
+        outcome["reason"] = first_diagnostic(work / "ours")
+    return outcome
+
+
+def first_diagnostic(output):
+    """The first evaluator diagnostic in our run's traces, so a row that scored nothing says why."""
+    for trace in sorted(output.glob("trace-*.jsonl")):
+        for line in trace.read_text(encoding="utf-8", errors="replace").splitlines():
+            record = json.loads(line) if line.strip().startswith("{") else {}
+            for diagnostic in record.get("diagnostics") or []:
+                return (diagnostic.get("code", "") + ": " + diagnostic.get("message", ""))[:300]
+    return "no evaluation completed and no diagnostic was recorded"
 
 
 def upstream(checkout, directory, work, python, endpoint, iterations):
@@ -121,6 +134,11 @@ def main(argv=None):
     parser.add_argument("--python", default=sys.executable)
     parser.add_argument("--iterations", type=int, default=3)
     arguments = parser.parse_args(argv)
+    # Absolute, because each engine runs the evaluator from its own working directory. abspath and not
+    # resolve: resolving a venv's interpreter follows its symlink out of the venv and loses its packages.
+    arguments.python = os.path.abspath(arguments.python)
+    arguments.cli = os.path.abspath(arguments.cli)
+    arguments.upstream = os.path.abspath(arguments.upstream)
 
     server = http.server.ThreadingHTTPServer(("127.0.0.1", 0), StandInModel)
     threading.Thread(target=server.serve_forever, daemon=True).start()
