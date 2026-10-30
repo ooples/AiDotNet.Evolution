@@ -229,8 +229,9 @@ public sealed class ContainerExecutionEngineTests
     public void A_mount_source_holding_a_live_unix_socket_is_refused()
     {
         if (!Socket.OSSupportsUnixDomainSockets) return;
-        string directory = Path.Combine(Path.GetTempPath(), "aidotnet-mount-socket-" + Guid.NewGuid().ToString("N"));
-        string nested = Path.Combine(directory, "nested");
+        // Short names: a socket path is limited to 108 characters, and a Windows runner's temp path is already long.
+        string directory = Path.Combine(Path.GetTempPath(), "ams-" + Guid.NewGuid().ToString("N").Substring(0, 8));
+        string nested = Path.Combine(directory, "n");
         Directory.CreateDirectory(nested);
         string socketPath = Path.Combine(nested, "agent.sock");
         try
@@ -296,14 +297,22 @@ public sealed class ContainerExecutionEngineTests
         using var engine = new ContainerExecutionEngine(Sandbox(), Container());
         string arguments = string.Join(" ", engine.BuildRunArguments("probe"));
         ContainerExecutionOptions mounting = Container();
-        string hostDirectory = Path.GetFullPath(Path.GetTempPath()).TrimEnd('/');
-        mounting.ReadOnlyMounts["/opt/evaluator"] = hostDirectory;
-        using (var mounted = new ContainerExecutionEngine(Sandbox(), mounting))
+        // A directory of its own: the temp directory itself holds live sockets (the .NET diagnostic one among them),
+        // which the engine rightly refuses to mount.
+        string hostDirectory = Path.Combine(Path.GetFullPath(Path.GetTempPath()), "aidotnet-mount-" + Guid.NewGuid().ToString("N"));
+        Directory.CreateDirectory(hostDirectory);
+        try
         {
+            mounting.ReadOnlyMounts["/opt/evaluator"] = hostDirectory;
+            using var mounted = new ContainerExecutionEngine(Sandbox(), mounting);
             Assert.Contains("--mount type=bind,source=" + hostDirectory + ",target=/opt/evaluator,readonly",
                 string.Join(" ", mounted.BuildRunArguments("probe")), StringComparison.Ordinal);
             // What a candidate can read is part of what a result means.
             Assert.NotEqual(engine.VersionHash, mounted.VersionHash);
+        }
+        finally
+        {
+            Directory.Delete(hostDirectory, recursive: true);
         }
 
         foreach (string flag in new[]
