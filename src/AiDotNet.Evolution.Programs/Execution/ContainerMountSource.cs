@@ -264,7 +264,11 @@ internal static class ContainerMountSource
             string expanded = Normalize(expandedDirectory + "/" + normalized.Substring(normalized.LastIndexOf('/') + 1), windows: false);
             foreach ((string path, _) in forms)
             {
-                if (IsAtOrBelow(normalized, path) || IsAtOrBelow(expanded, path)) return socket;
+                // The table keeps a bound path while any process still holds the socket, including after the path is
+                // unlinked (a child forked before the owner closed it is enough). An unlinked path cannot be reached
+                // through a mount, so only a socket whose node is still on disk is refused.
+                if ((IsAtOrBelow(normalized, path) || IsAtOrBelow(expanded, path)) && (File.Exists(normalized) || File.Exists(expanded)))
+                    return socket;
             }
         }
 
