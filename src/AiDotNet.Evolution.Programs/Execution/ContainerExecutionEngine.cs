@@ -303,7 +303,7 @@ public sealed class ContainerExecutionEngine : IProgramExecutionEngine, IProgram
             container.Completed++;
             bool clean = reply["clean"]?.GetValue<bool>() == true;
             reusable = clean && _container.Lifecycle == ContainerLifecycle.Warm && container.Completed < _container.RecycleAfter;
-            return FromReply(reply, language);
+            return FromReply(reply, language, _limits);
         }
         catch (Exception exception) when (exception is IOException or InvalidOperationException or JsonException
                                               or InvalidDataException or Win32Exception or ObjectDisposedException)
@@ -349,7 +349,7 @@ public sealed class ContainerExecutionEngine : IProgramExecutionEngine, IProgram
     // The supervisor decides memory_exceeded: from the cgroup's OOM counter, or from exit code 125 only for a Python
     // candidate it forked (where 125 is the MemoryError sentinel); any other candidate may exit 125 for its own reasons.
     // A memory event fails the execution even when the candidate exits 0, so its output is never scored.
-    internal ProgramExecuteResponse FromReply(JsonNode reply, ProgramLanguage language)
+    internal static ProgramExecuteResponse FromReply(JsonNode reply, ProgramLanguage language, ProgramSandboxLimitOptions limits)
     {
         int exit = reply["exit"]?.GetValue<int>() ?? -1;
         bool timedOut = reply["timed_out"]?.GetValue<bool>() == true;
@@ -357,8 +357,8 @@ public sealed class ContainerExecutionEngine : IProgramExecutionEngine, IProgram
         bool cpu = reply["cpu_exceeded"]?.GetValue<bool>() == true;
         bool success = exit == 0 && !timedOut && !memory;
         string? error = success ? null
-            : timedOut ? $"Execution exceeded the {_limits.TimeLimitSeconds.ToString(CultureInfo.InvariantCulture)} second limit and was terminated."
-            : memory ? $"Execution exceeded the {_limits.MemoryLimitMb.ToString(CultureInfo.InvariantCulture)} MB container memory limit."
+            : timedOut ? $"Execution exceeded the {limits.TimeLimitSeconds.ToString(CultureInfo.InvariantCulture)} second limit and was terminated."
+            : memory ? $"Execution exceeded the {limits.MemoryLimitMb.ToString(CultureInfo.InvariantCulture)} MB container memory limit."
             : cpu ? "Execution exceeded its CPU-time limit."
             : $"Execution failed with exit code {exit.ToString(CultureInfo.InvariantCulture)}.";
         return new ProgramExecuteResponse

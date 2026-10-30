@@ -82,7 +82,8 @@ public sealed class ContainerExecutionEngineTests
         Assert.Equal(nameof(ContainerExecutionOptions.ReadOnlyMounts), tooLong.ParamName);
     }
 
-    [Fact]
+    // The engine resolves its image when it is built, so even this test needs Docker.
+    [DockerFact]
     public void A_token_canceled_before_the_call_is_a_failed_execution_not_an_exception()
     {
         using var engine = new ContainerExecutionEngine(Sandbox(), Container());
@@ -99,14 +100,14 @@ public sealed class ContainerExecutionEngineTests
     [Fact]
     public void A_memory_event_fails_the_execution_and_exit_code_125_alone_is_not_one()
     {
-        using var engine = new ContainerExecutionEngine(Sandbox(), Container());
-        ProgramExecuteResponse oom = engine.FromReply(JsonNode.Parse("""{"exit": 0, "stdout": "42", "memory_exceeded": true}""")!,
-            ProgramLanguage.Python);
+        ProgramSandboxLimitOptions limits = Sandbox().Limits;
+        ProgramExecuteResponse oom = ContainerExecutionEngine.FromReply(
+            JsonNode.Parse("""{"exit": 0, "stdout": "42", "memory_exceeded": true}""")!, ProgramLanguage.Python, limits);
         Assert.False(oom.Success);
         Assert.Equal(ProgramExecuteErrorCode.MemoryLimitExceeded, oom.ErrorCode);
 
-        ProgramExecuteResponse chosen = engine.FromReply(JsonNode.Parse("""{"exit": 125, "memory_exceeded": false}""")!,
-            ProgramLanguage.JavaScript);
+        ProgramExecuteResponse chosen = ContainerExecutionEngine.FromReply(
+            JsonNode.Parse("""{"exit": 125, "memory_exceeded": false}""")!, ProgramLanguage.JavaScript, limits);
         Assert.False(chosen.Success);
         Assert.Equal(125, chosen.ExitCode);
         Assert.Equal(ProgramExecuteErrorCode.ExecutionFailed, chosen.ErrorCode);
