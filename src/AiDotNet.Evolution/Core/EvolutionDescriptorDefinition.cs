@@ -482,7 +482,7 @@ public sealed class EvolutionDescriptorDefinition
         int sampleCapacity,
         long stride)
     {
-        if (count == 0 || !(highest > lowest) || !IsFinite(highest - lowest))
+        if (count == 0 || highest <= lowest || !IsFinite(highest - lowest))
         {
             return new EvolutionDescriptorDefinition(name, initialMinimum, initialMaximum, binCount, policy, binning,
                 Array.Empty<double>(), count, lowest, highest, sample, sampleCapacity, stride);
