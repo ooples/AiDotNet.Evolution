@@ -156,8 +156,12 @@ def main(argv=None):
             for arm, run in (("ours", ours), ("openevolve", upstream)):
                 work = root / arm / problem
                 work.mkdir(parents=True)
-                outcome = run(arguments.cli if arm == "ours" else arguments.upstream, directory, work,
-                              arguments.python, endpoint, arguments.iterations)
+                try:
+                    outcome = run(arguments.cli if arm == "ours" else arguments.upstream, directory, work,
+                                  arguments.python, endpoint, arguments.iterations)
+                except subprocess.TimeoutExpired as expired:
+                    # A hung engine fails its row; the other rows and the results file still get written.
+                    outcome = {"status": "failed", "reason": "timed out after %s s" % expired.timeout}
                 outcome["passed"] = (outcome["status"] == "ran" and outcome.get("best") is not None
                                      and abs(outcome["best"] - expected) <= 1e-9 * abs(expected))
                 row[arm] = outcome

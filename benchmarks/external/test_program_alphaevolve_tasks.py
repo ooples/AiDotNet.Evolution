@@ -114,6 +114,9 @@ class AlphaEvolveTaskTests(unittest.TestCase):
             empty = Path(directory) / "empty.py"
             empty.write_text("X = 1\n", encoding="utf-8")
             self.assertEqual(evaluate(str(raising)), {"combined_score": 0.0, "error": "ValueError: no idea"})
+            exiting = Path(directory) / "exiting.py"
+            exiting.write_text("import sys\n\ndef construct():\n    sys.exit(3)\n", encoding="utf-8")
+            self.assertEqual(evaluate(str(exiting)), {"combined_score": 0.0, "error": "SystemExit: 3"})
             result = evaluate(str(empty))
             self.assertEqual(result["combined_score"], 0.0)
             self.assertIn("construct()", result["error"])
@@ -129,19 +132,60 @@ class AlphaEvolveTaskTests(unittest.TestCase):
             for path in written:
                 problem = path.name
                 self.assertEqual(sorted(child.name for child in path.iterdir()),
-                                 ["config.yaml", "evaluator.py", "initial_program.py"])
+                                 ["config.yaml", "evaluator.py", "initial_program.py", "support"])
+                self.assertEqual(sorted(child.name for child in (path / "support").iterdir()),
+                                 sorted(tasks.SUPPORT + ("floors.json",)))
+                import runpy
+
+                evaluate = runpy.run_path(str(path / "evaluator.py"))["evaluate"]
+                self.assertEqual(evaluate(str(path / "initial_program.py")),
+                                 tasks.score(problem, eval(tasks.SEEDS[problem])))  # noqa: S307
                 config = yaml.safe_load((path / "config.yaml").read_text(encoding="utf-8"))
                 message = " ".join(config["prompt"]["system_message"].split())
                 self.assertIn(" ".join(tasks.STATEMENTS[problem].split()), message)
                 self.assertIn(str(headroom.IN_SCOPE[problem]["published"]), message)
                 self.assertEqual(config["evaluator"]["timeout"], tasks.TIMEOUT_SECONDS)
 
-                namespace = {}
-                exec((path / "evaluator.py").read_text(encoding="utf-8"), namespace)  # noqa: S102 - generated here
-                generated = namespace["evaluate"](str(path / "initial_program.py"))
-                self.assertEqual(generated, tasks.score(problem, eval(tasks.SEEDS[problem])))  # noqa: S307
             with self.assertRaises(FileExistsError):
                 tasks.write(directory, ["c1-autocorrelation"])
+
+    def test_a_task_runs_from_its_own_directory_with_the_checkout_out_of_reach(self):
+        # A container mounts only the evaluator's directory. Run the generated evaluator in a fresh
+        # interpreter, from a copy whose only neighbours are its own files, with sys.path stripped of
+        # the checkout: it must score the seed exactly as the checkout does.
+        import shutil
+        import subprocess
+
+        with tempfile.TemporaryDirectory() as directory:
+            source = tasks.write(Path(directory) / "written", ["c5-erdos-overlap"])[0]
+            moved = Path(directory) / "elsewhere" / "task"
+            shutil.copytree(source, moved)
+            shutil.rmtree(source)
+            probe = (
+                "import json, runpy, sys\n"
+                "sys.path = [p for p in sys.path if 'benchmarks' not in p]\n"
+                "evaluate = runpy.run_path(sys.argv[1])['evaluate']\n"
+                "print(json.dumps(evaluate(sys.argv[2])))\n")
+            run = subprocess.run([sys.executable, "-I", "-c", probe, str(moved / "evaluator.py"),
+                                  str(moved / "initial_program.py")], capture_output=True, text=True, timeout=120,
+                                 cwd=str(moved))
+            self.assertEqual(run.returncode, 0, run.stderr)
+            self.assertEqual(json.loads(run.stdout), json.loads(json.dumps(tasks.score("c5-erdos-overlap", [0.5] * 16))))
+            self.assertNotIn(str(HERE), (moved / "evaluator.py").read_text(encoding="utf-8"))
+            self.assertEqual(json.loads((moved / "support" / "floors.json").read_text(encoding="utf-8")),
+                             {problem: tasks.FLOORS[problem] for problem in tasks.TASKS})
+
+    def test_a_refused_write_leaves_nothing_behind(self):
+        with tempfile.TemporaryDirectory() as directory:
+            root = Path(directory)
+            (root / "c5-erdos-overlap").mkdir()
+            with self.assertRaises(FileExistsError):
+                tasks.write(root, ["c1-autocorrelation", "c5-erdos-overlap"])
+            with self.assertRaises(ValueError):
+                tasks.write(root, ["c2-autocorrelation", "c2-autocorrelation"])
+            with self.assertRaises(KeyError):
+                tasks.write(root, ["c3-autocorrelation", "c4-uncertainty-hermite"])
+            self.assertEqual(sorted(path.name for path in root.iterdir()), ["c5-erdos-overlap"])
 
 
 if __name__ == "__main__":
