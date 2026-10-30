@@ -1,3 +1,4 @@
+#if NET8_0_OR_GREATER
 using AiDotNet.Evolution.Cli;
 using Xunit;
 
@@ -109,3 +110,4 @@ public sealed class CliDescriptorBinningTests
         return path;
     }
 }
+#endif

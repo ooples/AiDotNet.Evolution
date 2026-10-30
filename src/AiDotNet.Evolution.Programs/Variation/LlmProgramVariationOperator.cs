@@ -63,7 +63,7 @@ namespace AiDotNet.Evolution.Programs;
 /// and asks again instead of wasting the round. You supply the chat client, so no model is contacted unless you
 /// configure one.</para>
 /// </remarks>
-public sealed class LlmProgramVariationOperator : ICheckpointableVariationOperator<ProgramGenome>, IProgramVariationOperator, IEvolutionLatencyProfile,
+public sealed class LlmProgramVariationOperator : IOutcomeAwareVariationOperator<ProgramGenome>, IProgramVariationOperator, IEvolutionLatencyProfile,
     IDeterministicConcurrentVariationOperator<ProgramGenome>
 {
     /// <inheritdoc/>
@@ -72,7 +72,8 @@ public sealed class LlmProgramVariationOperator : ICheckpointableVariationOperat
 
     // Bumped whenever the checkpointed attempt shape changes, so an older checkpoint is refused rather than
     // silently misread into a different prompt.
-    private const int AttemptStateSchemaVersion = 1;
+    // Version 2 added the evaluated children; a version 1 state, which has none, is still read.
+    private const int AttemptStateSchemaVersion = 2;
 
     private const int MaxFeedbackFailures = 5;
     private const int MaxFeedbackChars = 1_200;
@@ -96,6 +97,18 @@ public sealed class LlmProgramVariationOperator : ICheckpointableVariationOperat
     private readonly Dictionary<long, ProgramProposalAttempt[]> _frozen = new();
     private long _frozenHorizon = long.MinValue;
     private long _nextUnidentifiedRecord = long.MinValue / 2;
+
+    // Evaluated children, learned through Observe. An accepted reply is remembered under its child's genome id until the
+    // engine commits that child, which is when its measurements exist. The record is then filed by evaluation id and
+    // read with the same horizon rule as the attempts above, so a prompt recounts exactly the children committed
+    // before it was planned.
+    private const int MaxPendingChildren = 4_096;
+    private readonly Dictionary<string, List<PendingChild>> _pending = new(StringComparer.Ordinal);
+    private readonly Queue<string> _pendingOrder = new();
+    private readonly SortedList<long, ChildRecord> _children = new();
+    private readonly Dictionary<long, ChildRecord[]> _frozenChildren = new();
+    private long _childrenFrozenHorizon = long.MinValue;
+    private long _childCount;
 
     /// <inheritdoc/>
     /// <remarks>True when <see cref="LlmProgramVariationOptions.ConcurrentProposals"/> is set; the chat client must then
@@ -322,7 +335,7 @@ public sealed class LlmProgramVariationOperator : ICheckpointableVariationOperat
 
             CheckModelIdentity();
             ProgramProposalOutcome outcome = TryBuildChild(
-                parent, responseText, prompt.Mode, out ProgramGenome child, out string feedback);
+                parent, responseText, prompt.Mode, out ProgramGenome child, out string feedback, out string changes);
             Record(context, recordId, recordSequence++, parent.Id, attemptNumber, outcome, feedback, inputTokens, outputTokens);
             if (recordProvenance)
             {
@@ -336,7 +349,11 @@ public sealed class LlmProgramVariationOperator : ICheckpointableVariationOperat
                     cancellationToken).ConfigureAwait(false);
             }
 
-            if (outcome == ProgramProposalOutcome.Accepted) return child;
+            if (outcome == ProgramProposalOutcome.Accepted)
+            {
+                RememberChild(child, parent.Id, context.Parent.Evaluation, changes);
+                return child;
+            }
             if (lastSampleOfAttempt) AppendFeedback(messages, responseText, feedback);
         }
 
@@ -412,18 +429,26 @@ public sealed class LlmProgramVariationOperator : ICheckpointableVariationOperat
         return promptContext;
     }
 
-    /// <summary>Tells the model what has already been tried on this same parent, and how it went.</summary>
+    /// <summary>Tells the model what was recently tried and how it went, and which replies on this parent failed.</summary>
     /// <param name="promptContext">The context being built.</param>
-    /// <param name="parentGenomeId">The parent whose attempt history is relevant.</param>
+    /// <param name="parentGenomeId">The parent being varied.</param>
     /// <param name="context">
-    /// The proposal's context. With concurrent proposals it fixes which recorded attempts this proposal may see, so the
-    /// prompt does not depend on which other model calls happened to finish first.
+    /// The proposal's context. With a horizon it fixes which records this proposal may see, so the prompt does not
+    /// depend on which other model calls or evaluations happened to finish first.
     /// </param>
     /// <remarks>
-    /// Within a single proposal a rejected answer is already fed back into the conversation, so the model can see
-    /// its own mistake. Across proposals it cannot: the next call starts a fresh conversation from the same parent
-    /// and is free to repeat an edit that failed to parse or applied to nothing. This surfaces the recorded
-    /// attempts for that parent so the same dead end is not paid for twice.
+    /// <para>
+    /// The evaluated children come first: each says what it changed, what it measured, and how that compared with its
+    /// own parent, which is what the model needs to avoid repeating an idea that did not pay. They are drawn from the
+    /// scope <see cref="LlmProgramVariationOptions.PreviousAttemptScope"/> chooses, newest last.
+    /// </para>
+    /// <para>
+    /// Replies on this same parent that could not be applied follow. Within a single proposal such a reply is already
+    /// fed back into the conversation; across proposals it is not, and the next call is free to repeat an edit that
+    /// failed to parse or matched nothing. They come last because the prompt shows the newest entries when it has to
+    /// cut, and these are the edits the model is about to make again. A reply that was applied is not listed: its
+    /// child is, with its measurements, once it has been evaluated.
+    /// </para>
     /// </remarks>
     private void ApplyPreviousAttempts(ProgramPromptContext promptContext, string parentGenomeId, EvolutionVariationContext<ProgramGenome> context)
     {
@@ -431,27 +456,56 @@ public sealed class LlmProgramVariationOperator : ICheckpointableVariationOperat
         if (limit <= 0) return;
 
         ProgramProposalAttempt[] recorded;
+        ChildRecord[] children;
         lock (_attemptLock)
         {
             recorded = _variationOptions.ConcurrentProposals ? Frozen(context) : _attempts.ToArray();
+            children = FrozenChildren(context);
         }
 
         var recent = new List<ProgramPromptAttempt>();
-        for (int i = recorded.Length - 1; i >= 0 && recent.Count < limit; i--)
+        for (int i = children.Length - 1; i >= 0 && recent.Count < limit; i--)
         {
-            ProgramProposalAttempt attempt = recorded[i];
-            if (!string.Equals(attempt.ParentGenomeId, parentGenomeId, StringComparison.Ordinal)) continue;
-
+            ChildRecord child = children[i];
+            if (!InScope(child, parentGenomeId, context.Island)) continue;
             recent.Add(new ProgramPromptAttempt(
-                attempt.AttemptNumber,
-                attempt.Outcome + ": " + ProgramText.Bound(attempt.Detail, 200)));
+                (int)Math.Min(child.Ordinal, int.MaxValue),
+                child.Changes.Length == 0 ? null : ProgramText.Bound(child.Changes, ProgramPromptAttempt.MaxChangesLength),
+                child.Measurements,
+                child.ParentMeasurements)
+            {
+                Outcome = child.Status == EvolutionEvaluationStatus.Completed ? null : "Evaluation " + child.Status
+            });
         }
 
-        // Reversed so the oldest attempt reads first, which is the order a person would recount them in.
-        if (recent.Count == 0) return;
+        // Oldest first: the prompt keeps the last entries when it has to cut, and shows them newest first.
         recent.Reverse();
+
+        var failed = new List<ProgramPromptAttempt>();
+        for (int i = recorded.Length - 1; i >= 0 && failed.Count < limit; i--)
+        {
+            ProgramProposalAttempt attempt = recorded[i];
+            if (attempt.Outcome == ProgramProposalOutcome.Accepted) continue;
+            if (!string.Equals(attempt.ParentGenomeId, parentGenomeId, StringComparison.Ordinal)) continue;
+
+            failed.Add(new ProgramPromptAttempt(attempt.AttemptNumber, ProgramText.Bound(attempt.Detail, 200))
+            {
+                Outcome = "Not applied: " + attempt.Outcome
+            });
+        }
+
+        failed.Reverse();
+        recent.AddRange(failed);
+        if (recent.Count == 0) return;
         promptContext.PreviousAttempts = recent;
     }
+
+    private bool InScope(ChildRecord child, string parentGenomeId, int island) => _variationOptions.PreviousAttemptScope switch
+    {
+        ProgramPreviousAttemptScope.Parent => string.Equals(child.ParentGenomeId, parentGenomeId, StringComparison.Ordinal),
+        ProgramPreviousAttemptScope.Run => true,
+        _ => child.Island == island
+    };
 
     /// <summary>Adds the two prompt sections that describe the frontier rather than the parent.</summary>
     /// <param name="promptContext">The context being built.</param>
@@ -610,9 +664,11 @@ public sealed class LlmProgramVariationOperator : ICheckpointableVariationOperat
         string responseText,
         ProgramPromptEvolutionMode mode,
         out ProgramGenome child,
-        out string feedback)
+        out string feedback,
+        out string changes)
     {
         child = parent;
+        changes = string.Empty;
         if (responseText.Length > _programOptions.Diff.MaxResponseChars)
         {
             feedback = "The response exceeds the configured parsing bound.";
@@ -639,6 +695,7 @@ public sealed class LlmProgramVariationOperator : ICheckpointableVariationOperat
             }
 
             candidateSource = extraction.Code;
+            changes = ProgramDiffSummary.FullRewrite;
         }
         else if (!maintainsChangesDescription)
         {
@@ -650,6 +707,7 @@ public sealed class LlmProgramVariationOperator : ICheckpointableVariationOperat
             }
 
             candidateSource = applied.ModifiedSource;
+            changes = ProgramDiffSummary.Format(ProgramDiff.Parse(responseText, _programOptions.Diff).Blocks);
         }
         else
         {
@@ -687,6 +745,9 @@ public sealed class LlmProgramVariationOperator : ICheckpointableVariationOperat
                 candidateSource = appliedSource.ModifiedSource;
             }
 
+            changes = split.ProgramBlocks.Count > 0
+                ? ProgramDiffSummary.Format(split.ProgramBlocks)
+                : "Changes description only";
             candidateDescription = parentDescription;
             if (split.DescriptionBlocks.Count > 0)
             {
@@ -844,6 +905,112 @@ public sealed class LlmProgramVariationOperator : ICheckpointableVariationOperat
         }
     }
 
+    /// <summary>Remembers an accepted reply until its child is committed and measured.</summary>
+    private void RememberChild(ProgramGenome child, string parentGenomeId, EvolutionEvaluation parent, string changes)
+    {
+        if (_variationOptions.MaxRecordedAttempts == 0 || _variationOptions.MaxPreviousAttempts == 0) return;
+        var pending = new PendingChild(parentGenomeId, changes, Measurements(parent));
+        lock (_attemptLock)
+        {
+            if (!_pending.TryGetValue(child.Id, out List<PendingChild>? entries))
+            {
+                _pending[child.Id] = entries = new List<PendingChild>(1);
+                _pendingOrder.Enqueue(child.Id);
+            }
+            entries.Add(pending);
+
+            // Only a child the engine never commits stays here, such as one a custom task canonicalizes to another id.
+            while (_pendingOrder.Count > MaxPendingChildren) _pending.Remove(_pendingOrder.Dequeue());
+        }
+    }
+
+    /// <inheritdoc/>
+    /// <remarks>
+    /// Files the committed child with its measurements and its parent's, which is what the previous-attempts section
+    /// recounts. A proposal this operator did not make, or one that returned its parent unchanged, has nothing waiting
+    /// and is ignored. The engine calls this in commit order, so the history is the same in every run that commits
+    /// the same evaluations.
+    /// </remarks>
+    public void Observe(EvolutionEvaluation evaluation, EvolutionArchiveInsertionResult? insertionResult)
+    {
+        ProgramGuard.NotNull(evaluation);
+        lock (_attemptLock)
+        {
+            if (!_pending.TryGetValue(evaluation.GenomeId, out List<PendingChild>? entries)) return;
+
+            // Two proposals can reach the same program. The one from this evaluation's own parent is the one committed;
+            // between equals, the ordinal-first change text decides, so arrival order never does.
+            string? parentId = evaluation.Lineage.ParentIds.Count > 0 ? evaluation.Lineage.ParentIds[0] : null;
+            PendingChild chosen = entries
+                .OrderBy(entry => string.Equals(entry.ParentGenomeId, parentId, StringComparison.Ordinal) ? 0 : 1)
+                .ThenBy(entry => entry.Changes, StringComparer.Ordinal)
+                .First();
+            entries.Remove(chosen);
+            if (entries.Count == 0) _pending.Remove(evaluation.GenomeId);
+
+            _children[evaluation.EvaluationId] = new ChildRecord(
+                evaluation.EvaluationId, evaluation.Lineage.Island, ++_childCount, chosen.ParentGenomeId, chosen.Changes,
+                evaluation.Status, Measurements(evaluation), chosen.ParentMeasurements);
+            TrimChildren();
+        }
+    }
+
+    // What a prompt compares: the evaluator's metrics (descriptors when it reported none, as for the parent's own
+    // section), plus the quality the search ranks by, so an attempt's outcome reflects the score as well.
+    private static IReadOnlyDictionary<string, double> Measurements(EvolutionEvaluation evaluation)
+    {
+        var values = new SortedDictionary<string, double>(StringComparer.Ordinal);
+        foreach (KeyValuePair<string, double> pair in evaluation.Metrics.Count > 0 ? evaluation.Metrics : evaluation.Descriptors)
+            values[pair.Key] = pair.Value;
+        if (evaluation.Quality is double quality && !values.ContainsKey("quality")) values["quality"] = quality;
+        return values;
+    }
+
+    // Called under _attemptLock. The children as of this proposal's planning, by the same rule as Frozen.
+    private ChildRecord[] FrozenChildren(EvolutionVariationContext<ProgramGenome> context)
+    {
+        int capacity = _variationOptions.MaxRecordedAttempts;
+        if (context.CommittedBefore is not long horizon)
+            return _children.Values.Skip(Math.Max(0, _children.Count - capacity)).ToArray();
+        if (_frozenChildren.TryGetValue(horizon, out ChildRecord[]? frozen)) return frozen;
+        int below = CountChildrenBelow(horizon);
+        frozen = _children.Values.Skip(Math.Max(0, below - capacity)).Take(Math.Min(below, capacity)).ToArray();
+        if (horizon > _childrenFrozenHorizon)
+        {
+            _childrenFrozenHorizon = horizon;
+            foreach (long stale in _frozenChildren.Keys.Where(existing => existing < horizon).ToArray()) _frozenChildren.Remove(stale);
+            TrimChildren();
+        }
+        _frozenChildren[horizon] = frozen;
+        return frozen;
+    }
+
+    // Called under _attemptLock. Without a horizon the newest capacity are kept; with one, only records below the newest
+    // horizon can be trimmed, because a prompt planned later may still read anything above it.
+    private void TrimChildren()
+    {
+        int capacity = _variationOptions.MaxRecordedAttempts;
+        if (_childrenFrozenHorizon == long.MinValue)
+        {
+            while (_children.Count > capacity) _children.RemoveAt(0);
+            return;
+        }
+        while (CountChildrenBelow(_childrenFrozenHorizon) > capacity) _children.RemoveAt(0);
+    }
+
+    private int CountChildrenBelow(long horizon)
+    {
+        IList<long> keys = _children.Keys;
+        int low = 0, high = keys.Count;
+        while (low < high)
+        {
+            int middle = low + (high - low) / 2;
+            if (keys[middle] < horizon) low = middle + 1;
+            else high = middle;
+        }
+        return low;
+    }
+
     /// <inheritdoc/>
     /// <remarks>
     /// The recorded attempts are the operator's only state, and they change the next prompt: a rejected parse is
@@ -854,16 +1021,47 @@ public sealed class LlmProgramVariationOperator : ICheckpointableVariationOperat
     public string CaptureState()
     {
         ProgramProposalAttempt[] recorded;
+        ChildRecord[] children;
+        List<PendingDocument> pending;
+        long childCount;
         lock (_attemptLock)
         {
             recorded = _variationOptions.ConcurrentProposals
                 ? _ordered.Values.Skip(Math.Max(0, _ordered.Count - _variationOptions.MaxRecordedAttempts)).ToArray()
                 : _attempts.ToArray();
+            children = _children.Values.ToArray();
+            pending = _pending
+                .OrderBy(entry => entry.Key, StringComparer.Ordinal)
+                .SelectMany(entry => entry.Value.Select(item => new PendingDocument
+                {
+                    GenomeId = entry.Key,
+                    ParentGenomeId = item.ParentGenomeId,
+                    Changes = item.Changes,
+                    ParentMeasurements = new SortedDictionary<string, double>(
+                        item.ParentMeasurements.ToDictionary(pair => pair.Key, pair => pair.Value), StringComparer.Ordinal)
+                }))
+                .ToList();
+            childCount = _childCount;
         }
 
         var document = new AttemptStateDocument
         {
             SchemaVersion = AttemptStateSchemaVersion,
+            ChildCount = childCount,
+            Children = children.Select(child => new ChildDocument
+            {
+                EvaluationId = child.EvaluationId,
+                Island = child.Island,
+                Ordinal = child.Ordinal,
+                ParentGenomeId = child.ParentGenomeId,
+                Changes = child.Changes,
+                Status = (int)child.Status,
+                Measurements = new SortedDictionary<string, double>(
+                    child.Measurements.ToDictionary(pair => pair.Key, pair => pair.Value), StringComparer.Ordinal),
+                ParentMeasurements = new SortedDictionary<string, double>(
+                    child.ParentMeasurements.ToDictionary(pair => pair.Key, pair => pair.Value), StringComparer.Ordinal)
+            }).ToList(),
+            Pending = pending,
             Attempts = recorded.Select(attempt => new AttemptDocument
             {
                 ParentGenomeId = attempt.ParentGenomeId,
@@ -896,7 +1094,7 @@ public sealed class LlmProgramVariationOperator : ICheckpointableVariationOperat
             throw new InvalidDataException("The variation-operator state is not readable.", exception);
         }
 
-        if (document is null || document.SchemaVersion != AttemptStateSchemaVersion)
+        if (document is null || document.SchemaVersion is < 1 or > AttemptStateSchemaVersion)
             throw new InvalidDataException("The variation-operator state schema is invalid.");
 
         List<AttemptDocument> attempts = document.Attempts ?? new List<AttemptDocument>();
@@ -921,8 +1119,46 @@ public sealed class LlmProgramVariationOperator : ICheckpointableVariationOperat
             }
         }
 
+        List<ChildDocument> childDocuments = document.Children ?? new List<ChildDocument>();
+        List<PendingDocument> pendingDocuments = document.Pending ?? new List<PendingDocument>();
+        if (childDocuments.Count > _variationOptions.MaxRecordedAttempts || pendingDocuments.Count > MaxPendingChildren)
+            throw new InvalidDataException("The variation-operator state holds more children than the configured bound.");
+        var restoredChildren = new List<ChildRecord>(childDocuments.Count);
+        foreach (ChildDocument child in childDocuments)
+        {
+            if (child is null || string.IsNullOrEmpty(child.ParentGenomeId) || child.Ordinal < 1 || child.Ordinal > document.ChildCount ||
+                !Enum.IsDefined(typeof(EvolutionEvaluationStatus), child.Status) ||
+                restoredChildren.Any(existing => existing.EvaluationId == child.EvaluationId))
+                throw new InvalidDataException("A recorded child is invalid.");
+            restoredChildren.Add(new ChildRecord(child.EvaluationId, child.Island, child.Ordinal, child.ParentGenomeId,
+                child.Changes ?? string.Empty, (EvolutionEvaluationStatus)child.Status,
+                Finite(child.Measurements), Finite(child.ParentMeasurements)));
+        }
+        foreach (PendingDocument entry in pendingDocuments)
+        {
+            if (entry is null || string.IsNullOrEmpty(entry.GenomeId) || string.IsNullOrEmpty(entry.ParentGenomeId))
+                throw new InvalidDataException("A pending child is invalid.");
+        }
+
         lock (_attemptLock)
         {
+            _children.Clear();
+            _frozenChildren.Clear();
+            _childrenFrozenHorizon = long.MinValue;
+            foreach (ChildRecord child in restoredChildren) _children[child.EvaluationId] = child;
+            _childCount = document.ChildCount;
+            _pending.Clear();
+            _pendingOrder.Clear();
+            foreach (PendingDocument entry in pendingDocuments)
+            {
+                if (!_pending.TryGetValue(entry.GenomeId, out List<PendingChild>? entries))
+                {
+                    _pending[entry.GenomeId] = entries = new List<PendingChild>(1);
+                    _pendingOrder.Enqueue(entry.GenomeId);
+                }
+                entries.Add(new PendingChild(entry.ParentGenomeId, entry.Changes ?? string.Empty, Finite(entry.ParentMeasurements)));
+            }
+
             _attempts.Clear();
             _ordered.Clear();
             _frozen.Clear();
@@ -1210,6 +1446,7 @@ public sealed class LlmProgramVariationOperator : ICheckpointableVariationOperat
             variationOptions.MaxTopPrograms.ToString(CultureInfo.InvariantCulture),
             variationOptions.MaxEmptyNeighborCells.ToString(CultureInfo.InvariantCulture),
             variationOptions.MaxPreviousAttempts.ToString(CultureInfo.InvariantCulture),
+            "previous-attempt-scope:" + ((int)variationOptions.PreviousAttemptScope).ToString(CultureInfo.InvariantCulture),
             variationOptions.MaxRecordedAttempts.ToString(CultureInfo.InvariantCulture),
             variationOptions.IncludeParentMetrics ? "include-metrics" : "omit-metrics",
             variationOptions.Temperature.HasValue ? variationOptions.Temperature.Value.ToString("R", CultureInfo.InvariantCulture) : "provider-temperature",
@@ -1252,7 +1489,70 @@ public sealed class LlmProgramVariationOperator : ICheckpointableVariationOperat
         public int SchemaVersion { get; set; }
 
         public List<AttemptDocument>? Attempts { get; set; }
+
+        public long ChildCount { get; set; }
+
+        public List<ChildDocument>? Children { get; set; }
+
+        public List<PendingDocument>? Pending { get; set; }
     }
+
+    /// <summary>One evaluated child, in evaluation-id order.</summary>
+    private sealed class ChildDocument
+    {
+        public long EvaluationId { get; set; }
+
+        public int Island { get; set; }
+
+        public long Ordinal { get; set; }
+
+        public string ParentGenomeId { get; set; } = string.Empty;
+
+        public string? Changes { get; set; }
+
+        public int Status { get; set; }
+
+        public SortedDictionary<string, double>? Measurements { get; set; }
+
+        public SortedDictionary<string, double>? ParentMeasurements { get; set; }
+    }
+
+    /// <summary>An accepted reply whose child had not been committed when the state was captured.</summary>
+    private sealed class PendingDocument
+    {
+        public string GenomeId { get; set; } = string.Empty;
+
+        public string ParentGenomeId { get; set; } = string.Empty;
+
+        public string? Changes { get; set; }
+
+        public SortedDictionary<string, double>? ParentMeasurements { get; set; }
+    }
+
+    private static IReadOnlyDictionary<string, double> Finite(IDictionary<string, double>? values)
+    {
+        var copy = new SortedDictionary<string, double>(StringComparer.Ordinal);
+        if (values is null) return copy;
+        foreach (KeyValuePair<string, double> pair in values)
+        {
+            if (pair.Key is null || double.IsNaN(pair.Value) || double.IsInfinity(pair.Value))
+                throw new InvalidDataException("A recorded measurement is invalid.");
+            copy[pair.Key] = pair.Value;
+        }
+        return copy;
+    }
+
+    private sealed record PendingChild(string ParentGenomeId, string Changes, IReadOnlyDictionary<string, double> ParentMeasurements);
+
+    private sealed record ChildRecord(
+        long EvaluationId,
+        int Island,
+        long Ordinal,
+        string ParentGenomeId,
+        string Changes,
+        EvolutionEvaluationStatus Status,
+        IReadOnlyDictionary<string, double> Measurements,
+        IReadOnlyDictionary<string, double> ParentMeasurements);
 
     /// <summary>One recorded proposal attempt, in the order the queue holds it.</summary>
     private sealed class AttemptDocument

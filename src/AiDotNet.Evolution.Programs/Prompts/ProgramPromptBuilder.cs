@@ -419,7 +419,9 @@ public sealed class ProgramPromptBuilder
                     ? BoundChanges(PromptTextRedactor.Redact(changes.Trim()))
                     : _templates.RenderFragment(ProgramPromptFragmentKey.AttemptUnknownChanges),
                 ["performance"] = DescribeMetricsInline(attempt.Metrics),
-                ["outcome"] = DescribeOutcome(context.Direction, attempt)
+                ["outcome"] = attempt.Outcome is { } stated && stated.Trim().Length > 0
+                    ? PromptTextRedactor.Redact(stated.Trim())
+                    : DescribeOutcome(context.Direction, attempt)
             };
 
             AddCustomVariables(values);
