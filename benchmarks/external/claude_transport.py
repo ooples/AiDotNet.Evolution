@@ -36,6 +36,9 @@ import time
 
 from codex_transport import kill_owned
 
+# Revalidated for 2.1.314 on 2026-10-29 for the E-4 re-pilot, by the same procedure: `record_claude_canary.py` succeeded
+# for all three models, the resolved models are unchanged and the baselines did not move (658/637/633).
+#
 # Revalidated for 2.1.312 on 2026-10-29 for the E-4 pilot, by the same procedure: `record_claude_canary.py` succeeded
 # for all three models (so every assertion below held), the resolved models are unchanged and the baselines moved
 # 659/661/657 -> 658/637/633, within the CLI's own scaffolding drift and nowhere near a 29k hook injection.
@@ -54,7 +57,7 @@ from codex_transport import kill_owned
 # Previously revalidated for 2.1.299 on 2026-10-15, where `--max-turns` still worked although it
 # had been dropped from `--help`, and the baselines moved 448/579/516 and were re-recorded because
 # the CLI's own scaffolding had grown; that was the canary working, not contamination.
-PINNED_CLI = "2.1.312 (Claude Code)"
+PINNED_CLI = "2.1.314 (Claude Code)"
 MAX_OUTPUT = 4 * 1024 * 1024
 MAX_TEXT = 64 * 1024
 SYSTEM_PROMPT = ("Generate exactly one candidate response to the benchmark conversation in the user message. "
