@@ -47,6 +47,25 @@ class PilotCellTests(unittest.TestCase):
         self.assertNotIn(999.0, outcome.values(), "the searcher's own claim must not reach the row")
         self.assertEqual((4, 1234), (outcome["ModelCalls"], outcome["ModelTokens"]))
 
+    def test_our_arms_champion_decision_reaches_the_row_and_no_other_arm_gets_one(self):
+        champion = {"StandardErrors": 1.0, "BeatSeed": True}
+
+        def searcher(with_champion):
+            def search(_cell, directory, _resume):
+                outcome = {"program": program(directory, "def predict(x):\n    return 0.0\n"), "model_calls": 1}
+                if with_champion:
+                    outcome["champion"] = champion
+                return outcome
+            return search
+
+        run = pilot_cells.executor(TASK, {"aidotnet": searcher(True), "openevolve-matched": searcher(False)}, holdout_seed=918273)
+        with tempfile.TemporaryDirectory() as directory:
+            ours = run(cell("aidotnet"), directory, False)
+        with tempfile.TemporaryDirectory() as directory:
+            theirs = run(cell("openevolve-matched"), directory, False)
+        self.assertEqual(champion, ours["Champion"])
+        self.assertNotIn("Champion", theirs)
+
     def test_a_constant_predictor_scores_about_one_and_the_truth_beats_it(self):
         # Two arms, one cell each, so the executor is shown to discriminate rather than to return a
         # constant. Without this, "the truth scores 0" is also what a broken scorer reports.

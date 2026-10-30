@@ -185,6 +185,14 @@ class OurArmTests(unittest.TestCase):
         self.assertEqual("1.0", command[command.index("--champion-standard-errors") + 1])
         self.assertEqual("quality_standard_error", command[command.index("--standard-error-metric") + 1])
 
+    def test_the_champion_decision_is_kept_on_the_outcome_and_absent_when_the_cli_reports_none(self):
+        champion = {"StandardErrors": 1.0, "ReferenceQuality": 0.5, "ReferenceStandardError": 0.01, "BeatSeed": False}
+        with tempfile.TemporaryDirectory() as directory:
+            outcome = self.run_capture(directory, FakeBroker(calls=2), stdout=json.dumps({"Champion": champion}))["outcome"]
+        self.assertEqual(champion, outcome["champion"])
+        with tempfile.TemporaryDirectory() as directory:
+            self.assertNotIn("champion", self.run_capture(directory, FakeBroker(calls=2))["outcome"])
+
     def test_the_cli_may_be_a_command_prefix_not_only_an_executable(self):
         """A dry run caught this: `cli="dotnet"` became `dotnet run ...` and the SDK answered
         "Couldn't find a project to run". CI builds the dll rather than installing the tool, so a

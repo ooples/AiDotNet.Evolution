@@ -189,8 +189,13 @@ def ours(cli, task_directory, python_executable, *, iterations, session, timeout
         best = output / "best.py"
         if not best.exists():
             raise SearchFailed("the run produced no best program at " + str(best), accounting)
-        return {"program": str(best), "best_quality": summary.get("BestQuality"),
-                "stop_reason": summary.get("StopReason"), **accounting}
+        outcome = {"program": str(best), "best_quality": summary.get("BestQuality"),
+                   "stop_reason": summary.get("StopReason"), **accounting}
+        # E-4: the champion rule's decision (did a candidate beat the seed by k standard errors, or did the seed
+        # stand), so the evidence shows how often the guard kept the seed rather than leaving it to be inferred.
+        if summary.get("Champion") is not None:
+            outcome["champion"] = summary["Champion"]
+        return outcome
 
     return search
 
