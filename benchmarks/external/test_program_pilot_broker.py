@@ -139,6 +139,9 @@ class EvaluateCallbackTests(unittest.TestCase):
         self.assertEqual("inputs: x = xs[0] in [-3, 3]", lines[0])
         self.assertEqual("x target prediction residual", lines[2])
         self.assertEqual(pilot_broker.FEEDBACK_ROWS, len(lines) - 3)
+        # The first rows of the training split, in input order: a fixed sample, the same for every candidate.
+        expected = sorted(round(xs[0], 4) for xs, _ in rows["train"][:pilot_broker.FEEDBACK_ROWS])
+        self.assertEqual(expected, [float(line.split()[0]) for line in lines[3:]])
         for line in lines[3:]:
             x, target, prediction, residual = (float(value) for value in line.split())
             self.assertIn(x, train - validation)
