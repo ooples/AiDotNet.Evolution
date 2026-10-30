@@ -564,7 +564,11 @@ public sealed class LlmProgramVariationOperator : ICheckpointableVariationOperat
         {
             if (prefix.Length > 0 && diagnostic.Code.StartsWith(prefix, StringComparison.Ordinal))
             {
-                artifacts.Add(new ProgramPromptArtifact(diagnostic.Code, diagnostic.Message));
+                // "<prefix>:<name>" names the artifact; a bare prefix (text withheld, or an older checkpoint) keeps the code.
+                string name = diagnostic.Code.Length > prefix.Length + 1 && diagnostic.Code[prefix.Length] == ':'
+                    ? diagnostic.Code.Substring(prefix.Length + 1)
+                    : diagnostic.Code;
+                artifacts.Add(new ProgramPromptArtifact(name, diagnostic.Message));
             }
             else
             {

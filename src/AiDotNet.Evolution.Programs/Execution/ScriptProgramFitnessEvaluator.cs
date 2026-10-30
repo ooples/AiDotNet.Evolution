@@ -394,15 +394,19 @@ public sealed class ScriptProgramFitnessEvaluator : IProgramFitnessEvaluator, IE
                 if (string.IsNullOrWhiteSpace(property.Name)) continue;
                 artifactCount++;
 
-                diagnostics.Add(new EvolutionDiagnostic(
-                    "program_script_artifact",
-                    string.Concat(
-                        _options.RetainArtifactText ? ProgramText.Sanitize(property.Name) : "artifact",
-                        ": ",
-                        ProgramText.Bound(_options.RetainArtifactText
-                            ? ProgramText.Sanitize(property.Value.ToString(Formatting.None))
-                            : "[artifact content withheld]", _options.MaxArtifactLength)),
-                    isRedacted: !_options.RetainArtifactText));
+                // A retained artifact is filed under its own name (program_script_artifact:<name>) with its text as
+                // written, so the prompt shows a heading per artifact and the rows as rows. A string value used to be
+                // JSON-encoded here, which put the model's feedback on one line of quoted, \n-escaped text.
+                diagnostics.Add(_options.RetainArtifactText
+                    ? new EvolutionDiagnostic(
+                        ArtifactCode(ProgramText.Sanitize(property.Name)),
+                        ProgramText.Bound(ProgramText.SanitizeMultiline(property.Value.Type == JTokenType.String
+                            ? property.Value.Value<string>() ?? string.Empty
+                            : property.Value.ToString(Formatting.None)), _options.MaxArtifactLength))
+                    : new EvolutionDiagnostic(
+                        ArtifactDiagnosticCode,
+                        "artifact: " + ProgramText.Bound("[artifact content withheld]", _options.MaxArtifactLength),
+                        isRedacted: true));
             }
         }
 
@@ -415,6 +419,16 @@ public sealed class ScriptProgramFitnessEvaluator : IProgramFitnessEvaluator, IE
             costUnits: 1,
             diagnostics: diagnostics.Take(EvolutionTaskResult.MaximumDiagnostics),
             metrics: ReadReportedMetrics(payload));
+    }
+
+    /// <summary>The diagnostic code of an evaluator artifact; a retained one carries its name after a colon.</summary>
+    internal const string ArtifactDiagnosticCode = "program_script_artifact";
+
+    private static string ArtifactCode(string name)
+    {
+        // Diagnostic codes are at most 128 characters; the name is cut rather than the artifact dropped.
+        string code = ArtifactDiagnosticCode + ":" + name;
+        return code.Length <= 128 ? code : code.Substring(0, 128);
     }
 
     private void ValidateCollections(JObject payload)

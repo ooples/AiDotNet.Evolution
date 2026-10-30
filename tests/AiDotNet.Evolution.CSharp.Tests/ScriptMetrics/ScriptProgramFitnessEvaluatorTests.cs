@@ -214,6 +214,26 @@ public sealed class ScriptProgramFitnessEvaluatorTests
         }
     }
 
+    // E-4: the pilot's evaluator returned its training rows as a string with newlines, and the model received them
+    // JSON-encoded on one line. Retained text is now the string as written, under the artifact's own name.
+    [Fact]
+    public async Task ARetainedStringArtifactKeepsItsNameAndItsTextAsWritten()
+    {
+        var options = new ScriptProgramEvaluationOptions { RetainArtifactText = true };
+        ScriptProgramFitnessEvaluator evaluator = Evaluator(
+            _ => Printed("{\"quality\": 1, \"artifacts\": {\"training_rows\": \"t \\\"y\\\"\\n0.1 0.2\", \"counts\": [1, 2]}}"),
+            options);
+
+        EvolutionTaskResult result = await evaluator.EvaluateAsync(Genome(), Context);
+
+        Assert.Equal(EvolutionEvaluationStatus.Completed, result.Status);
+        EvolutionDiagnostic rows = Assert.Single(result.Diagnostics, d => d.Code == "program_script_artifact:training_rows");
+        Assert.Equal("t \"y\"\n0.1 0.2", rows.Message);
+        Assert.False(rows.IsRedacted);
+        // A value that is not a string is still shown as JSON.
+        Assert.Equal("[1,2]", Assert.Single(result.Diagnostics, d => d.Code == "program_script_artifact:counts").Message);
+    }
+
     [Fact]
     public async Task ASandboxTimeoutIsReportedAsATimeoutNotAsAZeroScore()
     {
