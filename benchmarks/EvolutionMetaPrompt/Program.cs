@@ -23,10 +23,21 @@ internal static class Program
 {
     private static async Task<int> Main(string[] args)
     {
+        // The evaluator and the held-out scorer run model-written programs as host processes, with this machine's files
+        // and network, so the operator says so on every run rather than inheriting it.
+        bool allowUnsandboxed = args.Contains("--allow-unsandboxed", StringComparer.Ordinal);
+        args = args.Where(arg => arg != "--allow-unsandboxed").ToArray();
         if (args.Length < 4)
         {
             Console.Error.WriteLine(
-                "Usage: <task-directory> <output.json> <seeds> <evaluations-per-arm> [python] [claude] [model]");
+                "Usage: <task-directory> <output.json> <seeds> <evaluations-per-arm> [python] [claude] [model] --allow-unsandboxed");
+            return 2;
+        }
+
+        if (!allowUnsandboxed)
+        {
+            Console.Error.WriteLine("error: this ablation runs model-written programs as host processes, with this machine's files " +
+                "and network. Pass --allow-unsandboxed on a machine provisioned for that.");
             return 2;
         }
 
@@ -58,7 +69,7 @@ internal static class Program
             foreach (MetaPromptArm arm in new[] { MetaPromptArm.Fixed, MetaPromptArm.Evolving })
             {
                 ArmResult result = await Arm.RunAsync(arm, seed, evaluations, evaluatorSource, seedProgram,
-                    scorer, python, claude, model).ConfigureAwait(false);
+                    scorer, python, claude, model, allowUnsandboxed).ConfigureAwait(false);
                 rows.Add(result.ToRow(seed, arm));
                 Console.WriteLine(JsonSerializer.Serialize(rows[^1]));
             }

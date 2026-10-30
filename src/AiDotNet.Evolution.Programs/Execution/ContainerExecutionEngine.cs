@@ -53,6 +53,11 @@ public sealed class ContainerExecutionEngine : IProgramExecutionEngine, IProgram
     private const int MaxDiagnosticChars = 4_000;
     private const int RemoveAttempts = 3;
     private static readonly TimeSpan ReplyMargin = TimeSpan.FromSeconds(5);
+    // CreateProcess's lpCommandLine limit, in characters, including the terminating null.
+    private const int WindowsCommandLineChars = 32_767;
+    // The smallest CPU limit Docker accepts, and the length of an image id (sha256: and 64 hex digits).
+    private const double MinimumCpus = 0.01;
+    private const string ImageIdShape = "sha256:0000000000000000000000000000000000000000000000000000000000000000";
     private static readonly TimeSpan ControlTimeout = TimeSpan.FromSeconds(60);
 
     private readonly ProgramSandboxOptions _options;
@@ -98,7 +103,29 @@ public sealed class ContainerExecutionEngine : IProgramExecutionEngine, IProgram
                 "The container memory limit must be at least 16 MB: it also holds the supervisor and the workdir.");
         }
 
+        // --cpus is written to three decimals, and Docker reads 0 as no limit at all, so a value that rounds below its
+        // minimum would start every container uncapped while the configuration check, reading the same string, agreed.
+        if (double.Parse(FormatCpus(_limits.CpuLimit), CultureInfo.InvariantCulture) < MinimumCpus)
+        {
+            throw new ArgumentOutOfRangeException(nameof(options), _limits.CpuLimit,
+                "The container CPU limit must be at least 0.01 cores, the smallest Docker accepts.");
+        }
+
         _script = ReadScript();
+        // The supervisor travels on the command line, so on Windows the whole of it, mounts and declared environment
+        // included, must fit CreateProcess's limit; past it every candidate would fail to start.
+        if (OperatingSystem.IsWindows())
+        {
+            int length = CommandLineLength(_container.DockerExecutable, BuildRunArguments("aidotnet-evolution-" + Guid.Empty.ToString("N"), ImageIdShape));
+            if (length >= WindowsCommandLineChars)
+            {
+                throw new ArgumentException(
+                    "The docker command line would be " + length.ToString(CultureInfo.InvariantCulture) + " characters, over Windows' limit of "
+                    + (WindowsCommandLineChars - 1).ToString(CultureInfo.InvariantCulture) + ". Shorten the read-only mounts or the declared environment.",
+                    nameof(options));
+            }
+        }
+
         // Blocking I/O in a constructor is deliberate: a host without a usable daemon should fail where it is configured,
         // not on the first candidate, where the failure would be scored as the candidate's.
         Task.Run(VerifyDaemonAsync).GetAwaiter().GetResult();
@@ -305,6 +332,12 @@ public sealed class ContainerExecutionEngine : IProgramExecutionEngine, IProgram
             reusable = clean && _container.Lifecycle == ContainerLifecycle.Warm && container.Completed < _container.RecycleAfter;
             return FromReply(reply, language, _limits);
         }
+        catch (OperationCanceledException) when (cancellationToken.IsCancellationRequested)
+        {
+            // Canceled while the request was being written; a half-written frame leaves the container unusable.
+            reusable = false;
+            return Rejected(language, ProgramExecuteErrorCode.TimeoutOrCanceled, "Execution was canceled.");
+        }
         catch (Exception exception) when (exception is IOException or InvalidOperationException or JsonException
                                               or InvalidDataException or Win32Exception or ObjectDisposedException)
         {
@@ -380,7 +413,9 @@ public sealed class ContainerExecutionEngine : IProgramExecutionEngine, IProgram
     }
 
     // The arguments of `docker run`. Internal so a test can prove every hardening flag is present.
-    internal List<string> BuildRunArguments(string name)
+    internal List<string> BuildRunArguments(string name) => BuildRunArguments(name, ImageId);
+
+    private List<string> BuildRunArguments(string name, string image)
     {
         string memory = _limits.MemoryLimitMb.ToString(CultureInfo.InvariantCulture) + "m";
         string user = _container.UserId.ToString(CultureInfo.InvariantCulture);
@@ -395,7 +430,7 @@ public sealed class ContainerExecutionEngine : IProgramExecutionEngine, IProgram
             "--ipc", "none",
             "--pids-limit", _container.PidsLimit.ToString(CultureInfo.InvariantCulture),
             "--memory", memory, "--memory-swap", memory,
-            "--cpus", _limits.CpuLimit.ToString("0.###", CultureInfo.InvariantCulture),
+            "--cpus", FormatCpus(_limits.CpuLimit),
             "--user", user + ":" + group,
             "--tmpfs", Workdir + ":" + WorkdirTmpfsOptions(),
             "--log-driver", "none",
@@ -424,7 +459,7 @@ public sealed class ContainerExecutionEngine : IProgramExecutionEngine, IProgram
 
         arguments.Add("--entrypoint");
         arguments.Add(_container.SupervisorPython);
-        arguments.Add(ImageId);
+        arguments.Add(image);
         arguments.Add("-u");
         arguments.Add("-c");
         arguments.Add(_script);
@@ -499,7 +534,7 @@ public sealed class ContainerExecutionEngine : IProgramExecutionEngine, IProgram
         JsonNode? host = root?["HostConfig"];
         if (root is null || host is null) return "docker inspect returned no configuration";
         long memory = _limits.GetMemoryLimitBytes();
-        long cpus = (long)Math.Round(double.Parse(_limits.CpuLimit.ToString("0.###", CultureInfo.InvariantCulture), CultureInfo.InvariantCulture) * 1e9);
+        long cpus = (long)Math.Round(double.Parse(FormatCpus(_limits.CpuLimit), CultureInfo.InvariantCulture) * 1e9);
         string user = _container.UserId.ToString(CultureInfo.InvariantCulture) + ":" + _container.GroupId.ToString(CultureInfo.InvariantCulture);
         List<string> security = Strings(host["SecurityOpt"]);
         if (root["Image"]?.GetValue<string>() != ImageId) return "the image is not " + ImageId;
@@ -688,6 +723,30 @@ public sealed class ContainerExecutionEngine : IProgramExecutionEngine, IProgram
         using var reader = new StreamReader(stream, Encoding.UTF8);
         // A carriage return inside `python -c` would be a syntax error on a Windows checkout.
         return reader.ReadToEnd().Replace("\r\n", "\n", StringComparison.Ordinal);
+    }
+
+    private static string FormatCpus(double cpus) => cpus.ToString("0.###", CultureInfo.InvariantCulture);
+
+    /// <summary>The length of the command line <see cref="ProcessStartInfo.ArgumentList"/> builds on Windows, by its quoting rules.</summary>
+    internal static int CommandLineLength(string executable, IEnumerable<string> arguments)
+    {
+        int length = Quoted(executable);
+        foreach (string argument in arguments) length += 1 + Quoted(argument);
+        return length;
+
+        static int Quoted(string argument)
+        {
+            if (argument.Length > 0 && !argument.Any(c => char.IsWhiteSpace(c) || c == '"')) return argument.Length;
+            int length = 2, backslashes = 0;
+            foreach (char c in argument)
+            {
+                if (c == '\\') { backslashes++; continue; }
+                length += c == '"' ? backslashes * 2 + 2 : backslashes + 1;
+                backslashes = 0;
+            }
+
+            return length + backslashes * 2;
+        }
     }
 
     private static ProgramExecuteResponse Rejected(ProgramLanguage language, ProgramExecuteErrorCode code, string error) => new()

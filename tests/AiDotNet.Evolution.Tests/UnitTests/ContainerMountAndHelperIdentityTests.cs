@@ -24,9 +24,11 @@ public sealed class ContainerMountAndHelperIdentityTests
         try
         {
             InvalidDataException refused = Assert.Throws<InvalidDataException>(() => RunCommand.RequireMountable(link, "the evaluator's directory"));
-            Assert.Contains("a link to " + home, refused.Message, StringComparison.Ordinal);
+            // Where the home directory sits below a link itself (/home -> /var/home), the message names where it resolves.
+            string resolvedHome = RunCommand.ResolveLinks(home);
+            Assert.Contains("a link to " + resolvedHome, refused.Message, StringComparison.Ordinal);
             // A link in a parent directory is resolved too.
-            Assert.Equal(Path.Combine(home, "below"), RunCommand.ResolveLinks(Path.Combine(link, "below")), ignoreCase: OperatingSystem.IsWindows());
+            Assert.Equal(Path.Combine(resolvedHome, "below"), RunCommand.ResolveLinks(Path.Combine(link, "below")), ignoreCase: OperatingSystem.IsWindows());
         }
         finally
         {
@@ -104,6 +106,60 @@ public sealed class ContainerMountAndHelperIdentityTests
         Assert.NotEqual(edited, added);
         File.Delete(Path.Combine(first.Path, "package", "extra.py"));
         Assert.Equal(edited, Shim(first.Path));
+    }
+
+    // A home directory reached through a link (/home -> /var/home): a mount source resolves to the link's target, which
+    // the lexical home never equals, so the resolved home is compared too.
+    [Fact]
+    public void A_mount_source_that_resolves_to_a_home_reached_through_a_link_is_refused()
+    {
+        using var directory = new TemporaryDirectory();
+        string real = Path.Combine(directory.Path, "var-home-user");
+        Directory.CreateDirectory(real);
+        string home = Path.Combine(directory.Path, "home-user");
+        CreateDirectoryLink(home, real);
+        try
+        {
+            Assert.Throws<InvalidDataException>(() => RunCommand.RequireNotRootOrHome(real, home, "the evaluator's directory", home));
+            RunCommand.RequireNotRootOrHome(Path.Combine(real, "below"), null, "the evaluator's directory", home);
+        }
+        finally
+        {
+            Directory.Delete(home);
+        }
+    }
+
+    // The run writes best.py into its output directory, which may be the evaluator's own: only that file is skipped.
+    [Fact]
+    public void An_output_directory_that_is_the_evaluators_own_skips_only_best_py()
+    {
+        using var root = new TemporaryDirectory();
+        File.WriteAllText(Path.Combine(root.Path, "helper.py"), "K = 1\n");
+        string Digest() => OpenEvolveEvaluatorShim.HelperSourcesSha256(new[] { root.Path }, root.Path);
+        string before = Digest();
+        File.WriteAllText(Path.Combine(root.Path, "best.py"), "X = 1\n");
+        Assert.Equal(before, Digest());
+        File.WriteAllText(Path.Combine(root.Path, "helper.py"), "K = 2\n");
+        Assert.NotEqual(before, Digest());
+        // And with the output a parent of the evaluator's directory, nothing in it is skipped.
+        string nested = Path.Combine(root.Path, "evaluator");
+        Directory.CreateDirectory(nested);
+        File.WriteAllText(Path.Combine(nested, "helper.py"), "K = 1\n");
+        string parent = OpenEvolveEvaluatorShim.HelperSourcesSha256(new[] { nested }, root.Path);
+        File.WriteAllText(Path.Combine(nested, "helper.py"), "K = 2\n");
+        Assert.NotEqual(parent, OpenEvolveEvaluatorShim.HelperSourcesSha256(new[] { nested }, root.Path));
+    }
+
+    [Fact]
+    public void A_helper_directory_past_the_file_or_byte_cap_is_refused_by_name()
+    {
+        using var root = new TemporaryDirectory();
+        for (int index = 0; index < 3; index++) File.WriteAllText(Path.Combine(root.Path, "m" + index + ".py"), "K = 1\n");
+        Assert.NotNull(OpenEvolveEvaluatorShim.HelperSourcesSha256(new[] { root.Path }, null, maxFiles: 3, maxBytes: 18));
+        InvalidDataException files = Assert.Throws<InvalidDataException>(() =>
+            OpenEvolveEvaluatorShim.HelperSourcesSha256(new[] { root.Path }, null, maxFiles: 2, maxBytes: 18));
+        Assert.Contains(root.Path, files.Message, StringComparison.Ordinal);
+        Assert.Throws<InvalidDataException>(() => OpenEvolveEvaluatorShim.HelperSourcesSha256(new[] { root.Path }, null, maxFiles: 3, maxBytes: 17));
     }
 
     private static void CreateDirectoryLink(string link, string target)

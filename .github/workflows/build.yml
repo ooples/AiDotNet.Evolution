@@ -463,7 +463,7 @@ jobs:
             executed="$(grep -o 'executed="[0-9]*"' "$trx" | head -1 | grep -o '[0-9]*')"
             skipped="$(grep -o 'notExecuted="[0-9]*"' "$trx" | head -1 | grep -o '[0-9]*')"
             echo "$framework: container tests executed ${executed:-0}, not executed ${skipped:-0}"
-            [ "${executed:-0}" -ge 28 ] || { echo "::error::expected at least 28 container tests on $framework, ran ${executed:-0}"; exit 1; }
+            [ "${executed:-0}" -ge 31 ] || { echo "::error::expected at least 31 container tests on $framework, ran ${executed:-0}"; exit 1; }
             [ "${skipped:-0}" -eq 0 ] || { echo "::error::$framework skipped ${skipped} container tests on a Linux runner with Docker"; exit 1; }
           done
       # The CLI end to end: an OpenEvolve evaluator, its helper and a pythonPath module reached through the read-only

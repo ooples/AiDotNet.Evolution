@@ -603,6 +603,45 @@ public sealed class ContainerExecutionEngineTests
         Assert.True(next.Success, next.Error + " " + next.StdErr);
     }
 
+    // A writer the candidate left behind keeps its stdout ready forever; the reply must still come, with the exit code.
+    [DockerFact]
+    public async Task A_candidate_that_leaves_a_writer_behind_still_gets_its_reply()
+    {
+        using var engine = new ContainerExecutionEngine(Sandbox(timeLimitSeconds: 20), Container());
+        var clock = Stopwatch.StartNew();
+        ProgramExecuteResponse response = await Run(engine,
+            "import subprocess, sys\n" +
+            "subprocess.Popen([sys.executable, '-c', 'import sys\\nwhile True:\\n    sys.stdout.write(\"x\" * 4096)\\n'])\n" +
+            "print('done', flush=True)\n");
+        Assert.True(response.Success, response.Error + " " + response.StdErr);
+        Assert.Equal(0, response.ExitCode);
+        Assert.StartsWith("done", response.StdOut, StringComparison.Ordinal);
+        Assert.True(clock.Elapsed < TimeSpan.FromSeconds(10), "the reply took " + clock.Elapsed);
+    }
+
+    // --cpus is written to three decimals and Docker reads 0 as no limit, so a value that rounds below 0.01 is refused.
+    [Fact]
+    public void A_cpu_limit_that_rounds_below_dockers_minimum_is_refused_before_touching_docker()
+    {
+        ProgramSandboxOptions options = Sandbox();
+        options.Limits.CpuLimit = 0.004;
+        Assert.Throws<ArgumentOutOfRangeException>(() => new ContainerExecutionEngine(options, Container()));
+    }
+
+    // The supervisor travels on the docker command line; on Windows all of it must fit CreateProcess's limit.
+    [Fact]
+    public void The_whole_docker_command_line_must_fit_the_windows_limit()
+    {
+        // ArgumentList's quoting: bare, quoted for a space, an escaped quote, a trailing backslash left bare.
+        Assert.Equal(6 + 1 + 5 + 1 + 6 + 1 + 2, ContainerExecutionEngine.CommandLineLength("docker", new[] { "a b", "x\"y", "c\\" }));
+        Assert.Equal(6 + 1 + 2 + 1 + 6, ContainerExecutionEngine.CommandLineLength("docker", new[] { "", "a\\ b" }));
+        if (!OperatingSystem.IsWindows()) return;
+        ProgramSandboxOptions options = Sandbox();
+        options.DeclaredEnvironment["AIDOTNET_PAD"] = new string('p', 12_000);
+        ArgumentException tooLong = Assert.Throws<ArgumentException>(() => new ContainerExecutionEngine(options, Container()));
+        Assert.Contains("command line", tooLong.Message, StringComparison.Ordinal);
+    }
+
     // docker inspect may reorder the options; every requested one must come back, or the container is refused.
     [Fact]
     public void The_workdir_tmpfs_must_come_back_with_every_requested_option()

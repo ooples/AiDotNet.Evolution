@@ -131,8 +131,8 @@ worker is replaced after a timeout, after a failure and every `RecycleAfter` can
 
 | Mode | Engine | Isolates the host's files, network and system calls | Opt-in | Added latency (Linux p50) |
 |---|---|---|---|---|
-| `Container`, warm | `ContainerExecutionEngine` | Yes | None | 25.35 ms (target 30 ms; one run, see `benchmarks/evidence/sandbox-overhead/bc07231-e2-container`) |
-| `Container`, cold | `ContainerExecutionEngine` | Yes | None | 285.52 ms |
+| `Container`, warm | `ContainerExecutionEngine` | Yes | None | 3.62 ms (target 30 ms; one run, see `benchmarks/evidence/sandbox-overhead/8f90bf2-e2-lazy-zygote`) |
+| `Container`, cold | `ContainerExecutionEngine` | Yes | None | 295.73 ms |
 | `WarmForkWorker` | `WarmPythonExecutionEngine` | No | `AllowUnsandboxedExecution` | 2.785 ms |
 | `WarmReusedWorker` | `WarmPythonExecutionEngine` | No, and candidates share one interpreter | `AllowUnsandboxedExecution` and `AllowUnsafeInProcessExecution` | Under 3 ms |
 | `OutOfProcessWorker` | `ProcessProgramExecutionEngine` | No | `AllowUnsandboxedExecution` | 45 to 62 ms |

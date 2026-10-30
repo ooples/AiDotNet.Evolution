@@ -188,7 +188,7 @@ refuses the resume too. Data files those directories hold are not part of the di
 `run --openevolve-config` makes you choose where the evaluator runs, and refuses a command that chooses neither.
 `--allow-unsandboxed-execution` writes `"allowUnsandboxedExecution": true` into the generated `run.json`, so the evaluator
 runs as a host process, as OpenEvolve runs evaluators. That process sandbox does not keep a model-written program away from
-your files, credentials or network. `--container-image IMAGE` (with `--container-lifecycle Warm\|Cold`) instead writes a
+your files, credentials or network. `--container-image IMAGE` (with `--container-lifecycle Warm|Cold`) instead writes a
 `container` section, so the evaluator and every candidate run in a locked-down Docker container. The image must hold the
 evaluator's packages (numpy, and `openevolve` when the evaluator imports it):
 
@@ -198,7 +198,7 @@ evaluator's packages (numpy, and `openevolve` when the evaluator imports it):
 
 The evaluator's directory is then mounted read-only at `/aidotnet/evaluator`, so the shim imports the unmodified file and
 any helper beside it, and each `openEvolveEvaluator.pythonPath` directory is mounted read-only and put on the container's
-`PYTHONPATH`. Remove `openEvolveEvaluator.python` (from `--python`): it names a host interpreter, and the image's
+`PYTHONPATH`. With a container, `--python` only parses the config (PyYAML) and is not written to `run.json`: the image's
 `python3` runs the evaluator. See [Choosing an execution mode](../PROGRAM_EVOLUTION.md#choosing-an-execution-mode) and
 [CLI.md](../CLI.md).
 

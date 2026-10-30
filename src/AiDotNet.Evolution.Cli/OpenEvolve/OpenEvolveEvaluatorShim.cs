@@ -69,8 +69,13 @@ internal static class OpenEvolveEvaluatorShim
     /// SHA-256 over every <c>*.py</c> file under each directory, by position, relative path and bytes; hidden and
     /// linked entries and <c>__pycache__</c> are skipped. Positions rather than host paths, so moving a checkout keeps
     /// the identity while editing, adding or removing a helper changes it.
+    /// <para>Of the run's output directory only <c>best.py</c> is skipped, the one source the run writes there: skipping the
+    /// whole directory would drop every helper when the output is the evaluator's directory or one of its parents.</para>
     /// </summary>
-    internal static string HelperSourcesSha256(IReadOnlyList<string> directories, string? excludedDirectory)
+    /// <exception cref="InvalidDataException">A directory holds more than <see cref="MaxHelperFiles"/> sources or
+    /// <see cref="MaxHelperBytes"/> bytes of them.</exception>
+    internal static string HelperSourcesSha256(IReadOnlyList<string> directories, string? excludedDirectory,
+        int maxFiles = MaxHelperFiles, long maxBytes = MaxHelperBytes)
     {
         var enumeration = new EnumerationOptions
         {
@@ -78,7 +83,7 @@ internal static class OpenEvolveEvaluatorShim
             IgnoreInaccessible = true,
             AttributesToSkip = FileAttributes.Hidden | FileAttributes.System | FileAttributes.ReparsePoint
         };
-        string? excluded = excludedDirectory is null ? null : Path.TrimEndingDirectorySeparator(Path.GetFullPath(excludedDirectory)) + Path.DirectorySeparatorChar;
+        string? excluded = excludedDirectory is null ? null : Path.Combine(Path.GetFullPath(excludedDirectory), "best.py");
         StringComparison comparison = OperatingSystem.IsWindows() ? StringComparison.OrdinalIgnoreCase : StringComparison.Ordinal;
         using var hash = IncrementalHash.CreateHash(HashAlgorithmName.SHA256);
         for (int index = 0; index < directories.Count; index++)
@@ -86,13 +91,19 @@ internal static class OpenEvolveEvaluatorShim
             string directory = Path.GetFullPath(directories[index]);
             Append(hash, "directory " + index.ToString(System.Globalization.CultureInfo.InvariantCulture) + "\n");
             if (!Directory.Exists(directory)) continue;
-            IEnumerable<string> files = Directory.EnumerateFiles(directory, "*.py", enumeration)
-                .Where(file => excluded is null || !file.StartsWith(excluded, comparison))
+            int count = 0;
+            long total = 0;
+            List<string> files = Directory.EnumerateFiles(directory, "*.py", enumeration)
+                .Where(file => excluded is null || !string.Equals(file, excluded, comparison))
                 .Select(file => Path.GetRelativePath(directory, file).Replace('\\', '/'))
                 .Where(relative => !relative.Split('/').Contains("__pycache__"))
-                .OrderBy(relative => relative, StringComparer.Ordinal);
+                .Where(relative => ++count <= maxFiles ? true : throw TooLarge(directory))
+                .OrderBy(relative => relative, StringComparer.Ordinal)
+                .ToList();
             foreach (string relative in files)
             {
+                total += new FileInfo(Path.Combine(directory, relative)).Length;
+                if (total > maxBytes) throw TooLarge(directory);
                 byte[] bytes = File.ReadAllBytes(Path.Combine(directory, relative));
                 Append(hash, relative + "\n" + bytes.Length.ToString(System.Globalization.CultureInfo.InvariantCulture) + "\n");
                 hash.AppendData(bytes);
@@ -101,6 +112,17 @@ internal static class OpenEvolveEvaluatorShim
 
         return Hex(hash.GetHashAndReset());
     }
+
+    /// <summary>The most <c>*.py</c> files one helper directory may hold; the digest reads them all on every run.</summary>
+    internal const int MaxHelperFiles = 10_000;
+
+    /// <summary>The most bytes of <c>*.py</c> source one helper directory may hold.</summary>
+    internal const long MaxHelperBytes = 64L * 1024 * 1024;
+
+    private static InvalidDataException TooLarge(string directory) => new(
+        directory + " holds more than " + MaxHelperFiles.ToString(System.Globalization.CultureInfo.InvariantCulture) + " Python files or "
+        + (MaxHelperBytes / (1024 * 1024)).ToString(System.Globalization.CultureInfo.InvariantCulture) + " MB of them, and the evaluator's "
+        + "identity hashes every one on each run. Point the evaluator and openEvolveEvaluator.pythonPath at the directories it imports from.");
 
     private static void Append(IncrementalHash hash, string text) => hash.AppendData(Encoding.UTF8.GetBytes(text));
 

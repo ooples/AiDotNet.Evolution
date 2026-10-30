@@ -967,15 +967,18 @@ internal static class RunCommand
         return current;
     }
 
-    private static void RequireNotRootOrHome(string? directory, string? named, string what)
+    internal static void RequireNotRootOrHome(string? directory, string? named, string what, string? homeDirectory = null)
     {
         string trimmed = directory?.TrimEnd(Path.DirectorySeparatorChar, Path.AltDirectorySeparatorChar) ?? string.Empty;
-        string home = Environment.GetFolderPath(Environment.SpecialFolder.UserProfile)
+        string home = (homeDirectory ?? Environment.GetFolderPath(Environment.SpecialFolder.UserProfile))
             .TrimEnd(Path.DirectorySeparatorChar, Path.AltDirectorySeparatorChar);
-        StringComparison comparison = OperatingSystem.IsWindows() ? StringComparison.OrdinalIgnoreCase : StringComparison.Ordinal;
+        // A resolved mount source is compared with the resolved home too: where /home is itself a link, a link to the home
+        // directory resolves to the link's target, which the lexical home never equals. Windows and macOS compare without case.
+        string resolvedHome = home.Length == 0 ? home : ResolveLinks(home).TrimEnd(Path.DirectorySeparatorChar, Path.AltDirectorySeparatorChar);
+        StringComparison comparison = OperatingSystem.IsWindows() || OperatingSystem.IsMacOS() ? StringComparison.OrdinalIgnoreCase : StringComparison.Ordinal;
         bool root = directory is null || trimmed.Length == 0
             || string.Equals(trimmed, (Path.GetPathRoot(directory) ?? string.Empty).TrimEnd(Path.DirectorySeparatorChar, Path.AltDirectorySeparatorChar), comparison);
-        if (root || (home.Length > 0 && string.Equals(trimmed, home, comparison)))
+        if (root || (home.Length > 0 && (string.Equals(trimmed, home, comparison) || string.Equals(trimmed, resolvedHome, comparison))))
         {
             string resolved = directory is not null && !string.Equals(directory, named, comparison) ? ", a link to " + directory : string.Empty;
             throw new InvalidDataException(

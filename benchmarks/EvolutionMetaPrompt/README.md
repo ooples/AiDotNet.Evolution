@@ -41,8 +41,11 @@ storing the six answers, and only the held-out set separates those.
 ```powershell
 dotnet build benchmarks/EvolutionMetaPrompt/EvolutionMetaPrompt.csproj -c Release
 ./benchmarks/EvolutionMetaPrompt/bin/Release/net10.0/EvolutionMetaPrompt.exe `
-  benchmarks/EvolutionMetaPrompt/task out.json 6 5 python claude sonnet
+  benchmarks/EvolutionMetaPrompt/task out.json 6 5 python claude sonnet --allow-unsandboxed
 ```
+
+`--allow-unsandboxed` is required: the evaluator and the held-out scorer run model-written programs as host processes,
+with this machine's files and network, so run it on a machine provisioned for that.
 
 Real model calls through the ClaudeCode provider; there is no stub option, because a stub answers both arms
 identically and a run against one would measure the stub. Cost is set by the call count rather than prompt

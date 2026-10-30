@@ -853,6 +853,14 @@ public sealed class OpenEvolveImportTests
         Assert.Equal("python:3.12-slim", contained.Run.Container?.Image);
         Assert.Equal(ContainerLifecycle.Cold, contained.Run.Container?.Lifecycle);
 
+        // --python only parses the config there: a host interpreter in the run would be refused at load.
+        OpenEvolveImport parsed = OpenEvolveConfigImporter.Import(config, initial, evaluator, iterations: null, python: Python,
+            container: new RunContainer { Image = "python:3.12-slim" }, allowUnsandboxedExecution: false);
+        Assert.Null(parsed.Run.OpenEvolveEvaluator?.Python);
+        Assert.Contains(parsed.Notes, note => note.Contains("parsed the config only", StringComparison.Ordinal));
+        Assert.Equal(Python, OpenEvolveConfigImporter.Import(config, initial, evaluator, iterations: null, python: Python,
+            container: null, allowUnsandboxedExecution: true).Run.OpenEvolveEvaluator?.Python);
+
         // The explicit opt-in is carried through as given, and only then.
         OpenEvolveImport host = OpenEvolveConfigImporter.Import(
             config, initial, evaluator, iterations: null, python: null, container: null, allowUnsandboxedExecution: true);

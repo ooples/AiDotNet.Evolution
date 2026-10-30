@@ -74,6 +74,8 @@ internal static class OpenEvolveConfigImporter
                 : "container.image is " + container.Image + ": the evaluator and the programs it runs execute in a " +
                   "locked-down Docker container, with the evaluator's directory mounted read-only."
         };
+        if (container is not null && python is not null)
+            notes.Add("--python " + python + " parsed the config only; it is not recorded in the run, because the image's python3 runs the evaluator.");
         foreach (string key in unknown)
             notes.Add(key + " is not an OpenEvolve 0.3.2 config key; OpenEvolve ignores it, and so does this import.");
         if (!config.ContainsKey("llm.api_base") && Environment.GetEnvironmentVariable("OPENAI_API_BASE") is { Length: > 0 } apiBase)
@@ -197,7 +199,7 @@ internal static class OpenEvolveConfigImporter
             },
             OpenEvolveEvaluator = new RunOpenEvolveEvaluator
             {
-                Python = python,
+                Python = container is null ? python : null,
                 Cascade = Boolean(merged["evaluator.cascade_evaluation"]),
                 CascadeThresholds = List(merged["evaluator.cascade_thresholds"]).Select(value => Number(value) ?? 0).ToList(),
                 FileSuffix = merged["file_suffix"] as string ?? ".py",

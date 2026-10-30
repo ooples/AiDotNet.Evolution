@@ -36,6 +36,8 @@ WORK = "/work"
 # raise it itself, but that only misclassifies its own failure.
 MEMORY_SIGNAL = signal.SIGUSR2
 MEMORY_ERROR = object()
+# How long output is still read once the candidate has exited; the engine's reply margin is 5 s.
+POST_EXIT_DRAIN_SECONDS = 1.0
 
 
 def read_exactly(stream, count):
@@ -495,7 +497,10 @@ def run(request, zygote):
                     continue
                 status = struct.unpack(">i", reply)[0]
         if status is not None:
-            while open_fds and drain(0):
+            # Bounded: a descendant that keeps writing after the candidate exited keeps a pipe ready forever, and an
+            # unbounded drain would never reply. The sweep below kills it.
+            drain_until = time.monotonic() + POST_EXIT_DRAIN_SECONDS
+            while open_fds and time.monotonic() < drain_until and drain(0):
                 pass
             break
         remaining = deadline - time.monotonic()
