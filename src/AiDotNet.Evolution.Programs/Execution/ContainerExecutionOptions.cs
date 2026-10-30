@@ -116,7 +116,18 @@ public sealed class ContainerExecutionOptions
     /// mounted directory. Keep credentials, held-out answers and anything else a candidate must not see out of it.
     /// The directory must be readable by <see cref="UserId"/>. Keys must be absolute paths of letters, digits,
     /// <c>.</c>, <c>_</c>, <c>-</c> and <c>/</c>, and must not be or lie under <c>/work</c>, <c>/proc</c>,
-    /// <c>/sys</c> or <c>/dev</c>; values must be rooted host paths without a comma or a quote. The mounts are part of
+    /// <c>/sys</c> or <c>/dev</c>; values must be rooted host paths without a comma or a quote.
+    /// </para>
+    /// <para>
+    /// A read-only mount stops writes but not <c>connect()</c>: a Unix socket inside it still accepts connections, and
+    /// the Docker socket is root on the host. So a value is refused when it is the filesystem root; when it is, lies
+    /// under, or contains <c>/run</c>, <c>/var/run</c>, <c>/var/lib/docker</c> or <c>/var/lib/containerd</c> (whatever
+    /// is in them now); when it overlaps one of the current user's credential directories (<c>~/.ssh</c>,
+    /// <c>~/.gnupg</c>, <c>~/.docker</c>, <c>~/.aws</c>, <c>~/.azure</c>, <c>~/.kube</c>, <c>~/.config/gcloud</c>);
+    /// when it exists and is not a directory; and, on a Linux host, when a live Unix socket is bound at or anywhere
+    /// below it, which includes the temporary directory itself while any .NET process runs. Symbolic links are
+    /// expanded first. The engine also reads each mount's source back from <c>docker inspect</c> and refuses a
+    /// container whose daemon mounted a different host path. The mounts are part of
     /// <see cref="ContainerExecutionEngine.VersionHash"/>; the files in them are not, so a caller that needs a
     /// changed file to change results should hash it into its own identity. All the mounts together are limited to
     /// <see cref="MaxReadOnlyMountChars"/> characters of <c>docker run</c> arguments: the supervisor script travels on
@@ -223,6 +234,15 @@ public sealed class ContainerExecutionOptions
             {
                 throw new ArgumentException(
                     "The host directory for " + mount.Key + " must be a rooted path without a comma, a quote or a line break.",
+                    nameof(ReadOnlyMounts));
+            }
+
+            string? refusal = ContainerMountSource.Refusal(mount.Value);
+            if (refusal is not null)
+            {
+                throw new ArgumentException(
+                    "The host directory for " + mount.Key + " cannot be mounted: it is " + refusal + ". Mount a directory that holds only " +
+                    "what the evaluator needs.",
                     nameof(ReadOnlyMounts));
             }
         }

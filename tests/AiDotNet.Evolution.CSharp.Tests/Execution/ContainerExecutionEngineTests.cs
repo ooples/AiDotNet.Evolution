@@ -1,4 +1,5 @@
 using System.Diagnostics;
+using System.Net.Sockets;
 using System.Text.Json;
 using System.Text.Json.Nodes;
 using AiDotNet.Evolution.Programs;
@@ -122,7 +123,9 @@ public sealed class ContainerExecutionEngineTests
         Assert.Throws<ArgumentOutOfRangeException>(() => new ContainerExecutionOptions { Image = "x", PidsLimit = 7 }.Validate());
         Assert.Throws<ArgumentOutOfRangeException>(() => new ContainerExecutionOptions { Image = "x", WorkspaceSizeMb = 0 }.Validate());
         Assert.Throws<ArgumentOutOfRangeException>(() => new ContainerExecutionOptions { Image = "x", StartupTimeoutSeconds = 0 }.Validate());
-        string hostDirectory = Path.GetFullPath(Path.GetTempPath());
+        // A directory of its own: the temporary directory itself holds every .NET process's diagnostic socket on Linux.
+        string hostDirectory = Path.Combine(Path.GetTempPath(), "aidotnet-container-knobs-" + Guid.NewGuid().ToString("N"));
+        Directory.CreateDirectory(hostDirectory);
         foreach (string target in new[] { "relative", "/", "/work", "/work/x", "/proc", "/sys/fs", "/dev", "/a/../work", "/a//b", "/a/", "/a b", "/a,b" })
         {
             var mounted = new ContainerExecutionOptions { Image = "x" };
@@ -157,6 +160,133 @@ public sealed class ContainerExecutionEngineTests
         Assert.Equal(16, copy.WorkspaceSizeMb);
         Assert.Equal("/usr/local/bin/python3", copy.SupervisorPython);
         Assert.Equal(5, copy.StartupTimeoutSeconds);
+        Directory.Delete(hostDirectory);
+    }
+
+    private static void AssertMountRefused(string source)
+    {
+        var mounted = new ContainerExecutionOptions { Image = "x" };
+        mounted.ReadOnlyMounts["/opt/evaluator"] = source;
+        ArgumentException refused = Assert.Throws<ArgumentException>(() => mounted.Validate());
+        Assert.Contains("cannot be mounted", refused.Message, StringComparison.Ordinal);
+    }
+
+    private static void AssertMountAccepted(string source)
+    {
+        var mounted = new ContainerExecutionOptions { Image = "x" };
+        mounted.ReadOnlyMounts["/opt/evaluator"] = source;
+        mounted.Validate();
+    }
+
+    [Fact]
+    public void A_mount_source_that_exposes_the_root_a_daemon_socket_or_credentials_is_refused()
+    {
+        // A read-only bind still lets a candidate connect() to a socket in it, and the Docker socket is root on the host.
+        foreach (string source in new[]
+                 {
+                     "/", "/run", "/var/run", "/var/run/docker.sock", "/run/containerd/containerd.sock", "/var",
+                     "/var/lib/docker/volumes", "/srv/../var/run/docker.sock", "//var//run/", "/var/run/."
+                 })
+        {
+            AssertMountRefused(source);
+        }
+
+        string temp = Path.GetFullPath(Path.GetTempPath());
+        AssertMountRefused(Path.GetPathRoot(temp) ?? "/");
+        string home = Environment.GetFolderPath(Environment.SpecialFolder.UserProfile);
+        if (home.Length > 0)
+        {
+            AssertMountRefused(Path.Combine(home, ".ssh"));
+            AssertMountRefused(Path.Combine(home, ".docker", "run"));
+            AssertMountRefused(home);
+        }
+
+        string directory = Path.Combine(temp, "aidotnet-mount-source-" + Guid.NewGuid().ToString("N"));
+        Directory.CreateDirectory(directory);
+        try
+        {
+            AssertMountAccepted(directory);
+            string file = Path.Combine(directory, "helper.py");
+            File.WriteAllText(file, "x = 1\n");
+            AssertMountRefused(file);
+
+            if (!OperatingSystem.IsWindows())
+            {
+                // A link elsewhere is expanded before the checks, so it cannot carry /var/run past them.
+                string link = Path.Combine(directory, "innocent");
+                Directory.CreateSymbolicLink(link, "/var/run");
+                AssertMountRefused(link);
+            }
+        }
+        finally
+        {
+            Directory.Delete(directory, recursive: true);
+        }
+    }
+
+    [Fact]
+    public void A_mount_source_holding_a_live_unix_socket_is_refused()
+    {
+        if (!Socket.OSSupportsUnixDomainSockets) return;
+        string directory = Path.Combine(Path.GetTempPath(), "aidotnet-mount-socket-" + Guid.NewGuid().ToString("N"));
+        string nested = Path.Combine(directory, "nested");
+        Directory.CreateDirectory(nested);
+        string socketPath = Path.Combine(nested, "agent.sock");
+        try
+        {
+            using (var listener = new Socket(AddressFamily.Unix, SocketType.Stream, ProtocolType.Unspecified))
+            {
+                listener.Bind(new UnixDomainSocketEndPoint(socketPath));
+                listener.Listen(1);
+                AssertMountRefused(socketPath);
+                if (OperatingSystem.IsLinux())
+                {
+                    // /proc/net/unix lists the bound path, so the socket is found however deep below the source it is.
+                    AssertMountRefused(nested);
+                    AssertMountRefused(directory);
+                }
+            }
+
+            File.Delete(socketPath);
+            AssertMountAccepted(directory);
+        }
+        finally
+        {
+            Directory.Delete(directory, recursive: true);
+        }
+    }
+
+    private static JsonArray InspectMounts(string source) => new()
+    {
+        new JsonObject { ["Type"] = "tmpfs", ["Destination"] = "/work", ["RW"] = true },
+        new JsonObject { ["Type"] = "bind", ["Source"] = source, ["Destination"] = "/opt/evaluator", ["RW"] = false }
+    };
+
+    [Fact]
+    public void The_inspect_read_back_refuses_a_bind_whose_host_source_is_not_the_declared_one()
+    {
+        var declared = new Dictionary<string, string>(StringComparer.Ordinal) { ["/opt/evaluator"] = "/srv/evaluator/" };
+        Assert.Null(ContainerExecutionEngine.CheckMounts(InspectMounts("/srv/evaluator"), declared));
+        Assert.Null(ContainerExecutionEngine.CheckMounts(InspectMounts("/host_mnt/srv/evaluator"), declared));
+        foreach (string substituted in new[] { "/", "/var/run", "/srv/evaluator/..", "/srv/evaluator-other", "/evil/srv/evaluator", "" })
+        {
+            string? refusal = ContainerExecutionEngine.CheckMounts(InspectMounts(substituted), declared);
+            Assert.NotNull(refusal);
+            Assert.Contains("not the declared", refusal, StringComparison.Ordinal);
+        }
+
+        var missingSource = new JsonArray
+        {
+            new JsonObject { ["Type"] = "bind", ["Destination"] = "/opt/evaluator", ["RW"] = false }
+        };
+        Assert.NotNull(ContainerExecutionEngine.CheckMounts(missingSource, declared));
+
+        if (OperatingSystem.IsWindows())
+        {
+            var windows = new Dictionary<string, string>(StringComparer.Ordinal) { ["/opt/evaluator"] = @"C:\eval\helpers" };
+            Assert.Null(ContainerExecutionEngine.CheckMounts(InspectMounts("/run/desktop/mnt/host/c/eval/helpers"), windows));
+            Assert.NotNull(ContainerExecutionEngine.CheckMounts(InspectMounts("/run/desktop/mnt/host/c/eval"), windows));
+        }
     }
 
     [DockerFact]

@@ -518,18 +518,31 @@ public sealed class ContainerExecutionEngine : IProgramExecutionEngine, IProgram
         if (host["Memory"]?.GetValue<long>() != memory || host["MemorySwap"]?.GetValue<long>() != memory) return "the memory limit is not applied";
         if (host["NanoCpus"]?.GetValue<long>() != cpus) return "the CPU limit is not applied";
         if (Strings(host["Binds"]).Count != 0) return "host paths are bound";
-        var declared = new HashSet<string>(_container.ReadOnlyMounts.Keys, StringComparer.Ordinal);
-        foreach (JsonNode? mount in root["Mounts"] as JsonArray ?? new JsonArray())
+        string? mounts = CheckMounts(root["Mounts"] as JsonArray, _container.ReadOnlyMounts);
+        if (mounts is not null) return mounts;
+        if (host["Tmpfs"]?[Workdir] is null) return "the workdir is not a tmpfs";
+        return null;
+    }
+
+    /// <summary>Checks <c>docker inspect</c>'s mount list against the declared read-only mounts; null when they match.</summary>
+    /// <remarks>Every bind must be declared, read-only, and backed by the declared host path, so a daemon or wrapper that
+    /// substituted another source (the root, a socket directory) is caught as surely as a writable one.</remarks>
+    internal static string? CheckMounts(JsonArray? mounts, IDictionary<string, string> declaredMounts)
+    {
+        var declared = new HashSet<string>(declaredMounts.Keys, StringComparer.Ordinal);
+        foreach (JsonNode? mount in mounts ?? new JsonArray())
         {
             string? type = mount?["Type"]?.GetValue<string>();
             if (type == "tmpfs") continue;
             string destination = mount?["Destination"]?.GetValue<string>() ?? string.Empty;
             if (type != "bind" || !declared.Remove(destination)) return "an undeclared host path or volume is mounted at " + destination;
             if (mount?["RW"]?.GetValue<bool>() != false) return "the host path mounted at " + destination + " is writable";
+            string source = mount?["Source"]?.GetValue<string>() ?? string.Empty;
+            if (!ContainerMountSource.IsReportedAs(source, declaredMounts[destination]))
+                return "the host path mounted at " + destination + " is '" + source + "', not the declared " + declaredMounts[destination];
         }
 
         if (declared.Count != 0) return "a declared read-only mount is missing: " + string.Join(", ", declared);
-        if (host["Tmpfs"]?[Workdir] is null) return "the workdir is not a tmpfs";
         return null;
     }
 
