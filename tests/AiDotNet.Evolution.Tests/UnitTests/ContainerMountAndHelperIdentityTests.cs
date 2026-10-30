@@ -55,6 +55,18 @@ public sealed class ContainerMountAndHelperIdentityTests
 
         InvalidDataException refused = Assert.Throws<InvalidDataException>(() => RunCommand.RequireEvaluatorNotLinked(link));
         Assert.Contains(real, refused.Message, StringComparison.Ordinal);
+
+        // A relative link to a file beside it resolves inside the mounted directory, and so does a chain of them.
+        string beside = Path.Combine(directory.Path, "real", "current.py");
+        File.CreateSymbolicLink(beside, "evaluator.py");
+        RunCommand.RequireEvaluatorNotLinked(beside);
+        string chained = Path.Combine(directory.Path, "real", "latest.py");
+        File.CreateSymbolicLink(chained, "current.py");
+        RunCommand.RequireEvaluatorNotLinked(chained);
+        // A relative link that climbs out does not, even when the chain comes back.
+        string climbing = Path.Combine(directory.Path, "real", "climbing.py");
+        File.CreateSymbolicLink(climbing, Path.Combine("..", "evaluator.py"));
+        Assert.Throws<InvalidDataException>(() => RunCommand.RequireEvaluatorNotLinked(climbing));
     }
 
     [Fact]

@@ -926,16 +926,27 @@ internal static class RunCommand
         return directory ?? string.Empty;
     }
 
-    /// <summary>Refuses an evaluator file that is itself a link: a container mounts only the evaluator's directory, so the
-    /// link would dangle inside it and the run would fail at its first evaluation. A link in a parent directory is
-    /// fine, since the directory mount resolves it.</summary>
+    /// <summary>Refuses an evaluator file that is a link leaving its own directory: a container mounts only that
+    /// directory, so such a link would dangle inside it and the run would fail at its first evaluation. A relative link
+    /// to a file beside it (every hop of a chain, not only the last) resolves inside the mount and is accepted, and a
+    /// link in a parent directory is fine, since the directory mount resolves it.</summary>
     internal static void RequireEvaluatorNotLinked(string path)
     {
-        if (new FileInfo(path).LinkTarget is { } target)
+        string directory = Path.GetDirectoryName(Path.GetFullPath(path)) ?? string.Empty;
+        StringComparison comparison = OperatingSystem.IsWindows() ? StringComparison.OrdinalIgnoreCase : StringComparison.Ordinal;
+        string current = Path.GetFullPath(path);
+        for (int hop = 0; new FileInfo(current).LinkTarget is { } target; hop++)
         {
-            throw new InvalidDataException(
-                "The evaluator " + path + " is a link to " + target + ". In a container only the evaluator's directory is mounted, "
-                + "so the link would not resolve there; point the run file at the evaluator itself.");
+            string next = Path.GetFullPath(Path.Combine(directory, target));
+            if (hop >= 40 || Path.IsPathRooted(target) || !string.Equals(Path.GetDirectoryName(next), directory, comparison))
+            {
+                throw new InvalidDataException(
+                    "The evaluator " + path + " is a link to " + target + ", outside its own directory. In a container only the "
+                    + "evaluator's directory is mounted, so the link would not resolve there; point the run file at the evaluator "
+                    + "itself, or use a relative link to a file beside it.");
+            }
+
+            current = next;
         }
     }
 
