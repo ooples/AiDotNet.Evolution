@@ -31,6 +31,58 @@ public sealed class ReleaseWorkflowSecurityContractTests
             error => error.IndexOf("pack job cannot request an OIDC token", StringComparison.Ordinal) >= 0);
     }
 
+    [Theory]
+    [InlineData("publish-npm", "publish-npm job cannot check out the repository")]
+    [InlineData("publish-pypi", "publish-pypi job cannot check out the repository")]
+    public void RegistryPublishJobThatChecksOutTheRepositoryIsRejected(string job, string expected)
+    {
+        using var fixture = ReleaseWorkflowFixture.Create();
+        string releasePath = Path.Combine(fixture.WorkflowDirectory, "automated-release.yml");
+        string workflow = File.ReadAllText(releasePath).Replace("\r\n", "\n");
+        string firstStep = "  " + job + ":\n";
+        int start = workflow.IndexOf(firstStep, StringComparison.Ordinal);
+        int steps = workflow.IndexOf("    steps:\n", start, StringComparison.Ordinal) + "    steps:\n".Length;
+        File.WriteAllText(releasePath, workflow.Insert(steps, "      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1\n"));
+
+        IReadOnlyList<string> errors = ReleaseWorkflowSecurityContract.Validate(fixture.WorkflowDirectory);
+
+        Assert.Contains(errors, error => error.IndexOf(expected, StringComparison.Ordinal) >= 0);
+    }
+
+    [Theory]
+    [InlineData("publish-npm", "npm")]
+    [InlineData("publish-pypi", "pypi")]
+    public void RegistryPublishJobWithoutItsEnvironmentIsRejected(string job, string environment)
+    {
+        using var fixture = ReleaseWorkflowFixture.Create();
+        string releasePath = Path.Combine(fixture.WorkflowDirectory, "automated-release.yml");
+        string workflow = File.ReadAllText(releasePath).Replace("\r\n", "\n");
+        string declared = "    environment:\n      name: " + environment + "\n";
+        int start = workflow.IndexOf("  " + job + ":\n", StringComparison.Ordinal);
+        int at = workflow.IndexOf(declared, start, StringComparison.Ordinal);
+        Assert.True(start >= 0 && at > start, job + " should declare the " + environment + " environment");
+        File.WriteAllText(releasePath, workflow.Remove(at, declared.Length).Insert(at, "    environment:\n      name: production\n"));
+
+        IReadOnlyList<string> errors = ReleaseWorkflowSecurityContract.Validate(fixture.WorkflowDirectory);
+
+        Assert.Contains(errors, error => error.IndexOf(job + " job must run in the '" + environment + "' environment", StringComparison.Ordinal) >= 0);
+    }
+
+    [Fact]
+    public void OidcPermissionInARegistryBuildJobIsRejected()
+    {
+        using var fixture = ReleaseWorkflowFixture.Create();
+        string releasePath = Path.Combine(fixture.WorkflowDirectory, "automated-release.yml");
+        string workflow = File.ReadAllText(releasePath).Replace("\r\n", "\n");
+        const string safe = "  registry-pack:\n    name: Pack and test npm and PyPI packages\n    permissions:\n      contents: read\n";
+        Assert.Contains(safe, workflow, StringComparison.Ordinal);
+        File.WriteAllText(releasePath, workflow.Replace(safe, safe + "      id-token: write\n"));
+
+        IReadOnlyList<string> errors = ReleaseWorkflowSecurityContract.Validate(fixture.WorkflowDirectory);
+
+        Assert.Contains(errors, error => error.IndexOf("registry-pack job cannot request an OIDC token", StringComparison.Ordinal) >= 0);
+    }
+
     [Fact]
     public void CommentsThatLookLikeSecuritySettingsAreIgnored()
     {
@@ -130,6 +182,13 @@ internal static class ReleaseWorkflowSecurityContract
     private const string ReleaseWorkflowName = "automated-release.yml";
     private const string AttestationWorkflowName = "attest-release.yml";
     private const string NuGetLoginAction = "NuGet/login@";
+    private static readonly string[] RegistryPublishJobs = { "publish-npm", "publish-pypi" };
+    // Each registry's trusted publisher names this environment, and its protection rules gate the upload.
+    private static readonly Dictionary<string, string> RegistryEnvironments = new(StringComparer.Ordinal)
+    {
+        ["publish-npm"] = "npm",
+        ["publish-pypi"] = "pypi"
+    };
     private const string ProvenanceAction = "actions/attest-build-provenance@";
 
     public static IReadOnlyList<string> Validate(string workflowDirectory)
@@ -257,6 +316,36 @@ internal static class ReleaseWorkflowSecurityContract
                 "publish job must contain exactly one NuGet trusted-publishing login step");
             Require(Needs(publish).SetEquals(new[] { "validate", "pack", "attest" }), errors,
                 "publish job must wait for validation, package creation, and provenance");
+        }
+
+        // npm and PyPI (E-5). Any job of this workflow that holds an OIDC token could exchange it for a NuGet key, so the
+        // registry publish jobs may not check out or run the repository's code, and only the four publishers hold one.
+        foreach (string name in RegistryPublishJobs)
+        {
+            YamlMappingNode? registry = Job(jobs, name, errors);
+            if (registry is null)
+                continue;
+            Require(Steps(registry).All(step => !Action(step).StartsWith("actions/checkout@", StringComparison.OrdinalIgnoreCase)),
+                errors, $"{name} job cannot check out the repository");
+            Require(Steps(registry).All(step => !Action(step).StartsWith(NuGetLoginAction, StringComparison.OrdinalIgnoreCase)),
+                errors, $"{name} job cannot authenticate to NuGet");
+            Require(Needs(registry).IsSupersetOf(new[] { "publish", "registry-pack" }), errors,
+                $"{name} job must wait for the NuGet publish and the tested registry packages");
+            string? environment = Mapping(registry, "environment") is { } environmentMapping
+                ? Scalar(environmentMapping, "name")
+                : Scalar(registry, "environment");
+            Require(string.Equals(environment, RegistryEnvironments[name], StringComparison.Ordinal), errors,
+                $"{name} job must run in the '{RegistryEnvironments[name]}' environment");
+        }
+
+        foreach (KeyValuePair<YamlNode, YamlNode> pair in jobs.Children)
+        {
+            string name = (pair.Key as YamlScalarNode)?.Value ?? string.Empty;
+            if (name is "publish" or "attest" || RegistryPublishJobs.Contains(name) || pair.Value is not YamlMappingNode job)
+                continue;
+            Require(!HasKey(Mapping(job, "permissions"), "id-token"), errors, $"{name} job cannot request an OIDC token");
+            Require(Steps(job).All(step => !Action(step).StartsWith(NuGetLoginAction, StringComparison.OrdinalIgnoreCase)),
+                errors, $"{name} job cannot authenticate to NuGet");
         }
     }
 

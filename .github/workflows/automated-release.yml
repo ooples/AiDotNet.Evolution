@@ -274,3 +274,219 @@ jobs:
           # The release report and the complete declared bundle are published beside the packages (US-12).
           (cd evidence && zip -qr ../release-evidence-bundle.zip .)
           gh release upload "$RELEASE_TAG" out/*.nupkg out/*.snupkg out/*.cdx.json evidence/release-evidence.json release-evidence-bundle.zip --clobber --repo "$REPOSITORY"
+
+  # npm and PyPI (E-5). Opt-in with the repository variable PUBLISH_REGISTRIES=true, set once the npm trusted publisher
+  # and the PyPI trusted publisher name this workflow (.github/REPOSITORY_SETUP.md); until then every job below skips.
+  # Everything is built and tested in jobs that hold no OIDC token. The two publish jobs never check out the repository
+  # or run its code: they upload the files these jobs produced, because any job of this workflow that holds an OIDC token
+  # could also exchange it for a NuGet key.
+  registry-host:
+    name: Build npm host (${{ matrix.rid }})
+    if: vars.PUBLISH_REGISTRIES == 'true'
+    permissions:
+      contents: read
+    needs: validate
+    runs-on: ${{ matrix.runner }}
+    timeout-minutes: 30
+    strategy:
+      fail-fast: true
+      matrix:
+        include:
+          - rid: win-x64
+            runner: windows-latest
+          - rid: linux-x64
+            runner: ubuntu-latest
+          - rid: osx-arm64
+            runner: macos-14
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          ref: ${{ inputs.tag }}
+      - uses: actions/setup-dotnet@a98b56852c35b8e3190ac28c8c2271da59106c68 # v6.0.0
+        with:
+          dotnet-version: |
+            8.0.x
+            10.0.x
+      - uses: actions/setup-node@949feb2413d6458794dcd2491c4babbbce0c15c1 # v7.1.0
+        with:
+          node-version: '22'
+      - name: Install the Linux AOT prerequisites
+        if: matrix.rid == 'linux-x64'
+        run: |
+          sudo apt-get update
+          sudo apt-get install --yes clang zlib1g-dev
+      - name: Build and pack the platform host
+        working-directory: bindings/typescript
+        shell: bash
+        run: |
+          set -euo pipefail
+          npm install --no-audit --no-fund
+          npm run host
+          npm run package -- '${{ matrix.rid }}'
+          mkdir -p "$GITHUB_WORKSPACE/out"
+          # "./" keeps npm from reading packages/<rid> as a GitHub owner/repository shorthand.
+          npm pack './packages/${{ matrix.rid }}' --pack-destination "$GITHUB_WORKSPACE/out"
+      - uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9 # v7.0.2
+        with:
+          name: registry-host-${{ matrix.rid }}-${{ github.sha }}
+          path: out/*.tgz
+          if-no-files-found: error
+          retention-days: 30
+
+  registry-pack:
+    name: Pack and test npm and PyPI packages
+    permissions:
+      contents: read
+    needs: [validate, registry-host]
+    runs-on: ubuntu-latest
+    timeout-minutes: 20
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          ref: ${{ inputs.tag }}
+      - uses: actions/setup-node@949feb2413d6458794dcd2491c4babbbce0c15c1 # v7.1.0
+        with:
+          node-version: '22'
+      - uses: actions/setup-python@6d4fd22b20465ccc0f7354476588e8df7c9ca0e0 # v7.1.0
+        with:
+          python-version: '3.12'
+      - uses: actions/download-artifact@9000827ccba6bdab643e8b6fd33ac0654aef8333 # v8.0.2
+        with:
+          pattern: registry-host-*-${{ github.sha }}
+          path: out/npm
+          merge-multiple: true
+      - name: Check every registry version is the release version
+        shell: bash
+        env:
+          RELEASE_VERSION: ${{ needs.validate.outputs.version }}
+        run: |
+          set -euo pipefail
+          node -e '
+            const manifest = require("./bindings/typescript/package.json");
+            const want = process.env.RELEASE_VERSION;
+            const found = [manifest.version, ...Object.values(manifest.optionalDependencies)];
+            if (found.some((version) => version !== want)) {
+              console.error("::error::bindings/typescript/package.json has " + found.join(", ") + ", the release is " + want);
+              process.exit(1);
+            }'
+          python - <<'EOF'
+          import os, tomllib
+          found = tomllib.load(open("bindings/python/pyproject.toml", "rb"))["project"]["version"]
+          if found != os.environ["RELEASE_VERSION"]:
+              raise SystemExit("::error::bindings/python/pyproject.toml has " + found + ", the release is " + os.environ["RELEASE_VERSION"])
+          EOF
+      - name: Pack the npm package and the Python distributions
+        shell: bash
+        run: |
+          set -euo pipefail
+          (cd bindings/typescript && npm install --no-audit --no-fund && npm pack --pack-destination "$GITHUB_WORKSPACE/out/npm")
+          python -m pip install build==1.2.2.post1
+          python -m build --outdir out/python bindings/python
+          ls -l out/npm out/python
+      - name: Install and run them as fresh consumers
+        shell: pwsh
+        env:
+          RELEASE_VERSION: ${{ needs.validate.outputs.version }}
+        run: ./eng/Test-RegistryConsumers.ps1 -Version $env:RELEASE_VERSION -NpmDirectory out/npm -PythonDirectory out/python
+      - uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9 # v7.0.2
+        with:
+          name: registry-packages-${{ github.sha }}
+          path: |
+            out/npm/*.tgz
+            out/python/*
+          if-no-files-found: error
+          retention-days: 30
+
+  publish-npm:
+    name: Publish to npm
+    # npm trusted publishing: npm (11.5.1 or later) exchanges the OIDC token itself, and the provenance statement names
+    # this workflow. Hosts first, so the main package never points at a host version that does not exist yet.
+    # npm matches the CALLING workflow's filename, so a release from release-please.yml needs a trusted publisher
+    # for release-please.yml as well as one for this file (manual reruns); see .github/REPOSITORY_SETUP.md.
+    permissions:
+      contents: read
+      id-token: write
+    needs: [validate, publish, registry-pack]
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    # The environment is part of the OIDC token, so the npm trusted publisher can require it, and a required reviewer
+    # on it makes each npm upload wait for approval, as the pypi environment does for PyPI.
+    environment:
+      name: npm
+      url: https://www.npmjs.com/package/@aidotnet/evolution
+    steps:
+      - uses: actions/download-artifact@9000827ccba6bdab643e8b6fd33ac0654aef8333 # v8.0.2
+        with:
+          name: registry-packages-${{ github.sha }}
+          path: out
+      - uses: actions/setup-node@949feb2413d6458794dcd2491c4babbbce0c15c1 # v7.1.0
+        with:
+          node-version: '24'
+          registry-url: https://registry.npmjs.org
+      - name: Publish the packed tarballs
+        shell: bash
+        env:
+          RELEASE_VERSION: ${{ needs.validate.outputs.version }}
+        run: |
+          set -euo pipefail
+          node -e '
+            const [major, minor, patch] = process.argv[1].split(".").map(Number);
+            if (major < 11 || (major === 11 && (minor < 5 || (minor === 5 && patch < 1)))) {
+              console.error("::error::npm " + process.argv[1] + " cannot use trusted publishing (needs 11.5.1)");
+              process.exit(1);
+            }' "$(npm --version)"
+          for name in evolution-host-win-x64 evolution-host-linux-x64 evolution-host-osx-arm64 evolution; do
+            if npm view "@aidotnet/$name@$RELEASE_VERSION" version >/dev/null 2>&1; then
+              echo "@aidotnet/$name@$RELEASE_VERSION is already published; skipping."
+              continue
+            fi
+            npm publish "out/npm/aidotnet-$name-$RELEASE_VERSION.tgz" --access public --provenance --ignore-scripts
+          done
+
+  publish-pypi:
+    name: Publish to PyPI
+    permissions:
+      contents: read
+      id-token: write
+    needs: [validate, publish, registry-pack]
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    environment:
+      name: pypi
+      url: https://pypi.org/p/aidotnet-evolution-worker
+    steps:
+      - uses: actions/download-artifact@9000827ccba6bdab643e8b6fd33ac0654aef8333 # v8.0.2
+        with:
+          name: registry-packages-${{ github.sha }}
+          path: out
+      - uses: pypa/gh-action-pypi-publish@ed0c53931b1dc9bd32cbe73a98c7f6766f8a527e # v1.13.0
+        with:
+          packages-dir: out/python
+          skip-existing: true
+
+  verify-registries:
+    name: Fresh consumers from npm and PyPI (${{ matrix.os }})
+    permissions:
+      contents: read
+    needs: [validate, publish-npm, publish-pypi]
+    runs-on: ${{ matrix.os }}
+    timeout-minutes: 20
+    strategy:
+      fail-fast: false
+      matrix:
+        os: [windows-latest, ubuntu-latest, macos-14]
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          ref: ${{ inputs.tag }}
+      - uses: actions/setup-node@949feb2413d6458794dcd2491c4babbbce0c15c1 # v7.1.0
+        with:
+          node-version: '22'
+      - uses: actions/setup-python@6d4fd22b20465ccc0f7354476588e8df7c9ca0e0 # v7.1.0
+        with:
+          python-version: '3.12'
+      - name: Install the published packages into fresh consumers
+        shell: pwsh
+        env:
+          RELEASE_VERSION: ${{ needs.validate.outputs.version }}
+        run: ./eng/Test-RegistryConsumers.ps1 -Version $env:RELEASE_VERSION -FromRegistry

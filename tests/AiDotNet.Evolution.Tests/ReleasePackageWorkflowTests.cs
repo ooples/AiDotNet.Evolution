@@ -12,9 +12,24 @@ public sealed class ReleasePackageWorkflowTests
     {
         string root = Root();
         using var config = JsonDocument.Parse(File.ReadAllText(Path.Combine(root, "release-please-config.json")));
-        string[] configured = config.RootElement.GetProperty("packages").GetProperty(".")
-            .GetProperty("extra-files").EnumerateArray().Select(file => file.GetProperty("path").GetString()!)
+        JsonElement[] extraFiles = config.RootElement.GetProperty("packages").GetProperty(".")
+            .GetProperty("extra-files").EnumerateArray().ToArray();
+        string[] configured = extraFiles.Select(file => file.GetProperty("path").GetString()!)
+            .Where(path => path.StartsWith("src/", StringComparison.Ordinal))
             .OrderBy(path => path, StringComparer.Ordinal).ToArray();
+        // The npm and PyPI packages release in lock-step with NuGet (E-5): every version field they carry, the npm
+        // package's pins of its platform hosts included, and nothing else outside src/.
+        string[] bindings = extraFiles.Where(file => !file.GetProperty("path").GetString()!.StartsWith("src/", StringComparison.Ordinal))
+            .Select(file => file.GetProperty("path").GetString() + " " + file.GetProperty("jsonpath").GetString())
+            .OrderBy(entry => entry, StringComparer.Ordinal).ToArray();
+        Assert.Equal(new[]
+        {
+            "bindings/python/pyproject.toml $.project.version",
+            "bindings/typescript/package.json $.optionalDependencies['@aidotnet/evolution-host-linux-x64']",
+            "bindings/typescript/package.json $.optionalDependencies['@aidotnet/evolution-host-osx-arm64']",
+            "bindings/typescript/package.json $.optionalDependencies['@aidotnet/evolution-host-win-x64']",
+            "bindings/typescript/package.json $.version"
+        }, bindings);
         string[] packable = Directory.EnumerateFiles(Path.Combine(root, "src"), "*.csproj", SearchOption.AllDirectories)
             .Where(path => !XDocument.Load(path).Descendants("IsPackable").Any(value => value.Value == "false"))
             .Select(path => "src/" + new DirectoryInfo(Path.GetDirectoryName(path)!).Name + "/" + Path.GetFileName(path))
