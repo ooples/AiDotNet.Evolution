@@ -215,12 +215,17 @@ class PilotCellTests(unittest.TestCase):
         import campaign_registration as cr
         import campaign_runner as runner
 
+        champion = {"StandardErrors": 1.0, "BeatSeed": False}
+
         def searchers(ours_body, theirs_body):
-            def make(body):
+            def make(body, decision=None):
                 def search(_cell, directory, _resume):
-                    return {"program": program(directory, body), "model_calls": 2, "model_tokens": 100}
+                    outcome = {"program": program(directory, body), "model_calls": 2, "model_tokens": 100}
+                    if decision is not None:
+                        outcome["champion"] = decision
+                    return outcome
                 return search
-            return {"aidotnet": make(ours_body),
+            return {"aidotnet": make(ours_body, champion),
                     "openevolve-recommended": make(theirs_body),
                     "openevolve-matched": make(theirs_body)}
 
@@ -243,6 +248,9 @@ class PilotCellTests(unittest.TestCase):
                                   confirm=projection["ProjectionSha256"], log=lambda *args: None)
                 self.assertEqual(18, len(rows), "3 arms x 6 seeds")
                 self.assertEqual({"completed"}, {row["Status"] for row in rows})
+                # Our arm's champion decision reaches the campaign's rows; the other arms carry none.
+                self.assertEqual([champion] * 6, [row.get("Champion") for row in rows if row["Arm"] == "aidotnet"])
+                self.assertEqual(set(), {row["Arm"] for row in rows if row["Arm"] != "aidotnet" and "Champion" in row})
                 report = cr.analyze(registration, rows)
                 verdicts[label] = [endpoint["Superior"] for endpoint in report["Endpoints"]]
 

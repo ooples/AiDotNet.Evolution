@@ -1,0 +1,101 @@
+{
+ "Note": "Recovered from each ours cell's trace-*.jsonl and best.py after the run: campaign_runner.run dropped the Champion field from rows (fixed in the commit that adds this bundle). Z = (candidate quality - seed quality) / sqrt(se^2 + se_seed^2) on the 600+200 selection rows; the rule needs Z > StandardErrors.",
+ "Cells": [
+  {
+   "Seed": 2504790974,
+   "StandardErrors": 1,
+   "StandardErrorMetric": "quality_standard_error",
+   "ReferenceQuality": 0.48843362357134956,
+   "ReferenceStandardError": 0.013088587888379527,
+   "CandidatesWithStandardError": 45,
+   "BestCandidate": {
+    "Z": 0.0644,
+    "Gain": 0.00117157556546571,
+    "Quality": 0.4896051991368153,
+    "StandardError": 0.012632820815129224
+   },
+   "BeatSeed": false,
+   "BestPyIsSeed": true
+  },
+  {
+   "Seed": 3365596871,
+   "StandardErrors": 1,
+   "StandardErrorMetric": "quality_standard_error",
+   "ReferenceQuality": 0.49292316812150205,
+   "ReferenceStandardError": 0.012873887985470372,
+   "CandidatesWithStandardError": 45,
+   "BestCandidate": {
+    "Z": 0.0,
+    "Gain": 0.0,
+    "Quality": 0.49292316812150205,
+    "StandardError": 0.012873887985470372
+   },
+   "BeatSeed": false,
+   "BestPyIsSeed": true
+  },
+  {
+   "Seed": 380179826,
+   "StandardErrors": 1,
+   "StandardErrorMetric": "quality_standard_error",
+   "ReferenceQuality": 0.48780147569980453,
+   "ReferenceStandardError": 0.012986055881363824,
+   "CandidatesWithStandardError": 45,
+   "BestCandidate": {
+    "Z": 0.2054,
+    "Gain": 0.0036687674373936385,
+    "Quality": 0.49147024313719817,
+    "StandardError": 0.012265315722040584
+   },
+   "BeatSeed": false,
+   "BestPyIsSeed": true
+  },
+  {
+   "Seed": 4217085262,
+   "StandardErrors": 1,
+   "StandardErrorMetric": "quality_standard_error",
+   "ReferenceQuality": 0.4936571546834458,
+   "ReferenceStandardError": 0.013195766465858868,
+   "CandidatesWithStandardError": 45,
+   "BestCandidate": {
+    "Z": 0.0143,
+    "Gain": 0.0002650488329050682,
+    "Quality": 0.49392220351635086,
+    "StandardError": 0.013068150729374006
+   },
+   "BeatSeed": false,
+   "BestPyIsSeed": true
+  },
+  {
+   "Seed": 600375634,
+   "StandardErrors": 1,
+   "StandardErrorMetric": "quality_standard_error",
+   "ReferenceQuality": 0.4933324311207584,
+   "ReferenceStandardError": 0.01288835985685826,
+   "CandidatesWithStandardError": 45,
+   "BestCandidate": {
+    "Z": 0.1012,
+    "Gain": 0.0018293214413689363,
+    "Quality": 0.49516175256212736,
+    "StandardError": 0.012674966654718971
+   },
+   "BeatSeed": false,
+   "BestPyIsSeed": true
+  },
+  {
+   "Seed": 663733166,
+   "StandardErrors": 1,
+   "StandardErrorMetric": "quality_standard_error",
+   "ReferenceQuality": 0.4946639318773011,
+   "ReferenceStandardError": 0.013067154917655914,
+   "CandidatesWithStandardError": 45,
+   "BestCandidate": {
+    "Z": 0.0042,
+    "Gain": 7.7263784863002e-05,
+    "Quality": 0.4947411956621641,
+    "StandardError": 0.012989693677238984
+   },
+   "BeatSeed": false,
+   "BestPyIsSeed": true
+  }
+ ]
+}
