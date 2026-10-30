@@ -47,11 +47,11 @@ namespace AiDotNet.Evolution.Programs;
 /// </remarks>
 public sealed class ContainerExecutionEngine : IProgramExecutionEngine, IProgramExecutionTelemetrySource, IDisposable
 {
-    private const int MemoryExitCode = 125;
     private const string ScriptResource = "AiDotNet.Evolution.Programs.Execution.container_supervisor.py";
     private const string OwnerLabel = "org.aidotnet.evolution.container";
     private const string Workdir = "/work";
     private const int MaxDiagnosticChars = 4_000;
+    private const int RemoveAttempts = 3;
     private static readonly TimeSpan ReplyMargin = TimeSpan.FromSeconds(5);
     private static readonly TimeSpan ControlTimeout = TimeSpan.FromSeconds(60);
 
@@ -64,6 +64,7 @@ public sealed class ContainerExecutionEngine : IProgramExecutionEngine, IProgram
     private readonly ConcurrentDictionary<Container, byte> _busy = new();
     private int _queued;
     private int _active;
+    private int _unremoved;
     private volatile bool _disposed;
 
     /// <summary>Creates the engine, checks the Docker daemon and resolves the image. Containers start on first use.</summary>
@@ -144,16 +145,31 @@ public sealed class ContainerExecutionEngine : IProgramExecutionEngine, IProgram
     // Containers started and not yet removed; for tests that a timeout or a recycle does not leave one behind.
     internal int LiveContainerCount => _idle.Count + _busy.Count;
 
+    // Containers `docker rm --force` could not remove after RemoveAttempts tries; the owner label still finds them.
+    internal int UnremovedContainerCount => Volatile.Read(ref _unremoved);
+
     /// <inheritdoc />
     public bool TryExecute(ProgramLanguage language, string sourceCode, string input, out string output, out string? errorMessage,
         CancellationToken cancellationToken = default)
     {
-        ProgramExecuteResponse response = Task.Run(() => ExecuteAsync(new ProgramExecuteRequest
+        ProgramExecuteResponse response;
+        try
         {
-            Language = language,
-            SourceCode = sourceCode ?? string.Empty,
-            StdIn = input ?? string.Empty
-        }, cancellationToken), cancellationToken).GetAwaiter().GetResult();
+            response = Task.Run(() => ExecuteAsync(new ProgramExecuteRequest
+            {
+                Language = language,
+                SourceCode = sourceCode ?? string.Empty,
+                StdIn = input ?? string.Empty
+            }, cancellationToken), cancellationToken).GetAwaiter().GetResult();
+        }
+        catch (OperationCanceledException)
+        {
+            // A token canceled before Task.Run starts skips the delegate, so ExecuteAsync never reports it.
+            output = string.Empty;
+            errorMessage = "Execution was canceled.";
+            return false;
+        }
+
         if (response.Success && !response.StdOutTruncated)
         {
             output = response.StdOut;
@@ -330,13 +346,16 @@ public sealed class ContainerExecutionEngine : IProgramExecutionEngine, IProgram
         return argv;
     }
 
-    private ProgramExecuteResponse FromReply(JsonNode reply, ProgramLanguage language)
+    // The supervisor decides memory_exceeded: from the cgroup's OOM counter, or from exit code 125 only for a Python
+    // candidate it forked (where 125 is the MemoryError sentinel); any other candidate may exit 125 for its own reasons.
+    // A memory event fails the execution even when the candidate exits 0, so its output is never scored.
+    internal ProgramExecuteResponse FromReply(JsonNode reply, ProgramLanguage language)
     {
         int exit = reply["exit"]?.GetValue<int>() ?? -1;
         bool timedOut = reply["timed_out"]?.GetValue<bool>() == true;
-        bool memory = reply["memory_exceeded"]?.GetValue<bool>() == true || exit == MemoryExitCode;
+        bool memory = reply["memory_exceeded"]?.GetValue<bool>() == true;
         bool cpu = reply["cpu_exceeded"]?.GetValue<bool>() == true;
-        bool success = exit == 0 && !timedOut;
+        bool success = exit == 0 && !timedOut && !memory;
         string? error = success ? null
             : timedOut ? $"Execution exceeded the {_limits.TimeLimitSeconds.ToString(CultureInfo.InvariantCulture)} second limit and was terminated."
             : memory ? $"Execution exceeded the {_limits.MemoryLimitMb.ToString(CultureInfo.InvariantCulture)} MB container memory limit."
@@ -597,19 +616,33 @@ public sealed class ContainerExecutionEngine : IProgramExecutionEngine, IProgram
     private async Task RemoveAsync(Container container)
     {
         bool exited = await container.CloseAsync(TimeSpan.FromSeconds(10)).ConfigureAwait(false);
-        if (!exited)
+        if (!exited && !await ForceRemoveAsync(container.Name).ConfigureAwait(false))
+            Interlocked.Increment(ref _unremoved);
+
+        container.Dispose();
+    }
+
+    // Never throws: it runs in ExecuteAsync's finally, where an exception would replace the candidate's response.
+    // "No such container" means --rm already removed it; any other refusal is retried.
+    private async Task<bool> ForceRemoveAsync(string name)
+    {
+        for (int attempt = 1; attempt <= RemoveAttempts; attempt++)
         {
             try
             {
-                await RunDockerAsync(new[] { "rm", "--force", container.Name }, CancellationToken.None).ConfigureAwait(false);
+                (int exit, _, string error) = await RunDockerAsync(new[] { "rm", "--force", name }, CancellationToken.None).ConfigureAwait(false);
+                if (exit == 0 || error.Contains("No such container", StringComparison.OrdinalIgnoreCase)) return true;
             }
             catch (InvalidOperationException)
             {
                 // The daemon is gone; nothing more can be done from here, and --rm removes it if the daemon returns.
+                return false;
             }
+
+            if (attempt < RemoveAttempts) await Task.Delay(TimeSpan.FromMilliseconds(250 * attempt)).ConfigureAwait(false);
         }
 
-        container.Dispose();
+        return false;
     }
 
     private void DrainIdle()

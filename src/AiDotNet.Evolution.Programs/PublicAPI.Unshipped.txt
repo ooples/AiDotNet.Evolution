@@ -1933,3 +1933,4 @@ virtual AiDotNet.Evolution.Programs.ProgramPlanner.Invoke(AiDotNet.Evolution.Pro
 virtual AiDotNet.Evolution.Programs.ProgramTaskOptions.Clone() -> AiDotNet.Evolution.Programs.ProgramTaskOptions!
 virtual AiDotNet.Evolution.Programs.ProgramTaskOptions.Validate() -> void
 virtual AiDotNet.Evolution.Programs.ProgramVerifier.Invoke(AiDotNet.Evolution.Programs.VerificationRequest! request, System.Threading.CancellationToken cancellationToken) -> System.Threading.Tasks.ValueTask<AiDotNet.Evolution.EvolutionResourceResult<AiDotNet.Evolution.Programs.VerificationReceipt!>!>
+const AiDotNet.Evolution.Programs.ContainerExecutionOptions.MaxReadOnlyMountChars = 4096 -> int

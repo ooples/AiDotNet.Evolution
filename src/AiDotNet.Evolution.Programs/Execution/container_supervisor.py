@@ -60,7 +60,15 @@ def write_frame(stream, message):
 
 
 def bound(text, limit):
-    return (text, False) if len(text) <= limit else (text[:limit], True)
+    # In UTF-16 units, as .NET counts MaxStdOutChars; a cut never splits a surrogate pair.
+    if len(text.encode("utf-16-le")) // 2 <= limit:
+        return text, False
+    units = 0
+    for index, char in enumerate(text):
+        units += 2 if ord(char) > 0xFFFF else 1
+        if units > limit:
+            return text[:index], True
+    return text, False
 
 
 def status_field(name):
@@ -511,7 +519,8 @@ def run(request, zygote):
         memory = oom_after > oom_before
     else:
         memory = killed  # no counter to read: nothing in the container but the OOM killer sends SIGKILL first
-    memory = memory or code == MEMORY_EXIT
+    # 125 is the MemoryError sentinel of a forked Python candidate only; an exec'd candidate may exit 125 on its own.
+    memory = memory or (not request["argv"] and code == MEMORY_EXIT)
     cpu = signaled and os.WTERMSIG(status) == signal.SIGXCPU
     stdout = b"".join(chunks[out_read]).decode("utf-8", "replace")
     stderr = b"".join(chunks[err_read]).decode("utf-8", "replace")

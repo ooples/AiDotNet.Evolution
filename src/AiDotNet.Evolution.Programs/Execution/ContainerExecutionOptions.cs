@@ -118,10 +118,15 @@ public sealed class ContainerExecutionOptions
     /// <c>.</c>, <c>_</c>, <c>-</c> and <c>/</c>, and must not be or lie under <c>/work</c>, <c>/proc</c>,
     /// <c>/sys</c> or <c>/dev</c>; values must be rooted host paths without a comma or a quote. The mounts are part of
     /// <see cref="ContainerExecutionEngine.VersionHash"/>; the files in them are not, so a caller that needs a
-    /// changed file to change results should hash it into its own identity.
+    /// changed file to change results should hash it into its own identity. All the mounts together are limited to
+    /// <see cref="MaxReadOnlyMountChars"/> characters of <c>docker run</c> arguments: the supervisor script travels on
+    /// the same command line, and Windows refuses one longer than 32,767 characters.
     /// </para>
     /// </remarks>
     public IDictionary<string, string> ReadOnlyMounts => _readOnlyMounts;
+
+    /// <summary>The most characters <see cref="ReadOnlyMounts"/> may add to the <c>docker run</c> command line.</summary>
+    public const int MaxReadOnlyMountChars = 4_096;
 
     /// <summary>Builds the default in-image interpreter table.</summary>
     /// <returns>Python as <c>python3</c> and JavaScript as <c>node</c>.</returns>
@@ -220,6 +225,16 @@ public sealed class ContainerExecutionOptions
                     "The host directory for " + mount.Key + " must be a rooted path without a comma, a quote or a line break.",
                     nameof(ReadOnlyMounts));
             }
+        }
+
+        // As the engine passes each one: "--mount" and "type=bind,source=...,target=...,readonly", space separated.
+        long mountChars = _readOnlyMounts.Sum(mount => (long)"--mount type=bind,source=,target=,readonly  ".Length + mount.Key.Length + mount.Value.Length);
+        if (mountChars > MaxReadOnlyMountChars)
+        {
+            throw new ArgumentException(
+                "The read-only mounts add " + mountChars.ToString(System.Globalization.CultureInfo.InvariantCulture) + " characters to the docker command line; at most " +
+                MaxReadOnlyMountChars.ToString(System.Globalization.CultureInfo.InvariantCulture) + " are allowed. Mount fewer or shorter paths.",
+                nameof(ReadOnlyMounts));
         }
     }
 

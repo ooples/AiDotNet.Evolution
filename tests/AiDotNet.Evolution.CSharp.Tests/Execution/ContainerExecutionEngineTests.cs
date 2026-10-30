@@ -1,5 +1,6 @@
 using System.Diagnostics;
 using System.Text.Json;
+using System.Text.Json.Nodes;
 using AiDotNet.Evolution.Programs;
 using Xunit;
 
@@ -69,6 +70,45 @@ public sealed class ContainerExecutionEngineTests
         Assert.Throws<ArgumentException>(() => new ContainerExecutionOptions { Image = "x", SeccompProfilePath = "unconfined" }.Validate());
         Assert.Throws<ArgumentException>(() => new ContainerExecutionOptions { Image = "--privileged" }.Validate());
         Assert.Throws<ArgumentOutOfRangeException>(() => new ContainerExecutionEngine(Sandbox(memoryLimitMb: 8), Container()));
+
+        // The mounts share the docker command line with the supervisor script, under Windows' 32,767-character limit.
+        var mounts = new ContainerExecutionOptions { Image = "x" };
+        string source = Path.GetPathRoot(Path.GetTempPath()) + new string('d', 200);
+        for (int index = 0; index < 15; index++) mounts.ReadOnlyMounts["/opt/m" + index] = source;
+        mounts.Validate();
+        for (int index = 15; index < 20; index++) mounts.ReadOnlyMounts["/opt/m" + index] = source;
+        ArgumentException tooLong = Assert.Throws<ArgumentException>(() => mounts.Validate());
+        Assert.Equal(nameof(ContainerExecutionOptions.ReadOnlyMounts), tooLong.ParamName);
+    }
+
+    [Fact]
+    public void A_token_canceled_before_the_call_is_a_failed_execution_not_an_exception()
+    {
+        using var engine = new ContainerExecutionEngine(Sandbox(), Container());
+        using var canceled = new CancellationTokenSource();
+        canceled.Cancel();
+        Assert.False(engine.TryExecute(ProgramLanguage.Python, "print(1)\n", string.Empty, out string output, out string? error,
+            canceled.Token));
+        Assert.Equal(string.Empty, output);
+        Assert.Equal("Execution was canceled.", error);
+    }
+
+    // The supervisor's memory flag alone decides a memory failure: exit 0 under an OOM event is still a failure, and
+    // exit 125 without the flag (a candidate that chose 125) is an ordinary failed execution.
+    [Fact]
+    public void A_memory_event_fails_the_execution_and_exit_code_125_alone_is_not_one()
+    {
+        using var engine = new ContainerExecutionEngine(Sandbox(), Container());
+        ProgramExecuteResponse oom = engine.FromReply(JsonNode.Parse("""{"exit": 0, "stdout": "42", "memory_exceeded": true}""")!,
+            ProgramLanguage.Python);
+        Assert.False(oom.Success);
+        Assert.Equal(ProgramExecuteErrorCode.MemoryLimitExceeded, oom.ErrorCode);
+
+        ProgramExecuteResponse chosen = engine.FromReply(JsonNode.Parse("""{"exit": 125, "memory_exceeded": false}""")!,
+            ProgramLanguage.JavaScript);
+        Assert.False(chosen.Success);
+        Assert.Equal(125, chosen.ExitCode);
+        Assert.Equal(ProgramExecuteErrorCode.ExecutionFailed, chosen.ErrorCode);
     }
 
     [Fact]
@@ -226,8 +266,9 @@ public sealed class ContainerExecutionEngineTests
             // The container runs as nobody, so the directory must be readable by others whatever the runner's umask is.
             if (!OperatingSystem.IsWindows())
             {
-                File.SetUnixFileMode(host, (UnixFileMode)0b111_101_101);
-                File.SetUnixFileMode(Path.Combine(host, "helper.txt"), (UnixFileMode)0b110_100_100);
+                // World-writable, so the read-only mount is the only thing that refuses the writes below.
+                File.SetUnixFileMode(host, (UnixFileMode)0b111_111_111);
+                File.SetUnixFileMode(Path.Combine(host, "helper.txt"), (UnixFileMode)0b110_110_110);
             }
 
             ContainerExecutionOptions container = Container();
@@ -397,6 +438,30 @@ public sealed class ContainerExecutionEngineTests
         Assert.Equal("42", next.StdOut.Trim());
     }
 
+    // 125 is the forked-Python MemoryError sentinel; an exec'd interpreter that exits 125 did not run out of memory.
+    [DockerFact]
+    public async Task An_execd_candidate_that_exits_125_is_not_reported_as_out_of_memory()
+    {
+        using var engine = new ContainerExecutionEngine(Sandbox(), Container(launch: ContainerPythonLaunch.FreshInterpreter));
+        ProgramExecuteResponse response = await Run(engine, "import sys\nsys.exit(125)\n");
+        Assert.False(response.Success);
+        Assert.Equal(125, response.ExitCode);
+        Assert.Equal(ProgramExecuteErrorCode.ExecutionFailed, response.ErrorCode);
+    }
+
+    // The cap counts UTF-16 units, as the process engine does: ten emoji are twenty units, so a cap of 10 keeps five
+    // and never splits a surrogate pair.
+    [DockerFact]
+    public async Task The_output_cap_counts_utf16_units_and_never_splits_a_surrogate_pair()
+    {
+        ProgramSandboxOptions sandbox = Sandbox();
+        sandbox.Limits.MaxStdOutChars = 10;
+        using var engine = new ContainerExecutionEngine(sandbox, Container());
+        ProgramExecuteResponse response = await Run(engine, "print('\\U0001F600' * 10, end='')\n");
+        Assert.True(response.StdOutTruncated);
+        Assert.Equal(string.Concat(Enumerable.Repeat("\U0001F600", 5)), response.StdOut);
+    }
+
     [DockerFact]
     public async Task A_cold_engine_uses_a_fresh_container_per_candidate_and_leaves_none_behind()
     {
@@ -417,6 +482,7 @@ public sealed class ContainerExecutionEngineTests
         (int ExitCode, string StdOut)? listed = DockerTestEnvironment.Docker(
             "ps", "--all", "--quiet", "--filter", "label=org.aidotnet.evolution.container");
         Assert.NotNull(listed);
+        Assert.Equal(0, listed.Value.ExitCode);
         Assert.Equal(string.Empty, listed.Value.StdOut.Trim());
     }
 }
