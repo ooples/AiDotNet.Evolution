@@ -210,6 +210,12 @@ does, through `IGrowableEvolutionArchive<TGenome>`). A Pareto archive implements
 deployable and exploratory populations separately. A checkpoint that does not match the engine's
 compatibility hash is refused with `InvalidDataException` rather than silently forking the run.
 
+A resume decodes every archived genome, so a large archive spends much of its resume in the codec. A codec that
+also implements `IEvolutionUtf8GenomeCodec<TGenome>` is handed each archived payload as the UTF-8 bytes it was
+stored as, rather than as a string built from them; `ProgramGenomeCodec` does. It must decode those bytes to the
+same genome its string overload returns, and refuse bytes that are not UTF-8 with `InvalidDataException`. A cold
+resume of 10,000 program elites allocated 225-229 MB with it instead of 252-260 MB.
+
 To inspect a checkpoint without resuming it, call
 `EvolutionEngine<TGenome>.ReadCheckpoint(checkpoint, genomeCodec)`, or, for a segmented checkpoint,
 `ReadCheckpointAsync(checkpoint, genomeCodec, store)` with the store that wrote it, which replays its segments

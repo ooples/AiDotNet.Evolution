@@ -39,5 +39,7 @@
   <ItemGroup Condition="'$([MSBuild]::GetTargetFrameworkIdentifier($(TargetFramework)))' != '.NETFramework'">
     <ProjectReference Include="..\..\src\AiDotNet.Evolution.Host\AiDotNet.Evolution.Host.csproj" />
     <ProjectReference Include="..\..\src\AiDotNet.Evolution.Cli\AiDotNet.Evolution.Cli.csproj" />
+    <!-- The same Docker gate as the engine's container tests, for the CLI's container-mode test. -->
+    <Compile Include="..\AiDotNet.Evolution.CSharp.Tests\Execution\DockerTestEnvironment.cs" Link="UnitTests\DockerTestEnvironment.cs" />
   </ItemGroup>
 </Project>

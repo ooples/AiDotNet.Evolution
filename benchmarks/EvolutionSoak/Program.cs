@@ -153,7 +153,8 @@ static async Task<int> Sandbox(int executions, string python, int concurrency)
 {
     // Every grandchild carries this marker in its command line, so survivors can be found whatever their parent now is.
     string marker = "soak-orphan-" + Guid.NewGuid().ToString("N");
-    var options = new AiDotNet.Evolution.Programs.ProgramSandboxOptions();
+    // The soak's candidates are this benchmark's own fixtures, run unsandboxed on purpose to stress the process runner.
+    var options = new AiDotNet.Evolution.Programs.ProgramSandboxOptions { AllowUnsandboxedExecution = true };
     options.SetInterpreter(AiDotNet.Evolution.Programs.ProgramLanguage.Python,
         new AiDotNet.Evolution.Programs.ProgramInterpreterSpecification(python, "{source}"));
     options.Limits.TimeLimitSeconds = 2;

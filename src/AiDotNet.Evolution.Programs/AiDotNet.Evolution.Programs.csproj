@@ -53,5 +53,6 @@
   </ItemGroup>
   <ItemGroup>
     <EmbeddedResource Include="Execution\warm_python_worker.py" LogicalName="AiDotNet.Evolution.Programs.Execution.warm_python_worker.py"/>
+    <EmbeddedResource Include="Execution\container_supervisor.py" LogicalName="AiDotNet.Evolution.Programs.Execution.container_supervisor.py"/>
   </ItemGroup>
 </Project>

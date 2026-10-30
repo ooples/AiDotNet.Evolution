@@ -3,6 +3,7 @@
   "release-type": "simple",
   "versioning": "prerelease",
   "prerelease": false,
+  "bump-minor-pre-major": true,
   "prerelease-type": "preview",
   "include-component-in-tag": false,
   "tag-separator": "",
@@ -46,6 +47,31 @@
           "type": "xml",
           "path": "src/AiDotNet.Evolution.Surrogates/AiDotNet.Evolution.Surrogates.csproj",
           "xpath": "//PropertyGroup/Version"
+        },
+        {
+          "type": "json",
+          "path": "bindings/typescript/package.json",
+          "jsonpath": "$.version"
+        },
+        {
+          "type": "json",
+          "path": "bindings/typescript/package.json",
+          "jsonpath": "$.optionalDependencies['@aidotnet/evolution-host-win-x64']"
+        },
+        {
+          "type": "json",
+          "path": "bindings/typescript/package.json",
+          "jsonpath": "$.optionalDependencies['@aidotnet/evolution-host-linux-x64']"
+        },
+        {
+          "type": "json",
+          "path": "bindings/typescript/package.json",
+          "jsonpath": "$.optionalDependencies['@aidotnet/evolution-host-osx-arm64']"
+        },
+        {
+          "type": "toml",
+          "path": "bindings/python/pyproject.toml",
+          "jsonpath": "$.project.version"
         }
       ]
     }

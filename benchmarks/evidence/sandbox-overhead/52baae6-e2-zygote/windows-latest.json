@@ -1,0 +1,39 @@
+{
+  "Os": "Microsoft Windows 10.0.26100",
+  "Python": "C:\\hostedtoolcache\\windows\\Python\\3.12.10\\x64\\python.exe",
+  "Evaluations": 500,
+  "BaselineMs": {
+    "P50": 0.1662,
+    "P95": 0.2132,
+    "Mean": 0.1769171999999999
+  },
+  "ProcessMs": {
+    "P50": 37.0034,
+    "P95": 44.2854,
+    "Mean": 37.52321100000001
+  },
+  "AddedP50Ms": 36.837199999999996,
+  "AddedP95Ms": 44.0722,
+  "WarmMode": "WarmReusedWorker",
+  "WarmMs": {
+    "P50": 0.289,
+    "P95": 0.3272,
+    "Mean": 0.287629
+  },
+  "WarmAddedP50Ms": 0.12279999999999999,
+  "WarmAddedP95Ms": 0.11399999999999999,
+  "DockerImage": null,
+  "DockerMs": null,
+  "DockerAddedP50Ms": null,
+  "DockerAddedP95Ms": null,
+  "ContainerWarmMs": null,
+  "ContainerWarmAddedP50Ms": null,
+  "ContainerWarmAddedP95Ms": null,
+  "ContainerWarmTargetP50Ms": 30,
+  "ContainerWarmMeetsTarget": null,
+  "ContainerColdMs": null,
+  "ContainerColdAddedP50Ms": null,
+  "ContainerColdAddedP95Ms": null,
+  "DockerExecMs": null,
+  "DockerExecAddedP50Ms": null
+}

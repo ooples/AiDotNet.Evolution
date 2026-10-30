@@ -140,7 +140,9 @@ def main():
         copied.write_text(text, encoding="utf-8")
         run = subprocess.run(
             ["dotnet", args.cli, "run", "--openevolve-config", str(copied), str(initial), str(evaluator),
-             "--iterations", str(args.iterations), "--output", str(work / "out"), "--python", args.python],
+             "--iterations", str(args.iterations), "--output", str(work / "out"), "--python", args.python,
+             # OpenEvolve runs these evaluators on the host, and so does this smoke run; the CLI needs that said.
+             "--allow-unsandboxed-execution"],
             # OpenEvolve's examples are run from the repository root (openevolve-run.py examples/<name>/...), and some
             # configs name paths relative to it, such as lm_eval's template_dir.
             capture_output=True, text=True, timeout=1800, env=env, cwd=str(working_directory(text, example, Path(args.upstream))))

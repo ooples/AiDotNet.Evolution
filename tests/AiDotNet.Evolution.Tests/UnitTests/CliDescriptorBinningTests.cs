@@ -102,7 +102,8 @@ public sealed class CliDescriptorBinningTests
               "model": { "endpoint": "http://127.0.0.1:9/v1", "name": "fake-model" },
               "budget": { "maxEvaluations": 3, "seed": 7, "evaluationTimeLimitSeconds": 30 },
               "search": { "metricDescriptors": {{descriptors}} },
-              "output": "out"
+              "output": "out",
+              "allowUnsandboxedExecution": true
             }
             """);
         return path;

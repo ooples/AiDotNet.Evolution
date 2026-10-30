@@ -154,7 +154,10 @@ def ours(cli, task_directory, python_executable, *, iterations, session, timeout
                      "--python", python_executable, *champion,
                      # OpenEvolve feeds the evaluator's artifacts (the training rows) to the model by default; ours withholds
                      # their text unless told otherwise.
-                     "--retain-artifact-text", "true"],
+                     "--retain-artifact-text", "true",
+                     # Every arm of the pilot evaluates on the host, OpenEvolve's included; the CLI refuses that unless
+                     # it is accepted explicitly.
+                     "--allow-unsandboxed-execution"],
                     capture_output=True, text=True, timeout=timeout, env=environment, cwd=str(directory),
                     check=False)
             except subprocess.TimeoutExpired as error:

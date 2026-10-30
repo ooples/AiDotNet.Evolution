@@ -35,7 +35,7 @@ var modelRuntime = new LlmProgramVariationOperator(new FixtureChat(),
     new ProgramProposalOptions { Language = ProgramLanguage.Python });
 if (modelRuntime.PromptBuilder.Build(new AiDotNet.Evolution.Prompts.ProgramPromptContext(new ProgramGenome("x = 1", ProgramLanguage.Python))).Messages.Count == 0)
     throw new InvalidOperationException("Packaged model runtime produced no prompt.");
-var processOptions = new ProgramSandboxOptions { RuntimeVersion = "package-fixture-shell-v1" };
+var processOptions = new ProgramSandboxOptions { RuntimeVersion = "package-fixture-shell-v1", AllowUnsandboxedExecution = true };
 processOptions.SetInterpreter(ProgramLanguage.Python, new ProgramInterpreterSpecification(
     OperatingSystem.IsWindows() ? Path.Combine(Environment.GetFolderPath(Environment.SpecialFolder.System), "cmd.exe") : "/bin/cat",
     OperatingSystem.IsWindows() ? "/c type {source}" : "{source}"));

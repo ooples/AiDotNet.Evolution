@@ -14,10 +14,11 @@ public static class Program
     private const string Usage = """
         Usage:
           aidotnet-evolve run     <run.json>
-          aidotnet-evolve run --openevolve-config <config.yaml> <initial_program> <evaluator.py> [--iterations N] [--output DIR] [--python EXE]
-                                                                                              [--python-path DIR]...
-                                                                                              [--champion-standard-errors K --standard-error-metric NAME]
-                                                                                              [--retain-artifact-text true|false]
+          aidotnet-evolve run --openevolve-config <config.yaml> <initial_program> <evaluator.py>
+                              (--container-image IMAGE [--container-lifecycle Warm|Cold] | --allow-unsandboxed-execution)
+                              [--iterations N] [--output DIR] [--python EXE] [--python-path DIR]...
+                              [--champion-standard-errors K --standard-error-metric NAME]
+                              [--retain-artifact-text true|false]
           aidotnet-evolve resume  <run.json>
           aidotnet-evolve preflight <run.json>
           aidotnet-evolve inspect <trace>
@@ -79,12 +80,23 @@ public static class Program
         int? iterations = null;
         string output = "openevolve_output";
         string? python = null;
+        string? containerImage = null;
+        ContainerLifecycle? containerLifecycle = null;
+        bool allowUnsandboxedExecution = false;
         var pythonPath = new List<string>();
         double? championStandardErrors = null;
         string? standardErrorMetric = null;
         bool? retainArtifactText = null;
         for (int i = 0; i < rest.Length; i += 2)
         {
+            // The one flag without a value: an explicit, per-invocation acceptance of host-process evaluation.
+            if (rest[i] == "--allow-unsandboxed-execution")
+            {
+                allowUnsandboxedExecution = true;
+                i--;
+                continue;
+            }
+
             if (i + 1 >= rest.Length) return Fail("error: " + rest[i] + " needs a value.");
             switch (rest[i])
             {
@@ -115,11 +127,24 @@ public static class Program
                 case "--retain-artifact-text" when bool.TryParse(rest[i + 1], out bool retain):
                     retainArtifactText = retain;
                     break;
+                case "--container-image":
+                    containerImage = rest[i + 1];
+                    break;
+                case "--container-lifecycle" when Enum.TryParse(rest[i + 1], ignoreCase: false, out ContainerLifecycle lifecycle)
+                                                  && Enum.IsDefined(lifecycle):
+                    containerLifecycle = lifecycle;
+                    break;
                 default:
                     return Fail("error: unknown or invalid option " + rest[i] + " " + rest[i + 1] + "." + Environment.NewLine + Usage);
             }
         }
-        OpenEvolveImport imported = OpenEvolveConfigImporter.Import(config, initial, evaluator, iterations, python, pythonPath);
+        if (containerLifecycle is not null && containerImage is null)
+            return Fail("error: --container-lifecycle needs --container-image.");
+        RunContainer? container = containerImage is null
+            ? null
+            : new RunContainer { Image = containerImage, Lifecycle = containerLifecycle ?? ContainerLifecycle.Warm };
+        OpenEvolveImport imported = OpenEvolveConfigImporter.Import(
+            config, initial, evaluator, iterations, python, container, allowUnsandboxedExecution, pythonPath);
         Directory.CreateDirectory(output);
         string runFile = Path.Combine(output, "run.json");
         string translated = JsonSerializer.Serialize(imported.Run, RunCommand.RunFileJson);

@@ -28,9 +28,24 @@ internal static class OpenEvolveConfigImporter
         "_manual_queue_dir"
     };
 
+    /// <param name="container">Runs the evaluator in this container; <c>null</c> runs it as a host process, which
+    /// <paramref name="allowUnsandboxedExecution"/> must then accept.</param>
+    /// <param name="allowUnsandboxedExecution">The caller's explicit acceptance of a host-process evaluator. An import
+    /// never grants it on the caller's behalf: OpenEvolve running evaluators unsandboxed is the risk being opted into,
+    /// not a reason to opt in.</param>
     public static OpenEvolveImport Import(string configPath, string initialProgram, string evaluator, int? iterations,
-        string? python, IReadOnlyList<string>? pythonPath = null)
+        string? python, RunContainer? container, bool allowUnsandboxedExecution, IReadOnlyList<string>? pythonPath = null)
     {
+        if (container is null && !allowUnsandboxedExecution)
+        {
+            throw new InvalidDataException(
+                "Choose how the evaluator runs. --container-image <image> runs it, and the programs it executes, in a " +
+                "locked-down Docker container; --allow-unsandboxed-execution runs it as a host process, as OpenEvolve does, " +
+                "with this machine's files, credentials and network.");
+        }
+        if (container is not null && allowUnsandboxedExecution)
+            throw new InvalidDataException("--container-image and --allow-unsandboxed-execution are alternatives; give one.");
+
         Dictionary<string, object?> config = Flatten(Load(configPath, python));
         Dictionary<string, object?> defaults = Defaults();
         var merged = new Dictionary<string, object?>(defaults, StringComparer.Ordinal);
@@ -50,7 +65,17 @@ internal static class OpenEvolveConfigImporter
                 errors.Add(key + " = " + Show(value) + ": not supported (" + known.Ours + ")");
             merged[key] = value;
         }
-        var notes = new List<string>();
+        var notes = new List<string>
+        {
+            container is null
+                ? "allowUnsandboxedExecution is true (--allow-unsandboxed-execution): like OpenEvolve, the evaluator and the " +
+                  "programs it runs execute as host processes, with this machine's files and network. Run on a machine " +
+                  "provisioned for that."
+                : "container.image is " + container.Image + ": the evaluator and the programs it runs execute in a " +
+                  "locked-down Docker container, with the evaluator's directory mounted read-only."
+        };
+        if (container is not null && python is not null)
+            notes.Add("--python " + python + " parsed the config only; it is not recorded in the run, because the image's python3 runs the evaluator.");
         foreach (string key in unknown)
             notes.Add(key + " is not an OpenEvolve 0.3.2 config key; OpenEvolve ignores it, and so does this import.");
         if (!config.ContainsKey("llm.api_base") && Environment.GetEnvironmentVariable("OPENAI_API_BASE") is { Length: > 0 } apiBase)
@@ -118,6 +143,9 @@ internal static class OpenEvolveConfigImporter
             InitialProgram = Path.GetFullPath(initialProgram),
             Evaluator = Path.GetFullPath(evaluator),
             Output = ".",
+            // Only what the caller chose: the opt-in is never implied by the config being OpenEvolve's.
+            Container = container,
+            AllowUnsandboxedExecution = allowUnsandboxedExecution,
             Model = models[0],
             AdditionalModels = models.Skip(1).ToList(),
             Language = language is null ? ProgramLanguage.Python : ParseLanguage(language, notes),
@@ -171,7 +199,7 @@ internal static class OpenEvolveConfigImporter
             },
             OpenEvolveEvaluator = new RunOpenEvolveEvaluator
             {
-                Python = python,
+                Python = container is null ? python : null,
                 Cascade = Boolean(merged["evaluator.cascade_evaluation"]),
                 CascadeThresholds = List(merged["evaluator.cascade_thresholds"]).Select(value => Number(value) ?? 0).ToList(),
                 FileSuffix = merged["file_suffix"] as string ?? ".py",

@@ -25,7 +25,7 @@ public sealed class HungCandidateDefectClassTests
                         "                         start_new_session=sys.platform != 'win32')\n" +
                         "with open('" + pidFile + "', 'w') as f:\n    f.write(str(child.pid))\n" +
                         "time.sleep(60)\n";
-        var options = new ProgramSandboxOptions();
+        var options = new ProgramSandboxOptions { AllowUnsandboxedExecution = true };
         options.SetInterpreter(ProgramLanguage.Python, new ProgramInterpreterSpecification(Python, "{source}"));
         options.Limits.TimeLimitSeconds = 3;
         string pidPath = Path.Combine(directory, "grandchild.pid");

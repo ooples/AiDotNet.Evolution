@@ -127,7 +127,9 @@ public sealed class ProcessProgramExecutionEngine : IProgramExecutionEngine, IPr
     /// <exception cref="ArgumentException">
     /// The options are invalid, or <see cref="ProgramSandboxOptions.Mode"/> is not
     /// <see cref="ProgramSandboxMode.OutOfProcessWorker"/>. This engine implements only the out-of-process boundary;
-    /// selecting another mode and then using this engine anyway would quietly contradict the configuration.
+    /// selecting another mode and then using this engine anyway would quietly contradict the configuration. Also
+    /// thrown when <see cref="ProgramSandboxOptions.AllowUnsandboxedExecution"/> is not set, because this boundary
+    /// leaves the candidate the host's filesystem, network and system calls.
     /// </exception>
     /// <exception cref="ArgumentOutOfRangeException">A configured limit is impossible.</exception>
     public ProcessProgramExecutionEngine(ProgramSandboxOptions options)
@@ -141,6 +143,8 @@ public sealed class ProcessProgramExecutionEngine : IProgramExecutionEngine, IPr
                 nameof(options));
         }
 
+        // A separate process bounds time and output, not what the candidate can touch on this machine, so Validate
+        // above has already refused this mode unless AllowUnsandboxedExecution accepts that.
         _options = options.Clone();
         _limits = _options.Limits;
         _concurrency = new SemaphoreSlim(_limits.MaxConcurrentExecutions, _limits.MaxConcurrentExecutions);
@@ -561,7 +565,8 @@ public sealed class ProcessProgramExecutionEngine : IProgramExecutionEngine, IPr
         };
     }
 
-    private ProgramExecuteResponse? ResolveLanguage(
+    // Shared with ContainerExecutionEngine, so a generic request resolves to the same language whichever engine runs it.
+    internal static ProgramExecuteResponse? ResolveLanguage(
         ProgramExecuteRequest request,
         string source,
         out ProgramLanguage language)

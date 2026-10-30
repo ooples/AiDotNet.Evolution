@@ -1710,6 +1710,8 @@ AiDotNet.Evolution.IEvolutionGenomeCodec<TGenome>.Deserialize(string! payload) -
 AiDotNet.Evolution.IEvolutionGenomeCodec<TGenome>.Id.get -> string!
 AiDotNet.Evolution.IEvolutionGenomeCodec<TGenome>.Serialize(TGenome genome) -> string!
 AiDotNet.Evolution.IEvolutionGenomeCodec<TGenome>.VersionHash.get -> string!
+AiDotNet.Evolution.IEvolutionUtf8GenomeCodec<TGenome>
+AiDotNet.Evolution.IEvolutionUtf8GenomeCodec<TGenome>.Deserialize(System.ReadOnlySpan<byte> utf8Payload) -> TGenome
 AiDotNet.Evolution.IEvolutionIslandProposalScheduler
 AiDotNet.Evolution.IEvolutionIslandProposalScheduler.IslandCount.get -> int
 AiDotNet.Evolution.IEvolutionIslandProposalScheduler.SelectIsland(long evaluationId, AiDotNet.Evolution.StableRandom! random) -> int

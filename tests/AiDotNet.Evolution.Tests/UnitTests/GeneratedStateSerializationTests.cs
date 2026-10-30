@@ -15,7 +15,7 @@ public sealed class GeneratedStateSerializationTests
             CellBins = new[] { 0 },
             EvaluationId = long.MaxValue,
             GenomeId = "id/é",
-            GenomePayload = "7",
+            GenomePayload = new EvolutionGenomePayload("7"),
             Lineage = new LineageDocument { ParentIds = new() { "parent" }, SeedStream = ulong.MaxValue },
             Evaluation = new EvaluationDocument { Quality = 7, Descriptors = new() { ["x"] = 0.25 }, MeasurementOriginJson = "origin" }
         };

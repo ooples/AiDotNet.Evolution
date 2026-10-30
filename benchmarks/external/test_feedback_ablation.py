@@ -1,4 +1,6 @@
 """Contracts for the V1-54 (#167) feedback ablation driver. No model calls and no CLI."""
+import contextlib
+import io
 import json
 import pathlib
 import subprocess
@@ -337,6 +339,30 @@ def solve(x):
         self.assertIn("exceeded the 7 s run timeout", failure)
         self.assertGreaterEqual(elapsed, 0)
 
+
+
+class IsolationTests(unittest.TestCase):
+    """Where model-written code runs is never chosen for the operator."""
+
+    common = dict(evaluations=6, model="sonnet", executable="claude", budget_usd=None, time_limit=60)
+
+    def test_neither_choice_leaves_the_run_for_the_cli_to_refuse(self):
+        run = fa.run_file("o", 0, None, **self.common)
+        self.assertNotIn("allowUnsandboxedExecution", run)
+        self.assertNotIn("container", run)
+
+    def test_each_choice_reaches_the_run_file(self):
+        self.assertEqual({"image": "python:3.12-slim"},
+                         fa.run_file("o", 0, None, container_image="python:3.12-slim", **self.common)["container"])
+        self.assertIs(True, fa.run_file("o", 0, None, allow_unsandboxed=True, **self.common)["allowUnsandboxedExecution"])
+        with self.assertRaises(ValueError):
+            fa.run_file("o", 0, None, container_image="x", allow_unsandboxed=True, **self.common)
+
+    def test_the_driver_requires_exactly_one_choice(self):
+        required = ["--cli", "c", "--output", "o", "--work", "w"]
+        for extra in ([], ["--container-image", "x", "--allow-unsandboxed"]):
+            with self.assertRaises(SystemExit), contextlib.redirect_stderr(io.StringIO()):
+                fa.main(required + extra)
 
 
 if __name__ == "__main__":

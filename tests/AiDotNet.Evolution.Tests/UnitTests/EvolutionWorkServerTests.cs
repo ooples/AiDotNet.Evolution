@@ -215,34 +215,34 @@ public sealed class EvolutionWorkServerTests : IDisposable
     [Fact]
     public async Task IdleTimeout_closes_an_authenticated_connection_that_goes_quiet()
     {
-        using EvolutionWorkServer server = Serve(new EvolutionWorkServerOptions { IdleTimeout = TimeSpan.FromMilliseconds(300) });
+        var events = new List<EvolutionWorkServerEvent>();
+        var idle = TimeSpan.FromMilliseconds(300);
+        using EvolutionWorkServer server = Serve(new EvolutionWorkServerOptions
+        {
+            IdleTimeout = idle,
+            OnEvent = e => { lock (events) events.Add(e); }
+        });
         using EvolutionWorkRemoteClient worker = await ConnectTo(server);
         JsonObject first = Assert.IsType<JsonObject>(JsonNode.Parse(await worker.SendAsync(Request("status").ToJsonString())));
         Assert.True(first["ok"]?.GetValue<bool>());
+        var quiet = System.Diagnostics.Stopwatch.StartNew();
 
-        // Poll until the connection is gone rather than probing once after a fixed wait. The idle
-        // sweep is a background timer, and on a loaded runner it can miss any particular window:
-        // this failed in CI twice as "Assert.ThrowsAny() Failure: No exception was thrown" after a
-        // 2 s delay against a 300 ms timeout, while passing locally in isolation every time.
-        //
-        // The property is unchanged and still required - a quiet authenticated connection must be
-        // closed - but it is now "within 30 seconds" instead of "by the 2-second mark", so a
-        // starved sweep is late rather than a failure, and a sweep that never fires still fails.
-        Exception? closed = null;
-        for (int attempt = 0; attempt < 60 && closed is null; attempt++)
+        // Stay quiet and watch the server, rather than probing the connection. Every probe is traffic: polling with a
+        // request every 500 ms against a 300 ms timeout left 200 ms of slack, so on a loaded runner a late idle timer
+        // let the next probe arrive first, reset the timer, and keep the connection alive for the whole test. A sweep
+        // that is merely late now passes; one that never fires still fails, at 30 s, and one that ignores IdleTimeout
+        // and closes on some other, longer timer fails the bound of twenty idle timeouts below.
+        var deadline = DateTime.UtcNow + TimeSpan.FromSeconds(30);
+        bool closed = false;
+        while (!closed && DateTime.UtcNow < deadline)
         {
-            await Task.Delay(TimeSpan.FromMilliseconds(500));
-            try
-            {
-                await worker.SendAsync(Request("status").ToJsonString());
-            }
-            catch (Exception exception)
-            {
-                closed = exception;
-            }
+            await Task.Delay(25);
+            lock (events) closed = events.Any(e => e.Kind == EvolutionWorkServerEventKind.Closed);
         }
 
-        Assert.NotNull(closed);
+        Assert.True(closed, "the server never closed the quiet connection");
+        Assert.True(quiet.Elapsed < TimeSpan.FromTicks(idle.Ticks * 20), "the quiet connection closed after " + quiet.Elapsed + ", not near the " + idle + " idle timeout");
+        await Assert.ThrowsAnyAsync<Exception>(() => worker.SendAsync(Request("status").ToJsonString()));
     }
 
     private Task<EvolutionWorkRemoteClient> Connect() =>

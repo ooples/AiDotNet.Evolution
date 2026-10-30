@@ -50,6 +50,24 @@ internal sealed class RunFile
     /// <c>meta_prompt_weight</c> exist and its own config comment says "not implemented".
     /// </remarks>
     public RunMetaPrompt? MetaPrompt { get; init; }
+    /// <summary>Runs the evaluator, and the candidates it executes, in a Docker container; <c>null</c> runs them as host processes.</summary>
+    public RunContainer? Container { get; init; }
+    /// <summary>Must be <c>true</c> when <see cref="Container"/> is <c>null</c>.</summary>
+    /// <remarks>A host process bounds time and output, but the evaluator and the model-written programs it runs keep
+    /// this machine's filesystem, network and user. A run without a container is refused unless this says so.</remarks>
+    public bool AllowUnsandboxedExecution { get; init; }
+}
+
+/// <summary>The container the evaluator runs in (see <see cref="ContainerExecutionEngine"/>).</summary>
+/// <remarks>The image must hold the evaluator's interpreter and every package it imports, and must already be pulled.
+/// Nothing from the host is mounted, so the evaluator receives the candidate on standard input as usual and cannot
+/// read files beside the run file.</remarks>
+internal sealed class RunContainer
+{
+    /// <summary>The image, already present on the Docker host; a <c>name@sha256:...</c> digest pins it.</summary>
+    public required string Image { get; init; }
+    /// <summary>Reuse one container per concurrent evaluation (<c>Warm</c>, the default) or start one per evaluation (<c>Cold</c>).</summary>
+    public ContainerLifecycle Lifecycle { get; init; } = ContainerLifecycle.Warm;
 }
 
 /// <summary>Instruction evolution: candidate system instructions, scored by the programs they produce.</summary>
@@ -421,7 +439,8 @@ internal static class RunCommand
         string tracePath = NextTracePath(outputDirectory);
         using var marker = RunMarker.Create(outputDirectory, run.RunId, tracePath);
 
-        using var execution = CreateExecution(run, baseDirectory);
+        IProgramExecutionEngine execution = CreateExecution(run, baseDirectory);
+        using var ownedExecution = (IDisposable)execution;
         IProgramChatClient model = CreateModels(new[] { run.Model }.Concat(run.AdditionalModels).ToList(), baseDirectory);
         using var ownedModel = model as IDisposable;
 
@@ -846,7 +865,8 @@ internal static class RunCommand
         ProbeWritable(outputDirectory);
 
         EvolutionTaskResult seed;
-        using (var execution = CreateExecution(run, baseDirectory))
+        IProgramExecutionEngine execution = CreateExecution(run, baseDirectory);
+        using (var ownedExecution = (IDisposable)execution)
         {
             var fitness = CreateFitness(run, execution, evaluator);
             seed = fitness.EvaluateAsync(new ProgramGenome(initial, run.Language),
@@ -887,9 +907,15 @@ internal static class RunCommand
     /// <summary>Returned when preflight finds the seed does not pass the evaluator.</summary>
     public const int PreflightFailedExitCode = 4;
 
-    internal static ProcessProgramExecutionEngine CreateExecution(RunFile run, string baseDirectory)
+    internal static IProgramExecutionEngine CreateExecution(RunFile run, string baseDirectory)
     {
-        var sandbox = new ProgramSandboxOptions { RuntimeVersion = run.RuntimeVersion };
+        var sandbox = new ProgramSandboxOptions
+        {
+            RuntimeVersion = run.RuntimeVersion,
+            Mode = run.Container is null ? ProgramSandboxMode.OutOfProcessWorker : ProgramSandboxMode.Container,
+            // Load refuses a run without a container unless the run file opted in, so this restates that decision.
+            AllowUnsandboxedExecution = run.AllowUnsandboxedExecution
+        };
         sandbox.Limits.TimeLimitSeconds = run.Budget.EvaluationTimeLimitSeconds;
         sandbox.Limits.MaxConcurrentExecutions = run.Budget.Parallelism;
         if (run.Search.EvaluationMemoryLimitMb is int memory) sandbox.Limits.MemoryLimitMb = memory;
@@ -904,11 +930,28 @@ internal static class RunCommand
             {
                 // Declared rather than inherited: the sandbox clears the environment, so an evaluator that imports
                 // openevolve itself sees exactly the directories named in the run file and nothing else the host holds.
-                sandbox.DeclaredEnvironment["PYTHONPATH"] = string.Join(
-                    Path.PathSeparator.ToString(),
-                    openEvolve.PythonPath.Select(entry => Path.GetFullPath(Path.Combine(baseDirectory, entry))));
+                // In a container each directory is mounted read-only, so the path is the one inside the container.
+                sandbox.DeclaredEnvironment["PYTHONPATH"] = run.Container is null
+                    ? string.Join(Path.PathSeparator.ToString(), HostPythonPath(openEvolve, baseDirectory))
+                    : string.Join(":", openEvolve.PythonPath.Select((_, index) => ContainerPythonPathEntry(index)));
             }
         }
+        if (run.Container is { } container)
+        {
+            var options = new ContainerExecutionOptions
+            {
+                Image = container.Image,
+                Lifecycle = container.Lifecycle
+            };
+            if (run.OpenEvolveEvaluator is not null)
+            {
+                foreach (KeyValuePair<string, string> mount in ContainerMounts(run, baseDirectory))
+                    options.ReadOnlyMounts[mount.Key] = mount.Value;
+            }
+
+            return new ContainerExecutionEngine(sandbox, options);
+        }
+
         return new ProcessProgramExecutionEngine(sandbox);
     }
 
@@ -940,15 +983,124 @@ internal static class RunCommand
         if (source.ComprehensiveImplementationMinLines is int comprehensive) prompt.ComprehensiveImplementationMinLines = comprehensive;
     }
 
+    /// <summary>Where a container sees the OpenEvolve evaluator's directory, mounted read-only.</summary>
+    internal const string ContainerEvaluatorDirectory = "/aidotnet/evaluator";
+
+    /// <summary>Where a container sees the <paramref name="index"/>th <c>openEvolveEvaluator.pythonPath</c> directory.</summary>
+    internal static string ContainerPythonPathEntry(int index) =>
+        "/aidotnet/pythonpath/" + index.ToString(System.Globalization.CultureInfo.InvariantCulture);
+
+    private static List<string> HostPythonPath(RunOpenEvolveEvaluator openEvolve, string baseDirectory) =>
+        openEvolve.PythonPath.Select(entry => Path.GetFullPath(Path.Combine(baseDirectory, entry))).ToList();
+
+    /// <summary>
+    /// The host directories an OpenEvolve evaluator needs inside a container, keyed by where the container sees them:
+    /// the evaluator's own directory (the shim imports it and the helpers beside it) and each <c>pythonPath</c> entry.
+    /// </summary>
+    /// <remarks>
+    /// Every candidate can read what is mounted, and its output reaches the archive and the model's prompts, so a
+    /// filesystem root or the home directory - where SSH keys and cloud credentials live - is refused rather than
+    /// mounted. Move the evaluator into a directory of its own instead.
+    /// </remarks>
+    private static Dictionary<string, string> ContainerMounts(RunFile run, string baseDirectory)
+    {
+        var mounts = new Dictionary<string, string>(StringComparer.Ordinal)
+        {
+            [ContainerEvaluatorDirectory] = RequireMountable(
+                Path.GetDirectoryName(Path.GetFullPath(Path.Combine(baseDirectory, run.Evaluator))), "the evaluator's directory")
+        };
+        List<string> pythonPath = run.OpenEvolveEvaluator is { } openEvolve ? HostPythonPath(openEvolve, baseDirectory) : new List<string>();
+        for (int index = 0; index < pythonPath.Count; index++)
+            mounts[ContainerPythonPathEntry(index)] = RequireMountable(pythonPath[index], "openEvolveEvaluator.pythonPath[" + index + "]");
+        return mounts;
+    }
+
+    /// <summary>The directory, refused when it or the directory its links resolve to is a filesystem root or the home directory.</summary>
+    /// <remarks>Docker bind-mounts the resolved target, so a link to the home directory would mount the home directory.</remarks>
+    internal static string RequireMountable(string? directory, string what)
+    {
+        RequireNotRootOrHome(directory, directory, what);
+        if (directory is not null) RequireNotRootOrHome(ResolveLinks(directory), directory, what);
+        return directory ?? string.Empty;
+    }
+
+    /// <summary>Refuses an evaluator file that is a link leaving its own directory: a container mounts only that
+    /// directory, so such a link would dangle inside it and the run would fail at its first evaluation. A relative link
+    /// to a file beside it (every hop of a chain, not only the last) resolves inside the mount and is accepted, and a
+    /// link in a parent directory is fine, since the directory mount resolves it.</summary>
+    internal static void RequireEvaluatorNotLinked(string path)
+    {
+        string directory = Path.GetDirectoryName(Path.GetFullPath(path)) ?? string.Empty;
+        StringComparison comparison = OperatingSystem.IsWindows() ? StringComparison.OrdinalIgnoreCase : StringComparison.Ordinal;
+        string current = Path.GetFullPath(path);
+        for (int hop = 0; new FileInfo(current).LinkTarget is { } target; hop++)
+        {
+            string next = Path.GetFullPath(Path.Combine(directory, target));
+            if (hop >= 40 || Path.IsPathRooted(target) || !string.Equals(Path.GetDirectoryName(next), directory, comparison))
+            {
+                throw new InvalidDataException(
+                    "The evaluator " + path + " is a link to " + target + ", outside its own directory. In a container only the "
+                    + "evaluator's directory is mounted, so the link would not resolve there; point the run file at the evaluator "
+                    + "itself, or use a relative link to a file beside it.");
+            }
+
+            current = next;
+        }
+    }
+
+    // Resolves every link along the path, one component at a time, so a link in a parent directory counts too.
+    internal static string ResolveLinks(string path, int depth = 0)
+    {
+        if (depth > 40) throw new InvalidDataException(path + " has too many levels of symbolic links.");
+        string full = Path.GetFullPath(path);
+        string current = Path.GetPathRoot(full) ?? string.Empty;
+        foreach (string part in full.Substring(current.Length).Split(new[] { Path.DirectorySeparatorChar, Path.AltDirectorySeparatorChar }, StringSplitOptions.RemoveEmptyEntries))
+        {
+            current = Path.Combine(current, part);
+            var info = new DirectoryInfo(current);
+            if (info.Exists && info.LinkTarget is not null && info.ResolveLinkTarget(returnFinalTarget: true) is { } target)
+                current = ResolveLinks(target.FullName, depth + 1);
+        }
+
+        return current;
+    }
+
+    internal static void RequireNotRootOrHome(string? directory, string? named, string what, string? homeDirectory = null)
+    {
+        string trimmed = directory?.TrimEnd(Path.DirectorySeparatorChar, Path.AltDirectorySeparatorChar) ?? string.Empty;
+        string home = (homeDirectory ?? Environment.GetFolderPath(Environment.SpecialFolder.UserProfile))
+            .TrimEnd(Path.DirectorySeparatorChar, Path.AltDirectorySeparatorChar);
+        // A resolved mount source is compared with the resolved home too: where /home is itself a link, a link to the home
+        // directory resolves to the link's target, which the lexical home never equals. Windows and macOS compare without case.
+        string resolvedHome = home.Length == 0 ? home : ResolveLinks(home).TrimEnd(Path.DirectorySeparatorChar, Path.AltDirectorySeparatorChar);
+        StringComparison comparison = OperatingSystem.IsWindows() || OperatingSystem.IsMacOS() ? StringComparison.OrdinalIgnoreCase : StringComparison.Ordinal;
+        bool root = directory is null || trimmed.Length == 0
+            || string.Equals(trimmed, (Path.GetPathRoot(directory) ?? string.Empty).TrimEnd(Path.DirectorySeparatorChar, Path.AltDirectorySeparatorChar), comparison);
+        if (root || (home.Length > 0 && (string.Equals(trimmed, home, comparison) || string.Equals(trimmed, resolvedHome, comparison))))
+        {
+            string resolved = directory is not null && !string.Equals(directory, named, comparison) ? ", a link to " + directory : string.Empty;
+            throw new InvalidDataException(
+                what + " (" + (named ?? "none") + resolved + ") would be mounted read-only into the container, where every candidate can "
+                + "read it; a filesystem root or the home directory is refused. Move the evaluator and its helpers into a "
+                + "directory of their own.");
+        }
+    }
+
     /// <summary>The evaluator script to run: the file itself, or the OpenEvolve shim that imports it.</summary>
     private static string LoadEvaluator(RunFile run, string baseDirectory)
     {
         string path = Path.GetFullPath(Path.Combine(baseDirectory, run.Evaluator));
         string source = ReadBounded(path, MaxRunFileBytes); // bounds and existence, whichever form runs
-        return run.OpenEvolveEvaluator is { } openEvolve ? OpenEvolveEvaluatorShim.Build(path, openEvolve) : source;
+        if (run.OpenEvolveEvaluator is not { } openEvolve) return source;
+        // The shim hashes the host file and, in a container, imports the same file through the read-only mount.
+        if (run.Container is not null) RequireEvaluatorNotLinked(path);
+        string runtimePath = run.Container is null ? path : ContainerEvaluatorDirectory + "/" + Path.GetFileName(path);
+        var helpers = new List<string> { Path.GetDirectoryName(path) ?? baseDirectory };
+        helpers.AddRange(HostPythonPath(openEvolve, baseDirectory));
+        return OpenEvolveEvaluatorShim.Build(path, runtimePath, openEvolve, helpers, Path.GetFullPath(Path.Combine(baseDirectory, run.Output)));
     }
 
-    private static ScriptProgramFitnessEvaluator CreateFitness(RunFile run, ProcessProgramExecutionEngine execution, string evaluator)
+    private static ScriptProgramFitnessEvaluator CreateFitness(RunFile run, IProgramExecutionEngine execution, string evaluator)
         => new(execution, evaluator,
             new ScriptProgramEvaluationOptions
             {
@@ -988,6 +1140,28 @@ internal static class RunCommand
         if (string.IsNullOrWhiteSpace(run.RunId)) throw new InvalidDataException("runId is required.");
         // System.Text.Json does not enforce non-nullable required members, so an explicit null arrives here.
         if (run.Model is null) throw new InvalidDataException("model is required.");
+        if (run.Container is null && !run.AllowUnsandboxedExecution)
+        {
+            throw new InvalidDataException(
+                "This run would execute the evaluator and the model-written programs it runs as host processes, which are " +
+                "not isolated from this machine's files, credentials or network. Add a \"container\" section (an image " +
+                "holding the evaluator's interpreter and packages) to run them in a locked-down Docker container, or set " +
+                "\"allowUnsandboxedExecution\": true to accept the risk for code you trust or on a machine provisioned for it.");
+        }
+
+        if (run.Container is { } container)
+        {
+            if (string.IsNullOrWhiteSpace(container.Image)) throw new InvalidDataException("container.image is required.");
+            if (!Enum.IsDefined(container.Lifecycle)) throw new InvalidDataException("container.lifecycle must be Warm or Cold.");
+            // A host interpreter path means nothing inside the image, whose own python3 runs the evaluator there.
+            if (run.OpenEvolveEvaluator?.Python is not null)
+            {
+                throw new InvalidDataException(
+                    "openEvolveEvaluator.python names a host interpreter, which a container cannot run; the image's python3 runs "
+                    + "the evaluator in a container, so remove the field or drop the container section.");
+            }
+        }
+
         // The same gap applies to every collection in the file: an explicit null deserializes over the
         // initializer, and the first thing that reads .Count throws NullReferenceException - a stack trace
         // on the console instead of the named refusal this surface promises for every other bad value.
@@ -1057,6 +1231,10 @@ internal static class RunCommand
             default:
                 throw new InvalidDataException("model.provider is not supported.");
         }
+
+        // Refused here, before anything is created, rather than when the container starts.
+        if (run.Container is not null && run.OpenEvolveEvaluator is not null)
+            _ = ContainerMounts(run, Path.GetDirectoryName(Path.GetFullPath(path)) ?? ".");
         return run;
     }
 

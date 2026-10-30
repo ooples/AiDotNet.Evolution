@@ -1,0 +1,55 @@
+{
+  "Os": "Ubuntu 24.04.5 LTS",
+  "Python": "/usr/bin/python3.12",
+  "Evaluations": 500,
+  "BaselineMs": {
+    "P50": 0.1139,
+    "P95": 0.1476,
+    "Mean": 0.11819999999999989
+  },
+  "ProcessMs": {
+    "P50": 58.1643,
+    "P95": 61.1881,
+    "Mean": 58.390086200000034
+  },
+  "AddedP50Ms": 58.050399999999996,
+  "AddedP95Ms": 61.0405,
+  "WarmMode": "WarmForkWorker",
+  "WarmMs": {
+    "P50": 3.0953,
+    "P95": 4.2127,
+    "Mean": 3.3095442000000026
+  },
+  "WarmAddedP50Ms": 2.9814,
+  "WarmAddedP95Ms": 4.0651,
+  "DockerImage": "python:3.12-slim",
+  "DockerMs": {
+    "P50": 146.2205,
+    "P95": 152.6095,
+    "Mean": 146.691316
+  },
+  "DockerAddedP50Ms": 146.1066,
+  "DockerAddedP95Ms": 152.46189999999999,
+  "ContainerWarmMs": {
+    "P50": 3.7367,
+    "P95": 3.9794,
+    "Mean": 3.7672386000000024
+  },
+  "ContainerWarmAddedP50Ms": 3.6228,
+  "ContainerWarmAddedP95Ms": 3.8318,
+  "ContainerWarmTargetP50Ms": 30,
+  "ContainerWarmMeetsTarget": true,
+  "ContainerColdMs": {
+    "P50": 384.1862,
+    "P95": 393.0598,
+    "Mean": 384.44723999999997
+  },
+  "ContainerColdAddedP50Ms": 384.0723,
+  "ContainerColdAddedP95Ms": 392.9122,
+  "DockerExecMs": {
+    "P50": 63.075,
+    "P95": 65.054,
+    "Mean": 63.270329999999994
+  },
+  "DockerExecAddedP50Ms": 62.9611
+}

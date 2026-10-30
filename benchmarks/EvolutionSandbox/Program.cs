@@ -3,7 +3,7 @@ using System.Text;
 using System.Text.Json;
 using AiDotNet.Evolution.Programs;
 
-// V1-76 (#181): what process isolation adds to one evaluation of a trivial Python candidate.
+// V1-76 (#181), E-2: what process and container isolation add to one evaluation of a trivial Python candidate.
 // Usage: EvolutionSandbox <python> <evaluations> [warmup] [docker-image]
 //   baseline  one long-lived interpreter that execs each candidate in-process and replies on a pipe, the way
 //             OpenEvolve's process pool evaluates; its round trip is the cost of evaluation without isolation.
@@ -11,6 +11,12 @@ using AiDotNet.Evolution.Programs;
 //   warm      WarmPythonExecutionEngine: a forked child per candidate on Linux and macOS, a reused interpreter on Windows.
 //   docker    with an image: a fresh `docker run --rm --network none` container per candidate, the container
 //             boundary a hostile candidate needs; fewer evaluations, since each one starts a container.
+//   container-warm  with an image: ContainerExecutionEngine reusing one hardened container, a fresh process and a
+//             clean workdir per candidate. The E-2 target is an added p50 of at most 30 ms on Linux.
+//   container-cold  with an image: ContainerExecutionEngine starting, verifying and removing a hardened container per
+//             candidate; fewer evaluations.
+//   docker-exec  with an image: `docker exec` of a fresh interpreter in one long-lived container per candidate, the
+//             obvious alternative to the engine's supervisor; measured so the choice between them is evidence.
 // Added latency is sandbox minus baseline at each percentile.
 if (args.Length is < 2 or > 4 || !int.TryParse(args[1], out int evaluations) || evaluations is < 10 or > 100_000)
 {
@@ -33,6 +39,11 @@ double[] process = await Sandbox(python, Candidate, evaluations, warmup, Program
 ProgramSandboxMode warmMode = OperatingSystem.IsWindows() ? ProgramSandboxMode.WarmReusedWorker : ProgramSandboxMode.WarmForkWorker;
 double[] warm = await Sandbox(python, Candidate, evaluations, warmup, warmMode);
 double[]? docker = dockerImage is null ? null : await Docker(dockerImage, Candidate, Math.Min(evaluations, 50), Math.Min(warmup, 3));
+double[]? containerWarm = dockerImage is null ? null : await Container(dockerImage, Candidate, evaluations, warmup, ContainerLifecycle.Warm);
+double[]? containerCold = dockerImage is null ? null
+    : await Container(dockerImage, Candidate, Math.Min(evaluations, 50), Math.Min(warmup, 3), ContainerLifecycle.Cold);
+double[]? dockerExec = dockerImage is null ? null : await DockerExec(dockerImage, Candidate, Math.Min(evaluations, 100), Math.Min(warmup, 5));
+const double ContainerWarmTargetMs = 30.0;
 Console.WriteLine(JsonSerializer.Serialize(new
 {
     Os = System.Runtime.InteropServices.RuntimeInformation.OSDescription,
@@ -46,7 +57,18 @@ Console.WriteLine(JsonSerializer.Serialize(new
     DockerImage = dockerImage,
     DockerMs = docker is null ? null : Summary(docker),
     DockerAddedP50Ms = docker is null ? (double?)null : Percentile(docker, 0.50) - Percentile(baseline, 0.50),
-    DockerAddedP95Ms = docker is null ? (double?)null : Percentile(docker, 0.95) - Percentile(baseline, 0.95)
+    DockerAddedP95Ms = docker is null ? (double?)null : Percentile(docker, 0.95) - Percentile(baseline, 0.95),
+    ContainerWarmMs = containerWarm is null ? null : Summary(containerWarm),
+    ContainerWarmAddedP50Ms = containerWarm is null ? (double?)null : Percentile(containerWarm, 0.50) - Percentile(baseline, 0.50),
+    ContainerWarmAddedP95Ms = containerWarm is null ? (double?)null : Percentile(containerWarm, 0.95) - Percentile(baseline, 0.95),
+    ContainerWarmTargetP50Ms = ContainerWarmTargetMs,
+    ContainerWarmMeetsTarget = containerWarm is null ? (bool?)null
+        : Percentile(containerWarm, 0.50) - Percentile(baseline, 0.50) <= ContainerWarmTargetMs,
+    ContainerColdMs = containerCold is null ? null : Summary(containerCold),
+    ContainerColdAddedP50Ms = containerCold is null ? (double?)null : Percentile(containerCold, 0.50) - Percentile(baseline, 0.50),
+    ContainerColdAddedP95Ms = containerCold is null ? (double?)null : Percentile(containerCold, 0.95) - Percentile(baseline, 0.95),
+    DockerExecMs = dockerExec is null ? null : Summary(dockerExec),
+    DockerExecAddedP50Ms = dockerExec is null ? (double?)null : Percentile(dockerExec, 0.50) - Percentile(baseline, 0.50)
 }));
 return 0;
 
@@ -118,7 +140,11 @@ static async Task<byte[]> ReadFrame(Stream stream)
 
 static async Task<double[]> Sandbox(string python, string candidate, int evaluations, int warmup, ProgramSandboxMode mode)
 {
-    var options = new ProgramSandboxOptions { Mode = mode, AllowUnsafeInProcessExecution = mode == ProgramSandboxMode.WarmReusedWorker };
+    // The benchmark's candidate is a fixed literal, not model-written code, so running it unsandboxed is the point.
+    var options = new ProgramSandboxOptions
+    {
+        Mode = mode, AllowUnsafeInProcessExecution = mode == ProgramSandboxMode.WarmReusedWorker, AllowUnsandboxedExecution = true
+    };
     options.SetInterpreter(ProgramLanguage.Python, new ProgramInterpreterSpecification(python, "{source}"));
     options.Limits.MaxConcurrentExecutions = 1;
     IProgramExecutionEngine engine = mode == ProgramSandboxMode.OutOfProcessWorker
@@ -138,6 +164,66 @@ static async Task<double[]> Sandbox(string python, string candidate, int evaluat
         if (i >= warmup) times.Add(ms);
     }
     return times.ToArray();
+}
+
+static async Task<double[]> Container(string image, string candidate, int evaluations, int warmup, ContainerLifecycle lifecycle)
+{
+    var options = new ProgramSandboxOptions { Mode = ProgramSandboxMode.Container };
+    options.Limits.MaxConcurrentExecutions = 1;
+    using var engine = new ContainerExecutionEngine(options, new ContainerExecutionOptions { Image = image, Lifecycle = lifecycle });
+    var times = new List<double>(evaluations);
+    for (int i = 0; i < warmup + evaluations; i++)
+    {
+        long begin = Stopwatch.GetTimestamp();
+        ProgramExecuteResponse response = await engine.ExecuteAsync(new ProgramExecuteRequest
+        {
+            Language = ProgramLanguage.Python, SourceCode = candidate
+        });
+        double ms = Stopwatch.GetElapsedTime(begin).TotalMilliseconds;
+        if (!response.Success || response.StdOut?.Trim() != "42") throw new InvalidOperationException("Container run failed: " + response.Error + " " + response.StdErr);
+        if (i >= warmup) times.Add(ms);
+    }
+    return times.ToArray();
+}
+
+static async Task<double[]> DockerExec(string image, string candidate, int evaluations, int warmup)
+{
+    string name = "evolution-sandbox-exec-" + Guid.NewGuid().ToString("N");
+    await DockerControl("run", "--detach", "--rm", "--name", name, "--network", "none", "--read-only", "--cap-drop", "ALL",
+        "--security-opt", "no-new-privileges=true", "--user", "65534:65534", "--memory", "256m", "--entrypoint", "sleep", image, "infinity");
+    try
+    {
+        var times = new List<double>(evaluations);
+        for (int i = 0; i < warmup + evaluations; i++)
+        {
+            var start = new ProcessStartInfo("docker") { RedirectStandardOutput = true, RedirectStandardError = true, UseShellExecute = false };
+            foreach (string argument in new[] { "exec", name, "python3", "-c", candidate }) start.ArgumentList.Add(argument);
+            long begin = Stopwatch.GetTimestamp();
+            using Process process = Process.Start(start) ?? throw new InvalidOperationException("docker did not start.");
+            Task<string> stdout = process.StandardOutput.ReadToEndAsync();
+            Task<string> stderr = process.StandardError.ReadToEndAsync();
+            await Task.WhenAll(stdout, stderr, process.WaitForExitAsync());
+            double ms = Stopwatch.GetElapsedTime(begin).TotalMilliseconds;
+            if (process.ExitCode != 0 || (await stdout).Trim() != "42") throw new InvalidOperationException("docker exec failed: " + await stderr);
+            if (i >= warmup) times.Add(ms);
+        }
+        return times.ToArray();
+    }
+    finally
+    {
+        await DockerControl("rm", "--force", name);
+    }
+}
+
+static async Task DockerControl(params string[] arguments)
+{
+    var start = new ProcessStartInfo("docker") { RedirectStandardOutput = true, RedirectStandardError = true, UseShellExecute = false };
+    foreach (string argument in arguments) start.ArgumentList.Add(argument);
+    using Process process = Process.Start(start) ?? throw new InvalidOperationException("docker did not start.");
+    Task<string> stderr = process.StandardError.ReadToEndAsync();
+    Task<string> stdout = process.StandardOutput.ReadToEndAsync();
+    await Task.WhenAll(stdout, stderr, process.WaitForExitAsync());
+    if (process.ExitCode != 0) throw new InvalidOperationException("docker " + arguments[0] + " failed: " + await stderr);
 }
 
 static async Task<double[]> Docker(string image, string candidate, int evaluations, int warmup)
