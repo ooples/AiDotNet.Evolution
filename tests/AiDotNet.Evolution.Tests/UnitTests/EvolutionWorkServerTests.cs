@@ -216,19 +216,22 @@ public sealed class EvolutionWorkServerTests : IDisposable
     public async Task IdleTimeout_closes_an_authenticated_connection_that_goes_quiet()
     {
         var events = new List<EvolutionWorkServerEvent>();
+        var idle = TimeSpan.FromMilliseconds(300);
         using EvolutionWorkServer server = Serve(new EvolutionWorkServerOptions
         {
-            IdleTimeout = TimeSpan.FromMilliseconds(300),
+            IdleTimeout = idle,
             OnEvent = e => { lock (events) events.Add(e); }
         });
         using EvolutionWorkRemoteClient worker = await ConnectTo(server);
         JsonObject first = Assert.IsType<JsonObject>(JsonNode.Parse(await worker.SendAsync(Request("status").ToJsonString())));
         Assert.True(first["ok"]?.GetValue<bool>());
+        var quiet = System.Diagnostics.Stopwatch.StartNew();
 
         // Stay quiet and watch the server, rather than probing the connection. Every probe is traffic: polling with a
         // request every 500 ms against a 300 ms timeout left 200 ms of slack, so on a loaded runner a late idle timer
         // let the next probe arrive first, reset the timer, and keep the connection alive for the whole test. A sweep
-        // that is merely late now passes; one that never fires still fails, at 30 s.
+        // that is merely late now passes; one that never fires still fails, at 30 s, and one that ignores IdleTimeout
+        // and closes on some other, longer timer fails the bound of twenty idle timeouts below.
         var deadline = DateTime.UtcNow + TimeSpan.FromSeconds(30);
         bool closed = false;
         while (!closed && DateTime.UtcNow < deadline)
@@ -238,6 +241,7 @@ public sealed class EvolutionWorkServerTests : IDisposable
         }
 
         Assert.True(closed, "the server never closed the quiet connection");
+        Assert.True(quiet.Elapsed < TimeSpan.FromTicks(idle.Ticks * 20), "the quiet connection closed after " + quiet.Elapsed + ", not near the " + idle + " idle timeout");
         await Assert.ThrowsAnyAsync<Exception>(() => worker.SendAsync(Request("status").ToJsonString()));
     }
 
