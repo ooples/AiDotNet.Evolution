@@ -31,7 +31,14 @@ public sealed class ProgramSandboxOptionsTests
 
         Assert.Equal(ProgramSandboxMode.OutOfProcessWorker, options.Mode);
         Assert.False(options.AllowUnsafeInProcessExecution);
+        // The default mode is a host process, so it validates only with the explicit opt-in, and Validate is where
+        // every engine meets that rule.
+        Assert.False(options.AllowUnsandboxedExecution);
+        ArgumentException refused = Assert.Throws<ArgumentException>(() => options.Validate());
+        Assert.Contains("AllowUnsandboxedExecution", refused.Message, StringComparison.Ordinal);
+        options.AllowUnsandboxedExecution = true;
         options.Validate();
+        new ProgramSandboxOptions { Mode = ProgramSandboxMode.Container }.Validate();
     }
 
     [Fact]
@@ -43,6 +50,8 @@ public sealed class ProgramSandboxOptionsTests
         Assert.Contains("AllowUnsafeInProcessExecution", failure.Message, StringComparison.Ordinal);
 
         options.AllowUnsafeInProcessExecution = true;
+        Assert.Contains("AllowUnsandboxedExecution", Assert.Throws<ArgumentException>(() => options.Validate()).Message, StringComparison.Ordinal);
+        options.AllowUnsandboxedExecution = true;
         options.Validate();
     }
 
@@ -145,7 +154,7 @@ public sealed class ProgramSandboxOptionsTests
     public void WhiteSpaceWorkingDirectoryIsRejectedButNullIsAllowed()
     {
         Assert.Throws<ArgumentException>(() => new ProgramSandboxOptions { WorkingDirectory = "   " }.Validate());
-        new ProgramSandboxOptions { WorkingDirectory = null }.Validate();
+        new ProgramSandboxOptions { WorkingDirectory = null, AllowUnsandboxedExecution = true }.Validate();
     }
 
     [Fact]

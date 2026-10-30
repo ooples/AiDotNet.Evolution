@@ -75,7 +75,7 @@ public sealed class WarmPythonExecutionEngine : IProgramExecutionEngine, IProgra
             ProgramSandboxMode.WarmReusedWorker => false,
             _ => throw new ArgumentException("WarmPythonExecutionEngine runs only the warm sandbox modes.", nameof(options))
         };
-        _options.RequireUnsandboxedOptIn(nameof(WarmPythonExecutionEngine));
+        // Both warm modes are host processes: Validate above has refused them unless AllowUnsandboxedExecution is set.
         if (_fork && OperatingSystem.IsWindows())
             throw new PlatformNotSupportedException("The warm fork worker needs fork(), which Windows does not have. Use WarmReusedWorker or the process engine.");
         if (!_fork && !_options.AllowUnsafeInProcessExecution)

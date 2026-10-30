@@ -143,8 +143,8 @@ public sealed class ProcessProgramExecutionEngine : IProgramExecutionEngine, IPr
                 nameof(options));
         }
 
-        // A separate process bounds time and output, not what the candidate can touch on this machine.
-        options.RequireUnsandboxedOptIn(nameof(ProcessProgramExecutionEngine));
+        // A separate process bounds time and output, not what the candidate can touch on this machine, so Validate
+        // above has already refused this mode unless AllowUnsandboxedExecution accepts that.
         _options = options.Clone();
         _limits = _options.Limits;
         _concurrency = new SemaphoreSlim(_limits.MaxConcurrentExecutions, _limits.MaxConcurrentExecutions);

@@ -225,9 +225,12 @@ public sealed class ProgramSandboxOptions
     /// <see cref="Limits"/> is <c>null</c>, an interpreter entry is <c>null</c> or lacks the
     /// <see cref="ProgramInterpreterSpecification.SourcePlaceholder"/> token, <see cref="WorkingDirectory"/> is
     /// white space, <see cref="DeclaredEnvironment"/> carries an unusable name or a name the engine sets itself
-    /// (see <see cref="ReservedEnvironmentNames"/>), or <see cref="Mode"/> is
-    /// <see cref="ProgramSandboxMode.InProcessUnsafe"/> without <see cref="AllowUnsafeInProcessExecution"/>.
+    /// (see <see cref="ReservedEnvironmentNames"/>), <see cref="Mode"/> is
+    /// <see cref="ProgramSandboxMode.InProcessUnsafe"/> without <see cref="AllowUnsafeInProcessExecution"/>, or
+    /// <see cref="Mode"/> runs candidates as host processes without <see cref="AllowUnsandboxedExecution"/>.
     /// </exception>
+    /// <remarks>Every execution engine validates its options before it runs anything, so this is the one place the
+    /// unsandboxed opt-in is enforced: an engine cannot start a host-process mode without passing through it.</remarks>
     public void Validate()
     {
         VersionPinnedProgramFitnessEvaluator.ValidateIdentity(RuntimeVersion, nameof(RuntimeVersion));
@@ -317,6 +320,9 @@ public sealed class ProgramSandboxOptions
                     nameof(Interpreters));
             }
         }
+
+        // Last, so a configuration that is wrong for another reason is reported for that reason.
+        RequireUnsandboxedOptIn();
     }
 
     /// <summary>Gets whether <paramref name="mode"/> leaves the candidate the host's filesystem, network and system calls.</summary>
@@ -324,18 +330,17 @@ public sealed class ProgramSandboxOptions
         or ProgramSandboxMode.WarmForkWorker or ProgramSandboxMode.WarmReusedWorker or ProgramSandboxMode.InProcessUnsafe;
 
     /// <summary>Refuses an unsandboxed mode unless <see cref="AllowUnsandboxedExecution"/> is set.</summary>
-    /// <param name="engine">The engine about to run candidates, named in the message.</param>
     /// <exception cref="ArgumentException">The mode is unsandboxed and the opt-in is not set.</exception>
-    internal void RequireUnsandboxedOptIn(string engine)
+    private void RequireUnsandboxedOptIn()
     {
         if (AllowUnsandboxedExecution || !IsUnsandboxed(Mode)) return;
         throw new ArgumentException(
-            $"{engine} would run candidates in {Mode} mode, which does not isolate them from this machine: " +
+            $"ProgramSandboxMode.{Mode} runs candidates as host processes, which does not isolate them from this machine: " +
             "LLM-written code would run as your user, with your files, credentials and network. " +
             "Set ProgramSandboxOptions.AllowUnsandboxedExecution = true to accept that risk for code you trust or " +
             "for a process that already runs inside a VM or container, or use ContainerExecutionEngine " +
             "(ProgramSandboxMode.Container) to isolate candidates.",
-            "options");
+            nameof(AllowUnsandboxedExecution));
     }
 
     private static bool IsWindowsHost()
