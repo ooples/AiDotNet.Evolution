@@ -62,4 +62,13 @@ public sealed class EvolutionEvent<TGenome>
     public EvolutionArchiveInsertionResult? InsertionResult { get; }
     /// <summary>Gets an optional bounded message.</summary>
     public string? Message { get; }
+
+    /// <summary>Gets the archive cell the evaluation was binned into, on an <see cref="EvolutionEventKind.Evaluated"/>
+    /// event the engine raised for a candidate that could be placed.</summary>
+    /// <remarks>
+    /// This is the cell under the archive's descriptor bins at the moment the candidate was committed. An adaptive or
+    /// growing axis moves its bins as the run goes on, so recomputing the cell later from the configured definitions
+    /// would name a different, or no, cell.
+    /// </remarks>
+    public EvolutionCellKey? Cell { get; init; }
 }

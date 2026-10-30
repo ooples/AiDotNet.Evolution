@@ -60,7 +60,7 @@ class OpenEvolveAdapterTests(unittest.TestCase):
 class NativeConfigTests(unittest.TestCase):
     """Recommended and matched configs drive upstream's own OpenAI client through the broker shim."""
 
-    def run_native(self, kind):
+    def run_native(self, kind, artifacts=None):
         import openevolve_configs
         upstream = os.environ.get("EVOLUTION_OPENEVOLVE_CHECKOUT")
         if not upstream:
@@ -75,14 +75,18 @@ class NativeConfigTests(unittest.TestCase):
             record = openevolve_configs.matched({"haiku": 0.5, "sonnet": 0.3, "opus": 0.2}, "Contract fixture only.",
                                                 iterations=2, seed=37)
             reply = "```python\ndef solve(x):\n    return 1 + x\n```"
-        calls = []
+        calls, prompts = [], []
 
         def generate(system, messages, model=None):
             calls.append(model)
+            prompts.append(json.dumps(messages))
             return {"text": reply, "cost_units": 0, "cost_metric": "reported_input_plus_cache_plus_output_tokens"}
 
         def evaluate(code):
-            return dict(candidate_hash=candidate_hash(code), status="valid", quality=1.0, work_units=1, unknown_work=False)
+            reply = dict(candidate_hash=candidate_hash(code), status="valid", quality=1.0, work_units=1, unknown_work=False)
+            if artifacts is not None:
+                reply["artifacts"] = artifacts
+            return reply
 
         with tempfile.TemporaryDirectory() as directory:
             root = Path(directory)
@@ -112,15 +116,20 @@ class NativeConfigTests(unittest.TestCase):
                 self.assertIn("temperature", models[0]["request"]["ignored_sampling"])
                 report = json.loads((root / "result/adapter-result.json").read_text(encoding="utf-8"))
                 self.assertEqual((kind, record["changes"]), (report["mode"], report["changes"]))
-                return models
+                return models, prompts
 
     def test_recommended_config_runs_verbatim_through_the_shim(self):
-        models = self.run_native("recommended")
+        models, _ = self.run_native("recommended")
         self.assertIn("autonomous programmer", models[0]["request"]["system"])
 
     def test_matched_config_runs_through_the_shim(self):
-        models = self.run_native("matched")
+        models, _ = self.run_native("matched")
         self.assertTrue(models[0]["request"]["system"].startswith("Contract fixture only."))
+
+    def test_the_brokers_artifacts_reach_openevolves_prompt(self):
+        # E-4: the pilot's evaluator returns training rows as artifacts; upstream must put them in the next prompt.
+        _, prompts = self.run_native("matched", artifacts={"training_rows": "ROWS-MARKER"})
+        self.assertTrue(any("ROWS-MARKER" in prompt for prompt in prompts), prompts)
 
 class ResumeTests(unittest.TestCase):
     def test_a_killed_openevolve_search_resumes_from_checkpoint_losing_at_most_one_iteration(self):

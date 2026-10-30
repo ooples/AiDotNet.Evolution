@@ -84,7 +84,7 @@ internal static class OpenEvolveConfigCatalog
         new("database.exploration_ratio", OpenEvolveKeyDisposition.Mapped, "search.explorationRatio; the remainder after exploitation becomes search.eliteRatio"),
         new("database.exploitation_ratio", OpenEvolveKeyDisposition.Mapped, "search.exploitationRatio"),
         new("database.diversity_metric", OpenEvolveKeyDisposition.RefusedUnlessDefault, "only OpenEvolve's default diversity metric name is accepted"),
-        new("database.feature_dimensions", OpenEvolveKeyDisposition.Mapped, "search.metricDescriptors; complexity becomes program length, diversity is dropped and reported"),
+        new("database.feature_dimensions", OpenEvolveKeyDisposition.Mapped, "search.metricDescriptors with adaptive min-max bins, as OpenEvolve scales features; complexity becomes program length, diversity is dropped and reported"),
         new("database.feature_bins", OpenEvolveKeyDisposition.Mapped, "the bin count of each descriptor"),
         new("database.diversity_reference_size", OpenEvolveKeyDisposition.RefusedUnlessDefault, "OpenEvolve's population-relative diversity feature is not reproduced"),
         new("database.migration_interval", OpenEvolveKeyDisposition.Mapped, "search.migrationInterval"),

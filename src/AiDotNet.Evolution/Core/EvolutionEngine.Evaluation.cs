@@ -705,7 +705,12 @@ public sealed partial class EvolutionEngine<TGenome>
             }
 
             await NotifyAsync(new EvolutionEvent<TGenome>(EvolutionEventKind.Evaluated, NextEventSequence(),
-                item.Candidate, evaluation, insertion), cancellationToken).ConfigureAwait(false);
+                item.Candidate, evaluation, insertion)
+            {
+                Cell = evaluation.Status == EvolutionEvaluationStatus.Completed
+                    ? TryCreateCellKey(_islands[item.Island], evaluation.Descriptors)
+                    : null
+            }, cancellationToken).ConfigureAwait(false);
             if (insertion == EvolutionArchiveInsertionResult.Inserted ||
                 insertion == EvolutionArchiveInsertionResult.Replaced ||
                 insertion == EvolutionArchiveInsertionResult.InsertedWithEviction ||

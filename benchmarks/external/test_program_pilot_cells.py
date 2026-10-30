@@ -47,6 +47,25 @@ class PilotCellTests(unittest.TestCase):
         self.assertNotIn(999.0, outcome.values(), "the searcher's own claim must not reach the row")
         self.assertEqual((4, 1234), (outcome["ModelCalls"], outcome["ModelTokens"]))
 
+    def test_our_arms_champion_decision_reaches_the_row_and_no_other_arm_gets_one(self):
+        champion = {"StandardErrors": 1.0, "BeatSeed": True}
+
+        def searcher(with_champion):
+            def search(_cell, directory, _resume):
+                outcome = {"program": program(directory, "def predict(x):\n    return 0.0\n"), "model_calls": 1}
+                if with_champion:
+                    outcome["champion"] = champion
+                return outcome
+            return search
+
+        run = pilot_cells.executor(TASK, {"aidotnet": searcher(True), "openevolve-matched": searcher(False)}, holdout_seed=918273)
+        with tempfile.TemporaryDirectory() as directory:
+            ours = run(cell("aidotnet"), directory, False)
+        with tempfile.TemporaryDirectory() as directory:
+            theirs = run(cell("openevolve-matched"), directory, False)
+        self.assertEqual(champion, ours["Champion"])
+        self.assertNotIn("Champion", theirs)
+
     def test_a_constant_predictor_scores_about_one_and_the_truth_beats_it(self):
         # Two arms, one cell each, so the executor is shown to discriminate rather than to return a
         # constant. Without this, "the truth scores 0" is also what a broken scorer reports.
@@ -196,12 +215,17 @@ class PilotCellTests(unittest.TestCase):
         import campaign_registration as cr
         import campaign_runner as runner
 
+        champion = {"StandardErrors": 1.0, "BeatSeed": False}
+
         def searchers(ours_body, theirs_body):
-            def make(body):
+            def make(body, decision=None):
                 def search(_cell, directory, _resume):
-                    return {"program": program(directory, body), "model_calls": 2, "model_tokens": 100}
+                    outcome = {"program": program(directory, body), "model_calls": 2, "model_tokens": 100}
+                    if decision is not None:
+                        outcome["champion"] = decision
+                    return outcome
                 return search
-            return {"aidotnet": make(ours_body),
+            return {"aidotnet": make(ours_body, champion),
                     "openevolve-recommended": make(theirs_body),
                     "openevolve-matched": make(theirs_body)}
 
@@ -224,6 +248,9 @@ class PilotCellTests(unittest.TestCase):
                                   confirm=projection["ProjectionSha256"], log=lambda *args: None)
                 self.assertEqual(18, len(rows), "3 arms x 6 seeds")
                 self.assertEqual({"completed"}, {row["Status"] for row in rows})
+                # Our arm's champion decision reaches the campaign's rows; the other arms carry none.
+                self.assertEqual([champion] * 6, [row.get("Champion") for row in rows if row["Arm"] == "aidotnet"])
+                self.assertEqual(set(), {row["Arm"] for row in rows if row["Arm"] != "aidotnet" and "Champion" in row})
                 report = cr.analyze(registration, rows)
                 verdicts[label] = [endpoint["Superior"] for endpoint in report["Endpoints"]]
 

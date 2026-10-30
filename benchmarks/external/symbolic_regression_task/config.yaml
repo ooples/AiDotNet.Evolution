@@ -35,6 +35,9 @@ prompt:
     Improve the Python function `predict(*xs)` so it fits the data better. Return the complete
     program in a python code fence. Keep the signature, and do not read or guess the held-out data:
     only the training and validation rows are scored during the search.
+    The pilot task, damped_oscillator, has one input: t = xs[0], drawn uniformly from [0, 6].
+    Each evaluation's feedback lists the task's inputs and ranges and a few training rows with
+    your program's prediction and residual.
 
 database:
   population_size: 20

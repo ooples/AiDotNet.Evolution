@@ -150,7 +150,7 @@ public sealed class EvolutionTraceObserver<TGenome> : IEvolutionObserver<TGenome
                     if (evolutionEvent.Candidate is not null && evolutionEvent.Evaluation is not null)
                     {
                         Append(BuildRecord(evolutionEvent.Sequence, evolutionEvent.Candidate, evolutionEvent.Evaluation,
-                            evolutionEvent.InsertionResult));
+                            evolutionEvent.InsertionResult, evolutionEvent.Cell));
                     }
                     break;
                 case EvolutionEventKind.Checkpointed:
@@ -186,7 +186,7 @@ public sealed class EvolutionTraceObserver<TGenome> : IEvolutionObserver<TGenome
     }
 
     private EvolutionTraceRecord BuildRecord(long sequence, EvolutionCandidate<TGenome> candidate,
-        EvolutionEvaluation evaluation, EvolutionArchiveInsertionResult? insertion)
+        EvolutionEvaluation evaluation, EvolutionArchiveInsertionResult? insertion, EvolutionCellKey? cell)
     {
         EvolutionLineage lineage = candidate.Lineage;
         ParentSnapshot? parent = FindParent(lineage);
@@ -219,7 +219,9 @@ public sealed class EvolutionTraceObserver<TGenome> : IEvolutionObserver<TGenome
         {
             Quality = evaluation.Quality,
             InsertionResult = insertion,
-            Cell = _options.IncludeDescriptors ? TryCreateCell(evaluation.Descriptors) : null,
+            // The engine reports the cell the archive actually used; the configured definitions are only a fallback
+            // for an event raised without one, and go stale once an adaptive or growing axis moves its bins.
+            Cell = _options.IncludeDescriptors ? cell?.StableKey ?? TryCreateCell(evaluation.Descriptors) : null,
             Descriptors = _options.IncludeDescriptors ? evaluation.Descriptors : EmptyValues,
             Metrics = evaluation.Metrics,
             ParentGenomeId = parent?.GenomeId,

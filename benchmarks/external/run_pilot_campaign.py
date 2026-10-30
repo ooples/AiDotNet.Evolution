@@ -34,6 +34,7 @@ from claude_transport import ClaudeModelSet, reconcile_receipts  # noqa: E402
 import campaign_registration as registration  # noqa: E402
 import campaign_runner as runner  # noqa: E402
 import pilot_broker  # noqa: E402
+import program_broker  # noqa: E402
 import pilot_campaign  # noqa: E402
 import pilot_cells  # noqa: E402
 import pilot_searchers  # noqa: E402
@@ -111,10 +112,11 @@ def transport(executable, evidence, max_calls, *, timeout):
     return models, models.verify_canaries()
 
 
-def searchers_for(session, *, cli, upstream, python_executable, iterations, timeout):
+def searchers_for(session, *, cli, upstream, python_executable, iterations, timeout, champion_standard_errors=None):
     return {
         "aidotnet": pilot_searchers.ours(cli, TASK_DIRECTORY, python_executable,
-                                         iterations=iterations, session=session, timeout=timeout),
+                                         iterations=iterations, session=session, timeout=timeout,
+                                         champion_standard_errors=champion_standard_errors),
         "openevolve-recommended": pilot_searchers.openevolve(ADAPTER, upstream, TASK_DIRECTORY, session,
                                                              mode="recommended", model=MODEL,
                                                              iterations=iterations, timeout=timeout),
@@ -154,6 +156,8 @@ def summarise(rows, report, *, task, arguments, frozen, projection, wall, canari
         "projection_sha256": projection["ProjectionSha256"],
         "holdout_partition_sha256": frozen["Spec"]["TestPartitionHashes"][task],
         "iterations_per_cell": arguments.iterations,
+        "selection_rows": {"train": arguments.selection_rows[0], "validation": arguments.selection_rows[1]},
+        "champion_standard_errors": arguments.champion_standard_errors,
         "wall_seconds": round(wall, 1),
         "cells": len(rows),
         "statuses": {status: sum(1 for row in rows if row["Status"] == status)
@@ -162,6 +166,7 @@ def summarise(rows, report, *, task, arguments, frozen, projection, wall, canari
         "model_tokens": sum(row["ModelTokens"] or 0 for row in rows),
         "cells_with_unknown_spend": sum(1 for row in rows if row["ModelCalls"] is None),
         "canaries": canaries,
+        "hardware": describe_hardware(),
         # Coverage below 1.0 means an admitted call left no receipt, so the bill cannot be reconciled.
         "receipt_coverage": {name: record["coverage"] for name, record in receipts.items()},
         "endpoints": report["Endpoints"],
@@ -193,6 +198,10 @@ def describe(projection, arguments):
         "rough cost           ~%d tokens if every call is served, at ~%dk per call"
         % (projection["MaxModelCalls"] * TOKENS_PER_CALL, TOKENS_PER_CALL // 1000),
         "sizing target        CI half width %.4g, frozen with the seeds" % arguments.target_half_width,
+        "selection            %d train + %d validation rows; our champion rule: %s"
+        % (arguments.selection_rows[0], arguments.selection_rows[1],
+           "none" if arguments.champion_standard_errors is None
+           else "beat the seed by %g standard errors" % arguments.champion_standard_errors),
         "ProjectionSha256     " + projection["ProjectionSha256"],
     ]
 
@@ -211,6 +220,12 @@ def build_parser():
                         help="the endpoint's seed; never reaches a search process")
     parser.add_argument("--seed-count", type=int, default=6, help="a multiple of 6 keeps positions balanced")
     parser.add_argument("--iterations", type=int, default=10)
+    # E-4: at 60 + 20 rows a constant and the seed program trade places on the row draw alone (sd 0.112 of their
+    # NMSE difference); 600 + 200 brings that to 0.029.
+    parser.add_argument("--selection-rows", type=int, nargs=2, default=[60, 20], metavar=("TRAIN", "VALIDATION"),
+                        help="rows every arm's candidates are selected on")
+    parser.add_argument("--champion-standard-errors", type=float, default=None,
+                        help="our arm's champion must beat the seed by this many standard errors, or the seed stands")
     # 10 x 18 cells = 180 calls, which is what the authorised envelope buys at this account's rate.
     parser.add_argument("--model-calls", type=int, default=10, help="per cell; the broker's ceiling")
     parser.add_argument("--model-tokens", type=int, default=600_000,
@@ -256,6 +271,46 @@ def exit_status(failed, analysis):
     return 1 if failed or "Unachievable" in analysis else 0
 
 
+
+def describe_hardware():
+    """The machine the campaign ran on, as the V1-43 report names it (#123): CPU, logical processors, memory, OS.
+
+    Each part is read from the operating system; a part that cannot be read says so instead of being guessed.
+    """
+    import os
+    import platform
+    import subprocess
+    cpu = None
+    memory = None
+    try:
+        if sys.platform == "win32":
+            import ctypes
+            import winreg
+            with winreg.OpenKey(winreg.HKEY_LOCAL_MACHINE, r"HARDWARE\DESCRIPTION\System\CentralProcessor\0") as key:
+                cpu = winreg.QueryValueEx(key, "ProcessorNameString")[0]
+
+            class Status(ctypes.Structure):
+                _fields_ = [("length", ctypes.c_ulong), ("load", ctypes.c_ulong), ("total", ctypes.c_ulonglong),
+                            ("available", ctypes.c_ulonglong), ("total_page", ctypes.c_ulonglong),
+                            ("available_page", ctypes.c_ulonglong), ("total_virtual", ctypes.c_ulonglong),
+                            ("available_virtual", ctypes.c_ulonglong), ("available_extended", ctypes.c_ulonglong)]
+            status = Status(length=ctypes.sizeof(Status))
+            if ctypes.windll.kernel32.GlobalMemoryStatusEx(ctypes.byref(status)):
+                memory = status.total
+        elif sys.platform == "darwin":
+            cpu = subprocess.check_output(["sysctl", "-n", "machdep.cpu.brand_string"], text=True).strip()
+            memory = int(subprocess.check_output(["sysctl", "-n", "hw.memsize"], text=True))
+        else:
+            with open("/proc/cpuinfo", encoding="utf-8") as info:
+                cpu = next((line.split(":", 1)[1].strip() for line in info if line.startswith("model name")), None)
+            memory = os.sysconf("SC_PAGE_SIZE") * os.sysconf("SC_PHYS_PAGES")
+    except (OSError, ValueError, subprocess.SubprocessError):
+        pass
+    return "%s; %s logical processors; %s; %s %s (%s); Python %s" % (
+        (cpu or "CPU not readable").strip(), os.cpu_count() or "unknown",
+        "%.0f GB memory" % (memory / 2**30) if memory else "memory not readable",
+        platform.system(), platform.release(), platform.machine(), platform.python_version())
+
 def main():
     parser = build_parser()
     arguments = parser.parse_args()
@@ -264,6 +319,13 @@ def main():
 
     if not (math.isfinite(arguments.target_half_width) and arguments.target_half_width > 0):
         raise SystemExit("--target-half-width must be a positive, finite number; it sizes the gate campaign")
+    # The broker refuses these per cell, after the confirmation: a 90-call, 7,200 s projection printed and was
+    # confirmed, then every one of its 18 cells failed with "Invalid broker budget" (E-4 pilot, 2026-10-29).
+    most_calls = min(program_broker.MAX_MODEL_CALLS, program_broker.MAX_EVALUATIONS - pilot_campaign.EVALUATION_HEADROOM)
+    if not 1 <= arguments.model_calls <= most_calls:
+        raise SystemExit("--model-calls %d is outside the broker's 1..%d per cell" % (arguments.model_calls, most_calls))
+    if not 0 < arguments.wall_seconds <= program_broker.MAX_SECONDS:
+        raise SystemExit("--wall-seconds %r is outside the broker's (0, %d] per cell" % (arguments.wall_seconds, program_broker.MAX_SECONDS))
     budget_tokens = arguments.model_calls * TOKENS_PER_CALL
     if arguments.model_tokens < budget_tokens:
         raise SystemExit("--model-tokens %d is below %d calls x ~%d tokens: the token ceiling would bind "
@@ -326,10 +388,16 @@ def main():
         provider = models.generate
         print("canaries             " + json.dumps(canaries))
 
-    session = pilot_campaign.cell_broker(frozen, provider, arguments.task, initial)
+    if min(arguments.selection_rows) < 4:
+        parser.error("--selection-rows needs at least 4 rows in each split")
+    if arguments.champion_standard_errors is not None and not arguments.champion_standard_errors >= 0:
+        parser.error("--champion-standard-errors must be non-negative")
+    session = pilot_campaign.cell_broker(frozen, provider, arguments.task, initial,
+                                         selection_rows=tuple(arguments.selection_rows))
     searchers = searchers_for(session, cli=arguments.cli, upstream=arguments.upstream,
                               python_executable=arguments.python, iterations=arguments.iterations,
-                              timeout=arguments.cell_timeout)
+                              timeout=arguments.cell_timeout,
+                              champion_standard_errors=arguments.champion_standard_errors)
     started = time.monotonic()
     rows, report = pilot_campaign.run(frozen, registration_path, projection, root / "state",
                                       arguments.task, searchers, holdout_seed=arguments.holdout_seed,

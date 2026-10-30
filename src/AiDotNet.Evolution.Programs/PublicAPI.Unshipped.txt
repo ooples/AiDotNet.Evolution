@@ -1935,3 +1935,13 @@ virtual AiDotNet.Evolution.Programs.ProgramTaskOptions.Clone() -> AiDotNet.Evolu
 virtual AiDotNet.Evolution.Programs.ProgramTaskOptions.Validate() -> void
 virtual AiDotNet.Evolution.Programs.ProgramVerifier.Invoke(AiDotNet.Evolution.Programs.VerificationRequest! request, System.Threading.CancellationToken cancellationToken) -> System.Threading.Tasks.ValueTask<AiDotNet.Evolution.EvolutionResourceResult<AiDotNet.Evolution.Programs.VerificationReceipt!>!>
 const AiDotNet.Evolution.Programs.ContainerExecutionOptions.MaxReadOnlyMountChars = 4096 -> int
+AiDotNet.Evolution.Prompts.ProgramPromptAttempt.Outcome.get -> string?
+AiDotNet.Evolution.Prompts.ProgramPromptAttempt.Outcome.init -> void
+const AiDotNet.Evolution.Prompts.ProgramPromptAttempt.MaxOutcomeLength = 256 -> int
+AiDotNet.Evolution.Programs.ProgramPreviousAttemptScope
+AiDotNet.Evolution.Programs.ProgramPreviousAttemptScope.Island = 0 -> AiDotNet.Evolution.Programs.ProgramPreviousAttemptScope
+AiDotNet.Evolution.Programs.ProgramPreviousAttemptScope.Parent = 1 -> AiDotNet.Evolution.Programs.ProgramPreviousAttemptScope
+AiDotNet.Evolution.Programs.ProgramPreviousAttemptScope.Run = 2 -> AiDotNet.Evolution.Programs.ProgramPreviousAttemptScope
+AiDotNet.Evolution.Programs.LlmProgramVariationOptions.PreviousAttemptScope.get -> AiDotNet.Evolution.Programs.ProgramPreviousAttemptScope
+AiDotNet.Evolution.Programs.LlmProgramVariationOptions.PreviousAttemptScope.set -> void
+AiDotNet.Evolution.Programs.LlmProgramVariationOperator.Observe(AiDotNet.Evolution.EvolutionEvaluation! evaluation, AiDotNet.Evolution.EvolutionArchiveInsertionResult? insertionResult) -> void

@@ -2,6 +2,7 @@ using System.Globalization;
 using System.Runtime.InteropServices;
 using System.Text;
 using System.Text.Json;
+using System.Text.Json.Nodes;
 using AiDotNet.Evolution;
 using AiDotNet.Evolution.Programs;
 
@@ -16,6 +17,8 @@ public static class Program
           aidotnet-evolve run --openevolve-config <config.yaml> <initial_program> <evaluator.py>
                               (--container-image IMAGE [--container-lifecycle Warm|Cold] | --allow-unsandboxed-execution)
                               [--iterations N] [--output DIR] [--python EXE] [--python-path DIR]...
+                              [--champion-standard-errors K --standard-error-metric NAME]
+                              [--retain-artifact-text true|false]
           aidotnet-evolve resume  <run.json>
           aidotnet-evolve preflight <run.json>
           aidotnet-evolve inspect <trace>
@@ -81,6 +84,9 @@ public static class Program
         ContainerLifecycle? containerLifecycle = null;
         bool allowUnsandboxedExecution = false;
         var pythonPath = new List<string>();
+        double? championStandardErrors = null;
+        string? standardErrorMetric = null;
+        bool? retainArtifactText = null;
         for (int i = 0; i < rest.Length; i += 2)
         {
             // The one flag without a value: an explicit, per-invocation acceptance of host-process evaluation.
@@ -108,6 +114,19 @@ public static class Program
                 case "--python-path":
                     pythonPath.Add(rest[i + 1]);
                     break;
+                // OpenEvolve has no counterpart, so these are set on the translated run as search.championStandardErrors
+                // and search.standardErrorMetric; RunCommand refuses one without the other.
+                case "--champion-standard-errors" when double.TryParse(rest[i + 1], NumberStyles.Float, CultureInfo.InvariantCulture, out double k):
+                    championStandardErrors = k;
+                    break;
+                case "--standard-error-metric":
+                    standardErrorMetric = rest[i + 1];
+                    break;
+                // OpenEvolve puts artifact text in the next prompt; ours withholds it unless the run says otherwise
+                // (search.retainArtifactText), so a comparison with upstream has to say so.
+                case "--retain-artifact-text" when bool.TryParse(rest[i + 1], out bool retain):
+                    retainArtifactText = retain;
+                    break;
                 case "--container-image":
                     containerImage = rest[i + 1];
                     break;
@@ -128,7 +147,18 @@ public static class Program
             config, initial, evaluator, iterations, python, container, allowUnsandboxedExecution, pythonPath);
         Directory.CreateDirectory(output);
         string runFile = Path.Combine(output, "run.json");
-        File.WriteAllText(runFile, JsonSerializer.Serialize(imported.Run, RunCommand.RunFileJson));
+        string translated = JsonSerializer.Serialize(imported.Run, RunCommand.RunFileJson);
+        if (championStandardErrors is not null || standardErrorMetric is not null || retainArtifactText is not null)
+        {
+            JsonObject node = JsonNode.Parse(translated)!.AsObject();
+            JsonObject search = node["search"] as JsonObject ?? new JsonObject();
+            node["search"] = search;
+            if (championStandardErrors is double k) search["championStandardErrors"] = k;
+            if (standardErrorMetric is not null) search["standardErrorMetric"] = standardErrorMetric;
+            if (retainArtifactText is bool retainText) search["retainArtifactText"] = retainText;
+            translated = node.ToJsonString(RunCommand.RunFileJson);
+        }
+        File.WriteAllText(runFile, translated);
         File.WriteAllText(Path.Combine(output, "openevolve-import.json"), JsonSerializer.Serialize(new
         {
             Source = Path.GetFullPath(config),

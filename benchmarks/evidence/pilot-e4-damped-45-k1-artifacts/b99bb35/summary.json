@@ -1,0 +1,110 @@
+{
+ "story": "V1-07 (#116)",
+ "task": "damped_oscillator",
+ "stub": false,
+ "registration_sha256": "cde8e132fe0ccf8091e974047d6574acac3011c03b7fc4371cbd0872f32bdb6f",
+ "projection_sha256": "8a9764dc1d0f098b9df0b91540180ab5e5e1b30ffeba9afe6daa05496940ae75",
+ "holdout_partition_sha256": "e4f8be2df3ca41b28ceaef2bfd84f4970a4f6fd1f2a7dc504914850b1f9b382b",
+ "iterations_per_cell": 45,
+ "selection_rows": {
+  "train": 600,
+  "validation": 200
+ },
+ "champion_standard_errors": 1.0,
+ "wall_seconds": 6992.2,
+ "cells": 18,
+ "statuses": {
+  "completed": 18
+ },
+ "model_calls": 833,
+ "model_tokens": 2847367,
+ "cells_with_unknown_spend": 0,
+ "canaries": {
+  "sonnet": 637
+ },
+ "hardware": "AMD Ryzen Threadripper 3990X 64-Core Processor; 128 logical processors; 96 GB memory; Windows 11 (AMD64); Python 3.14.6",
+ "receipt_coverage": {
+  "sonnet": 1.0
+ },
+ "endpoints": [
+  {
+   "Family": "damped_oscillator",
+   "Config": "recommended",
+   "Metric": "nmse",
+   "Direction": "minimize",
+   "N": 6,
+   "MeanDifference": 0.0035048833375984343,
+   "Interval95": [
+    -0.006948872477649099,
+    0.017463522490444403
+   ],
+   "OneSidedP": 0.2827172827172827,
+   "Failures": {
+    "aidotnet": 0,
+    "openevolve-recommended": 0
+   },
+   "HolmAdjustedP": 0.5654345654345654,
+   "Superior": false
+  },
+  {
+   "Family": "damped_oscillator",
+   "Config": "matched",
+   "Metric": "nmse",
+   "Direction": "minimize",
+   "N": 6,
+   "MeanDifference": -0.042467505494391565,
+   "Interval95": [
+    -0.12276993483140863,
+    0.0
+   ],
+   "OneSidedP": 1.0,
+   "Failures": {
+    "aidotnet": 0,
+    "openevolve-matched": 0
+   },
+   "HolmAdjustedP": 1.0,
+   "Superior": false
+  }
+ ],
+ "power_analysis": {
+  "Schema": "evolution-power-analysis-v1",
+  "RegistrationSha256": "cde8e132fe0ccf8091e974047d6574acac3011c03b7fc4371cbd0872f32bdb6f",
+  "TargetHalfWidth": 0.1,
+  "Confidence": 0.95,
+  "Endpoints": [
+   {
+    "Family": "damped_oscillator",
+    "Config": "recommended",
+    "PilotN": 6,
+    "MeanDifference": 0.0035048833375984343,
+    "StandardDeviation": 0.016366676771284363,
+    "Variance": 0.00026786810853569914,
+    "ObservedHalfWidth": 0.01220619748404675,
+    "TargetHalfWidth": 0.1,
+    "ScaledRequiredN": 2,
+    "NormalRequiredN": 2,
+    "RequiredN": 2,
+    "Agreement": 1.0,
+    "Degenerate": false,
+    "PilotAlreadyMeetsTarget": true
+   },
+   {
+    "Family": "damped_oscillator",
+    "Config": "matched",
+    "PilotN": 6,
+    "MeanDifference": -0.042467505494391565,
+    "StandardDeviation": 0.09737405670319484,
+    "Variance": 0.009481706918837002,
+    "ObservedHalfWidth": 0.06138496741570432,
+    "TargetHalfWidth": 0.1,
+    "ScaledRequiredN": 3,
+    "NormalRequiredN": 4,
+    "RequiredN": 4,
+    "Agreement": 1.3333333333333333,
+    "Degenerate": false,
+    "PilotAlreadyMeetsTarget": true
+   }
+  ],
+  "RequiredN": 4
+ }
+}

@@ -21,6 +21,10 @@ from urllib.parse import urlsplit
 from program_controls import candidate_hash
 
 MAX_MESSAGE = 256 * 1024
+# Per-broker (per-cell) ceilings; a campaign runner checks a requested budget against these before it spends.
+MAX_MODEL_CALLS = 64
+MAX_EVALUATIONS = 65
+MAX_SECONDS = 3600
 # Both transports' token metrics; one campaign uses one transport, so arms never mix them.
 COST_METRICS = ("reported_input_plus_output_tokens", "reported_input_plus_cache_plus_output_tokens")
 CHAT_PATH = "/v1/chat/completions"
@@ -137,9 +141,9 @@ def request(endpoint, capability, operation, payload):
 
 class ProgramBroker:
     def __init__(self, generate, evaluate, *, model_calls, evaluations, seconds, initial, model_tokens=100000, journal=None, resume="replay"):
-        if (type(model_calls) is not int or not 1 <= model_calls <= 64
-                or type(evaluations) is not int or not 2 <= evaluations <= 65
-                or type(seconds) not in (int, float) or not math.isfinite(seconds) or not 0 < seconds <= 3600
+        if (type(model_calls) is not int or not 1 <= model_calls <= MAX_MODEL_CALLS
+                or type(evaluations) is not int or not 2 <= evaluations <= MAX_EVALUATIONS
+                or type(seconds) not in (int, float) or not math.isfinite(seconds) or not 0 < seconds <= MAX_SECONDS
                 or type(model_tokens) is not int or not 1 <= model_tokens <= 10000000):
             raise ValueError("Invalid broker budget")
         self.initial_hash = candidate_hash(initial)

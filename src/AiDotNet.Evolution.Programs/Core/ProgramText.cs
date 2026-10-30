@@ -139,6 +139,24 @@ internal static class ProgramText
             : text.Substring(0, maximumLength - 3) + "...";
     }
 
+    /// <summary>Keeps line breaks and tabs, and replaces every other control character with a middle dot.</summary>
+    /// <remarks>For multi-line text a reader needs as written, such as an evaluator's artifact; a carriage return is
+    /// dropped so a Windows line ending reads as one break.</remarks>
+    internal static string SanitizeMultiline(string text)
+    {
+        if (text is null) throw new ArgumentNullException(nameof(text));
+        var builder = new StringBuilder(text.Length);
+        foreach (char character in text)
+        {
+            if (character == '\r') continue;
+            if (character == '\t' || character == LineFeed) builder.Append(character);
+            else if (char.IsControl(character)) builder.Append('\u00B7');
+            else builder.Append(character);
+        }
+
+        return builder.ToString();
+    }
+
     /// <summary>Replaces control characters other than tab with a middle dot so logs stay printable.</summary>
     internal static string Sanitize(string text)
     {

@@ -119,7 +119,7 @@ class CellJournal:
 def run(registration_path, state, execute_cell, *, confirm, mean_tokens_per_call=None, log=print):
     """Run (or resume) every registered cell once. execute_cell(cell, directory, resume) -> dict
     with Status ('completed'|'failed'), Value, an optional Reason for a failure, and optional
-    ThrottleSeconds/ModelCalls/ModelTokens/LostCalls."""
+    ThrottleSeconds/ModelCalls/ModelTokens/LostCalls/Champion."""
     registration = load_registration(registration_path)
     projection = project(registration, mean_tokens_per_call)
     log(json.dumps(projection, indent=2))
@@ -153,6 +153,10 @@ def run(registration_path, state, execute_cell, *, confirm, mean_tokens_per_call
                    ThrottleSeconds=float(outcome.get("ThrottleSeconds", 0.0)),
                    ModelCalls=outcome.get("ModelCalls"), ModelTokens=outcome.get("ModelTokens"),
                    LostCalls=outcome.get("LostCalls", 0))
+        # E-4: an arm's champion decision (did a candidate beat the seed by k standard errors). The executor
+        # passed it and this row used to drop it, so the first re-pilot's rows could not show it.
+        if outcome.get("Champion") is not None:
+            row["Champion"] = outcome["Champion"]
         journal.write(dict(Event="finished", Cell=cell["Cell"], Row=row))
         journal.finished[cell["Cell"]] = row
     rows = [journal.finished[cell["Cell"]] for cell in schedule(registration)]

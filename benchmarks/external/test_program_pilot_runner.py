@@ -140,6 +140,19 @@ class BudgetConsistencyTests(unittest.TestCase):
             self.assertIsInstance(code, str)
             self.assertIn("token ceiling would bind", code)
 
+    def test_a_budget_the_broker_would_refuse_is_refused_before_anything_is_frozen(self):
+        # A projection used to print and accept a budget the broker then refused in every cell.
+        # 64 calls passes the broker's call cap but not its evaluation cap, which a cell sets at calls + 2.
+        most = runner.program_broker.MAX_EVALUATIONS - runner.pilot_campaign.EVALUATION_HEADROOM
+        for flag, value in (("--model-calls", most + 1), ("--model-calls", runner.program_broker.MAX_MODEL_CALLS + 1),
+                            ("--wall-seconds", runner.program_broker.MAX_SECONDS + 1)):
+            with tempfile.TemporaryDirectory() as directory:
+                root = Path(directory) / "campaign"
+                code, _ = invoke(root, flag, str(value), "--model-tokens", "10000000")
+                self.assertIsInstance(code, str)
+                self.assertIn("outside the broker", code)
+                self.assertFalse(root.exists())
+
     def test_the_defaults_leave_the_call_ceiling_binding(self):
         # Read from the parser itself, so a default cannot be asserted from memory.
         defaults = {action.dest: action.default for action in runner.build_parser()._actions}
@@ -239,6 +252,12 @@ class SummaryTests(unittest.TestCase):
         self.assertEqual(5, summary["model_calls"])
         self.assertEqual(0, summary["cells_with_unknown_spend"], "a failed cell that accounted for itself is known")
 
+    def test_the_summary_names_the_hardware_the_report_publishes(self):
+        # V1-43 (#123) names the hardware; without this the report could only say "not recorded by this bundle".
+        hardware = self.summary([{"Status": "completed", "ModelCalls": 1, "ModelTokens": 1}])["hardware"]
+        self.assertIn("logical processors", hardware)
+        self.assertNotIn("CPU not readable", hardware)
+        self.assertNotIn("memory not readable", hardware)
 
 class TransportDirectoryTests(unittest.TestCase):
     def test_a_second_attempt_gets_a_directory_of_its_own(self):

@@ -394,10 +394,13 @@ internal static class OpenEvolveConfigImporter
                           + "no candidates. OpenEvolve raises an error for the same configuration rather than "
                           + "binning the candidate anyway.");
             }
+            // OpenEvolve min-max scales every feature over the values it has seen (database.py's
+            // _scale_feature_value; its feature_scaling_method is not configurable), so each axis adapts the same way.
             descriptors.Add(new RunMetricDescriptor
             {
                 Name = name,
-                Bins = Math.Max(1, count)
+                Bins = Math.Max(1, count),
+                Binning = EvolutionDescriptorBinning.AdaptiveMinMax
             });
         }
         return descriptors;
