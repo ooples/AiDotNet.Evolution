@@ -185,14 +185,15 @@ refuses the resume too. Data files those directories hold are not part of the di
 
 ### Running the evaluator in a container
 
-The importer writes `"allowUnsandboxedExecution": true` into the generated `run.json`, because OpenEvolve itself runs
-evaluators as host processes and an imported run should behave the same way first; the generated notes say so. That
-process sandbox does not keep a model-written program away from your files, credentials or network. To run the evaluator
-and every candidate in a locked-down Docker container instead, replace that line with a `container` section naming an
-image that holds the evaluator's packages (numpy, and `openevolve` when the evaluator imports it):
+`run --openevolve-config` makes you choose where the evaluator runs, and refuses a command that chooses neither.
+`--allow-unsandboxed-execution` writes `"allowUnsandboxedExecution": true` into the generated `run.json`, so the evaluator
+runs as a host process, as OpenEvolve runs evaluators. That process sandbox does not keep a model-written program away from
+your files, credentials or network. `--container-image IMAGE` (with `--container-lifecycle Warm\|Cold`) instead writes a
+`container` section, so the evaluator and every candidate run in a locked-down Docker container. The image must hold the
+evaluator's packages (numpy, and `openevolve` when the evaluator imports it):
 
 ```json
-"container": { "image": "my-evaluator-image:1" }
+"container": { "image": "my-evaluator-image:1", "lifecycle": "Warm" }
 ```
 
 The evaluator's directory is then mounted read-only at `/aidotnet/evaluator`, so the shim imports the unmodified file and

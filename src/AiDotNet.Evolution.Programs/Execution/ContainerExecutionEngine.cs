@@ -346,8 +346,8 @@ public sealed class ContainerExecutionEngine : IProgramExecutionEngine, IProgram
         return argv;
     }
 
-    // The supervisor decides memory_exceeded: from the cgroup's OOM counter, or from exit code 125 only for a Python
-    // candidate it forked (where 125 is the MemoryError sentinel); any other candidate may exit 125 for its own reasons.
+    // The supervisor decides memory_exceeded: from the cgroup's OOM counter, or from the MemoryError signal of a Python
+    // candidate it forked; an exit code alone, 125 included, is never read as a memory failure.
     // A memory event fails the execution even when the candidate exits 0, so its output is never scored.
     internal static ProgramExecuteResponse FromReply(JsonNode reply, ProgramLanguage language, ProgramSandboxLimitOptions limits)
     {
@@ -397,8 +397,7 @@ public sealed class ContainerExecutionEngine : IProgramExecutionEngine, IProgram
             "--memory", memory, "--memory-swap", memory,
             "--cpus", _limits.CpuLimit.ToString("0.###", CultureInfo.InvariantCulture),
             "--user", user + ":" + group,
-            "--tmpfs", Workdir + ":rw,nosuid,nodev,noexec,size=" + _container.WorkspaceSizeMb.ToString(CultureInfo.InvariantCulture)
-                       + "m,uid=" + user + ",gid=" + group + ",mode=0700",
+            "--tmpfs", Workdir + ":" + WorkdirTmpfsOptions(),
             "--log-driver", "none",
             "--env", "HOME=" + Workdir, "--env", "TMPDIR=" + Workdir, "--env", "LANG=C.UTF-8",
             "--env", "PYTHONIOENCODING=utf-8", "--env", "PYTHONDONTWRITEBYTECODE=1"
@@ -520,8 +519,24 @@ public sealed class ContainerExecutionEngine : IProgramExecutionEngine, IProgram
         if (Strings(host["Binds"]).Count != 0) return "host paths are bound";
         string? mounts = CheckMounts(root["Mounts"] as JsonArray, _container.ReadOnlyMounts);
         if (mounts is not null) return mounts;
-        if (host["Tmpfs"]?[Workdir] is null) return "the workdir is not a tmpfs";
-        return null;
+        return CheckTmpfs(host["Tmpfs"]?[Workdir]?.GetValue<string>(), WorkdirTmpfsOptions());
+    }
+
+    // The workdir's tmpfs options, as requested and as VerifyConfigurationAsync requires them back.
+    private string WorkdirTmpfsOptions() =>
+        "rw,nosuid,nodev,noexec,size=" + _container.WorkspaceSizeMb.ToString(CultureInfo.InvariantCulture) + "m,uid="
+        + _container.UserId.ToString(CultureInfo.InvariantCulture) + ",gid=" + _container.GroupId.ToString(CultureInfo.InvariantCulture)
+        + ",mode=0700";
+
+    /// <summary>Null when the daemon reports a tmpfs at the workdir with every requested option; otherwise the reason.</summary>
+    /// <remarks>Compared as option sets, since a daemon may reorder them; an option the daemon adds is not refused.</remarks>
+    internal static string? CheckTmpfs(string? reported, string requested)
+    {
+        if (reported is null) return "the workdir is not a tmpfs";
+        var options = new HashSet<string>(reported.Split(new[] { ',' }, StringSplitOptions.RemoveEmptyEntries).Select(option => option.Trim()),
+            StringComparer.Ordinal);
+        string? missing = requested.Split(',').FirstOrDefault(option => !options.Contains(option));
+        return missing is null ? null : "the workdir tmpfs lacks '" + missing + "' (it has '" + reported + "')";
     }
 
     /// <summary>Checks <c>docker inspect</c>'s mount list against the declared read-only mounts; null when they match.</summary>

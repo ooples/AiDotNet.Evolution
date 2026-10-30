@@ -35,6 +35,29 @@ public sealed class ContainerMountAndHelperIdentityTests
     }
 
     [Fact]
+    public void An_evaluator_that_is_itself_a_link_is_refused_for_a_container_and_the_file_is_not()
+    {
+        using var directory = new TemporaryDirectory();
+        string real = Path.Combine(directory.Path, "real", "evaluator.py");
+        Directory.CreateDirectory(Path.GetDirectoryName(real)!);
+        File.WriteAllText(real, "def evaluate(path):\n    return {}\n");
+        RunCommand.RequireEvaluatorNotLinked(real);
+
+        string link = Path.Combine(directory.Path, "evaluator.py");
+        try
+        {
+            File.CreateSymbolicLink(link, real);
+        }
+        catch (Exception exception) when (OperatingSystem.IsWindows() && exception is IOException or UnauthorizedAccessException)
+        {
+            return; // an unelevated Windows user cannot create a file link (and has no junction for files); Linux CI runs this
+        }
+
+        InvalidDataException refused = Assert.Throws<InvalidDataException>(() => RunCommand.RequireEvaluatorNotLinked(link));
+        Assert.Contains(real, refused.Message, StringComparison.Ordinal);
+    }
+
+    [Fact]
     public void Editing_adding_or_removing_a_helper_changes_the_evaluator_identity_and_moving_the_checkout_does_not()
     {
         using var first = new TemporaryDirectory();

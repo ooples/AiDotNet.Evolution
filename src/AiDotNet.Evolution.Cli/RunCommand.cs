@@ -926,6 +926,19 @@ internal static class RunCommand
         return directory ?? string.Empty;
     }
 
+    /// <summary>Refuses an evaluator file that is itself a link: a container mounts only the evaluator's directory, so the
+    /// link would dangle inside it and the run would fail at its first evaluation. A link in a parent directory is
+    /// fine, since the directory mount resolves it.</summary>
+    internal static void RequireEvaluatorNotLinked(string path)
+    {
+        if (new FileInfo(path).LinkTarget is { } target)
+        {
+            throw new InvalidDataException(
+                "The evaluator " + path + " is a link to " + target + ". In a container only the evaluator's directory is mounted, "
+                + "so the link would not resolve there; point the run file at the evaluator itself.");
+        }
+    }
+
     // Resolves every link along the path, one component at a time, so a link in a parent directory counts too.
     internal static string ResolveLinks(string path, int depth = 0)
     {
@@ -968,6 +981,7 @@ internal static class RunCommand
         string source = ReadBounded(path, MaxRunFileBytes); // bounds and existence, whichever form runs
         if (run.OpenEvolveEvaluator is not { } openEvolve) return source;
         // The shim hashes the host file and, in a container, imports the same file through the read-only mount.
+        if (run.Container is not null) RequireEvaluatorNotLinked(path);
         string runtimePath = run.Container is null ? path : ContainerEvaluatorDirectory + "/" + Path.GetFileName(path);
         var helpers = new List<string> { Path.GetDirectoryName(path) ?? baseDirectory };
         helpers.AddRange(HostPythonPath(openEvolve, baseDirectory));

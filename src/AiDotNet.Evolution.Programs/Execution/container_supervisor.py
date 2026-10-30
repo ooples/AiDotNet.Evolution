@@ -31,7 +31,11 @@ import threading
 import time
 
 WORK = "/work"
-MEMORY_EXIT = 125
+# A forked Python candidate that raises MemoryError ends by this signal rather than by an exit code, so a candidate that
+# exits 125 (or any code) of its own accord is never read as out of memory. The candidate shares the process and could
+# raise it itself, but that only misclassifies its own failure.
+MEMORY_SIGNAL = signal.SIGUSR2
+MEMORY_ERROR = object()
 
 
 def read_exactly(stream, count):
@@ -129,7 +133,7 @@ def run_python(path, source):
         print(code, file=sys.stderr)
         return 1
     except MemoryError:
-        return MEMORY_EXIT
+        return MEMORY_ERROR
     except BaseException:
         traceback.print_exc()
         return 1
@@ -172,6 +176,11 @@ def child(in_read, out_write, err_write, request_read):
         code = run_python(path, request["source"])
         sys.stdout.flush()
         sys.stderr.flush()
+        if code is MEMORY_ERROR:
+            signal.signal(MEMORY_SIGNAL, signal.SIG_DFL)
+            signal.pthread_sigmask(signal.SIG_UNBLOCK, [MEMORY_SIGNAL])
+            os.kill(os.getpid(), MEMORY_SIGNAL)
+            code = 1  # not reached: the default action of the signal ends the process
     except BaseException:
         code = 1
     os._exit(code if 0 <= code <= 255 else 1)
@@ -519,8 +528,8 @@ def run(request, zygote):
         memory = oom_after > oom_before
     else:
         memory = killed  # no counter to read: nothing in the container but the OOM killer sends SIGKILL first
-    # 125 is the MemoryError sentinel of a forked Python candidate only; an exec'd candidate may exit 125 on its own.
-    memory = memory or (not request["argv"] and code == MEMORY_EXIT)
+    # MEMORY_SIGNAL is the MemoryError report of a forked Python candidate only; an exec'd program may raise it itself.
+    memory = memory or (not request["argv"] and signaled and os.WTERMSIG(status) == MEMORY_SIGNAL)
     cpu = signaled and os.WTERMSIG(status) == signal.SIGXCPU
     stdout = b"".join(chunks[out_read]).decode("utf-8", "replace")
     stderr = b"".join(chunks[err_read]).decode("utf-8", "replace")

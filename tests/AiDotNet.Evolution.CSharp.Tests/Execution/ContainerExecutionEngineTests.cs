@@ -578,15 +578,47 @@ public sealed class ContainerExecutionEngineTests
         Assert.Equal("42", next.StdOut.Trim());
     }
 
-    // 125 is the forked-Python MemoryError sentinel; an exec'd interpreter that exits 125 did not run out of memory.
-    [DockerFact]
-    public async Task An_execd_candidate_that_exits_125_is_not_reported_as_out_of_memory()
+    // No exit code is a memory report, however the candidate starts: a forked one reports MemoryError by a signal.
+    [DockerTheory]
+    [InlineData(ContainerPythonLaunch.ForkSupervisor)]
+    [InlineData(ContainerPythonLaunch.FreshInterpreter)]
+    public async Task A_candidate_that_exits_125_is_not_reported_as_out_of_memory(ContainerPythonLaunch launch)
     {
-        using var engine = new ContainerExecutionEngine(Sandbox(), Container(launch: ContainerPythonLaunch.FreshInterpreter));
+        using var engine = new ContainerExecutionEngine(Sandbox(), Container(launch: launch));
         ProgramExecuteResponse response = await Run(engine, "import sys\nsys.exit(125)\n");
         Assert.False(response.Success);
         Assert.Equal(125, response.ExitCode);
         Assert.Equal(ProgramExecuteErrorCode.ExecutionFailed, response.ErrorCode);
+    }
+
+    [DockerFact]
+    public async Task A_forked_candidates_memory_error_is_reported_as_out_of_memory()
+    {
+        using var engine = new ContainerExecutionEngine(Sandbox(), Container(launch: ContainerPythonLaunch.ForkSupervisor));
+        ProgramExecuteResponse response = await Run(engine, "raise MemoryError\n");
+        Assert.False(response.Success);
+        Assert.Equal(ProgramExecuteErrorCode.MemoryLimitExceeded, response.ErrorCode);
+        // The container still serves the next candidate.
+        ProgramExecuteResponse next = await Run(engine, "print(6 * 7)\n");
+        Assert.True(next.Success, next.Error + " " + next.StdErr);
+    }
+
+    // docker inspect may reorder the options; every requested one must come back, or the container is refused.
+    [Fact]
+    public void The_workdir_tmpfs_must_come_back_with_every_requested_option()
+    {
+        const string Requested = "rw,nosuid,nodev,noexec,size=64m,uid=65534,gid=65534,mode=0700";
+        Assert.Null(ContainerExecutionEngine.CheckTmpfs("mode=0700,size=64m,rw,nosuid,nodev,noexec,uid=65534,gid=65534", Requested));
+        Assert.Equal("the workdir is not a tmpfs", ContainerExecutionEngine.CheckTmpfs(null, Requested));
+        foreach (string dropped in Requested.Split(','))
+        {
+            string reported = string.Join(",", Requested.Split(',').Where(option => option != dropped));
+            string? refusal = ContainerExecutionEngine.CheckTmpfs(reported, Requested);
+            Assert.NotNull(refusal);
+            Assert.Contains("'" + dropped + "'", refusal, StringComparison.Ordinal);
+        }
+
+        Assert.NotNull(ContainerExecutionEngine.CheckTmpfs("rw,nosuid,nodev,exec,size=64m,uid=65534,gid=65534,mode=0700", Requested));
     }
 
     // The cap counts UTF-16 units, as the process engine does: ten emoji are twenty units, so a cap of 10 keeps five
