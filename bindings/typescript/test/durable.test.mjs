@@ -13,8 +13,11 @@ const config = directory => ({ directory, runId: 'run', compatibilityHash: 'comp
 const job = { evaluationId: '9223372036854775807', attempt: 1, canonicalGenomeId: 'integer:7', payload: '7', estimated: { cost: '1' }, maximum: { cost: '5' } };
 const worker = workerId => ({ workerId, compatibilityHash: 'compat' });
 const receipt = lease => ({ identity: lease.identity, workerId: lease.workerId, payload: '49', provenance: 'local-square-v1', actual: { cost: '0.1234567890123456789012345678' }, outcome: 'completed' });
+// Only the 'timeout' mode waits out its timer; every other mode answers at once, and a 1.5 s timer there raced the
+// fake host's own start-up on a loaded Windows runner ('open' timed out in the downgrade test).
 const fake = mode => ({ ...config('unused'), hostPath: process.execPath,
-  hostArgs: [fileURLToPath(new URL('fake-durable-host.mjs', import.meta.url)), mode], requestTimeoutMs: 1500 });
+  hostArgs: [fileURLToPath(new URL('fake-durable-host.mjs', import.meta.url)), mode],
+  requestTimeoutMs: mode === 'timeout' ? 1500 : 30_000 });
 
 test('durable live host preserves Int64 identities and exact decimal receipts across reopen', async () => {
   const directory = await mkdtemp(join(tmpdir(), 'evolution-ts-durable-')); let client;

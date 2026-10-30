@@ -103,7 +103,7 @@ def executor(task, searchers, *, holdout_seed):
             # only that a search failed. The message is what names the cause, so it is carried too.
             return _failed(locals().get("outcome") or getattr(error, "accounting", None),
                            _reason(error))
-        return {
+        row = {
             "Status": "completed",
             "Value": value,
             "ModelCalls": outcome.get("model_calls"),
@@ -111,6 +111,9 @@ def executor(task, searchers, *, holdout_seed):
             "ThrottleSeconds": float(outcome.get("throttle_seconds", 0.0)),
             "LostCalls": int(outcome.get("lost_calls", 0)),
         }
+        if outcome.get("champion") is not None:
+            row["Champion"] = outcome["champion"]
+        return row
 
     return execute_cell
 

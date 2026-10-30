@@ -1,0 +1,28 @@
+{
+ "Schema": "evolution-pilot-losses-v1",
+ "RegistrationSha256": "d6753177215a6b46a21b3d4b4f9987b1200afbf8477b6a63c9ac6b0550ae8fa0",
+ "Endpoints": [
+  {
+   "Family": "damped_oscillator",
+   "Config": "matched",
+   "Metric": "nmse",
+   "Direction": "minimize",
+   "ComparablePairs": 6,
+   "IncomparablePairs": 0,
+   "LostCells": 0,
+   "WorstMargin": null,
+   "Losses": []
+  },
+  {
+   "Family": "damped_oscillator",
+   "Config": "recommended",
+   "Metric": "nmse",
+   "Direction": "minimize",
+   "ComparablePairs": 6,
+   "IncomparablePairs": 0,
+   "LostCells": 0,
+   "WorstMargin": null,
+   "Losses": []
+  }
+ ]
+}

@@ -332,6 +332,21 @@ public sealed class LlmProgramVariationOperatorTests
         Assert.Contains("Evaluation Diagnostics", user, StringComparison.Ordinal);
     }
 
+    // E-4: a retained artifact is filed as program_script_artifact:<name>, and the prompt heads it with the name.
+    [Fact]
+    public async Task ANamedArtifactDiagnosticIsHeadedByItsNameWithItsTextAsWritten()
+    {
+        var client = new FakeChatClient(DiffResponse("    return x", "    return 4"));
+        await new LlmProgramVariationOperator(client).ProposeAsync(Context(diagnostics: new[]
+        {
+            new EvolutionDiagnostic("program_script_artifact:training_rows", "t target\n0.1 0.2")
+        }));
+
+        string user = client.Conversations[0][1].Text;
+        Assert.Contains("### training_rows\n```\nt target\n0.1 0.2\n```", user, StringComparison.Ordinal);
+        Assert.DoesNotContain("### program_script_artifact", user, StringComparison.Ordinal);
+    }
+
     [Fact]
     public async Task ArtifactDiagnosticPrefixDecidesWhichDiagnosticsBecomeArtifacts()
     {

@@ -198,6 +198,27 @@ def nmse(predict, rows):
     return (total / len(rows)) / variance
 
 
+def nmse_and_error(predict, rows):
+    """`nmse` and its standard error over the rows: the sample standard deviation of the squared errors over
+    sqrt(n), divided by the same variance. Both are inf where `nmse` is.
+
+    E-4's pilot selected on 80 rows, where a constant and the seed program differ by +0.020 NMSE on average with a
+    standard deviation of 0.112 across row draws; the error lets a searcher tell such a gain from the sample.
+    """
+    score = nmse(predict, rows)
+    if not math.isfinite(score): return math.inf, math.inf
+    targets = [y for _, y in rows]
+    mean = sum(targets) / len(targets)
+    variance = sum((y - mean) ** 2 for y in targets) / len(targets)
+    squares = []
+    for xs, y in rows:
+        error = float(predict(*xs)) - y
+        squares.append(error * error)
+    average = sum(squares) / len(squares)
+    spread = math.sqrt(sum((square - average) * (square - average) for square in squares) / (len(squares) - 1))
+    return score, spread / math.sqrt(len(squares)) / variance
+
+
 def score(predict, split):
     """Scores a candidate on every split, refusing a test split that no longer matches its seal.
 

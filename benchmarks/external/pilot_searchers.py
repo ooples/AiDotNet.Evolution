@@ -101,7 +101,7 @@ def _environment(broker):
                 EVOLUTION_BROKER_CAPABILITY=broker.capability)
 
 
-def ours(cli, task_directory, python_executable, *, iterations, session, timeout=1800):
+def ours(cli, task_directory, python_executable, *, iterations, session, timeout=1800, champion_standard_errors=None):
     """Returns a searcher that runs our CLI over the task's unmodified OpenEvolve config.
 
     `cli` is a command prefix, not just an executable: a string for an installed
@@ -134,6 +134,10 @@ def ours(cli, task_directory, python_executable, *, iterations, session, timeout
         if resume and output.exists():
             shutil.rmtree(output)  # a resumed cell re-runs: the engine owns its own resume, not this
         prefix = [cli] if isinstance(cli, (str, Path)) else list(cli)
+        # The champion must beat the seed by this many standard errors of the broker's quality, or the seed stands.
+        champion = ([] if champion_standard_errors is None else
+                    ["--champion-standard-errors", repr(float(champion_standard_errors)),
+                     "--standard-error-metric", "quality_standard_error"])
         with session(cell) as broker:
             # The CLI scrubs its evaluator's environment, so the broker is written into the
             # evaluator file rather than passed through it.
@@ -147,7 +151,13 @@ def ours(cli, task_directory, python_executable, *, iterations, session, timeout
                 completed = subprocess.run(
                     [*[str(part) for part in prefix], "run", "--openevolve-config", str(config), str(initial),
                      str(evaluator), "--iterations", str(iterations), "--output", str(output),
-                     "--python", python_executable],
+                     "--python", python_executable, *champion,
+                     # OpenEvolve feeds the evaluator's artifacts (the training rows) to the model by default; ours withholds
+                     # their text unless told otherwise.
+                     "--retain-artifact-text", "true",
+                     # Every arm of the pilot evaluates on the host, OpenEvolve's included; the CLI refuses that unless
+                     # it is accepted explicitly.
+                     "--allow-unsandboxed-execution"],
                     capture_output=True, text=True, timeout=timeout, env=environment, cwd=str(directory),
                     check=False)
             except subprocess.TimeoutExpired as error:
@@ -185,8 +195,13 @@ def ours(cli, task_directory, python_executable, *, iterations, session, timeout
         best = output / "best.py"
         if not best.exists():
             raise SearchFailed("the run produced no best program at " + str(best), accounting)
-        return {"program": str(best), "best_quality": summary.get("BestQuality"),
-                "stop_reason": summary.get("StopReason"), **accounting}
+        outcome = {"program": str(best), "best_quality": summary.get("BestQuality"),
+                   "stop_reason": summary.get("StopReason"), **accounting}
+        # E-4: the champion rule's decision (did a candidate beat the seed by k standard errors, or did the seed
+        # stand), so the evidence shows how often the guard kept the seed rather than leaving it to be inferred.
+        if summary.get("Champion") is not None:
+            outcome["champion"] = summary["Champion"]
+        return outcome
 
     return search
 

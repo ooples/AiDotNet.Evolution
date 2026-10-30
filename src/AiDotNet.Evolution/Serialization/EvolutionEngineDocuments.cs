@@ -244,6 +244,15 @@ internal static class EvolutionEngineDocuments
         public double Maximum { get; set; }
         public int BinCount { get; set; }
         public EvolutionOutOfRangePolicy OutOfRangePolicy { get; set; }
+        // Absent from checkpoints written before binning modes existed, which were all linear.
+        public EvolutionDescriptorBinning Binning { get; set; }
+        public double[]? Edges { get; set; }
+        public long ObservationCount { get; set; }
+        public double ObservedMinimum { get; set; }
+        public double ObservedMaximum { get; set; }
+        public double[]? Sample { get; set; }
+        public int SampleCapacity { get; set; }
+        public long SampleStride { get; set; } = 1;
 
         public static DescriptorDocument From(EvolutionDescriptorDefinition descriptor) => new()
         {
@@ -251,17 +260,28 @@ internal static class EvolutionEngineDocuments
             Minimum = descriptor.Minimum,
             Maximum = descriptor.Maximum,
             BinCount = descriptor.BinCount,
-            OutOfRangePolicy = descriptor.OutOfRangePolicy
+            OutOfRangePolicy = descriptor.OutOfRangePolicy,
+            Binning = descriptor.Binning,
+            // Quantile edges are implied by the observations and recomputed on restore; only explicit ones are stored.
+            Edges = descriptor.Binning == EvolutionDescriptorBinning.ExplicitEdges ? descriptor.Edges.ToArray() : null,
+            ObservationCount = descriptor.ObservationCount,
+            ObservedMinimum = descriptor.ObservedMinimum ?? 0,
+            ObservedMaximum = descriptor.ObservedMaximum ?? 0,
+            Sample = descriptor.Sample.Count == 0 ? null : descriptor.Sample.ToArray(),
+            SampleCapacity = descriptor.SampleCapacity,
+            SampleStride = descriptor.SampleStride
         };
 
         public EvolutionDescriptorDefinition ToDefinition()
         {
             if (string.IsNullOrWhiteSpace(Name) || BinCount <= 0 ||
-                !Enum.IsDefined(typeof(EvolutionOutOfRangePolicy), OutOfRangePolicy))
+                !Enum.IsDefined(typeof(EvolutionOutOfRangePolicy), OutOfRangePolicy) ||
+                !Enum.IsDefined(typeof(EvolutionDescriptorBinning), Binning))
                 throw new InvalidDataException("A checkpoint descriptor definition is invalid.");
             try
             {
-                return new EvolutionDescriptorDefinition(Name, Minimum, Maximum, BinCount, OutOfRangePolicy);
+                return EvolutionDescriptorDefinition.Restore(Name, Minimum, Maximum, BinCount, OutOfRangePolicy, Binning,
+                    Edges, ObservationCount, ObservedMinimum, ObservedMaximum, Sample, SampleCapacity, SampleStride);
             }
             catch (Exception exception) when (exception is ArgumentException or ArgumentOutOfRangeException)
             {

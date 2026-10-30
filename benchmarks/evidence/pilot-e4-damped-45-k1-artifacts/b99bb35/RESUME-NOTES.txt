@@ -1,0 +1,2 @@
+2026-10-30T07:07:44 Resume of F:\evo-pilot\e4-repilot-artifacts-45-k1 after its transport refused call 380 (Claude Code synthetic continuation after a thinking-only reply; see commit 8f8d931). Same registration (seeds frozen), same projection arguments. Carried over: the 8 completed cells' journal events and directories, unchanged. Re-run fresh: the 10 failed cells. The original root is kept intact as the record of the failure.
+2026-10-30T07:08:08 launched PID 81572; transport at 8f8d931 (local, F:\evo-e4)

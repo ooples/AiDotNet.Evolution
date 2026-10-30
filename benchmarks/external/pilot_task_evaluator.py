@@ -41,6 +41,13 @@ evaluate = pilot_task_evaluator.bind({endpoint!r}, {capability!r})
 '''
 
 
+class Scored:
+    """OpenEvolve's `EvaluationResult` shape (metrics and artifacts), without importing OpenEvolve."""
+
+    def __init__(self, metrics, artifacts):
+        self.metrics, self.artifacts = metrics, artifacts
+
+
 def bind(endpoint, capability):
     """Returns `evaluate(program_path)` in OpenEvolve's contract, scored by that broker."""
     def evaluate(program_path):
@@ -52,7 +59,11 @@ def bind(endpoint, capability):
         result = request(endpoint, capability, "evaluate", {"code": code})
         if result["status"] != "valid":
             return {"combined_score": 0.0, "status": result["status"]}
-        return {"combined_score": result["quality"], "status": "valid",
-                "selection_nmse": result.get("selection_nmse")}
+        scored = {"combined_score": result["quality"], "status": "valid",
+                  "selection_nmse": result.get("selection_nmse")}
+        if result.get("quality_standard_error") is not None:
+            scored["quality_standard_error"] = result["quality_standard_error"]
+        # The broker's feedback rows, as OpenEvolve's EvaluationResult carries them; our shim reads `.artifacts`.
+        return Scored(scored, dict(result.get("artifacts") or {}))
 
     return evaluate

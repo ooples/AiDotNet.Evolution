@@ -110,6 +110,8 @@ public sealed class OpenEvolveImportTests
         // n = 4 inspirations: the island best, max(1, int(4 x 0.5)) = 2 top programs, then 1 diverse.
         Assert.Equal((2, 1), (run.Search.TopInspirations ?? -1, run.Search.DiversePrograms ?? -1));
         Assert.Equal(new[] { ("length", 8), ("accuracy", 8) }, run.Search.MetricDescriptors.Select(d => (d.Name, d.Bins)));
+        // OpenEvolve min-max scales every feature over the values it has seen, so every imported axis adapts.
+        Assert.All(run.Search.MetricDescriptors, d => Assert.Equal(EvolutionDescriptorBinning.AdaptiveMinMax, d.Binning));
         Assert.Equal(new[] { 0.4, 0.6 }, run.OpenEvolveEvaluator?.CascadeThresholds);
         Assert.True(run.OpenEvolveEvaluator?.Cascade); // OpenEvolve's default
         // Not the name of an OpenEvolve template, so it is the text itself, as OpenEvolve would decide.
@@ -1015,6 +1017,125 @@ public sealed class OpenEvolveImportTests
 
         Assert.NotEqual(0, code);
         Assert.Contains("ExplorationProbability", error, StringComparison.Ordinal);
+    }
+    // E-4: OpenEvolve has no champion rule, so the pilot passes ours on the command line. Seed X = 0 and the model's X = 1,
+    // each with standard error 0.6: at k = 3 the gain of 1 is short of 3 * sqrt(0.72), so best.py stays the seed.
+    [Fact]
+    public void A_champion_rule_on_the_command_line_reaches_the_translated_run()
+    {
+        using var directory = new TemporaryDirectory();
+        using var model = new CliRunTests.FakeChatModel();
+        File.WriteAllText(Path.Combine(directory.Path, "initial_program.py"), "X = 0\n");
+        File.WriteAllText(Path.Combine(directory.Path, "evaluator.py"), """
+            import re
+
+            def evaluate(path):
+                with open(path) as handle:
+                    x = int(re.search(r"X = (\d+)", handle.read()).group(1))
+                return {"combined_score": float(x), "quality_se": 0.6}
+            """);
+        File.WriteAllText(Path.Combine(directory.Path, "config.yaml"), $"""
+            max_iterations: 1
+            random_seed: 7
+            diff_based_evolution: false
+            llm:
+              api_base: {model.Endpoint}
+              models:
+                - name: fake-model
+              timeout: 20
+              retries: 0
+            database:
+              num_islands: 1
+            evaluator:
+              timeout: 30
+            """);
+        string output = Path.Combine(directory.Path, "out");
+
+        string? previousKey = Environment.GetEnvironmentVariable("OPENAI_API_KEY");
+        Environment.SetEnvironmentVariable("OPENAI_API_KEY", "unused-by-the-fake");
+        try
+        {
+            var (code, stdout, error) = CliRunTests.Run("run", "--openevolve-config", Path.Combine(directory.Path, "config.yaml"),
+                Path.Combine(directory.Path, "initial_program.py"), Path.Combine(directory.Path, "evaluator.py"),
+                "--python", Python, "--output", output, "--champion-standard-errors", "3", "--standard-error-metric", "quality_se",
+                "--allow-unsandboxed-execution");
+
+            Assert.True(code == 0, error);
+            using (JsonDocument run = JsonDocument.Parse(File.ReadAllText(Path.Combine(output, "run.json"))))
+            {
+                JsonElement search = run.RootElement.GetProperty("search");
+                Assert.Equal(3, search.GetProperty("championStandardErrors").GetDouble());
+                Assert.Equal("quality_se", search.GetProperty("standardErrorMetric").GetString());
+            }
+            using JsonDocument report = JsonDocument.Parse(stdout);
+            Assert.False(report.RootElement.GetProperty("Champion").GetProperty("BeatSeed").GetBoolean());
+            Assert.Equal("X = 0", File.ReadAllText(Path.Combine(output, "best.py")).TrimEnd());
+        }
+        finally
+        {
+            Environment.SetEnvironmentVariable("OPENAI_API_KEY", previousKey);
+        }
+    }
+
+    // E-4: the pilot's evaluator returns training rows as artifacts, and OpenEvolve puts artifact text in the next prompt.
+    // Ours withholds it unless search.retainArtifactText is set, which the imported run can only get from the command line.
+    [Theory]
+    [InlineData(true)]
+    [InlineData(false)]
+    public void Retain_artifact_text_on_the_command_line_decides_whether_artifact_text_reaches_the_prompt(bool retain)
+    {
+        using var directory = new TemporaryDirectory();
+        using var model = new CliRunTests.FakeChatModel();
+        File.WriteAllText(Path.Combine(directory.Path, "initial_program.py"), "X = 0\n");
+        File.WriteAllText(Path.Combine(directory.Path, "evaluator.py"), """
+            import re
+
+            class Result:
+                def __init__(self, metrics, artifacts):
+                    self.metrics, self.artifacts = metrics, artifacts
+
+            def evaluate(path):
+                with open(path) as handle:
+                    x = int(re.search(r"X = (\d+)", handle.read()).group(1))
+                return Result({"combined_score": float(x)}, {"training_rows": "ROWS-MARKER-" + str(x)})
+            """);
+        File.WriteAllText(Path.Combine(directory.Path, "config.yaml"), $"""
+            max_iterations: 2
+            random_seed: 7
+            diff_based_evolution: false
+            llm:
+              api_base: {model.Endpoint}
+              models:
+                - name: fake-model
+              timeout: 20
+              retries: 0
+            database:
+              num_islands: 1
+            evaluator:
+              timeout: 30
+            """);
+        string output = Path.Combine(directory.Path, "out");
+
+        string? previousKey = Environment.GetEnvironmentVariable("OPENAI_API_KEY");
+        Environment.SetEnvironmentVariable("OPENAI_API_KEY", "unused-by-the-fake");
+        try
+        {
+            var (code, _, error) = CliRunTests.Run("run", "--openevolve-config", Path.Combine(directory.Path, "config.yaml"),
+                Path.Combine(directory.Path, "initial_program.py"), Path.Combine(directory.Path, "evaluator.py"),
+                "--python", Python, "--output", output, "--retain-artifact-text", retain ? "true" : "false",
+                "--allow-unsandboxed-execution");
+
+            Assert.True(code == 0, error);
+            using (JsonDocument run = JsonDocument.Parse(File.ReadAllText(Path.Combine(output, "run.json"))))
+                Assert.Equal(retain, run.RootElement.GetProperty("search").GetProperty("retainArtifactText").GetBoolean());
+            string prompts = string.Join("\n", model.Requests);
+            Assert.Equal(retain, prompts.Contains("ROWS-MARKER-", StringComparison.Ordinal));
+            Assert.Equal(!retain, prompts.Contains("artifact content withheld", StringComparison.Ordinal));
+        }
+        finally
+        {
+            Environment.SetEnvironmentVariable("OPENAI_API_KEY", previousKey);
+        }
     }
 }
 #endif

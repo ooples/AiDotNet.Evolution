@@ -1,4 +1,5 @@
 #if NET8_0_OR_GREATER
+using System.Collections.Concurrent;
 using System.Net;
 using System.Net.Sockets;
 using System.Text;
@@ -50,6 +51,55 @@ public sealed class CliRunTests
             }
             """);
         return path;
+    }
+
+    // E-4: with a standard error on every fitness, best.py is the seed unless a program beats it by more than k combined
+    // standard errors. Seed X = 0, then X = 1 and X = 2, each with standard error 0.6: the combined error is
+    // sqrt(0.72) = 0.849, so k = 2 needs a gain over 1.697 (X = 2 has 2) and k = 3 needs one over 2.546 (none has).
+    [Theory]
+    [InlineData(2.0, "X = 2", 2.0, true)]
+    [InlineData(3.0, "X = 0", 0.0, false)]
+    public void A_champion_must_beat_the_seed_by_more_than_its_standard_errors(double standardErrors, string expectedBest,
+        double expectedQuality, bool beatSeed)
+    {
+        using var directory = new TemporaryDirectory();
+        using var model = new FakeChatModel();
+        File.WriteAllText(Path.Combine(directory.Path, "initial.py"), "X = 0\n");
+        File.WriteAllText(Path.Combine(directory.Path, "evaluator.py"), Evaluator.Replace(
+            "return {\"quality\": float(match.group(1)) if match else 0.0}",
+            "return {\"quality\": float(match.group(1)) if match else 0.0, \"quality_se\": 0.6}"));
+        string runFile = WriteRun(directory.Path, model.Endpoint, maxEvaluations: 3, extra: $$"""
+            ,
+              "search": { "championStandardErrors": {{standardErrors.ToString(System.Globalization.CultureInfo.InvariantCulture)}}, "standardErrorMetric": "quality_se" }
+            """);
+
+        var (code, output, error) = Run("run", runFile);
+
+        Assert.True(code == 0, error);
+        using JsonDocument report = JsonDocument.Parse(output);
+        Assert.Equal(expectedQuality, report.RootElement.GetProperty("BestQuality").GetDouble());
+        JsonElement champion = report.RootElement.GetProperty("Champion");
+        Assert.Equal(beatSeed, champion.GetProperty("BeatSeed").GetBoolean());
+        Assert.Equal(0.6, champion.GetProperty("ReferenceStandardError").GetDouble());
+        Assert.Equal(expectedBest, File.ReadAllText(Path.Combine(directory.Path, "out", "best.py")).TrimEnd());
+    }
+
+    [Theory]
+    [InlineData("\"championStandardErrors\": 2")]
+    [InlineData("\"standardErrorMetric\": \"quality_se\"")]
+    [InlineData("\"championStandardErrors\": -1, \"standardErrorMetric\": \"quality_se\"")]
+    public void A_champion_rule_without_both_settings_or_with_a_negative_k_is_refused(string search)
+    {
+        using var directory = new TemporaryDirectory();
+        using var model = new FakeChatModel();
+        File.WriteAllText(Path.Combine(directory.Path, "initial.py"), "X = 0\n");
+        File.WriteAllText(Path.Combine(directory.Path, "evaluator.py"), Evaluator);
+        string runFile = WriteRun(directory.Path, model.Endpoint, maxEvaluations: 3, extra: ",\n  \"search\": { " + search + " }");
+
+        var (code, _, error) = Run("run", runFile);
+
+        Assert.NotEqual(0, code);
+        Assert.Contains("search.championStandardErrors", error);
     }
 
     [Fact]
@@ -830,6 +880,33 @@ public sealed class CliRunTests
         Assert.Equal(2, Run("run", Path.Combine(directory.Path, "run.json")).Code);
     }
 
+    // E-4: the binning a run file names reaches the archive. The metric is X x 100 on an axis whose initial range is
+    // [0, 1]: fixed linear bins clamp X = 1, 2 and 3 into one cell beside the seed, while adaptive min-max bins spread
+    // the four programs over four cells.
+    [Theory]
+    [InlineData("Linear", 2)]
+    [InlineData("AdaptiveMinMax", 4)]
+    public void The_run_files_binning_decides_how_many_elites_the_archive_keeps(string binning, int elites)
+    {
+        using var directory = new TemporaryDirectory();
+        using var model = new FakeChatModel();
+        File.WriteAllText(Path.Combine(directory.Path, "initial.py"), "X = 0\n");
+        File.WriteAllText(Path.Combine(directory.Path, "evaluator.py"), Evaluator.Replace(
+            "return {\"quality\": float(match.group(1)) if match else 0.0}",
+            "x = float(match.group(1)) if match else 0.0\n    return {\"quality\": x, \"metrics\": {\"m\": x * 100}}"));
+        string runFile = WriteRun(directory.Path, model.Endpoint, maxEvaluations: 4, extra: $$"""
+            ,
+              "search": { "metricDescriptors": [ { "name": "m", "bins": 4, "binning": "{{binning}}" } ] }
+            """);
+
+        var (code, _, error) = Run("run", runFile);
+
+        Assert.True(code == 0, error);
+        EvolutionRepertoire repertoire = EvolutionRepertoire.FromJson(
+            File.ReadAllText(Path.Combine(directory.Path, "out", "repertoire-000.json")));
+        Assert.Equal(elites, repertoire.Entries.Count);
+    }
+
     /// <summary>A loopback OpenAI-compatible /v1/chat/completions endpoint proposing X = 1, 2, 3, ... in a python fence.</summary>
     internal sealed class FakeChatModel : IDisposable
     {
@@ -849,6 +926,8 @@ public sealed class CliRunTests
 
         public string Endpoint { get; }
         public int Calls => Volatile.Read(ref _calls);
+        /// <summary>Every request body received, in arrival order.</summary>
+        public ConcurrentQueue<string> Requests { get; } = new();
         /// <summary>Runs with the call number before the response is sent.</summary>
         public Action<int>? OnCall { get; set; }
 
@@ -870,6 +949,7 @@ public sealed class CliRunTests
             using (var reader = new StreamReader(context.Request.InputStream, Encoding.UTF8))
             using (JsonDocument request = JsonDocument.Parse(await reader.ReadToEndAsync()))
             {
+                Requests.Enqueue(request.RootElement.GetRawText());
                 bool valid = context.Request.Url?.AbsolutePath == "/v1/chat/completions" &&
                     request.RootElement.GetProperty("model").GetString() == "fake-model" &&
                     request.RootElement.GetProperty("messages").GetArrayLength() > 0;

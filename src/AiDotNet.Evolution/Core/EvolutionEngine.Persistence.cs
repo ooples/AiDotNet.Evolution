@@ -634,8 +634,9 @@ public sealed partial class EvolutionEngine<TGenome>
 
         if (archive is not IGrowableEvolutionArchive<TGenome>)
             throw new InvalidDataException(
-                "The checkpoint recorded widened descriptor ranges, but the archive does not support restoring them. " +
-                "Resume requires an archive implementing IGrowableEvolutionArchive when any descriptor can grow.");
+                "The checkpoint recorded widened or learned descriptor ranges, but the archive does not support " +
+                "restoring them. Resume requires an archive implementing IGrowableEvolutionArchive when any descriptor " +
+                "can grow or is adaptive.");
 
         return restored;
     }

@@ -5,6 +5,7 @@ candidate - so the wrapper's job is to turn a provider's or a candidate's bad be
 something the broker can accept, and to refuse only what it genuinely cannot.
 """
 import sys
+import tempfile
 import unittest
 from pathlib import Path
 
@@ -12,6 +13,7 @@ ROOT = Path(__file__).resolve().parent
 sys.path.insert(0, str(ROOT))
 
 import pilot_broker  # noqa: E402
+import pilot_task_evaluator  # noqa: E402
 from program_broker import COST_METRICS, ProgramBroker  # noqa: E402
 import symbolic_regression_family as family  # noqa: E402
 
@@ -84,6 +86,29 @@ class ModelCallbackTests(unittest.TestCase):
 
 
 class EvaluateCallbackTests(unittest.TestCase):
+    def test_every_valid_reply_carries_the_qualitys_standard_error(self):
+        # E-4: the delta method through quality = 1 / (1 + score), from the two splits' own errors.
+        evaluate = pilot_broker.evaluate_callback(TASK, SEED)
+        rows = family.selection(TASK, SEED)
+        predict = lambda x: 0.0  # noqa: E731 - CONSTANT, as a function
+        train, train_error = family.nmse_and_error(predict, rows["train"])
+        validation, validation_error = family.nmse_and_error(predict, rows["validation"])
+        score = (train + validation) / 2.0
+        expected = ((train_error ** 2 + validation_error ** 2) ** 0.5 / 2.0) / (1.0 + score) ** 2
+        reply = evaluate(CONSTANT)
+        self.assertAlmostEqual(score, reply["selection_nmse"], places=12)
+        self.assertAlmostEqual(expected, reply["quality_standard_error"], places=12)
+        self.assertGreater(reply["quality_standard_error"], 0.0)
+
+    def test_the_selection_rows_are_the_ones_asked_for(self):
+        # More rows is the other half of E-4's fix: the reply must score on exactly them.
+        rows = family.selection(TASK, SEED, train=600, validation=200)
+        expected = (family.nmse(lambda x: 0.0, rows["train"]) + family.nmse(lambda x: 0.0, rows["validation"])) / 2.0
+        reply = pilot_broker.evaluate_callback(TASK, SEED, train=600, validation=200)(CONSTANT)
+        self.assertAlmostEqual(expected, reply["selection_nmse"], places=12)
+        self.assertNotAlmostEqual(pilot_broker.evaluate_callback(TASK, SEED)(CONSTANT)["selection_nmse"],
+                                  reply["selection_nmse"], places=6)
+
     def test_quality_is_higher_is_better_and_the_truth_tops_it(self):
         evaluate = pilot_broker.evaluate_callback(TASK, SEED)
         truth, constant = evaluate(TRUTH), evaluate(CONSTANT)
@@ -102,6 +127,27 @@ class EvaluateCallbackTests(unittest.TestCase):
                 result = evaluate(code)
                 self.assertEqual("invalid", result["status"])
                 self.assertNotIn("quality", result, "an invalid candidate must carry no quality")
+                self.assertNotIn("artifacts", result)
+
+    def test_a_valid_reply_shows_the_inputs_and_training_rows_with_the_candidates_residuals(self):
+        # E-4: the model saw a scalar score alone; the rows are training rows only, and the candidate's own predictions.
+        rows = family.selection(TASK, SEED)
+        train = {round(xs[0], 4) for xs, _ in rows["train"]}
+        validation = {round(xs[0], 4) for xs, _ in rows["validation"]}
+        text = pilot_broker.evaluate_callback(TASK, SEED)(TRUTH.replace("+ 1.0)/", "+ 2.0)/"))["artifacts"]["training_rows"]
+        lines = text.splitlines()
+        self.assertEqual("inputs: x = xs[0] in [-3, 3]", lines[0])
+        self.assertEqual("x target prediction residual", lines[2])
+        self.assertEqual(pilot_broker.FEEDBACK_ROWS, len(lines) - 3)
+        # The first rows of the training split, in input order: a fixed sample, the same for every candidate.
+        expected = sorted(round(xs[0], 4) for xs, _ in rows["train"][:pilot_broker.FEEDBACK_ROWS])
+        self.assertEqual(expected, [float(line.split()[0]) for line in lines[3:]])
+        for line in lines[3:]:
+            x, target, prediction, residual = (float(value) for value in line.split())
+            self.assertIn(x, train - validation)
+            self.assertAlmostEqual((3.0 * x + 1.0) / (x * x + 2.0), target, places=3)
+            self.assertAlmostEqual((3.0 * x + 2.0) / (x * x + 2.0), prediction, places=3)
+            self.assertAlmostEqual(1.0 / (x * x + 2.0), residual, places=3)
 
     def test_scoring_uses_selection_rows_only(self):
         # The endpoint belongs to pilot_cells, from a holdout seed this process never sees. If this
@@ -184,6 +230,40 @@ class SessionTests(unittest.TestCase):
         with self.session()({"Family": TASK, "Seed": SEED}) as broker:
             endpoint = broker.endpoint
         self.assertTrue(broker.shut, "a cell's broker must not outlive the cell: " + endpoint)
+
+
+
+class TaskEvaluatorTests(unittest.TestCase):
+    def test_the_standard_error_reaches_the_search_with_the_score(self):
+        # Our CLI reads it from the evaluator's metrics; without it a champion rule refuses the run.
+        replies = [{"status": "valid", "quality": 0.5, "selection_nmse": 1.0, "quality_standard_error": 0.01},
+                   {"status": "valid", "quality": 0.5, "selection_nmse": 1.0}]
+        genuine = pilot_task_evaluator.request
+        try:
+            pilot_task_evaluator.request = lambda endpoint, capability, operation, payload: replies.pop(0)
+            with tempfile.TemporaryDirectory() as directory:
+                path = Path(directory) / "candidate.py"
+                path.write_text(CONSTANT, encoding="utf-8")
+                evaluate = pilot_task_evaluator.bind("http://127.0.0.1:1", "capability")
+                self.assertEqual(0.01, evaluate(str(path)).metrics["quality_standard_error"])
+                self.assertNotIn("quality_standard_error", evaluate(str(path)).metrics)
+        finally:
+            pilot_task_evaluator.request = genuine
+
+    def test_the_brokers_artifacts_reach_the_search_as_artifacts(self):
+        # Our shim reads `.artifacts` from the result, as OpenEvolve does from its EvaluationResult.
+        genuine = pilot_task_evaluator.request
+        try:
+            pilot_task_evaluator.request = lambda endpoint, capability, operation, payload: {
+                "status": "valid", "quality": 0.5, "selection_nmse": 1.0, "artifacts": {"training_rows": "rows"}}
+            with tempfile.TemporaryDirectory() as directory:
+                path = Path(directory) / "candidate.py"
+                path.write_text(CONSTANT, encoding="utf-8")
+                result = pilot_task_evaluator.bind("http://127.0.0.1:1", "capability")(str(path))
+                self.assertEqual({"training_rows": "rows"}, result.artifacts)
+                self.assertEqual(0.5, result.metrics["combined_score"])
+        finally:
+            pilot_task_evaluator.request = genuine
 
 
 if __name__ == "__main__":

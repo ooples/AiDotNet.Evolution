@@ -36,6 +36,13 @@ import time
 
 from codex_transport import kill_owned
 
+# Revalidated for 2.1.314 on 2026-10-29 for the E-4 re-pilot, by the same procedure: `record_claude_canary.py` succeeded
+# for all three models, the resolved models are unchanged and the baselines did not move (658/637/633).
+#
+# Revalidated for 2.1.312 on 2026-10-29 for the E-4 pilot, by the same procedure: `record_claude_canary.py` succeeded
+# for all three models (so every assertion below held), the resolved models are unchanged and the baselines moved
+# 659/661/657 -> 658/637/633, within the CLI's own scaffolding drift and nowhere near a 29k hook injection.
+#
 # Revalidated for 2.1.302 on 2026-10-17. The CLI self-updated from 2.1.299 mid-campaign and this
 # pin refused every call until the check below was repeated, which is what it is for. Verified by
 # running `record_claude_canary.py` against 2.1.302 for all three models: every flag below is
@@ -50,7 +57,7 @@ from codex_transport import kill_owned
 # Previously revalidated for 2.1.299 on 2026-10-15, where `--max-turns` still worked although it
 # had been dropped from `--help`, and the baselines moved 448/579/516 and were re-recorded because
 # the CLI's own scaffolding had grown; that was the canary working, not contamination.
-PINNED_CLI = "2.1.302 (Claude Code)"
+PINNED_CLI = "2.1.314 (Claude Code)"
 MAX_OUTPUT = 4 * 1024 * 1024
 MAX_TEXT = 64 * 1024
 SYSTEM_PROMPT = ("Generate exactly one candidate response to the benchmark conversation in the user message. "
@@ -75,12 +82,23 @@ def verified_executable(executable):
     return str(path)
 
 
+# Claude Code's own continuation when a reply carried no visible text (thinking only): a synthetic user turn, no tool
+# involved. E-4's third pilot met it at call 380 and, refused as multi-turn, it closed admission for the campaign.
+SYNTHETIC_CONTINUATION = "[Your previous response had no visible output. Please continue and produce a user-visible response.]"
+
+
+def _synthetic_continuation(event):
+    content = (event.get("message") or {}).get("content")
+    return (event.get("isSynthetic") is True and event.get("parent_tool_use_id") is None
+            and content == [{"type": "text", "text": SYNTHETIC_CONTINUATION}])
+
+
 def parse_events(raw, resolved_model=None):
     """Validate one isolated, single-turn, tool-free generation and return (text, usage, init, notes)."""
     if len(raw) > MAX_OUTPUT:
         raise ValueError("Claude event stream exceeds evidence bound")
     init = result = None
-    retries, rate_limits = [], []
+    retries, rate_limits, continuations = [], [], 0
     for line in raw.decode("utf-8", errors="strict").splitlines():
         event = json.loads(line)
         kind = event.get("type")
@@ -99,7 +117,9 @@ def parse_events(raw, resolved_model=None):
                 if block.get("type") not in ("text", "thinking", "redacted_thinking"):
                     raise ValueError("Tool-using generation is not a controlled text-only sample")
         elif kind == "user":
-            raise ValueError("A user/tool-result turn means the generation was not text-only")
+            if not _synthetic_continuation(event):
+                raise ValueError("A user/tool-result turn means the generation was not text-only")
+            continuations += 1
         elif kind == "result":
             if result is not None:
                 raise ValueError("Multiple results violate the one-request contract")
@@ -120,7 +140,8 @@ def parse_events(raw, resolved_model=None):
             raise ValueError(f"Auto-memory {memory} is populated and would be loaded into an isolated call")
     if resolved_model is not None and init.get("model") != resolved_model:
         raise ValueError(f"Model resolved to {init.get('model')!r}, pinned {resolved_model!r}")
-    if result.get("subtype") != "success" or result.get("is_error") or result.get("num_turns") != 1:
+    # One turn, plus one for each synthetic continuation the CLI added; any other extra turn is refused.
+    if result.get("subtype") != "success" or result.get("is_error") or result.get("num_turns") != 1 + continuations:
         raise ValueError("Claude reported an unsuccessful or multi-turn generation")
     text = result.get("result")
     if not isinstance(text, str) or len(text.encode("utf-8")) > MAX_TEXT:
@@ -130,7 +151,7 @@ def parse_events(raw, resolved_model=None):
         raise ValueError("Invalid Claude token accounting")
     retry_ms = sum(int(event.get("retry_delay_ms", 0) or 0) for event in retries)
     notes = dict(api_retries=len(retries), retry_delay_seconds=retry_ms / 1000, rate_limit_events=rate_limits,
-                 duration_api_seconds=(result.get("duration_api_ms") or 0) / 1000)
+                 duration_api_seconds=(result.get("duration_api_ms") or 0) / 1000, synthetic_continuations=continuations)
     return text, {name: usage[name] for name in USAGE_FIELDS}, init, notes
 
 

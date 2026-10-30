@@ -36,7 +36,10 @@ def evaluate(program_path):
         code = source.read(64 * 1024 + 1)
     result = request(os.environ["EVOLUTION_BROKER_ENDPOINT"], os.environ["EVOLUTION_BROKER_CAPABILITY"],
                      "evaluate", {"code": code})
-    return {"combined_score": result["quality"] if result["status"] == "valid" else -1e300}
+    from openevolve.evaluation_result import EvaluationResult  # the upstream checkout is on sys.path by now
+    # The broker's feedback rows reach OpenEvolve's prompt as artifacts, exactly as they reach ours.
+    return EvaluationResult(metrics={"combined_score": result["quality"] if result["status"] == "valid" else -1e300},
+                            artifacts=dict(result.get("artifacts") or {}))
 
 
 NATIVE_MODES = ("recommended", "matched")

@@ -66,6 +66,10 @@ public sealed class CentroidArchiveTests
         Assert.Throws<ArgumentException>(() => new CentroidArchiveDefinition(Array.Empty<EvolutionDescriptorDefinition>(), new[] { new[] { 0d } }));
         Assert.Throws<ArgumentException>(() => new CentroidArchiveDefinition(new[] { axes[0], axes[0] }, new[] { new[] { 0d, 0d } }));
         Assert.Throws<ArgumentException>(() => Definition(EvolutionOutOfRangePolicy.Grow));
+        Assert.Throws<ArgumentException>(() => new CentroidArchiveDefinition(
+            new[] { EvolutionDescriptorDefinition.AdaptiveMinMax("x", 0, 1, 2) }, new[] { new[] { 0.5d } }));
+        Assert.Throws<ArgumentException>(() => new CentroidArchiveDefinition(
+            new[] { EvolutionDescriptorDefinition.Logarithmic("x", 1, 10, 2) }, new[] { new[] { 0.5d } }));
         Assert.Throws<ArgumentException>(() => Definition(EvolutionOutOfRangePolicy.OverflowBins));
         foreach (var sites in new[] { Array.Empty<double[]>(), new[] { new[] { 0d }, new[] { -0d } },
                      new[] { new[] { double.NaN } }, new[] { new[] { 1.1 } }, new[] { new[] { 0d, 1d } } })

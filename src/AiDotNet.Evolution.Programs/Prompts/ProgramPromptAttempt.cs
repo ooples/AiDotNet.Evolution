@@ -27,6 +27,9 @@ public sealed class ProgramPromptAttempt
     /// <summary>The longest change description accepted, in characters.</summary>
     public const int MaxChangesLength = 4_096;
 
+    /// <summary>The longest stated outcome accepted, in characters.</summary>
+    public const int MaxOutcomeLength = 256;
+
     private static readonly Dictionary<string, double> NoMetrics = new(StringComparer.Ordinal);
 
     /// <summary>Initializes an attempt summary.</summary>
@@ -66,6 +69,25 @@ public sealed class ProgramPromptAttempt
 
     /// <summary>Gets the values the attempt's parent measured; empty when unknown.</summary>
     public IReadOnlyDictionary<string, double> ParentMetrics { get; }
+
+    /// <summary>Gets or initializes an outcome to state instead of comparing metrics, or <c>null</c> to compare.</summary>
+    /// <remarks>
+    /// For an attempt with nothing to compare: a reply that could not be applied, or a program whose evaluation
+    /// failed. Comparing its empty metrics would call it "mixed results", which says the opposite of what happened.
+    /// </remarks>
+    /// <exception cref="ArgumentException">The value exceeds <see cref="MaxOutcomeLength"/>.</exception>
+    public string? Outcome
+    {
+        get => _outcome;
+        init
+        {
+            if (value is { Length: > MaxOutcomeLength })
+                throw new ArgumentException($"An attempt's outcome cannot exceed {MaxOutcomeLength} characters.", nameof(value));
+            _outcome = value;
+        }
+    }
+
+    private readonly string? _outcome;
 
     /// <summary>Returns a description that never echoes the change text.</summary>
     /// <returns>The attempt number and metric count.</returns>

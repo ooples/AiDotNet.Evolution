@@ -147,7 +147,8 @@ class ConstructionTests(unittest.TestCase):
 class OurArmTests(unittest.TestCase):
     """What our arm hands the CLI, captured by replacing the subprocess rather than running one."""
 
-    def run_capture(self, directory, broker, *, returncode=0, stdout="{}", cli="aidotnet-evolve"):
+    def run_capture(self, directory, broker, *, returncode=0, stdout="{}", cli="aidotnet-evolve",
+                    champion_standard_errors=None):
         captured = {}
 
         def fake_run(command, **kwargs):
@@ -164,7 +165,8 @@ class OurArmTests(unittest.TestCase):
         try:
             subprocess.run = fake_run
             search = pilot_searchers.ours(cli, root, sys.executable, iterations=2,
-                                          session=session_of(broker))
+                                          session=session_of(broker),
+                                          champion_standard_errors=champion_standard_errors)
             try:
                 captured["outcome"] = search(CELL, Path(directory) / "cell", False)
             except Exception as error:  # noqa: BLE001 - the failure is what some of these assert
@@ -172,6 +174,24 @@ class OurArmTests(unittest.TestCase):
         finally:
             subprocess.run = genuine
         return captured
+
+    def test_a_champion_rule_reaches_the_cli_with_the_brokers_standard_error_metric(self):
+        # E-4: without the option the command is unchanged, so a pilot that does not ask for it runs as before.
+        with tempfile.TemporaryDirectory() as directory:
+            plain = self.run_capture(directory, FakeBroker(calls=2))["command"]
+        with tempfile.TemporaryDirectory() as directory:
+            command = self.run_capture(directory, FakeBroker(calls=2), champion_standard_errors=1)["command"]
+        self.assertNotIn("--champion-standard-errors", plain)
+        self.assertEqual("1.0", command[command.index("--champion-standard-errors") + 1])
+        self.assertEqual("quality_standard_error", command[command.index("--standard-error-metric") + 1])
+
+    def test_the_champion_decision_is_kept_on_the_outcome_and_absent_when_the_cli_reports_none(self):
+        champion = {"StandardErrors": 1.0, "ReferenceQuality": 0.5, "ReferenceStandardError": 0.01, "BeatSeed": False}
+        with tempfile.TemporaryDirectory() as directory:
+            outcome = self.run_capture(directory, FakeBroker(calls=2), stdout=json.dumps({"Champion": champion}))["outcome"]
+        self.assertEqual(champion, outcome["champion"])
+        with tempfile.TemporaryDirectory() as directory:
+            self.assertNotIn("champion", self.run_capture(directory, FakeBroker(calls=2))["outcome"])
 
     def test_the_cli_may_be_a_command_prefix_not_only_an_executable(self):
         """A dry run caught this: `cli="dotnet"` became `dotnet run ...` and the SDK answered

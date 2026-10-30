@@ -283,7 +283,7 @@ any helper beside it, and each `openEvolveEvaluator.pythonPath` directory is mou
 | `database.exploration_ratio` | Mapped | search.explorationRatio; the remainder after exploitation becomes search.eliteRatio |
 | `database.exploitation_ratio` | Mapped | search.exploitationRatio |
 | `database.diversity_metric` | RefusedUnlessDefault | only OpenEvolve's default diversity metric name is accepted |
-| `database.feature_dimensions` | Mapped | search.metricDescriptors; complexity becomes program length, diversity is dropped and reported |
+| `database.feature_dimensions` | Mapped | search.metricDescriptors with adaptive min-max bins, as OpenEvolve scales features; complexity becomes program length, diversity is dropped and reported |
 | `database.feature_bins` | Mapped | the bin count of each descriptor |
 | `database.diversity_reference_size` | RefusedUnlessDefault | OpenEvolve's population-relative diversity feature is not reproduced |
 | `database.migration_interval` | Mapped | search.migrationInterval |

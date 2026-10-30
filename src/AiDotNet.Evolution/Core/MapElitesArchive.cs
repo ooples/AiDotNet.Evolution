@@ -56,6 +56,10 @@ public sealed class MapElitesArchive<TGenome> :
     private readonly int _capacity;
     private readonly long _maximumGridCells;
     private readonly bool _hasGrowAxis;
+    private readonly bool _hasAdaptiveAxis;
+    // A staging copy built for a restore or a remeasurement replays elites the live archive has already observed, so
+    // it must not observe them a second time.
+    private bool _observes = true;
     private readonly bool _capacityFollowsGrid;
     private IComparer<EvolutionArchiveEntry<TGenome>>? _comparer;
     private EvolutionArchiveEntry<TGenome>? _best;
@@ -114,6 +118,7 @@ public sealed class MapElitesArchive<TGenome> :
         TotalGridCells = gridCells;
         _maximumGridCells = maximumGridCells;
         _hasGrowAxis = _descriptors.Any(item => item.OutOfRangePolicy == EvolutionOutOfRangePolicy.Grow);
+        _hasAdaptiveAxis = _descriptors.Any(item => item.IsAdaptive);
         // The configured bounds are kept verbatim: they anchor the definition hash and are the reference a restored
         // checkpoint's grown bounds are validated against.
         _configuredDescriptors = _descriptors.ToArray();
@@ -218,9 +223,13 @@ public sealed class MapElitesArchive<TGenome> :
             return Mutation(EvolutionArchiveInsertionResult.Rejected);
         }
 
-        // A Grow axis reports a value outside its range as unbinnable, which is the archive's cue to widen rather
-        // than discard. Growth happens before keying so the candidate and every incumbent share one grid.
-        List<EvolutionArchiveEntry<TGenome>>? removed = GrowToFit(evaluation.Descriptors);
+        // An adaptive axis learns its bins from every completed candidate, and a Grow axis reports a value outside its
+        // range as unbinnable, which is the archive's cue to widen rather than discard. Both happen before keying so
+        // the candidate and every incumbent share one grid.
+        List<EvolutionArchiveEntry<TGenome>>? removed = _observes ? ObserveAdaptive(evaluation.Descriptors) : null;
+        List<EvolutionArchiveEntry<TGenome>>? grown = GrowToFit(evaluation.Descriptors);
+        if (grown is not null)
+            foreach (EvolutionArchiveEntry<TGenome> entry in grown) AddRemoved(ref removed, entry);
 
         EvolutionCellKey? key = TryCreateKey(evaluation.Descriptors);
         if (key is null) return Mutation(EvolutionArchiveInsertionResult.Rejected, removed: removed);
@@ -413,6 +422,40 @@ public sealed class MapElitesArchive<TGenome> :
         return RebinEntries();
     }
 
+    /// <summary>Refits every adaptive axis to the supplied values, then rebins existing entries if any bin moved.</summary>
+    /// <param name="descriptors">The named descriptor values about to be archived.</param>
+    /// <returns>The entries a rebin displaced, or <c>null</c>.</returns>
+    /// <remarks>
+    /// Values are observed only when the candidate supplies a finite value for every axis, that is, only when it can
+    /// be placed at all, so a malformed evaluation cannot move the grid. Observing changes the archive's state even
+    /// when no bin moves, because the observation count and the quantile sample are part of it, so the version always
+    /// advances; entries are rebinned only when the bounds or edges changed. OpenEvolve, by contrast, leaves every
+    /// program in the cell it was filed under when its range moves, so its cells drift out of step with its own bins.
+    /// </remarks>
+    private List<EvolutionArchiveEntry<TGenome>>? ObserveAdaptive(IReadOnlyDictionary<string, double> descriptors)
+    {
+        if (!_hasAdaptiveAxis) return null;
+        foreach (EvolutionDescriptorDefinition definition in _descriptors)
+        {
+            if (!descriptors.TryGetValue(definition.Name, out double value) || !EvolutionDescriptorDefinition.IsFinite(value))
+                return null;
+        }
+
+        bool rebin = false;
+        for (int axis = 0; axis < _descriptors.Length; axis++)
+        {
+            EvolutionDescriptorDefinition definition = _descriptors[axis];
+            if (!definition.IsAdaptive) continue;
+            EvolutionDescriptorDefinition fitted = definition.Observe(descriptors[definition.Name]);
+            rebin |= fitted.Minimum != definition.Minimum || fitted.Maximum != definition.Maximum ||
+                !fitted.Edges.SequenceEqual(definition.Edges);
+            _descriptors[axis] = fitted;
+        }
+
+        Version = checked(Version + 1);
+        return rebin ? RebinEntries() : null;
+    }
+
     /// <summary>Recomputes every entry's cell against the current descriptor definitions.</summary>
     /// <remarks>
     /// Rebinning from each entry's own descriptor values is what keeps the archive honest after growth: an index
@@ -492,14 +535,18 @@ public sealed class MapElitesArchive<TGenome> :
             _descriptors,
             Direction,
             _capacityFollowsGrid ? 0 : _capacity,
-            _maximumGridCells);
+            _maximumGridCells)
+        { _observes = false };
 
         // Settle the final grid before filing anything. An unplaceable replacement keeps the old descriptors, but all
-        // entries are keyed against the same final bounds after every successful growth has been considered.
+        // entries are keyed against the same final bounds after every successful growth has been considered. A
+        // replacement is a new measurement, so an adaptive axis observes it; the elites themselves were observed when
+        // they first arrived.
         for (int index = 0; index < ordered.Length; index++)
         {
             EvolutionEvaluation? replacement = replacements[index];
             if (replacement is null) continue;
+            staged.ObserveAdaptive(replacement.Descriptors);
             staged.GrowToFit(replacement.Descriptors);
             if (staged.TryCreateKey(replacement.Descriptors) is null) replacements[index] = null;
         }
@@ -569,7 +616,8 @@ public sealed class MapElitesArchive<TGenome> :
             _configuredDescriptors,
             Direction,
             _capacityFollowsGrid ? 0 : _capacity,
-            _maximumGridCells);
+            _maximumGridCells)
+        { _observes = false };
         staged.RestoreDescriptorBounds(descriptorSnapshot);
         foreach (EvolutionArchiveEntry<TGenome> entry in entrySnapshot.OrderBy(item => item.Cell.StableKey, StringComparer.Ordinal))
         {
@@ -652,6 +700,16 @@ public sealed class MapElitesArchive<TGenome> :
     {
         if (!string.Equals(restored.Name, configured.Name, StringComparison.Ordinal)) return false;
         if (restored.OutOfRangePolicy != configured.OutOfRangePolicy) return false;
+        if (restored.Binning != configured.Binning) return false;
+
+        // An adaptive axis keeps its bin count and learns everything else; its observation state is validated when the
+        // checkpoint is read, and implies the bounds and edges it is restored with.
+        if (configured.IsAdaptive)
+            return restored.BinCount == configured.BinCount && restored.SampleCapacity == configured.SampleCapacity;
+
+        if (configured.Binning == EvolutionDescriptorBinning.ExplicitEdges)
+            return restored.Edges.SequenceEqual(configured.Edges);
+
         if (restored.BinCount == configured.BinCount &&
             restored.Minimum == configured.Minimum && restored.Maximum == configured.Maximum)
         {
@@ -661,11 +719,17 @@ public sealed class MapElitesArchive<TGenome> :
         if (configured.OutOfRangePolicy != EvolutionOutOfRangePolicy.Grow) return false;
         if (restored.BinCount < configured.BinCount) return false;
 
-        double width = configured.BinWidth;
+        // Logarithmic growth keeps the log-width fixed, so bounds are compared in the space the bins are even in.
+        bool logarithmic = configured.Binning == EvolutionDescriptorBinning.Logarithmic;
+        double width = configured.UniformWidth;
         double tolerance = Math.Abs(width) * 1e-9;
-        if (restored.Minimum > configured.Minimum + tolerance) return false;
-        if (restored.Maximum < configured.Maximum - tolerance) return false;
-        return Math.Abs(restored.BinWidth - width) <= tolerance;
+        double configuredMinimum = logarithmic ? Math.Log(configured.Minimum) : configured.Minimum;
+        double configuredMaximum = logarithmic ? Math.Log(configured.Maximum) : configured.Maximum;
+        double restoredMinimum = logarithmic ? Math.Log(restored.Minimum) : restored.Minimum;
+        double restoredMaximum = logarithmic ? Math.Log(restored.Maximum) : restored.Maximum;
+        if (restoredMinimum > configuredMinimum + tolerance) return false;
+        if (restoredMaximum < configuredMaximum - tolerance) return false;
+        return Math.Abs(restored.UniformWidth - width) <= tolerance;
     }
 
     private IComparer<EvolutionArchiveEntry<TGenome>> Comparer =>

@@ -32,6 +32,10 @@ public sealed class CentroidArchiveDefinition
         if (axes.Any(axis => axis.OutOfRangePolicy != EvolutionOutOfRangePolicy.Reject &&
                              axis.OutOfRangePolicy != EvolutionOutOfRangePolicy.Clamp))
             throw new ArgumentException("Centroid normalization supports only Reject and Clamp.", nameof(descriptors));
+        // Sites are placed in coordinates normalized linearly over each axis's bounds, so logarithmic or explicit bins
+        // would be silently ignored, and an adaptive axis's bounds would never move.
+        if (axes.Any(axis => axis.Binning != EvolutionDescriptorBinning.Linear))
+            throw new ArgumentException("Centroid normalization supports only Linear binning.", nameof(descriptors));
 
         var sites = new List<IReadOnlyList<double>>();
         var unique = new HashSet<string>(StringComparer.Ordinal);

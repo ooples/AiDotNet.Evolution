@@ -206,6 +206,18 @@ internal sealed class RunSearch
     public double EarlyStoppingMinimumImprovement { get; init; }
     /// <summary>A fitness at which the run stops as soon as any program reaches it; null for none.</summary>
     public double? TargetQuality { get; init; }
+    /// <summary>
+    /// When set, best.py is the best program whose fitness beats the seed's by more than this many combined standard
+    /// errors, or the seed itself when none does; null keeps the highest fitness. Requires <see cref="StandardErrorMetric"/>.
+    /// </summary>
+    /// <remarks>
+    /// A fitness measured on a small sample rewards fitting its noise: in E-4's pilot, on 80 selection rows, the
+    /// highest-fitness program was worse than the seed held-out in 3 of 6 cells. See
+    /// <c>EvolutionChampionSelection.SelectSignificant</c>.
+    /// </remarks>
+    public double? ChampionStandardErrors { get; init; }
+    /// <summary>The evaluator metric that reports each fitness's standard error, for <see cref="ChampionStandardErrors"/>.</summary>
+    public string? StandardErrorMetric { get; init; }
     /// <summary>Retries for an evaluation that failed or timed out (OpenEvolve's <c>evaluator.max_retries</c>).</summary>
     public int EvaluationRetries { get; init; }
     /// <summary>A memory cap per evaluation in MiB, enforced by the sandbox; null for none.</summary>
@@ -239,9 +251,51 @@ internal sealed class RunSearch
 internal sealed class RunMetricDescriptor
 {
     public required string Name { get; init; }
+    /// <summary>The lower bound; for an adaptive axis, the one used until two distinct values arrive. Ignored for
+    /// <c>length</c>, whose range starts at 0 (1 when logarithmic).</summary>
     public double Minimum { get; init; }
+    /// <summary>The upper bound, as <see cref="Minimum"/>; <c>length</c> uses <c>budget.maxProgramChars</c>.</summary>
     public double Maximum { get; init; } = 1;
     public int Bins { get; init; } = 10;
+    /// <summary>Where the bin boundaries lie; <c>AdaptiveMinMax</c> for <c>length</c> and <c>Linear</c> otherwise
+    /// when absent.</summary>
+    public EvolutionDescriptorBinning? Binning { get; init; }
+    /// <summary>The boundaries of an <c>ExplicitEdges</c> axis, which replace the bounds and the bin count.</summary>
+    public List<double>? Edges { get; init; }
+    /// <summary>How a value outside the range is handled; <c>Reject</c> for a fixed <c>length</c> axis and
+    /// <c>Clamp</c> otherwise when absent.</summary>
+    public EvolutionOutOfRangePolicy? OutOfRange { get; init; }
+    /// <summary>How many observed values an <c>AdaptiveQuantile</c> axis keeps.</summary>
+    public int SampleCapacity { get; init; } = EvolutionDescriptorDefinition.DefaultQuantileSampleCapacity;
+
+    /// <summary>Builds the archive axis this entry describes.</summary>
+    /// <param name="maxProgramChars">The program length budget, which bounds a <c>length</c> axis.</param>
+    internal EvolutionDescriptorDefinition ToDefinition(int maxProgramChars)
+    {
+        bool length = Name == "length";
+        EvolutionDescriptorBinning binning = Binning ?? (length
+            ? EvolutionDescriptorBinning.AdaptiveMinMax
+            : EvolutionDescriptorBinning.Linear);
+        bool adaptive = binning is EvolutionDescriptorBinning.AdaptiveMinMax or EvolutionDescriptorBinning.AdaptiveQuantile;
+        EvolutionOutOfRangePolicy policy = OutOfRange ?? (length && !adaptive
+            ? EvolutionOutOfRangePolicy.Reject
+            : EvolutionOutOfRangePolicy.Clamp);
+        double minimum = length ? (binning == EvolutionDescriptorBinning.Logarithmic ? 1 : 0) : Minimum;
+        double maximum = length ? maxProgramChars : Maximum;
+        if (Edges is not null && binning != EvolutionDescriptorBinning.ExplicitEdges)
+            throw new ArgumentException("edges apply only to binning ExplicitEdges.", nameof(Edges));
+        return binning switch
+        {
+            EvolutionDescriptorBinning.Linear => new EvolutionDescriptorDefinition(Name, minimum, maximum, Bins, policy),
+            EvolutionDescriptorBinning.Logarithmic => EvolutionDescriptorDefinition.Logarithmic(Name, minimum, maximum, Bins, policy),
+            EvolutionDescriptorBinning.ExplicitEdges => EvolutionDescriptorDefinition.WithEdges(Name,
+                Edges ?? throw new ArgumentException("binning ExplicitEdges needs edges.", nameof(Edges)), policy),
+            EvolutionDescriptorBinning.AdaptiveMinMax => EvolutionDescriptorDefinition.AdaptiveMinMax(Name, minimum, maximum, Bins, policy),
+            EvolutionDescriptorBinning.AdaptiveQuantile => EvolutionDescriptorDefinition.AdaptiveQuantile(Name, minimum, maximum,
+                Bins, policy, SampleCapacity),
+            _ => throw new ArgumentOutOfRangeException(nameof(Binning))
+        };
+    }
 }
 
 /// <summary>Runs an OpenEvolve evaluator (<c>evaluate(program_path)</c> or cascade stages) through a Python shim.</summary>
@@ -479,13 +533,13 @@ internal static class RunCommand
 
         var variation = new LlmProgramVariationOperator(model, programOptions, variationOptions);
         // Program length stands for OpenEvolve's built-in "complexity" axis. Configured descriptors replace it, as
-        // OpenEvolve's feature_dimensions replace its defaults; "length" among them keeps it.
-        EvolutionDescriptorDefinition[] descriptors = run.Search.MetricDescriptors.Count == 0
-            ? new[] { new EvolutionDescriptorDefinition("length", 0, run.Budget.MaxProgramChars, 64) }
-            : run.Search.MetricDescriptors.Select(metric => metric.Name == "length"
-                ? new EvolutionDescriptorDefinition("length", 0, run.Budget.MaxProgramChars, metric.Bins)
-                : new EvolutionDescriptorDefinition(metric.Name, metric.Minimum, metric.Maximum, metric.Bins,
-                    EvolutionOutOfRangePolicy.Clamp)).ToArray();
+        // OpenEvolve's feature_dimensions replace its defaults; "length" among them keeps it. Length bins follow the
+        // lengths the search produces unless the run file says otherwise: a fixed 0-to-maxProgramChars range put every
+        // program of E-4's third pilot (400-550 characters of 10,000) in one cell.
+        EvolutionDescriptorDefinition[] descriptors = (run.Search.MetricDescriptors.Count == 0
+                ? new List<RunMetricDescriptor> { new() { Name = "length", Bins = 64 } }
+                : run.Search.MetricDescriptors)
+            .Select(metric => metric.ToDefinition(run.Budget.MaxProgramChars)).ToArray();
         var codec = new ProgramGenomeCodec();
         EvolutionReuseScope scope = Scope(task, codec, run);
 
@@ -550,6 +604,10 @@ internal static class RunCommand
             options.EarlyStopping.MinimumImprovement = run.Search.EarlyStoppingMinimumImprovement;
         }
         if (run.Search.TargetQuality is double target) options.TargetQuality = target;
+        if ((run.Search.ChampionStandardErrors is null) != string.IsNullOrWhiteSpace(run.Search.StandardErrorMetric))
+            throw new InvalidDataException("search.championStandardErrors and search.standardErrorMetric are set together or not at all.");
+        if (run.Search.ChampionStandardErrors is double sigmas && (double.IsNaN(sigmas) || double.IsInfinity(sigmas) || sigmas < 0))
+            throw new InvalidDataException("search.championStandardErrors must be a finite, non-negative number.");
         options.Artifacts.Enabled = run.Search.CollectArtifacts;
         options.Artifacts.DeliverToNextProposal = run.Search.IncludeArtifacts;
         options.GlobalEliteCount = run.Search.EliteArchiveSize;
@@ -589,6 +647,10 @@ internal static class RunCommand
         }
 
         EvolutionArchiveEntry<ProgramGenome>? best = result.Best;
+        ChampionChoice? champion = run.Search.ChampionStandardErrors is double standardErrors
+            ? ChooseChampion(result, outputDirectory, run.Search.StandardErrorMetric!, standardErrors)
+            : null;
+        if (champion is not null) best = champion.Entry;
         string? repertoirePath = ExportRepertoire(result, task, codec, scope, run, tracePath, cancellationToken);
         output.WriteLine(JsonSerializer.Serialize(new
         {
@@ -596,7 +658,17 @@ internal static class RunCommand
             Resumed = resume,
             StopReason = result.StopReason.ToString(),
             result.Counters.CompletedEvaluations,
-            BestQuality = best?.Evaluation.Quality,
+            BestQuality = champion is { Entry: null } ? champion.ReferenceQuality : best?.Evaluation.Quality,
+            Champion = champion is null
+                ? null
+                : new
+                {
+                    champion.StandardErrors,
+                    champion.ReferenceQuality,
+                    champion.ReferenceStandardError,
+                    // False when no program beat the seed by enough, so best.py is the seed.
+                    BeatSeed = champion.Entry is not null
+                },
             Fitness = fitnessBasis.Report(),
             Trace = tracePath,
             Checkpoints = Path.Combine(outputDirectory, "checkpoints"),
@@ -645,10 +717,10 @@ internal static class RunCommand
             // one; a run that recovers may report none.
             FailureOutput = FailureOutputOf(result)
         }, Program.Json));
-        if (best is not null)
+        if (best is not null || champion is not null)
         {
             string bestPath = Path.Combine(outputDirectory, "best" + Extension(run.Language));
-            File.WriteAllText(bestPath, best.Candidate.CanonicalGenome.Genome.Source, new UTF8Encoding(false));
+            File.WriteAllText(bestPath, best?.Candidate.CanonicalGenome.Genome.Source ?? initial, new UTF8Encoding(false));
         }
         // A run whose every candidate scored zero, including the seed. "Produced no candidate" does not
         // cover it - there IS a best entry, it is just worthless - so without this the run reports a best
@@ -718,6 +790,32 @@ internal static class RunCommand
 
     /// <summary>Writes the session's archive elites, best first, as <c>repertoire-NNN.json</c> beside its trace.</summary>
     /// <remarks>No evaluator or model call is made. The prior cost is the run's evaluation attempts so far.</remarks>
+    private sealed record ChampionChoice(EvolutionArchiveEntry<ProgramGenome>? Entry, double StandardErrors,
+        double ReferenceQuality, double ReferenceStandardError);
+
+    // The seed's quality and standard error come from the run's traces, which every segment of a resumed run appends
+    // to: the seed was evaluated once, by the first segment, and may since have left the archive.
+    private static ChampionChoice ChooseChampion(EvolutionRunResult<ProgramGenome> result, string outputDirectory,
+        string standardErrorMetric, double standardErrors)
+    {
+        EvolutionTraceRecord? seed = null;
+        foreach (string trace in Directory.GetFiles(outputDirectory, "trace-*.jsonl").OrderBy(path => path, StringComparer.Ordinal))
+            foreach (EvolutionTraceRecord record in EvolutionTraceFile.ReadRecords(trace))
+                if (record.VariationOperatorId == "seed" && record.Status == EvolutionEvaluationStatus.Completed &&
+                    record.Quality is double quality && (seed is null || Better(quality, seed.Quality!.Value, record.Direction)))
+                    seed = record;
+        if (seed is null)
+            throw new InvalidDataException("search.championStandardErrors needs the seed's evaluation, and the run's traces record no completed one.");
+        if (!seed.Metrics.TryGetValue(standardErrorMetric, out double seedError))
+            throw new InvalidDataException("search.standardErrorMetric names '" + standardErrorMetric + "', which the seed's evaluation did not report.");
+        EvolutionArchiveEntry<ProgramGenome>? entry = EvolutionChampionSelection.SelectSignificant(
+            result.Islands.SelectMany(island => island.Entries), seed.Quality!.Value, seedError, standardErrorMetric, standardErrors);
+        return new ChampionChoice(entry, standardErrors, seed.Quality.Value, seedError);
+    }
+
+    private static bool Better(double quality, double than, EvolutionOptimizationDirection direction) =>
+        direction == EvolutionOptimizationDirection.Maximize ? quality > than : quality < than;
+
     private static string? ExportRepertoire(EvolutionRunResult<ProgramGenome> result, ProgramEvolutionTask task, ProgramGenomeCodec codec,
         EvolutionReuseScope scope, RunFile run, string tracePath, CancellationToken cancellationToken)
     {
@@ -1094,6 +1192,23 @@ internal static class RunCommand
         if (run.Budget.Parallelism < 1) throw new InvalidDataException("budget.parallelism must be at least 1.");
         if (run.Budget.EvaluationTimeLimitSeconds < 1) throw new InvalidDataException("budget.evaluationTimeLimitSeconds must be at least 1.");
         if (run.Budget.MaxProgramChars < 1) throw new InvalidDataException("budget.maxProgramChars must be at least 1.");
+        if (run.Search is { } descriptorSection)
+        {
+            for (int i = 0; i < descriptorSection.MetricDescriptors.Count; i++)
+            {
+                RunMetricDescriptor metric = descriptorSection.MetricDescriptors[i]
+                    ?? throw new InvalidDataException($"search.metricDescriptors[{i}] is null.");
+                try
+                {
+                    metric.ToDefinition(run.Budget.MaxProgramChars);
+                }
+                catch (ArgumentException exception)
+                {
+                    throw new InvalidDataException(
+                        $"search.metricDescriptors[{i}] ('{metric.Name}') is invalid: {exception.Message}", exception);
+                }
+            }
+        }
         if (run.Model.TimeoutSeconds < 1) throw new InvalidDataException("model.timeoutSeconds must be at least 1.");
         if (run.Model.MaxRetries is < 0 or > 20) throw new InvalidDataException("model.maxRetries must be between 0 and 20.");
         if (run.Model.RetryDelaySeconds < 0) throw new InvalidDataException("model.retryDelaySeconds cannot be negative.");
