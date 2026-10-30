@@ -110,6 +110,8 @@ public sealed class OpenEvolveImportTests
         // n = 4 inspirations: the island best, max(1, int(4 x 0.5)) = 2 top programs, then 1 diverse.
         Assert.Equal((2, 1), (run.Search.TopInspirations ?? -1, run.Search.DiversePrograms ?? -1));
         Assert.Equal(new[] { ("length", 8), ("accuracy", 8) }, run.Search.MetricDescriptors.Select(d => (d.Name, d.Bins)));
+        // OpenEvolve min-max scales every feature over the values it has seen, so every imported axis adapts.
+        Assert.All(run.Search.MetricDescriptors, d => Assert.Equal(EvolutionDescriptorBinning.AdaptiveMinMax, d.Binning));
         Assert.Equal(new[] { 0.4, 0.6 }, run.OpenEvolveEvaluator?.CascadeThresholds);
         Assert.True(run.OpenEvolveEvaluator?.Cascade); // OpenEvolve's default
         // Not the name of an OpenEvolve template, so it is the text itself, as OpenEvolve would decide.

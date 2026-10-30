@@ -233,9 +233,51 @@ internal sealed class RunSearch
 internal sealed class RunMetricDescriptor
 {
     public required string Name { get; init; }
+    /// <summary>The lower bound; for an adaptive axis, the one used until two distinct values arrive. Ignored for
+    /// <c>length</c>, whose range starts at 0 (1 when logarithmic).</summary>
     public double Minimum { get; init; }
+    /// <summary>The upper bound, as <see cref="Minimum"/>; <c>length</c> uses <c>budget.maxProgramChars</c>.</summary>
     public double Maximum { get; init; } = 1;
     public int Bins { get; init; } = 10;
+    /// <summary>Where the bin boundaries lie; <c>AdaptiveMinMax</c> for <c>length</c> and <c>Linear</c> otherwise
+    /// when absent.</summary>
+    public EvolutionDescriptorBinning? Binning { get; init; }
+    /// <summary>The boundaries of an <c>ExplicitEdges</c> axis, which replace the bounds and the bin count.</summary>
+    public List<double>? Edges { get; init; }
+    /// <summary>How a value outside the range is handled; <c>Reject</c> for a fixed <c>length</c> axis and
+    /// <c>Clamp</c> otherwise when absent.</summary>
+    public EvolutionOutOfRangePolicy? OutOfRange { get; init; }
+    /// <summary>How many observed values an <c>AdaptiveQuantile</c> axis keeps.</summary>
+    public int SampleCapacity { get; init; } = EvolutionDescriptorDefinition.DefaultQuantileSampleCapacity;
+
+    /// <summary>Builds the archive axis this entry describes.</summary>
+    /// <param name="maxProgramChars">The program length budget, which bounds a <c>length</c> axis.</param>
+    internal EvolutionDescriptorDefinition ToDefinition(int maxProgramChars)
+    {
+        bool length = Name == "length";
+        EvolutionDescriptorBinning binning = Binning ?? (length
+            ? EvolutionDescriptorBinning.AdaptiveMinMax
+            : EvolutionDescriptorBinning.Linear);
+        bool adaptive = binning is EvolutionDescriptorBinning.AdaptiveMinMax or EvolutionDescriptorBinning.AdaptiveQuantile;
+        EvolutionOutOfRangePolicy policy = OutOfRange ?? (length && !adaptive
+            ? EvolutionOutOfRangePolicy.Reject
+            : EvolutionOutOfRangePolicy.Clamp);
+        double minimum = length ? (binning == EvolutionDescriptorBinning.Logarithmic ? 1 : 0) : Minimum;
+        double maximum = length ? maxProgramChars : Maximum;
+        if (Edges is not null && binning != EvolutionDescriptorBinning.ExplicitEdges)
+            throw new ArgumentException("edges apply only to binning ExplicitEdges.", nameof(Edges));
+        return binning switch
+        {
+            EvolutionDescriptorBinning.Linear => new EvolutionDescriptorDefinition(Name, minimum, maximum, Bins, policy),
+            EvolutionDescriptorBinning.Logarithmic => EvolutionDescriptorDefinition.Logarithmic(Name, minimum, maximum, Bins, policy),
+            EvolutionDescriptorBinning.ExplicitEdges => EvolutionDescriptorDefinition.WithEdges(Name,
+                Edges ?? throw new ArgumentException("binning ExplicitEdges needs edges.", nameof(Edges)), policy),
+            EvolutionDescriptorBinning.AdaptiveMinMax => EvolutionDescriptorDefinition.AdaptiveMinMax(Name, minimum, maximum, Bins, policy),
+            EvolutionDescriptorBinning.AdaptiveQuantile => EvolutionDescriptorDefinition.AdaptiveQuantile(Name, minimum, maximum,
+                Bins, policy, SampleCapacity),
+            _ => throw new ArgumentOutOfRangeException(nameof(Binning))
+        };
+    }
 }
 
 /// <summary>Runs an OpenEvolve evaluator (<c>evaluate(program_path)</c> or cascade stages) through a Python shim.</summary>
@@ -472,13 +514,13 @@ internal static class RunCommand
 
         var variation = new LlmProgramVariationOperator(model, programOptions, variationOptions);
         // Program length stands for OpenEvolve's built-in "complexity" axis. Configured descriptors replace it, as
-        // OpenEvolve's feature_dimensions replace its defaults; "length" among them keeps it.
-        EvolutionDescriptorDefinition[] descriptors = run.Search.MetricDescriptors.Count == 0
-            ? new[] { new EvolutionDescriptorDefinition("length", 0, run.Budget.MaxProgramChars, 64) }
-            : run.Search.MetricDescriptors.Select(metric => metric.Name == "length"
-                ? new EvolutionDescriptorDefinition("length", 0, run.Budget.MaxProgramChars, metric.Bins)
-                : new EvolutionDescriptorDefinition(metric.Name, metric.Minimum, metric.Maximum, metric.Bins,
-                    EvolutionOutOfRangePolicy.Clamp)).ToArray();
+        // OpenEvolve's feature_dimensions replace its defaults; "length" among them keeps it. Length bins follow the
+        // lengths the search produces unless the run file says otherwise: a fixed 0-to-maxProgramChars range put every
+        // program of E-4's third pilot (400-550 characters of 10,000) in one cell.
+        EvolutionDescriptorDefinition[] descriptors = (run.Search.MetricDescriptors.Count == 0
+                ? new List<RunMetricDescriptor> { new() { Name = "length", Bins = 64 } }
+                : run.Search.MetricDescriptors)
+            .Select(metric => metric.ToDefinition(run.Budget.MaxProgramChars)).ToArray();
         var codec = new ProgramGenomeCodec();
         EvolutionReuseScope scope = Scope(task, codec, run);
 
@@ -976,6 +1018,23 @@ internal static class RunCommand
         if (run.Budget.Parallelism < 1) throw new InvalidDataException("budget.parallelism must be at least 1.");
         if (run.Budget.EvaluationTimeLimitSeconds < 1) throw new InvalidDataException("budget.evaluationTimeLimitSeconds must be at least 1.");
         if (run.Budget.MaxProgramChars < 1) throw new InvalidDataException("budget.maxProgramChars must be at least 1.");
+        if (run.Search is { } descriptorSection)
+        {
+            for (int i = 0; i < descriptorSection.MetricDescriptors.Count; i++)
+            {
+                RunMetricDescriptor metric = descriptorSection.MetricDescriptors[i]
+                    ?? throw new InvalidDataException($"search.metricDescriptors[{i}] is null.");
+                try
+                {
+                    metric.ToDefinition(run.Budget.MaxProgramChars);
+                }
+                catch (ArgumentException exception)
+                {
+                    throw new InvalidDataException(
+                        $"search.metricDescriptors[{i}] ('{metric.Name}') is invalid: {exception.Message}", exception);
+                }
+            }
+        }
         if (run.Model.TimeoutSeconds < 1) throw new InvalidDataException("model.timeoutSeconds must be at least 1.");
         if (run.Model.MaxRetries is < 0 or > 20) throw new InvalidDataException("model.maxRetries must be between 0 and 20.");
         if (run.Model.RetryDelaySeconds < 0) throw new InvalidDataException("model.retryDelaySeconds cannot be negative.");

@@ -845,6 +845,33 @@ public sealed class CliRunTests
         Assert.Equal(2, Run("run", Path.Combine(directory.Path, "run.json")).Code);
     }
 
+    // E-4: the binning a run file names reaches the archive. The metric is X x 100 on an axis whose initial range is
+    // [0, 1]: fixed linear bins clamp X = 1, 2 and 3 into one cell beside the seed, while adaptive min-max bins spread
+    // the four programs over four cells.
+    [Theory]
+    [InlineData("Linear", 2)]
+    [InlineData("AdaptiveMinMax", 4)]
+    public void The_run_files_binning_decides_how_many_elites_the_archive_keeps(string binning, int elites)
+    {
+        using var directory = new TemporaryDirectory();
+        using var model = new FakeChatModel();
+        File.WriteAllText(Path.Combine(directory.Path, "initial.py"), "X = 0\n");
+        File.WriteAllText(Path.Combine(directory.Path, "evaluator.py"), Evaluator.Replace(
+            "return {\"quality\": float(match.group(1)) if match else 0.0}",
+            "x = float(match.group(1)) if match else 0.0\n    return {\"quality\": x, \"metrics\": {\"m\": x * 100}}"));
+        string runFile = WriteRun(directory.Path, model.Endpoint, maxEvaluations: 4, extra: $$"""
+            ,
+              "search": { "metricDescriptors": [ { "name": "m", "bins": 4, "binning": "{{binning}}" } ] }
+            """);
+
+        var (code, _, error) = Run("run", runFile);
+
+        Assert.True(code == 0, error);
+        EvolutionRepertoire repertoire = EvolutionRepertoire.FromJson(
+            File.ReadAllText(Path.Combine(directory.Path, "out", "repertoire-000.json")));
+        Assert.Equal(elites, repertoire.Entries.Count);
+    }
+
     /// <summary>A loopback OpenAI-compatible /v1/chat/completions endpoint proposing X = 1, 2, 3, ... in a python fence.</summary>
     internal sealed class FakeChatModel : IDisposable
     {

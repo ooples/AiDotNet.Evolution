@@ -2254,3 +2254,24 @@ static AiDotNet.Evolution.TopologyMigrationPolicy<TGenome>.DestinationsFor(AiDot
 static AiDotNet.Evolution.TopologyMigrationPolicy<TGenome>.ResolveMigrantCount(int eliteCount, int migrantsPerIsland, double migrationRate) -> int
 AiDotNet.Evolution.EvolutionChampionSelection
 static AiDotNet.Evolution.EvolutionChampionSelection.SelectSignificant<TGenome>(System.Collections.Generic.IEnumerable<AiDotNet.Evolution.EvolutionArchiveEntry<TGenome>!>! entries, double referenceQuality, double referenceStandardError, string! standardErrorMetric, double standardErrors) -> AiDotNet.Evolution.EvolutionArchiveEntry<TGenome>?
+AiDotNet.Evolution.EvolutionDescriptorBinning
+AiDotNet.Evolution.EvolutionDescriptorBinning.AdaptiveMinMax = 3 -> AiDotNet.Evolution.EvolutionDescriptorBinning
+AiDotNet.Evolution.EvolutionDescriptorBinning.AdaptiveQuantile = 4 -> AiDotNet.Evolution.EvolutionDescriptorBinning
+AiDotNet.Evolution.EvolutionDescriptorBinning.ExplicitEdges = 2 -> AiDotNet.Evolution.EvolutionDescriptorBinning
+AiDotNet.Evolution.EvolutionDescriptorBinning.Linear = 0 -> AiDotNet.Evolution.EvolutionDescriptorBinning
+AiDotNet.Evolution.EvolutionDescriptorBinning.Logarithmic = 1 -> AiDotNet.Evolution.EvolutionDescriptorBinning
+AiDotNet.Evolution.EvolutionDescriptorDefinition.Binning.get -> AiDotNet.Evolution.EvolutionDescriptorBinning
+AiDotNet.Evolution.EvolutionDescriptorDefinition.Edges.get -> System.Collections.Generic.IReadOnlyList<double>!
+AiDotNet.Evolution.EvolutionDescriptorDefinition.IsAdaptive.get -> bool
+AiDotNet.Evolution.EvolutionDescriptorDefinition.ObservationCount.get -> long
+AiDotNet.Evolution.EvolutionDescriptorDefinition.ObservedMaximum.get -> double?
+AiDotNet.Evolution.EvolutionDescriptorDefinition.ObservedMinimum.get -> double?
+AiDotNet.Evolution.EvolutionDescriptorDefinition.Observe(double value) -> AiDotNet.Evolution.EvolutionDescriptorDefinition!
+AiDotNet.Evolution.EvolutionDescriptorDefinition.SampleCapacity.get -> int
+const AiDotNet.Evolution.EvolutionDescriptorDefinition.DefaultQuantileSampleCapacity = 4096 -> int
+static AiDotNet.Evolution.EvolutionDescriptorDefinition.AdaptiveMinMax(string! name, double initialMinimum, double initialMaximum, int binCount, AiDotNet.Evolution.EvolutionOutOfRangePolicy outOfRangePolicy = AiDotNet.Evolution.EvolutionOutOfRangePolicy.Clamp) -> AiDotNet.Evolution.EvolutionDescriptorDefinition!
+static AiDotNet.Evolution.EvolutionDescriptorDefinition.AdaptiveQuantile(string! name, double initialMinimum, double initialMaximum, int binCount, AiDotNet.Evolution.EvolutionOutOfRangePolicy outOfRangePolicy = AiDotNet.Evolution.EvolutionOutOfRangePolicy.Clamp, int sampleCapacity = 4096) -> AiDotNet.Evolution.EvolutionDescriptorDefinition!
+static AiDotNet.Evolution.EvolutionDescriptorDefinition.Logarithmic(string! name, double minimum, double maximum, int binCount, AiDotNet.Evolution.EvolutionOutOfRangePolicy outOfRangePolicy = AiDotNet.Evolution.EvolutionOutOfRangePolicy.Reject) -> AiDotNet.Evolution.EvolutionDescriptorDefinition!
+static AiDotNet.Evolution.EvolutionDescriptorDefinition.WithEdges(string! name, System.Collections.Generic.IEnumerable<double>! edges, AiDotNet.Evolution.EvolutionOutOfRangePolicy outOfRangePolicy = AiDotNet.Evolution.EvolutionOutOfRangePolicy.Reject) -> AiDotNet.Evolution.EvolutionDescriptorDefinition!
+AiDotNet.Evolution.EvolutionEvent<TGenome>.Cell.get -> AiDotNet.Evolution.EvolutionCellKey?
+AiDotNet.Evolution.EvolutionEvent<TGenome>.Cell.init -> void

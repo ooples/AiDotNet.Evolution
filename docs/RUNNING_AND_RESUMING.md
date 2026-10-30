@@ -28,6 +28,16 @@ and above the range, and `Grow` extends the range in whole bins and re-keys exis
 archive that grows implements `IGrowableEvolutionArchive<TGenome>` (`MapElitesArchive<TGenome>`
 does), so its widened ranges survive a checkpoint.
 
+Where the bin boundaries lie is the definition's `Binning` (`EvolutionDescriptorBinning`). The
+constructor gives `Linear` bins; `EvolutionDescriptorDefinition.Logarithmic` gives bins of equal
+log-width, `WithEdges` takes the boundaries verbatim, and `AdaptiveMinMax` and `AdaptiveQuantile`
+learn them from the values the archive is offered: the observed range split evenly, or its
+quantiles. An adaptive axis re-keys every elite when its bins move and keeps the better one when two
+land in one cell, and what it has observed travels in the checkpoint, so a resumed run bins exactly
+as the uninterrupted one. A quantile axis keeps at most `sampleCapacity` observed values (4096 by
+default), halving them deterministically when full. Only `Linear` and `Logarithmic` axes can `Grow`,
+and a centroid archive accepts only `Linear` axes.
+
 When you do not know sensible bounds in advance, `EvolutionDescriptorCalibration` derives the whole
 grid from what a seed population measured. For a single descriptor, `EvolutionDescriptorCalibrator`
 collects observed values in any order with `Observe` and turns them into a fixed definition with
