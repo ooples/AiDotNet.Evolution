@@ -281,7 +281,7 @@ internal static class EvolutionEngineDocuments
         public int[]? CellBins { get; set; }
         public long EvaluationId { get; set; }
         public string GenomeId { get; set; } = string.Empty;
-        public string? GenomePayload { get; set; }
+        public EvolutionGenomePayload? GenomePayload { get; set; }
         public LineageDocument? Lineage { get; set; }
         public EvaluationDocument? Evaluation { get; set; }
 
@@ -290,7 +290,7 @@ internal static class EvolutionEngineDocuments
             CellBins = entry.Cell.Bins.ToArray(),
             EvaluationId = entry.Evaluation.EvaluationId,
             GenomeId = entry.Evaluation.GenomeId,
-            GenomePayload = serializeGenome(entry.Candidate.CanonicalGenome.Genome),
+            GenomePayload = new EvolutionGenomePayload(serializeGenome(entry.Candidate.CanonicalGenome.Genome)),
             Lineage = LineageDocument.From(entry.Evaluation.Lineage),
             Evaluation = EvaluationDocument.From(entry.Evaluation)
         };
@@ -392,10 +392,10 @@ internal static class EvolutionEngineDocuments
             ConstraintViolations ?? new List<double>(),
             new EvolutionEvaluationCost(TimeSpan.FromTicks(ElapsedTicks), AttemptCount, CostUnits,
                 StageCostUnits ?? new List<double>(), RejectedStage),
-            lineage, CacheStatus, (Diagnostics ?? new List<DiagnosticDocument>()).Select(item => item.ToDiagnostic()),
+            lineage, CacheStatus, Diagnostics?.ConvertAll(item => item.ToDiagnostic()) ?? (IEnumerable<EvolutionDiagnostic>)Array.Empty<EvolutionDiagnostic>(),
             TaskVersionHash, EvaluatorVersionHash, ConfigurationHash,
             Metrics ?? new Dictionary<string, double>(),
-            (Artifacts ?? new List<ArtifactDocument>()).Select(item => item.ToArtifact()));
+            Artifacts?.ConvertAll(item => item.ToArtifact()));
             return MeasurementOriginJson is null ? result : result.WithMeasurementOrigin(EvolutionMeasurementOrigin.FromJson(MeasurementOriginJson));
         }
     }
@@ -433,7 +433,7 @@ internal static class EvolutionEngineDocuments
             var result = new EvolutionTaskResult(Status, Quality, Direction,
             Descriptors ?? new Dictionary<string, double>(), Objectives ?? new List<double>(),
             ConstraintViolations ?? new List<double>(), CostUnits,
-            (Diagnostics ?? new List<DiagnosticDocument>()).Select(item => item.ToDiagnostic()),
+            Diagnostics?.ConvertAll(item => item.ToDiagnostic()),
             Metrics ?? new Dictionary<string, double>());
             return MeasurementOriginJson is null ? result : result.WithMeasurementOrigin(EvolutionMeasurementOrigin.FromJson(MeasurementOriginJson));
         }

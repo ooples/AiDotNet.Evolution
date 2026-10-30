@@ -875,6 +875,7 @@ AiDotNet.Evolution.Programs.ProgramGenome.Source.get -> string!
 AiDotNet.Evolution.Programs.ProgramGenome.WithDescription(string? description) -> AiDotNet.Evolution.Programs.ProgramGenome!
 AiDotNet.Evolution.Programs.ProgramGenome.WithSource(string! source, string? description = null) -> AiDotNet.Evolution.Programs.ProgramGenome!
 AiDotNet.Evolution.Programs.ProgramGenomeCodec
+AiDotNet.Evolution.Programs.ProgramGenomeCodec.Deserialize(System.ReadOnlySpan<byte> utf8Payload) -> AiDotNet.Evolution.Programs.ProgramGenome!
 AiDotNet.Evolution.Programs.ProgramGenomeCodec.Deserialize(string! payload) -> AiDotNet.Evolution.Programs.ProgramGenome!
 AiDotNet.Evolution.Programs.ProgramGenomeCodec.Id.get -> string!
 AiDotNet.Evolution.Programs.ProgramGenomeCodec.ProgramGenomeCodec() -> void

@@ -7,7 +7,7 @@ internal static class EvolutionCollection
     {
         Guard.NotNull(values);
         if (maximum < 0) throw new ArgumentOutOfRangeException(nameof(maximum));
-        int knownCount = 4;
+        int knownCount = 0;
         if (values is ICollection<T> collection)
         {
             knownCount = ValidateReportedCount(collection.Count, maximum, parameterName);
@@ -19,8 +19,8 @@ internal static class EvolutionCollection
 
         // Enumerated, not copied by count: a collection may report a count it does not hold. Sized from the reported
         // count, so a truthful collection costs its one array rather than a list and a copy (E-1: a resume runs this for
-        // every restored result).
-        var result = new T[Math.Min(maximum, knownCount)];
+        // every restored result). An enumeration of unknown length grows from empty, so an empty one allocates nothing.
+        T[] result = knownCount == 0 ? Array.Empty<T>() : new T[Math.Min(maximum, knownCount)];
         int count = 0;
         foreach (T value in values)
         {
@@ -28,6 +28,7 @@ internal static class EvolutionCollection
             if (count == result.Length) Array.Resize(ref result, Math.Min(maximum, Math.Max(4, result.Length * 2)));
             result[count++] = value;
         }
+        if (count == 0) return Array.Empty<T>();
         if (count != result.Length) Array.Resize(ref result, count);
         return result;
     }

@@ -1,5 +1,6 @@
 // Source: ooples/AiDotNet 66d7602c92101e5ab2bd9db8cfa7f7526fa2c75d:tests/AiDotNet.Tests/UnitTests/Evolution/Programs/ProgramGenomeCodecTests.cs; original BSL license retained in src/AiDotNet.Evolution.Programs/AIDOTNET-LICENSE.txt.
 using System.IO;
+using System.Text;
 using AiDotNet.Evolution.Programs;
 using Newtonsoft.Json.Linq;
 using Xunit;
@@ -73,8 +74,24 @@ public sealed class ProgramGenomeCodecTests
     [InlineData("{\"v\":1,\"language\":\"Python\",\"source\":\"x\"} 1")]
     [InlineData("{\"v\":1,\"language\":\"Python\",\"source\":\"x\"}{}")]
     [InlineData("{\"v\":1,\"language\":\"Python\",\"source\":\"x\"")]
-    public void MalformedPayloadsRaiseInvalidData(string payload) =>
+    public void MalformedPayloadsRaiseInvalidData(string payload)
+    {
         Assert.Throws<InvalidDataException>(() => Codec.Deserialize(payload));
+        Assert.Throws<InvalidDataException>(() => Codec.Deserialize(Encoding.UTF8.GetBytes(payload).AsSpan()));
+    }
+
+    // A resume hands the codec each archived payload as UTF-8 (E-1); bytes that are not UTF-8 are a corrupt payload,
+    // wherever they sit: in a field the byte reader reads, or in text it hands to the general reader.
+    [Theory]
+    [InlineData("{\"v\":1,\"language\":\"Python\",\"source\":\"x \u0001 y\"}")]
+    [InlineData("{\"v\":1,\"language\":\"Python\",\"source\":\"x\\n\u0001\"}")]
+    [InlineData("{\"v\":1,\"language\":\"Python\",\"source\":\"x\",\"extra\":\"\u0001\"}")]
+    public void PayloadBytesThatAreNotUtf8RaiseInvalidData(string template)
+    {
+        byte[] payload = Encoding.UTF8.GetBytes(template);
+        payload[Array.IndexOf(payload, (byte)0x01)] = 0xFF;
+        Assert.Throws<InvalidDataException>(() => Codec.Deserialize(payload.AsSpan()));
+    }
 
     // E-1 reads payloads through pooled reader buffers. A source far longer than the reader's first buffer, with escapes
     // throughout, must still come back exactly, and decoding many in a row must not let one payload's text leak into the
@@ -87,10 +104,13 @@ public sealed class ProgramGenomeCodecTests
             string source = "# candidate " + round + "\r\n" + string.Concat(Enumerable.Range(0, 300)
                 .Select(line => "value_" + line + " = \"\\t" + (round * 300 + line) + "\"\t# caf\u00E9 \uD83D\uDE80\n"));
             var genome = new ProgramGenome(source, ProgramLanguage.Python, round % 2 == 0 ? null : "d" + round);
-            ProgramGenome restored = Codec.Deserialize(Codec.Serialize(genome));
-            Assert.Equal(genome.Source, restored.Source);
-            Assert.Equal(genome.Description, restored.Description);
-            Assert.Equal(genome.Id, restored.Id);
+            string payload = Codec.Serialize(genome);
+            foreach (ProgramGenome restored in new[] { Codec.Deserialize(payload), Codec.Deserialize(Encoding.UTF8.GetBytes(payload).AsSpan()) })
+            {
+                Assert.Equal(genome.Source, restored.Source);
+                Assert.Equal(genome.Description, restored.Description);
+                Assert.Equal(genome.Id, restored.Id);
+            }
         }
     }
 
@@ -165,6 +185,24 @@ public sealed class ProgramGenomeCodecTests
             decoded = null;
         }
 
+        // Read from its UTF-8 bytes, as a resume reads it, the payload decodes to the same genome or is refused too.
+        ProgramGenome? fromBytes;
+        try
+        {
+            fromBytes = Codec.Deserialize(Encoding.UTF8.GetBytes(payload).AsSpan());
+        }
+        catch (InvalidDataException)
+        {
+            fromBytes = null;
+        }
+        Assert.Equal(decoded is null, fromBytes is null);
+        if (decoded is not null)
+        {
+            Assert.Equal(decoded.Source, fromBytes!.Source);
+            Assert.Equal(decoded.Description, fromBytes.Description);
+            Assert.Equal(decoded.Language, fromBytes.Language);
+        }
+
         if (decoded is null)
         {
             // Refused: Json.NET either refused it too, or read something that is not a valid genome.
@@ -186,7 +224,7 @@ public sealed class ProgramGenomeCodecTests
     {
 #pragma warning disable CS8600, CS8625
         Assert.Throws<ArgumentNullException>(() => Codec.Serialize(null));
-        Assert.Throws<ArgumentNullException>(() => Codec.Deserialize(null));
+        Assert.Throws<ArgumentNullException>(() => Codec.Deserialize((string)null));
 #pragma warning restore CS8600, CS8625
     }
 }

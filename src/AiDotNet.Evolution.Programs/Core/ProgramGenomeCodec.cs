@@ -1,6 +1,7 @@
 // Source: ooples/AiDotNet 66d7602c92101e5ab2bd9db8cfa7f7526fa2c75d:src/Evolution/Programs/ProgramGenomeCodec.cs; original BSL license retained in src/AiDotNet.Evolution.Programs/AIDOTNET-LICENSE.txt.
 using System.IO;
 using System.Runtime.CompilerServices;
+using System.Text;
 using Newtonsoft.Json;
 using Newtonsoft.Json.Linq;
 
@@ -26,10 +27,12 @@ namespace AiDotNet.Evolution.Programs;
 /// turns a genome into a small line of JSON and turns that JSON back into an identical genome. You only need it
 /// when you give the engine a checkpoint store; runs that never pause do not use it at all.</para>
 /// </remarks>
-public sealed class ProgramGenomeCodec : IEvolutionGenomeCodec<ProgramGenome>
+public sealed class ProgramGenomeCodec : IEvolutionUtf8GenomeCodec<ProgramGenome>
 {
     /// <summary>The payload schema version written into every serialized genome.</summary>
     public const int PayloadVersion = 1;
+
+    private static readonly UTF8Encoding StrictUtf8 = new(encoderShouldEmitUTF8Identifier: false, throwOnInvalidBytes: true);
 
     /// <inheritdoc/>
     public string Id => "program-genome";
@@ -224,6 +227,150 @@ public sealed class ProgramGenomeCodec : IEvolutionGenomeCodec<ProgramGenome>
         }
     }
 
+    // TryReadCanonical over a payload's UTF-8 bytes, with the same rules: a resume hands the codec each archived genome
+    // as the bytes it was stored as, and reading those directly skips building the payload as a string (E-1). Every
+    // structural character is ASCII, and no byte of a multi-byte UTF-8 sequence is, so the scan is the same scan.
+    [MethodImpl(MethodImplOptions.AggressiveOptimization)]
+    private static bool TryReadCanonical(ReadOnlySpan<byte> text, out string? language, out string? source, out string? description)
+    {
+        language = null;
+        source = null;
+        description = null;
+        if (text.Length == 0 || text[0] != (byte)'{') return false;
+        int position = 1;
+        bool sawVersion = false;
+        while (true)
+        {
+            if (position >= text.Length || text[position] != (byte)'"') return false;
+            int nameLength = text.Slice(position + 1).IndexOf((byte)'"');
+            if (nameLength < 0) return false;
+            ReadOnlySpan<byte> name = text.Slice(position + 1, nameLength);
+            position += nameLength + 2;
+            if (position >= text.Length || text[position] != (byte)':') return false;
+            position++;
+
+            if (name.SequenceEqual("v"u8))
+            {
+                if (sawVersion || position >= text.Length || text[position] != (byte)'1') return false;
+                sawVersion = true;
+                position++;
+            }
+            else if (name.SequenceEqual("language"u8))
+            {
+                if (language is not null || !TryReadPlainString(text, ref position, out language)) return false;
+            }
+            else if (name.SequenceEqual("source"u8))
+            {
+                if (source is not null || !TryReadPlainString(text, ref position, out source)) return false;
+            }
+            else if (name.SequenceEqual("description"u8))
+            {
+                if (description is not null || !TryReadPlainString(text, ref position, out description)) return false;
+            }
+            else
+            {
+                return false;
+            }
+
+            if (position >= text.Length) return false;
+            byte separator = text[position++];
+            if (separator == (byte)'}') break;
+            if (separator != (byte)',') return false;
+        }
+
+        return position == text.Length && sawVersion && language is not null && source is not null;
+    }
+
+    // TryReadPlainString over UTF-8. Invalid UTF-8 throws DecoderFallbackException, which Deserialize reports.
+    [MethodImpl(MethodImplOptions.AggressiveOptimization)]
+    private static bool TryReadPlainString(ReadOnlySpan<byte> text, ref int position, out string? value)
+    {
+        value = null;
+        if (position >= text.Length || text[position] != (byte)'"') return false;
+        int start = position + 1;
+        int run = text.Slice(start).IndexOfAny((byte)'"', (byte)'\\');
+        if (run < 0) return false;
+        string read;
+        int end;
+        if (text[start + run] == (byte)'"')
+        {
+            ReadOnlySpan<byte> plain = text.Slice(start, run);
+            if (plain.IndexOfAnyInRange((byte)0x00, (byte)0x1F) >= 0) return false;
+            read = StrictUtf8.GetString(plain);
+            end = start + run;
+        }
+        else if (!TryUnescape(text, start, out read, out end))
+        {
+            return false;
+        }
+
+        if (read.Length > 0 && (char.IsDigit(read[0]) || read[0] == '/')) return false;
+        value = read;
+        position = end + 1;
+        return true;
+    }
+
+    // TryUnescape over UTF-8. A UTF-8 byte never decodes to more than one UTF-16 char, so the byte count bounds the text.
+    [MethodImpl(MethodImplOptions.AggressiveOptimization)]
+    private static bool TryUnescape(ReadOnlySpan<byte> text, int start, out string value, out int end)
+    {
+        value = string.Empty;
+        end = -1;
+        char[] buffer = System.Buffers.ArrayPool<char>.Shared.Rent(text.Length - start);
+        try
+        {
+            int length = 0;
+            int index = start;
+            while (true)
+            {
+                int run = text.Slice(index).IndexOfAny((byte)'"', (byte)'\\');
+                if (run < 0) return false;
+                ReadOnlySpan<byte> plain = text.Slice(index, run);
+                if (plain.IndexOfAnyInRange((byte)0x00, (byte)0x1F) >= 0) return false;
+                length += StrictUtf8.GetChars(plain, buffer.AsSpan(length));
+                index += run;
+                if (text[index] == (byte)'"') break;
+
+                if (index + 1 >= text.Length) return false;
+                byte escaped = text[index + 1];
+                index += 2;
+                char unescaped;
+                switch (escaped)
+                {
+                    case (byte)'"': unescaped = '"'; break;
+                    case (byte)'\\': unescaped = '\\'; break;
+                    case (byte)'/': unescaped = '/'; break;
+                    case (byte)'b': unescaped = '\b'; break;
+                    case (byte)'f': unescaped = '\f'; break;
+                    case (byte)'n': unescaped = '\n'; break;
+                    case (byte)'r': unescaped = '\r'; break;
+                    case (byte)'t': unescaped = '\t'; break;
+                    case (byte)'u':
+                        if (index + 4 > text.Length ||
+                            !ushort.TryParse(text.Slice(index, 4), System.Globalization.NumberStyles.AllowHexSpecifier,
+                                System.Globalization.CultureInfo.InvariantCulture, out ushort code) ||
+                            char.IsSurrogate((char)code))
+                            return false;
+                        unescaped = (char)code;
+                        index += 4;
+                        break;
+                    default:
+                        return false;
+                }
+
+                buffer[length++] = unescaped;
+            }
+
+            value = new string(buffer, 0, length);
+            end = index;
+            return true;
+        }
+        finally
+        {
+            System.Buffers.ArrayPool<char>.Shared.Return(buffer);
+        }
+    }
+
     private sealed class SharedCharPool : IArrayPool<char>
     {
         internal static readonly SharedCharPool Instance = new();
@@ -268,6 +415,31 @@ public sealed class ProgramGenomeCodec : IEvolutionGenomeCodec<ProgramGenome>
             description = parsed["description"]?.Value<string>();
         }
 
+        return Create(languageName, source, description);
+    }
+
+    /// <inheritdoc/>
+    public ProgramGenome Deserialize(ReadOnlySpan<byte> utf8Payload)
+    {
+        string? languageName;
+        string? source;
+        string? description;
+        try
+        {
+            // Anything the byte reader does not take goes to the string reader whole, so it is read exactly as before.
+            if (!TryReadCanonical(utf8Payload, out languageName, out source, out description))
+                return Deserialize(StrictUtf8.GetString(utf8Payload));
+        }
+        catch (DecoderFallbackException exception)
+        {
+            throw new InvalidDataException("The program genome payload is not valid UTF-8.", exception);
+        }
+
+        return Create(languageName, source, description);
+    }
+
+    private static ProgramGenome Create(string? languageName, string? source, string? description)
+    {
         if (string.IsNullOrWhiteSpace(languageName))
             throw new InvalidDataException("The program genome payload is missing its language field.");
 
