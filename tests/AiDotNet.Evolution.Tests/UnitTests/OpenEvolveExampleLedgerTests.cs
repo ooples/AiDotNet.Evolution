@@ -284,7 +284,7 @@ public sealed class OpenEvolveExampleLedgerTests
             {
                 OpenEvolveImport import = OpenEvolveConfigImporter.Import(
                     config, Program(checkout, row.Example, config), Evaluator(checkout, row.Example, config),
-                    iterations: 3, python: null);
+                    iterations: 3, python: null, container: null, allowUnsandboxedExecution: true);
                 imported = true;
                 detail = import.Notes.Count.ToString(System.Globalization.CultureInfo.InvariantCulture) + " notes";
             }

@@ -134,7 +134,7 @@ public sealed class OpenEvolveExampleSmokeTests
             string output = Path.Combine(directory.Path, "out");
             (int Code, string Output, string Error) run = CliRunTests.Run(
                 "run", "--openevolve-config", rewritten, program, evaluator,
-                "--iterations", "3", "--output", output, "--python", Python);
+                "--iterations", "3", "--output", output, "--python", Python, "--allow-unsandboxed-execution");
 
             Assert.True(run.Code == 0, run.Error);
             using JsonDocument result = JsonDocument.Parse(run.Output);

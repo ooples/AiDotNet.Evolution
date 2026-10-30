@@ -4,9 +4,17 @@
 changes:
 
 ```text
-aidotnet-evolve run --openevolve-config config.yaml initial_program.py evaluator.py [--iterations N] [--output DIR] [--python EXE]
-                                                                                    [--python-path DIR]...
+aidotnet-evolve run --openevolve-config config.yaml initial_program.py evaluator.py
+                    (--container-image IMAGE [--container-lifecycle Warm|Cold] | --allow-unsandboxed-execution)
+                    [--iterations N] [--output DIR] [--python EXE] [--python-path DIR]...
 ```
+
+One choice has no OpenEvolve counterpart: where the evaluator runs. OpenEvolve runs it, and the programs it
+executes, as host processes with your files, credentials and network. Here you say which you want on every
+import. `--container-image` runs it in a locked-down Docker container (the evaluator's directory and each
+`--python-path` directory are mounted read-only; see `container.image` in [the CLI reference](../CLI.md)), and
+`--allow-unsandboxed-execution` accepts OpenEvolve's behaviour for code you trust or on a machine provisioned for
+it. The command refuses to import with neither, so the opt-in in `run.json` is always one you gave.
 
 The arguments mirror `openevolve-run.py`. The command translates the config into a normal run file
 (`<output>/run.json`) and writes a per-key report (`<output>/openevolve-import.json`). It then runs the task, which you
@@ -124,7 +132,7 @@ holds is visible to code it is evaluating. Nothing is inherited, including `PYTH
 Name the directories instead, once per directory:
 
 ```text
-aidotnet-evolve run --openevolve-config config.yaml initial_program.py evaluator.py --python-path /path/to/openevolve --python-path /path/to/my-helpers
+aidotnet-evolve run --openevolve-config config.yaml initial_program.py evaluator.py --allow-unsandboxed-execution --python-path /path/to/openevolve --python-path /path/to/my-helpers
 ```
 
 Paths are resolved relative to the config file, joined with the platform's path separator, and

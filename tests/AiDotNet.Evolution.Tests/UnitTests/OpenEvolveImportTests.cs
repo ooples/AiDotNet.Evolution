@@ -237,7 +237,7 @@ public sealed class OpenEvolveImportTests
             string output = Path.Combine(directory.Path, "out");
             var (code, stdout, error) = CliRunTests.Run("run", "--openevolve-config", Path.Combine(directory.Path, "config.yaml"),
                 Path.Combine(directory.Path, "initial_program.py"), Path.Combine(directory.Path, "evaluator.py"),
-                "--output", output, "--python", Python);
+                "--output", output, "--python", Python, "--allow-unsandboxed-execution");
             Assert.True(code == 0, error);
             using JsonDocument result = JsonDocument.Parse(stdout);
             Assert.Equal(5, result.RootElement.GetProperty("CompletedEvaluations").GetInt64());
@@ -465,7 +465,7 @@ public sealed class OpenEvolveImportTests
                 "run", "--openevolve-config", Path.Combine(directory.Path, "config.yaml"),
                 Path.Combine(directory.Path, "initial_program.py"),
                 Path.Combine(directory.Path, "evaluator.py"),
-                "--output", output, "--python", Python);
+                "--output", output, "--python", Python, "--allow-unsandboxed-execution");
 
             using JsonDocument result = JsonDocument.Parse(stdout);
             JsonElement failures = result.RootElement.GetProperty("Failures");
@@ -544,7 +544,7 @@ public sealed class OpenEvolveImportTests
         {
             "run", "--openevolve-config", Path.Combine(directory.Path, "config.yaml"),
             Path.Combine(directory.Path, "initial_program.py"), Path.Combine(directory.Path, "evaluator.py"),
-            "--python", Python
+            "--python", Python, "--allow-unsandboxed-execution"
         };
 
         string? previousKey = Environment.GetEnvironmentVariable("OPENAI_API_KEY");
@@ -823,7 +823,48 @@ public sealed class OpenEvolveImportTests
         File.WriteAllText(Path.Combine(directory.Path, "initial_program.py"), "X = 0\n");
         File.WriteAllText(Path.Combine(directory.Path, "evaluator.py"), "def evaluate(path):\n    return {}\n");
         return OpenEvolveConfigImporter.Import(config, Path.Combine(directory.Path, "initial_program.py"),
-            Path.Combine(directory.Path, "evaluator.py"), iterations: null, python: python);
+            Path.Combine(directory.Path, "evaluator.py"), iterations: null, python: python, container: null,
+            allowUnsandboxedExecution: true);
+    }
+
+    [Fact]
+    public void An_import_never_grants_the_unsandboxed_opt_in_on_the_callers_behalf()
+    {
+        using var directory = new TemporaryDirectory();
+        string config = Path.Combine(directory.Path, "config.yaml");
+        File.WriteAllText(config, "llm:\n  name: m\nmax_iterations: 2\n");
+        string initial = Path.Combine(directory.Path, "initial_program.py");
+        string evaluator = Path.Combine(directory.Path, "evaluator.py");
+        File.WriteAllText(initial, "X = 0\n");
+        File.WriteAllText(evaluator, "def evaluate(path):\n    return {}\n");
+
+        // Neither choice: refused by name, rather than writing allowUnsandboxedExecution = true into the run file.
+        InvalidDataException refused = Assert.Throws<InvalidDataException>(() => OpenEvolveConfigImporter.Import(
+            config, initial, evaluator, iterations: null, python: null, container: null, allowUnsandboxedExecution: false));
+        Assert.Contains("--container-image", refused.Message, StringComparison.Ordinal);
+        Assert.Contains("--allow-unsandboxed-execution", refused.Message, StringComparison.Ordinal);
+        Assert.Throws<InvalidDataException>(() => OpenEvolveConfigImporter.Import(config, initial, evaluator, iterations: null,
+            python: null, container: new RunContainer { Image = "python:3.12-slim" }, allowUnsandboxedExecution: true));
+
+        // A container keeps the run sandboxed and records no opt-in.
+        OpenEvolveImport contained = OpenEvolveConfigImporter.Import(config, initial, evaluator, iterations: null, python: null,
+            container: new RunContainer { Image = "python:3.12-slim", Lifecycle = ContainerLifecycle.Cold }, allowUnsandboxedExecution: false);
+        Assert.False(contained.Run.AllowUnsandboxedExecution);
+        Assert.Equal("python:3.12-slim", contained.Run.Container?.Image);
+        Assert.Equal(ContainerLifecycle.Cold, contained.Run.Container?.Lifecycle);
+
+        // The explicit opt-in is carried through as given, and only then.
+        OpenEvolveImport host = OpenEvolveConfigImporter.Import(
+            config, initial, evaluator, iterations: null, python: null, container: null, allowUnsandboxedExecution: true);
+        Assert.True(host.Run.AllowUnsandboxedExecution);
+        Assert.Null(host.Run.Container);
+
+        // The command line refuses before writing a run file when the caller names neither.
+        string output = Path.Combine(directory.Path, "out");
+        var (code, _, error) = CliRunTests.Run("run", "--openevolve-config", config, initial, evaluator, "--output", output);
+        Assert.NotEqual(0, code);
+        Assert.Contains("--allow-unsandboxed-execution", error, StringComparison.Ordinal);
+        Assert.False(File.Exists(Path.Combine(output, "run.json")));
     }
 
     private static string RepositoryRoot()
