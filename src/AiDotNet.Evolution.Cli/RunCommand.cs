@@ -917,7 +917,33 @@ internal static class RunCommand
         return mounts;
     }
 
-    private static string RequireMountable(string? directory, string what)
+    /// <summary>The directory, refused when it or the directory its links resolve to is a filesystem root or the home directory.</summary>
+    /// <remarks>Docker bind-mounts the resolved target, so a link to the home directory would mount the home directory.</remarks>
+    internal static string RequireMountable(string? directory, string what)
+    {
+        RequireNotRootOrHome(directory, directory, what);
+        if (directory is not null) RequireNotRootOrHome(ResolveLinks(directory), directory, what);
+        return directory ?? string.Empty;
+    }
+
+    // Resolves every link along the path, one component at a time, so a link in a parent directory counts too.
+    internal static string ResolveLinks(string path, int depth = 0)
+    {
+        if (depth > 40) throw new InvalidDataException(path + " has too many levels of symbolic links.");
+        string full = Path.GetFullPath(path);
+        string current = Path.GetPathRoot(full) ?? string.Empty;
+        foreach (string part in full.Substring(current.Length).Split(new[] { Path.DirectorySeparatorChar, Path.AltDirectorySeparatorChar }, StringSplitOptions.RemoveEmptyEntries))
+        {
+            current = Path.Combine(current, part);
+            var info = new DirectoryInfo(current);
+            if (info.Exists && info.LinkTarget is not null && info.ResolveLinkTarget(returnFinalTarget: true) is { } target)
+                current = ResolveLinks(target.FullName, depth + 1);
+        }
+
+        return current;
+    }
+
+    private static void RequireNotRootOrHome(string? directory, string? named, string what)
     {
         string trimmed = directory?.TrimEnd(Path.DirectorySeparatorChar, Path.AltDirectorySeparatorChar) ?? string.Empty;
         string home = Environment.GetFolderPath(Environment.SpecialFolder.UserProfile)
@@ -927,13 +953,12 @@ internal static class RunCommand
             || string.Equals(trimmed, (Path.GetPathRoot(directory) ?? string.Empty).TrimEnd(Path.DirectorySeparatorChar, Path.AltDirectorySeparatorChar), comparison);
         if (root || (home.Length > 0 && string.Equals(trimmed, home, comparison)))
         {
+            string resolved = directory is not null && !string.Equals(directory, named, comparison) ? ", a link to " + directory : string.Empty;
             throw new InvalidDataException(
-                what + " (" + (directory ?? "none") + ") would be mounted read-only into the container, where every candidate can "
+                what + " (" + (named ?? "none") + resolved + ") would be mounted read-only into the container, where every candidate can "
                 + "read it; a filesystem root or the home directory is refused. Move the evaluator and its helpers into a "
                 + "directory of their own.");
         }
-
-        return directory ?? string.Empty;
     }
 
     /// <summary>The evaluator script to run: the file itself, or the OpenEvolve shim that imports it.</summary>
@@ -944,7 +969,9 @@ internal static class RunCommand
         if (run.OpenEvolveEvaluator is not { } openEvolve) return source;
         // The shim hashes the host file and, in a container, imports the same file through the read-only mount.
         string runtimePath = run.Container is null ? path : ContainerEvaluatorDirectory + "/" + Path.GetFileName(path);
-        return OpenEvolveEvaluatorShim.Build(path, runtimePath, openEvolve);
+        var helpers = new List<string> { Path.GetDirectoryName(path) ?? baseDirectory };
+        helpers.AddRange(HostPythonPath(openEvolve, baseDirectory));
+        return OpenEvolveEvaluatorShim.Build(path, runtimePath, openEvolve, helpers, Path.GetFullPath(Path.Combine(baseDirectory, run.Output)));
     }
 
     private static ScriptProgramFitnessEvaluator CreateFitness(RunFile run, IProgramExecutionEngine execution, string evaluator)

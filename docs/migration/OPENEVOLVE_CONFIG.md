@@ -170,7 +170,10 @@ killed on a timeout and a memory cap enforced. A bundled shim reproduces OpenEvo
 - Metrics and artifacts (dict returns or `EvaluationResult`) are carried into the run.
 
 The shim records the evaluator's SHA-256. Editing the evaluator therefore changes the run's identity, and a changed file
-is refused rather than mixed into an ongoing run.
+is refused rather than mixed into an ongoing run. The same holds for the helpers it imports: the shim also records a digest
+of every `.py` file in the evaluator's directory and in each `pythonPath` entry (skipping hidden files, links,
+`__pycache__` and the run's own output directory), so editing, adding or removing a helper between `run` and `resume`
+refuses the resume too. Data files those directories hold are not part of the digest.
 
 ### Running the evaluator in a container
 
