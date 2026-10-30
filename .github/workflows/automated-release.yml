@@ -401,12 +401,19 @@ jobs:
     name: Publish to npm
     # npm trusted publishing: npm (11.5.1 or later) exchanges the OIDC token itself, and the provenance statement names
     # this workflow. Hosts first, so the main package never points at a host version that does not exist yet.
+    # npm matches the CALLING workflow's filename, so a release from release-please.yml needs a trusted publisher
+    # for release-please.yml as well as one for this file (manual reruns); see .github/REPOSITORY_SETUP.md.
     permissions:
       contents: read
       id-token: write
     needs: [validate, publish, registry-pack]
     runs-on: ubuntu-latest
     timeout-minutes: 10
+    # The environment is part of the OIDC token, so the npm trusted publisher can require it, and a required reviewer
+    # on it makes each npm upload wait for approval, as the pypi environment does for PyPI.
+    environment:
+      name: npm
+      url: https://www.npmjs.com/package/@aidotnet/evolution
     steps:
       - uses: actions/download-artifact@9000827ccba6bdab643e8b6fd33ac0654aef8333 # v8.0.2
         with:

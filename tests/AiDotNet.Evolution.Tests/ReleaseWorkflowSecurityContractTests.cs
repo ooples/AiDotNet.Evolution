@@ -49,6 +49,25 @@ public sealed class ReleaseWorkflowSecurityContractTests
         Assert.Contains(errors, error => error.IndexOf(expected, StringComparison.Ordinal) >= 0);
     }
 
+    [Theory]
+    [InlineData("publish-npm", "npm")]
+    [InlineData("publish-pypi", "pypi")]
+    public void RegistryPublishJobWithoutItsEnvironmentIsRejected(string job, string environment)
+    {
+        using var fixture = ReleaseWorkflowFixture.Create();
+        string releasePath = Path.Combine(fixture.WorkflowDirectory, "automated-release.yml");
+        string workflow = File.ReadAllText(releasePath).Replace("\r\n", "\n");
+        string declared = "    environment:\n      name: " + environment + "\n";
+        int start = workflow.IndexOf("  " + job + ":\n", StringComparison.Ordinal);
+        int at = workflow.IndexOf(declared, start, StringComparison.Ordinal);
+        Assert.True(start >= 0 && at > start, job + " should declare the " + environment + " environment");
+        File.WriteAllText(releasePath, workflow.Remove(at, declared.Length).Insert(at, "    environment:\n      name: production\n"));
+
+        IReadOnlyList<string> errors = ReleaseWorkflowSecurityContract.Validate(fixture.WorkflowDirectory);
+
+        Assert.Contains(errors, error => error.IndexOf(job + " job must run in the '" + environment + "' environment", StringComparison.Ordinal) >= 0);
+    }
+
     [Fact]
     public void OidcPermissionInARegistryBuildJobIsRejected()
     {
@@ -164,6 +183,12 @@ internal static class ReleaseWorkflowSecurityContract
     private const string AttestationWorkflowName = "attest-release.yml";
     private const string NuGetLoginAction = "NuGet/login@";
     private static readonly string[] RegistryPublishJobs = { "publish-npm", "publish-pypi" };
+    // Each registry's trusted publisher names this environment, and its protection rules gate the upload.
+    private static readonly Dictionary<string, string> RegistryEnvironments = new(StringComparer.Ordinal)
+    {
+        ["publish-npm"] = "npm",
+        ["publish-pypi"] = "pypi"
+    };
     private const string ProvenanceAction = "actions/attest-build-provenance@";
 
     public static IReadOnlyList<string> Validate(string workflowDirectory)
@@ -306,6 +331,11 @@ internal static class ReleaseWorkflowSecurityContract
                 errors, $"{name} job cannot authenticate to NuGet");
             Require(Needs(registry).IsSupersetOf(new[] { "publish", "registry-pack" }), errors,
                 $"{name} job must wait for the NuGet publish and the tested registry packages");
+            string? environment = Mapping(registry, "environment") is { } environmentMapping
+                ? Scalar(environmentMapping, "name")
+                : Scalar(registry, "environment");
+            Require(string.Equals(environment, RegistryEnvironments[name], StringComparison.Ordinal), errors,
+                $"{name} job must run in the '{RegistryEnvironments[name]}' environment");
         }
 
         foreach (KeyValuePair<YamlNode, YamlNode> pair in jobs.Children)
