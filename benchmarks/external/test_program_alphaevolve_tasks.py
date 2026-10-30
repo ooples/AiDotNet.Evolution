@@ -145,6 +145,9 @@ class AlphaEvolveTaskTests(unittest.TestCase):
                 self.assertIn(" ".join(tasks.STATEMENTS[problem].split()), message)
                 self.assertIn(str(headroom.IN_SCOPE[problem]["published"]), message)
                 self.assertEqual(config["evaluator"]["timeout"], tasks.TIMEOUT_SECONDS)
+                # The message asks for a whole program, so the config must not leave both engines in diff mode.
+                self.assertIs(config["diff_based_evolution"], False)
+                self.assertIn("complete program in a python", message)
 
             with self.assertRaises(FileExistsError):
                 tasks.write(directory, ["c1-autocorrelation"])
@@ -186,6 +189,57 @@ class AlphaEvolveTaskTests(unittest.TestCase):
             with self.assertRaises(KeyError):
                 tasks.write(root, ["c3-autocorrelation", "c4-uncertainty-hermite"])
             self.assertEqual(sorted(path.name for path in root.iterdir()), ["c5-erdos-overlap"])
+
+    def test_a_dangling_link_at_a_destination_is_refused_before_anything_is_written(self):
+        with tempfile.TemporaryDirectory() as directory:
+            root = Path(directory)
+            try:
+                (root / "c5-erdos-overlap").symlink_to(root / "missing", target_is_directory=True)
+            except OSError as error:  # Windows without the symlink privilege
+                self.skipTest("cannot create a symlink here: %s" % error)
+            with self.assertRaises(FileExistsError):
+                tasks.write(root, ["c1-autocorrelation", "c5-erdos-overlap"])
+            self.assertFalse((root / "c1-autocorrelation").exists())
+
+
+class AlphaEvolveSmokeTests(unittest.TestCase):
+    """The smoke's pass rule and its readers, without running either engine."""
+
+    def setUp(self):
+        import alphaevolve_tasks_smoke as smoke
+
+        self.smoke = smoke
+
+    def test_a_row_passes_only_when_the_seed_was_scored_and_the_best_is_the_stand_ins(self):
+        ran = {"status": "ran", "seed_scored": True, "best": 0.9}
+        self.assertTrue(self.smoke.passed(ran, 0.9))
+        self.assertFalse(self.smoke.passed(dict(ran, seed_scored=False), 0.9))
+        self.assertFalse(self.smoke.passed(dict(ran, best=0.75), 0.9))
+        self.assertFalse(self.smoke.passed(dict(ran, best=None), 0.9))
+        self.assertFalse(self.smoke.passed(dict(ran, status="failed"), 0.9))
+
+    def test_a_trace_line_cut_short_is_skipped_rather_than_ending_the_smoke(self):
+        with tempfile.TemporaryDirectory() as directory:
+            trace = Path(directory) / "trace-000.jsonl"
+            trace.write_text('{"variationOperatorId":"seed","status":"Completed","quality":0.5}\n'
+                             '{"diagnostics":[{"code":"evaluator_exception","message":"boom"}]}\n'
+                             '{"variationOperatorId":"llm","stat\n', encoding="utf-8")
+            records = list(self.smoke.trace_records(Path(directory)))
+            self.assertEqual(len(records), 2)
+            self.assertEqual(self.smoke.first_diagnostic(Path(directory)), "evaluator_exception: boom")
+
+    def test_the_seed_score_is_the_first_evaluation_openevolve_logs_after_adding_it(self):
+        with tempfile.TemporaryDirectory() as directory:
+            log = Path(directory) / "openevolve.log"
+            log.write_text(
+                "x - openevolve.evaluator - INFO - Evaluated program a in 0.01s: combined_score=0.1111\n"
+                "x - openevolve.controller - INFO - Adding initial program to database\n"
+                "x - openevolve.evaluator - INFO - Evaluated program b in 0.01s: value=2.0000, combined_score=0.7527\n"
+                "x - openevolve.evaluator - INFO - Evaluated program c in 0.01s: combined_score=0.9015\n",
+                encoding="utf-8")
+            self.assertEqual(self.smoke.logged_seed_score(Path(directory)), 0.7527)
+            log.write_text("x - openevolve.controller - INFO - Adding initial program to database\n", encoding="utf-8")
+            self.assertIsNone(self.smoke.logged_seed_score(Path(directory)))
 
 
 if __name__ == "__main__":

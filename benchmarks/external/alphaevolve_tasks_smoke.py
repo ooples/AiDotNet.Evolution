@@ -2,9 +2,10 @@
 
     python alphaevolve_tasks_smoke.py --cli <aidotnet-evolve.dll> --upstream <openevolve checkout> --output <json>
 
-The stand-in answers every call with one fixed edit per problem whose construction beats the seed
-(`improved`, a short seeded descent from the seed). A row passes when the engine scored the seed AND
-reported that program's score as its best, which can only happen if a proposal travelled from the
+The stand-in answers every call with one fixed program per problem whose construction beats the seed
+(`improved`, a short seeded descent from the seed). A row passes when the engine scored the seed (our
+trace's seed record, OpenEvolve's log of its initial program) AND reported that program's score as
+its best, which can only happen if a proposal travelled from the
 model through the engine into the task's evaluator and back. It proves the wiring, never a result.
 """
 from __future__ import annotations
@@ -70,13 +71,9 @@ def improved(problem, iterations=400, seed=7):
 
 
 def answer(heights):
-    """A SEARCH/REPLACE edit anchored on the signature, which every candidate keeps.
-
-    The tasks evolve by diff, as OpenEvolve does by default, so both engines refuse a whole-program
-    fence; anchoring on the seed's body instead would apply to the seed only.
-    """
+    """The whole program in a python fence, which is what the tasks' full-rewrite config asks for."""
     body = "    return [" + ", ".join(repr(float(h)) for h in heights) + "]"
-    return "\n".join(["<<<<<<< SEARCH", "def construct():", "=======", "def construct():", body, ">>>>>>> REPLACE"])
+    return "```python\ndef construct():\n" + body + "\n```"
 
 
 def configured(text, endpoint):
@@ -84,7 +81,7 @@ def configured(text, endpoint):
     return text.replace("llm:\n", "llm:\n  api_base: " + endpoint + "\n", 1)
 
 
-def ours(cli, directory, work, python, endpoint, iterations):
+def ours(cli, directory, work, python, endpoint, iterations, seed):
     config = work / "config.yaml"
     config.write_text(configured((directory / "config.yaml").read_text(encoding="utf-8"), endpoint), encoding="utf-8")
     run = subprocess.run(
@@ -96,22 +93,41 @@ def ours(cli, directory, work, python, endpoint, iterations):
         return {"status": "failed", "reason": (run.stderr.strip() or run.stdout.strip()).splitlines()[-1:]}
     result = json.loads(run.stdout)
     outcome = {"status": "ran", "completed": result.get("CompletedEvaluations"), "best": result.get("BestQuality")}
+    # The seed is the record the seed operator produced; it must have completed with the seed's own score.
+    seeds = [record for record in trace_records(work / "ours") if record.get("variationOperatorId") == "seed"]
+    outcome["seed_scored"] = any(record.get("status") == "Completed" and record.get("quality") is not None
+                                 and abs(record["quality"] - seed) <= 1e-9 * abs(seed) for record in seeds)
     if not outcome["completed"]:
         outcome["reason"] = first_diagnostic(work / "ours")
     return outcome
 
 
-def first_diagnostic(output):
-    """The first evaluator diagnostic in our run's traces, so a row that scored nothing says why."""
+def trace_records(output):
+    """Every parseable record in our run's traces. A line cut short by a failed write is skipped."""
     for trace in sorted(output.glob("trace-*.jsonl")):
         for line in trace.read_text(encoding="utf-8", errors="replace").splitlines():
-            record = json.loads(line) if line.strip().startswith("{") else {}
-            for diagnostic in record.get("diagnostics") or []:
-                return (diagnostic.get("code", "") + ": " + diagnostic.get("message", ""))[:300]
+            if not line.strip().startswith("{"):
+                continue
+            try:
+                yield json.loads(line)
+            except json.JSONDecodeError:
+                continue
+
+
+def first_diagnostic(output):
+    """The first evaluator diagnostic in our run's traces, so a row that scored nothing says why."""
+    for record in trace_records(output):
+        for diagnostic in record.get("diagnostics") or []:
+            return (diagnostic.get("code", "") + ": " + diagnostic.get("message", ""))[:300]
     return "no evaluation completed and no diagnostic was recorded"
 
 
-def upstream(checkout, directory, work, python, endpoint, iterations):
+# OpenEvolve logs each evaluation's metrics to 4 decimals; the first after this line is the seed's.
+SEED_ADDED = "Adding initial program to database"
+LOGGED_SCORE = re.compile(r"Evaluated program \S+ in [0-9.]+s: .*\bcombined_score=([0-9.]+)")
+
+
+def upstream(checkout, directory, work, python, endpoint, iterations, seed):
     config = work / "openevolve.yaml"
     config.write_text(configured((directory / "config.yaml").read_text(encoding="utf-8"), endpoint), encoding="utf-8")
     run = subprocess.run(
@@ -123,7 +139,27 @@ def upstream(checkout, directory, work, python, endpoint, iterations):
     if run.returncode != 0 or not best.is_file():
         return {"status": "failed", "reason": (run.stderr.strip() or run.stdout.strip()).splitlines()[-1:]}
     metrics = json.loads(best.read_text(encoding="utf-8")).get("metrics", {})
-    return {"status": "ran", "best": metrics.get("combined_score")}
+    logged = logged_seed_score(work / "openevolve" / "logs")
+    return {"status": "ran", "best": metrics.get("combined_score"),
+            "seed_scored": logged is not None and abs(logged - seed) <= 5e-5}
+
+
+def logged_seed_score(logs):
+    """The seed's combined_score as OpenEvolve logged it, or None when it was never evaluated."""
+    for log in sorted(logs.glob("*.log")):
+        added = False
+        for line in log.read_text(encoding="utf-8", errors="replace").splitlines():
+            added = added or SEED_ADDED in line
+            match = LOGGED_SCORE.search(line) if added else None
+            if match:
+                return float(match.group(1))
+    return None
+
+
+def passed(outcome, expected):
+    """A row passes only when the engine scored the seed and reported the stand-in's construction as its best."""
+    return (outcome["status"] == "ran" and bool(outcome.get("seed_scored")) and outcome.get("best") is not None
+            and abs(outcome["best"] - expected) <= 1e-9 * abs(expected))
 
 
 def main(argv=None):
@@ -156,23 +192,24 @@ def main(argv=None):
             for arm, run in (("ours", ours), ("openevolve", upstream)):
                 work = root / arm / problem
                 work.mkdir(parents=True)
+                # A hung or unlaunchable engine fails its row; the other rows and the results file still get written.
                 try:
                     outcome = run(arguments.cli if arm == "ours" else arguments.upstream, directory, work,
-                                  arguments.python, endpoint, arguments.iterations)
+                                  arguments.python, endpoint, arguments.iterations, seed_score)
                 except subprocess.TimeoutExpired as expired:
-                    # A hung engine fails its row; the other rows and the results file still get written.
                     outcome = {"status": "failed", "reason": "timed out after %s s" % expired.timeout}
-                outcome["passed"] = (outcome["status"] == "ran" and outcome.get("best") is not None
-                                     and abs(outcome["best"] - expected) <= 1e-9 * abs(expected))
+                except OSError as error:
+                    outcome = {"status": "failed", "reason": "could not launch: %s" % error}
+                outcome["passed"] = passed(outcome, expected)
                 row[arm] = outcome
             rows.append(row)
             print(json.dumps(row), flush=True)
     finally:
         server.shutdown()
     pathlib.Path(arguments.output).write_text(json.dumps({"rows": rows}, indent=1) + "\n", encoding="utf-8")
-    passed = sum(row["ours"]["passed"] and row["openevolve"]["passed"] for row in rows)
-    print("passed %d of %d" % (passed, len(rows)))
-    return 0 if passed == len(rows) else 1
+    passing = sum(row["ours"]["passed"] and row["openevolve"]["passed"] for row in rows)
+    print("passed %d of %d" % (passing, len(rows)))
+    return 0 if passing == len(rows) else 1
 
 
 if __name__ == "__main__":
