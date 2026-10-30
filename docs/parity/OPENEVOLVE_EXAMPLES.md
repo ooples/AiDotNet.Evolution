@@ -163,24 +163,26 @@ triple in the pinned checkout as firmly as it refuses a missing one.
 Paths are relative to the OpenEvolve checkout. `--python-path <checkout>` appears exactly where the
 example's own evaluator imports `openevolve` - measured, not assumed, because the sandbox clears the
 child environment and does not inherit `PYTHONPATH`; installing the package into the interpreter given
-to `--python` works instead and needs no option.
+to `--python` works instead and needs no option. Every command carries `--allow-unsandboxed-execution`
+because these runs reproduce OpenEvolve's host-process evaluation; `--container-image IMAGE` is the sandboxed
+alternative.
 
 | example | command | needs the checkout importable | notes |
 | --- | --- | :-: | --- |
-| `arc_benchmark` | `aidotnet-evolve run --openevolve-config examples/arc_benchmark/config.yaml examples/arc_benchmark/initial_program.py examples/arc_benchmark/evaluator.py --python-path <checkout>` | yes | reads its dataset from the absolute path `/workspaces/ARC-Evolve/data/arc-prize-2025/...`, so it completes at 0 without it |
-| `attention_optimization` | `aidotnet-evolve run --openevolve-config examples/attention_optimization/config.yaml examples/attention_optimization/initial_program.py examples/attention_optimization/evaluator.py` | no | `RuntimeError: Required tool not found: mlir-opt` |
-| `background_blur` | `aidotnet-evolve run --openevolve-config examples/background_blur/config.yaml examples/background_blur/initial_program.py examples/background_blur/evaluator.py --python-path <checkout>` | yes | - |
-| `circle_packing` | `aidotnet-evolve run --openevolve-config examples/circle_packing/config_phase_1.yaml examples/circle_packing/initial_program.py examples/circle_packing/evaluator.py` | no | Linux: its evaluator embeds its own `NamedTemporaryFile` path in a single-quoted literal, so every candidate scores 0 on Windows |
-| `circle_packing_with_artifacts` | `aidotnet-evolve run --openevolve-config examples/circle_packing_with_artifacts/config.yaml examples/circle_packing_with_artifacts/initial_program.py examples/circle_packing_with_artifacts/evaluator.py --python-path <checkout>` | yes | Linux, for the same embedded-path reason |
-| `claude_code_quickstart` | `aidotnet-evolve run --openevolve-config examples/claude_code_quickstart/config.yaml examples/claude_code_quickstart/initial_program.py examples/claude_code_quickstart/evaluator.py --python-path <checkout>` | yes | routes to the Claude Code CLI rather than an HTTP endpoint, so no loopback stub can serve it |
-| `function_minimization` | `aidotnet-evolve run --openevolve-config examples/function_minimization/config.yaml examples/function_minimization/initial_program.py examples/function_minimization/evaluator.py --python-path <checkout>` | yes | - |
-| `k_module_problem` | `aidotnet-evolve run --openevolve-config examples/k_module_problem/config.yaml examples/k_module_problem/initial_program.py examples/k_module_problem/evaluator.py` | no | its own seed scores 0, so the run cannot tell a win from a broken evaluator |
-| `mlx_metal_kernel_opt` | `aidotnet-evolve run --openevolve-config examples/mlx_metal_kernel_opt/config.yaml examples/mlx_metal_kernel_opt/initial_program.py examples/mlx_metal_kernel_opt/evaluator.py` | no | needs Apple MLX (`No module named 'mlx'`) |
-| `online_judge_programming` | `aidotnet-evolve run --openevolve-config examples/online_judge_programming/config.yaml examples/online_judge_programming/initial_program.py examples/online_judge_programming/evaluator.py` | no | needs `requests`; its own seed scores 0 |
-| `r_robust_regression` | `aidotnet-evolve run --openevolve-config examples/r_robust_regression/config.yaml examples/r_robust_regression/initial_program.r examples/r_robust_regression/evaluator.py --python-path <checkout>` | yes | needs R on the PATH; its `evaluate` is a coroutine |
-| `rust_adaptive_sort` | `aidotnet-evolve run --openevolve-config examples/rust_adaptive_sort/config.yaml examples/rust_adaptive_sort/initial_program.rs examples/rust_adaptive_sort/evaluator.py --python-path <checkout>` | yes | needs a Rust toolchain |
-| `signal_processing` | `aidotnet-evolve run --openevolve-config examples/signal_processing/config.yaml examples/signal_processing/initial_program.py examples/signal_processing/evaluator.py` | no | - |
-| `web_scraper_optillm` | `aidotnet-evolve run --openevolve-config examples/web_scraper_optillm/config.yaml examples/web_scraper_optillm/initial_program.py examples/web_scraper_optillm/evaluator.py` | no | its own seed scores 0 |
+| `arc_benchmark` | `aidotnet-evolve run --openevolve-config examples/arc_benchmark/config.yaml examples/arc_benchmark/initial_program.py examples/arc_benchmark/evaluator.py --python-path <checkout> --allow-unsandboxed-execution` | yes | reads its dataset from the absolute path `/workspaces/ARC-Evolve/data/arc-prize-2025/...`, so it completes at 0 without it |
+| `attention_optimization` | `aidotnet-evolve run --openevolve-config examples/attention_optimization/config.yaml examples/attention_optimization/initial_program.py examples/attention_optimization/evaluator.py --allow-unsandboxed-execution` | no | `RuntimeError: Required tool not found: mlir-opt` |
+| `background_blur` | `aidotnet-evolve run --openevolve-config examples/background_blur/config.yaml examples/background_blur/initial_program.py examples/background_blur/evaluator.py --python-path <checkout> --allow-unsandboxed-execution` | yes | - |
+| `circle_packing` | `aidotnet-evolve run --openevolve-config examples/circle_packing/config_phase_1.yaml examples/circle_packing/initial_program.py examples/circle_packing/evaluator.py --allow-unsandboxed-execution` | no | Linux: its evaluator embeds its own `NamedTemporaryFile` path in a single-quoted literal, so every candidate scores 0 on Windows |
+| `circle_packing_with_artifacts` | `aidotnet-evolve run --openevolve-config examples/circle_packing_with_artifacts/config.yaml examples/circle_packing_with_artifacts/initial_program.py examples/circle_packing_with_artifacts/evaluator.py --python-path <checkout> --allow-unsandboxed-execution` | yes | Linux, for the same embedded-path reason |
+| `claude_code_quickstart` | `aidotnet-evolve run --openevolve-config examples/claude_code_quickstart/config.yaml examples/claude_code_quickstart/initial_program.py examples/claude_code_quickstart/evaluator.py --python-path <checkout> --allow-unsandboxed-execution` | yes | routes to the Claude Code CLI rather than an HTTP endpoint, so no loopback stub can serve it |
+| `function_minimization` | `aidotnet-evolve run --openevolve-config examples/function_minimization/config.yaml examples/function_minimization/initial_program.py examples/function_minimization/evaluator.py --python-path <checkout> --allow-unsandboxed-execution` | yes | - |
+| `k_module_problem` | `aidotnet-evolve run --openevolve-config examples/k_module_problem/config.yaml examples/k_module_problem/initial_program.py examples/k_module_problem/evaluator.py --allow-unsandboxed-execution` | no | its own seed scores 0, so the run cannot tell a win from a broken evaluator |
+| `mlx_metal_kernel_opt` | `aidotnet-evolve run --openevolve-config examples/mlx_metal_kernel_opt/config.yaml examples/mlx_metal_kernel_opt/initial_program.py examples/mlx_metal_kernel_opt/evaluator.py --allow-unsandboxed-execution` | no | needs Apple MLX (`No module named 'mlx'`) |
+| `online_judge_programming` | `aidotnet-evolve run --openevolve-config examples/online_judge_programming/config.yaml examples/online_judge_programming/initial_program.py examples/online_judge_programming/evaluator.py --allow-unsandboxed-execution` | no | needs `requests`; its own seed scores 0 |
+| `r_robust_regression` | `aidotnet-evolve run --openevolve-config examples/r_robust_regression/config.yaml examples/r_robust_regression/initial_program.r examples/r_robust_regression/evaluator.py --python-path <checkout> --allow-unsandboxed-execution` | yes | needs R on the PATH; its `evaluate` is a coroutine |
+| `rust_adaptive_sort` | `aidotnet-evolve run --openevolve-config examples/rust_adaptive_sort/config.yaml examples/rust_adaptive_sort/initial_program.rs examples/rust_adaptive_sort/evaluator.py --python-path <checkout> --allow-unsandboxed-execution` | yes | needs a Rust toolchain |
+| `signal_processing` | `aidotnet-evolve run --openevolve-config examples/signal_processing/config.yaml examples/signal_processing/initial_program.py examples/signal_processing/evaluator.py --allow-unsandboxed-execution` | no | - |
+| `web_scraper_optillm` | `aidotnet-evolve run --openevolve-config examples/web_scraper_optillm/config.yaml examples/web_scraper_optillm/initial_program.py examples/web_scraper_optillm/evaluator.py --allow-unsandboxed-execution` | no | its own seed scores 0 |
 
 Nothing here is a claim that the run *succeeds*: four of these have committed real-run evidence
 (`claude_code_quickstart`, `function_minimization`, `signal_processing`, `background_blur`) and the
@@ -206,7 +208,7 @@ For a run of your own, the sandbox clears the child environment and does not inh
 the checkout explicitly (added in #245):
 
 ```text
-aidotnet-evolve run --openevolve-config config.yaml initial_program.py evaluator.py --python-path /path/to/openevolve
+aidotnet-evolve run --openevolve-config config.yaml initial_program.py evaluator.py --allow-unsandboxed-execution --python-path /path/to/openevolve
 ```
 
 Installing the package into the interpreter passed to `--python` works too and needs no option.

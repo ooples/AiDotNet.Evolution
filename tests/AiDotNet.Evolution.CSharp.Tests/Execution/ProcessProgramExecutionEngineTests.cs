@@ -307,7 +307,7 @@ public sealed class ProcessProgramExecutionEngineTests
     [Fact]
     public async Task SqlIsRoutedAwayFromTheProgramSandbox()
     {
-        using var engine = new ProcessProgramExecutionEngine(new ProgramSandboxOptions());
+        using var engine = new ProcessProgramExecutionEngine(new ProgramSandboxOptions { AllowUnsandboxedExecution = true });
 
         ProgramExecuteResponse response = await engine.ExecuteAsync(new ProgramExecuteRequest
         {
@@ -322,7 +322,7 @@ public sealed class ProcessProgramExecutionEngineTests
     [Fact]
     public async Task ALanguageWithoutAConfiguredInterpreterIsRejected()
     {
-        using var engine = new ProcessProgramExecutionEngine(new ProgramSandboxOptions());
+        using var engine = new ProcessProgramExecutionEngine(new ProgramSandboxOptions { AllowUnsandboxedExecution = true });
 
         ProgramExecuteResponse response = await engine.ExecuteAsync(new ProgramExecuteRequest
         {
@@ -338,7 +338,7 @@ public sealed class ProcessProgramExecutionEngineTests
     [Fact]
     public async Task AnUndetectableGenericProgramIsRejected()
     {
-        using var engine = new ProcessProgramExecutionEngine(new ProgramSandboxOptions());
+        using var engine = new ProcessProgramExecutionEngine(new ProgramSandboxOptions { AllowUnsandboxedExecution = true });
 
         ProgramExecuteResponse response = await engine.ExecuteAsync(new ProgramExecuteRequest
         {
@@ -353,7 +353,7 @@ public sealed class ProcessProgramExecutionEngineTests
     [Fact]
     public async Task ALanguageOutsideTheAllowedListIsRejected()
     {
-        using var engine = new ProcessProgramExecutionEngine(new ProgramSandboxOptions());
+        using var engine = new ProcessProgramExecutionEngine(new ProgramSandboxOptions { AllowUnsandboxedExecution = true });
 
         ProgramExecuteResponse response = await engine.ExecuteAsync(new ProgramExecuteRequest
         {
@@ -369,7 +369,7 @@ public sealed class ProcessProgramExecutionEngineTests
     [Fact]
     public async Task OversizedSourceAndInputAreRejectedBeforeAnyProcessStarts()
     {
-        var options = new ProgramSandboxOptions();
+        var options = new ProgramSandboxOptions { AllowUnsandboxedExecution = true };
         options.Limits.MaxSourceCodeChars = 10;
         options.Limits.MaxStdInChars = 4;
 
@@ -388,7 +388,7 @@ public sealed class ProcessProgramExecutionEngineTests
     [Fact]
     public async Task AMissingInterpreterIsReportedRatherThanThrown()
     {
-        var options = new ProgramSandboxOptions();
+        var options = new ProgramSandboxOptions { AllowUnsandboxedExecution = true };
         options.SetInterpreter(
             ProgramLanguage.Python,
             new ProgramInterpreterSpecification(
@@ -405,7 +405,7 @@ public sealed class ProcessProgramExecutionEngineTests
     [Fact]
     public async Task CancellationBeforeStartIsReportedAsCanceled()
     {
-        using var engine = new ProcessProgramExecutionEngine(new ProgramSandboxOptions());
+        using var engine = new ProcessProgramExecutionEngine(new ProgramSandboxOptions { AllowUnsandboxedExecution = true });
         using var source = new CancellationTokenSource();
         source.Cancel();
 
@@ -417,13 +417,14 @@ public sealed class ProcessProgramExecutionEngineTests
     [Fact]
     public void TheEngineRefusesModesItDoesNotImplement()
     {
-        var serving = new ProgramSandboxOptions { Mode = ProgramSandboxMode.Serving };
+        var serving = new ProgramSandboxOptions { AllowUnsandboxedExecution = true, Mode = ProgramSandboxMode.Serving };
         Assert.Throws<ArgumentException>(() => new ProcessProgramExecutionEngine(serving));
 
         var unsafeMode = new ProgramSandboxOptions
         {
             Mode = ProgramSandboxMode.InProcessUnsafe,
-            AllowUnsafeInProcessExecution = true
+            AllowUnsafeInProcessExecution = true,
+            AllowUnsandboxedExecution = true
         };
         Assert.Throws<ArgumentException>(() => new ProcessProgramExecutionEngine(unsafeMode));
     }
@@ -435,7 +436,7 @@ public sealed class ProcessProgramExecutionEngineTests
         Assert.Throws<ArgumentNullException>(() => new ProcessProgramExecutionEngine(null));
 #pragma warning restore CS8625
 
-        using var engine = new ProcessProgramExecutionEngine(new ProgramSandboxOptions());
+        using var engine = new ProcessProgramExecutionEngine(new ProgramSandboxOptions { AllowUnsandboxedExecution = true });
 #pragma warning disable CS8625
         await Assert.ThrowsAsync<ArgumentNullException>(() => engine.ExecuteAsync(null));
 #pragma warning restore CS8625
@@ -444,7 +445,7 @@ public sealed class ProcessProgramExecutionEngineTests
     [Fact]
     public void MemoryLimitEnforcementIsReportedHonestly()
     {
-        using var engine = new ProcessProgramExecutionEngine(new ProgramSandboxOptions());
+        using var engine = new ProcessProgramExecutionEngine(new ProgramSandboxOptions { AllowUnsandboxedExecution = true });
 
         // Windows always has job objects; elsewhere the cap needs a POSIX shell. The engine must never claim a
         // protection it cannot apply, so this mirrors the two mechanisms rather than asserting a constant.
@@ -455,7 +456,7 @@ public sealed class ProcessProgramExecutionEngineTests
     [Fact]
     public void OptionsAreCopiedSoLaterMutationCannotChangeARunningEngine()
     {
-        var options = new ProgramSandboxOptions();
+        var options = new ProgramSandboxOptions { AllowUnsandboxedExecution = true };
         options.Limits.TimeLimitSeconds = 9;
 
         using var engine = new ProcessProgramExecutionEngine(options);

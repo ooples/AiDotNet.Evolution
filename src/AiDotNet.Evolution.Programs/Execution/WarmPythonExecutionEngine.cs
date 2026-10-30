@@ -28,7 +28,9 @@ namespace AiDotNet.Evolution.Programs;
 /// </para>
 /// <para>
 /// Neither mode restricts filesystem, network or system calls; like the process engine, run hostile candidates inside
-/// a container or VM you provision. Only Python is supported, and compile-only requests are refused.
+/// a container or VM you provision, or use <see cref="ContainerExecutionEngine"/>. Both modes therefore require
+/// <see cref="ProgramSandboxOptions.AllowUnsandboxedExecution"/>. Only Python is supported, and compile-only requests
+/// are refused.
 /// </para>
 /// </remarks>
 public sealed class WarmPythonExecutionEngine : IProgramExecutionEngine, IProgramExecutionTelemetrySource, IDisposable
@@ -57,7 +59,9 @@ public sealed class WarmPythonExecutionEngine : IProgramExecutionEngine, IProgra
     /// Python interpreter must be configured.</param>
     /// <param name="recycleAfter">Candidates a reused worker runs before it is replaced, 1 to 100,000.</param>
     /// <exception cref="ArgumentException">The mode is not a warm mode, no Python interpreter is configured, or the reused
-    /// mode was chosen without <see cref="ProgramSandboxOptions.AllowUnsafeInProcessExecution"/>.</exception>
+    /// mode was chosen without <see cref="ProgramSandboxOptions.AllowUnsafeInProcessExecution"/>, or
+    /// <see cref="ProgramSandboxOptions.AllowUnsandboxedExecution"/> is not set: neither mode isolates a candidate
+    /// from the host's filesystem, network or system calls.</exception>
     /// <exception cref="PlatformNotSupportedException">The fork mode was chosen on Windows.</exception>
     public WarmPythonExecutionEngine(ProgramSandboxOptions options, int recycleAfter = 100)
     {
@@ -71,6 +75,7 @@ public sealed class WarmPythonExecutionEngine : IProgramExecutionEngine, IProgra
             ProgramSandboxMode.WarmReusedWorker => false,
             _ => throw new ArgumentException("WarmPythonExecutionEngine runs only the warm sandbox modes.", nameof(options))
         };
+        // Both warm modes are host processes: Validate above has refused them unless AllowUnsandboxedExecution is set.
         if (_fork && OperatingSystem.IsWindows())
             throw new PlatformNotSupportedException("The warm fork worker needs fork(), which Windows does not have. Use WarmReusedWorker or the process engine.");
         if (!_fork && !_options.AllowUnsafeInProcessExecution)

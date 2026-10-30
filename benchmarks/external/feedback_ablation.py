@@ -43,8 +43,14 @@ def repository_root():
 
 
 def run_file(output, seed, feedback_weight, evaluations, model, executable, budget_usd, time_limit,
-             arm=None, criteria=None, blend=None):
-    """The two arms differ in `llmFeedback` and nothing else; every other key is shared."""
+             arm=None, criteria=None, blend=None, container_image=None, allow_unsandboxed=False):
+    """The two arms differ in `llmFeedback` and nothing else; every other key is shared.
+
+    Model-written candidates run in `container_image` when it is given. Running them as host processes, with the
+    operator's files, credentials and network, takes `allow_unsandboxed`; with neither, the CLI refuses the run.
+    """
+    if container_image is not None and allow_unsandboxed:
+        raise ValueError("choose a container image or the unsandboxed opt-in, not both")
     run = {
         "schema": "aidotnet-evolve-run-v1",
         "runId": "feedback-ablation-s%d-%s" % (seed, arm or ("on" if feedback_weight is not None else "off")),
@@ -76,6 +82,10 @@ def run_file(output, seed, feedback_weight, evaluations, model, executable, budg
             "evaluationTimeLimitSeconds": time_limit,
         },
     }
+    if container_image is not None:
+        run["container"] = {"image": container_image}
+    if allow_unsandboxed:
+        run["allowUnsandboxedExecution"] = True
     if budget_usd is not None:
         run["model"]["maxBudgetUsd"] = budget_usd
     if feedback_weight is not None:
@@ -233,6 +243,12 @@ def main(argv=None):
     parser.add_argument("--time-limit", type=int, default=60, help="sandbox seconds per evaluation")
     parser.add_argument("--run-timeout", type=int, default=1800, help="seconds for one arm")
     parser.add_argument("--python", default=sys.executable, help="interpreter for the held-out scorer")
+    # Model-written code runs either way, so where it runs is the operator's explicit choice.
+    isolation = parser.add_mutually_exclusive_group(required=True)
+    isolation.add_argument("--container-image", default=None,
+                           help="run each candidate in this Docker image (the CLI's container mode)")
+    isolation.add_argument("--allow-unsandboxed", action="store_true",
+                           help="run candidates as host processes with this user's files, credentials and network")
     parser.add_argument("--draws", type=int, default=4000)
     parser.add_argument("--bootstrap-seed", type=int, default=7)
     arguments = parser.parse_args(argv)
@@ -262,7 +278,8 @@ def main(argv=None):
                 shutil.rmtree(results)
             run_path.write_text(json.dumps(run_file(
                 results, seed, weight, arguments.evaluations, arguments.model, arguments.claude,
-                arguments.max_budget_usd, arguments.time_limit, arm, criteria, arguments.blend),
+                arguments.max_budget_usd, arguments.time_limit, arm, criteria, arguments.blend,
+                container_image=arguments.container_image, allow_unsandboxed=arguments.allow_unsandboxed),
                 indent=2), encoding="utf-8")
             result, elapsed, failure = evolve(arguments.cli, run_path, results, arguments.run_timeout)
             # A failed arm takes a zero endpoint by contract rather than by scoring whatever is on disk.

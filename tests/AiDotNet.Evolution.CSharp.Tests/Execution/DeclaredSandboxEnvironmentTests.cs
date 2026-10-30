@@ -82,7 +82,7 @@ public sealed class DeclaredSandboxEnvironmentTests
     {
         // Each of these carries part of the boundary. Letting a declaration win would move the workspace, unpin the
         // search path, or change the child's encoding while still looking like ordinary configuration.
-        var options = new ProgramSandboxOptions();
+        var options = new ProgramSandboxOptions { AllowUnsandboxedExecution = true };
         options.DeclaredEnvironment[reserved] = "anything";
 
         ArgumentException error = Assert.Throws<ArgumentException>(() => options.Validate());
@@ -117,7 +117,7 @@ public sealed class DeclaredSandboxEnvironmentTests
     [InlineData("HAS\u0000NULL")]
     public void A_name_that_cannot_be_an_environment_variable_is_refused(string name)
     {
-        var options = new ProgramSandboxOptions();
+        var options = new ProgramSandboxOptions { AllowUnsandboxedExecution = true };
         options.DeclaredEnvironment[name] = "value";
 
         Assert.Throws<ArgumentException>(() => options.Validate());
@@ -126,7 +126,7 @@ public sealed class DeclaredSandboxEnvironmentTests
     [Fact]
     public void A_null_value_is_refused_rather_than_read_as_an_unset_variable()
     {
-        var options = new ProgramSandboxOptions();
+        var options = new ProgramSandboxOptions { AllowUnsandboxedExecution = true };
         options.DeclaredEnvironment["AIDOTNET_PROBE"] = null!;
 
         Assert.Throws<ArgumentException>(() => options.Validate());
@@ -137,7 +137,7 @@ public sealed class DeclaredSandboxEnvironmentTests
     {
         // One variable on Windows, two everywhere else. A configuration that means different things per platform is
         // refused rather than resolved by whichever entry the dictionary happened to yield last.
-        var options = new ProgramSandboxOptions();
+        var options = new ProgramSandboxOptions { AllowUnsandboxedExecution = true };
         options.DeclaredEnvironment["AIDOTNET_PROBE"] = "first";
         options.DeclaredEnvironment["aidotnet_probe"] = "second";
 
@@ -161,7 +161,7 @@ public sealed class DeclaredSandboxEnvironmentTests
     [Fact]
     public void An_empty_value_is_accepted_because_an_empty_search_path_is_a_real_setting()
     {
-        var options = new ProgramSandboxOptions();
+        var options = new ProgramSandboxOptions { AllowUnsandboxedExecution = true };
         options.DeclaredEnvironment["PYTHONPATH"] = string.Empty;
 
         options.Validate();
@@ -172,7 +172,7 @@ public sealed class DeclaredSandboxEnvironmentTests
     {
         // A hand-written Clone that lists properties one by one drops whichever one is added next, and the engine
         // snapshots its options through Clone, so a dropped entry would disappear before the first execution.
-        var options = new ProgramSandboxOptions { RuntimeVersion = "pinned-v1" };
+        var options = new ProgramSandboxOptions { AllowUnsandboxedExecution = true, RuntimeVersion = "pinned-v1" };
         options.DeclaredEnvironment["PYTHONPATH"] = "/one";
 
         ProgramSandboxOptions clone = options.Clone();
@@ -204,7 +204,18 @@ public sealed class DeclaredSandboxEnvironmentTests
                 nameof(ProgramSandboxOptions.TimeProvider), nameof(ProgramSandboxOptions.WorkingDirectory)
             },
             copied.Where(name => name != nameof(ProgramSandboxOptions.Mode)
-                && name != nameof(ProgramSandboxOptions.AllowUnsafeInProcessExecution)).ToArray());
+                && name != nameof(ProgramSandboxOptions.AllowUnsafeInProcessExecution)
+                && name != nameof(ProgramSandboxOptions.AllowUnsandboxedExecution)).ToArray());
+        // The three flags are value types the filter above lets through; their copies are asserted directly.
+        var flags = new ProgramSandboxOptions
+        {
+            Mode = ProgramSandboxMode.Container,
+            AllowUnsafeInProcessExecution = true,
+            AllowUnsandboxedExecution = true
+        }.Clone();
+        Assert.Equal(ProgramSandboxMode.Container, flags.Mode);
+        Assert.True(flags.AllowUnsafeInProcessExecution);
+        Assert.True(flags.AllowUnsandboxedExecution);
     }
 
     [Fact]

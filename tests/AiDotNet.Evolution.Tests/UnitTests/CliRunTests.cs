@@ -40,6 +40,7 @@ public sealed class CliRunTests
         File.WriteAllText(path, $$"""
             {
               "schema": "aidotnet-evolve-run-v1",
+              "allowUnsandboxedExecution": true,
               "runId": "cli-run",
               "initialProgram": "initial.py",
               "evaluator": "evaluator.py",
@@ -49,6 +50,40 @@ public sealed class CliRunTests
             }
             """);
         return path;
+    }
+
+    [Fact]
+    public void A_run_file_with_neither_a_container_nor_the_unsandboxed_opt_in_is_refused_before_anything_runs()
+    {
+        using var directory = new TemporaryDirectory();
+        File.WriteAllText(Path.Combine(directory.Path, "initial.py"), "X = 0\n");
+        File.WriteAllText(Path.Combine(directory.Path, "evaluator.py"), Evaluator);
+        string runFile = WriteRun(directory.Path, "http://127.0.0.1:9/v1", maxEvaluations: 1);
+        File.WriteAllText(runFile, File.ReadAllText(runFile).Replace("\"allowUnsandboxedExecution\": true,", "", StringComparison.Ordinal));
+
+        var (code, _, error) = Run("run", runFile);
+
+        Assert.NotEqual(0, code);
+        Assert.Contains("allowUnsandboxedExecution", error, StringComparison.Ordinal);
+        Assert.Contains("\"container\"", error, StringComparison.Ordinal);
+        Assert.False(Directory.Exists(Path.Combine(directory.Path, "out")), "the refused run created its output directory");
+
+        // A container runs the image's interpreter, so a host interpreter path for the OpenEvolve shim is refused by
+        // name rather than silently ignored.
+        string shim = WriteRun(directory.Path, "http://127.0.0.1:9/v1", maxEvaluations: 1,
+            extra: ", \"container\": { \"image\": \"python:3.12-slim\" }, \"openEvolveEvaluator\": { \"python\": \"/usr/bin/python3\" }");
+        (code, _, error) = Run("run", shim);
+        Assert.NotEqual(0, code);
+        Assert.Contains("openEvolveEvaluator.python", error, StringComparison.Ordinal);
+
+        // Every candidate can read what a container mounts, so a filesystem root is refused before anything starts.
+        string root = JsonSerializer.Serialize(Path.GetPathRoot(Path.GetFullPath(directory.Path)));
+        string rooted = WriteRun(directory.Path, "http://127.0.0.1:9/v1", maxEvaluations: 1,
+            extra: ", \"container\": { \"image\": \"python:3.12-slim\" }, \"openEvolveEvaluator\": { \"pythonPath\": [ " + root + " ] }");
+        (code, _, error) = Run("run", rooted);
+        Assert.NotEqual(0, code);
+        Assert.Contains("openEvolveEvaluator.pythonPath[0]", error, StringComparison.Ordinal);
+        Assert.False(Directory.Exists(Path.Combine(directory.Path, "out")), "the refused run created its output directory");
     }
 
     [Fact]

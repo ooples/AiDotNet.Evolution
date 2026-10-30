@@ -42,14 +42,16 @@ internal static class Arm
         "evaluator reports, and reply with the complete program in one fenced block.";
 
     internal static async Task<ArmResult> RunAsync(MetaPromptArm arm, int seed, int evaluations,
-        string evaluatorSource, string seedProgram, string scorerPath, string python, string claude, string model)
+        string evaluatorSource, string seedProgram, string scorerPath, string python, string claude, string model, bool allowUnsandboxed)
     {
         var clock = Stopwatch.StartNew();
         string workspace = Path.Combine(Path.GetTempPath(), "aidotnet-meta-" + Guid.NewGuid().ToString("N"));
         Directory.CreateDirectory(workspace);
         try
         {
-            var sandbox = new ProgramSandboxOptions { RuntimeVersion = "meta-prompt-ablation-v1" };
+            // The ablation evaluates model-written programs on the measurement host, and only when the operator passed
+            // --allow-unsandboxed; without it the engine refuses at construction, before the evaluator or the scorer runs.
+            var sandbox = new ProgramSandboxOptions { RuntimeVersion = "meta-prompt-ablation-v1", AllowUnsandboxedExecution = allowUnsandboxed };
             sandbox.Limits.TimeLimitSeconds = 60;
             sandbox.Limits.MaxConcurrentExecutions = 1;
             sandbox.SetInterpreter(ProgramLanguage.Python, new ProgramInterpreterSpecification(python, "{source}"));

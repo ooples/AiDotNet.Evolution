@@ -46,6 +46,53 @@ AiDotNet.Evolution.Programs.CompilationDiagnosticSeverity
 AiDotNet.Evolution.Programs.CompilationDiagnosticSeverity.Error = 2 -> AiDotNet.Evolution.Programs.CompilationDiagnosticSeverity
 AiDotNet.Evolution.Programs.CompilationDiagnosticSeverity.Info = 0 -> AiDotNet.Evolution.Programs.CompilationDiagnosticSeverity
 AiDotNet.Evolution.Programs.CompilationDiagnosticSeverity.Warning = 1 -> AiDotNet.Evolution.Programs.CompilationDiagnosticSeverity
+AiDotNet.Evolution.Programs.ContainerExecutionEngine
+AiDotNet.Evolution.Programs.ContainerExecutionEngine.ActiveExecutionCount.get -> int
+AiDotNet.Evolution.Programs.ContainerExecutionEngine.ContainerExecutionEngine(AiDotNet.Evolution.Programs.ProgramSandboxOptions! options, AiDotNet.Evolution.Programs.ContainerExecutionOptions! container) -> void
+AiDotNet.Evolution.Programs.ContainerExecutionEngine.Dispose() -> void
+AiDotNet.Evolution.Programs.ContainerExecutionEngine.ExecuteAsync(AiDotNet.Evolution.Programs.ProgramExecuteRequest! request, System.Threading.CancellationToken cancellationToken = default(System.Threading.CancellationToken)) -> System.Threading.Tasks.Task<AiDotNet.Evolution.Programs.ProgramExecuteResponse!>!
+AiDotNet.Evolution.Programs.ContainerExecutionEngine.Id.get -> string!
+AiDotNet.Evolution.Programs.ContainerExecutionEngine.ImageId.get -> string!
+AiDotNet.Evolution.Programs.ContainerExecutionEngine.Lifecycle.get -> AiDotNet.Evolution.Programs.ContainerLifecycle
+AiDotNet.Evolution.Programs.ContainerExecutionEngine.QueuedExecutionCount.get -> int
+AiDotNet.Evolution.Programs.ContainerExecutionEngine.TryExecute(AiDotNet.Evolution.Programs.ProgramLanguage language, string! sourceCode, string! input, out string! output, out string? errorMessage, System.Threading.CancellationToken cancellationToken = default(System.Threading.CancellationToken)) -> bool
+AiDotNet.Evolution.Programs.ContainerExecutionEngine.VersionHash.get -> string!
+AiDotNet.Evolution.Programs.ContainerExecutionOptions
+AiDotNet.Evolution.Programs.ContainerExecutionOptions.Clone() -> AiDotNet.Evolution.Programs.ContainerExecutionOptions!
+AiDotNet.Evolution.Programs.ContainerExecutionOptions.ContainerExecutionOptions() -> void
+AiDotNet.Evolution.Programs.ContainerExecutionOptions.DockerExecutable.get -> string!
+AiDotNet.Evolution.Programs.ContainerExecutionOptions.DockerExecutable.set -> void
+AiDotNet.Evolution.Programs.ContainerExecutionOptions.GroupId.get -> int
+AiDotNet.Evolution.Programs.ContainerExecutionOptions.GroupId.set -> void
+AiDotNet.Evolution.Programs.ContainerExecutionOptions.Image.get -> string!
+AiDotNet.Evolution.Programs.ContainerExecutionOptions.Image.set -> void
+AiDotNet.Evolution.Programs.ContainerExecutionOptions.Interpreters.get -> System.Collections.Generic.IDictionary<AiDotNet.Evolution.Programs.ProgramLanguage, AiDotNet.Evolution.Programs.ProgramInterpreterSpecification!>!
+AiDotNet.Evolution.Programs.ContainerExecutionOptions.Lifecycle.get -> AiDotNet.Evolution.Programs.ContainerLifecycle
+AiDotNet.Evolution.Programs.ContainerExecutionOptions.Lifecycle.set -> void
+AiDotNet.Evolution.Programs.ContainerExecutionOptions.PidsLimit.get -> int
+AiDotNet.Evolution.Programs.ContainerExecutionOptions.PidsLimit.set -> void
+AiDotNet.Evolution.Programs.ContainerExecutionOptions.PythonLaunch.get -> AiDotNet.Evolution.Programs.ContainerPythonLaunch
+AiDotNet.Evolution.Programs.ContainerExecutionOptions.PythonLaunch.set -> void
+AiDotNet.Evolution.Programs.ContainerExecutionOptions.ReadOnlyMounts.get -> System.Collections.Generic.IDictionary<string!, string!>!
+AiDotNet.Evolution.Programs.ContainerExecutionOptions.RecycleAfter.get -> int
+AiDotNet.Evolution.Programs.ContainerExecutionOptions.RecycleAfter.set -> void
+AiDotNet.Evolution.Programs.ContainerExecutionOptions.SeccompProfilePath.get -> string?
+AiDotNet.Evolution.Programs.ContainerExecutionOptions.SeccompProfilePath.set -> void
+AiDotNet.Evolution.Programs.ContainerExecutionOptions.StartupTimeoutSeconds.get -> int
+AiDotNet.Evolution.Programs.ContainerExecutionOptions.StartupTimeoutSeconds.set -> void
+AiDotNet.Evolution.Programs.ContainerExecutionOptions.SupervisorPython.get -> string!
+AiDotNet.Evolution.Programs.ContainerExecutionOptions.SupervisorPython.set -> void
+AiDotNet.Evolution.Programs.ContainerExecutionOptions.UserId.get -> int
+AiDotNet.Evolution.Programs.ContainerExecutionOptions.UserId.set -> void
+AiDotNet.Evolution.Programs.ContainerExecutionOptions.Validate() -> void
+AiDotNet.Evolution.Programs.ContainerExecutionOptions.WorkspaceSizeMb.get -> int
+AiDotNet.Evolution.Programs.ContainerExecutionOptions.WorkspaceSizeMb.set -> void
+AiDotNet.Evolution.Programs.ContainerLifecycle
+AiDotNet.Evolution.Programs.ContainerLifecycle.Cold = 1 -> AiDotNet.Evolution.Programs.ContainerLifecycle
+AiDotNet.Evolution.Programs.ContainerLifecycle.Warm = 0 -> AiDotNet.Evolution.Programs.ContainerLifecycle
+AiDotNet.Evolution.Programs.ContainerPythonLaunch
+AiDotNet.Evolution.Programs.ContainerPythonLaunch.ForkSupervisor = 0 -> AiDotNet.Evolution.Programs.ContainerPythonLaunch
+AiDotNet.Evolution.Programs.ContainerPythonLaunch.FreshInterpreter = 1 -> AiDotNet.Evolution.Programs.ContainerPythonLaunch
 AiDotNet.Evolution.Programs.DelegateProgramFitnessEvaluator
 AiDotNet.Evolution.Programs.DelegateProgramFitnessEvaluator.DelegateProgramFitnessEvaluator(System.Func<AiDotNet.Evolution.Programs.ProgramGenome!, AiDotNet.Evolution.EvolutionEvaluationContext!, System.Threading.CancellationToken, System.Threading.Tasks.ValueTask<AiDotNet.Evolution.EvolutionTaskResult!>>! evaluate, string! id = "delegate-program-evaluator", string! versionHash = "delegate-program-evaluator-v1") -> void
 AiDotNet.Evolution.Programs.DelegateProgramFitnessEvaluator.DelegateProgramFitnessEvaluator(System.Func<AiDotNet.Evolution.Programs.ProgramGenome!, double>! score, string! id = "delegate-program-evaluator", string! versionHash = "delegate-program-evaluator-v1", AiDotNet.Evolution.EvolutionOptimizationDirection direction = AiDotNet.Evolution.EvolutionOptimizationDirection.Maximize) -> void
@@ -1171,6 +1218,7 @@ AiDotNet.Evolution.Programs.ProgramSandboxLimitOptions.TimeLimitSeconds.get -> i
 AiDotNet.Evolution.Programs.ProgramSandboxLimitOptions.TimeLimitSeconds.set -> void
 AiDotNet.Evolution.Programs.ProgramSandboxLimitOptions.Validate() -> void
 AiDotNet.Evolution.Programs.ProgramSandboxMode
+AiDotNet.Evolution.Programs.ProgramSandboxMode.Container = 5 -> AiDotNet.Evolution.Programs.ProgramSandboxMode
 AiDotNet.Evolution.Programs.ProgramSandboxMode.InProcessUnsafe = 2 -> AiDotNet.Evolution.Programs.ProgramSandboxMode
 AiDotNet.Evolution.Programs.ProgramSandboxMode.OutOfProcessWorker = 0 -> AiDotNet.Evolution.Programs.ProgramSandboxMode
 AiDotNet.Evolution.Programs.ProgramSandboxMode.Serving = 1 -> AiDotNet.Evolution.Programs.ProgramSandboxMode
@@ -1179,6 +1227,8 @@ AiDotNet.Evolution.Programs.ProgramSandboxMode.WarmReusedWorker = 4 -> AiDotNet.
 AiDotNet.Evolution.Programs.ProgramSandboxOptions
 AiDotNet.Evolution.Programs.ProgramSandboxOptions.AllowUnsafeInProcessExecution.get -> bool
 AiDotNet.Evolution.Programs.ProgramSandboxOptions.AllowUnsafeInProcessExecution.set -> void
+AiDotNet.Evolution.Programs.ProgramSandboxOptions.AllowUnsandboxedExecution.get -> bool
+AiDotNet.Evolution.Programs.ProgramSandboxOptions.AllowUnsandboxedExecution.set -> void
 AiDotNet.Evolution.Programs.ProgramSandboxOptions.Clone() -> AiDotNet.Evolution.Programs.ProgramSandboxOptions!
 AiDotNet.Evolution.Programs.ProgramSandboxOptions.DeclaredEnvironment.get -> System.Collections.Generic.IDictionary<string!, string!>!
 AiDotNet.Evolution.Programs.ProgramSandboxOptions.Interpreters.get -> System.Collections.Generic.IDictionary<AiDotNet.Evolution.Programs.ProgramLanguage, AiDotNet.Evolution.Programs.ProgramInterpreterSpecification!>!
@@ -1634,6 +1684,7 @@ AiDotNet.Evolution.Prompts.PromptTextRedactor
 [AIDEVO004]static AiDotNet.Evolution.Programs.Experience.ProgramExperienceQuery.operator ==(AiDotNet.Evolution.Programs.Experience.ProgramExperienceQuery? left, AiDotNet.Evolution.Programs.Experience.ProgramExperienceQuery? right) -> bool
 [AIDEVO004]static AiDotNet.Evolution.Programs.Experience.ProgramExperienceRetrieval.operator !=(AiDotNet.Evolution.Programs.Experience.ProgramExperienceRetrieval? left, AiDotNet.Evolution.Programs.Experience.ProgramExperienceRetrieval? right) -> bool
 [AIDEVO004]static AiDotNet.Evolution.Programs.Experience.ProgramExperienceRetrieval.operator ==(AiDotNet.Evolution.Programs.Experience.ProgramExperienceRetrieval? left, AiDotNet.Evolution.Programs.Experience.ProgramExperienceRetrieval? right) -> bool
+const AiDotNet.Evolution.Programs.ContainerExecutionOptions.MaxRecycleAfter = 1000000 -> int
 const AiDotNet.Evolution.Programs.DirectoryProgramSampleEvidenceStore.MaximumArtifactBytes = 2097152 -> int
 const AiDotNet.Evolution.Programs.EvolveBlock.DefaultEndMarker = "# EVOLVE-BLOCK-END" -> string!
 const AiDotNet.Evolution.Programs.EvolveBlock.DefaultStartMarker = "# EVOLVE-BLOCK-START" -> string!
@@ -1772,6 +1823,7 @@ override AiDotNet.Evolution.Prompts.ProgramPromptExample.ToString() -> string!
 override AiDotNet.Evolution.Prompts.ProgramPromptResult.ToString() -> string!
 override AiDotNet.Evolution.Prompts.ProgramPromptTemplate.ToString() -> string!
 override AiDotNet.Evolution.Prompts.ProgramPromptTemplateSet.ToString() -> string!
+static AiDotNet.Evolution.Programs.ContainerExecutionOptions.CreateDefaultInterpreters() -> System.Collections.Generic.Dictionary<AiDotNet.Evolution.Programs.ProgramLanguage, AiDotNet.Evolution.Programs.ProgramInterpreterSpecification!>!
 static AiDotNet.Evolution.Programs.EditTarget.operator !=(AiDotNet.Evolution.Programs.EditTarget? left, AiDotNet.Evolution.Programs.EditTarget? right) -> bool
 static AiDotNet.Evolution.Programs.EditTarget.operator ==(AiDotNet.Evolution.Programs.EditTarget? left, AiDotNet.Evolution.Programs.EditTarget? right) -> bool
 static AiDotNet.Evolution.Programs.EvolveBlock.ContainsStartMarker(string! source, AiDotNet.Evolution.Programs.EvolveBlockMarkers markers = default(AiDotNet.Evolution.Programs.EvolveBlockMarkers)) -> bool
@@ -1882,3 +1934,4 @@ virtual AiDotNet.Evolution.Programs.ProgramPlanner.Invoke(AiDotNet.Evolution.Pro
 virtual AiDotNet.Evolution.Programs.ProgramTaskOptions.Clone() -> AiDotNet.Evolution.Programs.ProgramTaskOptions!
 virtual AiDotNet.Evolution.Programs.ProgramTaskOptions.Validate() -> void
 virtual AiDotNet.Evolution.Programs.ProgramVerifier.Invoke(AiDotNet.Evolution.Programs.VerificationRequest! request, System.Threading.CancellationToken cancellationToken) -> System.Threading.Tasks.ValueTask<AiDotNet.Evolution.EvolutionResourceResult<AiDotNet.Evolution.Programs.VerificationReceipt!>!>
+const AiDotNet.Evolution.Programs.ContainerExecutionOptions.MaxReadOnlyMountChars = 4096 -> int

@@ -51,7 +51,8 @@ from the misplaced Evolution process/runtime callers before deleting anything.
 ## Usage and security boundary
 
 ```csharp
-var options = new ProgramSandboxOptions { RuntimeVersion = "my-provisioned-image-sha256" };
+// The process runner does not isolate candidates, so it refuses to start without this opt-in.
+var options = new ProgramSandboxOptions { RuntimeVersion = "my-provisioned-image-sha256", AllowUnsandboxedExecution = true };
 options.SetInterpreter(ProgramLanguage.Python,
     new ProgramInterpreterSpecification("/usr/bin/python3", "{source}", "-m py_compile {source}"));
 using var runner = new ProcessProgramExecutionEngine(options);
@@ -68,8 +69,9 @@ This is a bounded child-process runner, **not filesystem/network isolation**. Re
 limits include wall time, output and concurrency. Windows job/POSIX memory limits are
 attempted, not attested fail-closed containment; `CanEnforceMemoryLimit` reports capability
 only. Hostile candidates require an independently provisioned least-privilege OS/container
-boundary without secrets or sealed test answers. No serving connector or in-process
-unsafe runner is included. Compile-only requests without a separate command are refused.
+boundary without secrets or sealed test answers; `ContainerExecutionEngine` is the shipped
+one (see [Choosing an execution mode](../PROGRAM_EVOLUTION.md#choosing-an-execution-mode)).
+No serving connector or in-process unsafe runner is included. Compile-only requests without a separate command are refused.
 
 Cost units count dispatched evaluator calls, not dollars, tokens or runtime. Local proof
 uses authored shell fixtures, not generated hostile code or a competitor benchmark.

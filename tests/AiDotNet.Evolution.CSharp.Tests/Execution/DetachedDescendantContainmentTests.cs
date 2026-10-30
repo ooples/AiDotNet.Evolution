@@ -89,7 +89,7 @@ public sealed class DetachedDescendantContainmentTests
 
     private static async Task<ProgramExecuteResponse> Run(string source, Action<ProgramSandboxLimitOptions> configure)
     {
-        var options = new ProgramSandboxOptions();
+        var options = new ProgramSandboxOptions { AllowUnsandboxedExecution = true };
         options.SetInterpreter(ProgramLanguage.Python, new ProgramInterpreterSpecification(Python, "{source}"));
         options.Limits.TimeLimitSeconds = 30;
         configure(options.Limits);

@@ -118,6 +118,24 @@ public sealed class ProgramSandboxOptions
     /// </remarks>
     public bool AllowUnsafeInProcessExecution { get; set; }
 
+    /// <summary>Gets or sets whether candidates may run in a mode that does not isolate them from this machine.</summary>
+    /// <remarks>
+    /// <para>
+    /// Defaults to <c>false</c>. <see cref="ProgramSandboxMode.OutOfProcessWorker"/>,
+    /// <see cref="ProgramSandboxMode.WarmForkWorker"/> and <see cref="ProgramSandboxMode.WarmReusedWorker"/> bound a
+    /// candidate's time and output, but the candidate still runs as the host's user with the host's filesystem,
+    /// network and system calls: code a language model wrote can read files and credentials, reach the network, and
+    /// change anything that user can change. The engines for those modes refuse to start while this is <c>false</c>,
+    /// so running unreviewed code without isolation is always a decision someone wrote down.
+    /// </para>
+    /// <para>
+    /// Set it only for candidates you would run yourself, or when this whole process already runs inside a VM or
+    /// container you provisioned for the purpose. Otherwise use <see cref="ContainerExecutionEngine"/>
+    /// (<see cref="ProgramSandboxMode.Container"/>), which needs no opt-in.
+    /// </para>
+    /// </remarks>
+    public bool AllowUnsandboxedExecution { get; set; }
+
     /// <summary>Gets or sets the clock the time limit is measured on; <see cref="TimeProvider.System"/> by default.</summary>
     /// <remarks>A fake provider lets a test fire the limit at a chosen moment. It never changes what a run means.</remarks>
     public TimeProvider TimeProvider { get; set; } = TimeProvider.System;
@@ -183,6 +201,7 @@ public sealed class ProgramSandboxOptions
             Limits = Limits is null ? new ProgramSandboxLimitOptions() : Limits.Clone(),
             WorkingDirectory = WorkingDirectory,
             AllowUnsafeInProcessExecution = AllowUnsafeInProcessExecution,
+            AllowUnsandboxedExecution = AllowUnsandboxedExecution,
             TimeProvider = TimeProvider ?? TimeProvider.System
         };
 
@@ -206,9 +225,12 @@ public sealed class ProgramSandboxOptions
     /// <see cref="Limits"/> is <c>null</c>, an interpreter entry is <c>null</c> or lacks the
     /// <see cref="ProgramInterpreterSpecification.SourcePlaceholder"/> token, <see cref="WorkingDirectory"/> is
     /// white space, <see cref="DeclaredEnvironment"/> carries an unusable name or a name the engine sets itself
-    /// (see <see cref="ReservedEnvironmentNames"/>), or <see cref="Mode"/> is
-    /// <see cref="ProgramSandboxMode.InProcessUnsafe"/> without <see cref="AllowUnsafeInProcessExecution"/>.
+    /// (see <see cref="ReservedEnvironmentNames"/>), <see cref="Mode"/> is
+    /// <see cref="ProgramSandboxMode.InProcessUnsafe"/> without <see cref="AllowUnsafeInProcessExecution"/>, or
+    /// <see cref="Mode"/> runs candidates as host processes without <see cref="AllowUnsandboxedExecution"/>.
     /// </exception>
+    /// <remarks>Every execution engine validates its options before it runs anything, so this is the one place the
+    /// unsandboxed opt-in is enforced: an engine cannot start a host-process mode without passing through it.</remarks>
     public void Validate()
     {
         VersionPinnedProgramFitnessEvaluator.ValidateIdentity(RuntimeVersion, nameof(RuntimeVersion));
@@ -298,6 +320,27 @@ public sealed class ProgramSandboxOptions
                     nameof(Interpreters));
             }
         }
+
+        // Last, so a configuration that is wrong for another reason is reported for that reason.
+        RequireUnsandboxedOptIn();
+    }
+
+    /// <summary>Gets whether <paramref name="mode"/> leaves the candidate the host's filesystem, network and system calls.</summary>
+    internal static bool IsUnsandboxed(ProgramSandboxMode mode) => mode is ProgramSandboxMode.OutOfProcessWorker
+        or ProgramSandboxMode.WarmForkWorker or ProgramSandboxMode.WarmReusedWorker or ProgramSandboxMode.InProcessUnsafe;
+
+    /// <summary>Refuses an unsandboxed mode unless <see cref="AllowUnsandboxedExecution"/> is set.</summary>
+    /// <exception cref="ArgumentException">The mode is unsandboxed and the opt-in is not set.</exception>
+    private void RequireUnsandboxedOptIn()
+    {
+        if (AllowUnsandboxedExecution || !IsUnsandboxed(Mode)) return;
+        throw new ArgumentException(
+            $"ProgramSandboxMode.{Mode} runs candidates as host processes, which does not isolate them from this machine: " +
+            "LLM-written code would run as your user, with your files, credentials and network. " +
+            "Set ProgramSandboxOptions.AllowUnsandboxedExecution = true to accept that risk for code you trust or " +
+            "for a process that already runs inside a VM or container, or use ContainerExecutionEngine " +
+            "(ProgramSandboxMode.Container) to isolate candidates.",
+            nameof(AllowUnsandboxedExecution));
     }
 
     private static bool IsWindowsHost()

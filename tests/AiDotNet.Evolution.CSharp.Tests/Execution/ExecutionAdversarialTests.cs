@@ -62,7 +62,7 @@ public sealed class ExecutionAdversarialTests
     [InlineData((ProgramLanguage)999)]
     public async Task InvalidAllowListCannotSilentlyBecomeUnrestricted(ProgramLanguage allowed)
     {
-        using var engine = new ProcessProgramExecutionEngine(new());
+        using var engine = new ProcessProgramExecutionEngine(new() { AllowUnsandboxedExecution = true });
         var response = await engine.ExecuteAsync(new()
         {
             Language = ProgramLanguage.Python,
@@ -122,7 +122,7 @@ public sealed class ExecutionAdversarialTests
     [Fact]
     public void RunnerConfigurationAndProvisionedRuntimeInvalidateFitnessIdentity()
     {
-        var options = new ProgramSandboxOptions { RuntimeVersion = "fixture-v1" };
+        var options = new ProgramSandboxOptions { AllowUnsandboxedExecution = true, RuntimeVersion = "fixture-v1" };
         using var first = new ProcessProgramExecutionEngine(options);
         using var same = new ProcessProgramExecutionEngine(options);
         Assert.Equal(first.VersionHash, same.VersionHash);
@@ -138,8 +138,8 @@ public sealed class ExecutionAdversarialTests
     [Fact]
     public void UnversionedRuntimeCannotReuseAnotherEnginesCacheIdentity()
     {
-        using var first = new ProcessProgramExecutionEngine(new());
-        using var second = new ProcessProgramExecutionEngine(new());
+        using var first = new ProcessProgramExecutionEngine(new() { AllowUnsandboxedExecution = true });
+        using var second = new ProcessProgramExecutionEngine(new() { AllowUnsandboxedExecution = true });
         Assert.NotEqual(first.VersionHash, second.VersionHash);
     }
 

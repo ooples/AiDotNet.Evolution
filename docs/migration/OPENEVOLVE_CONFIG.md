@@ -4,9 +4,17 @@
 changes:
 
 ```text
-aidotnet-evolve run --openevolve-config config.yaml initial_program.py evaluator.py [--iterations N] [--output DIR] [--python EXE]
-                                                                                    [--python-path DIR]...
+aidotnet-evolve run --openevolve-config config.yaml initial_program.py evaluator.py
+                    (--container-image IMAGE [--container-lifecycle Warm|Cold] | --allow-unsandboxed-execution)
+                    [--iterations N] [--output DIR] [--python EXE] [--python-path DIR]...
 ```
+
+One choice has no OpenEvolve counterpart: where the evaluator runs. OpenEvolve runs it, and the programs it
+executes, as host processes with your files, credentials and network. Here you say which you want on every
+import. `--container-image` runs it in a locked-down Docker container (the evaluator's directory and each
+`--python-path` directory are mounted read-only; see `container.image` in [the CLI reference](../CLI.md)), and
+`--allow-unsandboxed-execution` accepts OpenEvolve's behaviour for code you trust or on a machine provisioned for
+it. The command refuses to import with neither, so the opt-in in `run.json` is always one you gave.
 
 The arguments mirror `openevolve-run.py`. The command translates the config into a normal run file
 (`<output>/run.json`) and writes a per-key report (`<output>/openevolve-import.json`). It then runs the task, which you
@@ -124,7 +132,7 @@ holds is visible to code it is evaluating. Nothing is inherited, including `PYTH
 Name the directories instead, once per directory:
 
 ```text
-aidotnet-evolve run --openevolve-config config.yaml initial_program.py evaluator.py --python-path /path/to/openevolve --python-path /path/to/my-helpers
+aidotnet-evolve run --openevolve-config config.yaml initial_program.py evaluator.py --allow-unsandboxed-execution --python-path /path/to/openevolve --python-path /path/to/my-helpers
 ```
 
 Paths are resolved relative to the config file, joined with the platform's path separator, and
@@ -170,7 +178,29 @@ killed on a timeout and a memory cap enforced. A bundled shim reproduces OpenEvo
 - Metrics and artifacts (dict returns or `EvaluationResult`) are carried into the run.
 
 The shim records the evaluator's SHA-256. Editing the evaluator therefore changes the run's identity, and a changed file
-is refused rather than mixed into an ongoing run.
+is refused rather than mixed into an ongoing run. The same holds for the helpers it imports: the shim also records a digest
+of every `.py` file in the evaluator's directory and in each `pythonPath` entry (skipping hidden files, links,
+`__pycache__` and the run's own output directory), so editing, adding or removing a helper between `run` and `resume`
+refuses the resume too. Data files those directories hold are not part of the digest.
+
+### Running the evaluator in a container
+
+`run --openevolve-config` makes you choose where the evaluator runs, and refuses a command that chooses neither.
+`--allow-unsandboxed-execution` writes `"allowUnsandboxedExecution": true` into the generated `run.json`, so the evaluator
+runs as a host process, as OpenEvolve runs evaluators. That process sandbox does not keep a model-written program away from
+your files, credentials or network. `--container-image IMAGE` (with `--container-lifecycle Warm|Cold`) instead writes a
+`container` section, so the evaluator and every candidate run in a locked-down Docker container. The image must hold the
+evaluator's packages (numpy, and `openevolve` when the evaluator imports it):
+
+```json
+"container": { "image": "my-evaluator-image:1", "lifecycle": "Warm" }
+```
+
+The evaluator's directory is then mounted read-only at `/aidotnet/evaluator`, so the shim imports the unmodified file and
+any helper beside it, and each `openEvolveEvaluator.pythonPath` directory is mounted read-only and put on the container's
+`PYTHONPATH`. With a container, `--python` only parses the config (PyYAML) and is not written to `run.json`: the image's
+`python3` runs the evaluator. See [Choosing an execution mode](../PROGRAM_EVOLUTION.md#choosing-an-execution-mode) and
+[CLI.md](../CLI.md).
 
 ## What differs, and is reported
 

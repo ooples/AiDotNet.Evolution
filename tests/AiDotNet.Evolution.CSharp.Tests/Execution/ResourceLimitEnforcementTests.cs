@@ -155,7 +155,7 @@ public sealed class ResourceLimitEnforcementTests
     {
         if (MissingInterpreter.Value is { } missing)
             Assert.Fail("These tests need Python on PATH or in EVOLUTION_PYTHON: " + missing);
-        var options = new ProgramSandboxOptions();
+        var options = new ProgramSandboxOptions { AllowUnsandboxedExecution = true };
         options.SetInterpreter(ProgramLanguage.Python, new ProgramInterpreterSpecification(Python, "{source}"));
         options.Limits.TimeLimitSeconds = wallLimitSeconds;
         configure(options.Limits);
