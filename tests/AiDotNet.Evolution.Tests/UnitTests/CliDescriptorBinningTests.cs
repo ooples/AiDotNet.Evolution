@@ -26,11 +26,15 @@ public sealed class CliDescriptorBinningTests
     {
         EvolutionDescriptorDefinition linear = new RunMetricDescriptor
         {
-            Name = "length", Bins = 10, Binning = EvolutionDescriptorBinning.Linear
+            Name = "length",
+            Bins = 10,
+            Binning = EvolutionDescriptorBinning.Linear
         }.ToDefinition(10000);
         EvolutionDescriptorDefinition logarithmic = new RunMetricDescriptor
         {
-            Name = "length", Bins = 4, Binning = EvolutionDescriptorBinning.Logarithmic
+            Name = "length",
+            Bins = 4,
+            Binning = EvolutionDescriptorBinning.Logarithmic
         }.ToDefinition(10000);
 
         Assert.Equal((0.0, 10000.0, EvolutionOutOfRangePolicy.Reject), (linear.Minimum, linear.Maximum, linear.OutOfRangePolicy));
@@ -45,12 +49,19 @@ public sealed class CliDescriptorBinningTests
             .ToDefinition(10000);
         EvolutionDescriptorDefinition quantile = new RunMetricDescriptor
         {
-            Name = "runtime", Minimum = 2, Maximum = 8, Bins = 3, Binning = EvolutionDescriptorBinning.AdaptiveQuantile,
-            SampleCapacity = 64, OutOfRange = EvolutionOutOfRangePolicy.OverflowBins
+            Name = "runtime",
+            Minimum = 2,
+            Maximum = 8,
+            Bins = 3,
+            Binning = EvolutionDescriptorBinning.AdaptiveQuantile,
+            SampleCapacity = 64,
+            OutOfRange = EvolutionOutOfRangePolicy.OverflowBins
         }.ToDefinition(10000);
         EvolutionDescriptorDefinition edges = new RunMetricDescriptor
         {
-            Name = "runtime", Binning = EvolutionDescriptorBinning.ExplicitEdges, Edges = new List<double> { 0, 1, 10, 100 }
+            Name = "runtime",
+            Binning = EvolutionDescriptorBinning.ExplicitEdges,
+            Edges = new List<double> { 0, 1, 10, 100 }
         }.ToDefinition(10000);
 
         Assert.Equal((EvolutionDescriptorBinning.Linear, 2.0, 8.0, EvolutionOutOfRangePolicy.Clamp),

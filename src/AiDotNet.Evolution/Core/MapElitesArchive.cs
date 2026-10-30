@@ -535,7 +535,8 @@ public sealed class MapElitesArchive<TGenome> :
             _descriptors,
             Direction,
             _capacityFollowsGrid ? 0 : _capacity,
-            _maximumGridCells) { _observes = false };
+            _maximumGridCells)
+        { _observes = false };
 
         // Settle the final grid before filing anything. An unplaceable replacement keeps the old descriptors, but all
         // entries are keyed against the same final bounds after every successful growth has been considered. A
@@ -615,7 +616,8 @@ public sealed class MapElitesArchive<TGenome> :
             _configuredDescriptors,
             Direction,
             _capacityFollowsGrid ? 0 : _capacity,
-            _maximumGridCells) { _observes = false };
+            _maximumGridCells)
+        { _observes = false };
         staged.RestoreDescriptorBounds(descriptorSnapshot);
         foreach (EvolutionArchiveEntry<TGenome> entry in entrySnapshot.OrderBy(item => item.Cell.StableKey, StringComparer.Ordinal))
         {
