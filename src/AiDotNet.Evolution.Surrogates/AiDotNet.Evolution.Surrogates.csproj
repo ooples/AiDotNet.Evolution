@@ -11,7 +11,7 @@
     <GenerateDocumentationFile>true</GenerateDocumentationFile>
     <Deterministic>true</Deterministic>
     <ContinuousIntegrationBuild Condition="'$(CI)' == 'true'">true</ContinuousIntegrationBuild>
-    <Version>0.7.0</Version>
+    <Version>0.8.0</Version>
     <PackageId>AiDotNet.Evolution.Surrogates</PackageId>
     <Description>Optional bounded numeric surrogate adapters with explicit reliability diagnostics for AiDotNet.Evolution.</Description>
     <Authors>ooples</Authors>
