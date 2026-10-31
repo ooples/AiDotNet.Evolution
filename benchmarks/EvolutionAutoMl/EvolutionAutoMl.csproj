@@ -9,6 +9,6 @@
   <ItemGroup>
     <ProjectReference Include="../../src/AiDotNet.Evolution/AiDotNet.Evolution.csproj" />
     <!-- The consumer's own package, aliased: the point of this story is the consumer's workload. -->
-    <PackageReference Include="AiDotNet" Version="0.234.0" Aliases="AiDotNetConsumer" />
+    <PackageReference Include="AiDotNet" Version="0.235.0" Aliases="AiDotNetConsumer" />
   </ItemGroup>
 </Project>
