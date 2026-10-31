@@ -1,0 +1,4 @@
+2026-10-31T16:52:57 launched PID 50596 at 7428bcd; CLI frozen F:\evo-pilot\cli-7428bcd; post-#359 fixes; user approved capped post-fix pilot 2026-10-31
+2026-10-31T16:54:56 first launch (PID 50596) refused at the canary: Claude Code 2.1.316 != pin 2.1.314; no cell ran. Revalidated (4424904, baselines 626/605/601). Relaunched PID 30992; transport at 4424904, CLI still frozen at 7428bcd
+2026-10-31T16:56:35 second launch (PID 30992) refused at the canary: sonnet 637 (2 readings, transport-20261031T205456Z) != 605; probe right after read 605 x6 for sonnet. Relaunched PID 31140
+2026-10-31T17:02:55 third launch (PID 31140) refused at canary, sonnet 637. Cause: the 605 baseline was recorded from a shell exporting DO_NOT_TRACK=1, which the transport did not scrub. Fixed in b65c4c2 (scrub DO_NOT_TRACK, CLAUDE_EFFORT; baselines back to 658/637/633). Relaunched PID 12436
