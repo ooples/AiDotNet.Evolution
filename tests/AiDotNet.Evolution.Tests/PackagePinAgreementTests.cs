@@ -1,16 +1,10 @@
-using System.Text.RegularExpressions;
+using System.Xml.Linq;
 using Xunit;
 
 namespace AiDotNet.Evolution.Tests;
 
 public sealed class PackagePinAgreementTests
 {
-    // One PackageReference element, whatever its attributes and their order.
-    private static readonly Regex PackageReference = new("<PackageReference\\b(?<attributes>[^>]*)>", RegexOptions.CultureInvariant);
-
-    private static readonly Regex Attribute = new(
-        "\\b(?<name>Include|Version)\\s*=\\s*\"(?<value>[^\"]*)\"", RegexOptions.CultureInvariant);
-
     // Dependabot only bumps projects the solution lists, so #363 moved AiDotNet to 0.235.0 everywhere but in
     // eng/fixtures/DeploymentConsumer and benchmarks/EvolutionNoise. The consumer then asked for 0.234.0 below the
     // Deployment package's 0.235.0 floor, NU1605 failed Pack and validate NuGet, and main went red (#364).
@@ -29,6 +23,54 @@ public sealed class PackagePinAgreementTests
         Assert.True(disagreements.Count == 0, string.Join(Environment.NewLine, disagreements));
     }
 
+    // Restore ignores a commented-out reference and reads a child <Version> element like the attribute, so the scan does too.
+    [Fact]
+    public void A_pin_is_read_from_either_version_form_and_never_from_a_comment()
+    {
+        const string project = """
+            <Project>
+              <ItemGroup>
+                <!-- <PackageReference Include="Old" Version="0.1.0" /> -->
+                <PackageReference Include="Attribute" Version="1.0.0" />
+                <PackageReference Include="Element"><Version>2.0.0</Version></PackageReference>
+                <PackageReference Include="Property" Version="$(SomeVersion)" />
+                <PackageReference Update="Updated" Version="3.0.0" />
+              </ItemGroup>
+            </Project>
+            """;
+
+        Assert.Equal(
+            new[] { ("Attribute", "1.0.0"), ("Element", "2.0.0"), ("Updated", "3.0.0") },
+            Pins(project).OrderBy(pin => pin.Id, StringComparer.Ordinal).ToArray());
+    }
+
+    [Fact]
+    public void A_pin_is_read_whatever_the_attribute_order()
+    {
+        var pins = Pins(
+            "<Project>" +
+            "<PackageReference Include=\"A\" Version=\"1.0.0\" />" +
+            "<PackageReference Version=\"2.0.0\" Include=\"B\" />" +
+            "<PackageReference Include=\"C\" PrivateAssets=\"all\" Version=\"3.0.0\" />" +
+            "<PackageReference Include=\"D\" Version=\"$(DVersion)\" />" +
+            "<PackageReference Include=\"E\" />" +
+            "</Project>").ToList();
+
+        Assert.Equal(new[] { ("A", "1.0.0"), ("B", "2.0.0"), ("C", "3.0.0") }, pins);
+    }
+
+    // The literal pins of a project file, read as XML so attribute order, comments and a child <Version> element are
+    // handled as restore handles them. A version taken from an MSBuild property, or none, is not a pin this test can compare.
+
+    private static IEnumerable<(string Id, string Version)> Pins(string project) =>
+        XDocument.Parse(project).Descendants()
+            .Where(element => element.Name.LocalName == "PackageReference")
+            .Select(element => (
+                Id: (string?)element.Attribute("Include") ?? (string?)element.Attribute("Update") ?? "",
+                Version: (string?)element.Attribute("Version")
+                    ?? element.Elements().FirstOrDefault(child => child.Name.LocalName == "Version")?.Value.Trim() ?? ""))
+            .Where(pin => pin.Id.Length > 0 && pin.Version.Length > 0 && pin.Version.IndexOf('$') < 0);
+
     [Fact]
     public void The_scan_reaches_projects_the_solution_does_not_list()
     {
@@ -38,29 +80,6 @@ public sealed class PackagePinAgreementTests
         Assert.Contains("eng/fixtures/DeploymentConsumer/DeploymentConsumer.csproj", scanned);
         Assert.Contains("benchmarks/EvolutionNoise/EvolutionNoise.csproj", scanned);
     }
-
-    [Fact]
-    public void A_pin_is_read_whatever_the_attribute_order()
-    {
-        var pins = Pins(
-            "<PackageReference Include=\"A\" Version=\"1.0.0\" />" +
-            "<PackageReference Version=\"2.0.0\" Include=\"B\" />" +
-            "<PackageReference Include=\"C\" PrivateAssets=\"all\" Version=\"3.0.0\">" +
-            "<PackageReference Include=\"D\" Version=\"$(DVersion)\" />" +
-            "<PackageReference Include=\"E\" />").ToList();
-
-        Assert.Equal(new[] { ("A", "1.0.0"), ("B", "2.0.0"), ("C", "3.0.0") }, pins);
-    }
-
-    // The literal (Include, Version) pins of a project file. A version taken from an MSBuild property, or none, is not
-    // a pin this test can compare.
-    private static IEnumerable<(string Id, string Version)> Pins(string projectText) =>
-        PackageReference.Matches(projectText).Cast<Match>()
-            .Select(element => Attribute.Matches(element.Groups["attributes"].Value).Cast<Match>()
-                .ToDictionary(a => a.Groups["name"].Value, a => a.Groups["value"].Value, StringComparer.Ordinal))
-            .Where(a => a.TryGetValue("Include", out var id) && id.Length > 0
-                && a.TryGetValue("Version", out var version) && version.Length > 0 && version.IndexOf('$') < 0)
-            .Select(a => (a["Include"], a["Version"]));
 
     private static IEnumerable<string> ProjectFiles(string root) =>
         new[] { "src", "tests", "benchmarks", "examples", "eng" }
