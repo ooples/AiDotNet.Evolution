@@ -118,7 +118,8 @@ class ParseTests(unittest.TestCase):
 class IsolationTests(unittest.TestCase):
     def test_routing_and_session_variables_are_scrubbed(self):
         source = {"ANTHROPIC_BASE_URL": "http://127.0.0.1:58207", "ANTHROPIC_API_KEY": "k", "TOKEN_OPTIMIZER_CLIENT": "x",
-                  "CLAUDE_CODE_SESSION_ID": "s", "CLAUDECODE": "1", "CLAUDE_PID": "1", "PATH": "p", "USERPROFILE": "u"}
+                  "CLAUDE_CODE_SESSION_ID": "s", "CLAUDECODE": "1", "CLAUDE_PID": "1", "CLAUDE_EFFORT": "medium",
+                  "DO_NOT_TRACK": "1", "PATH": "p", "USERPROFILE": "u"}
         self.assertEqual({"PATH": "p", "USERPROFILE": "u"}, scrubbed_environment(source))
 
     def test_launchers_and_optimizer_shims_are_refused(self):
