@@ -1,5 +1,39 @@
 # Changelog
 
+## [0.8.0](https://github.com/ooples/AiDotNet.Evolution/compare/v0.7.0...v0.8.0) (2026-10-31)
+
+
+### ⚠ BREAKING CHANGES
+
+* **bench:** the CLI's program-length axis now adapts to the observed lengths by default. Set "binning": "Linear" on the length descriptor for the old fixed range. Imported OpenEvolve feature dimensions are adaptive min-max.
+* **programs:** ProcessProgramExecutionEngine and WarmPythonExecutionEngine (WarmForkWorker and WarmReusedWorker) now throw ArgumentException at construction unless ProgramSandboxOptions.AllowUnsandboxedExecution is true, because they do not isolate candidates from the host's files, network or system calls. Set it to keep running candidates as host processes, or use ContainerExecutionEngine (ProgramSandboxMode.Container). CLI run files must now carry either a "container" section or "allowUnsandboxedExecution": true; a run file with neither is refused at load. Runs imported from an OpenEvolve config write the opt-in themselves.
+* **checkpoint:** ProgramGenomeCodec implements IEvolutionUtf8GenomeCodec<ProgramGenome>, which adds a Deserialize(ReadOnlySpan<byte>) overload.
+* **benchmarks:** ProfileDelayBucket gains MedianMilliseconds; profile evidence now records it.
+* **checkpoint:** IEvolutionGenomeCodec.Deserialize is now called concurrently during a resume, so codecs must be thread-safe. The built-in codecs are.
+
+### Features
+
+* **bench:** AlphaEvolve problems as tasks both engines run ([#361](https://github.com/ooples/AiDotNet.Evolution/issues/361)) ([7428bcd](https://github.com/ooples/AiDotNet.Evolution/commit/7428bcdcbf24bd906ade7a2cc674126be73e4e03))
+* **programs:** container execution engine and an explicit opt-in for unsandboxed execution ([#351](https://github.com/ooples/AiDotNet.Evolution/issues/351)) ([9854dfe](https://github.com/ooples/AiDotNet.Evolution/commit/9854dfea6371330af8ea1033c67ae6d27d97361a))
+* **release:** publish npm and PyPI at the NuGet version through trusted publishing ([#357](https://github.com/ooples/AiDotNet.Evolution/issues/357)) ([c7d6668](https://github.com/ooples/AiDotNet.Evolution/commit/c7d6668e3fada20ae70050cac34fabcc30899745))
+
+
+### Bug Fixes
+
+* **benchmarks:** hold simulated delays to the clock and judge them by the median ([#353](https://github.com/ooples/AiDotNet.Evolution/issues/353)) ([acc3ea9](https://github.com/ooples/AiDotNet.Evolution/commit/acc3ea9b35152ed895e5c88df82f1ab2b0095ab0))
+
+
+### Performance
+
+* **checkpoint:** hand archived genome payloads to UTF-8 codecs as bytes on resume ([#358](https://github.com/ooples/AiDotNet.Evolution/issues/358)) ([e217774](https://github.com/ooples/AiDotNet.Evolution/commit/e217774d7afc1ebb07e7061c5797f188c6c5cb24))
+* **checkpoint:** journal archives in segments; resume 10,000 elites in under 1 s ([#352](https://github.com/ooples/AiDotNet.Evolution/issues/352)) ([d07beda](https://github.com/ooples/AiDotNet.Evolution/commit/d07beda1db830ca0610f4fc8e5ce91b72b8c8298))
+* **packages:** ship ReadyToRun images for six runtimes in every .NET library package ([#354](https://github.com/ooples/AiDotNet.Evolution/issues/354)) ([73e3c89](https://github.com/ooples/AiDotNet.Evolution/commit/73e3c8977c50475659ac1ce327d115bb1fdcbddc))
+
+
+### Tests
+
+* **bench:** E-4 capped pilot tooling and damped_oscillator evidence at 45 iterations ([#359](https://github.com/ooples/AiDotNet.Evolution/issues/359)) ([9e054ac](https://github.com/ooples/AiDotNet.Evolution/commit/9e054ac94af3147eeb5f8063cb2ee85ee16478b5))
+
 ## [0.7.0](https://github.com/ooples/AiDotNet.Evolution/compare/v0.6.0...v0.7.0) (2026-10-26)
 
 
