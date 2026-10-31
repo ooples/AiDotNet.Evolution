@@ -405,6 +405,17 @@ jobs:
           executed="$(grep -o 'executed="[0-9]*"' TestResults/openevolve-examples/openevolve-examples.trx | head -1 | grep -o '[0-9]*')"
           echo "OpenEvolve example tests executed: ${executed:-0}"
           [ "${executed:-0}" -ge 7 ] || { echo "::error::expected at least 7 OpenEvolve example tests, ran ${executed:-0}"; exit 1; }
+      # E-4 (#347): every AlphaEvolve task runs through both engines against a stand-in model. A row passes only when
+      # each engine reports the stand-in's construction as its best, so a proposal crossed model, engine and evaluator.
+      # No model is called.
+      - name: AlphaEvolve tasks through both engines
+        run: |
+          dotnet build src/AiDotNet.Evolution.Cli/AiDotNet.Evolution.Cli.csproj -c Release -f net10.0
+          mkdir -p TestResults
+          .local/program-env/bin/python benchmarks/external/alphaevolve_tasks_smoke.py \
+            --cli src/AiDotNet.Evolution.Cli/bin/Release/net10.0/aidotnet-evolve.dll \
+            --upstream .local/openevolve-upstream --python .local/program-env/bin/python \
+            --output TestResults/alphaevolve-tasks-smoke.json
       # V1-25 (#119): a competitor's Python benchmark runs through the reference worker without source modification. The
       # script refuses unless evaluator.py and initial_program.py match the pinned OpenEvolve blobs byte for byte, then
       # serves them through the real durable host; it fails unless both leases are accepted and the unmodified initial

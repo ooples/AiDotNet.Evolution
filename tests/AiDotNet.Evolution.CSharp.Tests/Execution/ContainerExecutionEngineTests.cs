@@ -246,6 +246,11 @@ public sealed class ContainerExecutionEngineTests
                     // /proc/net/unix lists the bound path, so the socket is found however deep below the source it is.
                     AssertMountRefused(nested);
                     AssertMountRefused(directory);
+
+                    // Unlinked while still open, as when a forked child still holds it: /proc/net/unix keeps the path,
+                    // but nothing can connect through a mount to a node that is gone. This failed CI intermittently.
+                    File.Delete(socketPath);
+                    AssertMountAccepted(directory);
                 }
             }
 
