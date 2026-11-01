@@ -81,14 +81,36 @@ def task_directories(root, problems):
 
 
 def resolve_python(parser, value):
-    """`--python` as an absolute path: a bare name through PATH, anything with a separator from the working directory."""
+    """`--python` as an absolute path: a bare name through PATH, anything with a separator from the working directory.
+
+    Either way it must name an executable file, so a mistyped path is refused before anything is frozen or spent.
+    """
     separators = [os.sep] + ([os.altsep] if os.altsep else [])
     if any(separator in value for separator in separators):
-        return str(Path(value).absolute())
+        path = Path(value).absolute()
+        if not path.is_file() or not os.access(path, os.X_OK):
+            parser.error("--python %r is not an executable file" % value)
+        return str(path)
     found = shutil.which(value)
     if found is None:
         parser.error("--python %r is not on PATH" % value)
     return str(Path(found).absolute())
+
+
+def frozen_budget(frozen, arguments):
+    """Refuses a resume whose per-cell budget or seed count differs from what the registration froze.
+
+    The broker enforces the registered budget whatever the flags say, so a differing flag would only make the launcher
+    describe a limit it does not enforce.
+    """
+    budget = frozen["Spec"]["Budget"]
+    requested = {"--model-calls": (arguments.model_calls, budget["ModelCalls"]),
+                 "--model-tokens": (arguments.model_tokens, budget["ModelTokens"]),
+                 "--wall-seconds": (arguments.wall_seconds, budget["WallSeconds"]),
+                 "--seed-count": (arguments.seed_count, len(frozen["Seeds"]))}
+    for flag, (asked, registered) in requested.items():
+        if asked != registered:
+            raise SystemExit("%s %r is not the %r this registration froze" % (flag, asked, registered))
 
 
 def frozen_iterations(path, requested):
@@ -132,15 +154,16 @@ def stub_answers(problems):
     return {problem: smoke.answer(smoke.improved(problem)) for problem in problems}
 
 
-def describe(projection, arguments, problems):
+def describe(projection, frozen, arguments, problems):
+    """What will run, read from the frozen registration: the budget the broker enforces, not the flags as given."""
     return [
         "problems             " + ", ".join(problems),
         "cells                %d (%d problems x %d seeds x 3 arms)" % (projection["Cells"], len(problems),
-                                                                       arguments.seed_count),
+                                                                       len(frozen["Seeds"])),
         "ceiling              %d model calls, %d tokens, %d wall seconds"
         % (projection["MaxModelCalls"], projection["MaxModelTokens"], projection["MaxWallSeconds"]),
         "per cell             %d calls over %d iterations, which is the broker's own limit"
-        % (arguments.model_calls, arguments.iterations),
+        % (frozen["Spec"]["Budget"]["ModelCalls"], arguments.iterations),
         "construction limit   %d s in the broker; the engines' evaluator timeout is %d s"
         % (pilot.CONSTRUCT_TIMEOUT, pilot.ENGINE_EVALUATOR_TIMEOUT),
         "sizing target        CI half width %.4g, frozen with the seeds" % arguments.target_half_width,
@@ -148,7 +171,7 @@ def describe(projection, arguments, problems):
     ]
 
 
-def summarise(rows, report, *, problems, arguments, frozen, projection, wall, canaries, receipts):
+def summarise(rows, report, *, problems, arguments, frozen, projection, wall, canaries, receipts, libraries):
     return {
         "story": "E-4 (#347)",
         "problems": problems,
@@ -158,6 +181,8 @@ def summarise(rows, report, *, problems, arguments, frozen, projection, wall, ca
         "verifier_seals": frozen["Spec"]["TestPartitionHashes"],
         "iterations_per_cell": arguments.iterations,
         "construction_limit_seconds": pilot.CONSTRUCT_TIMEOUT,
+        "endpoint": "the verifier's score of the construction the search's own evaluation produced",
+        "libraries": libraries,
         "wall_seconds": round(wall, 1),
         "cells": len(rows),
         "statuses": {status: sum(1 for row in rows if row["Status"] == status)
@@ -206,6 +231,8 @@ def main(argv=None):
     if arguments.seed_count < 6 or arguments.seed_count % 6:
         raise SystemExit("--seed-count %d does not complete the three-arm position design; use a multiple of 6"
                          % arguments.seed_count)
+    if arguments.iterations < 1:
+        raise SystemExit("--iterations %d must be at least 1; it is frozen for every cell" % arguments.iterations)
     if not (math.isfinite(arguments.target_half_width) and arguments.target_half_width > 0):
         raise SystemExit("--target-half-width must be a positive, finite number; it sizes the gate campaign")
     most_calls = min(program_broker.MAX_MODEL_CALLS, program_broker.MAX_EVALUATIONS - pilot_campaign.EVALUATION_HEADROOM)
@@ -222,6 +249,11 @@ def main(argv=None):
     root = Path(arguments.root).resolve()
     arguments.upstream = str(Path(arguments.upstream).resolve())
     arguments.python = resolve_python(parser, arguments.python)
+    # The statement promises these libraries; an interpreter without one would break that promise in every cell.
+    try:
+        libraries = pilot.library_versions(arguments.python)
+    except RuntimeError as error:
+        raise SystemExit(str(error)) from error
     registration_path = root / "registration" / "registration.json"
     sizing_path = root / "registration" / "sizing.json"
     iterations_path = root / "registration" / "iterations.json"
@@ -231,6 +263,7 @@ def main(argv=None):
         registered = [family["Family"] for family in frozen["Spec"]["Families"]]
         if registered != problems:
             raise SystemExit("--problem %s is not the %s this registration froze" % (problems, registered))
+        frozen_budget(frozen, arguments)
         for problem in problems:
             if frozen["Spec"]["TestPartitionHashes"][problem] != pilot.verifier_seal(problem):
                 raise SystemExit("The verifier for %s changed since the registration sealed it" % problem)
@@ -248,7 +281,7 @@ def main(argv=None):
     half_width = symbolic.frozen_half_width(sizing_path, arguments.target_half_width)
     frozen_iterations(iterations_path, arguments.iterations)
     directories = task_directories(root, problems)
-    for line in describe(projection, arguments, problems):
+    for line in describe(projection, frozen, arguments, problems):
         print(line)
     if arguments.confirm != projection["ProjectionSha256"]:
         print("\nNothing ran. Re-run the same command with --confirm " + projection["ProjectionSha256"])
@@ -270,12 +303,13 @@ def main(argv=None):
         provider = models.generate
         print("canaries             " + json.dumps(canaries))
 
-    session = pilot.cell_broker(frozen, provider, initials=initials, python=arguments.python)
+    ledger = pilot.EvaluatedHeights(root / "state" / "heights")
+    session = pilot.cell_broker(frozen, provider, initials=initials, python=arguments.python, ledger=ledger)
     searchers = searchers_for(session, directories, cli=arguments.cli, upstream=arguments.upstream,
                               python_executable=arguments.python, iterations=arguments.iterations,
                               timeout=arguments.cell_timeout)
     started = time.monotonic()
-    execute = pilot.executor(searchers, python=arguments.python)
+    execute = pilot.executor(searchers, ledger=ledger)
     rows = runner.run(registration_path, root / "state", execute, confirm=projection["ProjectionSha256"], log=print)
     report = registration.analyze(frozen, rows)
     wall = time.monotonic() - started
@@ -283,7 +317,7 @@ def main(argv=None):
     receipts = ({name: reconcile_receipts(transports / name) for name in models.transports}
                 if models is not None else {})
     summary = summarise(rows, report, problems=problems, arguments=arguments, frozen=frozen, projection=projection,
-                        wall=wall, canaries=canaries, receipts=receipts)
+                        wall=wall, canaries=canaries, receipts=receipts, libraries=libraries)
     # Raw results before the sizing, because the sizing can refuse (see run_pilot_campaign.main).
     (evidence / "rows.json").write_text(json.dumps(rows, indent=1) + "\n", encoding="utf-8")
     (evidence / "report.json").write_text(json.dumps(report, indent=1) + "\n", encoding="utf-8")
