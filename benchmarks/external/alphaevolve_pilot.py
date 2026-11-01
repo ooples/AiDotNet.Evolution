@@ -2,9 +2,9 @@
 
 `pilot_broker`, `pilot_cells` and `pilot_campaign.spec` are written for the symbolic-regression family: a candidate
 defines `predict`, selection rows score it, and a held-out split is the endpoint. An AlphaEvolve candidate defines
-`construct()` instead, and its verifier is exact and deterministic, so there is nothing held out: the endpoint is the
-same verifier run again, in a fresh process, on the program the search returned. Everything else - the searchers,
-`campaign_runner`, the per-cell broker, the paired analysis and the power analysis - is reused unchanged.
+`construct()` instead, and its verifier is exact and deterministic, so there is nothing held out: the endpoint
+rescores the stored heights from the search's own evaluation of the returned program. A fresh run can differ when
+candidates read the clock. The searchers, per-cell broker, paired analysis and power analysis are reused.
 
 **A construction runs in a child process with a timeout.** The symbolic pilot loads `predict` into the broker's own
 process, which is safe for a formula. A construction may run an optimisation for the full limit, or never return, and
@@ -50,8 +50,41 @@ ENGINE_EVALUATOR_TIMEOUT = tasks.TIMEOUT_SECONDS + 30
 CHILD_ENVIRONMENT = ("PATH", "SYSTEMROOT", "SYSTEMDRIVE", "TEMP", "TMP", "HOME", "USERPROFILE", "LANG")
 VERIFIER_SOURCES = ("alphaevolve_math.py", "alphaevolve_headroom.py", "alphaevolve_tasks.py")
 
+def _release(process):
+    """Allow candidate imports only after process containment is installed."""
+    try:
+        process.stdin.write(b"1")
+        process.stdin.flush()
+    finally:
+        process.stdin.close()
+
+
+
+@contextlib.contextmanager
+def _construction_directory():
+    directory = tempfile.TemporaryDirectory(prefix="alphaevolve-construct-")
+    try:
+        yield directory.name
+    finally:
+        # Windows may release redirected file handles just after the job reports zero active processes.
+        deadline = time.monotonic() + 10
+        while True:
+            try:
+                directory.cleanup()
+                break
+            except PermissionError as error:
+                if getattr(error, "winerror", None) != 32 or time.monotonic() >= deadline:
+                    raise
+                time.sleep(0.01)
+
+
+
 CONSTRUCT = r'''
 import importlib.util, json, os, sys
+# Parent grants admission only after job assignment succeeds. No candidate code runs before this gate.
+if sys.stdin.buffer.read(1) != b"1":
+    raise SystemExit("construction admission refused")
+sys.stdin.close()
 if os.name != "nt":
     # Soft and hard alike, so the candidate cannot raise it. RLIMIT_DATA rather than RLIMIT_AS: numpy reserves address
     # space at import that it never commits, and Linux counts mmap'd memory against RLIMIT_DATA since 4.7.
@@ -122,8 +155,37 @@ class _Job:
             raise self._error(self._last_error())
 
     def close(self):
-        if self._handle:
-            handle, self._handle = self._handle, None
+        if not self._handle:
+            return
+        import ctypes
+        from ctypes import wintypes
+
+        class Accounting(ctypes.Structure):
+            _fields_ = [("TotalUserTime", ctypes.c_int64), ("TotalKernelTime", ctypes.c_int64),
+                        ("ThisPeriodTotalUserTime", ctypes.c_int64), ("ThisPeriodTotalKernelTime", ctypes.c_int64),
+                        ("TotalPageFaultCount", wintypes.DWORD), ("TotalProcesses", wintypes.DWORD),
+                        ("ActiveProcesses", wintypes.DWORD), ("TotalTerminatedProcesses", wintypes.DWORD)]
+
+        self._kernel.TerminateJobObject.argtypes = (wintypes.HANDLE, wintypes.UINT)
+        self._kernel.QueryInformationJobObject.argtypes = (
+            wintypes.HANDLE, ctypes.c_int, ctypes.c_void_p, wintypes.DWORD, ctypes.c_void_p)
+        handle, self._handle = self._handle, None
+        try:
+            if not self._kernel.TerminateJobObject(handle, 1):
+                raise ctypes.WinError(ctypes.get_last_error())
+            # Job termination is asynchronous. Reap the whole tree before deleting its redirected files.
+            deadline = time.monotonic() + 10
+            accounting = Accounting()
+            while True:
+                if not self._kernel.QueryInformationJobObject(
+                        handle, 1, ctypes.byref(accounting), ctypes.sizeof(accounting), None):
+                    raise ctypes.WinError(ctypes.get_last_error())
+                if accounting.ActiveProcesses == 0:
+                    break
+                if time.monotonic() >= deadline:
+                    raise TimeoutError("construction job did not terminate within 10 seconds")
+                time.sleep(0.01)
+        finally:
             self._kernel.CloseHandle(handle)
 
 
@@ -137,7 +199,11 @@ def _stop(process, job):
         except (ProcessLookupError, PermissionError):
             pass  # the group is already empty
     if process.poll() is None:
+        # Assignment can fail before the child belongs to the job; closing that job cannot reap it.
+        process.kill()
         process.wait(timeout=10)
+    if process.stdin is not None and not process.stdin.closed:
+        process.stdin.close()
 
 
 def _size(path):
@@ -156,7 +222,7 @@ def construction(program_path, python, *, timeout=CONSTRUCT_TIMEOUT):
     output and its `heights.json` are bounded by `MAX_OUTPUT` while it runs and again after it exits.
     """
     environment = {name: os.environ[name] for name in CHILD_ENVIRONMENT if name in os.environ}
-    with tempfile.TemporaryDirectory(prefix="alphaevolve-construct-") as directory:
+    with _construction_directory() as directory:
         directory = Path(directory)
         output, printed = directory / "heights.json", (directory / "stdout.txt", directory / "stderr.txt")
         process, job = None, (_Job(CONSTRUCT_MEMORY) if os.name == "nt" else None)
@@ -165,10 +231,11 @@ def construction(program_path, python, *, timeout=CONSTRUCT_TIMEOUT):
             with printed[0].open("xb") as stdout, printed[1].open("xb") as stderr:
                 process = subprocess.Popen([str(python), "-I", "-c", CONSTRUCT, str(program_path), str(output),
                                             str(CONSTRUCT_MEMORY)],
-                                           stdin=subprocess.DEVNULL, stdout=stdout, stderr=stderr, cwd=directory,
+                                           stdin=subprocess.PIPE, stdout=stdout, stderr=stderr, cwd=directory,
                                            env=environment, start_new_session=os.name != "nt")
                 if job is not None:
                     job.assign(process)
+                _release(process)
                 while process.poll() is None:
                     if time.monotonic() - started >= timeout:
                         return None, "construct() did not return within %d seconds" % timeout
