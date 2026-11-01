@@ -7,7 +7,14 @@ updates:
   # bumps into a single branch removes the conflicts rather than resolving them one at
   # a time, and the whole week's upgrade is reviewed and CI'd once.
   - package-ecosystem: nuget
-    directory: /
+    # "/" only reaches projects the solution lists. #363 bumped AiDotNet there but left the
+    # consumer fixture and EvolutionNoise on the old version, and the fixture's NU1605
+    # downgrade turned main red (#364). PackagePinAgreementTests fails any pin that lags.
+    directories:
+      - /
+      - /benchmarks/EvolutionGpu
+      - /benchmarks/EvolutionNoise
+      - /eng/fixtures/DeploymentConsumer
     schedule:
       interval: weekly
     open-pull-requests-limit: 5
