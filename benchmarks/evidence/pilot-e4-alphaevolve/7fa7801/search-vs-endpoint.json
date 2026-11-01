@@ -1,0 +1,362 @@
+[
+ {
+  "Family": "c3-autocorrelation",
+  "Arm": "aidotnet",
+  "Seed": 1353004307,
+  "Endpoint": 0.9975309361518462,
+  "SearchBest": 0.9975139916358144,
+  "Gap": -1.694451603173608e-05,
+  "Evaluated": 26,
+  "EqualToSeed": 0
+ },
+ {
+  "Family": "c3-autocorrelation",
+  "Arm": "aidotnet",
+  "Seed": 1756722251,
+  "Endpoint": 0.9902398999310084,
+  "SearchBest": 0.9903393307657807,
+  "Gap": 9.94308347723738e-05,
+  "Evaluated": 26,
+  "EqualToSeed": 0
+ },
+ {
+  "Family": "c3-autocorrelation",
+  "Arm": "aidotnet",
+  "Seed": 2413275516,
+  "Endpoint": 0.9981400027600263,
+  "SearchBest": 0.9983645522597445,
+  "Gap": 0.00022454949971817406,
+  "Evaluated": 26,
+  "EqualToSeed": 0
+ },
+ {
+  "Family": "c3-autocorrelation",
+  "Arm": "aidotnet",
+  "Seed": 2901860563,
+  "Endpoint": 0.9981610957278437,
+  "SearchBest": 0.9981720310519482,
+  "Gap": 1.093532410445519e-05,
+  "Evaluated": 26,
+  "EqualToSeed": 0
+ },
+ {
+  "Family": "c3-autocorrelation",
+  "Arm": "aidotnet",
+  "Seed": 305925402,
+  "Endpoint": 0.9774931234325286,
+  "SearchBest": 0.987386825075277,
+  "Gap": 0.009893701642748387,
+  "Evaluated": 26,
+  "EqualToSeed": 0
+ },
+ {
+  "Family": "c3-autocorrelation",
+  "Arm": "aidotnet",
+  "Seed": 3721011351,
+  "Endpoint": 0.994418149750002,
+  "SearchBest": 0.9946120448039054,
+  "Gap": 0.00019389505390343675,
+  "Evaluated": 26,
+  "EqualToSeed": 0
+ },
+ {
+  "Family": "c3-autocorrelation",
+  "Arm": "openevolve-matched",
+  "Seed": 1353004307,
+  "Endpoint": 0.9942567654078,
+  "SearchBest": 0.9957774392152087,
+  "Gap": 0.0015206738074087234,
+  "Evaluated": 0,
+  "EqualToSeed": 0
+ },
+ {
+  "Family": "c3-autocorrelation",
+  "Arm": "openevolve-matched",
+  "Seed": 1756722251,
+  "Endpoint": 0.9962706323893575,
+  "SearchBest": 0.9963099766084346,
+  "Gap": 3.9344219077031006e-05,
+  "Evaluated": 0,
+  "EqualToSeed": 0
+ },
+ {
+  "Family": "c3-autocorrelation",
+  "Arm": "openevolve-matched",
+  "Seed": 2413275516,
+  "Endpoint": 0.9946425614131887,
+  "SearchBest": 0.9946423855890396,
+  "Gap": -1.7582414912897804e-07,
+  "Evaluated": 0,
+  "EqualToSeed": 0
+ },
+ {
+  "Family": "c3-autocorrelation",
+  "Arm": "openevolve-matched",
+  "Seed": 2901860563,
+  "Endpoint": 0.9615379335816885,
+  "SearchBest": 0.9615327606824149,
+  "Gap": -5.172899273597764e-06,
+  "Evaluated": 0,
+  "EqualToSeed": 0
+ },
+ {
+  "Family": "c3-autocorrelation",
+  "Arm": "openevolve-matched",
+  "Seed": 305925402,
+  "Endpoint": 0.9962470557293878,
+  "SearchBest": 0.9962470557293878,
+  "Gap": 0.0,
+  "Evaluated": 0,
+  "EqualToSeed": 0
+ },
+ {
+  "Family": "c3-autocorrelation",
+  "Arm": "openevolve-matched",
+  "Seed": 3721011351,
+  "Endpoint": 0.995100613392475,
+  "SearchBest": 0.9950989755293653,
+  "Gap": -1.6378631096936047e-06,
+  "Evaluated": 0,
+  "EqualToSeed": 0
+ },
+ {
+  "Family": "c3-autocorrelation",
+  "Arm": "openevolve-recommended",
+  "Seed": 1353004307,
+  "Endpoint": 0.996522117395914,
+  "SearchBest": 0.9964822566455982,
+  "Gap": -3.9860750315812155e-05,
+  "Evaluated": 0,
+  "EqualToSeed": 0
+ },
+ {
+  "Family": "c3-autocorrelation",
+  "Arm": "openevolve-recommended",
+  "Seed": 1756722251,
+  "Endpoint": 0.9755200073757285,
+  "SearchBest": 0.9760445595652989,
+  "Gap": 0.0005245521895703709,
+  "Evaluated": 0,
+  "EqualToSeed": 0
+ },
+ {
+  "Family": "c3-autocorrelation",
+  "Arm": "openevolve-recommended",
+  "Seed": 2413275516,
+  "Endpoint": 0.963580929572426,
+  "SearchBest": 0.9641294494115608,
+  "Gap": 0.0005485198391347312,
+  "Evaluated": 0,
+  "EqualToSeed": 0
+ },
+ {
+  "Family": "c3-autocorrelation",
+  "Arm": "openevolve-recommended",
+  "Seed": 2901860563,
+  "Endpoint": 0.9913956294364241,
+  "SearchBest": 0.9913776463289351,
+  "Gap": -1.798310748901688e-05,
+  "Evaluated": 0,
+  "EqualToSeed": 0
+ },
+ {
+  "Family": "c3-autocorrelation",
+  "Arm": "openevolve-recommended",
+  "Seed": 305925402,
+  "Endpoint": 0.9643635646841001,
+  "SearchBest": 0.9643628822518969,
+  "Gap": -6.824322031917518e-07,
+  "Evaluated": 0,
+  "EqualToSeed": 0
+ },
+ {
+  "Family": "c3-autocorrelation",
+  "Arm": "openevolve-recommended",
+  "Seed": 3721011351,
+  "Endpoint": 0.9957288688647772,
+  "SearchBest": 0.9957333549977291,
+  "Gap": 4.486132951897481e-06,
+  "Evaluated": 0,
+  "EqualToSeed": 0
+ },
+ {
+  "Family": "c5-erdos-overlap",
+  "Arm": "aidotnet",
+  "Seed": 1353004307,
+  "Endpoint": 0.9970112508067539,
+  "SearchBest": 0.9970573689991619,
+  "Gap": 4.611819240796233e-05,
+  "Evaluated": 26,
+  "EqualToSeed": 3
+ },
+ {
+  "Family": "c5-erdos-overlap",
+  "Arm": "aidotnet",
+  "Seed": 1756722251,
+  "Endpoint": 0.9941066190245715,
+  "SearchBest": 0.996678469448827,
+  "Gap": 0.0025718504242554507,
+  "Evaluated": 26,
+  "EqualToSeed": 6
+ },
+ {
+  "Family": "c5-erdos-overlap",
+  "Arm": "aidotnet",
+  "Seed": 2413275516,
+  "Endpoint": 0.9984299314206923,
+  "SearchBest": 0.998429363350256,
+  "Gap": -5.68070436246515e-07,
+  "Evaluated": 26,
+  "EqualToSeed": 1
+ },
+ {
+  "Family": "c5-erdos-overlap",
+  "Arm": "aidotnet",
+  "Seed": 2901860563,
+  "Endpoint": 0.9979992248911681,
+  "SearchBest": 0.9980381807453286,
+  "Gap": 3.895585416047176e-05,
+  "Evaluated": 26,
+  "EqualToSeed": 0
+ },
+ {
+  "Family": "c5-erdos-overlap",
+  "Arm": "aidotnet",
+  "Seed": 305925402,
+  "Endpoint": 0.9988004151562891,
+  "SearchBest": 0.9988004151562891,
+  "Gap": 0.0,
+  "Evaluated": 26,
+  "EqualToSeed": 1
+ },
+ {
+  "Family": "c5-erdos-overlap",
+  "Arm": "aidotnet",
+  "Seed": 3721011351,
+  "Endpoint": 0.9964374682189071,
+  "SearchBest": 0.9964209924426504,
+  "Gap": -1.6475776256741348e-05,
+  "Evaluated": 26,
+  "EqualToSeed": 3
+ },
+ {
+  "Family": "c5-erdos-overlap",
+  "Arm": "openevolve-matched",
+  "Seed": 1353004307,
+  "Endpoint": 0.9981823084981054,
+  "SearchBest": 0.9981933875591806,
+  "Gap": 1.1079061075225383e-05,
+  "Evaluated": 0,
+  "EqualToSeed": 0
+ },
+ {
+  "Family": "c5-erdos-overlap",
+  "Arm": "openevolve-matched",
+  "Seed": 1756722251,
+  "Endpoint": 0.9978127573690276,
+  "SearchBest": 0.9978263145585701,
+  "Gap": 1.3557189542434678e-05,
+  "Evaluated": 0,
+  "EqualToSeed": 0
+ },
+ {
+  "Family": "c5-erdos-overlap",
+  "Arm": "openevolve-matched",
+  "Seed": 2413275516,
+  "Endpoint": 0.9990451709258975,
+  "SearchBest": 0.9990451709258975,
+  "Gap": 0.0,
+  "Evaluated": 0,
+  "EqualToSeed": 0
+ },
+ {
+  "Family": "c5-erdos-overlap",
+  "Arm": "openevolve-matched",
+  "Seed": 2901860563,
+  "Endpoint": 0.9980968976994443,
+  "SearchBest": 0.9980968883197904,
+  "Gap": -9.379653942431787e-09,
+  "Evaluated": 0,
+  "EqualToSeed": 0
+ },
+ {
+  "Family": "c5-erdos-overlap",
+  "Arm": "openevolve-matched",
+  "Seed": 305925402,
+  "Endpoint": 0.9974750088834974,
+  "SearchBest": 0.9974784935576269,
+  "Gap": 3.484674129472509e-06,
+  "Evaluated": 0,
+  "EqualToSeed": 0
+ },
+ {
+  "Family": "c5-erdos-overlap",
+  "Arm": "openevolve-matched",
+  "Seed": 3721011351,
+  "Endpoint": 0.996997072634285,
+  "SearchBest": 0.996997072634285,
+  "Gap": 0.0,
+  "Evaluated": 0,
+  "EqualToSeed": 0
+ },
+ {
+  "Family": "c5-erdos-overlap",
+  "Arm": "openevolve-recommended",
+  "Seed": 1353004307,
+  "Endpoint": 0.9992117910928595,
+  "SearchBest": 0.9992117910928595,
+  "Gap": 0.0,
+  "Evaluated": 0,
+  "EqualToSeed": 0
+ },
+ {
+  "Family": "c5-erdos-overlap",
+  "Arm": "openevolve-recommended",
+  "Seed": 1756722251,
+  "Endpoint": 0.9981791236557055,
+  "SearchBest": 0.9981815073131908,
+  "Gap": 2.3836574852831305e-06,
+  "Evaluated": 0,
+  "EqualToSeed": 0
+ },
+ {
+  "Family": "c5-erdos-overlap",
+  "Arm": "openevolve-recommended",
+  "Seed": 2413275516,
+  "Endpoint": 0.9990879626303567,
+  "SearchBest": 0.9987972196792112,
+  "Gap": -0.0002907429511455062,
+  "Evaluated": 0,
+  "EqualToSeed": 0
+ },
+ {
+  "Family": "c5-erdos-overlap",
+  "Arm": "openevolve-recommended",
+  "Seed": 2901860563,
+  "Endpoint": 0.9987485838485224,
+  "SearchBest": 0.9987485838485224,
+  "Gap": 0.0,
+  "Evaluated": 0,
+  "EqualToSeed": 0
+ },
+ {
+  "Family": "c5-erdos-overlap",
+  "Arm": "openevolve-recommended",
+  "Seed": 305925402,
+  "Endpoint": 0.9971428266854646,
+  "SearchBest": 0.9971449382650339,
+  "Gap": 2.1115795693082973e-06,
+  "Evaluated": 0,
+  "EqualToSeed": 0
+ },
+ {
+  "Family": "c5-erdos-overlap",
+  "Arm": "openevolve-recommended",
+  "Seed": 3721011351,
+  "Endpoint": 0.9979241815683012,
+  "SearchBest": 0.997957562317924,
+  "Gap": 3.338074962278004e-05,
+  "Evaluated": 0,
+  "EqualToSeed": 0
+ }
+]

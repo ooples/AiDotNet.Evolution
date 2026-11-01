@@ -1,0 +1,434 @@
+[
+ {
+  "Family": "c3-autocorrelation",
+  "Arm": "aidotnet",
+  "Seed": 305925402,
+  "SearchBest": 0.987386825075277,
+  "Endpoint": 0.9774931234325286,
+  "Reruns": [
+   0.9895519060154794,
+   0.986060214533442
+  ],
+  "Spread": 0.012058782582950789
+ },
+ {
+  "Family": "c3-autocorrelation",
+  "Arm": "aidotnet",
+  "Seed": 1353004307,
+  "SearchBest": 0.9975139916358144,
+  "Endpoint": 0.9975309361518462,
+  "Reruns": [
+   0.9974877191350869,
+   0.9974809847675767
+  ],
+  "Spread": 4.995138426944212e-05
+ },
+ {
+  "Family": "c3-autocorrelation",
+  "Arm": "aidotnet",
+  "Seed": 1756722251,
+  "SearchBest": 0.9903393307657807,
+  "Endpoint": 0.9902398999310084,
+  "Reruns": [
+   0.9903367843240731,
+   0.9902952748957135
+  ],
+  "Spread": 9.68843930647667e-05
+ },
+ {
+  "Family": "c3-autocorrelation",
+  "Arm": "aidotnet",
+  "Seed": 2413275516,
+  "SearchBest": 0.9983645522597445,
+  "Endpoint": 0.9981400027600263,
+  "Reruns": [
+   0.9980494321893398,
+   0.9984666206382191
+  ],
+  "Spread": 0.00041718844887927986
+ },
+ {
+  "Family": "c3-autocorrelation",
+  "Arm": "aidotnet",
+  "Seed": 2901860563,
+  "SearchBest": 0.9981720310519482,
+  "Endpoint": 0.9981610957278437,
+  "Reruns": [
+   0.99813077266977,
+   0.9981848094034239
+  ],
+  "Spread": 5.403673365389494e-05
+ },
+ {
+  "Family": "c3-autocorrelation",
+  "Arm": "aidotnet",
+  "Seed": 3721011351,
+  "SearchBest": 0.9946120448039054,
+  "Endpoint": 0.994418149750002,
+  "Reruns": [
+   0.9939121687319111,
+   0.9945620410145779
+  ],
+  "Spread": 0.0006498722826667747
+ },
+ {
+  "Family": "c3-autocorrelation",
+  "Arm": "openevolve-matched",
+  "Seed": 305925402,
+  "SearchBest": 0.9962470557293878,
+  "Endpoint": 0.9962470557293878,
+  "Reruns": [
+   0.9962470557293878,
+   0.9962470557293878
+  ],
+  "Spread": 0.0
+ },
+ {
+  "Family": "c3-autocorrelation",
+  "Arm": "openevolve-matched",
+  "Seed": 1353004307,
+  "SearchBest": 0.9957774392152087,
+  "Endpoint": 0.9942567654078,
+  "Reruns": [
+   0.994468314571206,
+   0.994421308399692
+  ],
+  "Spread": 0.00021154916340604402
+ },
+ {
+  "Family": "c3-autocorrelation",
+  "Arm": "openevolve-matched",
+  "Seed": 1756722251,
+  "SearchBest": 0.9963099766084346,
+  "Endpoint": 0.9962706323893575,
+  "Reruns": [
+   0.9962740234666734,
+   0.9962969795551155
+  ],
+  "Spread": 2.6347165758000557e-05
+ },
+ {
+  "Family": "c3-autocorrelation",
+  "Arm": "openevolve-matched",
+  "Seed": 2413275516,
+  "SearchBest": 0.9946423855890396,
+  "Endpoint": 0.9946425614131887,
+  "Reruns": [
+   0.9946502108475225,
+   0.9946425849746553
+  ],
+  "Spread": 7.649434333734106e-06
+ },
+ {
+  "Family": "c3-autocorrelation",
+  "Arm": "openevolve-matched",
+  "Seed": 2901860563,
+  "SearchBest": 0.9615327606824149,
+  "Endpoint": 0.9615379335816885,
+  "Reruns": [
+   0.961534450447059,
+   0.961533023612258
+  ],
+  "Spread": 4.909969430477723e-06
+ },
+ {
+  "Family": "c3-autocorrelation",
+  "Arm": "openevolve-matched",
+  "Seed": 3721011351,
+  "SearchBest": 0.9950989755293653,
+  "Endpoint": 0.995100613392475,
+  "Reruns": [
+   0.9950996081698839,
+   0.9950945810641552
+  ],
+  "Spread": 6.032328319860447e-06
+ },
+ {
+  "Family": "c3-autocorrelation",
+  "Arm": "openevolve-recommended",
+  "Seed": 305925402,
+  "SearchBest": 0.9643628822518969,
+  "Endpoint": 0.9643635646841001,
+  "Reruns": [
+   0.9643661857797741,
+   0.9643633645969208
+  ],
+  "Spread": 2.821182853218751e-06
+ },
+ {
+  "Family": "c3-autocorrelation",
+  "Arm": "openevolve-recommended",
+  "Seed": 1353004307,
+  "SearchBest": 0.9964822566455982,
+  "Endpoint": 0.996522117395914,
+  "Reruns": [
+   0.9964796630431443,
+   0.9964824125717433
+  ],
+  "Spread": 4.245435276972742e-05
+ },
+ {
+  "Family": "c3-autocorrelation",
+  "Arm": "openevolve-recommended",
+  "Seed": 1756722251,
+  "SearchBest": 0.9760445595652989,
+  "Endpoint": 0.9755200073757285,
+  "Reruns": [
+   0.9745168821284981,
+   0.9752011127642374
+  ],
+  "Spread": 0.001003125247230452
+ },
+ {
+  "Family": "c3-autocorrelation",
+  "Arm": "openevolve-recommended",
+  "Seed": 2413275516,
+  "SearchBest": 0.9641294494115608,
+  "Endpoint": 0.963580929572426,
+  "Reruns": [
+   0.9635770941063082,
+   0.96357192482003
+  ],
+  "Spread": 9.004752396069016e-06
+ },
+ {
+  "Family": "c3-autocorrelation",
+  "Arm": "openevolve-recommended",
+  "Seed": 2901860563,
+  "SearchBest": 0.9913776463289351,
+  "Endpoint": 0.9913956294364241,
+  "Reruns": [
+   0.991400389985453,
+   0.9914030342890311
+  ],
+  "Spread": 7.404852606973655e-06
+ },
+ {
+  "Family": "c3-autocorrelation",
+  "Arm": "openevolve-recommended",
+  "Seed": 3721011351,
+  "SearchBest": 0.9957333549977291,
+  "Endpoint": 0.9957288688647772,
+  "Reruns": [
+   0.9957566792922268,
+   0.9957574289380121
+  ],
+  "Spread": 2.856007323492893e-05
+ },
+ {
+  "Family": "c5-erdos-overlap",
+  "Arm": "aidotnet",
+  "Seed": 305925402,
+  "SearchBest": 0.9988004151562891,
+  "Endpoint": 0.9988004151562891,
+  "Reruns": [
+   0.9988004151562891,
+   0.9988004151562891
+  ],
+  "Spread": 0.0
+ },
+ {
+  "Family": "c5-erdos-overlap",
+  "Arm": "aidotnet",
+  "Seed": 1353004307,
+  "SearchBest": 0.9970573689991619,
+  "Endpoint": 0.9970112508067539,
+  "Reruns": [
+   0.997030567822549,
+   0.9970301758007306
+  ],
+  "Spread": 1.931701579505063e-05
+ },
+ {
+  "Family": "c5-erdos-overlap",
+  "Arm": "aidotnet",
+  "Seed": 1756722251,
+  "SearchBest": 0.996678469448827,
+  "Endpoint": 0.9941066190245715,
+  "Reruns": [
+   0.9941034071586088,
+   0.9941034792768513
+  ],
+  "Spread": 3.2118659627489166e-06
+ },
+ {
+  "Family": "c5-erdos-overlap",
+  "Arm": "aidotnet",
+  "Seed": 2413275516,
+  "SearchBest": 0.998429363350256,
+  "Endpoint": 0.9984299314206923,
+  "Reruns": [
+   0.998432513513178,
+   0.9981982697421733
+  ],
+  "Spread": 0.00023424377100467186
+ },
+ {
+  "Family": "c5-erdos-overlap",
+  "Arm": "aidotnet",
+  "Seed": 2901860563,
+  "SearchBest": 0.9980381807453286,
+  "Endpoint": 0.9979992248911681,
+  "Reruns": [
+   0.9980521446059023,
+   0.9980481795081533
+  ],
+  "Spread": 5.291971473420087e-05
+ },
+ {
+  "Family": "c5-erdos-overlap",
+  "Arm": "aidotnet",
+  "Seed": 3721011351,
+  "SearchBest": 0.9964209924426504,
+  "Endpoint": 0.9964374682189071,
+  "Reruns": [
+   0.99641821496701,
+   0.9964204427273514
+  ],
+  "Spread": 1.9253251897111134e-05
+ },
+ {
+  "Family": "c5-erdos-overlap",
+  "Arm": "openevolve-matched",
+  "Seed": 305925402,
+  "SearchBest": 0.9974784935576269,
+  "Endpoint": 0.9974750088834974,
+  "Reruns": [
+   0.9974691063361358,
+   0.997470171433154
+  ],
+  "Spread": 5.90254736154705e-06
+ },
+ {
+  "Family": "c5-erdos-overlap",
+  "Arm": "openevolve-matched",
+  "Seed": 1353004307,
+  "SearchBest": 0.9981933875591806,
+  "Endpoint": 0.9981823084981054,
+  "Reruns": [
+   0.9981979641355179,
+   0.9981965176850409
+  ],
+  "Spread": 1.5655637412459456e-05
+ },
+ {
+  "Family": "c5-erdos-overlap",
+  "Arm": "openevolve-matched",
+  "Seed": 1756722251,
+  "SearchBest": 0.9978263145585701,
+  "Endpoint": 0.9978127573690276,
+  "Reruns": [
+   0.9978251736506961,
+   0.997828393005181
+  ],
+  "Spread": 1.563563615336605e-05
+ },
+ {
+  "Family": "c5-erdos-overlap",
+  "Arm": "openevolve-matched",
+  "Seed": 2413275516,
+  "SearchBest": 0.9990451709258975,
+  "Endpoint": 0.9990451709258975,
+  "Reruns": [
+   0.9990451709258975,
+   0.9990451709258975
+  ],
+  "Spread": 0.0
+ },
+ {
+  "Family": "c5-erdos-overlap",
+  "Arm": "openevolve-matched",
+  "Seed": 2901860563,
+  "SearchBest": 0.9980968883197904,
+  "Endpoint": 0.9980968976994443,
+  "Reruns": [
+   0.9980968849329178,
+   0.9980968943977689
+  ],
+  "Spread": 1.276652650261667e-08
+ },
+ {
+  "Family": "c5-erdos-overlap",
+  "Arm": "openevolve-matched",
+  "Seed": 3721011351,
+  "SearchBest": 0.996997072634285,
+  "Endpoint": 0.996997072634285,
+  "Reruns": [
+   0.996997072634285,
+   0.996997072634285
+  ],
+  "Spread": 0.0
+ },
+ {
+  "Family": "c5-erdos-overlap",
+  "Arm": "openevolve-recommended",
+  "Seed": 305925402,
+  "SearchBest": 0.9971449382650339,
+  "Endpoint": 0.9971428266854646,
+  "Reruns": [
+   0.9971455333782151,
+   0.9971455333782151
+  ],
+  "Spread": 2.706692750487072e-06
+ },
+ {
+  "Family": "c5-erdos-overlap",
+  "Arm": "openevolve-recommended",
+  "Seed": 1353004307,
+  "SearchBest": 0.9992117910928595,
+  "Endpoint": 0.9992117910928595,
+  "Reruns": [
+   0.9992117910928595,
+   0.9992117910928595
+  ],
+  "Spread": 0.0
+ },
+ {
+  "Family": "c5-erdos-overlap",
+  "Arm": "openevolve-recommended",
+  "Seed": 1756722251,
+  "SearchBest": 0.9981815073131908,
+  "Endpoint": 0.9981791236557055,
+  "Reruns": [
+   0.9981808721504584,
+   0.9982023848748839
+  ],
+  "Spread": 2.32612191783943e-05
+ },
+ {
+  "Family": "c5-erdos-overlap",
+  "Arm": "openevolve-recommended",
+  "Seed": 2413275516,
+  "SearchBest": 0.9987972196792112,
+  "Endpoint": 0.9990879626303567,
+  "Reruns": [
+   0.9987053637649159,
+   0.9988389761035354
+  ],
+  "Spread": 0.00038259886544078636
+ },
+ {
+  "Family": "c5-erdos-overlap",
+  "Arm": "openevolve-recommended",
+  "Seed": 2901860563,
+  "SearchBest": 0.9987485838485224,
+  "Endpoint": 0.9987485838485224,
+  "Reruns": [
+   0.9987485838485224,
+   0.9987485838485224
+  ],
+  "Spread": 0.0
+ },
+ {
+  "Family": "c5-erdos-overlap",
+  "Arm": "openevolve-recommended",
+  "Seed": 3721011351,
+  "SearchBest": 0.997957562317924,
+  "Endpoint": 0.9979241815683012,
+  "Reruns": [
+   0.9979236072157545,
+   0.9979237633546743
+  ],
+  "Spread": 5.743525467449828e-07
+ }
+]
