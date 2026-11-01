@@ -10,6 +10,6 @@
   <ItemGroup>
     <ProjectReference Include="../../src/AiDotNet.Evolution/AiDotNet.Evolution.csproj" />
     <ProjectReference Include="$(TensorsProject)" Condition="'$(TensorsProject)' != ''" />
-    <PackageReference Include="AiDotNet.Tensors" Version="0.130.3" Condition="'$(TensorsProject)' == ''" />
+    <PackageReference Include="AiDotNet.Tensors" Version="0.144.2" Condition="'$(TensorsProject)' == ''" />
   </ItemGroup>
 </Project>
