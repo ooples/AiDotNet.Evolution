@@ -24,6 +24,7 @@ ROOT = Path(__file__).resolve().parent
 sys.path.insert(0, str(ROOT))
 
 import pilot_searchers  # noqa: E402
+import yaml  # noqa: E402
 
 NL = chr(10)
 CELL = {"Cell": "c", "Family": "rational_gain", "Arm": "aidotnet", "Seed": 4242, "Block": 0, "Position": 0}
@@ -232,12 +233,16 @@ class OurArmTests(unittest.TestCase):
             for name in ("EVOLUTION_SR_TASK", "EVOLUTION_SR_SEED", "EVOLUTION_SR_HOLDOUT_SEED"):
                 self.assertNotIn(name, environment, name + " would tell the search which rows score it")
 
-    def test_the_task_config_is_handed_over_unmodified(self):
+    def test_the_task_config_is_handed_over_with_only_the_cells_seed_added(self):
+        # Without this our arm ran every cell on the importer's default seed 42 while OpenEvolve's arms got the cell's.
         with tempfile.TemporaryDirectory() as directory:
             captured = self.run_capture(directory, FakeBroker(calls=2))
             command = captured["command"]
             config = Path(command[command.index("--openevolve-config") + 1])
-            self.assertEqual(Path(directory) / "config.yaml", config)
+            handed = yaml.safe_load(config.read_text(encoding="utf-8"))
+            declared = yaml.safe_load((Path(directory) / "config.yaml").read_text(encoding="utf-8"))
+        self.assertEqual(int(CELL["Seed"]), handed.pop("random_seed"))
+        self.assertEqual(declared, handed)
 
     def test_spend_is_the_brokers_measurement_and_the_self_report_is_only_a_cross_check(self):
         with tempfile.TemporaryDirectory() as directory:

@@ -122,7 +122,8 @@ def ours(cli, task_directory, python_executable, *, iterations, session, timeout
     for path in (config, delegate, initial):
         if not path.exists():
             raise FileNotFoundError("the pilot task is incomplete: " + str(path))
-    if yaml.safe_load(config.read_text(encoding="utf-8")).get("llm", {}).get("api_base") is not None:
+    declared = yaml.safe_load(config.read_text(encoding="utf-8"))
+    if declared.get("llm", {}).get("api_base") is not None:
         raise ValueError("the task config pins its own api_base, so the broker would not be reached")
 
     def search(cell, directory, resume):
@@ -138,6 +139,13 @@ def ours(cli, task_directory, python_executable, *, iterations, session, timeout
         champion = ([] if champion_standard_errors is None else
                     ["--champion-standard-errors", repr(float(champion_standard_errors)),
                      "--standard-error-metric", "quality_standard_error"])
+        # The paired seed reaches our arm the way it reaches OpenEvolve's: as the config's random_seed, in a per-cell
+        # copy that differs from the task's file in that key alone. Handing the task's file over as written left every
+        # cell of ours on the importer's default seed 42 (E-4 pilots, found 2026-11-01), so our six "seeds" differed
+        # only by the model's own sampling while the OpenEvolve arms' really differed.
+        seeded = dict(declared, random_seed=int(cell["Seed"]))
+        cell_config = directory / "cell_config.yaml"
+        cell_config.write_text(yaml.safe_dump(seeded, sort_keys=False), encoding="utf-8", newline="\n")
         with session(cell) as broker:
             # The CLI scrubs its evaluator's environment, so the broker is written into the
             # evaluator file rather than passed through it.
@@ -149,7 +157,7 @@ def ours(cli, task_directory, python_executable, *, iterations, session, timeout
                                OPENAI_API_BASE=broker.endpoint + "/v1", OPENAI_API_KEY=broker.capability)
             try:
                 completed = subprocess.run(
-                    [*[str(part) for part in prefix], "run", "--openevolve-config", str(config), str(initial),
+                    [*[str(part) for part in prefix], "run", "--openevolve-config", str(cell_config), str(initial),
                      str(evaluator), "--iterations", str(iterations), "--output", str(output),
                      "--python", python_executable, *champion,
                      # OpenEvolve feeds the evaluator's artifacts (the training rows) to the model by default; ours withholds
