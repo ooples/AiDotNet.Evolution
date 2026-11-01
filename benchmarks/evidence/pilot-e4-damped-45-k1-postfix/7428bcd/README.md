@@ -26,9 +26,11 @@ This pilot repeats that design on 7428bcd (main after #359 and #361), so the gat
    - The baseline was re-recorded from a shell that exported `DO_NOT_TRACK=1`. That variable removes 32 tokens from the CLI's own prompt, and the transport did not scrub it, so the recording read 626/605/601.
    - The pilot, launched without the variable, read sonnet at 637 on both its warm-up and its check, and refused both times.
    - The variable was isolated by unsetting candidates one group at a time.
-3. **Fix in b65c4c2:** the transport now scrubs `DO_NOT_TRACK` and `CLAUDE_EFFORT`.
-   - The canary, re-recorded under the fix, reads 658/637/633, the same as 2.1.314.
-   - The fourth launch passed.
+3. **Fix in b65c4c2:** the transport scrubbed `DO_NOT_TRACK` and `CLAUDE_EFFORT`.
+   - The canary, re-recorded under that fix, read 658/637/633, the same as 2.1.314.
+   - The fourth launch passed, and this pilot ran under that transport.
+4. **After the pilot, in review:** stripping `DO_NOT_TRACK` also discarded a caller's telemetry opt-out. The transport now launches every call with `DO_NOT_TRACK=1` whatever the caller set.
+   - The baselines are 626/605/601 from bash and from PowerShell alike.
 
 ## Result
 
@@ -46,6 +48,10 @@ Held-out NMSE per cell (`rows.json`); 0 is the exact formula, `exp(-0.3 t) sin(2
 | 4230622915 | 0 | 0 | 0 |
 
 - **18 of 18 cells reached the exact formula** (16 at 0, plus two at 8.1e-33). In the third pilot, 14 of 18 did.
+  - Held-out NMSE alone shows agreement on the held-out rows, not identity. So every returned program (`programs/`) was also evaluated on a dense grid, `t = linspace(0, 6, 100001)`, against `exp(-0.3 t) sin(2 t)` (`identity-check.json`).
+  - 16 programs agree exactly. The two `recommended` cells at 8.1e-33 differ by at most 2.22e-16, one floating-point ulp.
+  - 16 programs return `exp(-0.3 t) sin(2 t)` written out, or with named constants (`decay`, `omega`, `envelope`).
+  - The two `recommended` cells at 8.1e-33 return `A exp(-k t) cos(w t + phi)` with A = 1, k = 0.3, w = 2 and phi = -pi/2. That is the same formula, since cos(2 t - pi/2) = sin(2 t), and the 2.22e-16 is the rounding of `-math.pi / 2`.
 - **Our champion beat the seed in 6 of 6 cells.**
 - **Model calls per arm:** ours 290, `recommended` 270, `matched` 270. Tokens: ours 1,073,323, `recommended` 1,120,663, `matched` 687,816.
 

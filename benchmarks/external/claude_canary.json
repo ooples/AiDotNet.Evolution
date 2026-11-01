@@ -5,26 +5,26 @@
   "models": {
     "haiku": {
       "resolved_model": "claude-haiku-5-5",
-      "canary_input_tokens": 658,
+      "canary_input_tokens": 626,
       "readings": [
-        658,
-        658
+        626,
+        626
       ]
     },
     "sonnet": {
       "resolved_model": "claude-sonnet-5-5",
-      "canary_input_tokens": 637,
+      "canary_input_tokens": 605,
       "readings": [
-        637,
-        637
+        605,
+        605
       ]
     },
     "opus": {
       "resolved_model": "claude-opus-5-5",
-      "canary_input_tokens": 633,
+      "canary_input_tokens": 601,
       "readings": [
-        633,
-        633
+        601,
+        601
       ]
     }
   }

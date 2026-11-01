@@ -1,0 +1,24 @@
+{
+ "grid": "t = linspace(0, 6, 100001)",
+ "target": "exp(-0.3 t) sin(2 t)",
+ "max_abs_difference": {
+  "aidotnet__1650068384": 0.0,
+  "aidotnet__2039418671": 0.0,
+  "aidotnet__2362860140": 0.0,
+  "aidotnet__2677011789": 0.0,
+  "aidotnet__2770936532": 0.0,
+  "aidotnet__4230622915": 0.0,
+  "openevolve-matched__1650068384": 0.0,
+  "openevolve-matched__2039418671": 0.0,
+  "openevolve-matched__2362860140": 0.0,
+  "openevolve-matched__2677011789": 0.0,
+  "openevolve-matched__2770936532": 0.0,
+  "openevolve-matched__4230622915": 0.0,
+  "openevolve-recommended__1650068384": 0.0,
+  "openevolve-recommended__2039418671": 2.220446049250313e-16,
+  "openevolve-recommended__2362860140": 2.220446049250313e-16,
+  "openevolve-recommended__2677011789": 0.0,
+  "openevolve-recommended__2770936532": 0.0,
+  "openevolve-recommended__4230622915": 0.0
+ }
+}

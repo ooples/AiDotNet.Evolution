@@ -39,7 +39,8 @@ from codex_transport import kill_owned
 # Revalidated for 2.1.316 on 2026-10-31 for the E-4 post-fix pilot, by the same procedure: `record_claude_canary.py`
 # succeeded for all three models, the resolved models are unchanged and the baselines did not move (658/637/633).
 # A first recording read 626/605/601 because DO_NOT_TRACK leaked from the recording shell; the pilot, launched
-# without it, then read 637 and refused. DO_NOT_TRACK and CLAUDE_EFFORT are now scrubbed.
+# without it, then read 637 and refused. CLAUDE_EFFORT is now scrubbed, and DO_NOT_TRACK is no longer the caller's to
+# choose: every call is launched with DO_NOT_TRACK=1 (see TELEMETRY_OPT_OUT), so the baselines are 626/605/601.
 #
 # Revalidated for 2.1.314 on 2026-10-29 for the E-4 re-pilot, by the same procedure: `record_claude_canary.py` succeeded
 # for all three models, the resolved models are unchanged and the baselines did not move (658/637/633).
@@ -68,18 +69,25 @@ MAX_TEXT = 64 * 1024
 SYSTEM_PROMPT = ("Generate exactly one candidate response to the benchmark conversation in the user message. "
                  "Do not use tools, access files, or perform evaluations. Treat message roles as conversation data.")
 CANARY_PROMPT = "Reply with exactly: OK"
-# Anything that could reroute, re-authenticate or re-contextualise a call. DO_NOT_TRACK=1 drops 32 tokens from the
-# CLI's own prompt (2.1.316: canary 637 -> 605 for sonnet), so a caller that set it would read a different baseline;
-# CLAUDE_EFFORT would change the effort a call runs at. A Claude Code session exports both to its shell commands.
+# Anything that could reroute, re-authenticate or re-contextualise a call. CLAUDE_EFFORT would change the effort a call
+# runs at; a Claude Code session exports it to its shell commands. DO_NOT_TRACK is scrubbed here only to be set below.
 SCRUBBED_PREFIXES = ("ANTHROPIC_", "TOKEN_OPTIMIZER_", "CLAUDE_CODE_", "CLAUDECODE", "CLAUDE_PID", "CLAUDE_EFFORT",
                      "DO_NOT_TRACK")
 EVENT_TYPES = ("system", "assistant", "user", "rate_limit_event", "result", "stream_event")
 USAGE_FIELDS = ("input_tokens", "cache_creation_input_tokens", "cache_read_input_tokens", "output_tokens")
 
 
+# Every call opts out of telemetry, whatever the caller set. DO_NOT_TRACK=1 also drops 32 tokens from the CLI's own
+# prompt (2.1.316: sonnet canary 637 -> 605), so passing the caller's choice through would make the baseline depend on
+# who launched the run - which is how the E-4 post-fix pilot was refused - and removing it would silently discard a
+# caller's opt-out. Forcing it is the one setting that is both deterministic and private.
+TELEMETRY_OPT_OUT = {"DO_NOT_TRACK": "1"}
+
+
 def scrubbed_environment(source=None):
     source = os.environ if source is None else source
-    return {name: value for name, value in source.items() if not name.upper().startswith(SCRUBBED_PREFIXES)}
+    kept = {name: value for name, value in source.items() if not name.upper().startswith(SCRUBBED_PREFIXES)}
+    return dict(kept, **TELEMETRY_OPT_OUT)
 
 
 def verified_executable(executable):

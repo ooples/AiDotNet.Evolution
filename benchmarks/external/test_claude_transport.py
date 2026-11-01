@@ -120,7 +120,11 @@ class IsolationTests(unittest.TestCase):
         source = {"ANTHROPIC_BASE_URL": "http://127.0.0.1:58207", "ANTHROPIC_API_KEY": "k", "TOKEN_OPTIMIZER_CLIENT": "x",
                   "CLAUDE_CODE_SESSION_ID": "s", "CLAUDECODE": "1", "CLAUDE_PID": "1", "CLAUDE_EFFORT": "medium",
                   "DO_NOT_TRACK": "1", "PATH": "p", "USERPROFILE": "u"}
-        self.assertEqual({"PATH": "p", "USERPROFILE": "u"}, scrubbed_environment(source))
+        self.assertEqual({"PATH": "p", "USERPROFILE": "u", "DO_NOT_TRACK": "1"}, scrubbed_environment(source))
+
+    def test_every_call_opts_out_of_telemetry_whatever_the_caller_set(self):
+        for caller in ({}, {"DO_NOT_TRACK": "0"}, {"do_not_track": "1"}):
+            self.assertEqual({"DO_NOT_TRACK": "1"}, scrubbed_environment(caller))
 
     def test_launchers_and_optimizer_shims_are_refused(self):
         with tempfile.TemporaryDirectory() as directory:
