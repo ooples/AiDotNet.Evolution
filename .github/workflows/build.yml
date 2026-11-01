@@ -513,6 +513,13 @@ jobs:
     timeout-minutes: 25
     steps:
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+      - name: Verify Windows job admission and cleanup
+        shell: pwsh
+        run: |
+          python -m venv .local/job-env
+          .local/job-env/Scripts/python -m pip install numpy==2.4.6
+          .local/job-env/Scripts/python eng/run_required_tests.py benchmarks/external test_windows_job_admission.py
+
       - uses: actions/setup-dotnet@a98b56852c35b8e3190ac28c8c2271da59106c68 # v6.0.0
         with:
           dotnet-version: '10.0.x'

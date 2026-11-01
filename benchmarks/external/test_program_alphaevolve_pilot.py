@@ -38,41 +38,6 @@ class ConstructionTests(unittest.TestCase):
             path.write_text(code, encoding="utf-8")
             return pilot.construction(path, PYTHON, **options)
 
-    @unittest.skipUnless(sys.platform == "win32", "Windows job admission")
-    def test_candidate_waits_until_job_assignment(self):
-        assign = pilot._Job.assign
-
-        def delayed(job, process):
-            # Without admission gating this small candidate exits before it belongs to the job.
-            with self.assertRaises(subprocess.TimeoutExpired):
-                process.wait(timeout=2)
-            assign(job, process)
-
-        with mock.patch.object(pilot._Job, "assign", delayed):
-            self.assertEqual(([1.0], None), self.run_program(program("return [1.0]")))
-
-    @unittest.skipUnless(sys.platform == "win32", "Windows job admission")
-    def test_assignment_failure_reaps_the_unassigned_child(self):
-        processes = []
-        popen = pilot.subprocess.Popen
-
-        def capture(*args, **kwargs):
-            process = popen(*args, **kwargs)
-            processes.append(process)
-            return process
-
-        try:
-            with mock.patch.object(pilot.subprocess, "Popen", side_effect=capture), \
-                    mock.patch.object(pilot._Job, "assign", side_effect=OSError("assignment refused")):
-                with self.assertRaisesRegex(OSError, "assignment refused"):
-                    self.run_program(program("import time\ntime.sleep(30)\nreturn [1.0]"))
-            self.assertIsNotNone(processes[0].poll(), "an unassigned child survived cleanup")
-        finally:
-            for process in processes:
-                if process.poll() is None:
-                    process.kill()
-                process.wait(timeout=10)
-
 
     def test_a_construction_comes_back_as_a_list(self):
         self.assertEqual(([0.5, 0.25], None), self.run_program(program("return np.array([0.5, 0.25])")))
