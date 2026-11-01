@@ -17,7 +17,9 @@ from __future__ import annotations
 import argparse
 import json
 import math
+import os
 from pathlib import Path
+import shutil
 import sys
 import time
 
@@ -54,13 +56,75 @@ def searchers_for(session, directories, *, cli, upstream, python_executable, ite
     } for problem, directory in directories.items()}
 
 
+# Every file `tasks.write` puts in a problem's directory. A directory missing any of them (a crash mid-write) is
+# regenerated rather than handed to a searcher that would fail on it cell after cell.
+TASK_FILES = ("config.yaml", "initial_program.py", "evaluator.py", "support/floors.json") + tuple(
+    "support/" + name for name in tasks.SUPPORT)
+
+
 def task_directories(root, problems):
     """The generated task directories, written once beside the registration and reused by the confirming run."""
     base = Path(root) / "tasks"
+    for problem in problems:
+        directory = base / problem
+        if directory.is_symlink():
+            raise SystemExit("Refusing " + str(directory) + ": a task directory must not be a link")
+        if directory.is_dir() and not all((directory / name).is_file() for name in TASK_FILES):
+            # Only an incomplete directory is removed, and only after checking that it is one.
+            shutil.rmtree(directory)
+        elif directory.exists() and not directory.is_dir():
+            raise SystemExit("Refusing " + str(directory) + ": it is not a task directory")
     missing = [problem for problem in problems if not (base / problem).exists()]
     if missing:
         tasks.write(base, missing, evaluator_timeout=pilot.ENGINE_EVALUATOR_TIMEOUT)
     return {problem: base / problem for problem in problems}
+
+
+def resolve_python(parser, value):
+    """`--python` as an absolute path: a bare name through PATH, anything with a separator from the working directory."""
+    separators = [os.sep] + ([os.altsep] if os.altsep else [])
+    if any(separator in value for separator in separators):
+        return str(Path(value).absolute())
+    found = shutil.which(value)
+    if found is None:
+        parser.error("--python %r is not on PATH" % value)
+    return str(Path(found).absolute())
+
+
+def frozen_iterations(path, requested):
+    """The per-cell iteration count the first run froze, refusing a resume that changed it (or that cannot say).
+
+    Frozen beside the registration rather than in it, as the sizing target is: `pilot_campaign.spec` is a closed
+    field set. Without it a resumed campaign could mix cells searched for different numbers of iterations.
+    """
+    if not path.exists():
+        raise SystemExit("Refusing " + str(path.parent) + ": it holds a frozen registration but no frozen iteration "
+                         "count, so nothing says how long its cells searched")
+    frozen = json.loads(path.read_text(encoding="utf-8"))["Iterations"]
+    if frozen != requested:
+        raise SystemExit("--iterations %r is not the %r this campaign froze; every cell searches for the same "
+                         "number of iterations" % (requested, frozen))
+    return frozen
+
+
+def check_provider_mode(state, stub):
+    """Records whether cells run against the stub or real models, and refuses to mix the two in one state directory.
+
+    `campaign_runner` reuses finished cells, so a real run resumed over stub cells (or the reverse) would report
+    loopback results as evidence. A state directory that already holds cells but no recorded mode is refused too.
+    """
+    mode = "stub" if stub else "models"
+    path = Path(state) / "provider-mode.json"
+    if path.exists():
+        recorded = json.loads(path.read_text(encoding="utf-8"))["Mode"]
+        if recorded != mode:
+            raise SystemExit("Refusing " + str(state) + ": its cells ran against %s, and this run uses %s"
+                             % (recorded, mode))
+        return
+    if Path(state).exists() and any(Path(state).iterdir()):
+        raise SystemExit("Refusing " + str(state) + ": it holds cells but no recorded provider mode")
+    Path(state).mkdir(parents=True, exist_ok=True)
+    path.write_text(json.dumps({"Mode": mode}, indent=1) + "\n", encoding="utf-8")
 
 
 def stub_answers(problems):
@@ -157,9 +221,10 @@ def main(argv=None):
     # Absolute, because every subprocess runs in a different working directory (see run_pilot_campaign.main).
     root = Path(arguments.root).resolve()
     arguments.upstream = str(Path(arguments.upstream).resolve())
-    arguments.python = str(Path(arguments.python).absolute())
+    arguments.python = resolve_python(parser, arguments.python)
     registration_path = root / "registration" / "registration.json"
     sizing_path = root / "registration" / "sizing.json"
+    iterations_path = root / "registration" / "iterations.json"
     if registration_path.exists():
         frozen = registration.load_registration(registration_path)
         projection = runner.project(frozen)
@@ -178,7 +243,10 @@ def main(argv=None):
         frozen, _, projection = pilot_campaign.freeze(declared, root / "registration")
         sizing_path.write_text(json.dumps({"TargetHalfWidth": arguments.target_half_width}, indent=1) + "\n",
                                encoding="utf-8")
+        iterations_path.write_text(json.dumps({"Iterations": arguments.iterations}, indent=1) + "\n",
+                                   encoding="utf-8")
     half_width = symbolic.frozen_half_width(sizing_path, arguments.target_half_width)
+    frozen_iterations(iterations_path, arguments.iterations)
     directories = task_directories(root, problems)
     for line in describe(projection, arguments, problems):
         print(line)
@@ -193,6 +261,7 @@ def main(argv=None):
     initials = {problem: (directory / "initial_program.py").read_text(encoding="utf-8")
                 for problem, directory in directories.items()}
     calls, canaries, models = [], None, None
+    check_provider_mode(root / "state", arguments.stub)
     if arguments.stub:
         provider = pilot.stub_provider(calls, stub_answers(problems))
     else:

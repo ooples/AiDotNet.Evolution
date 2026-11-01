@@ -33,6 +33,7 @@ import alphaevolve_tasks as tasks  # noqa: E402
 import pilot_broker  # noqa: E402
 import pilot_campaign  # noqa: E402
 import pilot_cells  # noqa: E402
+from codex_transport import MAX_OUTPUT, kill_owned  # noqa: E402
 from program_broker import ProgramBroker, candidate_hash  # noqa: E402
 
 METRIC = "published_ratio"
@@ -61,19 +62,40 @@ with open(sys.argv[2], "w", encoding="utf-8") as out:
 
 
 def construction(program_path, python, *, timeout=CONSTRUCT_TIMEOUT):
-    """Runs `construct()` in a child process. Returns `(heights, None)` or `(None, reason)`; never raises for the candidate."""
+    """Runs `construct()` in a child process. Returns `(heights, None)` or `(None, reason)`; never raises for the candidate.
+
+    The child runs in its own process group (a new session on POSIX; `taskkill /T` walks the tree on Windows), and the
+    whole group is killed when it overruns, prints more than `MAX_OUTPUT`, or finishes - so a candidate that spawns
+    workers leaves none behind. Its output and its `heights.json` are bounded by `MAX_OUTPUT` before anything reads them.
+    """
     environment = {name: os.environ[name] for name in CHILD_ENVIRONMENT if name in os.environ}
     with tempfile.TemporaryDirectory(prefix="alphaevolve-construct-") as directory:
-        output = Path(directory) / "heights.json"
+        directory = Path(directory)
+        output = directory / "heights.json"
+        process = None
+        started = time.monotonic()
         try:
-            completed = subprocess.run([str(python), "-I", "-c", CONSTRUCT, str(program_path), str(output)],
-                                       capture_output=True, text=True, timeout=timeout, cwd=directory,
-                                       env=environment, check=False)
-        except subprocess.TimeoutExpired:
-            return None, "construct() did not return within %d seconds" % timeout
-        if completed.returncode != 0 or not output.is_file():
-            lines = (completed.stderr or "").strip().splitlines()
-            return None, (lines[-1] if lines else "the construction exited %d" % completed.returncode)[:300]
+            with (directory / "stdout.txt").open("xb") as stdout, (directory / "stderr.txt").open("xb") as stderr:
+                process = subprocess.Popen([str(python), "-I", "-c", CONSTRUCT, str(program_path), str(output)],
+                                           stdin=subprocess.DEVNULL, stdout=stdout, stderr=stderr, cwd=directory,
+                                           env=environment, start_new_session=os.name != "nt")
+                while process.poll() is None:
+                    if time.monotonic() - started >= timeout:
+                        return None, "construct() did not return within %d seconds" % timeout
+                    if max(stdout.tell(), stderr.tell()) > MAX_OUTPUT:
+                        return None, "the construction printed more than %d bytes" % MAX_OUTPUT
+                    time.sleep(0.02)
+                returncode = process.returncode
+        finally:
+            if process is not None:
+                kill_owned(process)
+        if returncode != 0 or not output.is_file():
+            with (directory / "stderr.txt").open("rb") as stderr:
+                tail = stderr.read(MAX_OUTPUT).decode("utf-8", errors="replace")
+            lines = tail.strip().splitlines()
+            return None, (lines[-1] if lines else "the construction exited %d" % returncode)[:300]
+        if output.stat().st_size > MAX_OUTPUT:
+            return None, "construct() returned more than %d bytes of heights" % MAX_OUTPUT
         try:
             return json.loads(output.read_text(encoding="utf-8")), None
         except ValueError as error:
@@ -84,9 +106,14 @@ def verifier_feedback(problem, scored):
     """What both arms are shown about a scored construction: the verifier's reading, or why it refused."""
     if "error" in scored:
         return "refused, scored 0.0: " + scored["error"]
+    better = BETTER[headroom.IN_SCOPE[problem]["direction"]]
     return ("value %.10g (AlphaEvolve published %.10g, %s is better); combined_score %.6f; %d entries"
-            % (scored["value"], scored["published"], headroom.IN_SCOPE[problem]["direction"].replace("imize", "er"),
-               scored["combined_score"], scored["length"]))
+            % (scored["value"], scored["published"], better, scored["combined_score"], scored["length"]))
+
+
+# The word the feedback uses for each direction. A lookup rather than string surgery, which turns "minimize" into
+# "miner" (review caught it); a direction outside this table is a KeyError, not silently wrong feedback.
+BETTER = {"minimize": "lower", "maximize": "higher"}
 
 
 def evaluate_callback(problem, python, *, timeout=CONSTRUCT_TIMEOUT):

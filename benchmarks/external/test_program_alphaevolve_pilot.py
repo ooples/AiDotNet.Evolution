@@ -7,6 +7,7 @@ import json
 from pathlib import Path
 import sys
 import tempfile
+import time
 import unittest
 from unittest import mock
 
@@ -53,6 +54,30 @@ class ConstructionTests(unittest.TestCase):
         heights, reason = self.run_program(program("import time\ntime.sleep(30)\nreturn [1.0]"), timeout=2)
         self.assertIsNone(heights)
         self.assertIn("2 seconds", reason)
+
+    def test_a_timeout_also_stops_what_the_candidate_spawned(self):
+        with tempfile.TemporaryDirectory() as directory:
+            marker = Path(directory) / "survived.txt"
+            grandchild = "import time; time.sleep(4); open(%r, 'w').close()" % str(marker)
+            spawn = ("import subprocess, sys, time\nsubprocess.Popen([sys.executable, '-c', %r])\n"
+                     "time.sleep(30)\nreturn [1.0]" % grandchild)
+            heights, reason = self.run_program(program(spawn), timeout=2)
+            self.assertIsNone(heights)
+            self.assertIn("2 seconds", reason)
+            time.sleep(6)
+            self.assertFalse(marker.exists(), "the candidate's own child outlived the timeout")
+
+    def test_output_beyond_the_bound_is_refused(self):
+        code = program("import sys, time\nsys.stdout.write('x' * %d)\nsys.stdout.flush()\ntime.sleep(30)\nreturn [1.0]"
+                       % (pilot.MAX_OUTPUT + 1024))
+        heights, reason = self.run_program(code, timeout=25)
+        self.assertIsNone(heights)
+        self.assertIn("printed more than", reason)
+
+    def test_heights_beyond_the_bound_are_refused_before_parsing(self):
+        heights, reason = self.run_program(program("return np.full(600000, 0.123456789123)"))
+        self.assertIsNone(heights)
+        self.assertIn("bytes of heights", reason)
 
     def test_the_child_does_not_inherit_the_runner_environment(self):
         code = program("import os\nreturn [float('PILOT_SECRET' in os.environ)]")
@@ -170,6 +195,68 @@ class StubTests(unittest.TestCase):
         for problem, expected in answers.items():
             system = "\n".join("    " + line for line in tasks._wrap(tasks.STATEMENTS[problem]))
             self.assertEqual(expected, provider(system, [{"role": "user", "content": "go"}])[0])
+
+
+class FeedbackTests(unittest.TestCase):
+    def feedback(self, problem):
+        return pilot.verifier_feedback(problem, {"value": 1.0, "published": 1.0, "combined_score": 1.0, "length": 4})
+
+    def test_the_direction_word_matches_the_problem(self):
+        directions = {problem: pilot.headroom.IN_SCOPE[problem]["direction"] for problem in tasks.TASKS}
+        self.assertIn("minimize", directions.values())
+        self.assertIn("maximize", directions.values())
+        for problem, direction in directions.items():
+            expected = "lower is better" if direction == "minimize" else "higher is better"
+            self.assertIn(expected, self.feedback(problem), problem)
+
+
+class LauncherStateTests(unittest.TestCase):
+    def test_an_incomplete_task_directory_is_regenerated_and_a_complete_one_kept(self):
+        with tempfile.TemporaryDirectory() as directory:
+            written = runner.task_directories(directory, [PROBLEM])[PROBLEM]
+            (written / "evaluator.py").unlink()
+            runner.task_directories(directory, [PROBLEM])
+            self.assertTrue((written / "evaluator.py").is_file())
+            marker = written / "kept.txt"
+            marker.write_text("x", encoding="utf-8")
+            runner.task_directories(directory, [PROBLEM])
+            self.assertTrue(marker.exists(), "a complete directory was rewritten")
+
+    def test_python_resolves_a_bare_name_through_path(self):
+        parser = runner.build_parser()
+        name = Path(sys.executable).name
+        with mock.patch("shutil.which", return_value=sys.executable):
+            self.assertEqual(str(Path(sys.executable).absolute()), runner.resolve_python(parser, name))
+        with mock.patch("shutil.which", return_value=None), contextlib.redirect_stderr(io.StringIO()):
+            with self.assertRaises(SystemExit):
+                runner.resolve_python(parser, "no-such-python")
+        relative = "venv" + "/" + "python"
+        self.assertEqual(str(Path(relative).absolute()), runner.resolve_python(parser, relative))
+
+    def test_a_state_directory_refuses_the_other_provider_mode(self):
+        with tempfile.TemporaryDirectory() as directory:
+            state = Path(directory) / "state"
+            runner.check_provider_mode(state, True)
+            runner.check_provider_mode(state, True)
+            with self.assertRaises(SystemExit):
+                runner.check_provider_mode(state, False)
+
+    def test_cells_without_a_recorded_mode_are_refused(self):
+        with tempfile.TemporaryDirectory() as directory:
+            state = Path(directory) / "state"
+            (state / "cell-0").mkdir(parents=True)
+            with self.assertRaises(SystemExit):
+                runner.check_provider_mode(state, False)
+
+    def test_a_resume_with_other_iterations_or_none_frozen_is_refused(self):
+        with tempfile.TemporaryDirectory() as directory:
+            path = Path(directory) / "iterations.json"
+            with self.assertRaises(SystemExit):
+                runner.frozen_iterations(path, 25)
+            path.write_text(json.dumps({"Iterations": 25}), encoding="utf-8")
+            self.assertEqual(25, runner.frozen_iterations(path, 25))
+            with self.assertRaises(SystemExit):
+                runner.frozen_iterations(path, 26)
 
 
 class RunnerTests(unittest.TestCase):
