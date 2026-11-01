@@ -204,7 +204,7 @@ database:
   num_islands: 2
 
 evaluator:
-  timeout: {timeout}
+  timeout: {evaluator_timeout}
   cascade_evaluation: false
 """
 
@@ -229,12 +229,19 @@ evaluate = alphaevolve_tasks.evaluator({problem!r})
 TIMEOUT_SECONDS = 60
 
 
-def write(output, problems=TASKS):
+def write(output, problems=TASKS, *, evaluator_timeout=TIMEOUT_SECONDS):
     """Writes one task directory per problem under `output`.
+
+    `evaluator_timeout` is the engines' own evaluator timeout. It defaults to the construction limit the system
+    message states; a caller that enforces that limit itself, as the pilot's broker does, sets it higher so the
+    engine never abandons an evaluation the caller is still finishing.
 
     Everything is checked before anything is written, so a refusal (an unknown or repeated problem, or a
     directory that already exists) leaves no partial output behind.
     """
+    if type(evaluator_timeout) is not int or evaluator_timeout < TIMEOUT_SECONDS:
+        raise ValueError("evaluator_timeout must be a whole number of seconds, at least the %d-second construction limit"
+                         % TIMEOUT_SECONDS)
     root = pathlib.Path(output)
     problems = list(problems)
     unknown = [problem for problem in problems if problem not in STATEMENTS]
@@ -256,6 +263,7 @@ def write(output, problems=TASKS):
         statement = "\n".join("    " + line for line in _wrap(STATEMENTS[problem]))
         files = {
             "config.yaml": CONFIG.format(problem=problem, statement=statement, timeout=TIMEOUT_SECONDS,
+                                         evaluator_timeout=evaluator_timeout,
                                          max_length=MAX_LENGTH, published=headroom.IN_SCOPE[problem]["published"]),
             "initial_program.py": INITIAL.format(problem=problem, seed=SEEDS[problem]),
             "evaluator.py": EVALUATOR.format(problem=problem),
