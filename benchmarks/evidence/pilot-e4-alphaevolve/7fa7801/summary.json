@@ -1,0 +1,182 @@
+{
+ "story": "E-4 (#347)",
+ "problems": [
+  "c5-erdos-overlap",
+  "c3-autocorrelation"
+ ],
+ "stub": false,
+ "registration_sha256": "d511a6cfb9e70b35a4d302f1aed1345c26283b78a6d94066dbe2567f8958297e",
+ "projection_sha256": "09ed517ce3e53d2aa06f99bf67894c51543426381ccc19b75d7711c765f004c5",
+ "verifier_seals": {
+  "c5-erdos-overlap": "434041d95411f7815d1175354b3c32d9be48c8c95f1331a820e53c5238d312bc",
+  "c3-autocorrelation": "ce1484bec796caa66defc883c58e9e6919c431b89e64c10d20805213572d8f9d"
+ },
+ "iterations_per_cell": 25,
+ "construction_limit_seconds": 60,
+ "wall_seconds": 39608.0,
+ "cells": 36,
+ "statuses": {
+  "completed": 36
+ },
+ "model_calls": 900,
+ "model_tokens": 8447598,
+ "cells_with_unknown_spend": 0,
+ "canaries": {
+  "sonnet": 637
+ },
+ "hardware": "AMD Ryzen Threadripper 3990X 64-Core Processor; 128 logical processors; 96 GB memory; Windows 11 (AMD64); Python 3.14.6",
+ "receipt_coverage": {
+  "sonnet": 1.0
+ },
+ "endpoints": [
+  {
+   "Family": "c5-erdos-overlap",
+   "Config": "recommended",
+   "Metric": "published_ratio",
+   "Direction": "maximize",
+   "N": 6,
+   "MeanDifference": -0.0012515933271379787,
+   "Interval95": [
+    -0.0025878607880998003,
+    6.817814332029289e-05
+   ],
+   "OneSidedP": 0.972027972027972,
+   "Failures": {
+    "aidotnet": 0,
+    "openevolve-recommended": 0
+   },
+   "HolmAdjustedP": 1.0,
+   "Superior": false
+  },
+  {
+   "Family": "c5-erdos-overlap",
+   "Config": "matched",
+   "Metric": "published_ratio",
+   "Direction": "maximize",
+   "N": 6,
+   "MeanDifference": -0.0008040510819792105,
+   "Interval95": [
+    -0.00215141640985946,
+    0.00035798065056160305
+   ],
+   "OneSidedP": 0.9010989010989011,
+   "Failures": {
+    "aidotnet": 0,
+    "openevolve-matched": 0
+   },
+   "HolmAdjustedP": 1.0,
+   "Superior": false
+  },
+  {
+   "Family": "c3-autocorrelation",
+   "Config": "recommended",
+   "Metric": "published_ratio",
+   "Direction": "maximize",
+   "N": 6,
+   "MeanDifference": 0.0114786817373142,
+   "Interval95": [
+    0.0032121657034276025,
+    0.02170265862528901
+   ],
+   "OneSidedP": 0.002997002997002997,
+   "Failures": {
+    "aidotnet": 0,
+    "openevolve-recommended": 0
+   },
+   "HolmAdjustedP": 0.011988011988011988,
+   "Superior": true
+  },
+  {
+   "Family": "c3-autocorrelation",
+   "Config": "matched",
+   "Metric": "published_ratio",
+   "Direction": "maximize",
+   "N": 6,
+   "MeanDifference": 0.002987940973226281,
+   "Interval95": [
+    -0.008683770103654712,
+    0.017775621947413518
+   ],
+   "OneSidedP": 0.36563436563436563,
+   "Failures": {
+    "aidotnet": 0,
+    "openevolve-matched": 0
+   },
+   "HolmAdjustedP": 1.0,
+   "Superior": false
+  }
+ ],
+ "power_analysis": {
+  "Schema": "evolution-power-analysis-v1",
+  "RegistrationSha256": "d511a6cfb9e70b35a4d302f1aed1345c26283b78a6d94066dbe2567f8958297e",
+  "TargetHalfWidth": 0.02,
+  "Confidence": 0.95,
+  "Endpoints": [
+   {
+    "Family": "c5-erdos-overlap",
+    "Config": "recommended",
+    "PilotN": 6,
+    "MeanDifference": -0.0012515933271379787,
+    "StandardDeviation": 0.0018963763563122162,
+    "Variance": 3.5962432847799978e-06,
+    "ObservedHalfWidth": 0.0013280194657100466,
+    "TargetHalfWidth": 0.02,
+    "ScaledRequiredN": 2,
+    "NormalRequiredN": 2,
+    "RequiredN": 2,
+    "Agreement": 1.0,
+    "Degenerate": false,
+    "PilotAlreadyMeetsTarget": true
+   },
+   {
+    "Family": "c5-erdos-overlap",
+    "Config": "matched",
+    "PilotN": 6,
+    "MeanDifference": -0.0008040510819792105,
+    "StandardDeviation": 0.0016544344777619756,
+    "Variance": 2.737153441207541e-06,
+    "ObservedHalfWidth": 0.0012546985302105316,
+    "TargetHalfWidth": 0.02,
+    "ScaledRequiredN": 2,
+    "NormalRequiredN": 2,
+    "RequiredN": 2,
+    "Agreement": 1.0,
+    "Degenerate": false,
+    "PilotAlreadyMeetsTarget": true
+   },
+   {
+    "Family": "c3-autocorrelation",
+    "Config": "recommended",
+    "PilotN": 6,
+    "MeanDifference": 0.0114786817373142,
+    "StandardDeviation": 0.012971788749548166,
+    "Variance": 0.00016826730336290437,
+    "ObservedHalfWidth": 0.009245246460930704,
+    "TargetHalfWidth": 0.02,
+    "ScaledRequiredN": 2,
+    "NormalRequiredN": 2,
+    "RequiredN": 2,
+    "Agreement": 1.0,
+    "Degenerate": false,
+    "PilotAlreadyMeetsTarget": true
+   },
+   {
+    "Family": "c3-autocorrelation",
+    "Config": "matched",
+    "PilotN": 6,
+    "MeanDifference": 0.002987940973226281,
+    "StandardDeviation": 0.018434679358562606,
+    "Variance": 0.0003398374030530142,
+    "ObservedHalfWidth": 0.013229696025534116,
+    "TargetHalfWidth": 0.02,
+    "ScaledRequiredN": 3,
+    "NormalRequiredN": 4,
+    "RequiredN": 4,
+    "Agreement": 1.3333333333333333,
+    "Degenerate": false,
+    "PilotAlreadyMeetsTarget": true
+   }
+  ],
+  "RequiredN": 4
+ }
+}
