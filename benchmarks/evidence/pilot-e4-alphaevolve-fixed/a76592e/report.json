@@ -1,0 +1,87 @@
+{
+ "Schema": "evolution-campaign-report-v1",
+ "Campaign": "e4-alphaevolve-pilot",
+ "RegistrationSha256": "14ed0e420b8cc4de45c921e638d20719e7e1be65b9bd8199b264acc0eda440aa",
+ "RawSha256": "529b22723c85112b10299cc13fc347057564f95d5238df87585699a4467aa436",
+ "FamilywiseAlpha": 0.05,
+ "Endpoints": [
+  {
+   "Family": "c5-erdos-overlap",
+   "Config": "recommended",
+   "Metric": "published_ratio",
+   "Direction": "maximize",
+   "N": 6,
+   "MeanDifference": -5.006060437869516e-05,
+   "Interval95": [
+    -0.00023941046333756237,
+    0.00013487283819071014
+   ],
+   "OneSidedP": 0.6823176823176823,
+   "Failures": {
+    "aidotnet": 0,
+    "openevolve-recommended": 0
+   },
+   "HolmAdjustedP": 1.0,
+   "Superior": false
+  },
+  {
+   "Family": "c5-erdos-overlap",
+   "Config": "matched",
+   "Metric": "published_ratio",
+   "Direction": "maximize",
+   "N": 6,
+   "MeanDifference": 9.930233499007754e-06,
+   "Interval95": [
+    -0.00031185527598605783,
+    0.00042446725379441386
+   ],
+   "OneSidedP": 0.5294705294705294,
+   "Failures": {
+    "aidotnet": 0,
+    "openevolve-matched": 0
+   },
+   "HolmAdjustedP": 1.0,
+   "Superior": false
+  },
+  {
+   "Family": "c3-autocorrelation",
+   "Config": "recommended",
+   "Metric": "published_ratio",
+   "Direction": "maximize",
+   "N": 6,
+   "MeanDifference": 5.61935643278814e-05,
+   "Interval95": [
+    -0.0035283918726679736,
+    0.003447739732444053
+   ],
+   "OneSidedP": 0.4485514485514486,
+   "Failures": {
+    "aidotnet": 0,
+    "openevolve-recommended": 0
+   },
+   "HolmAdjustedP": 1.0,
+   "Superior": false
+  },
+  {
+   "Family": "c3-autocorrelation",
+   "Config": "matched",
+   "Metric": "published_ratio",
+   "Direction": "maximize",
+   "N": 6,
+   "MeanDifference": 0.0013403773675045676,
+   "Interval95": [
+    -0.0019450853012080798,
+    0.0046441063339964965
+   ],
+   "OneSidedP": 0.22577422577422576,
+   "Failures": {
+    "aidotnet": 0,
+    "openevolve-matched": 0
+   },
+   "HolmAdjustedP": 0.903096903096903,
+   "Superior": false
+  }
+ ],
+ "OpenEvolveGate": false,
+ "IntervalNote": "Interval95 is descriptive and unadjusted; the decision is Holm on one-sided bootstrap p"
+}

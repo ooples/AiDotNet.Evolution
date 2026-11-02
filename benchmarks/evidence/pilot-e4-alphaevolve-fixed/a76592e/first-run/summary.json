@@ -1,0 +1,188 @@
+{
+ "story": "E-4 (#347)",
+ "problems": [
+  "c5-erdos-overlap",
+  "c3-autocorrelation"
+ ],
+ "stub": false,
+ "registration_sha256": "14ed0e420b8cc4de45c921e638d20719e7e1be65b9bd8199b264acc0eda440aa",
+ "projection_sha256": "a5bd8f0ed38d9bf2d8477d6fa44027c9937d35999d3ad88a07292052b9049505",
+ "verifier_seals": {
+  "c5-erdos-overlap": "7c193343ebfe38cd92623a58cf9932cfc3414a4ffe4feb1e964a1ef541227fa5",
+  "c3-autocorrelation": "12669dcc8b2653445f921ac358df0792a0e25f9781940920eeec32b1cc9b3e8f"
+ },
+ "iterations_per_cell": 25,
+ "construction_limit_seconds": 60,
+ "endpoint": "the verifier's score of the construction the search's own evaluation produced",
+ "libraries": {
+  "numpy": "2.5.4",
+  "scipy": "1.17.1"
+ },
+ "wall_seconds": 38248.0,
+ "cells": 36,
+ "statuses": {
+  "completed": 31,
+  "failed": 5
+ },
+ "model_calls": 841,
+ "model_tokens": 7417209,
+ "cells_with_unknown_spend": 0,
+ "canaries": {
+  "sonnet": 605
+ },
+ "hardware": "AMD Ryzen Threadripper 3990X 64-Core Processor; 128 logical processors; 96 GB memory; Windows 11 (AMD64); Python 3.14.6",
+ "receipt_coverage": {
+  "sonnet": 1.0
+ },
+ "endpoints": [
+  {
+   "Family": "c5-erdos-overlap",
+   "Config": "recommended",
+   "Metric": "published_ratio",
+   "Direction": "maximize",
+   "N": 6,
+   "MeanDifference": 0.1666027551636216,
+   "Interval95": [
+    -0.00012611641677473667,
+    0.49982948054543813
+   ],
+   "OneSidedP": 0.16283716283716285,
+   "Failures": {
+    "aidotnet": 0,
+    "openevolve-recommended": 1
+   },
+   "HolmAdjustedP": 0.6513486513486514,
+   "Superior": false
+  },
+  {
+   "Family": "c5-erdos-overlap",
+   "Config": "matched",
+   "Metric": "published_ratio",
+   "Direction": "maximize",
+   "N": 6,
+   "MeanDifference": 9.930233499007754e-06,
+   "Interval95": [
+    -0.00031185527598605783,
+    0.00042446725379441386
+   ],
+   "OneSidedP": 0.5294705294705294,
+   "Failures": {
+    "aidotnet": 0,
+    "openevolve-matched": 0
+   },
+   "HolmAdjustedP": 1.0,
+   "Superior": false
+  },
+  {
+   "Family": "c3-autocorrelation",
+   "Config": "recommended",
+   "Metric": "published_ratio",
+   "Direction": "maximize",
+   "N": 6,
+   "MeanDifference": -0.16602734029578162,
+   "Interval95": [
+    -0.6625845955046586,
+    0.331142075573323
+   ],
+   "OneSidedP": 0.7442557442557443,
+   "Failures": {
+    "aidotnet": 2,
+    "openevolve-recommended": 1
+   },
+   "HolmAdjustedP": 1.0,
+   "Superior": false
+  },
+  {
+   "Family": "c3-autocorrelation",
+   "Config": "matched",
+   "Metric": "published_ratio",
+   "Direction": "maximize",
+   "N": 6,
+   "MeanDifference": -0.16352559548054296,
+   "Interval95": [
+    -0.6611710172592925,
+    0.33488955729583286
+   ],
+   "OneSidedP": 0.6593406593406593,
+   "Failures": {
+    "aidotnet": 2,
+    "openevolve-matched": 1
+   },
+   "HolmAdjustedP": 1.0,
+   "Superior": false
+  }
+ ],
+ "power_analysis": {
+  "Schema": "evolution-power-analysis-v1",
+  "RegistrationSha256": "14ed0e420b8cc4de45c921e638d20719e7e1be65b9bd8199b264acc0eda440aa",
+  "TargetHalfWidth": 0.02,
+  "Confidence": 0.95,
+  "Endpoints": [
+   {
+    "Family": "c5-erdos-overlap",
+    "Config": "recommended",
+    "PilotN": 6,
+    "MeanDifference": 0.1666027551636216,
+    "StandardDeviation": 0.40808071756281883,
+    "Variance": 0.16652987204658512,
+    "ObservedHalfWidth": 0.24997779848110643,
+    "TargetHalfWidth": 0.02,
+    "ScaledRequiredN": 938,
+    "NormalRequiredN": 1600,
+    "RequiredN": 1600,
+    "Agreement": 1.7057569296375266,
+    "Degenerate": false,
+    "PilotAlreadyMeetsTarget": false
+   },
+   {
+    "Family": "c5-erdos-overlap",
+    "Config": "matched",
+    "PilotN": 6,
+    "MeanDifference": 9.930233499007754e-06,
+    "StandardDeviation": 0.0005026170129246408,
+    "Variance": 2.526238616812885e-07,
+    "ObservedHalfWidth": 0.0003681612648902358,
+    "TargetHalfWidth": 0.02,
+    "ScaledRequiredN": 2,
+    "NormalRequiredN": 2,
+    "RequiredN": 2,
+    "Agreement": 1.0,
+    "Degenerate": false,
+    "PilotAlreadyMeetsTarget": true
+   },
+   {
+    "Family": "c3-autocorrelation",
+    "Config": "recommended",
+    "PilotN": 6,
+    "MeanDifference": -0.16602734029578162,
+    "StandardDeviation": 0.7463520093651443,
+    "Variance": 0.5570413218833885,
+    "ObservedHalfWidth": 0.4968633355389908,
+    "TargetHalfWidth": 0.02,
+    "ScaledRequiredN": 3704,
+    "NormalRequiredN": 5350,
+    "RequiredN": 5350,
+    "Agreement": 1.4443844492440605,
+    "Degenerate": false,
+    "PilotAlreadyMeetsTarget": false
+   },
+   {
+    "Family": "c3-autocorrelation",
+    "Config": "matched",
+    "PilotN": 6,
+    "MeanDifference": -0.16352559548054296,
+    "StandardDeviation": 0.7480141579410836,
+    "Variance": 0.5595251804803084,
+    "ObservedHalfWidth": 0.4980302872775627,
+    "TargetHalfWidth": 0.02,
+    "ScaledRequiredN": 3721,
+    "NormalRequiredN": 5374,
+    "RequiredN": 5374,
+    "Agreement": 1.444235420585864,
+    "Degenerate": false,
+    "PilotAlreadyMeetsTarget": false
+   }
+  ],
+  "RequiredN": 5374
+ }
+}
