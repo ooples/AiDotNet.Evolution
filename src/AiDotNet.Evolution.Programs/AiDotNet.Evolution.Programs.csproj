@@ -8,7 +8,7 @@
     <!-- The experience memory is experimental (AIDEVO004); this assembly uses it deliberately. -->
     <NoWarn>$(NoWarn);AIDEVO004</NoWarn>
     <GenerateDocumentationFile>true</GenerateDocumentationFile>
-    <Version>0.7.0</Version>
+    <Version>0.8.0</Version>
     <Description>Compiler-neutral bounded program improvement and artifact-bound promotion.</Description>
     <RepositoryUrl>https://github.com/ooples/AiDotNet.Evolution</RepositoryUrl>
     <PackageLicenseFile>AIDOTNET-LICENSE.txt</PackageLicenseFile>
