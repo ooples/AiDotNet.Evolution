@@ -1,0 +1,66 @@
+{
+  "Schema": "evolution-campaign-registration-v1",
+  "Spec": {
+    "Campaign": "e4-alphaevolve-pilot",
+    "Budget": {
+      "ModelTokens": 1100000,
+      "ModelCalls": 35,
+      "WallSeconds": 3600
+    },
+    "Models": [
+      "sonnet"
+    ],
+    "SeedCount": 6,
+    "BootstrapSamples": 1000,
+    "BootstrapSeed": 11,
+    "FamilywiseAlpha": 0.05,
+    "Families": [
+      {
+        "Family": "c5-erdos-overlap",
+        "Configs": [
+          "recommended",
+          "matched"
+        ],
+        "Endpoint": {
+          "Metric": "published_ratio",
+          "Direction": "maximize",
+          "FailureValue": 0.0
+        }
+      },
+      {
+        "Family": "c3-autocorrelation",
+        "Configs": [
+          "recommended",
+          "matched"
+        ],
+        "Endpoint": {
+          "Metric": "published_ratio",
+          "Direction": "maximize",
+          "FailureValue": 0.0
+        }
+      }
+    ],
+    "TestPartitionHashes": {
+      "c5-erdos-overlap": "7c193343ebfe38cd92623a58cf9932cfc3414a4ffe4feb1e964a1ef541227fa5",
+      "c3-autocorrelation": "12669dcc8b2653445f921ac358df0792a0e25f9781940920eeec32b1cc9b3e8f"
+    },
+    "Published": null
+  },
+  "Seeds": [
+    1851964264,
+    870798037,
+    3685940066,
+    1371484982,
+    3598861017,
+    2666403315
+  ],
+  "Arms": [
+    "aidotnet",
+    "openevolve-recommended",
+    "openevolve-matched"
+  ],
+  "StoppingRule": "Fixed N = SeedCount per arm; no interim analysis, no extension, no re-run",
+  "DecisionRule": "Holm step-down over every family x config one-sided bootstrap p; all must reject; ties fail",
+  "PublishedRule": "Strict majority of pre-declared problems matched or beaten (assumption A1)",
+  "RegistrationSha256": "14ed0e420b8cc4de45c921e638d20719e7e1be65b9bd8199b264acc0eda440aa"
+}

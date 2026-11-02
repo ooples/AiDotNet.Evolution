@@ -1,0 +1,73 @@
+{
+ "Schema": "evolution-power-analysis-v1",
+ "RegistrationSha256": "14ed0e420b8cc4de45c921e638d20719e7e1be65b9bd8199b264acc0eda440aa",
+ "TargetHalfWidth": 0.02,
+ "Confidence": 0.95,
+ "Endpoints": [
+  {
+   "Family": "c5-erdos-overlap",
+   "Config": "recommended",
+   "PilotN": 6,
+   "MeanDifference": 0.1666027551636216,
+   "StandardDeviation": 0.40808071756281883,
+   "Variance": 0.16652987204658512,
+   "ObservedHalfWidth": 0.24997779848110643,
+   "TargetHalfWidth": 0.02,
+   "ScaledRequiredN": 938,
+   "NormalRequiredN": 1600,
+   "RequiredN": 1600,
+   "Agreement": 1.7057569296375266,
+   "Degenerate": false,
+   "PilotAlreadyMeetsTarget": false
+  },
+  {
+   "Family": "c5-erdos-overlap",
+   "Config": "matched",
+   "PilotN": 6,
+   "MeanDifference": 9.930233499007754e-06,
+   "StandardDeviation": 0.0005026170129246408,
+   "Variance": 2.526238616812885e-07,
+   "ObservedHalfWidth": 0.0003681612648902358,
+   "TargetHalfWidth": 0.02,
+   "ScaledRequiredN": 2,
+   "NormalRequiredN": 2,
+   "RequiredN": 2,
+   "Agreement": 1.0,
+   "Degenerate": false,
+   "PilotAlreadyMeetsTarget": true
+  },
+  {
+   "Family": "c3-autocorrelation",
+   "Config": "recommended",
+   "PilotN": 6,
+   "MeanDifference": -0.16602734029578162,
+   "StandardDeviation": 0.7463520093651443,
+   "Variance": 0.5570413218833885,
+   "ObservedHalfWidth": 0.4968633355389908,
+   "TargetHalfWidth": 0.02,
+   "ScaledRequiredN": 3704,
+   "NormalRequiredN": 5350,
+   "RequiredN": 5350,
+   "Agreement": 1.4443844492440605,
+   "Degenerate": false,
+   "PilotAlreadyMeetsTarget": false
+  },
+  {
+   "Family": "c3-autocorrelation",
+   "Config": "matched",
+   "PilotN": 6,
+   "MeanDifference": -0.16352559548054296,
+   "StandardDeviation": 0.7480141579410836,
+   "Variance": 0.5595251804803084,
+   "ObservedHalfWidth": 0.4980302872775627,
+   "TargetHalfWidth": 0.02,
+   "ScaledRequiredN": 3721,
+   "NormalRequiredN": 5374,
+   "RequiredN": 5374,
+   "Agreement": 1.444235420585864,
+   "Degenerate": false,
+   "PilotAlreadyMeetsTarget": false
+  }
+ ],
+ "RequiredN": 5374
+}
