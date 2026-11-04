@@ -494,7 +494,8 @@ public sealed class ProgramPromptBuilder
                 template,
                 example,
                 (index + 1).ToString(CultureInfo.InvariantCulture),
-                DescribeKeyFeatures(example, ProgramPromptFragmentKey.TopProgramMetricsPrefix, withValues: true)));
+                DescribeKeyFeatures(example, ProgramPromptFragmentKey.TopProgramMetricsPrefix, withValues: true),
+                context.Parent.Source));
         }
 
         if (diverse.Count == 0) return builder.ToString();
@@ -513,7 +514,8 @@ public sealed class ProgramPromptBuilder
                 template,
                 example,
                 "D" + (index + 1).ToString(CultureInfo.InvariantCulture),
-                DescribeKeyFeatures(example, ProgramPromptFragmentKey.DiverseProgramMetricsPrefix, withValues: false)));
+                DescribeKeyFeatures(example, ProgramPromptFragmentKey.DiverseProgramMetricsPrefix, withValues: false),
+                context.Parent.Source));
         }
 
         return builder.ToString();
@@ -541,7 +543,7 @@ public sealed class ProgramPromptBuilder
                 ["score"] = FormatScore(example.Quality),
                 ["program_type"] = DescribeExampleKind(example),
                 ["language"] = _promptOptions.ProgramsAsChangesDescription ? "text" : _fenceLabel,
-                ["program_snippet"] = DescribeExampleSource(example),
+                ["program_snippet"] = DescribeExampleSource(example, context.Parent.Source),
                 ["unique_features"] = DescribeUniqueFeatures(example)
             };
 
@@ -563,14 +565,15 @@ public sealed class ProgramPromptBuilder
         ProgramPromptTemplate template,
         ProgramPromptExample example,
         string number,
-        string keyFeatures)
+        string keyFeatures,
+        string? parentSource = null)
     {
         var values = new Dictionary<string, string>(StringComparer.Ordinal)
         {
             ["program_number"] = number,
             ["score"] = FormatScore(example.Quality),
             ["language"] = _promptOptions.ProgramsAsChangesDescription ? "text" : _fenceLabel,
-            ["program_snippet"] = DescribeExampleSource(example),
+            ["program_snippet"] = DescribeExampleSource(example, parentSource),
             ["key_features"] = keyFeatures
         };
 
@@ -578,14 +581,24 @@ public sealed class ProgramPromptBuilder
         return RenderWithDefaults(template, values).TrimEnd();
     }
 
-    private string DescribeExampleSource(ProgramPromptExample example)
+    private string DescribeExampleSource(ProgramPromptExample example, string? parentSource = null)
     {
-        if (!_promptOptions.ProgramsAsChangesDescription) return BoundProgram(example.Genome.Source);
+        if (!_promptOptions.ProgramsAsChangesDescription)
+        {
+            string source = _promptOptions.CompressExamplesAgainstParent && !string.IsNullOrEmpty(parentSource)
+                ? CompressAgainstParent(parentSource!, example.Genome.Source)
+                : example.Genome.Source;
+            return BoundProgram(source);
+        }
+
         string changes = example.ChangesDescription ?? string.Empty;
         return changes.Trim().Length == 0
             ? _templates.RenderFragment(ProgramPromptFragmentKey.AttemptUnknownChanges)
             : BoundProgram(PromptTextRedactor.Redact(changes));
     }
+
+    private static string CompressAgainstParent(string parentSource, string exampleSource)
+        => ProgramSourceCompression.Compress(parentSource, exampleSource, "current program");
 
     private string DescribeKeyFeatures(ProgramPromptExample example, ProgramPromptFragmentKey prefixKey, bool withValues)
     {
@@ -1090,6 +1103,10 @@ public sealed class ProgramPromptBuilder
         yield return _promptOptions.MaxProgramSnippetChars.ToString(CultureInfo.InvariantCulture);
         yield return _promptOptions.ScoreDecimals.ToString(CultureInfo.InvariantCulture);
         yield return _promptOptions.ProgramsAsChangesDescription ? "changes" : "source";
+        if (_promptOptions.CompressExamplesAgainstParent)
+        {
+            yield return "compress-examples-v1";
+        }
         yield return _promptOptions.UseTemplateStochasticity ? "varying" : "fixed";
 
         foreach (string name in _variationNames)

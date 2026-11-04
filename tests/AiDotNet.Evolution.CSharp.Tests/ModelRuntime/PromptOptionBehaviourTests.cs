@@ -26,6 +26,29 @@ public sealed class PromptOptionBehaviourTests
     }
 
     [Fact]
+    public void CompressExamplesAgainstParent_elides_unchanged_shared_scaffolding_when_enabled()
+    {
+        string sharedHeader = "import math\nimport numpy as np\n\ndef helper_one(x):\n    return x * 2\n\ndef helper_two(y):\n    return y + 1\n";
+        string parent = sharedHeader + "def solve(n):\n    return helper_one(n)\n";
+        string example = sharedHeader + "def solve(n):\n    return helper_two(helper_one(n))\n";
+        var context = new ProgramPromptContext(new ProgramGenome(parent, ProgramLanguage.Python))
+        {
+            TopPrograms = new List<ProgramPromptExample>
+            {
+                new(new ProgramGenome(example, ProgramLanguage.Python), ProgramPromptExampleKind.TopProgram, 0.9)
+            }
+        };
+
+        string uncompressed = User(new ProgramEvolutionPromptOptions { CompressExamplesAgainstParent = false }, context);
+        string compressed = User(new ProgramEvolutionPromptOptions { CompressExamplesAgainstParent = true }, context);
+
+        Assert.DoesNotContain("lines unchanged from current program", uncompressed);
+        Assert.Contains("lines unchanged from current program", compressed);
+        Assert.Contains("return helper_two(helper_one(n))", compressed);
+        Assert.True(compressed.Length < uncompressed.Length);
+    }
+
+    [Fact]
     public void IncludePreviousAttempts_and_NumPreviousAttempts_bound_the_attempt_history()
     {
         Assert.Contains("alpha change", User(new ProgramEvolutionPromptOptions()));

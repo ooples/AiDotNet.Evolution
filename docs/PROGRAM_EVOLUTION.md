@@ -39,7 +39,7 @@ counts. Usage is what the provider said, not a charge or a budget admission.
 Four clients ship:
 
 - `ClaudeCodeChatClient` uses the Claude Code CLI (`claude -p`) and its login session, configured by
-  `ClaudeCodeChatClientOptions`.
+  `ClaudeCodeChatClientOptions` (including `Isolate` and `UseTokenOptimizer` for `@ooples/token-optimizer-mcp`).
 - `ManualProgramChatClient` writes each prompt to a queue directory for a person to answer, which is
   useful for inspecting prompts or evolving by hand.
 - `WeightedEnsembleChatClient` sends each request to one member of a weighted set of

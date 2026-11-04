@@ -403,8 +403,9 @@ public sealed class LlmProgramVariationOperator : IOutcomeAwareVariationOperator
 
             // Measurements are what the evaluator reported; descriptors are where the archive filed the candidate.
             // They are different things, and printing the descriptors under both headings tells the model nothing
-            // twice while hiding the numbers it could actually act on.
-            promptContext.ParentMetrics = evaluation.Metrics.Count > 0 ? evaluation.Metrics : evaluation.Descriptors;
+            promptContext.ParentMetrics = evaluation.Metrics.Count > 0 || _variationOptions.FeatureDimensions.Count > 0
+                ? evaluation.Metrics
+                : evaluation.Descriptors;
             promptContext.ParentDescriptors = evaluation.Descriptors;
             ApplyFeatureCoordinates(promptContext, context.Parent.Cell.Bins);
         }
@@ -1383,10 +1384,23 @@ public sealed class LlmProgramVariationOperator : IOutcomeAwareVariationOperator
         return prompt;
     }
 
-    private static void AppendFeedback(List<ProgramChatMessage> messages, string? responseText, string feedback)
+    private void AppendFeedback(List<ProgramChatMessage> messages, string? responseText, string feedback)
     {
+        if (_variationOptions.CompactRetryHistory)
+        {
+            for (int i = 0; i < messages.Count; i++)
+            {
+                if (messages[i].Role == ProgramChatRole.Assistant
+                    && messages[i].Text.Length > "(earlier failed draft omitted)".Length)
+                {
+                    messages[i] = ProgramChatMessage.Assistant("(earlier failed draft omitted)");
+                }
+            }
+        }
+
+        int draftCap = _variationOptions.CompactRetryHistory ? Math.Min(MaxFeedbackChars, 400) : MaxFeedbackChars;
         messages.Add(ProgramChatMessage.Assistant(
-            responseText is null ? "(no response)" : ProgramText.Bound(responseText, MaxFeedbackChars)));
+            responseText is null ? "(no response)" : ProgramText.Bound(responseText, draftCap)));
         messages.Add(ProgramChatMessage.User(feedback + " Answer again in the required format."));
     }
 
@@ -1462,6 +1476,7 @@ public sealed class LlmProgramVariationOperator : IOutcomeAwareVariationOperator
         };
         // Only when set, so existing operator identities are unchanged: concurrent history changes what prompts contain.
         if (variationOptions.ConcurrentProposals) components.Add("concurrent-proposals-v1");
+        if (variationOptions.CompactRetryHistory) components.Add("compact-retry-history-v1");
         // Only when set, so existing operator identities are unchanged.
         if (variationOptions.TopP is not null || variationOptions.ReasoningEffort is not null)
         {
