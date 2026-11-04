@@ -19,7 +19,7 @@ public sealed class ClaudeCodeChatClientTests : IDisposable
     }
 
     // Records its arguments, standard input and whether inherited credentials leaked, then answers like `claude -p --output-format json`.
-    private ClaudeCodeChatClient Client(bool isolate, int failFirst = 0, decimal? totalBudgetUsd = null, decimal? reportedCostUsd = null)
+    private ClaudeCodeChatClient Client(bool isolate, int failFirst = 0, decimal? totalBudgetUsd = null, decimal? reportedCostUsd = null, bool useTokenOptimizer = false)
     {
         string script = Path.Combine(_directory, "claude_stub.py");
         File.WriteAllText(script, """
@@ -29,7 +29,9 @@ public sealed class ClaudeCodeChatClientTests : IDisposable
             calls = int(open(counter).read()) if os.path.exists(counter) else 0
             open(counter, "w").write(str(calls + 1))
             stdin = sys.stdin.read()
-            json.dump({"args": args, "stdin": stdin, "leaked": "ANTHROPIC_API_KEY" in os.environ, "cwd_empty": sorted(os.listdir(".")) in ([], ["no-mcp.json"])}, open(record, "w"))
+            mcp_file = args[args.index("--mcp-config") + 1] if "--mcp-config" in args else None
+            mcp_json = open(mcp_file).read() if mcp_file and os.path.exists(mcp_file) else ""
+            json.dump({"args": args, "stdin": stdin, "leaked": "ANTHROPIC_API_KEY" in os.environ, "token_opt_env": "TOKEN_OPTIMIZER_POSTURE" in os.environ, "mcp_json": mcp_json, "cwd_empty": sorted(os.listdir(".")) in ([], ["no-mcp.json"], ["token-optimizer-mcp.json"])}, open(record, "w"))
             reply = {"type": "result", "subtype": "success", "is_error": False, "result": "print('hi')", "usage": {"input_tokens": 12, "output_tokens": 5}}
             if os.environ.get("STUB_COST"):
                 reply["total_cost_usd"] = float(os.environ["STUB_COST"])
@@ -48,6 +50,7 @@ public sealed class ClaudeCodeChatClientTests : IDisposable
             MaxBudgetUsd = 0.5m,
             TotalBudgetUsd = totalBudgetUsd,
             Isolate = isolate,
+            UseTokenOptimizer = useTokenOptimizer,
             MaxRetries = 2,
             RetryDelay = TimeSpan.Zero,
             Timeout = TimeSpan.FromSeconds(60)
@@ -96,6 +99,26 @@ public sealed class ClaudeCodeChatClientTests : IDisposable
             Assert.DoesNotContain("--strict-mcp-config", record.GetProperty("args").EnumerateArray().Select(a => a.GetString()));
         }
         finally { Environment.SetEnvironmentVariable("ANTHROPIC_API_KEY", null); }
+    }
+
+    [Fact]
+    public async Task UseTokenOptimizer_registers_token_optimizer_mcp_while_keeping_credential_isolation()
+    {
+        Environment.SetEnvironmentVariable("ANTHROPIC_API_KEY", "must-not-leak");
+        Environment.SetEnvironmentVariable("TOKEN_OPTIMIZER_POSTURE", "lean");
+        try
+        {
+            await Client(isolate: true, useTokenOptimizer: true).GetResponseAsync(new[] { ProgramChatMessage.User("x") });
+            JsonElement record = Record();
+            Assert.False(record.GetProperty("leaked").GetBoolean());
+            Assert.True(record.GetProperty("token_opt_env").GetBoolean());
+            Assert.Contains("@ooples/token-optimizer-mcp", record.GetProperty("mcp_json").GetString());
+        }
+        finally
+        {
+            Environment.SetEnvironmentVariable("ANTHROPIC_API_KEY", null);
+            Environment.SetEnvironmentVariable("TOKEN_OPTIMIZER_POSTURE", null);
+        }
     }
 
     [Fact]

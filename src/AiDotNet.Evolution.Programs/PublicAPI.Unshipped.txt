@@ -26,6 +26,8 @@ AiDotNet.Evolution.Programs.ClaudeCodeChatClientOptions.Timeout.get -> System.Ti
 AiDotNet.Evolution.Programs.ClaudeCodeChatClientOptions.Timeout.set -> void
 AiDotNet.Evolution.Programs.ClaudeCodeChatClientOptions.TotalBudgetUsd.get -> decimal?
 AiDotNet.Evolution.Programs.ClaudeCodeChatClientOptions.TotalBudgetUsd.set -> void
+AiDotNet.Evolution.Programs.ClaudeCodeChatClientOptions.UseTokenOptimizer.get -> bool
+AiDotNet.Evolution.Programs.ClaudeCodeChatClientOptions.UseTokenOptimizer.set -> void
 AiDotNet.Evolution.Programs.CompilationDiagnostic
 AiDotNet.Evolution.Programs.CompilationDiagnostic.Code.get -> string?
 AiDotNet.Evolution.Programs.CompilationDiagnostic.Code.init -> void
@@ -766,6 +768,8 @@ AiDotNet.Evolution.Programs.ProgramEvolutionPromptOptions.BuildTemplateSet() -> 
 AiDotNet.Evolution.Programs.ProgramEvolutionPromptOptions.Clone() -> AiDotNet.Evolution.Programs.ProgramEvolutionPromptOptions!
 AiDotNet.Evolution.Programs.ProgramEvolutionPromptOptions.ComprehensiveImplementationMinLines.get -> int?
 AiDotNet.Evolution.Programs.ProgramEvolutionPromptOptions.ComprehensiveImplementationMinLines.set -> void
+AiDotNet.Evolution.Programs.ProgramEvolutionPromptOptions.CompressExamplesAgainstParent.get -> bool
+AiDotNet.Evolution.Programs.ProgramEvolutionPromptOptions.CompressExamplesAgainstParent.set -> void
 AiDotNet.Evolution.Programs.ProgramEvolutionPromptOptions.ConciseImplementationMaxLines.get -> int?
 AiDotNet.Evolution.Programs.ProgramEvolutionPromptOptions.ConciseImplementationMaxLines.set -> void
 AiDotNet.Evolution.Programs.ProgramEvolutionPromptOptions.CustomVariables.get -> System.Collections.Generic.IDictionary<string!, string!>!

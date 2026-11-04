@@ -52,6 +52,16 @@ public sealed class ClaudeCodeChatClientOptions
     /// </summary>
     public bool Isolate { get; set; } = true;
 
+    /// <summary>
+    /// Gets or sets whether an isolated Claude Code invocation registers <c>@ooples/token-optimizer-mcp</c> in its
+    /// strict MCP configuration and preserves <c>TOKEN_OPTIMIZER_*</c> environment settings while still isolating user
+    /// profile settings and stripping <c>ANTHROPIC_*</c> and <c>CLAUDE_CODE_*</c> variables.
+    /// </summary>
+    /// <remarks>
+    /// Off by default so isolated benchmark runs keep their exact zero-MCP baseline unless token optimization is opted in.
+    /// </remarks>
+    public bool UseTokenOptimizer { get; set; }
+
     internal void Validate()
     {
         if (string.IsNullOrWhiteSpace(Executable)) throw new ArgumentException("Executable is required.", nameof(Executable));
@@ -111,7 +121,8 @@ public sealed class ClaudeCodeChatClient : IProgramChatClient
             MaxRetries = options.MaxRetries,
             MaxTurns = options.MaxTurns,
             RetryDelay = options.RetryDelay,
-            Isolate = options.Isolate
+            Isolate = options.Isolate,
+            UseTokenOptimizer = options.UseTokenOptimizer
         };
     }
 
@@ -242,12 +253,19 @@ public sealed class ClaudeCodeChatClient : IProgramChatClient
             if (capUsd is { } budget) { start.ArgumentList.Add("--max-budget-usd"); start.ArgumentList.Add(budget.ToString(CultureInfo.InvariantCulture)); }
             if (_options.Isolate)
             {
-                string mcp = Path.Combine(workspace, "no-mcp.json");
-                File.WriteAllText(mcp, "{\"mcpServers\":{}}");
+                string mcpFileName = _options.UseTokenOptimizer ? "token-optimizer-mcp.json" : "no-mcp.json";
+                string mcp = Path.Combine(workspace, mcpFileName);
+                string mcpJson = _options.UseTokenOptimizer
+                    ? "{\"mcpServers\":{\"token-optimizer\":{\"command\":\"npx\",\"args\":[\"-y\",\"@ooples/token-optimizer-mcp\"],\"env\":{\"TOKEN_OPTIMIZER_POSTURE\":\"lean\",\"TOKEN_OPTIMIZER_COMPRESSION\":\"aggressive\",\"TOKEN_OPTIMIZER_MODE\":\"enforce\"}}}}"
+                    : "{\"mcpServers\":{}}";
+                File.WriteAllText(mcp, mcpJson);
                 foreach (string argument in new[] { "--tools", "", "--strict-mcp-config", "--mcp-config", mcp, "--setting-sources", "" })
                     start.ArgumentList.Add(argument);
                 foreach (string name in start.Environment.Keys.ToArray())
+                {
+                    if (_options.UseTokenOptimizer && name.StartsWith("TOKEN_OPTIMIZER_", StringComparison.OrdinalIgnoreCase)) continue;
                     if (ScrubbedPrefixes.Any(prefix => name.StartsWith(prefix, StringComparison.OrdinalIgnoreCase))) start.Environment.Remove(name);
+                }
             }
 
             using var process = Process.Start(start) ?? throw new IOException("The Claude Code CLI did not start.");
