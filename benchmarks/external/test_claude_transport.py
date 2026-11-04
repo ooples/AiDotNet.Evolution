@@ -194,6 +194,33 @@ class ReceiptTests(unittest.TestCase):
             self.assertNotIn("transport_overhead_seconds", row)
             self.assertTrue(transport.failed)
 
+    def test_a_binary_replaced_mid_run_closes_admission(self):
+        # Claude Code updates itself in place; the version is read once, so the hash is what notices.
+        with tempfile.TemporaryDirectory() as directory:
+            binary = Path(directory) / "claude.exe"
+            binary.write_bytes(b"version one")
+            transport = ClaudeTransport(str(binary), "haiku", Path(directory) / "e", 3)
+            first = transport._unchanged_executable()
+            self.assertEqual(first, transport._unchanged_executable())
+            binary.write_bytes(b"version two")
+            with self.assertRaisesRegex(ValueError, "changed after its version was verified"):
+                transport._unchanged_executable()
+            self.assertTrue(transport.failed)
+            with patch.object(ClaudeTransport, "_version", return_value=PINNED_CLI):
+                with self.assertRaisesRegex(ValueError, "admission closed"):
+                    transport.generate("system", [])
+
+    def test_every_call_checks_the_binary_before_it_runs(self):
+        with tempfile.TemporaryDirectory() as directory:
+            transport = ClaudeTransport(sys.executable, "haiku", Path(directory) / "e", 2)
+            with patch.object(ClaudeTransport, "_version", return_value=PINNED_CLI), \
+                    patch.object(ClaudeTransport, "_unchanged_executable",
+                                 side_effect=ValueError("changed after its version was verified")), \
+                    patch("claude_transport.subprocess.Popen") as spawn:
+                with self.assertRaisesRegex(ValueError, "changed after"):
+                    transport.generate("system", [])
+            spawn.assert_not_called()
+
     def test_reconciliation_reports_missing_receipts_and_refuses_gaps(self):
         with tempfile.TemporaryDirectory() as directory:
             root = Path(directory)
