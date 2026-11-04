@@ -188,6 +188,18 @@ public sealed class LlmProgramVariationOptions
     /// <summary>Gets or sets whose evaluated children the previous-attempts section recounts.</summary>
     public ProgramPreviousAttemptScope PreviousAttemptScope { get; set; } = ProgramPreviousAttemptScope.Island;
 
+    /// <summary>
+    /// Gets or sets whether superseded assistant drafts from earlier failed retry turns are compacted
+    /// before appending the newest retry feedback.
+    /// </summary>
+    /// <remarks>
+    /// When <c>true</c>, earlier <see cref="ProgramChatRole.Assistant"/> retry turns are replaced with
+    /// <c>"(earlier failed draft omitted)"</c> while every <see cref="ProgramChatRole.User"/> failure-feedback
+    /// message and the most recent assistant draft are preserved in full. Defaults to <c>false</c> so existing
+    /// operator version hashes and replay transcripts remain unchanged unless opted in.
+    /// </remarks>
+    public bool CompactRetryHistory { get; set; }
+
     /// <summary>Creates an independent copy so a running operator is unaffected by later mutation.</summary>
     /// <returns>A new options instance carrying the same values.</returns>
     public LlmProgramVariationOptions Clone() => new()
@@ -200,6 +212,7 @@ public sealed class LlmProgramVariationOptions
         MaxEmptyNeighborCells = MaxEmptyNeighborCells,
         MaxPreviousAttempts = MaxPreviousAttempts,
         PreviousAttemptScope = PreviousAttemptScope,
+        CompactRetryHistory = CompactRetryHistory,
         MaxPromptProgramChars = MaxPromptProgramChars,
         SystemMessage = SystemMessage,
         // Copied by reference deliberately: the source is a live collaborator the run credits as

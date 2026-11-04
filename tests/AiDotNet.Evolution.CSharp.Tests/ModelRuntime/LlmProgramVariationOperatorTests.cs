@@ -816,4 +816,42 @@ public sealed class LlmProgramVariationOperatorTests
             }).ProposeAsync(Context(parent));
         Assert.DoesNotContain("memoise the inner loop", otherTask.Conversations.Single().Last().Text);
     }
+
+    [Fact]
+    public async Task CompactRetryHistory_elides_superseded_assistant_drafts_while_preserving_feedback()
+    {
+        var parent = new ProgramGenome(ParentSource, ProgramLanguage.Python);
+        string badDraft1 = DiffResponse("missing_one", "replacement_one");
+        string badDraft2 = DiffResponse("missing_two", "replacement_two");
+        string goodDraft = DiffResponse("    return x", "    return x + 1");
+
+        var compactClient = new FakeChatClient(badDraft1, badDraft2, goodDraft);
+        var compactOptions = new LlmProgramVariationOptions
+        {
+            Mode = ProgramEvolutionMode.Diff,
+            MaxProposalRetries = 2,
+            CompactRetryHistory = true
+        };
+        Assert.True(compactOptions.Clone().CompactRetryHistory);
+
+        var compactOperator = new LlmProgramVariationOperator(
+            compactClient,
+            new ProgramProposalOptions
+            {
+                Language = ProgramLanguage.Python,
+                Prompt = { ProgramsAsChangesDescription = false }
+            },
+            compactOptions);
+        ProgramGenome child = await compactOperator.ProposeAsync(Context(parent));
+
+        Assert.Contains("return x + 1", child.Source, StringComparison.Ordinal);
+        Assert.Equal(3, compactClient.Conversations.Count);
+
+        IReadOnlyList<ProgramChatMessage> thirdTurn = compactClient.Conversations[2];
+        // First assistant draft (index 2) is compacted; second assistant draft (index 4) and both user feedbacks survive.
+        Assert.Equal("(earlier failed draft omitted)", thirdTurn[2].Text);
+        Assert.Contains("missing_one", thirdTurn[3].Text, StringComparison.Ordinal);
+        Assert.Contains("replacement_two", thirdTurn[4].Text, StringComparison.Ordinal);
+        Assert.Contains("missing_two", thirdTurn[5].Text, StringComparison.Ordinal);
+    }
 }

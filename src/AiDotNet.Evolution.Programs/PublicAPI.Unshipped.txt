@@ -346,6 +346,8 @@ AiDotNet.Evolution.Programs.LlmProgramVariationOptions
 AiDotNet.Evolution.Programs.LlmProgramVariationOptions.ArtifactDiagnosticPrefix.get -> string!
 AiDotNet.Evolution.Programs.LlmProgramVariationOptions.ArtifactDiagnosticPrefix.set -> void
 AiDotNet.Evolution.Programs.LlmProgramVariationOptions.Clone() -> AiDotNet.Evolution.Programs.LlmProgramVariationOptions!
+AiDotNet.Evolution.Programs.LlmProgramVariationOptions.CompactRetryHistory.get -> bool
+AiDotNet.Evolution.Programs.LlmProgramVariationOptions.CompactRetryHistory.set -> void
 AiDotNet.Evolution.Programs.LlmProgramVariationOptions.ConcurrentProposals.get -> bool
 AiDotNet.Evolution.Programs.LlmProgramVariationOptions.ConcurrentProposals.set -> void
 AiDotNet.Evolution.Programs.LlmProgramVariationOptions.FeatureBinCounts.get -> System.Collections.Generic.IList<int>!
