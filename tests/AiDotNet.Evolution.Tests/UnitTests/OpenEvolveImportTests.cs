@@ -938,12 +938,16 @@ public sealed class OpenEvolveImportTests
         Assert.Equal((ProgramDescriptorRebaseMode.Frozen, 20, 20), (defaults.Mode, defaults.ReferenceSize, defaults.Interval));
         ProgramDescriptorRebaseOptions periodic = new RunMetricDescriptor
         {
-            Name = "diversity", Reference = ProgramDescriptorRebaseMode.Periodic, ReferenceSize = 8
+            Name = "diversity",
+            Reference = ProgramDescriptorRebaseMode.Periodic,
+            ReferenceSize = 8
         }.RebaseOptions()!;
         Assert.Equal((ProgramDescriptorRebaseMode.Periodic, 8, 8), (periodic.Mode, periodic.ReferenceSize, periodic.Interval));
         Assert.Equal(30, new RunMetricDescriptor
         {
-            Name = "diversity", Reference = ProgramDescriptorRebaseMode.Periodic, RebaseInterval = 30
+            Name = "diversity",
+            Reference = ProgramDescriptorRebaseMode.Periodic,
+            RebaseInterval = 30
         }.RebaseOptions()!.Interval);
     }
 
