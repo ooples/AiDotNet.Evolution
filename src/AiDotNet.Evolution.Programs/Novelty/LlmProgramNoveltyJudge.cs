@@ -180,8 +180,9 @@ public sealed class LlmProgramNoveltyJudge : IProgramNoveltyJudge
         string language = candidate.Language.ToString().ToLowerInvariant();
         string existing = PromptTextRedactor.RedactAndBound(
             incumbent.Source, MaxProgramBytes, TruncationNotice, out bool existingTruncated);
-        string proposed = PromptTextRedactor.RedactAndBound(
+        string proposedRaw = PromptTextRedactor.RedactAndBound(
             candidate.Source, MaxProgramBytes, TruncationNotice, out bool proposedTruncated);
+        string proposed = CompressProposedAgainstExisting(existing, proposedRaw);
 
         var builder = new System.Text.StringBuilder();
         builder.Append("Compare these two programs.\n\n**EXISTING CODE:**\n```").Append(incumbent.Language.ToString().ToLowerInvariant()).Append('\n')
@@ -197,6 +198,75 @@ public sealed class LlmProgramNoveltyJudge : IProgramNoveltyJudge
 
         builder.Append("Is the proposed program meaningfully different? Answer NOVEL or NOT_NOVEL first.");
         return builder.ToString();
+    }
+
+    private static string CompressProposedAgainstExisting(string existingSource, string proposedSource)
+    {
+        if (string.IsNullOrEmpty(existingSource) || string.IsNullOrEmpty(proposedSource))
+        {
+            return proposedSource;
+        }
+
+        string[] existingLines = existingSource.Replace("\r\n", "\n").Replace('\r', '\n').Split('\n');
+        string[] proposedLines = proposedSource.Replace("\r\n", "\n").Replace('\r', '\n').Split('\n');
+        const int minRunLines = 4;
+        if (existingLines.Length < minRunLines || proposedLines.Length < minRunLines)
+        {
+            return proposedSource;
+        }
+
+        var lineIndex = new Dictionary<string, List<int>>(StringComparer.Ordinal);
+        for (int i = 0; i < existingLines.Length; i++)
+        {
+            string key = existingLines[i].TrimEnd();
+            if (!lineIndex.TryGetValue(key, out List<int>? positions))
+            {
+                positions = new List<int>(2);
+                lineIndex[key] = positions;
+            }
+            positions.Add(i);
+        }
+
+        var output = new List<string>(proposedLines.Length);
+        int lineIdx = 0;
+        bool anyElided = false;
+        while (lineIdx < proposedLines.Length)
+        {
+            int bestRun = 0;
+            if (lineIndex.TryGetValue(proposedLines[lineIdx].TrimEnd(), out List<int>? starts))
+            {
+                foreach (int pStart in starts)
+                {
+                    int run = 0;
+                    while (lineIdx + run < proposedLines.Length &&
+                           pStart + run < existingLines.Length &&
+                           string.Equals(
+                               proposedLines[lineIdx + run].TrimEnd(),
+                               existingLines[pStart + run].TrimEnd(),
+                               StringComparison.Ordinal))
+                    {
+                        run++;
+                    }
+                    if (run > bestRun) bestRun = run;
+                }
+            }
+
+            if (bestRun >= minRunLines)
+            {
+                output.Add(proposedLines[lineIdx]);
+                output.Add($"# ... ({bestRun - 2} lines unchanged from existing code) ...");
+                output.Add(proposedLines[lineIdx + bestRun - 1]);
+                lineIdx += bestRun;
+                anyElided = true;
+            }
+            else
+            {
+                output.Add(proposedLines[lineIdx]);
+                lineIdx++;
+            }
+        }
+
+        return anyElided ? string.Join("\n", output) : proposedSource;
     }
 
     private ProgramChatOptions BuildChatOptions(ProgramGenome candidate, ProgramGenome incumbent) => new()
