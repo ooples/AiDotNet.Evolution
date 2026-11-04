@@ -829,10 +829,11 @@ public sealed class ProgramPromptBuilder
         foreach (ProgramPromptArtifact artifact in context.Artifacts)
         {
             if (shown >= _promptOptions.MaxArtifactCount) break;
+            string collapsed = CollapseRepeatedArtifactLines(artifact.Content);
             string content = _promptOptions.ArtifactSecurityFilter
                 ? PromptTextRedactor.RedactAndBound(
-                    artifact.Content, _promptOptions.MaxArtifactBytes, TruncationMarker(), out _)
-                : BoundArtifactWithoutRedaction(artifact.Content);
+                    collapsed, _promptOptions.MaxArtifactBytes, TruncationMarker(), out _)
+                : BoundArtifactWithoutRedaction(collapsed);
 
             if (content.Length == 0) continue;
             shown++;
@@ -842,6 +843,42 @@ public sealed class ProgramPromptBuilder
 
         if (shown == 0) return string.Empty;
         return "## " + _templates.RenderFragment(ProgramPromptFragmentKey.ArtifactTitle) + "\n\n" + builder;
+    }
+
+    private static string CollapseRepeatedArtifactLines(string content)
+    {
+        if (string.IsNullOrEmpty(content) || !content.Contains('\n')) return content;
+        string[] lines = content.Replace("\r\n", "\n").Replace('\r', '\n').Split('\n');
+        if (lines.Length < 4) return content;
+
+        var output = new List<string>(lines.Length);
+        int i = 0;
+        while (i < lines.Length)
+        {
+            string line = lines[i];
+            int run = 1;
+            if (line.Trim().Length > 0)
+            {
+                while (i + run < lines.Length && string.Equals(lines[i + run], line, StringComparison.Ordinal))
+                {
+                    run++;
+                }
+            }
+
+            if (run >= 4)
+            {
+                output.Add(line);
+                output.Add("... (line repeated " + (run - 1).ToString(CultureInfo.InvariantCulture) + " more times) ...");
+                i += run;
+            }
+            else
+            {
+                output.Add(line);
+                i++;
+            }
+        }
+
+        return output.Count < lines.Length ? string.Join("\n", output) : content;
     }
 
     private string TruncationMarker() => _templates.RenderFragment(
@@ -865,22 +902,36 @@ public sealed class ProgramPromptBuilder
 
         var builder = new StringBuilder(DiagnosticsHeading);
         int shown = 0;
-        foreach (EvolutionDiagnostic diagnostic in context.Diagnostics)
+        int index = 0;
+        while (index < context.Diagnostics.Count && shown < _promptOptions.MaxDiagnostics)
         {
-            if (shown >= _promptOptions.MaxDiagnostics) break;
+            EvolutionDiagnostic diagnostic = context.Diagnostics[index];
+            int repeat = 1;
+            while (index + repeat < context.Diagnostics.Count
+                && string.Equals(context.Diagnostics[index + repeat].Code, diagnostic.Code, StringComparison.Ordinal)
+                && string.Equals(context.Diagnostics[index + repeat].Message, diagnostic.Message, StringComparison.Ordinal))
+            {
+                repeat++;
+            }
+
             shown++;
+            index += repeat;
             builder.Append("\n- ").Append(diagnostic.Code);
             if (diagnostic.Message.Length > 0)
             {
                 builder.Append(": ")
                     .Append(Truncate(PromptTextRedactor.Redact(diagnostic.Message), MaxDiagnosticMessageChars));
             }
+            if (repeat > 1)
+            {
+                builder.Append(" (x").Append(repeat.ToString(CultureInfo.InvariantCulture)).Append(')');
+            }
         }
 
-        if (context.Diagnostics.Count > shown)
+        if (context.Diagnostics.Count > index)
         {
             builder.Append("\n- and ")
-                .Append((context.Diagnostics.Count - shown).ToString(CultureInfo.InvariantCulture))
+                .Append((context.Diagnostics.Count - index).ToString(CultureInfo.InvariantCulture))
                 .Append(" more.");
         }
 
