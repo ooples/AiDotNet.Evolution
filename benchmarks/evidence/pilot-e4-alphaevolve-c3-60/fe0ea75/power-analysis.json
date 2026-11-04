@@ -1,0 +1,41 @@
+{
+ "Schema": "evolution-power-analysis-v1",
+ "RegistrationSha256": "05255d69115f2315fcf403703a2f4ac6fe67e6d78acf805ce322c858737e6554",
+ "TargetHalfWidth": 0.002,
+ "Confidence": 0.95,
+ "Endpoints": [
+  {
+   "Family": "c3-autocorrelation",
+   "Config": "recommended",
+   "PilotN": 6,
+   "MeanDifference": -0.003086554557188148,
+   "StandardDeviation": 0.0047115183964496895,
+   "Variance": 2.2198405600083854e-05,
+   "ObservedHalfWidth": 0.003286438993524391,
+   "TargetHalfWidth": 0.002,
+   "ScaledRequiredN": 17,
+   "NormalRequiredN": 22,
+   "RequiredN": 22,
+   "Agreement": 1.2941176470588236,
+   "Degenerate": false,
+   "PilotAlreadyMeetsTarget": false
+  },
+  {
+   "Family": "c3-autocorrelation",
+   "Config": "matched",
+   "PilotN": 6,
+   "MeanDifference": -0.0006339908678849778,
+   "StandardDeviation": 0.005465841112989225,
+   "Variance": 2.9875419072443286e-05,
+   "ObservedHalfWidth": 0.0038762952266317525,
+   "TargetHalfWidth": 0.002,
+   "ScaledRequiredN": 23,
+   "NormalRequiredN": 29,
+   "RequiredN": 29,
+   "Agreement": 1.2608695652173914,
+   "Degenerate": false,
+   "PilotAlreadyMeetsTarget": false
+  }
+ ],
+ "RequiredN": 29
+}

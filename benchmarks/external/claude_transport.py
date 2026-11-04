@@ -36,6 +36,11 @@ import time
 
 from codex_transport import kill_owned
 
+# Revalidated for 2.1.317 on 2026-11-04, after it replaced 2.1.316 in place during the E-4 c3 run (the transport now
+# hashes the binary before every call, so that cannot happen silently again). `record_claude_canary.py` succeeded for
+# all three models with the resolved models unchanged; the baselines moved 626/605/601 -> 673/652/648, the CLI's own
+# scaffolding growing by 47 tokens per call, the same on all three models and nowhere near a 29k hook injection.
+#
 # Revalidated for 2.1.316 on 2026-10-31 for the E-4 post-fix pilot, by the same procedure: `record_claude_canary.py`
 # succeeded for all three models, the resolved models are unchanged and the baselines did not move (658/637/633).
 # A first recording read 626/605/601 because DO_NOT_TRACK leaked from the recording shell; the pilot, launched
@@ -63,7 +68,7 @@ from codex_transport import kill_owned
 # Previously revalidated for 2.1.299 on 2026-10-15, where `--max-turns` still worked although it
 # had been dropped from `--help`, and the baselines moved 448/579/516 and were re-recorded because
 # the CLI's own scaffolding had grown; that was the canary working, not contamination.
-PINNED_CLI = "2.1.316 (Claude Code)"
+PINNED_CLI = "2.1.317 (Claude Code)"
 MAX_OUTPUT = 4 * 1024 * 1024
 MAX_TEXT = 64 * 1024
 SYSTEM_PROMPT = ("Generate exactly one candidate response to the benchmark conversation in the user message. "
@@ -295,6 +300,7 @@ class ClaudeTransport:
         self.failed = False
         self._last_usage = None
         self._verified_version = None
+        self._verified_sha256 = None
         self._lock = threading.Lock()
 
     def generate(self, system_message, messages):
@@ -336,12 +342,34 @@ class ClaudeTransport:
 
     def _version(self):
         if self._verified_version is None:
+            before = hashlib.sha256(Path(self.executable).read_bytes()).hexdigest()
             version = subprocess.run([self.executable, "--version"], env=self.environment, capture_output=True,
                                      timeout=30, check=True).stdout.decode().strip()
+            after = hashlib.sha256(Path(self.executable).read_bytes()).hexdigest()
+            if before != after:
+                self.failed = True
+                raise ValueError("The Claude Code binary changed during version verification; revalidate before running on it")
             if version != PINNED_CLI:
                 raise ValueError("Revalidate isolation flags and the stream-json protocol before changing the pinned CLI")
             self._verified_version = version
+            self._verified_sha256 = after
         return self._verified_version
+
+    def _unchanged_executable(self):
+        """The binary's hash now, refusing (and closing admission) if it is not the one whose version was verified.
+
+        The version is read once, but Claude Code updates itself in place: during the E-4 c3 run 2.1.316 was replaced
+        by 2.1.317 after 50 of 975 calls, and the other 925 ran on an unverified binary whose canary reads 47 tokens
+        higher. Hashing before every call catches that at the first call it would affect.
+        """
+        digest = hashlib.sha256(Path(self.executable).read_bytes()).hexdigest()
+        if self._verified_sha256 is None:
+            self._verified_sha256 = digest
+        if digest != self._verified_sha256:
+            self.failed = True
+            raise ValueError("The Claude Code binary changed after its version was verified (%s -> %s); "
+                             "revalidate before running on it" % (self._verified_sha256[:12], digest[:12]))
+        return digest
 
     def _generate(self, system_message, messages, raw_prompt=None):
         if self.failed or self.calls >= self.max_calls:
@@ -351,13 +379,14 @@ class ClaudeTransport:
         if len(prompt.encode("utf-8")) > MAX_TEXT:
             raise ValueError("Prompt exceeds 64 KiB")
         version = self._version()
+        executable_sha256 = self._unchanged_executable()
         directory = self.evidence / str(self.calls)
         directory.mkdir(exist_ok=False)
         self.calls += 1
         (directory / "prompt.txt").write_text(prompt, encoding="utf-8")
         receipt = dict(requested_model=self.model, resolved_model=None, cli=version, auth="subscription", status="failed",
                        unknown_usage=True, canary=raw_prompt is not None,
-                       executable_sha256=hashlib.sha256(Path(self.executable).read_bytes()).hexdigest(),
+                       executable_sha256=executable_sha256,
                        prompt_sha256=hashlib.sha256(prompt.encode("utf-8")).hexdigest(),
                        api_key_calls=0, monetary_cost=None,
                        cost_note="Subscription access; the CLI's list-price estimate is not a monetary cost")
