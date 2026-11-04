@@ -42,6 +42,24 @@ public sealed partial class ProgramEvolutionTask : IRebasingEvolutionTask<Progra
     private readonly ProgramTaskOptions _options;
     private readonly EvolveBlockMarkers _markers;
 
+    /// <summary>Initializes a program-evolution task whose relative descriptors keep the references they were built
+    /// with.</summary>
+    /// <param name="evaluator">The evaluator that scores candidates.</param>
+    /// <param name="descriptors">The descriptors that place candidates in the archive; <c>null</c> means none.</param>
+    /// <param name="options">Program bounds and evolve-block settings; <c>null</c> uses the defaults.</param>
+    /// <param name="id">A stable task identifier.</param>
+    /// <remarks>Kept for binary compatibility with callers built before the <c>rebase</c> parameter existed.</remarks>
+    /// <exception cref="ArgumentNullException"><paramref name="evaluator"/> is <c>null</c>.</exception>
+    /// <exception cref="ArgumentException"><paramref name="id"/> is empty or white space, or <paramref name="options"/> is invalid.</exception>
+    public ProgramEvolutionTask(
+        IProgramFitnessEvaluator evaluator,
+        ProgramDescriptorSet? descriptors,
+        ProgramTaskOptions? options,
+        string id)
+        : this(evaluator, descriptors, options, id, rebase: null)
+    {
+    }
+
     /// <summary>Initializes a program-evolution task.</summary>
     /// <param name="evaluator">The evaluator that scores candidates.</param>
     /// <param name="descriptors">The descriptors that place candidates in the archive; <c>null</c> means none.</param>

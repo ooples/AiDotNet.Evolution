@@ -130,6 +130,20 @@ public sealed class ProgramDescriptorRebaseTests
         Assert.Throws<ArgumentOutOfRangeException>(() => ProgramTask(new ProgramDescriptorRebaseOptions { Mode = (ProgramDescriptorRebaseMode)5 }));
     }
 
+    [Fact]
+    public void The_constructor_without_a_rebase_policy_builds_the_same_task_as_a_null_policy()
+    {
+        // Binds to the four-parameter overload kept for callers built against the package before 'rebase' existed.
+        var set = new ProgramDescriptorSet(new ProgramLengthDescriptor(),
+            new ProgramDiversityDescriptor(new[] { new ProgramGenome("seed = 0\n", ProgramLanguage.Python) }));
+        var options = new ProgramTaskOptions { Language = ProgramLanguage.Python };
+        var compat = new ProgramEvolutionTask(new FixedEvaluator(), set, options, "compat");
+        var explicitNull = new ProgramEvolutionTask(new FixedEvaluator(), set, options, "compat", rebase: null);
+
+        Assert.Equal(("compat", false), (compat.Id, compat.RebasesDescriptors));
+        Assert.Equal(explicitNull.VersionHash, compat.VersionHash);
+    }
+
     // ---- helpers ----------------------------------------------------------------------------------------------
 
     private static string Trim(string source) => source.TrimEnd('\n');

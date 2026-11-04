@@ -1965,6 +1965,7 @@ AiDotNet.Evolution.Programs.ProgramDescriptorRebaseOptions.Validated() -> AiDotN
 AiDotNet.Evolution.Programs.ProgramEvolutionTask.CaptureRebaseState() -> string!
 AiDotNet.Evolution.Programs.ProgramEvolutionTask.MeasureRebasable(AiDotNet.Evolution.Programs.ProgramGenome! genome) -> System.Collections.Generic.IReadOnlyDictionary<string!, double>!
 AiDotNet.Evolution.Programs.ProgramEvolutionTask.ProgramEvolutionTask(AiDotNet.Evolution.Programs.IProgramFitnessEvaluator! evaluator, AiDotNet.Evolution.Programs.ProgramDescriptorSet? descriptors = null, AiDotNet.Evolution.Programs.ProgramTaskOptions? options = null, string! id = "program-evolution", AiDotNet.Evolution.Programs.ProgramDescriptorRebaseOptions? rebase = null) -> void
+AiDotNet.Evolution.Programs.ProgramEvolutionTask.ProgramEvolutionTask(AiDotNet.Evolution.Programs.IProgramFitnessEvaluator! evaluator, AiDotNet.Evolution.Programs.ProgramDescriptorSet? descriptors, AiDotNet.Evolution.Programs.ProgramTaskOptions? options, string! id) -> void
 AiDotNet.Evolution.Programs.ProgramEvolutionTask.RebaseReferences.get -> System.Collections.Generic.IReadOnlyList<string!>!
 AiDotNet.Evolution.Programs.ProgramEvolutionTask.RebasesDescriptors.get -> bool
 AiDotNet.Evolution.Programs.ProgramEvolutionTask.RestoreRebaseState(string! state) -> void
