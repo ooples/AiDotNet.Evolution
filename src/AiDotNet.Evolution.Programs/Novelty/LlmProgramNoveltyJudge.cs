@@ -83,7 +83,7 @@ public sealed class LlmProgramNoveltyJudge : IProgramNoveltyJudge
         Temperature = temperature;
         MaxOutputTokens = maxOutputTokens;
         Id = id.Trim();
-        _versionHash = EvolutionHash.Combine(new[] { "program-novelty-judge-v2", _modelId, SystemMessage,
+        _versionHash = EvolutionHash.Combine(new[] { "program-novelty-judge-v3", _modelId, SystemMessage,
             Newtonsoft.Json.JsonConvert.SerializeObject(new { maxProgramBytes, temperature, maxOutputTokens, MaxResponseChars }) });
     }
 
@@ -180,8 +180,11 @@ public sealed class LlmProgramNoveltyJudge : IProgramNoveltyJudge
         string language = candidate.Language.ToString().ToLowerInvariant();
         string existing = PromptTextRedactor.RedactAndBound(
             incumbent.Source, MaxProgramBytes, TruncationNotice, out bool existingTruncated);
-        string proposed = PromptTextRedactor.RedactAndBound(
+        string proposedRaw = PromptTextRedactor.RedactAndBound(
             candidate.Source, MaxProgramBytes, TruncationNotice, out bool proposedTruncated);
+        string proposed = CompressProposedAgainstExisting(existing, proposedRaw);
+        if (System.Text.Encoding.UTF8.GetByteCount(proposed) > MaxProgramBytes)
+            proposed = proposedRaw;
 
         var builder = new System.Text.StringBuilder();
         builder.Append("Compare these two programs.\n\n**EXISTING CODE:**\n```").Append(incumbent.Language.ToString().ToLowerInvariant()).Append('\n')
@@ -198,6 +201,10 @@ public sealed class LlmProgramNoveltyJudge : IProgramNoveltyJudge
         builder.Append("Is the proposed program meaningfully different? Answer NOVEL or NOT_NOVEL first.");
         return builder.ToString();
     }
+
+    private static string CompressProposedAgainstExisting(string existingSource, string proposedSource)
+        => ProgramSourceCompression.Compress(existingSource, proposedSource, "existing code");
+
 
     private ProgramChatOptions BuildChatOptions(ProgramGenome candidate, ProgramGenome incumbent) => new()
     {

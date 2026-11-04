@@ -122,4 +122,28 @@ public sealed class LlmProgramNoveltyJudgeTests
         Assert.Throws<ArgumentOutOfRangeException>(() =>
             new LlmProgramNoveltyJudge(client, temperature: 3.0));
     }
+
+    [Fact]
+    public async Task JudgeElidesUnchangedMultiLineSpansInProposedCodeAgainstExistingCode()
+    {
+        var client = new FakeChatClient("NOVEL: modified return line.");
+        var judge = new LlmProgramNoveltyJudge(client);
+
+        string sharedBlock =
+            "def solve(x):\n" +
+            "    a = x + 1\n" +
+            "    b = a * 2\n" +
+            "    c = b - 3\n" +
+            "    d = c * 4\n" +
+            "    e = d + 5\n";
+        var incumbent = new ProgramGenome(sharedBlock + "    return e\n");
+        var candidate = new ProgramGenome(sharedBlock + "    return e * 2\n");
+
+        ProgramNoveltyVerdict verdict = await judge.JudgeAsync(candidate, incumbent);
+
+        Assert.Equal(ProgramNoveltyVerdict.Novel, verdict);
+        string prompt = string.Join("\n", client.Conversations[0].Select(message => message.Text));
+        Assert.Contains("lines unchanged from existing code", prompt, StringComparison.Ordinal);
+        Assert.Contains("return e * 2", prompt, StringComparison.Ordinal);
+    }
 }

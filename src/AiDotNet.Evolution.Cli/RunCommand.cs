@@ -115,6 +115,7 @@ internal sealed class RunPrompt
     public ProgramPromptSystemMessageMode SystemMessageMode { get; init; } = ProgramPromptSystemMessageMode.TemplateKey;
     public string? EvaluatorSystemMessage { get; init; }
     public bool ProgramsAsChangesDescription { get; init; }
+    public bool? CompressExamplesAgainstParent { get; init; }
     public string? InitialChangesDescription { get; init; }
     /// <summary>Replaces the changes-description system text (OpenEvolve's <c>prompt.system_message_changes_description</c>).</summary>
     public string? SystemMessageChangesDescription { get; init; }
@@ -369,6 +370,8 @@ internal sealed class RunModel
     public decimal? MaxBudgetUsd { get; init; }
     /// <summary>The Claude Code executable; <c>claude</c> on PATH when null.</summary>
     public string? ClaudeExecutable { get; init; }
+    /// <summary>Registers <c>@ooples/token-optimizer-mcp</c> inside an isolated Claude Code invocation when true.</summary>
+    public bool UseTokenOptimizer { get; init; }
     /// <summary>The manual provider's queue directory, relative to the run file.</summary>
     public string? ManualQueue { get; init; }
     public int ManualTimeoutSeconds { get; init; } = 3600;
@@ -966,6 +969,7 @@ internal static class RunCommand
         if (source.SystemMessage is { } system) { prompt.SystemMessage = system; prompt.SystemMessageMode = source.SystemMessageMode; }
         if (source.EvaluatorSystemMessage is { } evaluatorSystem) prompt.EvaluatorSystemMessage = evaluatorSystem;
         prompt.ProgramsAsChangesDescription = source.ProgramsAsChangesDescription;
+        if (source.CompressExamplesAgainstParent is bool compressExamples) prompt.CompressExamplesAgainstParent = compressExamples;
         if (source.InitialChangesDescription is { } initial) prompt.InitialChangesDescription = initial;
         if (source.SystemMessageChangesDescription is { } changesSystem)
             prompt.TemplateOverrides[ProgramPromptTemplateKey.SystemMessageChangesDescription] = changesSystem;
@@ -1251,7 +1255,8 @@ internal static class RunCommand
                     MaxBudgetUsd = model.MaxBudgetUsd,
                     Timeout = TimeSpan.FromSeconds(model.TimeoutSeconds),
                     MaxRetries = model.MaxRetries,
-                    RetryDelay = TimeSpan.FromSeconds(model.RetryDelaySeconds)
+                    RetryDelay = TimeSpan.FromSeconds(model.RetryDelaySeconds),
+                    UseTokenOptimizer = model.UseTokenOptimizer
                 });
             case ModelProvider.Manual:
                 return new ManualProgramChatClient(Path.Combine(baseDirectory, model.ManualQueue ?? "manual-queue"),

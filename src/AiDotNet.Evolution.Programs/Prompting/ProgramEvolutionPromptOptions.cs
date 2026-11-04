@@ -72,6 +72,22 @@ public sealed class ProgramEvolutionPromptOptions
     /// </remarks>
     public bool ProgramsAsChangesDescription { get; set; }
 
+    /// <summary>
+    /// Gets or sets whether example programs (top programs, diverse programs, and inspirations) elide multi-line spans
+    /// that are identical to the current parent program, reducing prompt input tokens when examples share boilerplate.
+    /// </summary>
+    /// <remarks>
+    /// <para>
+    /// In typical program-evolution runs, the three top programs, two diverse programs, and inspirations share imports,
+    /// helper functions, and non-evolved scaffolding with the parent program being mutated. When enabled, unchanged
+    /// spans of four or more lines between an example and the current parent are replaced with a compact
+    /// <c># ... (N lines unchanged from current program) ...</c> marker whenever doing so shortens the snippet,
+    /// preserving the exact lines that differ plus one line of surrounding context.
+    /// </para>
+    /// <para>Off by default so existing prompt identities and exact-replay hashes remain unchanged unless opted in.</para>
+    /// </remarks>
+    public bool CompressExamplesAgainstParent { get; set; }
+
     /// <summary>Gets or sets the description given to a program that has none yet; <c>null</c> means none.</summary>
     /// <remarks>
     /// <para>
@@ -238,6 +254,7 @@ public sealed class ProgramEvolutionPromptOptions
             TaskDescription = TaskDescription,
             EvolutionMode = EvolutionMode,
             ProgramsAsChangesDescription = ProgramsAsChangesDescription,
+            CompressExamplesAgainstParent = CompressExamplesAgainstParent,
             InitialChangesDescription = InitialChangesDescription,
             AutoFullRewriteBelowChars = AutoFullRewriteBelowChars,
             NumTopPrograms = NumTopPrograms,

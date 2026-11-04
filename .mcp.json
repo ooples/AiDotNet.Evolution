@@ -1,0 +1,16 @@
+{
+  "mcpServers": {
+    "token-optimizer": {
+      "command": "npx",
+      "args": [
+        "-y",
+        "@ooples/token-optimizer-mcp@7.8.0"
+      ],
+      "env": {
+        "TOKEN_OPTIMIZER_POSTURE": "lean",
+        "TOKEN_OPTIMIZER_COMPRESSION": "aggressive",
+        "TOKEN_OPTIMIZER_MODE": "enforce"
+      }
+    }
+  }
+}

@@ -1,0 +1,10 @@
+# Ignore multi-megabyte benchmark receipt/evidence dumps and build artifacts during unbounded token-optimizer scans
+benchmarks/evidence/**/receipts*.json
+benchmarks/evidence/**/raw.json.gz
+benchmarks/evidence/**/*.jsonl
+docs/benchmarks/*.json
+docs/benchmarks/**/*.json
+.local/
+TestResults/
+bin/
+obj/
