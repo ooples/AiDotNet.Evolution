@@ -521,7 +521,7 @@ public sealed class LlmProgramVariationOperator : IOutcomeAwareVariationOperator
     {
         if (context.Archive is not { } archive) return;
 
-        int topCount = _variationOptions.MaxTopPrograms;
+        int topCount = TopProgramsToFetch(_variationOptions.MaxTopPrograms, _promptBuilder.GetPromptOptions());
         if (topCount > 0)
         {
             bool maximize = archive.Direction == EvolutionOptimizationDirection.Maximize;
@@ -1354,6 +1354,17 @@ public sealed class LlmProgramVariationOperator : IOutcomeAwareVariationOperator
         };
     }
 
+    /// <summary>How many of the island's strongest programs the prompt is handed.</summary>
+    /// <remarks>
+    /// The prompt quotes the first <see cref="ProgramEvolutionPromptOptions.NumTopPrograms"/> as top programs and draws
+    /// up to <see cref="ProgramEvolutionPromptOptions.NumDiversePrograms"/> at random from the rest, as OpenEvolve does
+    /// from its <c>num_top_programs + num_diverse_programs</c> island leaders. Handing over only
+    /// <see cref="LlmProgramVariationOptions.MaxTopPrograms"/> left that remainder empty whenever the two counts were
+    /// equal, which they are by default, so the diverse section never appeared. Zero still hands over none.
+    /// </remarks>
+    internal static int TopProgramsToFetch(int maxTopPrograms, ProgramEvolutionPromptOptions prompt) =>
+        maxTopPrograms <= 0 ? 0 : Math.Max(maxTopPrograms, prompt.NumTopPrograms + prompt.NumDiversePrograms);
+
     private static ProgramEvolutionPromptOptions DerivePromptOptions(
         ProgramProposalOptions programOptions,
         LlmProgramVariationOptions variationOptions)
@@ -1436,7 +1447,7 @@ public sealed class LlmProgramVariationOperator : IOutcomeAwareVariationOperator
     {
         var components = new List<string>
         {
-            "llm-program-variation-v6-standalone-bounded-provider",
+            "llm-program-variation-v7-top-plus-diverse",
             programOptions.Language.ToString(),
             programOptions.ResolveEvolveBlockMarkers().Start,
             programOptions.ResolveEvolveBlockMarkers().End,

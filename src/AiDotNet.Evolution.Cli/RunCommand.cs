@@ -540,6 +540,14 @@ internal static class RunCommand
                 new ProgramPromptBuilder(judgePrompt, programOptions), feedbackOptions);
         }
         var task = CreateTask(fitness, programOptions, run.Search, initial, run.Language);
+        // Program length stands for OpenEvolve's built-in "complexity" axis. Configured descriptors replace it, as
+        // OpenEvolve's feature_dimensions replace its defaults; "length" among them keeps it. Length bins follow the
+        // lengths the search produces unless the run file says otherwise: a fixed 0-to-maxProgramChars range put every
+        // program of E-4's third pilot (400-550 characters of 10,000) in one cell.
+        EvolutionDescriptorDefinition[] descriptors = (run.Search.MetricDescriptors.Count == 0
+                ? new List<RunMetricDescriptor> { new() { Name = "length", Bins = 64 } }
+                : run.Search.MetricDescriptors)
+            .Select(metric => metric.ToDefinition(run.Budget.MaxProgramChars)).ToArray();
         var variationOptions = new LlmProgramVariationOptions
         {
             Mode = run.Mode,
@@ -549,6 +557,7 @@ internal static class RunCommand
             MaxOutputTokens = run.Model.MaxOutputTokens
         };
         if (run.Search.TopPrograms is int topPrograms) variationOptions.MaxTopPrograms = topPrograms;
+        ApplyFeatureDimensions(variationOptions, descriptors);
         // Instruction evolution, when configured. The observer is both halves: the operator's instruction
         // source and the engine's outcome listener, because an instruction can only be scored by what the
         // programs it produced achieved - see ProgramInstructionCreditObserver.
@@ -579,14 +588,6 @@ internal static class RunCommand
         }
 
         var variation = new LlmProgramVariationOperator(model, programOptions, variationOptions);
-        // Program length stands for OpenEvolve's built-in "complexity" axis. Configured descriptors replace it, as
-        // OpenEvolve's feature_dimensions replace its defaults; "length" among them keeps it. Length bins follow the
-        // lengths the search produces unless the run file says otherwise: a fixed 0-to-maxProgramChars range put every
-        // program of E-4's third pilot (400-550 characters of 10,000) in one cell.
-        EvolutionDescriptorDefinition[] descriptors = (run.Search.MetricDescriptors.Count == 0
-                ? new List<RunMetricDescriptor> { new() { Name = "length", Bins = 64 } }
-                : run.Search.MetricDescriptors)
-            .Select(metric => metric.ToDefinition(run.Budget.MaxProgramChars)).ToArray();
         var codec = new ProgramGenomeCodec();
         EvolutionReuseScope scope = Scope(task, codec, run);
 
@@ -841,6 +842,17 @@ internal static class RunCommand
             rebase = own;
         }
         return new ProgramEvolutionTask(fitness, new ProgramDescriptorSet(descriptors), programOptions, rebase: rebase);
+    }
+
+    /// <summary>Names the archive's axes to the prompt, in the order the archive declares them.</summary>
+    /// <remarks>
+    /// OpenEvolve's prompt says which dimensions the search keeps diverse (its <c>feature_dimensions</c>). Without the
+    /// names the prompt said "none" and could not place the parent on the grid, however many axes the archive had.
+    /// </remarks>
+    internal static void ApplyFeatureDimensions(LlmProgramVariationOptions options, IReadOnlyList<EvolutionDescriptorDefinition> descriptors)
+    {
+        options.FeatureDimensions = descriptors.Select(descriptor => descriptor.Name).ToList();
+        options.FeatureBinCounts = descriptors.Select(descriptor => descriptor.BinCount).ToList();
     }
 
     /// <summary>Applies the run file's parent-selection settings; any ratio switches on the ratio policy.</summary>

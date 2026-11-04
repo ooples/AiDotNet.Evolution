@@ -147,6 +147,11 @@ public sealed class LlmProgramVariationOptions
     /// <summary>Gets or sets how many of the archive's strongest programs are quoted into the prompt; 0 quotes none.</summary>
     /// <remarks>
     /// <para>
+    /// The operator hands the prompt at least the prompt options' <c>NumTopPrograms + NumDiversePrograms</c> leaders,
+    /// so the prompt can quote its top programs and draw its diverse ones from the rest; this value raises that count
+    /// but never lowers it, except that 0 quotes none.
+    /// </para>
+    /// <para>
     /// These are the leaders of the whole island, chosen by quality, where <see cref="MaxInspirations"/> quotes what
     /// the selection policy picked, which is deliberately a mix of strong and distant candidates. Quoting both gives
     /// the model something to beat as well as something to vary from. Requires the engine to have supplied an

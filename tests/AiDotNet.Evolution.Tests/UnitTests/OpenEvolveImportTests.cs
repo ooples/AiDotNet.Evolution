@@ -1279,5 +1279,57 @@ public sealed class OpenEvolveImportTests
             Environment.SetEnvironmentVariable("OPENAI_API_KEY", previousKey);
         }
     }
+
+    [Fact]
+    public void An_imported_run_names_the_archive_axes_in_its_prompts()
+    {
+        // E-4's c3 prompts said "diverse across these dimensions: none" where OpenEvolve's named its feature_dimensions.
+        using var directory = new TemporaryDirectory();
+        using var model = new CliRunTests.FakeChatModel();
+        File.WriteAllText(Path.Combine(directory.Path, "initial_program.py"), "X = 0\n");
+        File.WriteAllText(Path.Combine(directory.Path, "evaluator.py"), """
+            import re
+
+            def evaluate(path):
+                with open(path) as handle:
+                    return {"combined_score": float(int(re.search(r"X = (\d+)", handle.read()).group(1)))}
+            """);
+        File.WriteAllText(Path.Combine(directory.Path, "config.yaml"), $"""
+            max_iterations: 2
+            random_seed: 7
+            diff_based_evolution: false
+            llm:
+              api_base: {model.Endpoint}
+              models:
+                - name: fake-model
+              timeout: 20
+              retries: 0
+            database:
+              num_islands: 1
+              feature_dimensions: [complexity, diversity]
+            evaluator:
+              timeout: 30
+            """);
+        string output = Path.Combine(directory.Path, "out");
+
+        string? previousKey = Environment.GetEnvironmentVariable("OPENAI_API_KEY");
+        Environment.SetEnvironmentVariable("OPENAI_API_KEY", "unused-by-the-fake");
+        try
+        {
+            var (code, _, error) = CliRunTests.Run("run", "--openevolve-config", Path.Combine(directory.Path, "config.yaml"),
+                Path.Combine(directory.Path, "initial_program.py"), Path.Combine(directory.Path, "evaluator.py"),
+                "--python", Python, "--output", output, "--allow-unsandboxed-execution");
+
+            Assert.True(code == 0, error);
+            string prompts = string.Join("\n", model.Requests);
+            Assert.NotEmpty(model.Requests);
+            Assert.Contains("dimensions: length, diversity", prompts, StringComparison.Ordinal);
+            Assert.DoesNotContain("dimensions: none", prompts, StringComparison.Ordinal);
+        }
+        finally
+        {
+            Environment.SetEnvironmentVariable("OPENAI_API_KEY", previousKey);
+        }
+    }
 }
 #endif
