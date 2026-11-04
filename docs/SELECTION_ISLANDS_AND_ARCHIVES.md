@@ -29,6 +29,27 @@ Three optional interfaces let an archive survive a checkpoint:
 - `ICheckpointableParetoArchive<TGenome>` restores a Pareto archive's deployable and exploratory
   populations without mixing their admission rules.
 
+### Relative descriptors
+
+A descriptor such as program diversity measures a candidate against other candidates. Its reading changes whenever
+that reference set changes. A task with such descriptors implements `IRebasingEvolutionTask<TGenome>`:
+
+- `MeasureRebasable` gives the current reading for one genome.
+- `TryRebase` is called after every committed batch, with every island's entries, and may move the references.
+- `CaptureRebaseState` and `RestoreRebaseState` carry the references through a checkpoint.
+
+The engine keeps every archive consistent with one reading:
+
+- **At commit.** It overwrites each evaluation's relative descriptors with the current reading before filing it, so
+  a slow or cached result is filed like a fresh one.
+- **When `TryRebase` reports a change.** It re-measures every island through
+  `IRemeasurableEvolutionArchive<TGenome>.RemeasureEntries` (`MapElitesArchive<TGenome>` implements it). Then it
+  re-keys the cross-island elite index before the next parent is drawn.
+
+A rebasing task therefore requires remeasurable archives. The state is part of the checkpoint and of the
+deterministic state hash. A checkpoint written without it is refused for a rebasing task, and the reverse is refused
+too.
+
 ## Choosing parents
 
 A selection policy returns an `EvolutionSelection<TGenome>`: one parent entry and the inspiration

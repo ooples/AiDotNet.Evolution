@@ -149,7 +149,7 @@ public sealed class ProgramDiversityDescriptor : IRebasableProgramDescriptor
         return Distance(ProgramText.Normalize(first), ProgramText.Normalize(second));
     }
 
-    private static double Distance(string first, string second)
+    internal static double Distance(string first, string second)
     {
         if (string.Equals(first, second, StringComparison.Ordinal)) return 0;
 

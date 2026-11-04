@@ -882,6 +882,80 @@ public sealed class OpenEvolveImportTests
     public void Each_island_holds_its_share_of_the_population(int population, int islands, long grid, int expected) =>
         Assert.Equal(expected, RunCommand.IslandCapacity(new RunSearch { ArchiveCapacity = population, Islands = islands }, grid));
 
+    [Theory]
+    [InlineData("  diversity_reference_size: 7\n", 7)]
+    [InlineData("", 20)]
+    public void An_imported_diversity_axis_is_built_against_a_frozen_reference_set_of_the_configured_size(string sizeLine, int size)
+    {
+        // E-4's c3 pilot: the importer used to drop OpenEvolve's diversity axis, leaving a one-axis grid of ten cells.
+        using var directory = new TemporaryDirectory();
+        RunFile run = Import(directory, """
+            max_iterations: 5
+            llm:
+              api_base: http://localhost:9/v1
+              models:
+                - name: fast
+                  weight: 1.0
+            database:
+              feature_dimensions: [complexity, diversity]
+              feature_bins: 6
+            """ + "\n" + sizeLine).Run;
+
+        RunMetricDescriptor diversity = run.Search.MetricDescriptors.Single(d => d.Name == "diversity");
+        Assert.Equal((6, EvolutionDescriptorBinning.AdaptiveMinMax, ProgramDescriptorRebaseMode.Frozen, size),
+            (diversity.Bins, diversity.Binning, diversity.Reference, diversity.ReferenceSize));
+        Assert.Equal(new[] { "length", "diversity" }, run.Search.MetricDescriptors.Select(d => d.Name));
+
+        ProgramEvolutionTask task = RunCommand.CreateTask(new ConstantFitness(), new ProgramTaskOptions(), run.Search, "X = 0\n",
+            ProgramLanguage.Python);
+        Assert.True(task.RebasesDescriptors);
+        Assert.Equal(new[] { "length", "diversity" }, task.Descriptors.Names);
+        // Until the first pick, diversity is measured against the seed: the seed itself is at distance zero.
+        Assert.Equal(0, task.MeasureRebasable(new ProgramGenome("X = 0\n", ProgramLanguage.Python))["diversity"]);
+        Assert.True(task.MeasureRebasable(new ProgramGenome("Y = 12345\nZ = 1\n", ProgramLanguage.Python))["diversity"] > 0);
+    }
+
+    [Fact]
+    public void A_run_file_without_a_diversity_axis_builds_a_task_that_never_rebases()
+    {
+        ProgramEvolutionTask task = RunCommand.CreateTask(new ConstantFitness(), new ProgramTaskOptions(),
+            new RunSearch { MetricDescriptors = { new RunMetricDescriptor { Name = "length" } } }, "X = 0\n", ProgramLanguage.Python);
+        Assert.False(task.RebasesDescriptors);
+        Assert.Equal(new[] { "length" }, task.Descriptors.Names);
+    }
+
+    [Fact]
+    public void Reference_settings_are_checked_and_defaulted_per_axis()
+    {
+        Assert.Null(new RunMetricDescriptor { Name = "accuracy" }.RebaseOptions());
+        Assert.Throws<ArgumentException>(() => new RunMetricDescriptor { Name = "accuracy", ReferenceSize = 5 }.RebaseOptions());
+        Assert.Throws<ArgumentException>(() => new RunMetricDescriptor { Name = "length", Reference = ProgramDescriptorRebaseMode.Frozen }.RebaseOptions());
+        Assert.Throws<ArgumentException>(() => new RunMetricDescriptor { Name = "accuracy", RebaseInterval = 5 }.RebaseOptions());
+        Assert.Throws<ArgumentException>(() => new RunMetricDescriptor { Name = "diversity", RebaseInterval = 5 }.RebaseOptions());
+        Assert.Throws<ArgumentOutOfRangeException>(() => new RunMetricDescriptor { Name = "diversity", ReferenceSize = 0 }.RebaseOptions());
+
+        ProgramDescriptorRebaseOptions defaults = new RunMetricDescriptor { Name = "diversity" }.RebaseOptions()!;
+        Assert.Equal((ProgramDescriptorRebaseMode.Frozen, 20, 20), (defaults.Mode, defaults.ReferenceSize, defaults.Interval));
+        ProgramDescriptorRebaseOptions periodic = new RunMetricDescriptor
+        {
+            Name = "diversity", Reference = ProgramDescriptorRebaseMode.Periodic, ReferenceSize = 8
+        }.RebaseOptions()!;
+        Assert.Equal((ProgramDescriptorRebaseMode.Periodic, 8, 8), (periodic.Mode, periodic.ReferenceSize, periodic.Interval));
+        Assert.Equal(30, new RunMetricDescriptor
+        {
+            Name = "diversity", Reference = ProgramDescriptorRebaseMode.Periodic, RebaseInterval = 30
+        }.RebaseOptions()!.Interval);
+    }
+
+    private sealed class ConstantFitness : IProgramFitnessEvaluator
+    {
+        public string Id => "constant";
+        public string VersionHash => "constant-v1";
+        public ValueTask<EvolutionTaskResult> EvaluateAsync(ProgramGenome candidate, EvolutionEvaluationContext context,
+            CancellationToken cancellationToken = default) =>
+            new(new EvolutionTaskResult(EvolutionEvaluationStatus.Completed, 0.5));
+    }
+
     private static OpenEvolveImport Import(TemporaryDirectory directory, string yaml, string? python = null)
     {
         string config = Path.Combine(directory.Path, "config.yaml");

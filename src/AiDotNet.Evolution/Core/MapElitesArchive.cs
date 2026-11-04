@@ -40,7 +40,8 @@ namespace AiDotNet.Evolution;
 public sealed class MapElitesArchive<TGenome> :
     IGrowableEvolutionArchive<TGenome>,
     IEvolutionArchiveMutationSource<TGenome>,
-    IEvolutionIndexedArchive<TGenome>
+    IEvolutionIndexedArchive<TGenome>,
+    IRemeasurableEvolutionArchive<TGenome>
 {
     private readonly EvolutionDescriptorDefinition[] _descriptors;
     private readonly EvolutionDescriptorDefinition[] _configuredDescriptors;
@@ -515,6 +516,19 @@ public sealed class MapElitesArchive<TGenome> :
     public int Remeasure(Func<TGenome, IReadOnlyDictionary<string, double>?> measure)
     {
         Guard.NotNull(measure);
+        return RemeasureEntries(entry => measure(entry.Candidate.CanonicalGenome.Genome));
+    }
+
+    /// <summary>Re-measures every elite from its whole entry and re-files the archive.</summary>
+    /// <param name="measure">
+    /// Produces an elite's complete replacement descriptor values from its entry, which carries the values it was filed
+    /// with, so a caller can replace some axes and keep the rest; <see langword="null"/> keeps its existing values. The
+    /// same contract as the genome overload applies.
+    /// </param>
+    /// <returns>How many elites remain after deterministic collision resolution.</returns>
+    public int RemeasureEntries(Func<EvolutionArchiveEntry<TGenome>, IReadOnlyDictionary<string, double>?> measure)
+    {
+        Guard.NotNull(measure);
         if (_cells.Count == 0) return 0;
 
         EvolutionArchiveEntry<TGenome>[] ordered = _cells.Values
@@ -526,8 +540,7 @@ public sealed class MapElitesArchive<TGenome> :
         // EvolutionEvaluation's constructor and guarantees callback failure has no observable archive side effect.
         for (int index = 0; index < ordered.Length; index++)
         {
-            IReadOnlyDictionary<string, double>? values =
-                measure(ordered[index].Candidate.CanonicalGenome.Genome);
+            IReadOnlyDictionary<string, double>? values = measure(ordered[index]);
             if (values is not null) replacements[index] = ordered[index].Evaluation.WithDescriptors(values);
         }
 

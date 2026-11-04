@@ -114,6 +114,15 @@ public sealed class EvolutionGlobalEliteIndex<TGenome>
         _ordered = null;
     }
 
+    /// <summary>Replaces every record, for an engine that has re-measured the archives the records came from.</summary>
+    internal void Replace(IEnumerable<EvolutionEliteRecord<TGenome>> records)
+    {
+        _records.Clear();
+        _genomeIds.Clear();
+        _ordered = null;
+        Restore(records);
+    }
+
     private sealed class RecordComparer : IComparer<EvolutionEliteRecord<TGenome>>
     {
         private readonly EvolutionOptimizationDirection _direction;

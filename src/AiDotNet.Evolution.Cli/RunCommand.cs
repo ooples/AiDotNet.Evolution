@@ -274,6 +274,41 @@ internal sealed class RunMetricDescriptor
     /// <summary>How a value outside the range is handled; <c>Reject</c> for a fixed <c>length</c> axis and
     /// <c>Clamp</c> otherwise when absent.</summary>
     public EvolutionOutOfRangePolicy? OutOfRange { get; init; }
+    /// <summary>For the built-in <c>diversity</c> axis only: when its reference set is picked from the population,
+    /// <c>Frozen</c> (once, OpenEvolve's behaviour) when absent, or <c>Periodic</c>.</summary>
+    public ProgramDescriptorRebaseMode? Reference { get; init; }
+    /// <summary>For <c>diversity</c>: how many programs the reference set holds (OpenEvolve's
+    /// <c>diversity_reference_size</c>); 20 when absent.</summary>
+    public int? ReferenceSize { get; init; }
+    /// <summary>For <c>diversity</c> with <c>Periodic</c> references: completed evaluations between picks; the
+    /// reference size when absent.</summary>
+    public int? RebaseInterval { get; init; }
+
+    /// <summary>The name of the built-in relative axis: a program's mean distance to a reference set of programs.</summary>
+    internal const string DiversityName = "diversity";
+
+    /// <summary>Whether the task measures this axis itself, rather than reading it from the evaluator's metrics.</summary>
+    internal bool IsBuiltIn => Name is "length" or DiversityName;
+
+    /// <summary>The rebase policy of a <c>diversity</c> axis; refuses the reference fields on any other axis.</summary>
+    internal ProgramDescriptorRebaseOptions? RebaseOptions()
+    {
+        if (Name != DiversityName)
+        {
+            if (Reference is not null || ReferenceSize is not null || RebaseInterval is not null)
+                throw new ArgumentException("reference, referenceSize and rebaseInterval apply only to the diversity axis.");
+            return null;
+        }
+        if (RebaseInterval is not null && Reference != ProgramDescriptorRebaseMode.Periodic)
+            throw new ArgumentException("rebaseInterval applies only to reference Periodic.");
+        int size = ReferenceSize ?? ProgramDescriptorRebaseOptions.DefaultReferenceSize;
+        return new ProgramDescriptorRebaseOptions
+        {
+            Mode = Reference ?? ProgramDescriptorRebaseMode.Frozen,
+            ReferenceSize = size,
+            Interval = RebaseInterval ?? size
+        }.Validated();
+    }
     /// <summary>How many observed values an <c>AdaptiveQuantile</c> axis keeps.</summary>
     public int SampleCapacity { get; init; } = EvolutionDescriptorDefinition.DefaultQuantileSampleCapacity;
 
@@ -282,7 +317,8 @@ internal sealed class RunMetricDescriptor
     internal EvolutionDescriptorDefinition ToDefinition(int maxProgramChars)
     {
         bool length = Name == "length";
-        EvolutionDescriptorBinning binning = Binning ?? (length
+        // A relative axis has no natural range either, so it adapts like length (OpenEvolve min-max scales both).
+        EvolutionDescriptorBinning binning = Binning ?? (length || Name == DiversityName
             ? EvolutionDescriptorBinning.AdaptiveMinMax
             : EvolutionDescriptorBinning.Linear);
         bool adaptive = binning is EvolutionDescriptorBinning.AdaptiveMinMax or EvolutionDescriptorBinning.AdaptiveQuantile;
@@ -462,7 +498,7 @@ internal static class RunCommand
             MaxProgramChars = run.Budget.MaxProgramChars
         };
         ApplyPrompt(run.Prompt, programOptions.Prompt, baseDirectory);
-        foreach (RunMetricDescriptor metric in run.Search.MetricDescriptors.Where(metric => metric.Name != "length"))
+        foreach (RunMetricDescriptor metric in run.Search.MetricDescriptors.Where(metric => !metric.IsBuiltIn))
             programOptions.MetricDescriptors.Add(metric.Name);
         IProgramFitnessEvaluator fitness = CreateFitness(run, execution, evaluator);
         if (run.LlmFeedback is { } feedback)
@@ -503,7 +539,7 @@ internal static class RunCommand
             fitness = new LlmJudgeProgramFitnessEvaluator(judge, fitness,
                 new ProgramPromptBuilder(judgePrompt, programOptions), feedbackOptions);
         }
-        var task = new ProgramEvolutionTask(fitness, new ProgramDescriptorSet(new[] { new ProgramLengthDescriptor() }), programOptions);
+        var task = CreateTask(fitness, programOptions, run.Search, initial, run.Language);
         var variationOptions = new LlmProgramVariationOptions
         {
             Mode = run.Mode,
@@ -787,6 +823,26 @@ internal static class RunCommand
     private const int MaxRepertoireSeeds = 256;
 
     /// <summary>The reuse identity of this run's programs. Facets the CLI cannot observe carry explicit versioned labels.</summary>
+    /// <summary>The program task: length always, and the built-in diversity axis when the run file declares it.</summary>
+    /// <remarks>
+    /// Diversity starts out measured against the seed program and, by its rebase policy, against a reference set picked
+    /// from the population from then on; the engine re-files the archives each time that set changes.
+    /// </remarks>
+    internal static ProgramEvolutionTask CreateTask(IProgramFitnessEvaluator fitness, ProgramTaskOptions programOptions,
+        RunSearch search, string initial, ProgramLanguage language)
+    {
+        var descriptors = new List<IProgramDescriptor> { new ProgramLengthDescriptor() };
+        ProgramDescriptorRebaseOptions? rebase = null;
+        foreach (RunMetricDescriptor metric in search.MetricDescriptors)
+        {
+            ProgramDescriptorRebaseOptions? own = metric.RebaseOptions();
+            if (own is null) continue;
+            descriptors.Add(new ProgramDiversityDescriptor(new[] { new ProgramGenome(initial, language) }, metric.Name));
+            rebase = own;
+        }
+        return new ProgramEvolutionTask(fitness, new ProgramDescriptorSet(descriptors), programOptions, rebase: rebase);
+    }
+
     /// <summary>Applies the run file's parent-selection settings; any ratio switches on the ratio policy.</summary>
     internal static void ApplySelection(RunSearch search, EvolutionEngineOptions options)
     {

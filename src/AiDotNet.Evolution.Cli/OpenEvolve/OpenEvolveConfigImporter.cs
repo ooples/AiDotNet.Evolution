@@ -369,16 +369,26 @@ internal static class OpenEvolveConfigImporter
             switch (Classify(dimension))
             {
                 case ReservedDimension.Diversity:
-                    notes.Add("database.feature_dimensions: OpenEvolve's population-relative 'diversity' axis has no deterministic " +
-                              "equivalent and is dropped.");
+                    // OpenEvolve's built-in: the mean fast code distance to up to diversity_reference_size programs, a
+                    // set it draws from the database once and then keeps. Reproduced with the same distance and size,
+                    // picked deterministically, and with the archive re-filed when the set is picked.
+                    descriptors.Add(new RunMetricDescriptor
+                    {
+                        Name = RunMetricDescriptor.DiversityName,
+                        Bins = Math.Max(1, count),
+                        Binning = EvolutionDescriptorBinning.AdaptiveMinMax,
+                        Reference = ProgramDescriptorRebaseMode.Frozen,
+                        ReferenceSize = (int)(Integer(merged["database.diversity_reference_size"])
+                                              ?? ProgramDescriptorRebaseOptions.DefaultReferenceSize)
+                    });
                     continue;
                 case ReservedDimension.Score:
                     // OpenEvolve's "score" axis is the fitness itself, not a metric the evaluator
                     // reports. Carrying the name through would demand a metric literally called
                     // "score" on every completed evaluation - which the 16 alphaevolve_math_problems
                     // configs that declare this axis do not report, since their evaluators return
-                    // combined_score - and the run would end with no candidates. Dropped by name, like
-                    // 'diversity', rather than mapped to something it is not.
+                    // combined_score - and the run would end with no candidates. Dropped by name rather
+                    // than mapped to something it is not.
                     notes.Add("database.feature_dimensions: OpenEvolve's 'score' axis is the fitness itself rather than a "
                               + "reported metric, and this archive has no quality axis to bin it on, so it is dropped. The "
                               + "remaining dimensions still apply.");
@@ -422,7 +432,7 @@ internal static class OpenEvolveConfigImporter
         /// <summary>"complexity": program length.</summary>
         Complexity,
 
-        /// <summary>"diversity": population-relative, with no deterministic equivalent.</summary>
+        /// <summary>"diversity": the mean code distance to a reference set drawn from the population.</summary>
         Diversity,
 
         /// <summary>"score": the fitness itself.</summary>
