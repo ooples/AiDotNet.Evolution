@@ -135,6 +135,28 @@ public sealed class PromptOptionBehaviourTests
     }
 
     [Fact]
+    public void Diagnostics_and_Artifacts_collapse_consecutive_duplicate_entries_to_save_tokens()
+    {
+        ProgramPromptContext context = Context();
+        context.Diagnostics = new List<EvolutionDiagnostic>
+        {
+            new("CS0103", "The name 'x' does not exist"),
+            new("CS0103", "The name 'x' does not exist"),
+            new("CS0103", "The name 'x' does not exist"),
+            new("CS1002", "semicolon expected")
+        };
+        context.Artifacts = new List<ProgramPromptArtifact>
+        {
+            new("stdout", "step warning: overflow\nstep warning: overflow\nstep warning: overflow\nstep warning: overflow\nstep warning: overflow\ndone")
+        };
+
+        string rendered = User(new ProgramEvolutionPromptOptions { MaxDiagnostics = 2 }, context);
+        Assert.Contains("- CS0103: The name 'x' does not exist (x3)", rendered);
+        Assert.Contains("- CS1002: semicolon expected", rendered);
+        Assert.Contains("... (line repeated 4 more times) ...", rendered);
+    }
+
+    [Fact]
     public void FragmentOverrides_replace_a_single_phrase()
     {
         var options = new ProgramEvolutionPromptOptions
