@@ -342,12 +342,17 @@ class ClaudeTransport:
 
     def _version(self):
         if self._verified_version is None:
+            before = hashlib.sha256(Path(self.executable).read_bytes()).hexdigest()
             version = subprocess.run([self.executable, "--version"], env=self.environment, capture_output=True,
                                      timeout=30, check=True).stdout.decode().strip()
+            after = hashlib.sha256(Path(self.executable).read_bytes()).hexdigest()
+            if before != after:
+                self.failed = True
+                raise ValueError("The Claude Code binary changed during version verification; revalidate before running on it")
             if version != PINNED_CLI:
                 raise ValueError("Revalidate isolation flags and the stream-json protocol before changing the pinned CLI")
             self._verified_version = version
-            self._verified_sha256 = hashlib.sha256(Path(self.executable).read_bytes()).hexdigest()
+            self._verified_sha256 = after
         return self._verified_version
 
     def _unchanged_executable(self):

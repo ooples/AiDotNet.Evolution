@@ -1,5 +1,6 @@
 """Contract tests. Only the opt-in live test (EVOLUTION_CLAUDE_EXECUTABLE) consumes subscription allowance."""
 import copy
+import hashlib
 import json
 import os
 from pathlib import Path
@@ -180,6 +181,40 @@ class IsolationTests(unittest.TestCase):
 
 
 class ReceiptTests(unittest.TestCase):
+    def test_replacement_during_version_verification_closes_admission(self):
+        with tempfile.TemporaryDirectory() as directory:
+            binary = Path(directory) / "claude.exe"
+            binary.write_bytes(b"version one")
+            transport = ClaudeTransport(str(binary), "haiku", Path(directory) / "e", 3)
+
+            def replace_during_check(*args, **kwargs):
+                binary.write_bytes(b"version two")
+                return subprocess.CompletedProcess([], 0, PINNED_CLI.encode(), b"")
+
+            with patch("claude_transport.subprocess.run", side_effect=replace_during_check), \
+                    patch("claude_transport.subprocess.Popen") as spawn:
+                with self.assertRaisesRegex(ValueError, "changed during version verification"):
+                    transport.generate("system", [])
+                spawn.assert_not_called()
+            self.assertTrue(transport.failed)
+            self.assertIsNone(transport._verified_version)
+            self.assertIsNone(transport._verified_sha256)
+            self.assertEqual(0, transport.calls)
+
+    def test_verified_version_caches_the_matching_binary_hash(self):
+        with tempfile.TemporaryDirectory() as directory:
+            binary = Path(directory) / "claude.exe"
+            binary.write_bytes(b"stable version")
+            transport = ClaudeTransport(str(binary), "haiku", Path(directory) / "e", 3)
+            result = subprocess.CompletedProcess([], 0, PINNED_CLI.encode(), b"")
+            with patch("claude_transport.subprocess.run", return_value=result) as run:
+                self.assertEqual(PINNED_CLI, transport._version())
+                self.assertEqual(PINNED_CLI, transport._version())
+                run.assert_called_once()
+            expected = hashlib.sha256(binary.read_bytes()).hexdigest()
+            self.assertEqual(expected, transport._verified_sha256)
+            self.assertEqual(expected, transport._unchanged_executable())
+
     def test_a_failed_spawn_still_leaves_a_failed_receipt(self):
         with tempfile.TemporaryDirectory() as directory:
             transport = ClaudeTransport(sys.executable, "haiku", Path(directory) / "e", 2)
