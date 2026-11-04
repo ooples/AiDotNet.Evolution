@@ -58,4 +58,19 @@
     </ItemGroup>
   </Target>
 
+  <!--
+    The NativeAOT compiler, pinned to a patched release. With PublishAot the SDK adds an implicit reference to the
+    ILCompiler version it bundles, and the bundled version can lag a security fix: SDK 10.0.403 still brings 8.0.32 and
+    10.0.13, which GHSA-p3jp-9v83-76w9 (CVE-2026-111497) flags, so every AOT project's restore fails with NU1903. An
+    explicit reference replaces the implicit one. Raise these with each servicing release; they must stay at or above
+    the SDK's own bundled versions. A framework not listed keeps the SDK's choice.
+  -->
+  <PropertyGroup Condition="'$(PublishAot)' == 'true'">
+    <EvoILCompilerVersion Condition="'$(TargetFramework)' == 'net8.0'">8.0.33</EvoILCompilerVersion>
+    <EvoILCompilerVersion Condition="'$(TargetFramework)' == 'net10.0'">10.0.14</EvoILCompilerVersion>
+  </PropertyGroup>
+  <ItemGroup Condition="'$(EvoILCompilerVersion)' != ''">
+    <PackageReference Include="Microsoft.DotNet.ILCompiler" Version="$(EvoILCompilerVersion)" />
+  </ItemGroup>
+
 </Project>
