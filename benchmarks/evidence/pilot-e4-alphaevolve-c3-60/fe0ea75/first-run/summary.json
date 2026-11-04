@@ -1,0 +1,80 @@
+{
+ "story": "E-4 (#347)",
+ "problems": [
+  "c3-autocorrelation"
+ ],
+ "stub": false,
+ "registration_sha256": "05255d69115f2315fcf403703a2f4ac6fe67e6d78acf805ce322c858737e6554",
+ "projection_sha256": "e23cbb5bd1ca9d678cb5caa80bbf03aa0ffedc30842d84a5d357d5e1b74a4c19",
+ "verifier_seals": {
+  "c3-autocorrelation": "12669dcc8b2653445f921ac358df0792a0e25f9781940920eeec32b1cc9b3e8f"
+ },
+ "iterations_per_cell": 60,
+ "construction_limit_seconds": 60,
+ "endpoint": "the verifier's score of the construction the search's own evaluation produced",
+ "libraries": {
+  "numpy": "2.5.4",
+  "scipy": "1.17.1"
+ },
+ "wall_seconds": 52936.6,
+ "cells": 18,
+ "statuses": {
+  "completed": 16,
+  "failed": 2
+ },
+ "model_calls": 974,
+ "model_tokens": 10095675,
+ "cells_with_unknown_spend": 0,
+ "canaries": {
+  "sonnet": 605
+ },
+ "hardware": "AMD Ryzen Threadripper 3990X 64-Core Processor; 128 logical processors; 96 GB memory; Windows 11 (AMD64); Python 3.14.6",
+ "receipt_coverage": {
+  "sonnet": 1.0
+ },
+ "endpoints": [
+  {
+   "Family": "c3-autocorrelation",
+   "Config": "recommended",
+   "Metric": "published_ratio",
+   "Direction": "maximize",
+   "N": 6,
+   "MeanDifference": -0.16834590286153128,
+   "Interval95": [
+    -0.49965697740563053,
+    -8.659818171826335e-05
+   ],
+   "OneSidedP": 0.9760239760239761,
+   "Failures": {
+    "aidotnet": 1,
+    "openevolve-recommended": 0
+   },
+   "HolmAdjustedP": 1.0,
+   "Superior": false
+  },
+  {
+   "Family": "c3-autocorrelation",
+   "Config": "matched",
+   "Metric": "published_ratio",
+   "Direction": "maximize",
+   "N": 6,
+   "MeanDifference": -0.0002929200714814617,
+   "Interval95": [
+    -0.0037678910420188747,
+    0.0038848361572865198
+   ],
+   "OneSidedP": 0.5824175824175825,
+   "Failures": {
+    "aidotnet": 1,
+    "openevolve-matched": 1
+   },
+   "HolmAdjustedP": 1.0,
+   "Superior": false
+  }
+ ],
+ "power_analysis": {
+  "Schema": "evolution-power-analysis-v1",
+  "Unachievable": "Required N exceeds the cap; a campaign that large is a plan to change, not to run",
+  "TargetHalfWidth": 0.002
+ }
+}

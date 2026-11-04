@@ -1,0 +1,2 @@
+2026-11-02T19:42:29-05:00 launching c3 re-pilot at the broker maximum: 60 iterations, 63-call cap, 3600 s wall, 6 seeds x 3 arms; harness fe0ea75 (frozen worktree); CLI frozen 7428bcd; half-width 0.002; maintainer approved (60 iterations, 63-call cap, $60 cap)
+2026-11-04T08:02:16-05:00 launching c3 supplement: rerun aidotnet/4035587021 and openevolve-matched/4035587021 (weekly-limit failures); harness e7ca811 (PR #370, frozen worktree), Claude Code 2.1.317 frozen copy F:/evo-pilot/claude-2.1.317.exe; same registration/projection; maintainer approved rerun within the $60 cap

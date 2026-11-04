@@ -1,0 +1,66 @@
+{
+ "Schema": "evolution-pilot-losses-v1",
+ "RegistrationSha256": "05255d69115f2315fcf403703a2f4ac6fe67e6d78acf805ce322c858737e6554",
+ "Endpoints": [
+  {
+   "Family": "c3-autocorrelation",
+   "Config": "recommended",
+   "Metric": "published_ratio",
+   "Direction": "maximize",
+   "ComparablePairs": 5,
+   "IncomparablePairs": 1,
+   "LostCells": 3,
+   "WorstMargin": 0.009834822957375922,
+   "Losses": [
+    {
+     "Seed": 2033491959,
+     "Ours": 0.985700212523169,
+     "Theirs": 0.9955350354805449,
+     "Margin": 0.009834822957375922
+    },
+    {
+     "Seed": 1529209595,
+     "Ours": 0.9885891150597552,
+     "Theirs": 0.9936795720985903,
+     "Margin": 0.005090457038835039
+    },
+    {
+     "Seed": 3312104218,
+     "Ours": 0.992796786197162,
+     "Theirs": 0.9975485812895784,
+     "Margin": 0.0047517950924163
+    }
+   ]
+  },
+  {
+   "Family": "c3-autocorrelation",
+   "Config": "matched",
+   "Metric": "published_ratio",
+   "Direction": "maximize",
+   "ComparablePairs": 5,
+   "IncomparablePairs": 1,
+   "LostCells": 3,
+   "WorstMargin": 0.0059619113976702165,
+   "Losses": [
+    {
+     "Seed": 2033491959,
+     "Ours": 0.985700212523169,
+     "Theirs": 0.9916621239208392,
+     "Margin": 0.0059619113976702165
+    },
+    {
+     "Seed": 1529209595,
+     "Ours": 0.9885891150597552,
+     "Theirs": 0.9924643475612328,
+     "Margin": 0.003875232501477588
+    },
+    {
+     "Seed": 3312104218,
+     "Ours": 0.992796786197162,
+     "Theirs": 0.9961360850125243,
+     "Margin": 0.0033392988153622127
+    }
+   ]
+  }
+ ]
+}
