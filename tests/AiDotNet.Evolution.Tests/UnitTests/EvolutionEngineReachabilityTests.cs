@@ -28,6 +28,36 @@ public sealed class EvolutionEngineReachabilityTests
         Assert.Contains(uniformParents, value => value < 30);
     }
 
+    [Theory]
+    [InlineData(EvolutionExploitationSource.GlobalTopK)]
+    [InlineData(EvolutionExploitationSource.IslandPreferredTopK)]
+    public async Task AnIndexBackedExploitationSourceGetsAnIndexAtTheDefaultCountAndResumesIt(EvolutionExploitationSource source)
+    {
+        EvolutionEngineOptions options = RatioOptions();
+        options.Selection.ExploitationSource = source;
+        options.Selection.ExploitationEliteCount = 3;
+        options.CheckpointInterval = 1;
+        Assert.Equal(0, options.GlobalEliteCount);
+        var store = new InMemoryEvolutionCheckpointStore();
+
+        EvolutionRunResult<TestGenome> first = await new EvolutionEngine<TestGenome>(new SyntheticEvolutionTask(),
+            new RecordingParentVariation(), _ => Archive(), options, checkpointStore: store, genomeCodec: new TestGenomeCodec())
+            .RunAsync(Seeds());
+        // The index holds the exploitation pool, so the configured source is the one that draws the parent.
+        Assert.Equal(3, first.GlobalElites.Count);
+
+        EvolutionEngineOptions resume = RatioOptions();
+        resume.Selection.ExploitationSource = source;
+        resume.Selection.ExploitationEliteCount = 3;
+        resume.CheckpointInterval = 1;
+        resume.MaxEvaluationAttempts = 20;
+        resume.Resume = true;
+        EvolutionRunResult<TestGenome> resumed = await new EvolutionEngine<TestGenome>(new SyntheticEvolutionTask(),
+            new RecordingParentVariation(), _ => Archive(), resume, checkpointStore: store, genomeCodec: new TestGenomeCodec())
+            .RunAsync(Seeds());
+        Assert.Equal(3, resumed.GlobalElites.Count);
+    }
+
     [Fact]
     public async Task AnExplicitlySuppliedSelectionPolicyWinsOverTheOptions()
     {

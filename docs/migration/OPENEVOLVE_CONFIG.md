@@ -285,7 +285,7 @@ any helper beside it, and each `openEvolveEvaluator.pythonPath` directory is mou
 | `database.archive_size` | Mapped | search.eliteArchiveSize, the global elite index, and the exploitation pool drawn from uniformly |
 | `database.num_islands` | Mapped | search.islands |
 | `database.elite_selection_ratio` | Mapped | search.topInspirations = max(1, int(num_diverse_programs x ratio)), OpenEvolve's top-program inspirations |
-| `database.exploration_ratio` | Mapped | search.explorationRatio; the remainder after exploitation becomes search.eliteRatio, drawn uniformly from every program (eliteBranch UniformGlobal) |
+| `database.exploration_ratio` | Mapped | search.explorationRatio; the remainder after exploitation becomes search.eliteRatio, drawn uniformly from the cross-island elite index of search.eliteArchiveSize entries, not every program (eliteBranch UniformGlobal) |
 | `database.exploitation_ratio` | Mapped | search.exploitationRatio |
 | `database.diversity_metric` | RefusedUnlessDefault | only OpenEvolve's default diversity metric name is accepted |
 | `database.feature_dimensions` | Mapped | search.metricDescriptors with adaptive min-max bins, as OpenEvolve scales features; complexity becomes program length, diversity the built-in diversity axis with a frozen reference set |

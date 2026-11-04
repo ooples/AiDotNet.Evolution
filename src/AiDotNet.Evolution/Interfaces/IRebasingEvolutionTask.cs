@@ -46,6 +46,13 @@ public interface IRebasingEvolutionTask<TGenome> : IEvolutionTask<TGenome>
 
     /// <summary>Restores a reading captured by <see cref="CaptureRebaseState"/>.</summary>
     /// <param name="state">The captured state.</param>
-    /// <exception cref="System.IO.InvalidDataException">The state is malformed or does not belong to this task.</exception>
-    void RestoreRebaseState(string state);
+    /// <param name="completedEvaluations">
+    /// The checkpoint's completed-evaluation count. A reading can never have been taken later than this, so a state
+    /// that claims otherwise is malformed.
+    /// </param>
+    /// <exception cref="System.IO.InvalidDataException">
+    /// The state is malformed, does not belong to this task, or records a reading later than
+    /// <paramref name="completedEvaluations"/>.
+    /// </exception>
+    void RestoreRebaseState(string state, long completedEvaluations);
 }

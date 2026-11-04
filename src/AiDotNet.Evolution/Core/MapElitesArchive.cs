@@ -425,6 +425,10 @@ public sealed class MapElitesArchive<TGenome> :
 
     /// <summary>Refits every adaptive axis to the supplied values, then rebins existing entries if any bin moved.</summary>
     /// <param name="descriptors">The named descriptor values about to be archived.</param>
+    /// <param name="previous">
+    /// The values the same elite was filed with before a remeasurement, or <see langword="null"/> for a new candidate.
+    /// An axis whose value is unchanged was already observed and is skipped.
+    /// </param>
     /// <returns>The entries a rebin displaced, or <c>null</c>.</returns>
     /// <remarks>
     /// Values are observed only when the candidate supplies a finite value for every axis, that is, only when it can
@@ -433,7 +437,9 @@ public sealed class MapElitesArchive<TGenome> :
     /// advances; entries are rebinned only when the bounds or edges changed. OpenEvolve, by contrast, leaves every
     /// program in the cell it was filed under when its range moves, so its cells drift out of step with its own bins.
     /// </remarks>
-    private List<EvolutionArchiveEntry<TGenome>>? ObserveAdaptive(IReadOnlyDictionary<string, double> descriptors)
+    private List<EvolutionArchiveEntry<TGenome>>? ObserveAdaptive(
+        IReadOnlyDictionary<string, double> descriptors,
+        IReadOnlyDictionary<string, double>? previous = null)
     {
         if (!_hasAdaptiveAxis) return null;
         foreach (EvolutionDescriptorDefinition definition in _descriptors)
@@ -447,7 +453,9 @@ public sealed class MapElitesArchive<TGenome> :
         {
             EvolutionDescriptorDefinition definition = _descriptors[axis];
             if (!definition.IsAdaptive) continue;
-            EvolutionDescriptorDefinition fitted = definition.Observe(descriptors[definition.Name]);
+            double observed = descriptors[definition.Name];
+            if (previous is not null && previous.TryGetValue(definition.Name, out double prior) && prior.Equals(observed)) continue;
+            EvolutionDescriptorDefinition fitted = definition.Observe(observed);
             rebin |= fitted.Minimum != definition.Minimum || fitted.Maximum != definition.Maximum ||
                 !fitted.Edges.SequenceEqual(definition.Edges);
             _descriptors[axis] = fitted;
@@ -516,7 +524,7 @@ public sealed class MapElitesArchive<TGenome> :
     public int Remeasure(Func<TGenome, IReadOnlyDictionary<string, double>?> measure)
     {
         Guard.NotNull(measure);
-        return RemeasureEntries(entry => measure(entry.Candidate.CanonicalGenome.Genome));
+        return RemeasureCore(entry => measure(entry.Candidate.CanonicalGenome.Genome), discardUnplaceable: false);
     }
 
     /// <summary>Re-measures every elite from its whole entry and re-files the archive.</summary>
@@ -526,9 +534,18 @@ public sealed class MapElitesArchive<TGenome> :
     /// same contract as the genome overload applies.
     /// </param>
     /// <returns>How many elites remain after deterministic collision resolution.</returns>
+    /// <remarks>
+    /// Unlike <see cref="Remeasure"/>, an elite whose replacement values no grid can place is discarded rather than
+    /// kept under its old values, so the archive never holds two readings at once.
+    /// </remarks>
     public int RemeasureEntries(Func<EvolutionArchiveEntry<TGenome>, IReadOnlyDictionary<string, double>?> measure)
     {
         Guard.NotNull(measure);
+        return RemeasureCore(measure, discardUnplaceable: true);
+    }
+
+    private int RemeasureCore(Func<EvolutionArchiveEntry<TGenome>, IReadOnlyDictionary<string, double>?> measure, bool discardUnplaceable)
+    {
         if (_cells.Count == 0) return 0;
 
         EvolutionArchiveEntry<TGenome>[] ordered = _cells.Values
@@ -551,21 +568,27 @@ public sealed class MapElitesArchive<TGenome> :
             _maximumGridCells)
         { _observes = false };
 
-        // Settle the final grid before filing anything. An unplaceable replacement keeps the old descriptors, but all
-        // entries are keyed against the same final bounds after every successful growth has been considered. A
-        // replacement is a new measurement, so an adaptive axis observes it; the elites themselves were observed when
-        // they first arrived.
+        // Settle the final grid before filing anything. An unplaceable replacement keeps the old descriptors (or, when
+        // discarding, drops the elite), but all entries are keyed against the same final bounds after every successful
+        // growth has been considered. A changed value is a new measurement, so an adaptive axis observes it; an
+        // unchanged one was observed when the elite first arrived and is not counted twice.
+        var discarded = new bool[ordered.Length];
         for (int index = 0; index < ordered.Length; index++)
         {
             EvolutionEvaluation? replacement = replacements[index];
             if (replacement is null) continue;
-            staged.ObserveAdaptive(replacement.Descriptors);
+            staged.ObserveAdaptive(replacement.Descriptors, ordered[index].Evaluation.Descriptors);
             staged.GrowToFit(replacement.Descriptors);
-            if (staged.TryCreateKey(replacement.Descriptors) is null) replacements[index] = null;
+            if (staged.TryCreateKey(replacement.Descriptors) is null)
+            {
+                replacements[index] = null;
+                discarded[index] = discardUnplaceable;
+            }
         }
 
         for (int index = 0; index < ordered.Length; index++)
         {
+            if (discarded[index]) continue;
             EvolutionArchiveEntry<TGenome> prior = ordered[index];
             EvolutionEvaluation evaluation = replacements[index] ?? prior.Evaluation;
             EvolutionArchiveInsertionResult outcome = staged.TryAdd(prior.Candidate, evaluation);

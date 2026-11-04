@@ -132,6 +132,83 @@ public sealed class DescriptorRebaseTests
         Assert.Equal(new[] { 2, 7 }, moved.Cell.Bins);
     }
 
+    [Fact]
+    public async Task Retained_history_holds_the_current_reading_after_a_rebase()
+    {
+        var store = new InMemoryEvolutionCheckpointStore();
+        var task = new AnchoredTask(interval: 4);
+        EvolutionEngineOptions options = Options(30, EvolutionDispatchMode.Batch);
+        options.HistorySize = 40;
+        EvolutionRunResult<TestGenome> result = await Run(task, options, store);
+
+        Assert.True(task.Rebases >= 3, "the anchor moved " + task.Rebases + " times");
+        EvolutionCheckpointContents<TestGenome> contents = EvolutionEngine<TestGenome>.ReadCheckpoint(
+            (await store.LoadLatestAsync(options.RunId))!, new TestGenomeCodec());
+        var history = contents.Entries.Where(item => item.Source == EvolutionCheckpointEntrySource.IslandHistory).ToList();
+        Assert.True(history.Count > 10, history.Count + " history entries");
+        Assert.All(history, item => Assert.Equal(task.Expected(item.Entry), item.Entry.Evaluation.Descriptors["rel"]));
+        Assert.All(history, item => Assert.Equal(KeyFor(result.Islands[item.Island], item.Entry.Evaluation.Descriptors), item.Entry.Cell.StableKey));
+    }
+
+    [Fact]
+    public void Remeasuring_by_entry_discards_an_elite_whose_new_values_no_cell_holds()
+    {
+        var archive = new MapElitesArchive<TestGenome>(new[]
+        {
+            new EvolutionDescriptorDefinition("x", 0, 10, 10),
+            new EvolutionDescriptorDefinition("rel", 0, 10, 10, EvolutionOutOfRangePolicy.Reject)
+        });
+        foreach ((int value, double x) in new[] { (1, 1.5), (2, 5.5) })
+        {
+            (EvolutionCandidate<TestGenome> candidate, EvolutionEvaluation evaluation) = MapElitesArchiveTests.Create(value, "g" + value, value, x);
+            Assert.Equal(EvolutionArchiveInsertionResult.Inserted,
+                archive.TryAdd(candidate, evaluation.WithDescriptors(new Dictionary<string, double> { ["x"] = x, ["rel"] = 1.5 })));
+        }
+
+        IRemeasurableEvolutionArchive<TestGenome> remeasurable = archive;
+        // Genome 2's new reading falls outside the rejecting axis, so it cannot keep its old one either.
+        int remaining = remeasurable.RemeasureEntries(entry => new Dictionary<string, double>
+        {
+            ["x"] = entry.Evaluation.Descriptors["x"],
+            ["rel"] = entry.Candidate.CanonicalGenome.Genome.Value == 2 ? 50 : 3.5
+        });
+
+        EvolutionArchiveEntry<TestGenome> kept = Assert.Single(archive.Entries);
+        Assert.Equal(1, remaining);
+        Assert.Equal((1, 3.5), (kept.Candidate.CanonicalGenome.Genome.Value, kept.Evaluation.Descriptors["rel"]));
+    }
+
+    [Fact]
+    public void Remeasuring_observes_only_the_values_that_changed()
+    {
+        var archive = new MapElitesArchive<TestGenome>(new[]
+        {
+            new EvolutionDescriptorDefinition("x", 0, 10, 10),
+            EvolutionDescriptorDefinition.AdaptiveQuantile("rel", 0, 10, 4)
+        });
+        foreach ((int value, double rel) in new[] { (1, 1.0), (2, 2.0), (3, 3.0) })
+        {
+            (EvolutionCandidate<TestGenome> candidate, EvolutionEvaluation evaluation) = MapElitesArchiveTests.Create(value, "g" + value, value, value);
+            archive.TryAdd(candidate, evaluation.WithDescriptors(new Dictionary<string, double> { ["x"] = value + 0.5, ["rel"] = rel }));
+        }
+        long Observed() => archive.Descriptors.Single(definition => definition.Name == "rel").ObservationCount;
+        Assert.Equal(3, Observed());
+
+        IRemeasurableEvolutionArchive<TestGenome> remeasurable = archive;
+        remeasurable.RemeasureEntries(entry => entry.Evaluation.Descriptors);
+        Assert.Equal(3, Observed());
+
+        // One elite's reading moves; only that new value is a new observation.
+        remeasurable.RemeasureEntries(entry => new Dictionary<string, double>
+        {
+            ["x"] = entry.Evaluation.Descriptors["x"],
+            ["rel"] = entry.Candidate.CanonicalGenome.Genome.Value == 3 ? 9.0 : entry.Evaluation.Descriptors["rel"]
+        });
+        Assert.Equal(4, Observed());
+        archive.Remeasure(genome => archive.Entries.Single(entry => entry.Candidate.CanonicalGenome.Genome.Value == genome.Value).Evaluation.Descriptors);
+        Assert.Equal(4, Observed());
+    }
+
     private static string KeyFor(IEvolutionArchiveView<TestGenome> archive, IReadOnlyDictionary<string, double> descriptors) =>
         new EvolutionCellKey(archive.Descriptors.Select(definition =>
             definition.TryGetBin(descriptors[definition.Name], out int bin) ? bin : throw new InvalidOperationException()).ToArray()).StableKey;
@@ -216,7 +293,7 @@ public sealed class DescriptorRebaseTests
         public string CaptureRebaseState() => string.Join(",", _anchor.ToString(CultureInfo.InvariantCulture),
             _last.ToString(CultureInfo.InvariantCulture), Rebases.ToString(CultureInfo.InvariantCulture), _salt);
 
-        public void RestoreRebaseState(string state)
+        public void RestoreRebaseState(string state, long completedEvaluations)
         {
             string[] parts = state.Split(',');
             if (parts.Length != 4) throw new InvalidDataException("bad anchored state");

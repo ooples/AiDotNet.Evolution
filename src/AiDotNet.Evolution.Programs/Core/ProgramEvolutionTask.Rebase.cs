@@ -75,7 +75,7 @@ public sealed partial class ProgramEvolutionTask
     });
 
     /// <inheritdoc/>
-    public void RestoreRebaseState(string state)
+    public void RestoreRebaseState(string state, long completedEvaluations)
     {
         ProgramGuard.NotNull(state);
         RebaseState? parsed;
@@ -88,24 +88,48 @@ public sealed partial class ProgramEvolutionTask
             throw new InvalidDataException("The descriptor-rebase state is not valid JSON.", exception);
         }
         if (parsed is null || parsed.Schema != RebaseStateSchema || parsed.References is null || parsed.RebasedAt < -1 ||
+            // A later position would hold off the next periodic pick until the counter caught up with it.
+            parsed.RebasedAt > completedEvaluations ||
             parsed.References.Any(reference => reference is null) ||
+            // A pick always stamps its position and keeps at least the best program, so the two agree or neither is set.
+            (parsed.RebasedAt < 0) != (parsed.References.Count == 0) ||
             (_rebase is not null && parsed.References.Count > _rebase.ReferenceSize))
             throw new InvalidDataException("The descriptor-rebase state is malformed or belongs to a different task.");
+
+        string[] references = parsed.References.ToArray();
+        ProgramGenome[] genomes;
+        try
+        {
+            genomes = Genomes(references);
+        }
+        catch (ArgumentException exception)
+        {
+            throw new InvalidDataException("The descriptor-rebase state holds a reference that is not a program.", exception);
+        }
+        // References are recorded normalized; anything else was not written by a pick.
+        for (int index = 0; index < references.Length; index++)
+            if (!string.Equals(genomes[index].NormalizedSource, references[index], StringComparison.Ordinal))
+                throw new InvalidDataException("The descriptor-rebase state holds a reference that is not normalized.");
+
         _rebasedAt = parsed.RebasedAt;
-        if (parsed.References.Count == 0)
+        if (references.Length == 0)
         {
             _references = Array.Empty<string>();
             _descriptors = _initialDescriptors;
         }
         else
         {
-            Apply(parsed.References.ToArray());
+            Apply(references, genomes);
         }
     }
 
-    private void Apply(string[] references)
+    private ProgramGenome[] Genomes(string[] references) =>
+        references.Select(source => new ProgramGenome(source, _options.Language)).ToArray();
+
+    private void Apply(string[] references) => Apply(references, Genomes(references));
+
+    private void Apply(string[] references, ProgramGenome[] genomes)
     {
-        ProgramGenome[] genomes = references.Select(source => new ProgramGenome(source, _options.Language)).ToArray();
         _descriptors = _initialDescriptors.Rebase(genomes);
         _references = Array.AsReadOnly(references);
     }

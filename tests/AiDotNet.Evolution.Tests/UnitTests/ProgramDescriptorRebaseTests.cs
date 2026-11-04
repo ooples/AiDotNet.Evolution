@@ -99,16 +99,16 @@ public sealed class ProgramDescriptorRebaseTests
         Assert.NotEqual(before, after);
 
         ProgramEvolutionTask restored = ProgramTask(options);
-        restored.RestoreRebaseState(task.CaptureRebaseState());
+        restored.RestoreRebaseState(task.CaptureRebaseState(), 2);
         Assert.Equal(task.RebaseReferences, restored.RebaseReferences);
         Assert.Equal(after, restored.MeasureRebasable(probe)["diversity"]);
         // Restored as frozen-and-done: it does not pick again.
         Assert.False(restored.TryRebase(99, Islands(("z", "zzz\n", 9.0))));
 
-        Assert.Throws<InvalidDataException>(() => restored.RestoreRebaseState("{not json"));
-        Assert.Throws<InvalidDataException>(() => restored.RestoreRebaseState("{\"Schema\":\"other\",\"RebasedAt\":1,\"References\":[]}"));
+        Assert.Throws<InvalidDataException>(() => restored.RestoreRebaseState("{not json", 2));
+        Assert.Throws<InvalidDataException>(() => restored.RestoreRebaseState("{\"Schema\":\"other\",\"RebasedAt\":1,\"References\":[]}", 2));
         Assert.Throws<InvalidDataException>(() => ProgramTask(new ProgramDescriptorRebaseOptions { ReferenceSize = 1 })
-            .RestoreRebaseState(task.CaptureRebaseState()));
+            .RestoreRebaseState(task.CaptureRebaseState(), 2));
     }
 
     [Fact]
@@ -142,6 +142,41 @@ public sealed class ProgramDescriptorRebaseTests
 
         Assert.Equal(("compat", false), (compat.Id, compat.RebasesDescriptors));
         Assert.Equal(explicitNull.VersionHash, compat.VersionHash);
+    }
+
+    [Fact]
+    public void A_restored_state_is_checked_against_the_checkpoint_counter_and_its_own_shape()
+    {
+        ProgramEvolutionTask task = ProgramTask(new ProgramDescriptorRebaseOptions { ReferenceSize = 3 });
+        Assert.True(task.TryRebase(5, Islands(("a", "x = 1\n", 0.9), ("b", "y = 2\n", 0.2), ("c", "z = 3\n", 0.1))));
+        string captured = task.CaptureRebaseState();
+
+        // The position the pick was taken at, or any later one, is a state the checkpoint could hold; an earlier one is not.
+        ProgramTask(new ProgramDescriptorRebaseOptions { ReferenceSize = 3 }).RestoreRebaseState(captured, 5);
+        ProgramTask(new ProgramDescriptorRebaseOptions { ReferenceSize = 3 }).RestoreRebaseState(captured, 9);
+        Assert.Throws<InvalidDataException>(() => ProgramTask(new ProgramDescriptorRebaseOptions { ReferenceSize = 3 })
+            .RestoreRebaseState(captured, 4));
+
+        // The initial state round-trips; a stamp without references, or references without a stamp, does not.
+        ProgramTask(new ProgramDescriptorRebaseOptions()).RestoreRebaseState("{\"Schema\":\"program-descriptor-rebase-state-v1\",\"RebasedAt\":-1,\"References\":[]}", 0);
+        Assert.Throws<InvalidDataException>(() => ProgramTask(new ProgramDescriptorRebaseOptions())
+            .RestoreRebaseState("{\"Schema\":\"program-descriptor-rebase-state-v1\",\"RebasedAt\":3,\"References\":[]}", 5));
+        Assert.Throws<InvalidDataException>(() => ProgramTask(new ProgramDescriptorRebaseOptions())
+            .RestoreRebaseState("{\"Schema\":\"program-descriptor-rebase-state-v1\",\"RebasedAt\":-1,\"References\":[\"x = 1\"]}", 5));
+    }
+
+    [Theory]
+    [InlineData("   ")]
+    [InlineData("x = 1   ")]
+    [InlineData("oversized")]
+    public void A_restored_reference_must_be_a_normalized_program(string reference)
+    {
+        if (reference == "oversized") reference = new string('a', ProgramGenome.MaxSourceLength + 1);
+        string state = "{\"Schema\":\"program-descriptor-rebase-state-v1\",\"RebasedAt\":2,\"References\":[\"x = 1\",\"" + reference + "\"]}";
+        ProgramEvolutionTask restored = ProgramTask(new ProgramDescriptorRebaseOptions());
+
+        Assert.Throws<InvalidDataException>(() => restored.RestoreRebaseState(state, 5));
+        Assert.Empty(restored.RebaseReferences);
     }
 
     // ---- helpers ----------------------------------------------------------------------------------------------

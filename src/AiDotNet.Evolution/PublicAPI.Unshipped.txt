@@ -2288,7 +2288,7 @@ AiDotNet.Evolution.IRebasingEvolutionTask<TGenome>
 AiDotNet.Evolution.IRebasingEvolutionTask<TGenome>.CaptureRebaseState() -> string!
 AiDotNet.Evolution.IRebasingEvolutionTask<TGenome>.MeasureRebasable(TGenome genome) -> System.Collections.Generic.IReadOnlyDictionary<string!, double>!
 AiDotNet.Evolution.IRebasingEvolutionTask<TGenome>.RebasesDescriptors.get -> bool
-AiDotNet.Evolution.IRebasingEvolutionTask<TGenome>.RestoreRebaseState(string! state) -> void
+AiDotNet.Evolution.IRebasingEvolutionTask<TGenome>.RestoreRebaseState(string! state, long completedEvaluations) -> void
 AiDotNet.Evolution.IRebasingEvolutionTask<TGenome>.TryRebase(long completedEvaluations, System.Collections.Generic.IReadOnlyList<System.Collections.Generic.IReadOnlyList<AiDotNet.Evolution.EvolutionArchiveEntry<TGenome>!>!>! islands) -> bool
 AiDotNet.Evolution.IRemeasurableEvolutionArchive<TGenome>
 AiDotNet.Evolution.IRemeasurableEvolutionArchive<TGenome>.RemeasureEntries(System.Func<AiDotNet.Evolution.EvolutionArchiveEntry<TGenome>!, System.Collections.Generic.IReadOnlyDictionary<string!, double>?>! measure) -> int

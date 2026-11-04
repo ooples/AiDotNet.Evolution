@@ -36,7 +36,8 @@ that reference set changes. A task with such descriptors implements `IRebasingEv
 
 - `MeasureRebasable` gives the current reading for one genome.
 - `TryRebase` is called after every committed batch, with every island's entries, and may move the references.
-- `CaptureRebaseState` and `RestoreRebaseState` carry the references through a checkpoint.
+- `CaptureRebaseState` and `RestoreRebaseState` carry the references through a checkpoint. The restore receives the
+  checkpoint's completed-evaluation count, so a state that claims a later reading is refused.
 
 The engine keeps every archive consistent with one reading:
 
@@ -44,11 +45,14 @@ The engine keeps every archive consistent with one reading:
   a slow or cached result is filed like a fresh one.
 - **When `TryRebase` reports a change.** It re-measures every island through
   `IRemeasurableEvolutionArchive<TGenome>.RemeasureEntries` (`MapElitesArchive<TGenome>` implements it). Then it
-  re-keys the cross-island elite index before the next parent is drawn.
+  re-keys the cross-island elite index and each island's retained history before the next parent is drawn. An entry
+  whose new values no cell can hold is dropped, never kept under the old reading. An adaptive axis observes only the
+  values that changed, so a rebase does not count unchanged elites twice.
 
 A rebasing task therefore requires remeasurable archives. The state is part of the checkpoint and of the
 deterministic state hash. A checkpoint written without it is refused for a rebasing task, and the reverse is refused
-too.
+too. Policy trials (`EvolutionPolicyEngineTrial`) refuse a rebasing task, because their task wrappers do not forward
+the rebase.
 
 ## Choosing parents
 
@@ -72,7 +76,9 @@ is uniform over.
 
 `EvolutionSelectionOptions.EliteBranch` (`EvolutionEliteBranch`) decides what the third branch, drawn
 with probability `EliteRatio`, returns: `IslandBest` (the default), `UniformIsland`, or `UniformGlobal`,
-a uniformly random entry of the cross-island elite index, which is OpenEvolve's `_sample_random_parent`.
+a uniformly random entry of the cross-island elite index. That is the bounded counterpart of OpenEvolve's
+`_sample_random_parent`: the index keeps only the best `GlobalEliteCount` entries, where upstream draws from every
+program in its database. With an empty index it samples the target island.
 `EvolutionEngineOptions.CreateOpenEvolveDefaults()` and an imported OpenEvolve config use
 `IslandPreferredTopK` over the 100-entry archive and `UniformGlobal`.
 

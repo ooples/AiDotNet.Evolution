@@ -879,6 +879,7 @@ public sealed class OpenEvolveImportTests
     [InlineData(40, 2, 10, 0)]   // a share at or above the grid is just the grid
     [InlineData(40, 2, 20, 0)]
     [InlineData(0, 2, 100, 0)]   // no bound
+    [InlineData(int.MaxValue, 2, 1L << 40, 1 << 30)] // the rounding-up sum does not overflow
     public void Each_island_holds_its_share_of_the_population(int population, int islands, long grid, int expected) =>
         Assert.Equal(expected, RunCommand.IslandCapacity(new RunSearch { ArchiveCapacity = population, Islands = islands }, grid));
 

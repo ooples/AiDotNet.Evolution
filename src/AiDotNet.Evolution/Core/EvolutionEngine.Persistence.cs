@@ -489,7 +489,7 @@ public sealed partial class EvolutionEngine<TGenome>
         if (_rebasingTask is not null)
         {
             if (state.RebaseState is null) throw new InvalidDataException("The checkpoint descriptor-rebase state is missing.");
-            _rebasingTask.RestoreRebaseState(state.RebaseState);
+            _rebasingTask.RestoreRebaseState(state.RebaseState, state.CompletedEvaluations);
         }
         else if (state.RebaseState is not null)
         {
@@ -786,7 +786,7 @@ public sealed partial class EvolutionEngine<TGenome>
     private void RestoreGlobalElites(EngineStateDocument state)
     {
         List<EliteRecordDocument> records = state.GlobalElites ?? new List<EliteRecordDocument>();
-        if (records.Count > _options.GlobalEliteCount)
+        if (records.Count > _globalElites.Capacity)
             throw new InvalidDataException("The checkpoint global elite index exceeds the configured capacity.");
         var restored = new List<EvolutionEliteRecord<TGenome>>(records.Count);
         foreach (EliteRecordDocument record in records)
@@ -1288,7 +1288,7 @@ public sealed partial class EvolutionEngine<TGenome>
             throw new InvalidDataException("Checkpoint islands are missing.");
         if (islands.Count != _islands.Length)
             throw new InvalidDataException("Checkpoint island count is incompatible.");
-        if ((state.GlobalElites?.Count ?? 0) > _options.GlobalEliteCount)
+        if ((state.GlobalElites?.Count ?? 0) > _globalElites.Capacity)
             throw new InvalidDataException("The checkpoint global elite index exceeds the configured capacity.");
 
         List<List<ArchiveEntryDocument>> histories = state.IslandHistories ?? new List<List<ArchiveEntryDocument>>();

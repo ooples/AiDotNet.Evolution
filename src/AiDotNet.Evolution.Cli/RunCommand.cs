@@ -875,7 +875,7 @@ internal static class RunCommand
     internal static int IslandCapacity(RunSearch search, long grid)
     {
         int islands = Math.Max(1, search.Islands);
-        int share = search.ArchiveCapacity > 0 ? (search.ArchiveCapacity + islands - 1) / islands : 0;
+        int share = search.ArchiveCapacity > 0 ? (int)(((long)search.ArchiveCapacity + islands - 1) / islands) : 0;
         return share > 0 && share < grid ? share : 0;
     }
 
@@ -1299,6 +1299,7 @@ internal static class RunCommand
                 try
                 {
                     metric.ToDefinition(run.Budget.MaxProgramChars);
+                    metric.RebaseOptions();
                 }
                 catch (ArgumentException exception)
                 {

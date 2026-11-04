@@ -12,5 +12,9 @@ public interface IRemeasurableEvolutionArchive<TGenome> : IEvolutionArchive<TGen
     /// <summary>Re-measures every entry and re-files the archive, transactionally.</summary>
     /// <param name="measure">Produces an entry's complete replacement descriptors; <see langword="null"/> keeps them.</param>
     /// <returns>How many entries remain after collisions are resolved.</returns>
+    /// <remarks>
+    /// An entry whose replacement values cannot be placed is discarded, never kept under its old values, so the archive
+    /// holds a single reading afterwards. An adaptive axis observes only values that changed.
+    /// </remarks>
     int RemeasureEntries(Func<EvolutionArchiveEntry<TGenome>, IReadOnlyDictionary<string, double>?> measure);
 }

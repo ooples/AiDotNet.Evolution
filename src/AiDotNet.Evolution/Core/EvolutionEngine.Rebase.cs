@@ -24,9 +24,9 @@ public sealed partial class EvolutionEngine<TGenome>
     /// <summary>Lets a rebasing task change its reading after a committed batch, and re-files everything when it does.</summary>
     /// <remarks>
     /// Runs on the sequential commit step, before the next parent is drawn. Every island is re-measured, then the
-    /// cross-island elite index is re-keyed against the islands' new grids, so selection never mixes two readings. An
-    /// elite-index record whose new values no grid can place is dropped from the index; its island already holds or
-    /// has discarded the entry by the archive's own rules.
+    /// cross-island elite index and each island's retained history are re-keyed against the islands' new grids, so
+    /// selection and checkpoints never mix two readings. An island elite, elite-index record or history entry whose new
+    /// values no grid can place is dropped.
     /// </remarks>
     private void RebaseIfDue()
     {
@@ -44,15 +44,25 @@ public sealed partial class EvolutionEngine<TGenome>
             var rekeyed = new List<EvolutionEliteRecord<TGenome>>(_globalElites.Count);
             foreach (EvolutionEliteRecord<TGenome> record in _globalElites.Entries)
             {
-                EvolutionEvaluation evaluation = record.Entry.Evaluation.WithDescriptors(
-                    MergeRebasable(record.Entry.Evaluation.Descriptors, record.Entry.Candidate.CanonicalGenome.Genome));
-                EvolutionCellKey? cell = TryCreateCellKey(_islands[record.Island], evaluation.Descriptors);
-                if (cell is null) continue;
-                rekeyed.Add(new EvolutionEliteRecord<TGenome>(record.Island,
-                    new EvolutionArchiveEntry<TGenome>(cell, record.Entry.Candidate, evaluation)));
+                EvolutionArchiveEntry<TGenome>? entry = Rekey(record.Island, record.Entry);
+                if (entry is not null) rekeyed.Add(new EvolutionEliteRecord<TGenome>(record.Island, entry));
             }
             _globalElites.Replace(rekeyed);
         }
+        for (int island = 0; island < _histories.Length; island++)
+        {
+            int owner = island;
+            _histories[island].Rekey(entry => Rekey(owner, entry));
+        }
         RebuildEarlyStoppingArchiveMetric();
+    }
+
+    /// <summary>Re-measures one retained entry and keys it on its island's current grid, or drops it when no cell fits.</summary>
+    private EvolutionArchiveEntry<TGenome>? Rekey(int island, EvolutionArchiveEntry<TGenome> entry)
+    {
+        EvolutionEvaluation evaluation = entry.Evaluation.WithDescriptors(
+            MergeRebasable(entry.Evaluation.Descriptors, entry.Candidate.CanonicalGenome.Genome));
+        EvolutionCellKey? cell = TryCreateCellKey(_islands[island], evaluation.Descriptors);
+        return cell is null ? null : new EvolutionArchiveEntry<TGenome>(cell, entry.Candidate, evaluation);
     }
 }

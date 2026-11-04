@@ -393,8 +393,8 @@ public sealed class EvolutionEngineOptions
     /// <para>
     /// One derived exception: when the engine builds the selection policy itself from
     /// <see cref="SelectionPolicy"/> and that policy draws its exploitation pool from the cross-island index
-    /// (<see cref="EvolutionSelectionPolicyKind.Ratio"/> with
-    /// <see cref="EvolutionExploitationSource.GlobalTopK"/>), the engine raises the effective capacity to the
+    /// (<see cref="EvolutionSelectionPolicyKind.Ratio"/> with <see cref="EvolutionExploitationSource.GlobalTopK"/> or
+    /// <see cref="EvolutionExploitationSource.IslandPreferredTopK"/>), the engine raises the effective capacity to the
     /// policy's <see cref="EvolutionSelectionOptions.ExploitationEliteCount"/> so that branch is not silently dead.
     /// The derivation is a pure function of these options and of the constructed policy, both of which are in the
     /// compatibility hash, so a resumed run derives the same capacity. A policy the caller supplies directly never

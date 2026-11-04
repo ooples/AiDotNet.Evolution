@@ -1968,6 +1968,6 @@ AiDotNet.Evolution.Programs.ProgramEvolutionTask.ProgramEvolutionTask(AiDotNet.E
 AiDotNet.Evolution.Programs.ProgramEvolutionTask.ProgramEvolutionTask(AiDotNet.Evolution.Programs.IProgramFitnessEvaluator! evaluator, AiDotNet.Evolution.Programs.ProgramDescriptorSet? descriptors, AiDotNet.Evolution.Programs.ProgramTaskOptions? options, string! id) -> void
 AiDotNet.Evolution.Programs.ProgramEvolutionTask.RebaseReferences.get -> System.Collections.Generic.IReadOnlyList<string!>!
 AiDotNet.Evolution.Programs.ProgramEvolutionTask.RebasesDescriptors.get -> bool
-AiDotNet.Evolution.Programs.ProgramEvolutionTask.RestoreRebaseState(string! state) -> void
+AiDotNet.Evolution.Programs.ProgramEvolutionTask.RestoreRebaseState(string! state, long completedEvaluations) -> void
 AiDotNet.Evolution.Programs.ProgramEvolutionTask.TryRebase(long completedEvaluations, System.Collections.Generic.IReadOnlyList<System.Collections.Generic.IReadOnlyList<AiDotNet.Evolution.EvolutionArchiveEntry<AiDotNet.Evolution.Programs.ProgramGenome!>!>!>! islands) -> bool
 const AiDotNet.Evolution.Programs.ProgramDescriptorRebaseOptions.DefaultReferenceSize = 20 -> int

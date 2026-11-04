@@ -123,6 +123,24 @@ public sealed class EvolutionIslandHistory<TGenome>
         return evicted.AsReadOnly();
     }
 
+    /// <summary>Re-keys every retained entry, dropping those the callback cannot place.</summary>
+    /// <param name="rekey">Returns an entry's replacement, or <see langword="null"/> to drop it.</param>
+    /// <remarks>Used when a rebasing task changes its descriptor reading, so the history never holds two readings.</remarks>
+    internal void Rekey(Func<EvolutionArchiveEntry<TGenome>, EvolutionArchiveEntry<TGenome>?> rekey)
+    {
+        if (_entries.Count == 0) return;
+        EvolutionArchiveEntry<TGenome>[] retained = _entries.Values.ToArray();
+        var replacements = new List<EvolutionArchiveEntry<TGenome>>(retained.Length);
+        foreach (EvolutionArchiveEntry<TGenome> entry in retained)
+        {
+            EvolutionArchiveEntry<TGenome>? replacement = rekey(entry);
+            if (replacement is not null) replacements.Add(replacement);
+        }
+        _entries.Clear();
+        foreach (EvolutionArchiveEntry<TGenome> replacement in replacements) _entries.Add(replacement.Evaluation.GenomeId, replacement);
+        _ordered = null;
+    }
+
     /// <summary>Replaces the whole history with a checkpointed entry sequence.</summary>
     /// <param name="entries">The entries captured at checkpoint time.</param>
     /// <exception cref="ArgumentNullException"><paramref name="entries"/> is <c>null</c>.</exception>
