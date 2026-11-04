@@ -256,7 +256,7 @@ public sealed class ClaudeCodeChatClient : IProgramChatClient
                 string mcpFileName = _options.UseTokenOptimizer ? "token-optimizer-mcp.json" : "no-mcp.json";
                 string mcp = Path.Combine(workspace, mcpFileName);
                 string mcpJson = _options.UseTokenOptimizer
-                    ? "{\"mcpServers\":{\"token-optimizer\":{\"command\":\"npx\",\"args\":[\"-y\",\"@ooples/token-optimizer-mcp\"],\"env\":{\"TOKEN_OPTIMIZER_POSTURE\":\"lean\",\"TOKEN_OPTIMIZER_COMPRESSION\":\"aggressive\",\"TOKEN_OPTIMIZER_MODE\":\"enforce\"}}}}"
+                    ? "{\"mcpServers\":{\"token-optimizer\":{\"command\":\"npx\",\"args\":[\"-y\",\"@ooples/token-optimizer-mcp@7.8.0\"],\"env\":{\"TOKEN_OPTIMIZER_POSTURE\":\"lean\",\"TOKEN_OPTIMIZER_COMPRESSION\":\"aggressive\",\"TOKEN_OPTIMIZER_MODE\":\"enforce\"}}}}"
                     : "{\"mcpServers\":{}}";
                 File.WriteAllText(mcp, mcpJson);
                 foreach (string argument in new[] { "--tools", "", "--strict-mcp-config", "--mcp-config", mcp, "--setting-sources", "" })

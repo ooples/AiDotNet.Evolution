@@ -195,8 +195,10 @@ public sealed class LlmProgramVariationOptions
     /// <remarks>
     /// When <c>true</c>, earlier <see cref="ProgramChatRole.Assistant"/> retry turns are replaced with
     /// <c>"(earlier failed draft omitted)"</c> while every <see cref="ProgramChatRole.User"/> failure-feedback
-    /// message and the most recent assistant draft are preserved in full. Defaults to <c>false</c> so existing
-    /// operator version hashes and replay transcripts remain unchanged unless opted in.
+    /// message is preserved in full. Shorter assistant messages are kept rather than expanded to the marker.
+    /// The latest draft retains at most 400 characters when enabled, or the usual 1,200-character feedback limit
+    /// otherwise. Defaults to <c>false</c> so existing operator version hashes and replay transcripts remain unchanged
+    /// unless opted in.
     /// </remarks>
     public bool CompactRetryHistory { get; set; }
 

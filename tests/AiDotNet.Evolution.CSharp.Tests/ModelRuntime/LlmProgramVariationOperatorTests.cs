@@ -817,6 +817,22 @@ public sealed class LlmProgramVariationOperatorTests
         Assert.DoesNotContain("memoise the inner loop", otherTask.Conversations.Single().Last().Text);
     }
 
+    [Theory]
+    [InlineData("x")]
+    [InlineData("(earlier failed draft omitted)")]
+    public async Task CompactRetryHistory_does_not_expand_short_assistant_drafts(string draft)
+    {
+        var parent = new ProgramGenome(ParentSource, ProgramLanguage.Python);
+        var client = new FakeChatClient(draft, DiffResponse("missing", "replacement"), DiffResponse("    return x", "    return x + 1"));
+        var op = new LlmProgramVariationOperator(client,
+            new ProgramProposalOptions { Language = ProgramLanguage.Python },
+            new LlmProgramVariationOptions { Mode = ProgramEvolutionMode.Diff, MaxProposalRetries = 2, CompactRetryHistory = true });
+        await op.ProposeAsync(Context(parent));
+        Assert.Equal(3, client.Conversations.Count);
+        Assert.Equal(draft, client.Conversations[2][2].Text);
+    }
+
+
     [Fact]
     public async Task CompactRetryHistory_elides_superseded_assistant_drafts_while_preserving_feedback()
     {

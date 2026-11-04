@@ -4,7 +4,7 @@
       "command": "npx",
       "args": [
         "-y",
-        "@ooples/token-optimizer-mcp"
+        "@ooples/token-optimizer-mcp@7.8.0"
       ],
       "env": {
         "TOKEN_OPTIMIZER_POSTURE": "lean",

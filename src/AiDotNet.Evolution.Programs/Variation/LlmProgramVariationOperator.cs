@@ -1390,7 +1390,8 @@ public sealed class LlmProgramVariationOperator : IOutcomeAwareVariationOperator
         {
             for (int i = 0; i < messages.Count; i++)
             {
-                if (messages[i].Role == ProgramChatRole.Assistant)
+                if (messages[i].Role == ProgramChatRole.Assistant
+                    && messages[i].Text.Length > "(earlier failed draft omitted)".Length)
                 {
                     messages[i] = ProgramChatMessage.Assistant("(earlier failed draft omitted)");
                 }

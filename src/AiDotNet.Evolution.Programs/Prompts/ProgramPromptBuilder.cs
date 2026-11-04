@@ -598,70 +598,7 @@ public sealed class ProgramPromptBuilder
     }
 
     private static string CompressAgainstParent(string parentSource, string exampleSource)
-    {
-        if (string.IsNullOrEmpty(parentSource) || string.IsNullOrEmpty(exampleSource)) return exampleSource;
-        string[] parentLines = parentSource.Replace("\r\n", "\n").Split('\n');
-        string[] exampleLines = exampleSource.Replace("\r\n", "\n").Split('\n');
-        if (exampleLines.Length < 6 || parentLines.Length < 6) return exampleSource;
-
-        var parentLineSet = new HashSet<string>(parentLines, StringComparer.Ordinal);
-        var matchFlags = new bool[exampleLines.Length];
-        for (int i = 0; i < exampleLines.Length; i++)
-        {
-            matchFlags[i] = parentLineSet.Contains(exampleLines[i]);
-        }
-
-        var builder = new StringBuilder(exampleSource.Length);
-        bool anyElided = false;
-        int index = 0;
-        while (index < exampleLines.Length)
-        {
-            if (matchFlags[index])
-            {
-                int runStart = index;
-                while (index < exampleLines.Length && matchFlags[index]) index++;
-                int runLength = index - runStart;
-                // Keep 1 boundary context line at the start/end of a matching block and elide interior runs >= 4 lines.
-                int keepLead = runStart > 0 ? 1 : 0;
-                int keepTrail = index < exampleLines.Length ? 1 : 0;
-                int elided = runLength - keepLead - keepTrail;
-                if (elided >= 4)
-                {
-                    anyElided = true;
-                    for (int k = 0; k < keepLead; k++)
-                    {
-                        if (builder.Length > 0) builder.Append('\n');
-                        builder.Append(exampleLines[runStart + k]);
-                    }
-                    if (builder.Length > 0) builder.Append('\n');
-                    builder.Append("# ... (")
-                        .Append(elided.ToString(CultureInfo.InvariantCulture))
-                        .Append(" lines unchanged from current program) ...");
-                    for (int k = runLength - keepTrail; k < runLength; k++)
-                    {
-                        builder.Append('\n').Append(exampleLines[runStart + k]);
-                    }
-                    continue;
-                }
-
-                for (int k = runStart; k < index; k++)
-                {
-                    if (builder.Length > 0) builder.Append('\n');
-                    builder.Append(exampleLines[k]);
-                }
-            }
-            else
-            {
-                if (builder.Length > 0) builder.Append('\n');
-                builder.Append(exampleLines[index]);
-                index++;
-            }
-        }
-
-        if (!anyElided) return exampleSource;
-        string compressed = builder.ToString();
-        return compressed.Length < exampleSource.Length ? compressed : exampleSource;
-    }
+        => ProgramSourceCompression.Compress(parentSource, exampleSource, "current program");
 
     private string DescribeKeyFeatures(ProgramPromptExample example, ProgramPromptFragmentKey prefixKey, bool withValues)
     {
