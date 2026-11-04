@@ -498,7 +498,11 @@ public sealed class EvolutionEngineOptions
     /// (<c>prompt.num_top_programs</c> 3 and <c>prompt.num_diverse_programs</c> 2, lines 268-269); and
     /// <see cref="SelectionPolicy"/> is <see cref="EvolutionSelectionPolicyKind.Ratio"/> with the 0.2 / 0.7 / 0.1
     /// mixture of <c>database.exploration_ratio</c>, <c>exploitation_ratio</c> and <c>elite_selection_ratio</c>
-    /// (lines 326-328). <see cref="EvolutionEarlyStoppingOptions.MinimumImprovement"/> already defaults to the
+    /// (lines 326-328), drawn the way database.py draws them: exploitation uniformly from the 100-program archive,
+    /// preferring the current island (<see cref="EvolutionExploitationSource.IslandPreferredTopK"/>,
+    /// <c>_sample_exploitation_parent</c>), and the remainder uniformly from every program
+    /// (<see cref="EvolutionEliteBranch.UniformGlobal"/>, <c>_sample_random_parent</c>).
+    /// <see cref="EvolutionEarlyStoppingOptions.MinimumImprovement"/> already defaults to the
     /// upstream <c>convergence_threshold</c> of 0.001 (line 442), and early stopping stays off because upstream's
     /// <c>early_stopping_patience</c> defaults to <c>None</c> (line 441).
     /// </para>
@@ -546,6 +550,9 @@ public sealed class EvolutionEngineOptions
             ExplorationRatio = 0.2,
             ExploitationRatio = 0.7,
             EliteRatio = 0.1,
+            ExploitationSource = EvolutionExploitationSource.IslandPreferredTopK,
+            ExploitationEliteCount = 100,
+            EliteBranch = EvolutionEliteBranch.UniformGlobal,
             TopInspirationCount = 3,
             DiverseInspirationCount = 2
         },

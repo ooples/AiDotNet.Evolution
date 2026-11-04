@@ -194,6 +194,13 @@ internal sealed class RunSearch
     public double? ExplorationRatio { get; init; }
     public double? ExploitationRatio { get; init; }
     public double? EliteRatio { get; init; }
+    /// <summary>Which elite pool the exploitation branch draws from; null keeps the engine default (<c>GlobalTopK</c>).</summary>
+    public EvolutionExploitationSource? ExploitationSource { get; init; }
+    /// <summary>How many strongest candidates the exploitation branch draws uniformly from; null keeps the engine
+    /// default, or <see cref="EliteArchiveSize"/> when that is set, which is what OpenEvolve's archive is.</summary>
+    public int? ExploitationEliteCount { get; init; }
+    /// <summary>What the third branch returns; null keeps the engine default (<c>IslandBest</c>).</summary>
+    public EvolutionEliteBranch? EliteBranch { get; init; }
     /// <summary>Top programs shown in each prompt (OpenEvolve's <c>prompt.num_top_programs</c>).</summary>
     public int? TopPrograms { get; init; }
     /// <summary>Top-quality elites offered as inspirations after the island best; null keeps the engine default.</summary>
@@ -243,7 +250,8 @@ internal sealed class RunSearch
     /// </para>
     /// </remarks>
     public bool RetainArtifactText { get; init; }
-    /// <summary>The most elites the archive holds (OpenEvolve's <c>database.population_size</c>); zero means the whole grid.</summary>
+    /// <summary>The most elites all islands hold together (OpenEvolve's <c>database.population_size</c>), split evenly
+    /// between the islands and rounded up; zero means the whole grid.</summary>
     public int ArchiveCapacity { get; init; }
     /// <summary>The global elite index size programs are drawn from (OpenEvolve's <c>database.archive_size</c>); zero for none.</summary>
     public int EliteArchiveSize { get; init; }
@@ -592,13 +600,7 @@ internal static class RunCommand
             MigrationRate = run.Search.MigrationRate,
             MaxRetries = run.Search.EvaluationRetries
         };
-        if (run.Search.ExplorationRatio is not null || run.Search.ExploitationRatio is not null || run.Search.EliteRatio is not null)
-        {
-            options.SelectionPolicy = EvolutionSelectionPolicyKind.Ratio;
-            if (run.Search.ExplorationRatio is double exploration) options.Selection.ExplorationRatio = exploration;
-            if (run.Search.ExploitationRatio is double exploitation) options.Selection.ExploitationRatio = exploitation;
-            if (run.Search.EliteRatio is double elite) options.Selection.EliteRatio = elite;
-        }
+        ApplySelection(run.Search, options);
         if (run.Search.DiversePrograms is int diverse) options.Selection.DiverseInspirationCount = diverse;
         if (run.Search.TopInspirations is int top) options.Selection.TopInspirationCount = top;
         if (run.Search.EarlyStoppingPatience is long patience)
@@ -616,9 +618,9 @@ internal static class RunCommand
         options.GlobalEliteCount = run.Search.EliteArchiveSize;
         if (run.Search.MaxArtifactBytes is int artifactBytes) options.Artifacts.MaxArtifactBytes = artifactBytes;
 
-        // OpenEvolve's population_size bounds the whole database; a bound at or above the grid is just the grid.
-        long grid = descriptors.Aggregate(1L, (cells, descriptor) => cells * descriptor.BinCount);
-        int capacity = run.Search.ArchiveCapacity > 0 && run.Search.ArchiveCapacity < grid ? run.Search.ArchiveCapacity : 0;
+        // OpenEvolve's population_size bounds the whole database, and each island has its own archive here, so each
+        // island gets its share, rounded up; a share at or above an island's grid is just the grid.
+        int capacity = IslandCapacity(run.Search, descriptors.Aggregate(1L, (cells, descriptor) => cells * descriptor.BinCount));
         // What the reported quality actually is. An OpenEvolve evaluator that reports combined_score has
         // its own objective optimised; one that does not has fitness computed as the mean of its remaining
         // metrics, upstream's rule and ours. Measured on examples/signal_processing: that mean rose from
@@ -785,6 +787,30 @@ internal static class RunCommand
     private const int MaxRepertoireSeeds = 256;
 
     /// <summary>The reuse identity of this run's programs. Facets the CLI cannot observe carry explicit versioned labels.</summary>
+    /// <summary>Applies the run file's parent-selection settings; any ratio switches on the ratio policy.</summary>
+    internal static void ApplySelection(RunSearch search, EvolutionEngineOptions options)
+    {
+        if (search.ExplorationRatio is null && search.ExploitationRatio is null && search.EliteRatio is null) return;
+        options.SelectionPolicy = EvolutionSelectionPolicyKind.Ratio;
+        if (search.ExplorationRatio is double exploration) options.Selection.ExplorationRatio = exploration;
+        if (search.ExploitationRatio is double exploitation) options.Selection.ExploitationRatio = exploitation;
+        if (search.EliteRatio is double elite) options.Selection.EliteRatio = elite;
+        if (search.ExploitationSource is EvolutionExploitationSource source) options.Selection.ExploitationSource = source;
+        if (search.EliteBranch is EvolutionEliteBranch branch) options.Selection.EliteBranch = branch;
+        // OpenEvolve's exploitation draws uniformly from its whole archive (archive_size), not from a top ten.
+        if ((search.ExploitationEliteCount ?? (search.EliteArchiveSize > 0 ? search.EliteArchiveSize : null)) is int pool)
+            options.Selection.ExploitationEliteCount = pool;
+    }
+
+    /// <summary>Each island archive's capacity: its share of <see cref="RunSearch.ArchiveCapacity"/>, rounded up, or zero
+    /// (the whole grid) when there is no bound or the share would reach the grid.</summary>
+    internal static int IslandCapacity(RunSearch search, long grid)
+    {
+        int islands = Math.Max(1, search.Islands);
+        int share = search.ArchiveCapacity > 0 ? (search.ArchiveCapacity + islands - 1) / islands : 0;
+        return share > 0 && share < grid ? share : 0;
+    }
+
     private static EvolutionReuseScope Scope(ProgramEvolutionTask task, ProgramGenomeCodec codec, RunFile run) =>
         new(task.Id, task.VersionHash, task.EvaluatorVersionHash, codec.Id, codec.VersionHash,
             constraintsVersion: "evaluator-defined-v1", dataVersion: "evaluator-defined-v1", fidelityVersion: "single-fidelity-v1",

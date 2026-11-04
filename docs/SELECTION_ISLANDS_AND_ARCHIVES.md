@@ -38,13 +38,22 @@ picks a built-in policy, or you can pass your own `ISelectionPolicy<TGenome>` to
 | Policy | Kind | Parent | Inspirations |
 | --- | --- | --- | --- |
 | `UniformEvolutionSelectionPolicy<TGenome>` | `Uniform` (default) | a uniformly random occupied cell | distinct, uniformly sampled |
-| `RatioEvolutionSelectionPolicy<TGenome>` | `Ratio` | exploration, exploitation or island-best draw by `EvolutionEngineOptions.Selection` ratios | top and diverse counts from the same options |
+| `RatioEvolutionSelectionPolicy<TGenome>` | `Ratio` | exploration, exploitation or third-branch draw by `EvolutionEngineOptions.Selection` ratios | top and diverse counts from the same options |
 | `CuriosityEvolutionSelectionPolicy<TGenome>` | `Curiosity` | weighted by a bounded curiosity score that rises when a parent's offspring improve the archive | as uniform |
 | `DoubleEvolutionSelectionPolicy<TGenome>` | `Double` | uniform | the highest-quality elites |
 
 In ratio selection, `EvolutionSelectionOptions.ExploitationSource` (`EvolutionExploitationSource`)
 decides where an exploitation draw comes from. `GlobalTopK` uses the best elites across every
-island, and `IslandTopK` uses the current island's best.
+island, `IslandTopK` uses the current island's best, and `IslandPreferredTopK` uses the current
+island's entries among the global best when it has any and the whole global list otherwise, which is
+OpenEvolve's `_sample_exploitation_parent`. `ExploitationEliteCount` sets how many of the best the draw
+is uniform over.
+
+`EvolutionSelectionOptions.EliteBranch` (`EvolutionEliteBranch`) decides what the third branch, drawn
+with probability `EliteRatio`, returns: `IslandBest` (the default), `UniformIsland`, or `UniformGlobal`,
+a uniformly random entry of the cross-island elite index, which is OpenEvolve's `_sample_random_parent`.
+`EvolutionEngineOptions.CreateOpenEvolveDefaults()` and an imported OpenEvolve config use
+`IslandPreferredTopK` over the 100-entry archive and `UniformGlobal`.
 
 A policy that learns from results implements `IOutcomeAwareEvolutionSelectionPolicy<TGenome>`. The
 engine calls `Observe` with each committed evaluation and its insertion result, and checkpoints the

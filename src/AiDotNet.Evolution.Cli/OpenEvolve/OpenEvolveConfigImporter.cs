@@ -178,6 +178,13 @@ internal static class OpenEvolveConfigImporter
                 ExplorationRatio = exploration,
                 ExploitationRatio = exploitation,
                 EliteRatio = 1 - exploration - exploitation,
+                // What each branch draws from, as upstream's database.py does: exploitation picks uniformly from the
+                // archive (archive_size, applied as the pool size by the run), preferring the current island's programs;
+                // the remainder picks uniformly from every program on any island. Our engine's own defaults are a
+                // quality-ranked top ten and the island best, which in E-4's c3 pilot put parents a median 0.0019 below
+                // the best where OpenEvolve's sat 0.010 below.
+                ExploitationSource = EvolutionExploitationSource.IslandPreferredTopK,
+                EliteBranch = EvolutionEliteBranch.UniformGlobal,
                 TopPrograms = (int?)Integer(merged["prompt.num_top_programs"]),
                 // OpenEvolve's n inspirations: the island best, then max(1, int(n x elite_selection_ratio)) top programs,
                 // then diverse ones filling the rest of n.

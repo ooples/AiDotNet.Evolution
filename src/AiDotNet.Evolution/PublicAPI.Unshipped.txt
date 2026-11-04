@@ -2277,3 +2277,10 @@ static AiDotNet.Evolution.EvolutionDescriptorDefinition.Logarithmic(string! name
 static AiDotNet.Evolution.EvolutionDescriptorDefinition.WithEdges(string! name, System.Collections.Generic.IEnumerable<double>! edges, AiDotNet.Evolution.EvolutionOutOfRangePolicy outOfRangePolicy = AiDotNet.Evolution.EvolutionOutOfRangePolicy.Reject) -> AiDotNet.Evolution.EvolutionDescriptorDefinition!
 AiDotNet.Evolution.EvolutionEvent<TGenome>.Cell.get -> AiDotNet.Evolution.EvolutionCellKey?
 AiDotNet.Evolution.EvolutionEvent<TGenome>.Cell.init -> void
+AiDotNet.Evolution.EvolutionEliteBranch
+AiDotNet.Evolution.EvolutionEliteBranch.IslandBest = 0 -> AiDotNet.Evolution.EvolutionEliteBranch
+AiDotNet.Evolution.EvolutionEliteBranch.UniformIsland = 1 -> AiDotNet.Evolution.EvolutionEliteBranch
+AiDotNet.Evolution.EvolutionEliteBranch.UniformGlobal = 2 -> AiDotNet.Evolution.EvolutionEliteBranch
+AiDotNet.Evolution.EvolutionExploitationSource.IslandPreferredTopK = 2 -> AiDotNet.Evolution.EvolutionExploitationSource
+AiDotNet.Evolution.EvolutionSelectionOptions.EliteBranch.get -> AiDotNet.Evolution.EvolutionEliteBranch
+AiDotNet.Evolution.EvolutionSelectionOptions.EliteBranch.set -> void

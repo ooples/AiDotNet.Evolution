@@ -818,6 +818,70 @@ public sealed class OpenEvolveImportTests
         Assert.Contains("CombinedBlend", error, StringComparison.Ordinal);
     }
 
+    [Fact]
+    public void An_import_draws_parents_the_way_openevolves_database_does()
+    {
+        // E-4's c3 pilot: with the engine defaults (top-ten exploitation, island-best remainder) our parents sat a median
+        // 0.0019 below the best where OpenEvolve's sat 0.010 below, from the same config.yaml.
+        using var directory = new TemporaryDirectory();
+        RunFile run = Import(directory, """
+            max_iterations: 5
+            llm:
+              api_base: http://localhost:9/v1
+              models:
+                - name: fast
+                  weight: 1.0
+            database:
+              population_size: 40
+              archive_size: 100
+              num_islands: 2
+            """).Run;
+        var options = new EvolutionEngineOptions();
+
+        RunCommand.ApplySelection(run.Search, options);
+
+        Assert.Equal(EvolutionSelectionPolicyKind.Ratio, options.SelectionPolicy);
+        Assert.Equal(EvolutionExploitationSource.IslandPreferredTopK, options.Selection.ExploitationSource);
+        Assert.Equal(EvolutionEliteBranch.UniformGlobal, options.Selection.EliteBranch);
+        Assert.Equal(100, options.Selection.ExploitationEliteCount);
+        // population_size bounds the whole database, so two islands hold 20 each.
+        Assert.Equal(20, RunCommand.IslandCapacity(run.Search, grid: 100));
+    }
+
+    [Fact]
+    public void Run_file_selection_settings_override_the_archive_size_and_defaults()
+    {
+        var options = new EvolutionEngineOptions();
+        RunCommand.ApplySelection(new RunSearch
+        {
+            ExplorationRatio = 0.2,
+            ExploitationRatio = 0.7,
+            EliteRatio = 0.1,
+            ExploitationSource = EvolutionExploitationSource.IslandTopK,
+            ExploitationEliteCount = 7,
+            EliteBranch = EvolutionEliteBranch.UniformIsland,
+            EliteArchiveSize = 100
+        }, options);
+        Assert.Equal((EvolutionExploitationSource.IslandTopK, 7, EvolutionEliteBranch.UniformIsland),
+            (options.Selection.ExploitationSource, options.Selection.ExploitationEliteCount, options.Selection.EliteBranch));
+
+        // No ratios: the ratio policy is not switched on, and its settings stay at the engine defaults.
+        var untouched = new EvolutionEngineOptions();
+        RunCommand.ApplySelection(new RunSearch { EliteBranch = EvolutionEliteBranch.UniformGlobal, EliteArchiveSize = 100 }, untouched);
+        Assert.NotEqual(EvolutionSelectionPolicyKind.Ratio, untouched.SelectionPolicy);
+        Assert.Equal((EvolutionEliteBranch.IslandBest, 10), (untouched.Selection.EliteBranch, untouched.Selection.ExploitationEliteCount));
+    }
+
+    [Theory]
+    [InlineData(40, 1, 100, 40)]
+    [InlineData(40, 2, 100, 20)]
+    [InlineData(41, 2, 100, 21)] // rounded up, so the islands together hold at least population_size
+    [InlineData(40, 2, 10, 0)]   // a share at or above the grid is just the grid
+    [InlineData(40, 2, 20, 0)]
+    [InlineData(0, 2, 100, 0)]   // no bound
+    public void Each_island_holds_its_share_of_the_population(int population, int islands, long grid, int expected) =>
+        Assert.Equal(expected, RunCommand.IslandCapacity(new RunSearch { ArchiveCapacity = population, Islands = islands }, grid));
+
     private static OpenEvolveImport Import(TemporaryDirectory directory, string yaml, string? python = null)
     {
         string config = Path.Combine(directory.Path, "config.yaml");
