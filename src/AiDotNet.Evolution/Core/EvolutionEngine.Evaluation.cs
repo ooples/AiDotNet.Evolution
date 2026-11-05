@@ -54,9 +54,18 @@ public sealed partial class EvolutionEngine<TGenome>
             if (_selection is IEliteIndexAwareEvolutionSelectionPolicy<TGenome> eliteAwareSelection)
                 eliteAwareSelection.UseEliteIndex(_globalElites.Entries,
                     _options.IslandAssignment == EvolutionIslandAssignmentStrategy.InheritParent ? candidateIsland : island);
-            if (_selection is IPopulationAwareEvolutionSelectionPolicy<TGenome> populationAwareSelection)
-                populationAwareSelection.UsePopulation(_islands);
-            selection = _selection.Select(sourceArchive, proposalRandom, _options.InspirationCount);
+            IPopulationAwareEvolutionSelectionPolicy<TGenome>? populationAwareSelection =
+                _selection as IPopulationAwareEvolutionSelectionPolicy<TGenome>;
+            populationAwareSelection?.UsePopulation(_islands);
+            try
+            {
+                selection = _selection.Select(sourceArchive, proposalRandom, _options.InspirationCount);
+            }
+            finally
+            {
+                // The policy holds the islands only for this draw, so a finished run's archives are not kept alive.
+                populationAwareSelection?.UsePopulation(Array.Empty<IEvolutionArchive<TGenome>>());
+            }
             if (selection is null) continue;
             sourceIsland = candidateIsland;
             break;

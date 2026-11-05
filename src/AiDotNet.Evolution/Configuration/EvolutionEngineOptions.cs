@@ -501,7 +501,7 @@ public sealed class EvolutionEngineOptions
     /// (lines 326-328), drawn the way database.py draws them: exploitation uniformly from the 100-program archive,
     /// preferring the current island (<see cref="EvolutionExploitationSource.IslandPreferredTopK"/>,
     /// <c>_sample_exploitation_parent</c>), and the remainder uniformly from every program
-    /// (<see cref="EvolutionEliteBranch.UniformGlobal"/>, <c>_sample_random_parent</c>).
+    /// (<see cref="EvolutionEliteBranch.UniformPopulation"/>, <c>_sample_random_parent</c>).
     /// <see cref="EvolutionEarlyStoppingOptions.MinimumImprovement"/> already defaults to the
     /// upstream <c>convergence_threshold</c> of 0.001 (line 442), and early stopping stays off because upstream's
     /// <c>early_stopping_patience</c> defaults to <c>None</c> (line 441).

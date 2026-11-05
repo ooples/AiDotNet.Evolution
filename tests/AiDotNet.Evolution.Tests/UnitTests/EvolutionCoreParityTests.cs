@@ -209,6 +209,14 @@ public sealed class EvolutionCoreParityTests
 
         Assert.Throws<ArgumentException>(() => policy.UsePopulation(new IEvolutionArchive<TestGenome>[] { own, null! }));
         Assert.Throws<ArgumentNullException>(() => policy.UsePopulation(null!));
+        Assert.Throws<ArgumentException>(() => policy.UsePopulation(
+            Enumerable.Repeat<IEvolutionArchive<TestGenome>>(own, EvolutionCollectionLimits.MaximumIslands + 1).ToArray()));
+
+        // The policy keeps a copy, so a caller reusing its array cannot change the next draw.
+        var reused = new IEvolutionArchive<TestGenome>[] { own, other };
+        aware.UsePopulation(reused);
+        reused[1] = own;
+        Assert.Contains("e", Counts().Keys);
     }
 
     [Fact]

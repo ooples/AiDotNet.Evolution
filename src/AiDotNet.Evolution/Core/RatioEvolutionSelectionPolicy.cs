@@ -84,19 +84,24 @@ public sealed class RatioEvolutionSelectionPolicy<TGenome> : IEliteIndexAwareEvo
 
     /// <inheritdoc/>
     /// <remarks>
-    /// Only <see cref="EvolutionEliteBranch.UniformPopulation"/> reads the islands. The list is kept by reference until
-    /// the next call, so the caller must supply it again before each selection it should apply to.
+    /// Only <see cref="EvolutionEliteBranch.UniformPopulation"/> reads the islands. The policy copies the list, at most
+    /// <see cref="EvolutionCollectionLimits.MaximumIslands"/> archives, and keeps the copy until the next call; the
+    /// engine passes an empty list after each selection, so a finished run's archives are not kept reachable.
     /// </remarks>
-    /// <exception cref="ArgumentException"><paramref name="islands"/> contains a <c>null</c> archive.</exception>
+    /// <exception cref="ArgumentException">
+    /// <paramref name="islands"/> contains a <c>null</c> archive or more than
+    /// <see cref="EvolutionCollectionLimits.MaximumIslands"/> archives.
+    /// </exception>
     public void UsePopulation(IReadOnlyList<IEvolutionArchive<TGenome>> islands)
     {
         Guard.NotNull(islands);
-        for (int index = 0; index < islands.Count; index++)
-        {
-            if (islands[index] is null)
-                throw new ArgumentException("The population cannot contain a null archive.", nameof(islands));
-        }
-        _population = islands;
+        IEvolutionArchive<TGenome>[] snapshot = EvolutionCollection.CopyBounded(
+            islands,
+            EvolutionCollectionLimits.MaximumIslands,
+            nameof(islands));
+        if (snapshot.Any(island => island is null))
+            throw new ArgumentException("The population cannot contain a null archive.", nameof(islands));
+        _population = snapshot;
     }
 
     /// <inheritdoc/>

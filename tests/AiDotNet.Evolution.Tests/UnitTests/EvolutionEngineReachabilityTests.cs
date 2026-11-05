@@ -98,6 +98,21 @@ public sealed class EvolutionEngineReachabilityTests
     }
 
     [Fact]
+    public async Task ThePopulationIsSuppliedForEachSelectionAndWithdrawnAfterIt()
+    {
+        EvolutionEngineOptions options = RatioOptions();
+        options.IslandCount = 2;
+        var selection = new PopulationRecordingSelection(throwOnCall: 3);
+
+        await Assert.ThrowsAsync<InvalidOperationException>(() =>
+            Engine(options, new RecordingParentVariation(), selection).RunAsync(Seeds()));
+
+        // Two archives before each draw and none after it, including the draw that threw.
+        Assert.Equal(new[] { 2, 0, 2, 0, 2, 0 }, selection.Supplied);
+        Assert.Equal(new[] { 2, 2, 2 }, selection.SeenAtSelect);
+    }
+
+    [Fact]
     public async Task AnExplicitlySuppliedSelectionPolicyWinsOverTheOptions()
     {
         EvolutionEngineOptions uniformOptions = RatioOptions();
@@ -214,6 +229,36 @@ public sealed class EvolutionEngineReachabilityTests
             IncludeIslandBest = false
         }
     };
+}
+
+internal sealed class PopulationRecordingSelection : IPopulationAwareEvolutionSelectionPolicy<TestGenome>
+{
+    private readonly int _throwOnCall;
+    private readonly UniformEvolutionSelectionPolicy<TestGenome> _inner = new();
+    private int _current;
+
+    public PopulationRecordingSelection(int throwOnCall) => _throwOnCall = throwOnCall;
+
+    public List<int> Supplied { get; } = new();
+
+    public List<int> SeenAtSelect { get; } = new();
+
+    public string Id => "population-recording";
+
+    public string VersionHash => "population-recording-v1";
+
+    public void UsePopulation(IReadOnlyList<IEvolutionArchive<TestGenome>> islands)
+    {
+        _current = islands.Count;
+        Supplied.Add(islands.Count);
+    }
+
+    public EvolutionSelection<TestGenome>? Select(IEvolutionArchive<TestGenome> archive, StableRandom random, int inspirationCount)
+    {
+        SeenAtSelect.Add(_current);
+        if (SeenAtSelect.Count == _throwOnCall) throw new InvalidOperationException("selection failed");
+        return _inner.Select(archive, random, inspirationCount);
+    }
 }
 
 internal sealed class RecordingIslandParentVariation : IVariationOperator<TestGenome>
