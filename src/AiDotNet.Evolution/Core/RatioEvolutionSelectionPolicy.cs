@@ -33,12 +33,14 @@ namespace AiDotNet.Evolution;
 /// mixing the very best with some deliberately different ones so the operator sees contrast rather than a set of
 /// near-copies. Use it when you want OpenEvolve-style sampling with reproducible results.</para>
 /// </remarks>
-public sealed class RatioEvolutionSelectionPolicy<TGenome> : IEliteIndexAwareEvolutionSelectionPolicy<TGenome>
+public sealed class RatioEvolutionSelectionPolicy<TGenome> : IEliteIndexAwareEvolutionSelectionPolicy<TGenome>,
+    IPopulationAwareEvolutionSelectionPolicy<TGenome>
 {
     private readonly EvolutionSelectionOptions _options;
     private readonly string _versionHash;
     private IReadOnlyList<EvolutionEliteRecord<TGenome>> _globalElites = Array.Empty<EvolutionEliteRecord<TGenome>>();
     private int _targetIsland;
+    private IReadOnlyList<IEvolutionArchive<TGenome>> _population = Array.Empty<IEvolutionArchive<TGenome>>();
 
     /// <summary>Initializes a ratio selection policy.</summary>
     /// <param name="options">
@@ -81,6 +83,28 @@ public sealed class RatioEvolutionSelectionPolicy<TGenome> : IEliteIndexAwareEvo
     }
 
     /// <inheritdoc/>
+    /// <remarks>
+    /// Only <see cref="EvolutionEliteBranch.UniformPopulation"/> reads the islands. The policy copies the list, at most
+    /// <see cref="EvolutionCollectionLimits.MaximumIslands"/> archives, and keeps the copy until the next call; the
+    /// engine passes an empty list after each selection, so a finished run's archives are not kept reachable.
+    /// </remarks>
+    /// <exception cref="ArgumentException">
+    /// <paramref name="islands"/> contains a <c>null</c> archive or more than
+    /// <see cref="EvolutionCollectionLimits.MaximumIslands"/> archives.
+    /// </exception>
+    public void UsePopulation(IReadOnlyList<IEvolutionArchive<TGenome>> islands)
+    {
+        Guard.NotNull(islands);
+        IEvolutionArchive<TGenome>[] snapshot = EvolutionCollection.CopyBounded(
+            islands,
+            EvolutionCollectionLimits.MaximumIslands,
+            nameof(islands));
+        if (snapshot.Any(island => island is null))
+            throw new ArgumentException("The population cannot contain a null archive.", nameof(islands));
+        _population = snapshot;
+    }
+
+    /// <inheritdoc/>
     public EvolutionSelection<TGenome>? Select(IEvolutionArchive<TGenome> archive, StableRandom random, int inspirationCount)
     {
         Guard.NotNull(archive);
@@ -107,6 +131,7 @@ public sealed class RatioEvolutionSelectionPolicy<TGenome> : IEliteIndexAwareEvo
                 EvolutionEliteBranch.UniformGlobal => _globalElites.Count > 0
                     ? _globalElites[random.NextInt(_globalElites.Count)].Entry
                     : archive.Sample(random),
+                EvolutionEliteBranch.UniformPopulation => SamplePopulation(random) ?? archive.Sample(random),
                 _ => archive.Best
             };
         }
@@ -114,6 +139,22 @@ public sealed class RatioEvolutionSelectionPolicy<TGenome> : IEliteIndexAwareEvo
         parent ??= archive.Sample(random);
         if (parent is null) return null;
         return new EvolutionSelection<TGenome>(parent, BuildInspirations(archive, entries, parent, random, inspirationCount));
+    }
+
+    // OpenEvolve's _sample_random_parent: one uniform draw over every island's entries, in island then entry order.
+    private EvolutionArchiveEntry<TGenome>? SamplePopulation(StableRandom random)
+    {
+        long total = 0;
+        foreach (IEvolutionArchive<TGenome> island in _population) total += island.Entries.Count;
+        if (total == 0) return null;
+        long index = total <= int.MaxValue ? random.NextInt((int)total) : (long)(random.NextDouble() * total);
+        foreach (IEvolutionArchive<TGenome> island in _population)
+        {
+            IReadOnlyList<EvolutionArchiveEntry<TGenome>> entries = island.Entries;
+            if (index < entries.Count) return entries[(int)index];
+            index -= entries.Count;
+        }
+        return null;
     }
 
     private EvolutionArchiveEntry<TGenome>? SampleExploitationParent(IEvolutionArchive<TGenome> archive,

@@ -184,7 +184,7 @@ internal static class OpenEvolveConfigImporter
                 // quality-ranked top ten and the island best, which in E-4's c3 pilot put parents a median 0.0019 below
                 // the best where OpenEvolve's sat 0.010 below.
                 ExploitationSource = EvolutionExploitationSource.IslandPreferredTopK,
-                EliteBranch = EvolutionEliteBranch.UniformGlobal,
+                EliteBranch = EvolutionEliteBranch.UniformPopulation,
                 TopPrograms = (int?)Integer(merged["prompt.num_top_programs"]),
                 // OpenEvolve's n inspirations: the island best, then max(1, int(n x elite_selection_ratio)) top programs,
                 // then diverse ones filling the rest of n.

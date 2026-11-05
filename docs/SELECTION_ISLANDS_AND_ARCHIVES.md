@@ -75,12 +75,14 @@ OpenEvolve's `_sample_exploitation_parent`. `ExploitationEliteCount` sets how ma
 is uniform over.
 
 `EvolutionSelectionOptions.EliteBranch` (`EvolutionEliteBranch`) decides what the third branch, drawn
-with probability `EliteRatio`, returns: `IslandBest` (the default), `UniformIsland`, or `UniformGlobal`,
-a uniformly random entry of the cross-island elite index. That is the bounded counterpart of OpenEvolve's
-`_sample_random_parent`: the index keeps only the best `GlobalEliteCount` entries, where upstream draws from every
-program in its database. With an empty index it samples the target island.
-`EvolutionEngineOptions.CreateOpenEvolveDefaults()` and an imported OpenEvolve config use
-`IslandPreferredTopK` over the 100-entry archive and `UniformGlobal`.
+with probability `EliteRatio`, returns: `IslandBest` (the default), `UniformIsland`, `UniformGlobal`, or
+`UniformPopulation`. `UniformPopulation` is OpenEvolve's `_sample_random_parent`: a uniformly random entry of
+any island archive, with an entry that migration copied to several islands counted once per island, as
+upstream's migrant copies are. The engine hands the islands to a policy that implements
+`IPopulationAwareEvolutionSelectionPolicy<TGenome>`. `UniformGlobal` is a bounded variant that draws
+from the cross-island elite index, which keeps only the best `GlobalEliteCount` entries; with an empty
+index it samples the target island. `EvolutionEngineOptions.CreateOpenEvolveDefaults()` and an imported
+OpenEvolve config use `IslandPreferredTopK` over the 100-entry archive and `UniformPopulation`.
 
 A policy that learns from results implements `IOutcomeAwareEvolutionSelectionPolicy<TGenome>`. The
 engine calls `Observe` with each committed evaluation and its insertion result, and checkpoints the
@@ -91,6 +93,10 @@ A policy that needs the cross-island leaderboard implements
 `IEliteIndexAwareEvolutionSelectionPolicy<TGenome>`. Before each selection the engine passes it the
 current `EvolutionEliteRecord<TGenome>` list from the `EvolutionGlobalEliteIndex<TGenome>` and the
 island being served. Set `EvolutionEngineOptions.GlobalEliteCount` to maintain that index.
+
+A policy that draws from the whole population implements
+`IPopulationAwareEvolutionSelectionPolicy<TGenome>`. Before each selection the engine passes it every
+island archive, in island order; the ratio policy reads them only for `UniformPopulation`.
 
 ## Islands
 
