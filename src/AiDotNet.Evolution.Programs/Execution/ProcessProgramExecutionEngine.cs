@@ -682,24 +682,47 @@ public sealed class ProcessProgramExecutionEngine : IProgramExecutionEngine, IPr
         string sourcePath,
         string workspace)
     {
-        var script = new StringBuilder();
-        // Backstops only: the engine measures the tree's resident memory and CPU time and terminates it at the
-        // limit. The address-space cap sits at twice the limit so an interpreter's reservations do not trip it first.
-        long kilobytes = _limits.GetMemoryLimitBytes() / 1024L * 2L;
-        if (kilobytes > 0)
-        {
-            // A shell whose ulimit cannot set the requested resource must not abort the script, so every limit is
-            // written defensively: the wall-clock limit and the tree kill remain the backstop either way.
-            script.Append("ulimit -v ").Append(kilobytes.ToString(CultureInfo.InvariantCulture))
-                .Append(" 2>/dev/null || true; ");
-        }
-
-        script.Append("ulimit -t ").Append(GetCpuTimeLimitSeconds().ToString(CultureInfo.InvariantCulture))
-            .Append(" 2>/dev/null || true; ");
+        var script = new StringBuilder(PosixLimitPrefix(_limits.GetMemoryLimitBytes(), GetCpuTimeLimitSeconds()));
         script.Append("exec ")
             .Append(ProgramInterpreterSpecification.QuoteForPosixShell(specification.Executable))
             .Append(' ')
             .Append(ProgramInterpreterSpecification.Expand(template, sourcePath, workspace, quoteWithDoubleQuotes: false));
+        return script.ToString();
+    }
+
+    /// <summary>The shell's resource backstops, written ahead of the interpreter's <c>exec</c>.</summary>
+    /// <remarks>
+    /// <para>
+    /// Backstops only: the engine measures the tree's resident memory and CPU time and terminates it at the limit. The
+    /// address-space cap sits at twice the limit so an interpreter's reservations do not trip it first.
+    /// </para>
+    /// <para>
+    /// The CPU limit is split. A plain <c>ulimit -t</c> sets the soft and hard limits together, and when they are equal
+    /// the kernel skips SIGXCPU and sends SIGKILL, whose exit status (137) is the out-of-memory killer's; a CPU overrun
+    /// the sampler missed was then reported as a memory violation. The soft limit raises SIGXCPU (152) instead, and
+    /// the hard limit one second later still ends a candidate that ignores it. The soft limit is set first, because a
+    /// hard limit below the current soft one is refused.
+    /// </para>
+    /// <para>
+    /// A shell whose ulimit cannot set the requested resource must not abort the script, so every limit is written
+    /// defensively: the wall-clock limit and the tree kill remain the backstop either way.
+    /// </para>
+    /// </remarks>
+    internal static string PosixLimitPrefix(long memoryLimitBytes, int cpuSoftSeconds)
+    {
+        var script = new StringBuilder();
+        long kilobytes = memoryLimitBytes / 1024L * 2L;
+        if (kilobytes > 0)
+        {
+            script.Append("ulimit -v ").Append(kilobytes.ToString(CultureInfo.InvariantCulture))
+                .Append(" 2>/dev/null || true; ");
+        }
+
+        int cpuHardSeconds = cpuSoftSeconds == int.MaxValue ? int.MaxValue : cpuSoftSeconds + 1;
+        script.Append("ulimit -S -t ").Append(cpuSoftSeconds.ToString(CultureInfo.InvariantCulture))
+            .Append(" 2>/dev/null || true; ");
+        script.Append("ulimit -H -t ").Append(cpuHardSeconds.ToString(CultureInfo.InvariantCulture))
+            .Append(" 2>/dev/null || true; ");
         return script.ToString();
     }
 
