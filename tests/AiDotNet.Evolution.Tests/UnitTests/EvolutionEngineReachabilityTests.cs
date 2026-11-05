@@ -67,6 +67,36 @@ public sealed class EvolutionEngineReachabilityTests
         Assert.Equal(3, (await Resume(20)).GlobalElites.Count);
     }
 
+    [Theory]
+    [InlineData(EvolutionEliteBranch.UniformPopulation, true)]
+    [InlineData(EvolutionEliteBranch.UniformGlobal, false)]
+    [InlineData(EvolutionEliteBranch.UniformIsland, false)]
+    public async Task OnlyThePopulationBranchParentsFromAnotherIslandWithoutAnIndexOrMigration(
+        EvolutionEliteBranch branch, bool crosses)
+    {
+        EvolutionEngineOptions options = RatioOptions();
+        options.IslandCount = 2;
+        options.MaxEvaluationAttempts = 24;
+        options.Selection.ExploitationRatio = 0;
+        options.Selection.EliteRatio = 1;
+        options.Selection.ExploitationSource = EvolutionExploitationSource.IslandTopK;
+        options.Selection.EliteBranch = branch;
+        Assert.Equal((0, 0), (options.GlobalEliteCount, options.MigrationInterval));
+        var variation = new RecordingIslandParentVariation();
+
+        // Seeds 10 and 20 land on island 0 and seed 80 on island 1. Each child is its parent plus one, so within this
+        // budget island 0 holds values below 80 and island 1 holds 80 and above.
+        await new EvolutionEngine<TestGenome>(new SyntheticEvolutionTask(), variation, _ => Archive(), options)
+            .RunAsync(new[] { new TestGenome(10), new TestGenome(80), new TestGenome(20) });
+
+        // A child that repeats an evaluated genome costs no attempt, so a run may make more proposals than its budget;
+        // fewer than 60 keeps island 0 below 80.
+        Assert.InRange(variation.Draws.Count, 21, 59);
+        Assert.Contains(variation.Draws, draw => draw.Island == 1);
+        Assert.Equal(crosses, variation.Draws.Any(draw => draw.Island == 0 && draw.Parent >= 80));
+        Assert.Equal(crosses, variation.Draws.Any(draw => draw.Island == 1 && draw.Parent < 80));
+    }
+
     [Fact]
     public async Task AnExplicitlySuppliedSelectionPolicyWinsOverTheOptions()
     {
@@ -184,6 +214,29 @@ public sealed class EvolutionEngineReachabilityTests
             IncludeIslandBest = false
         }
     };
+}
+
+internal sealed class RecordingIslandParentVariation : IVariationOperator<TestGenome>
+{
+    private readonly List<(int Island, int Parent)> _draws = new();
+
+    public string Id => "recording-island-parent";
+
+    public string VersionHash => "recording-island-parent-v1";
+
+    public IReadOnlyList<(int Island, int Parent)> Draws
+    {
+        get { lock (_draws) return _draws.ToArray(); }
+    }
+
+    public ValueTask<TestGenome> ProposeAsync(EvolutionVariationContext<TestGenome> context,
+        CancellationToken cancellationToken = default)
+    {
+        cancellationToken.ThrowIfCancellationRequested();
+        int parent = context.Parent.Candidate.CanonicalGenome.Genome.Value;
+        lock (_draws) _draws.Add((context.Island, parent));
+        return new ValueTask<TestGenome>(new TestGenome(parent + 1));
+    }
 }
 
 internal sealed class RecordingParentVariation : IVariationOperator<TestGenome>

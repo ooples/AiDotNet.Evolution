@@ -166,6 +166,52 @@ public sealed class EvolutionCoreParityTests
     }
 
     [Fact]
+    public void RatioSelectionEliteBranchCanDrawUniformlyFromEveryIslandsPrograms()
+    {
+        MapElitesArchive<TestGenome> own = SpreadArchive();
+        var other = new MapElitesArchive<TestGenome>(new[] { new EvolutionDescriptorDefinition("x", 0, 4, 4) });
+        MapElitesArchiveTests.Add(other, 5, "e", 0.5, 0.5);
+        MapElitesArchiveTests.Add(other, 6, "f", 0.25, 2.5);
+        // The index holds only the island's best entry, so a draw that reaches "e" or "f" cannot have come from it.
+        var index = new EvolutionGlobalEliteIndex<TestGenome>(1, EvolutionOptimizationDirection.Maximize);
+        index.Consider(Record(0, 2, "b", 4));
+        var policy = new RatioEvolutionSelectionPolicy<TestGenome>(new EvolutionSelectionOptions
+        {
+            ExplorationRatio = 0,
+            ExploitationRatio = 0,
+            EliteRatio = 1,
+            EliteBranch = EvolutionEliteBranch.UniformPopulation
+        });
+
+        Dictionary<string, int> Counts()
+        {
+            var counts = new Dictionary<string, int>(StringComparer.Ordinal);
+            for (int seed = 0; seed < 600; seed++)
+            {
+                policy.UseEliteIndex(index.Entries, island: 0);
+                string id = Assert.IsType<EvolutionSelection<TestGenome>>(
+                    policy.Select(own, new StableRandom((ulong)seed), inspirationCount: 0)).Parent.Evaluation.GenomeId;
+                counts[id] = counts.TryGetValue(id, out int count) ? count + 1 : 1;
+            }
+            return counts;
+        }
+
+        // Before the engine supplies the islands, the draw samples the target island.
+        Assert.Equal(new[] { "a", "b", "c", "d" }, Counts().Keys.OrderBy(id => id, StringComparer.Ordinal));
+
+        IPopulationAwareEvolutionSelectionPolicy<TestGenome> aware = policy;
+        aware.UsePopulation(new IEvolutionArchive<TestGenome>[] { own, other });
+        Dictionary<string, int> counts = Counts();
+        Assert.Equal(new[] { "a", "b", "c", "d", "e", "f" }, counts.Keys.OrderBy(id => id, StringComparer.Ordinal));
+        // One uniform draw over all six programs (100 each expected), not an island first and then one of its
+        // entries, which would give e and f 150 each.
+        Assert.All(counts.Values, count => Assert.InRange(count, 70, 130));
+
+        Assert.Throws<ArgumentException>(() => policy.UsePopulation(new IEvolutionArchive<TestGenome>[] { own, null! }));
+        Assert.Throws<ArgumentNullException>(() => policy.UsePopulation(null!));
+    }
+
+    [Fact]
     public void EliteBranchJoinsThePolicyHashOnlyWhenItChangesTheBehaviour()
     {
         string Hash(EvolutionEliteBranch? branch) => new RatioEvolutionSelectionPolicy<TestGenome>(branch is null
@@ -177,6 +223,7 @@ public sealed class EvolutionCoreParityTests
         Assert.DoesNotContain("elite-branch", Hash(null), StringComparison.Ordinal);
         Assert.NotEqual(Hash(null), Hash(EvolutionEliteBranch.UniformIsland));
         Assert.NotEqual(Hash(EvolutionEliteBranch.UniformIsland), Hash(EvolutionEliteBranch.UniformGlobal));
+        Assert.NotEqual(Hash(EvolutionEliteBranch.UniformGlobal), Hash(EvolutionEliteBranch.UniformPopulation));
         Assert.Throws<ArgumentOutOfRangeException>(() => new RatioEvolutionSelectionPolicy<TestGenome>(
             new EvolutionSelectionOptions { EliteBranch = (EvolutionEliteBranch)7 }));
     }
@@ -188,7 +235,7 @@ public sealed class EvolutionCoreParityTests
 
         Assert.Equal(EvolutionExploitationSource.IslandPreferredTopK, selection.ExploitationSource);
         Assert.Equal(100, selection.ExploitationEliteCount);
-        Assert.Equal(EvolutionEliteBranch.UniformGlobal, selection.EliteBranch);
+        Assert.Equal(EvolutionEliteBranch.UniformPopulation, selection.EliteBranch);
     }
 
     [Fact]

@@ -1679,6 +1679,8 @@ AiDotNet.Evolution.IDeterministicConcurrentVariationOperator<TGenome>
 AiDotNet.Evolution.IDeterministicConcurrentVariationOperator<TGenome>.SupportsDeterministicConcurrency.get -> bool
 AiDotNet.Evolution.IEliteIndexAwareEvolutionSelectionPolicy<TGenome>
 AiDotNet.Evolution.IEliteIndexAwareEvolutionSelectionPolicy<TGenome>.UseEliteIndex(System.Collections.Generic.IReadOnlyList<AiDotNet.Evolution.EvolutionEliteRecord<TGenome>!>! elites, int island) -> void
+AiDotNet.Evolution.IPopulationAwareEvolutionSelectionPolicy<TGenome>
+AiDotNet.Evolution.IPopulationAwareEvolutionSelectionPolicy<TGenome>.UsePopulation(System.Collections.Generic.IReadOnlyList<AiDotNet.Evolution.IEvolutionArchive<TGenome>!>! islands) -> void
 AiDotNet.Evolution.IEvolutionArchive<TGenome>
 AiDotNet.Evolution.IEvolutionArchive<TGenome>.Sample(AiDotNet.Evolution.StableRandom! random) -> AiDotNet.Evolution.EvolutionArchiveEntry<TGenome>?
 AiDotNet.Evolution.IEvolutionArchive<TGenome>.TryAdd(AiDotNet.Evolution.EvolutionCandidate<TGenome>! candidate, AiDotNet.Evolution.EvolutionEvaluation! evaluation) -> AiDotNet.Evolution.EvolutionArchiveInsertionResult
@@ -1822,6 +1824,7 @@ AiDotNet.Evolution.RatioEvolutionSelectionPolicy<TGenome>.Id.get -> string!
 AiDotNet.Evolution.RatioEvolutionSelectionPolicy<TGenome>.RatioEvolutionSelectionPolicy(AiDotNet.Evolution.EvolutionSelectionOptions? options = null) -> void
 AiDotNet.Evolution.RatioEvolutionSelectionPolicy<TGenome>.Select(AiDotNet.Evolution.IEvolutionArchive<TGenome>! archive, AiDotNet.Evolution.StableRandom! random, int inspirationCount) -> AiDotNet.Evolution.EvolutionSelection<TGenome>?
 AiDotNet.Evolution.RatioEvolutionSelectionPolicy<TGenome>.UseEliteIndex(System.Collections.Generic.IReadOnlyList<AiDotNet.Evolution.EvolutionEliteRecord<TGenome>!>! elites, int island) -> void
+AiDotNet.Evolution.RatioEvolutionSelectionPolicy<TGenome>.UsePopulation(System.Collections.Generic.IReadOnlyList<AiDotNet.Evolution.IEvolutionArchive<TGenome>!>! islands) -> void
 AiDotNet.Evolution.RatioEvolutionSelectionPolicy<TGenome>.VersionHash.get -> string!
 AiDotNet.Evolution.ResourceMeteredEvolutionTask<TGenome>
 AiDotNet.Evolution.ResourceMeteredEvolutionTask<TGenome>.CanonicalizeAsync(TGenome genome, System.Threading.CancellationToken cancellationToken = default(System.Threading.CancellationToken)) -> System.Threading.Tasks.ValueTask<AiDotNet.Evolution.EvolutionCanonicalGenome<TGenome>!>
@@ -2281,6 +2284,7 @@ AiDotNet.Evolution.EvolutionEliteBranch
 AiDotNet.Evolution.EvolutionEliteBranch.IslandBest = 0 -> AiDotNet.Evolution.EvolutionEliteBranch
 AiDotNet.Evolution.EvolutionEliteBranch.UniformIsland = 1 -> AiDotNet.Evolution.EvolutionEliteBranch
 AiDotNet.Evolution.EvolutionEliteBranch.UniformGlobal = 2 -> AiDotNet.Evolution.EvolutionEliteBranch
+AiDotNet.Evolution.EvolutionEliteBranch.UniformPopulation = 3 -> AiDotNet.Evolution.EvolutionEliteBranch
 AiDotNet.Evolution.EvolutionExploitationSource.IslandPreferredTopK = 2 -> AiDotNet.Evolution.EvolutionExploitationSource
 AiDotNet.Evolution.EvolutionSelectionOptions.EliteBranch.get -> AiDotNet.Evolution.EvolutionEliteBranch
 AiDotNet.Evolution.EvolutionSelectionOptions.EliteBranch.set -> void

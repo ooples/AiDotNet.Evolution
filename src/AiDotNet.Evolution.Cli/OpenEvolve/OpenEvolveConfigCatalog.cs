@@ -81,7 +81,7 @@ internal static class OpenEvolveConfigCatalog
         new("database.archive_size", OpenEvolveKeyDisposition.Mapped, "search.eliteArchiveSize, the global elite index, and the exploitation pool drawn from uniformly"),
         new("database.num_islands", OpenEvolveKeyDisposition.Mapped, "search.islands"),
         new("database.elite_selection_ratio", OpenEvolveKeyDisposition.Mapped, "search.topInspirations = max(1, int(num_diverse_programs x ratio)), OpenEvolve's top-program inspirations"),
-        new("database.exploration_ratio", OpenEvolveKeyDisposition.Mapped, "search.explorationRatio; the remainder after exploitation becomes search.eliteRatio, drawn uniformly from the cross-island elite index of search.eliteArchiveSize entries, not every program (eliteBranch UniformGlobal)"),
+        new("database.exploration_ratio", OpenEvolveKeyDisposition.Mapped, "search.explorationRatio; the remainder after exploitation becomes search.eliteRatio, drawn uniformly from every program on every island, as _sample_random_parent does (eliteBranch UniformPopulation)"),
         new("database.exploitation_ratio", OpenEvolveKeyDisposition.Mapped, "search.exploitationRatio"),
         new("database.diversity_metric", OpenEvolveKeyDisposition.RefusedUnlessDefault, "only OpenEvolve's default diversity metric name is accepted"),
         new("database.feature_dimensions", OpenEvolveKeyDisposition.Mapped, "search.metricDescriptors with adaptive min-max bins, as OpenEvolve scales features; complexity becomes program length, diversity the built-in diversity axis with a frozen reference set"),

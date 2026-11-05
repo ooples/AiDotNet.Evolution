@@ -552,7 +552,7 @@ public sealed class EvolutionEngineOptions
             EliteRatio = 0.1,
             ExploitationSource = EvolutionExploitationSource.IslandPreferredTopK,
             ExploitationEliteCount = 100,
-            EliteBranch = EvolutionEliteBranch.UniformGlobal,
+            EliteBranch = EvolutionEliteBranch.UniformPopulation,
             TopInspirationCount = 3,
             DiverseInspirationCount = 2
         },

@@ -54,6 +54,8 @@ public sealed partial class EvolutionEngine<TGenome>
             if (_selection is IEliteIndexAwareEvolutionSelectionPolicy<TGenome> eliteAwareSelection)
                 eliteAwareSelection.UseEliteIndex(_globalElites.Entries,
                     _options.IslandAssignment == EvolutionIslandAssignmentStrategy.InheritParent ? candidateIsland : island);
+            if (_selection is IPopulationAwareEvolutionSelectionPolicy<TGenome> populationAwareSelection)
+                populationAwareSelection.UsePopulation(_islands);
             selection = _selection.Select(sourceArchive, proposalRandom, _options.InspirationCount);
             if (selection is null) continue;
             sourceIsland = candidateIsland;
