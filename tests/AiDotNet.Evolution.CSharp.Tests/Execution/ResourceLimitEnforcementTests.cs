@@ -77,6 +77,56 @@ public sealed class ResourceLimitEnforcementTests
     }
 
     [Fact]
+    public void The_cpu_backstop_sets_a_soft_limit_below_the_hard_one()
+    {
+        // Equal limits make the kernel send SIGKILL (137, the out-of-memory killer's status) instead of SIGXCPU (152).
+        string prefix = ProcessProgramExecutionEngine.PosixLimitPrefix(256L * 1024 * 1024, 3);
+
+        Assert.Contains("ulimit -v 524288 ", prefix, StringComparison.Ordinal);
+        int soft = prefix.IndexOf("ulimit -S -t 3 ", StringComparison.Ordinal);
+        int hard = prefix.IndexOf("ulimit -H -t 4 ", StringComparison.Ordinal);
+        Assert.True(soft >= 0 && hard > soft, prefix); // a hard limit below the current soft one is refused
+        Assert.DoesNotContain("ulimit -t", prefix, StringComparison.Ordinal);
+        Assert.Contains("ulimit -H -t " + int.MaxValue, ProcessProgramExecutionEngine.PosixLimitPrefix(0, int.MaxValue),
+            StringComparison.Ordinal);
+    }
+
+    [Theory]
+    [InlineData("while True:\n    pass\n", 152)]
+    [InlineData("import signal\nsignal.signal(signal.SIGXCPU, signal.SIG_IGN)\nwhile True:\n    pass\n", 137)]
+    public async Task The_kernel_cpu_backstop_reports_sigxcpu_and_still_ends_a_candidate_that_ignores_it(string source, int expected)
+    {
+        if (!OperatingSystem.IsLinux()) return; // POSIX rlimits; Windows is covered by the job object.
+        string file = Path.Combine(Path.GetTempPath(), "cpu-backstop-" + Guid.NewGuid().ToString("N") + ".py");
+        File.WriteAllText(file, source);
+        Process? shell = null;
+        try
+        {
+            string command = ProcessProgramExecutionEngine.PosixLimitPrefix(0, 1) + "exec " +
+                ProgramInterpreterSpecification.QuoteForPosixShell(Python) + " " + ProgramInterpreterSpecification.QuoteForPosixShell(file);
+            shell = Process.Start(new ProcessStartInfo("/bin/sh") { ArgumentList = { "-c", command }, UseShellExecute = false })!;
+            // A runner that gives the loop a small CPU share stretches two CPU seconds over much more wall time.
+            using var timeout = new CancellationTokenSource(TimeSpan.FromSeconds(CpuCaseWallLimitSeconds));
+            await shell.WaitForExitAsync(timeout.Token);
+            Assert.Equal(expected, shell.ExitCode);
+        }
+        finally
+        {
+            try
+            {
+                // If the rlimits were not applied, a canceled wait would otherwise leave the busy loop running.
+                if (shell is { HasExited: false }) shell.Kill(entireProcessTree: true);
+            }
+            catch (InvalidOperationException)
+            {
+                // It exited between the check and the kill.
+            }
+            shell?.Dispose();
+            File.Delete(file);
+        }
+    }
+
+    [Fact]
     public async Task Waiting_does_not_count_against_the_cpu_time_limit()
     {
         ProgramExecuteResponse sleeper = await Run(

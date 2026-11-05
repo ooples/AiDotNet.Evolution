@@ -93,6 +93,8 @@ public static class EvolutionPolicyEngineTrial
                     if (task.Id != id || task.VersionHash != taskVersionHash || task.EvaluatorVersionHash != evaluatorVersionHash)
                         throw new InvalidOperationException("Policy task factory changed its pinned task protocol.");
                     if (task is ICascadeEvolutionTask<TGenome>) throw new NotSupportedException("Cascaded policy trials require a separately coordinated driver.");
+                    if (task is IRebasingEvolutionTask<TGenome> { RebasesDescriptors: true })
+                        throw new NotSupportedException("Policy trials cannot rebase descriptors: their task wrappers do not forward the rebase.");
                     var fresh = new PolicyFreshTask<TGenome>(task);
                     var metered = new ResourceMeteredEvolutionTask<TGenome>(fresh, ledger, new[] { maximumEvaluationCostUnits });
                     var mixture = new PolicyEngineMixture<TGenome>(policy, definitions, ledger, costUnitVersionHash, owned);

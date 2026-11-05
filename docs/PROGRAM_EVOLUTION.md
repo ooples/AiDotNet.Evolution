@@ -25,6 +25,13 @@ A program search plugs three interfaces into the engine:
   Three descriptors ship. `ProgramLengthDescriptor` measures the normalised source length.
   `ProgramTokenComplexityDescriptor` counts lexical tokens. `ProgramDiversityDescriptor` measures
   distance from a reference set of programs.
+- `ProgramDescriptorRebaseOptions` lets `ProgramEvolutionTask` pick that reference set from the population. Pass
+  it to the constructor's `rebase` parameter. Its `ProgramDescriptorRebaseMode` is `Frozen` or `Periodic`. `Frozen` picks the set once, as soon as the islands hold
+  `ReferenceSize` distinct programs or the run has completed that many evaluations. `Periodic` also re-picks it
+  every `Interval` evaluations. The pick is a greedy max-min walk that starts at the best program, so it is
+  deterministic. The policy joins the task's version hash. The current set is saved in every checkpoint, and the
+  engine re-files every archive when the set changes (see
+  [Selection, islands and archives](SELECTION_ISLANDS_AND_ARCHIVES.md#relative-descriptors)).
 
 `ProgramGenomeCodec` serialises `ProgramGenome` values for portable checkpoints.
 

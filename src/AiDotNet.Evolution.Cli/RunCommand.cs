@@ -194,6 +194,13 @@ internal sealed class RunSearch
     public double? ExplorationRatio { get; init; }
     public double? ExploitationRatio { get; init; }
     public double? EliteRatio { get; init; }
+    /// <summary>Which elite pool the exploitation branch draws from; null keeps the engine default (<c>GlobalTopK</c>).</summary>
+    public EvolutionExploitationSource? ExploitationSource { get; init; }
+    /// <summary>How many strongest candidates the exploitation branch draws uniformly from; null keeps the engine
+    /// default, or <see cref="EliteArchiveSize"/> when that is set, which is what OpenEvolve's archive is.</summary>
+    public int? ExploitationEliteCount { get; init; }
+    /// <summary>What the third branch returns; null keeps the engine default (<c>IslandBest</c>).</summary>
+    public EvolutionEliteBranch? EliteBranch { get; init; }
     /// <summary>Top programs shown in each prompt (OpenEvolve's <c>prompt.num_top_programs</c>).</summary>
     public int? TopPrograms { get; init; }
     /// <summary>Top-quality elites offered as inspirations after the island best; null keeps the engine default.</summary>
@@ -243,7 +250,8 @@ internal sealed class RunSearch
     /// </para>
     /// </remarks>
     public bool RetainArtifactText { get; init; }
-    /// <summary>The most elites the archive holds (OpenEvolve's <c>database.population_size</c>); zero means the whole grid.</summary>
+    /// <summary>The most elites all islands hold together (OpenEvolve's <c>database.population_size</c>), split evenly
+    /// between the islands and rounded up; zero means the whole grid.</summary>
     public int ArchiveCapacity { get; init; }
     /// <summary>The global elite index size programs are drawn from (OpenEvolve's <c>database.archive_size</c>); zero for none.</summary>
     public int EliteArchiveSize { get; init; }
@@ -266,6 +274,41 @@ internal sealed class RunMetricDescriptor
     /// <summary>How a value outside the range is handled; <c>Reject</c> for a fixed <c>length</c> axis and
     /// <c>Clamp</c> otherwise when absent.</summary>
     public EvolutionOutOfRangePolicy? OutOfRange { get; init; }
+    /// <summary>For the built-in <c>diversity</c> axis only: when its reference set is picked from the population,
+    /// <c>Frozen</c> (once, OpenEvolve's behaviour) when absent, or <c>Periodic</c>.</summary>
+    public ProgramDescriptorRebaseMode? Reference { get; init; }
+    /// <summary>For <c>diversity</c>: how many programs the reference set holds (OpenEvolve's
+    /// <c>diversity_reference_size</c>); 20 when absent.</summary>
+    public int? ReferenceSize { get; init; }
+    /// <summary>For <c>diversity</c> with <c>Periodic</c> references: completed evaluations between picks; the
+    /// reference size when absent.</summary>
+    public int? RebaseInterval { get; init; }
+
+    /// <summary>The name of the built-in relative axis: a program's mean distance to a reference set of programs.</summary>
+    internal const string DiversityName = "diversity";
+
+    /// <summary>Whether the task measures this axis itself, rather than reading it from the evaluator's metrics.</summary>
+    internal bool IsBuiltIn => Name is "length" or DiversityName;
+
+    /// <summary>The rebase policy of a <c>diversity</c> axis; refuses the reference fields on any other axis.</summary>
+    internal ProgramDescriptorRebaseOptions? RebaseOptions()
+    {
+        if (Name != DiversityName)
+        {
+            if (Reference is not null || ReferenceSize is not null || RebaseInterval is not null)
+                throw new ArgumentException("reference, referenceSize and rebaseInterval apply only to the diversity axis.");
+            return null;
+        }
+        if (RebaseInterval is not null && Reference != ProgramDescriptorRebaseMode.Periodic)
+            throw new ArgumentException("rebaseInterval applies only to reference Periodic.");
+        int size = ReferenceSize ?? ProgramDescriptorRebaseOptions.DefaultReferenceSize;
+        return new ProgramDescriptorRebaseOptions
+        {
+            Mode = Reference ?? ProgramDescriptorRebaseMode.Frozen,
+            ReferenceSize = size,
+            Interval = RebaseInterval ?? size
+        }.Validated();
+    }
     /// <summary>How many observed values an <c>AdaptiveQuantile</c> axis keeps.</summary>
     public int SampleCapacity { get; init; } = EvolutionDescriptorDefinition.DefaultQuantileSampleCapacity;
 
@@ -274,7 +317,8 @@ internal sealed class RunMetricDescriptor
     internal EvolutionDescriptorDefinition ToDefinition(int maxProgramChars)
     {
         bool length = Name == "length";
-        EvolutionDescriptorBinning binning = Binning ?? (length
+        // A relative axis has no natural range either, so it adapts like length (OpenEvolve min-max scales both).
+        EvolutionDescriptorBinning binning = Binning ?? (length || Name == DiversityName
             ? EvolutionDescriptorBinning.AdaptiveMinMax
             : EvolutionDescriptorBinning.Linear);
         bool adaptive = binning is EvolutionDescriptorBinning.AdaptiveMinMax or EvolutionDescriptorBinning.AdaptiveQuantile;
@@ -454,7 +498,7 @@ internal static class RunCommand
             MaxProgramChars = run.Budget.MaxProgramChars
         };
         ApplyPrompt(run.Prompt, programOptions.Prompt, baseDirectory);
-        foreach (RunMetricDescriptor metric in run.Search.MetricDescriptors.Where(metric => metric.Name != "length"))
+        foreach (RunMetricDescriptor metric in run.Search.MetricDescriptors.Where(metric => !metric.IsBuiltIn))
             programOptions.MetricDescriptors.Add(metric.Name);
         IProgramFitnessEvaluator fitness = CreateFitness(run, execution, evaluator);
         if (run.LlmFeedback is { } feedback)
@@ -495,7 +539,15 @@ internal static class RunCommand
             fitness = new LlmJudgeProgramFitnessEvaluator(judge, fitness,
                 new ProgramPromptBuilder(judgePrompt, programOptions), feedbackOptions);
         }
-        var task = new ProgramEvolutionTask(fitness, new ProgramDescriptorSet(new[] { new ProgramLengthDescriptor() }), programOptions);
+        var task = CreateTask(fitness, programOptions, run.Search, initial, run.Language);
+        // Program length stands for OpenEvolve's built-in "complexity" axis. Configured descriptors replace it, as
+        // OpenEvolve's feature_dimensions replace its defaults; "length" among them keeps it. Length bins follow the
+        // lengths the search produces unless the run file says otherwise: a fixed 0-to-maxProgramChars range put every
+        // program of E-4's third pilot (400-550 characters of 10,000) in one cell.
+        EvolutionDescriptorDefinition[] descriptors = (run.Search.MetricDescriptors.Count == 0
+                ? new List<RunMetricDescriptor> { new() { Name = "length", Bins = 64 } }
+                : run.Search.MetricDescriptors)
+            .Select(metric => metric.ToDefinition(run.Budget.MaxProgramChars)).ToArray();
         var variationOptions = new LlmProgramVariationOptions
         {
             Mode = run.Mode,
@@ -505,6 +557,7 @@ internal static class RunCommand
             MaxOutputTokens = run.Model.MaxOutputTokens
         };
         if (run.Search.TopPrograms is int topPrograms) variationOptions.MaxTopPrograms = topPrograms;
+        ApplyFeatureDimensions(variationOptions, descriptors);
         // Instruction evolution, when configured. The observer is both halves: the operator's instruction
         // source and the engine's outcome listener, because an instruction can only be scored by what the
         // programs it produced achieved - see ProgramInstructionCreditObserver.
@@ -535,14 +588,6 @@ internal static class RunCommand
         }
 
         var variation = new LlmProgramVariationOperator(model, programOptions, variationOptions);
-        // Program length stands for OpenEvolve's built-in "complexity" axis. Configured descriptors replace it, as
-        // OpenEvolve's feature_dimensions replace its defaults; "length" among them keeps it. Length bins follow the
-        // lengths the search produces unless the run file says otherwise: a fixed 0-to-maxProgramChars range put every
-        // program of E-4's third pilot (400-550 characters of 10,000) in one cell.
-        EvolutionDescriptorDefinition[] descriptors = (run.Search.MetricDescriptors.Count == 0
-                ? new List<RunMetricDescriptor> { new() { Name = "length", Bins = 64 } }
-                : run.Search.MetricDescriptors)
-            .Select(metric => metric.ToDefinition(run.Budget.MaxProgramChars)).ToArray();
         var codec = new ProgramGenomeCodec();
         EvolutionReuseScope scope = Scope(task, codec, run);
 
@@ -592,13 +637,7 @@ internal static class RunCommand
             MigrationRate = run.Search.MigrationRate,
             MaxRetries = run.Search.EvaluationRetries
         };
-        if (run.Search.ExplorationRatio is not null || run.Search.ExploitationRatio is not null || run.Search.EliteRatio is not null)
-        {
-            options.SelectionPolicy = EvolutionSelectionPolicyKind.Ratio;
-            if (run.Search.ExplorationRatio is double exploration) options.Selection.ExplorationRatio = exploration;
-            if (run.Search.ExploitationRatio is double exploitation) options.Selection.ExploitationRatio = exploitation;
-            if (run.Search.EliteRatio is double elite) options.Selection.EliteRatio = elite;
-        }
+        ApplySelection(run.Search, options);
         if (run.Search.DiversePrograms is int diverse) options.Selection.DiverseInspirationCount = diverse;
         if (run.Search.TopInspirations is int top) options.Selection.TopInspirationCount = top;
         if (run.Search.EarlyStoppingPatience is long patience)
@@ -616,9 +655,9 @@ internal static class RunCommand
         options.GlobalEliteCount = run.Search.EliteArchiveSize;
         if (run.Search.MaxArtifactBytes is int artifactBytes) options.Artifacts.MaxArtifactBytes = artifactBytes;
 
-        // OpenEvolve's population_size bounds the whole database; a bound at or above the grid is just the grid.
-        long grid = descriptors.Aggregate(1L, (cells, descriptor) => cells * descriptor.BinCount);
-        int capacity = run.Search.ArchiveCapacity > 0 && run.Search.ArchiveCapacity < grid ? run.Search.ArchiveCapacity : 0;
+        // OpenEvolve's population_size bounds the whole database, and each island has its own archive here, so each
+        // island gets its share, rounded up; a share at or above an island's grid is just the grid.
+        int capacity = IslandCapacity(run.Search, descriptors.Aggregate(1L, (cells, descriptor) => cells * descriptor.BinCount));
         // What the reported quality actually is. An OpenEvolve evaluator that reports combined_score has
         // its own objective optimised; one that does not has fitness computed as the mean of its remaining
         // metrics, upstream's rule and ours. Measured on examples/signal_processing: that mean rose from
@@ -785,6 +824,61 @@ internal static class RunCommand
     private const int MaxRepertoireSeeds = 256;
 
     /// <summary>The reuse identity of this run's programs. Facets the CLI cannot observe carry explicit versioned labels.</summary>
+    /// <summary>The program task: length always, and the built-in diversity axis when the run file declares it.</summary>
+    /// <remarks>
+    /// Diversity starts out measured against the seed program and, by its rebase policy, against a reference set picked
+    /// from the population from then on; the engine re-files the archives each time that set changes.
+    /// </remarks>
+    internal static ProgramEvolutionTask CreateTask(IProgramFitnessEvaluator fitness, ProgramTaskOptions programOptions,
+        RunSearch search, string initial, ProgramLanguage language)
+    {
+        var descriptors = new List<IProgramDescriptor> { new ProgramLengthDescriptor() };
+        ProgramDescriptorRebaseOptions? rebase = null;
+        foreach (RunMetricDescriptor metric in search.MetricDescriptors)
+        {
+            ProgramDescriptorRebaseOptions? own = metric.RebaseOptions();
+            if (own is null) continue;
+            descriptors.Add(new ProgramDiversityDescriptor(new[] { new ProgramGenome(initial, language) }, metric.Name));
+            rebase = own;
+        }
+        return new ProgramEvolutionTask(fitness, new ProgramDescriptorSet(descriptors), programOptions, rebase: rebase);
+    }
+
+    /// <summary>Names the archive's axes to the prompt, in the order the archive declares them.</summary>
+    /// <remarks>
+    /// OpenEvolve's prompt says which dimensions the search keeps diverse (its <c>feature_dimensions</c>). Without the
+    /// names the prompt said "none" and could not place the parent on the grid, however many axes the archive had.
+    /// </remarks>
+    internal static void ApplyFeatureDimensions(LlmProgramVariationOptions options, IReadOnlyList<EvolutionDescriptorDefinition> descriptors)
+    {
+        options.FeatureDimensions = descriptors.Select(descriptor => descriptor.Name).ToList();
+        options.FeatureBinCounts = descriptors.Select(descriptor => descriptor.BinCount).ToList();
+    }
+
+    /// <summary>Applies the run file's parent-selection settings; any ratio switches on the ratio policy.</summary>
+    internal static void ApplySelection(RunSearch search, EvolutionEngineOptions options)
+    {
+        if (search.ExplorationRatio is null && search.ExploitationRatio is null && search.EliteRatio is null) return;
+        options.SelectionPolicy = EvolutionSelectionPolicyKind.Ratio;
+        if (search.ExplorationRatio is double exploration) options.Selection.ExplorationRatio = exploration;
+        if (search.ExploitationRatio is double exploitation) options.Selection.ExploitationRatio = exploitation;
+        if (search.EliteRatio is double elite) options.Selection.EliteRatio = elite;
+        if (search.ExploitationSource is EvolutionExploitationSource source) options.Selection.ExploitationSource = source;
+        if (search.EliteBranch is EvolutionEliteBranch branch) options.Selection.EliteBranch = branch;
+        // OpenEvolve's exploitation draws uniformly from its whole archive (archive_size), not from a top ten.
+        if ((search.ExploitationEliteCount ?? (search.EliteArchiveSize > 0 ? search.EliteArchiveSize : null)) is int pool)
+            options.Selection.ExploitationEliteCount = pool;
+    }
+
+    /// <summary>Each island archive's capacity: its share of <see cref="RunSearch.ArchiveCapacity"/>, rounded up, or zero
+    /// (the whole grid) when there is no bound or the share would reach the grid.</summary>
+    internal static int IslandCapacity(RunSearch search, long grid)
+    {
+        int islands = Math.Max(1, search.Islands);
+        int share = search.ArchiveCapacity > 0 ? (int)(((long)search.ArchiveCapacity + islands - 1) / islands) : 0;
+        return share > 0 && share < grid ? share : 0;
+    }
+
     private static EvolutionReuseScope Scope(ProgramEvolutionTask task, ProgramGenomeCodec codec, RunFile run) =>
         new(task.Id, task.VersionHash, task.EvaluatorVersionHash, codec.Id, codec.VersionHash,
             constraintsVersion: "evaluator-defined-v1", dataVersion: "evaluator-defined-v1", fidelityVersion: "single-fidelity-v1",
@@ -1205,6 +1299,7 @@ internal static class RunCommand
                 try
                 {
                     metric.ToDefinition(run.Budget.MaxProgramChars);
+                    metric.RebaseOptions();
                 }
                 catch (ArgumentException exception)
                 {

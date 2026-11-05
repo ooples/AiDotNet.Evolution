@@ -85,6 +85,20 @@ public sealed class CliDescriptorBinningTests
         Assert.Contains("edges apply only to binning ExplicitEdges", refused.Message);
     }
 
+    [Theory]
+    [InlineData("{ \"name\": \"length\", \"referenceSize\": 5 }", "apply only to the diversity axis")]
+    [InlineData("{ \"name\": \"diversity\", \"rebaseInterval\": 5 }", "rebaseInterval applies only to reference Periodic")]
+    public void ARunFileRefusesMisplacedReferenceSettingsBeforeItRuns(string descriptor, string reason)
+    {
+        using var directory = new TemporaryDirectory();
+        string path = WriteRun(directory.Path, "[ " + descriptor + " ]");
+
+        InvalidDataException refused = Assert.Throws<InvalidDataException>(() => RunCommand.Load(path));
+
+        Assert.Contains("search.metricDescriptors[0]", refused.Message);
+        Assert.Contains(reason, refused.Message);
+    }
+
     [Fact]
     public void ARunFileReadsTheBinningByName()
     {

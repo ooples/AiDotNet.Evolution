@@ -30,6 +30,9 @@ internal static class EvolutionEngineDocuments
 
         /// <summary>State of a variation operator that remembers something between proposals.</summary>
         public string? VariationState { get; set; }
+
+        /// <summary>The descriptor reading of a task that rebases its relative descriptors.</summary>
+        public string? RebaseState { get; set; }
         public List<StatusCountDocument>? StatusCounts { get; set; }
         public List<string>? SeenGenomeIds { get; set; }
         public List<CacheDocument>? Cache { get; set; }

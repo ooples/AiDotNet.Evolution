@@ -662,6 +662,7 @@ public sealed partial class EvolutionEngine<TGenome>
         {
             EvolutionTaskResult result = item.Result ?? EvolutionTaskResult.Failed("missing_result", "No terminal evaluator result was produced.");
             EvolutionEvaluation evaluation = BuildEvaluation(item, result);
+            if (item.Candidate is not null) evaluation = WithCurrentDescriptors(evaluation, item.Candidate.CanonicalGenome.Genome);
             IncrementStatus(evaluation.Status);
             EvolutionArchiveInsertionResult? insertion = null;
             // Queued before the failure branch below, which forgets a failed candidate so an identical candidate may
@@ -723,6 +724,7 @@ public sealed partial class EvolutionEngine<TGenome>
             if (_checkpointStore is not null && _options.CheckpointInterval > 0) _commitsSinceCheckpoint++;
         }
         EnforceDeduplicationCapacity();
+        RebaseIfDue();
         return failedFast;
     }
 

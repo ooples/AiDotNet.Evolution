@@ -7,8 +7,10 @@ namespace AiDotNet.Evolution;
 /// to island <c>evaluationId % IslandCount</c>. That keeps the proposal stream perfectly balanced across islands but
 /// can move a child away from the island its parent came from whenever the preferred island is still empty and the
 /// engine has to borrow a parent from a neighbouring island.
-/// <see cref="InheritParent"/> instead assigns the child to the island the parent was actually drawn from, which is
-/// the island-isolation rule used by OpenEvolve's program database. Both strategies are fully deterministic and are
+/// <see cref="InheritParent"/> instead assigns the child to the island whose archive the parent was drawn for, which
+/// is the island-isolation rule used by OpenEvolve's program database. A parent that a selection policy takes from
+/// the cross-island elite index can live on another island; the child still joins the sampling island, as
+/// OpenEvolve's <c>target_island</c> places it. Both strategies are fully deterministic and are
 /// folded into the engine's configuration hash, so a checkpoint written under one strategy cannot resume under the
 /// other.
 /// </para>
@@ -25,6 +27,7 @@ public enum EvolutionIslandAssignmentStrategy
     /// <summary>Assign island <c>evaluationId % IslandCount</c>, regardless of where the parent came from.</summary>
     RoundRobin = 0,
 
-    /// <summary>Assign the island the parent was drawn from, falling back to the round-robin island for seeds.</summary>
+    /// <summary>Assign the island whose archive the parent was drawn for, falling back to the round-robin island for
+    /// seeds.</summary>
     InheritParent = 1
 }

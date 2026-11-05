@@ -29,29 +29,55 @@ namespace AiDotNet.Evolution.Programs;
 /// descriptor coordinates. Everything about running the code stays in your evaluator, so nothing here executes
 /// generated program text.</para>
 /// </remarks>
-public sealed class ProgramEvolutionTask : IEvolutionTask<ProgramGenome>, IEvolutionLatencyProfile
+public sealed partial class ProgramEvolutionTask : IRebasingEvolutionTask<ProgramGenome>, IEvolutionLatencyProfile
 {
     /// <inheritdoc/>
     /// <remarks>Forwards the program evaluator's declaration.</remarks>
     public bool IsLatencyBound => _evaluator is IEvolutionLatencyProfile { IsLatencyBound: true };
 
     private readonly IProgramFitnessEvaluator _evaluator;
-    private readonly ProgramDescriptorSet _descriptors;
+    private readonly ProgramDescriptorSet _initialDescriptors;
+    // Replaced, never mutated, when a rebase picks new references; read concurrently by evaluations, so volatile.
+    private volatile ProgramDescriptorSet _descriptors;
     private readonly ProgramTaskOptions _options;
     private readonly EvolveBlockMarkers _markers;
+
+    /// <summary>Initializes a program-evolution task whose relative descriptors keep the references they were built
+    /// with.</summary>
+    /// <param name="evaluator">The evaluator that scores candidates.</param>
+    /// <param name="descriptors">The descriptors that place candidates in the archive; <c>null</c> means none.</param>
+    /// <param name="options">Program bounds and evolve-block settings; <c>null</c> uses the defaults.</param>
+    /// <param name="id">A stable task identifier.</param>
+    /// <remarks>Kept for binary compatibility with callers built before the <c>rebase</c> parameter existed.</remarks>
+    /// <exception cref="ArgumentNullException"><paramref name="evaluator"/> is <c>null</c>.</exception>
+    /// <exception cref="ArgumentException"><paramref name="id"/> is empty or white space, or <paramref name="options"/> is invalid.</exception>
+    public ProgramEvolutionTask(
+        IProgramFitnessEvaluator evaluator,
+        ProgramDescriptorSet? descriptors,
+        ProgramTaskOptions? options,
+        string id)
+        : this(evaluator, descriptors, options, id, rebase: null)
+    {
+    }
 
     /// <summary>Initializes a program-evolution task.</summary>
     /// <param name="evaluator">The evaluator that scores candidates.</param>
     /// <param name="descriptors">The descriptors that place candidates in the archive; <c>null</c> means none.</param>
     /// <param name="options">Program bounds and evolve-block settings; <c>null</c> uses the defaults.</param>
     /// <param name="id">A stable task identifier.</param>
+    /// <param name="rebase">
+    /// When the relative descriptors in <paramref name="descriptors"/> re-pick their references from the population;
+    /// <c>null</c> keeps the references they were built with for the whole run.
+    /// </param>
     /// <exception cref="ArgumentNullException"><paramref name="evaluator"/> is <c>null</c>.</exception>
     /// <exception cref="ArgumentException"><paramref name="id"/> is empty or white space, or <paramref name="options"/> is invalid.</exception>
+    /// <exception cref="ArgumentOutOfRangeException"><paramref name="rebase"/> is invalid.</exception>
     public ProgramEvolutionTask(
         IProgramFitnessEvaluator evaluator,
         ProgramDescriptorSet? descriptors = null,
         ProgramTaskOptions? options = null,
-        string id = "program-evolution")
+        string id = "program-evolution",
+        ProgramDescriptorRebaseOptions? rebase = null)
     {
         ProgramGuard.NotNull(evaluator);
         ProgramGuard.NotNullOrWhiteSpace(id);
@@ -61,10 +87,13 @@ public sealed class ProgramEvolutionTask : IEvolutionTask<ProgramGenome>, IEvolu
 
         _evaluator = evaluator;
         _descriptors = descriptors ?? ProgramDescriptorSet.Empty();
+        _initialDescriptors = _descriptors;
+        // A policy with nothing to rebase is dropped, so the task keeps the identity it had without one.
+        _rebase = rebase is not null && _descriptors.HasRebasableDescriptors ? rebase.Validated() : null;
         _options = effective;
         _markers = effective.ResolveEvolveBlockMarkers();
         Id = id.Trim();
-        VersionHash = BuildVersionHash(effective, _descriptors, evaluator);
+        VersionHash = BuildVersionHash(effective, _descriptors, evaluator, _rebase);
     }
 
     /// <inheritdoc/>
@@ -76,7 +105,7 @@ public sealed class ProgramEvolutionTask : IEvolutionTask<ProgramGenome>, IEvolu
     /// <inheritdoc/>
     public string EvaluatorVersionHash => _evaluator.VersionHash;
 
-    /// <summary>Gets the descriptors merged into every completed evaluation.</summary>
+    /// <summary>Gets the descriptors merged into every completed evaluation, as currently rebased.</summary>
     public ProgramDescriptorSet Descriptors => _descriptors;
 
     /// <summary>Gets a copy of the program bounds and evolve-block settings this task enforces.</summary>
@@ -205,7 +234,8 @@ public sealed class ProgramEvolutionTask : IEvolutionTask<ProgramGenome>, IEvolu
     private static string BuildVersionHash(
         ProgramTaskOptions options,
         ProgramDescriptorSet descriptors,
-        IProgramFitnessEvaluator evaluator)
+        IProgramFitnessEvaluator evaluator,
+        ProgramDescriptorRebaseOptions? rebase)
     {
         EvolveBlockMarkers markers = options.ResolveEvolveBlockMarkers();
         var components = new List<string>
@@ -235,6 +265,12 @@ public sealed class ProgramEvolutionTask : IEvolutionTask<ProgramGenome>, IEvolu
         {
             components.Add("program-resource-cost-unit-v1");
             components.Add(resources.CostUnitVersionHash);
+        }
+
+        if (rebase is not null)
+        {
+            components.Add("program-descriptor-rebase-v1");
+            components.Add(rebase.Canonical());
         }
 
         return "program-task-" + EvolutionHash.Combine(components);

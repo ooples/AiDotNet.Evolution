@@ -8,8 +8,8 @@ namespace AiDotNet.Evolution;
 /// One draw from the proposal's <see cref="StableRandom"/> stream chooses the branch: below
 /// <see cref="EvolutionSelectionOptions.ExplorationRatio"/> the parent is a uniformly random occupied cell, below the
 /// sum of the exploration and exploitation ratios it is drawn uniformly from the strongest
-/// <see cref="EvolutionSelectionOptions.ExploitationEliteCount"/> candidates, and otherwise it is the target island's
-/// current best entry. The exploitation pool comes from the engine's cross-island elite index when
+/// <see cref="EvolutionSelectionOptions.ExploitationEliteCount"/> candidates, and otherwise it is what
+/// <see cref="EvolutionSelectionOptions.EliteBranch"/> names, by default the target island's current best entry. The exploitation pool comes from the engine's cross-island elite index when
 /// <see cref="EvolutionSelectionOptions.ExploitationSource"/> is
 /// <see cref="EvolutionExploitationSource.GlobalTopK"/> and the index is populated, and from the island's own
 /// best entries otherwise, so a cross-island parent is opt-in rather than the accidental leak it is in OpenEvolve.
@@ -38,6 +38,7 @@ public sealed class RatioEvolutionSelectionPolicy<TGenome> : IEliteIndexAwareEvo
     private readonly EvolutionSelectionOptions _options;
     private readonly string _versionHash;
     private IReadOnlyList<EvolutionEliteRecord<TGenome>> _globalElites = Array.Empty<EvolutionEliteRecord<TGenome>>();
+    private int _targetIsland;
 
     /// <summary>Initializes a ratio selection policy.</summary>
     /// <param name="options">
@@ -61,9 +62,9 @@ public sealed class RatioEvolutionSelectionPolicy<TGenome> : IEliteIndexAwareEvo
 
     /// <inheritdoc/>
     /// <remarks>
-    /// The island index is validated but not otherwise used: the archive handed to
-    /// <see cref="Select"/> already identifies the island, and
-    /// <see cref="EvolutionExploitationSource.GlobalTopK"/> deliberately draws from every island.
+    /// The island index is the one the next proposal targets. Only
+    /// <see cref="EvolutionExploitationSource.IslandPreferredTopK"/> reads it, to prefer that island's entries in the
+    /// index; <see cref="EvolutionExploitationSource.GlobalTopK"/> deliberately draws from every island.
     /// </remarks>
     public void UseEliteIndex(IReadOnlyList<EvolutionEliteRecord<TGenome>> elites, int island)
     {
@@ -76,6 +77,7 @@ public sealed class RatioEvolutionSelectionPolicy<TGenome> : IEliteIndexAwareEvo
         if (snapshot.Any(item => item is null))
             throw new ArgumentException("The elite index cannot contain null records.", nameof(elites));
         _globalElites = Array.AsReadOnly(snapshot);
+        _targetIsland = island;
     }
 
     /// <inheritdoc/>
@@ -99,7 +101,14 @@ public sealed class RatioEvolutionSelectionPolicy<TGenome> : IEliteIndexAwareEvo
         }
         else
         {
-            parent = archive.Best;
+            parent = _options.EliteBranch switch
+            {
+                EvolutionEliteBranch.UniformIsland => archive.Sample(random),
+                EvolutionEliteBranch.UniformGlobal => _globalElites.Count > 0
+                    ? _globalElites[random.NextInt(_globalElites.Count)].Entry
+                    : archive.Sample(random),
+                _ => archive.Best
+            };
         }
 
         parent ??= archive.Sample(random);
@@ -111,13 +120,18 @@ public sealed class RatioEvolutionSelectionPolicy<TGenome> : IEliteIndexAwareEvo
         IReadOnlyList<EvolutionArchiveEntry<TGenome>> entries, StableRandom random)
     {
         EvolutionArchiveEntry<TGenome>[] pool = Array.Empty<EvolutionArchiveEntry<TGenome>>();
-        if (_options.ExploitationSource == EvolutionExploitationSource.GlobalTopK && _globalElites.Count > 0)
+        if (_options.ExploitationSource != EvolutionExploitationSource.IslandTopK && _globalElites.Count > 0)
         {
-            pool = _globalElites
-                .Select(record => record.Entry)
-                .OrderBy(entry => entry, EvolutionEntryOrdering.BestFirst<TGenome>(archive.Direction))
+            EvolutionEliteRecord<TGenome>[] ranked = _globalElites
+                .OrderBy(record => record.Entry, EvolutionEntryOrdering.BestFirst<TGenome>(archive.Direction))
                 .Take(_options.ExploitationEliteCount)
                 .ToArray();
+            // OpenEvolve's exploitation prefers archive programs on the current island and only falls back to the
+            // whole archive when the island has none among them.
+            EvolutionEliteRecord<TGenome>[] own = _options.ExploitationSource == EvolutionExploitationSource.IslandPreferredTopK
+                ? ranked.Where(record => record.Island == _targetIsland).ToArray()
+                : Array.Empty<EvolutionEliteRecord<TGenome>>();
+            pool = (own.Length > 0 ? own : ranked).Select(record => record.Entry).ToArray();
         }
         if (pool.Length == 0)
         {

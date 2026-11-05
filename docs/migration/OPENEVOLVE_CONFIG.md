@@ -210,8 +210,13 @@ any helper beside it, and each `openEvolveEvaluator.pythonPath` directory is mou
   explicitly.
 - **LLM feedback.** ``evaluator.use_llm_feedback`` scores each program with ``llm.evaluator_models`` (or the proposal
   models) and blends the result in with ``llm_feedback_weight``.
-- **Diversity axis.** OpenEvolve's built-in `diversity` feature is measured against the current population, so it has
-  no deterministic equivalent. It is dropped, and `complexity` becomes program length.
+- **Diversity axis.** OpenEvolve's built-in `diversity` feature is the mean fast code distance to up to
+  `diversity_reference_size` programs. OpenEvolve draws that set from the database with a greedy max-min walk that starts
+  at a random program, and in practice draws it once, early. Here the same distance and set size are used, and the set
+  is also picked once (`reference: Frozen`). The differences: the walk starts at the best program, ties go to the
+  ordinally smaller genome identifier, and every archive is re-filed when the set is picked, so no cell mixes two
+  readings. `reference: Periodic` with `rebaseInterval` re-picks the set as the run goes on. `complexity` becomes
+  program length.
 - **Memory limit.** OpenEvolve declares `evaluator.memory_limit_mb` but does not enforce it. Here it is enforced, and
   when it is null the sandbox still caps each evaluation at 4096 MiB.
 - **Checkpoints.** Ours checkpoints after every batch, so any `checkpoint_interval` is met.
@@ -276,16 +281,16 @@ any helper beside it, and each `openEvolveEvaluator.pythonPath` directory is mou
 | `database.db_path` | NoEffect | run state lives in checkpoints under --output |
 | `database.in_memory` | NoEffect | run state lives in checkpoints under --output |
 | `database.log_prompts` | NoEffect | prompt logging only; prompts are not written to the trace |
-| `database.population_size` | Mapped | search.archiveCapacity, the most elites the archive holds |
-| `database.archive_size` | Mapped | search.eliteArchiveSize, the global elite index programs are drawn from |
+| `database.population_size` | Mapped | search.archiveCapacity, the most elites all islands hold together, split evenly between them |
+| `database.archive_size` | Mapped | search.eliteArchiveSize, the global elite index, and the exploitation pool drawn from uniformly |
 | `database.num_islands` | Mapped | search.islands |
 | `database.elite_selection_ratio` | Mapped | search.topInspirations = max(1, int(num_diverse_programs x ratio)), OpenEvolve's top-program inspirations |
-| `database.exploration_ratio` | Mapped | search.explorationRatio; the remainder after exploitation becomes search.eliteRatio |
+| `database.exploration_ratio` | Mapped | search.explorationRatio; the remainder after exploitation becomes search.eliteRatio, drawn uniformly from the cross-island elite index of search.eliteArchiveSize entries, not every program (eliteBranch UniformGlobal) |
 | `database.exploitation_ratio` | Mapped | search.exploitationRatio |
 | `database.diversity_metric` | RefusedUnlessDefault | only OpenEvolve's default diversity metric name is accepted |
-| `database.feature_dimensions` | Mapped | search.metricDescriptors with adaptive min-max bins, as OpenEvolve scales features; complexity becomes program length, diversity is dropped and reported |
+| `database.feature_dimensions` | Mapped | search.metricDescriptors with adaptive min-max bins, as OpenEvolve scales features; complexity becomes program length, diversity the built-in diversity axis with a frozen reference set |
 | `database.feature_bins` | Mapped | the bin count of each descriptor |
-| `database.diversity_reference_size` | RefusedUnlessDefault | OpenEvolve's population-relative diversity feature is not reproduced |
+| `database.diversity_reference_size` | Mapped | the diversity axis's referenceSize |
 | `database.migration_interval` | Mapped | search.migrationInterval |
 | `database.migration_rate` | Mapped | search.migrationRate |
 | `database.random_seed` | NoEffect | the run seed drives every random stream |

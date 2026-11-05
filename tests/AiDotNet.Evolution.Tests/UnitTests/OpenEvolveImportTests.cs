@@ -818,6 +818,149 @@ public sealed class OpenEvolveImportTests
         Assert.Contains("CombinedBlend", error, StringComparison.Ordinal);
     }
 
+    [Fact]
+    public void An_import_draws_parents_the_way_openevolves_database_does()
+    {
+        // E-4's c3 pilot: with the engine defaults (top-ten exploitation, island-best remainder) our parents sat a median
+        // 0.0019 below the best where OpenEvolve's sat 0.010 below, from the same config.yaml.
+        using var directory = new TemporaryDirectory();
+        RunFile run = Import(directory, """
+            max_iterations: 5
+            llm:
+              api_base: http://localhost:9/v1
+              models:
+                - name: fast
+                  weight: 1.0
+            database:
+              population_size: 40
+              archive_size: 100
+              num_islands: 2
+            """).Run;
+        var options = new EvolutionEngineOptions();
+
+        RunCommand.ApplySelection(run.Search, options);
+
+        Assert.Equal(EvolutionSelectionPolicyKind.Ratio, options.SelectionPolicy);
+        Assert.Equal(EvolutionExploitationSource.IslandPreferredTopK, options.Selection.ExploitationSource);
+        Assert.Equal(EvolutionEliteBranch.UniformGlobal, options.Selection.EliteBranch);
+        Assert.Equal(100, options.Selection.ExploitationEliteCount);
+        // population_size bounds the whole database, so two islands hold 20 each.
+        Assert.Equal(20, RunCommand.IslandCapacity(run.Search, grid: 100));
+    }
+
+    [Fact]
+    public void Run_file_selection_settings_override_the_archive_size_and_defaults()
+    {
+        var options = new EvolutionEngineOptions();
+        RunCommand.ApplySelection(new RunSearch
+        {
+            ExplorationRatio = 0.2,
+            ExploitationRatio = 0.7,
+            EliteRatio = 0.1,
+            ExploitationSource = EvolutionExploitationSource.IslandTopK,
+            ExploitationEliteCount = 7,
+            EliteBranch = EvolutionEliteBranch.UniformIsland,
+            EliteArchiveSize = 100
+        }, options);
+        Assert.Equal((EvolutionExploitationSource.IslandTopK, 7, EvolutionEliteBranch.UniformIsland),
+            (options.Selection.ExploitationSource, options.Selection.ExploitationEliteCount, options.Selection.EliteBranch));
+
+        // No ratios: the ratio policy is not switched on, and its settings stay at the engine defaults.
+        var untouched = new EvolutionEngineOptions();
+        RunCommand.ApplySelection(new RunSearch { EliteBranch = EvolutionEliteBranch.UniformGlobal, EliteArchiveSize = 100 }, untouched);
+        Assert.NotEqual(EvolutionSelectionPolicyKind.Ratio, untouched.SelectionPolicy);
+        Assert.Equal((EvolutionEliteBranch.IslandBest, 10), (untouched.Selection.EliteBranch, untouched.Selection.ExploitationEliteCount));
+    }
+
+    [Theory]
+    [InlineData(40, 1, 100, 40)]
+    [InlineData(40, 2, 100, 20)]
+    [InlineData(41, 2, 100, 21)] // rounded up, so the islands together hold at least population_size
+    [InlineData(40, 2, 10, 0)]   // a share at or above the grid is just the grid
+    [InlineData(40, 2, 20, 0)]
+    [InlineData(0, 2, 100, 0)]   // no bound
+    [InlineData(int.MaxValue, 2, 1L << 40, 1 << 30)] // the rounding-up sum does not overflow
+    public void Each_island_holds_its_share_of_the_population(int population, int islands, long grid, int expected) =>
+        Assert.Equal(expected, RunCommand.IslandCapacity(new RunSearch { ArchiveCapacity = population, Islands = islands }, grid));
+
+    [Theory]
+    [InlineData("  diversity_reference_size: 7\n", 7)]
+    [InlineData("", 20)]
+    public void An_imported_diversity_axis_is_built_against_a_frozen_reference_set_of_the_configured_size(string sizeLine, int size)
+    {
+        // E-4's c3 pilot: the importer used to drop OpenEvolve's diversity axis, leaving a one-axis grid of ten cells.
+        using var directory = new TemporaryDirectory();
+        RunFile run = Import(directory, """
+            max_iterations: 5
+            llm:
+              api_base: http://localhost:9/v1
+              models:
+                - name: fast
+                  weight: 1.0
+            database:
+              feature_dimensions: [complexity, diversity]
+              feature_bins: 6
+            """ + "\n" + sizeLine).Run;
+
+        RunMetricDescriptor diversity = run.Search.MetricDescriptors.Single(d => d.Name == "diversity");
+        Assert.Equal((6, EvolutionDescriptorBinning.AdaptiveMinMax, ProgramDescriptorRebaseMode.Frozen, size),
+            (diversity.Bins, diversity.Binning, diversity.Reference, diversity.ReferenceSize));
+        Assert.Equal(new[] { "length", "diversity" }, run.Search.MetricDescriptors.Select(d => d.Name));
+
+        ProgramEvolutionTask task = RunCommand.CreateTask(new ConstantFitness(), new ProgramTaskOptions(), run.Search, "X = 0\n",
+            ProgramLanguage.Python);
+        Assert.True(task.RebasesDescriptors);
+        Assert.Equal(new[] { "length", "diversity" }, task.Descriptors.Names);
+        // Until the first pick, diversity is measured against the seed: the seed itself is at distance zero.
+        Assert.Equal(0, task.MeasureRebasable(new ProgramGenome("X = 0\n", ProgramLanguage.Python))["diversity"]);
+        Assert.True(task.MeasureRebasable(new ProgramGenome("Y = 12345\nZ = 1\n", ProgramLanguage.Python))["diversity"] > 0);
+    }
+
+    [Fact]
+    public void A_run_file_without_a_diversity_axis_builds_a_task_that_never_rebases()
+    {
+        ProgramEvolutionTask task = RunCommand.CreateTask(new ConstantFitness(), new ProgramTaskOptions(),
+            new RunSearch { MetricDescriptors = { new RunMetricDescriptor { Name = "length" } } }, "X = 0\n", ProgramLanguage.Python);
+        Assert.False(task.RebasesDescriptors);
+        Assert.Equal(new[] { "length" }, task.Descriptors.Names);
+    }
+
+    [Fact]
+    public void Reference_settings_are_checked_and_defaulted_per_axis()
+    {
+        Assert.Null(new RunMetricDescriptor { Name = "accuracy" }.RebaseOptions());
+        Assert.Throws<ArgumentException>(() => new RunMetricDescriptor { Name = "accuracy", ReferenceSize = 5 }.RebaseOptions());
+        Assert.Throws<ArgumentException>(() => new RunMetricDescriptor { Name = "length", Reference = ProgramDescriptorRebaseMode.Frozen }.RebaseOptions());
+        Assert.Throws<ArgumentException>(() => new RunMetricDescriptor { Name = "accuracy", RebaseInterval = 5 }.RebaseOptions());
+        Assert.Throws<ArgumentException>(() => new RunMetricDescriptor { Name = "diversity", RebaseInterval = 5 }.RebaseOptions());
+        Assert.Throws<ArgumentOutOfRangeException>(() => new RunMetricDescriptor { Name = "diversity", ReferenceSize = 0 }.RebaseOptions());
+
+        ProgramDescriptorRebaseOptions defaults = new RunMetricDescriptor { Name = "diversity" }.RebaseOptions()!;
+        Assert.Equal((ProgramDescriptorRebaseMode.Frozen, 20, 20), (defaults.Mode, defaults.ReferenceSize, defaults.Interval));
+        ProgramDescriptorRebaseOptions periodic = new RunMetricDescriptor
+        {
+            Name = "diversity",
+            Reference = ProgramDescriptorRebaseMode.Periodic,
+            ReferenceSize = 8
+        }.RebaseOptions()!;
+        Assert.Equal((ProgramDescriptorRebaseMode.Periodic, 8, 8), (periodic.Mode, periodic.ReferenceSize, periodic.Interval));
+        Assert.Equal(30, new RunMetricDescriptor
+        {
+            Name = "diversity",
+            Reference = ProgramDescriptorRebaseMode.Periodic,
+            RebaseInterval = 30
+        }.RebaseOptions()!.Interval);
+    }
+
+    private sealed class ConstantFitness : IProgramFitnessEvaluator
+    {
+        public string Id => "constant";
+        public string VersionHash => "constant-v1";
+        public ValueTask<EvolutionTaskResult> EvaluateAsync(ProgramGenome candidate, EvolutionEvaluationContext context,
+            CancellationToken cancellationToken = default) =>
+            new(new EvolutionTaskResult(EvolutionEvaluationStatus.Completed, 0.5));
+    }
+
     private static OpenEvolveImport Import(TemporaryDirectory directory, string yaml, string? python = null)
     {
         string config = Path.Combine(directory.Path, "config.yaml");
@@ -1131,6 +1274,58 @@ public sealed class OpenEvolveImportTests
             string prompts = string.Join("\n", model.Requests);
             Assert.Equal(retain, prompts.Contains("ROWS-MARKER-", StringComparison.Ordinal));
             Assert.Equal(!retain, prompts.Contains("artifact content withheld", StringComparison.Ordinal));
+        }
+        finally
+        {
+            Environment.SetEnvironmentVariable("OPENAI_API_KEY", previousKey);
+        }
+    }
+
+    [Fact]
+    public void An_imported_run_names_the_archive_axes_in_its_prompts()
+    {
+        // E-4's c3 prompts said "diverse across these dimensions: none" where OpenEvolve's named its feature_dimensions.
+        using var directory = new TemporaryDirectory();
+        using var model = new CliRunTests.FakeChatModel();
+        File.WriteAllText(Path.Combine(directory.Path, "initial_program.py"), "X = 0\n");
+        File.WriteAllText(Path.Combine(directory.Path, "evaluator.py"), """
+            import re
+
+            def evaluate(path):
+                with open(path) as handle:
+                    return {"combined_score": float(int(re.search(r"X = (\d+)", handle.read()).group(1)))}
+            """);
+        File.WriteAllText(Path.Combine(directory.Path, "config.yaml"), $"""
+            max_iterations: 2
+            random_seed: 7
+            diff_based_evolution: false
+            llm:
+              api_base: {model.Endpoint}
+              models:
+                - name: fake-model
+              timeout: 20
+              retries: 0
+            database:
+              num_islands: 1
+              feature_dimensions: [complexity, diversity]
+            evaluator:
+              timeout: 30
+            """);
+        string output = Path.Combine(directory.Path, "out");
+
+        string? previousKey = Environment.GetEnvironmentVariable("OPENAI_API_KEY");
+        Environment.SetEnvironmentVariable("OPENAI_API_KEY", "unused-by-the-fake");
+        try
+        {
+            var (code, _, error) = CliRunTests.Run("run", "--openevolve-config", Path.Combine(directory.Path, "config.yaml"),
+                Path.Combine(directory.Path, "initial_program.py"), Path.Combine(directory.Path, "evaluator.py"),
+                "--python", Python, "--output", output, "--allow-unsandboxed-execution");
+
+            Assert.True(code == 0, error);
+            string prompts = string.Join("\n", model.Requests);
+            Assert.NotEmpty(model.Requests);
+            Assert.Contains("dimensions: length, diversity", prompts, StringComparison.Ordinal);
+            Assert.DoesNotContain("dimensions: none", prompts, StringComparison.Ordinal);
         }
         finally
         {

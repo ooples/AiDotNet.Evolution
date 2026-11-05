@@ -29,6 +29,31 @@ Three optional interfaces let an archive survive a checkpoint:
 - `ICheckpointableParetoArchive<TGenome>` restores a Pareto archive's deployable and exploratory
   populations without mixing their admission rules.
 
+### Relative descriptors
+
+A descriptor such as program diversity measures a candidate against other candidates. Its reading changes whenever
+that reference set changes. A task with such descriptors implements `IRebasingEvolutionTask<TGenome>`:
+
+- `MeasureRebasable` gives the current reading for one genome.
+- `TryRebase` is called after every committed batch, with every island's entries, and may move the references.
+- `CaptureRebaseState` and `RestoreRebaseState` carry the references through a checkpoint. The restore receives the
+  checkpoint's completed-evaluation count, so a state that claims a later reading is refused.
+
+The engine keeps every archive consistent with one reading:
+
+- **At commit.** It overwrites each evaluation's relative descriptors with the current reading before filing it, so
+  a slow or cached result is filed like a fresh one.
+- **When `TryRebase` reports a change.** It re-measures every island through
+  `IRemeasurableEvolutionArchive<TGenome>.RemeasureEntries` (`MapElitesArchive<TGenome>` implements it). Then it
+  re-keys the cross-island elite index and each island's retained history before the next parent is drawn. An entry
+  whose new values no cell can hold is dropped, never kept under the old reading. An adaptive axis observes only the
+  values that changed, so a rebase does not count unchanged elites twice.
+
+A rebasing task therefore requires remeasurable archives. The state is part of the checkpoint and of the
+deterministic state hash. A checkpoint written without it is refused for a rebasing task, and the reverse is refused
+too. Policy trials (`EvolutionPolicyEngineTrial`) refuse a rebasing task, because their task wrappers do not forward
+the rebase.
+
 ## Choosing parents
 
 A selection policy returns an `EvolutionSelection<TGenome>`: one parent entry and the inspiration
@@ -38,13 +63,24 @@ picks a built-in policy, or you can pass your own `ISelectionPolicy<TGenome>` to
 | Policy | Kind | Parent | Inspirations |
 | --- | --- | --- | --- |
 | `UniformEvolutionSelectionPolicy<TGenome>` | `Uniform` (default) | a uniformly random occupied cell | distinct, uniformly sampled |
-| `RatioEvolutionSelectionPolicy<TGenome>` | `Ratio` | exploration, exploitation or island-best draw by `EvolutionEngineOptions.Selection` ratios | top and diverse counts from the same options |
+| `RatioEvolutionSelectionPolicy<TGenome>` | `Ratio` | exploration, exploitation or third-branch draw by `EvolutionEngineOptions.Selection` ratios | top and diverse counts from the same options |
 | `CuriosityEvolutionSelectionPolicy<TGenome>` | `Curiosity` | weighted by a bounded curiosity score that rises when a parent's offspring improve the archive | as uniform |
 | `DoubleEvolutionSelectionPolicy<TGenome>` | `Double` | uniform | the highest-quality elites |
 
 In ratio selection, `EvolutionSelectionOptions.ExploitationSource` (`EvolutionExploitationSource`)
 decides where an exploitation draw comes from. `GlobalTopK` uses the best elites across every
-island, and `IslandTopK` uses the current island's best.
+island, `IslandTopK` uses the current island's best, and `IslandPreferredTopK` uses the current
+island's entries among the global best when it has any and the whole global list otherwise, which is
+OpenEvolve's `_sample_exploitation_parent`. `ExploitationEliteCount` sets how many of the best the draw
+is uniform over.
+
+`EvolutionSelectionOptions.EliteBranch` (`EvolutionEliteBranch`) decides what the third branch, drawn
+with probability `EliteRatio`, returns: `IslandBest` (the default), `UniformIsland`, or `UniformGlobal`,
+a uniformly random entry of the cross-island elite index. That is the bounded counterpart of OpenEvolve's
+`_sample_random_parent`: the index keeps only the best `GlobalEliteCount` entries, where upstream draws from every
+program in its database. With an empty index it samples the target island.
+`EvolutionEngineOptions.CreateOpenEvolveDefaults()` and an imported OpenEvolve config use
+`IslandPreferredTopK` over the 100-entry archive and `UniformGlobal`.
 
 A policy that learns from results implements `IOutcomeAwareEvolutionSelectionPolicy<TGenome>`. The
 engine calls `Observe` with each committed evaluation and its insertion result, and checkpoints the

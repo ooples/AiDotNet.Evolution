@@ -10,7 +10,8 @@ namespace AiDotNet.Evolution;
 /// tolerance of 1e-9, which is validated when the options are snapshotted and again when a policy is constructed
 /// from them. The exploration branch draws a uniformly random occupied cell, the exploitation branch draws
 /// uniformly from the strongest <see cref="ExploitationEliteCount"/> candidates selected by
-/// <see cref="ExploitationSource"/>, and the elite branch takes the target island's current best entry.
+/// <see cref="ExploitationSource"/>, and the elite branch returns what <see cref="EliteBranch"/> names, by default
+/// the target island's current best entry.
 /// Inspirations are then assembled deterministically: the island best when <see cref="IncludeIslandBest"/> is set,
 /// then <see cref="TopInspirationCount"/> highest-quality elites, then <see cref="DiverseInspirationCount"/> entries
 /// chosen by greedy maximum-minimum cell distance from the parent, and finally a uniform random fill if the engine
@@ -35,8 +36,12 @@ public sealed class EvolutionSelectionOptions
     /// <summary>Gets or sets the probability of drawing the parent from the configured elite pool.</summary>
     public double ExploitationRatio { get; set; } = 0.7;
 
-    /// <summary>Gets or sets the probability of using the target island's best entry as the parent.</summary>
+    /// <summary>Gets or sets the probability of the third branch, whose parent <see cref="EliteBranch"/> chooses.</summary>
     public double EliteRatio { get; set; } = 0.1;
+
+    /// <summary>Gets or sets what the third branch returns: the island best (the default), or a uniformly random
+    /// entry of the island or of the cross-island elite index.</summary>
+    public EvolutionEliteBranch EliteBranch { get; set; } = EvolutionEliteBranch.IslandBest;
 
     /// <summary>Gets or sets which elite pool the exploitation branch draws from.</summary>
     public EvolutionExploitationSource ExploitationSource { get; set; } = EvolutionExploitationSource.GlobalTopK;
@@ -67,6 +72,8 @@ public sealed class EvolutionSelectionOptions
                 "ExplorationRatio, ExploitationRatio, and EliteRatio must sum to one.", nameof(ExplorationRatio));
         if (!Enum.IsDefined(typeof(EvolutionExploitationSource), ExploitationSource))
             throw new ArgumentOutOfRangeException(nameof(ExploitationSource));
+        if (!Enum.IsDefined(typeof(EvolutionEliteBranch), EliteBranch))
+            throw new ArgumentOutOfRangeException(nameof(EliteBranch));
         Guard.Positive(ExploitationEliteCount);
         if (ExploitationEliteCount > EvolutionCollectionLimits.MaximumResultEntries)
             throw new ArgumentOutOfRangeException(nameof(ExploitationEliteCount));
@@ -82,6 +89,7 @@ public sealed class EvolutionSelectionOptions
             ExplorationRatio = ExplorationRatio,
             ExploitationRatio = ExploitationRatio,
             EliteRatio = EliteRatio,
+            EliteBranch = EliteBranch,
             ExploitationSource = ExploitationSource,
             ExploitationEliteCount = ExploitationEliteCount,
             TopInspirationCount = TopInspirationCount,
@@ -102,7 +110,10 @@ public sealed class EvolutionSelectionOptions
         TopInspirationCount.ToString(CultureInfo.InvariantCulture),
         DiverseInspirationCount.ToString(CultureInfo.InvariantCulture),
         IncludeIslandBest ? "island-best" : "no-island-best"
-    });
+    }.Concat(EliteBranch == EvolutionEliteBranch.IslandBest
+        // Appended only when it differs from the original behaviour, so every existing configuration keeps its hash.
+        ? Array.Empty<string>()
+        : new[] { "elite-branch-" + ((int)EliteBranch).ToString(CultureInfo.InvariantCulture) }));
 
     private static void ValidateRatio(double value, string parameterName)
     {

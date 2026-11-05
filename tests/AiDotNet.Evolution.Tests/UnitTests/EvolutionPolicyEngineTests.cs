@@ -24,6 +24,27 @@ public sealed class EvolutionPolicyEngineTests
         public void Dispose() => disposed();
     }
 
+    /// <summary>A numeric task that declares relative descriptors; the policy trial's wrappers cannot forward them.</summary>
+    private sealed class RebasingNumericTask(string id, Action disposed, EvolutionOptimizationDirection direction) :
+        IRebasingEvolutionTask<TestGenome>, IDisposable
+    {
+        private readonly NumericTask _inner = new(id, disposed, direction, feedback: true);
+        public string Id => _inner.Id;
+        public string VersionHash => _inner.VersionHash;
+        public string EvaluatorVersionHash => _inner.EvaluatorVersionHash;
+        public bool RebasesDescriptors => true;
+        public ValueTask<EvolutionCanonicalGenome<TestGenome>> CanonicalizeAsync(TestGenome genome, CancellationToken cancellationToken = default) =>
+            _inner.CanonicalizeAsync(genome, cancellationToken);
+        public ValueTask<EvolutionTaskResult> EvaluateAsync(EvolutionCandidate<TestGenome> candidate,
+            EvolutionEvaluationContext context, CancellationToken cancellationToken = default) =>
+            _inner.EvaluateAsync(candidate, context, cancellationToken);
+        public IReadOnlyDictionary<string, double> MeasureRebasable(TestGenome genome) => new Dictionary<string, double>();
+        public bool TryRebase(long completedEvaluations, IReadOnlyList<IReadOnlyList<EvolutionArchiveEntry<TestGenome>>> islands) => false;
+        public string CaptureRebaseState() => "none";
+        public void RestoreRebaseState(string state, long completedEvaluations) { }
+        public void Dispose() => _inner.Dispose();
+    }
+
     private sealed class Source(string id, Action disposed, Action<EvolutionVariationContext<TestGenome>>? inspect = null) :
         ICostedEvolutionProposalSource<TestGenome>, IDisposable
     {
@@ -46,13 +67,15 @@ public sealed class EvolutionPolicyEngineTests
         int restart = 0, EvolutionPolicyContext context = EvolutionPolicyContext.ParentOnly,
         EvolutionOptimizationDirection direction = EvolutionOptimizationDirection.Maximize,
         Action<EvolutionVariationContext<TestGenome>>? inspect = null, bool excessSeeds = false, bool changedOperator = false,
-        decimal costCap = 100)
+        decimal costCap = 100, bool rebasing = false)
     {
         var policies = new[] { EvolutionPolicySelectionSchedule.Uniform, EvolutionPolicySelectionSchedule.Greedy,
             EvolutionPolicySelectionSchedule.ExploreThenExploit }.Select(schedule => new EvolutionSearchPolicy(
                 new Dictionary<string, int> { ["increment"] = 1 }, schedule, restart, context)).ToArray();
         EvolutionPolicyTrial Trial(string id) => EvolutionPolicyEngineTrial.Create(id, id, "integer-v1", "quality-v1",
-            () => new NumericTask(id, disposedTask, direction, feedback: true), (_, cap) =>
+            () => rebasing
+                ? new RebasingNumericTask(id, disposedTask, direction)
+                : new NumericTask(id, disposedTask, direction, feedback: true), (_, cap) =>
                 Enumerable.Range(0, excessSeeds ? cap + 1 : 1).Select(value => new TestGenome(value)),
             new[] { new EvolutionPolicyEngineOperator<TestGenome>("increment", "operator-v1", EvolutionResources.Of("cost_units", 1),
                 () => new Source(changedOperator ? "changed" : "increment", disposedSource, inspect)) },
@@ -136,6 +159,18 @@ public sealed class EvolutionPolicyEngineTests
         Assert.Equal(1, tasks);
         Assert.Equal(1, sources);
         Assert.Equal(100m, report.Resources.Spent["cost_units"]);
+        Assert.False(report.GeneralizationPassed);
+    }
+
+    [Fact]
+    public async Task ARebasingTaskCannotRunInAPolicyTrial()
+    {
+        int tasks = 0, sources = 0;
+        var report = await Campaign(() => tasks++, () => sources++, rebasing: true).RunAsync();
+        Assert.Equal(EvolutionPolicyCampaignOutcome.Failed, report.Outcome);
+        Assert.Single(report.Trials);
+        Assert.Equal(1, tasks);
+        Assert.Equal(0, sources);
         Assert.False(report.GeneralizationPassed);
     }
 

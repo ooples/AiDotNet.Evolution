@@ -59,6 +59,8 @@ public sealed partial class EvolutionEngine<TGenome>
     private readonly IEvolutionGenomeCodec<TGenome>? _codec;
     private readonly IGenomeDistance<TGenome>? _distance;
     private readonly ICascadeEvolutionTask<TGenome>? _cascadeTask;
+    // Null unless the task re-reads relative descriptors (IRebasingEvolutionTask with RebasesDescriptors set).
+    private readonly IRebasingEvolutionTask<TGenome>? _rebasingTask;
     private readonly int _cascadeStageCount;
     private readonly EvolutionEngineOptions _options;
     private readonly IEvolutionArchive<TGenome>[] _islands;
@@ -205,6 +207,10 @@ public sealed partial class EvolutionEngine<TGenome>
                     throw new ArgumentException("The archive factory must return independent instances.", nameof(archiveFactory));
         }
         ValidateCompatibleArchives(_islands);
+        _rebasingTask = task is IRebasingEvolutionTask<TGenome> { RebasesDescriptors: true } rebasing ? rebasing : null;
+        if (_rebasingTask is not null && _islands.Any(archive => archive is not IRemeasurableEvolutionArchive<TGenome>))
+            throw new ArgumentException("A task that rebases its descriptors needs archives that implement " +
+                "IRemeasurableEvolutionArchive<TGenome>, so they can be re-filed when the reading changes.", nameof(archiveFactory));
         var paretoDefinition = (_islands[0] as IEvolutionParetoArchiveView<TGenome>)?.ParetoDefinition;
         if (paretoDefinition is not null)
         {
@@ -594,12 +600,16 @@ public sealed partial class EvolutionEngine<TGenome>
     /// <param name="policyCameFromOptions">Whether the engine built the selection policy rather than the caller.</param>
     /// <returns>
     /// <c>GlobalEliteCount</c>, raised to the exploitation pool size when the engine itself built a ratio policy that
-    /// draws that pool from the cross-island index, so the branch is not silently dead at the default count of zero.
+    /// draws that pool from the cross-island index (<c>GlobalTopK</c> or <c>IslandPreferredTopK</c>), so the branch is
+    /// not silently dead at the default count of zero.
     /// </returns>
     private static int EffectiveGlobalEliteCount(EvolutionEngineOptions options, bool policyCameFromOptions)
     {
         if (!policyCameFromOptions || options.SelectionPolicy != EvolutionSelectionPolicyKind.Ratio) return options.GlobalEliteCount;
-        if (options.Selection.ExploitationSource != EvolutionExploitationSource.GlobalTopK) return options.GlobalEliteCount;
+        // Both index-backed sources rank the index's best ExploitationEliteCount entries, so that many is enough to give
+        // the same pool as an unbounded index. UniformGlobal is not raised: the index keeps only a best-first
+        // leaderboard, so any floor would quietly narrow its uniform draw; with no index it samples the target island.
+        if (options.Selection.ExploitationSource == EvolutionExploitationSource.IslandTopK) return options.GlobalEliteCount;
         return Math.Max(options.GlobalEliteCount, options.Selection.ExploitationEliteCount);
     }
 

@@ -858,7 +858,6 @@ AiDotNet.Evolution.Programs.ProgramEvolutionTask.EvaluatorVersionHash.get -> str
 AiDotNet.Evolution.Programs.ProgramEvolutionTask.GetOptions() -> AiDotNet.Evolution.Programs.ProgramTaskOptions!
 AiDotNet.Evolution.Programs.ProgramEvolutionTask.Id.get -> string!
 AiDotNet.Evolution.Programs.ProgramEvolutionTask.IsLatencyBound.get -> bool
-AiDotNet.Evolution.Programs.ProgramEvolutionTask.ProgramEvolutionTask(AiDotNet.Evolution.Programs.IProgramFitnessEvaluator! evaluator, AiDotNet.Evolution.Programs.ProgramDescriptorSet? descriptors = null, AiDotNet.Evolution.Programs.ProgramTaskOptions? options = null, string! id = "program-evolution") -> void
 AiDotNet.Evolution.Programs.ProgramEvolutionTask.VersionHash.get -> string!
 AiDotNet.Evolution.Programs.ProgramExecuteErrorCode
 AiDotNet.Evolution.Programs.ProgramExecuteErrorCode.CompilationFailed = 8 -> AiDotNet.Evolution.Programs.ProgramExecuteErrorCode
@@ -1951,3 +1950,24 @@ AiDotNet.Evolution.Programs.ProgramPreviousAttemptScope.Run = 2 -> AiDotNet.Evol
 AiDotNet.Evolution.Programs.LlmProgramVariationOptions.PreviousAttemptScope.get -> AiDotNet.Evolution.Programs.ProgramPreviousAttemptScope
 AiDotNet.Evolution.Programs.LlmProgramVariationOptions.PreviousAttemptScope.set -> void
 AiDotNet.Evolution.Programs.LlmProgramVariationOperator.Observe(AiDotNet.Evolution.EvolutionEvaluation! evaluation, AiDotNet.Evolution.EvolutionArchiveInsertionResult? insertionResult) -> void
+AiDotNet.Evolution.Programs.ProgramDescriptorRebaseMode
+AiDotNet.Evolution.Programs.ProgramDescriptorRebaseMode.Frozen = 0 -> AiDotNet.Evolution.Programs.ProgramDescriptorRebaseMode
+AiDotNet.Evolution.Programs.ProgramDescriptorRebaseMode.Periodic = 1 -> AiDotNet.Evolution.Programs.ProgramDescriptorRebaseMode
+AiDotNet.Evolution.Programs.ProgramDescriptorRebaseOptions
+AiDotNet.Evolution.Programs.ProgramDescriptorRebaseOptions.Interval.get -> int
+AiDotNet.Evolution.Programs.ProgramDescriptorRebaseOptions.Interval.set -> void
+AiDotNet.Evolution.Programs.ProgramDescriptorRebaseOptions.Mode.get -> AiDotNet.Evolution.Programs.ProgramDescriptorRebaseMode
+AiDotNet.Evolution.Programs.ProgramDescriptorRebaseOptions.Mode.set -> void
+AiDotNet.Evolution.Programs.ProgramDescriptorRebaseOptions.ProgramDescriptorRebaseOptions() -> void
+AiDotNet.Evolution.Programs.ProgramDescriptorRebaseOptions.ReferenceSize.get -> int
+AiDotNet.Evolution.Programs.ProgramDescriptorRebaseOptions.ReferenceSize.set -> void
+AiDotNet.Evolution.Programs.ProgramDescriptorRebaseOptions.Validated() -> AiDotNet.Evolution.Programs.ProgramDescriptorRebaseOptions!
+AiDotNet.Evolution.Programs.ProgramEvolutionTask.CaptureRebaseState() -> string!
+AiDotNet.Evolution.Programs.ProgramEvolutionTask.MeasureRebasable(AiDotNet.Evolution.Programs.ProgramGenome! genome) -> System.Collections.Generic.IReadOnlyDictionary<string!, double>!
+AiDotNet.Evolution.Programs.ProgramEvolutionTask.ProgramEvolutionTask(AiDotNet.Evolution.Programs.IProgramFitnessEvaluator! evaluator, AiDotNet.Evolution.Programs.ProgramDescriptorSet? descriptors = null, AiDotNet.Evolution.Programs.ProgramTaskOptions? options = null, string! id = "program-evolution", AiDotNet.Evolution.Programs.ProgramDescriptorRebaseOptions? rebase = null) -> void
+AiDotNet.Evolution.Programs.ProgramEvolutionTask.ProgramEvolutionTask(AiDotNet.Evolution.Programs.IProgramFitnessEvaluator! evaluator, AiDotNet.Evolution.Programs.ProgramDescriptorSet? descriptors, AiDotNet.Evolution.Programs.ProgramTaskOptions? options, string! id) -> void
+AiDotNet.Evolution.Programs.ProgramEvolutionTask.RebaseReferences.get -> System.Collections.Generic.IReadOnlyList<string!>!
+AiDotNet.Evolution.Programs.ProgramEvolutionTask.RebasesDescriptors.get -> bool
+AiDotNet.Evolution.Programs.ProgramEvolutionTask.RestoreRebaseState(string! state, long completedEvaluations) -> void
+AiDotNet.Evolution.Programs.ProgramEvolutionTask.TryRebase(long completedEvaluations, System.Collections.Generic.IReadOnlyList<System.Collections.Generic.IReadOnlyList<AiDotNet.Evolution.EvolutionArchiveEntry<AiDotNet.Evolution.Programs.ProgramGenome!>!>!>! islands) -> bool
+const AiDotNet.Evolution.Programs.ProgramDescriptorRebaseOptions.DefaultReferenceSize = 20 -> int

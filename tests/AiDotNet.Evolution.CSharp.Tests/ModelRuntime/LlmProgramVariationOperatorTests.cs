@@ -870,4 +870,48 @@ public sealed class LlmProgramVariationOperatorTests
         Assert.Contains("replacement_two", thirdTurn[4].Text, StringComparison.Ordinal);
         Assert.Contains("missing_two", thirdTurn[5].Text, StringComparison.Ordinal);
     }
+
+    private static MapElitesArchive<ProgramGenome> ArchiveOf(int programs)
+    {
+        var archive = new MapElitesArchive<ProgramGenome>(new[] { new EvolutionDescriptorDefinition("x", 0, 1, 10) });
+        for (int index = 0; index < programs; index++)
+        {
+            // Distinct cells (x = quality), so every program stays in the archive.
+            EvolutionArchiveEntry<ProgramGenome> entry = Entry(
+                new ProgramGenome("def solve(x):\n    return x + " + index + "\n", ProgramLanguage.Python), 0.05 + 0.1 * index, index + 1);
+            Assert.Equal(EvolutionArchiveInsertionResult.Inserted, archive.TryAdd(entry.Candidate, entry.Evaluation));
+        }
+        return archive;
+    }
+
+    [Fact]
+    public async Task The_default_prompt_quotes_the_top_programs_and_draws_diverse_ones_from_the_next_leaders()
+    {
+        // E-4: OpenEvolve hands its prompt num_top_programs + num_diverse_programs island leaders (3 + 2), quotes the
+        // first three and samples the diverse ones from the rest. With only MaxTopPrograms (3) handed over, the
+        // remainder was empty and none of 613 c3 prompts had a diverse section, against 311 of OpenEvolve's 350.
+        var client = new FakeChatClient(DiffResponse("    return x", "    return 4"));
+        var variation = new LlmProgramVariationOperator(client, null, new LlmProgramVariationOptions());
+        MapElitesArchive<ProgramGenome> archive = ArchiveOf(6);
+
+        await variation.ProposeAsync(new EvolutionVariationContext<ProgramGenome>(
+            Entry(new ProgramGenome(ParentSource, ProgramLanguage.Python), 0.5), Array.Empty<EvolutionArchiveEntry<ProgramGenome>>(),
+            new StableRandom(1234UL, 7UL), 0, 0, archive: archive));
+
+        string user = client.Conversations[0][1].Text;
+        Assert.Contains("## Diverse Programs", user, StringComparison.Ordinal);
+        // The diverse ones are the 4th and 5th leaders (x + 2 and x + 1); the 6th is never handed over.
+        Assert.Contains("return x + 2", user, StringComparison.Ordinal);
+        Assert.Contains("return x + 1", user, StringComparison.Ordinal);
+        Assert.DoesNotContain("return x + 0", user, StringComparison.Ordinal);
+    }
+
+    [Theory]
+    [InlineData(3, 3, 2, 5)]  // the defaults: top plus diverse
+    [InlineData(8, 3, 2, 8)]  // a larger setting still wins
+    [InlineData(3, 3, 0, 3)]  // no diverse programs asked for
+    [InlineData(0, 3, 2, 0)]  // zero still quotes none
+    public void The_operator_hands_over_at_least_the_top_and_diverse_counts(int max, int top, int diverse, int expected) =>
+        Assert.Equal(expected, LlmProgramVariationOperator.TopProgramsToFetch(max,
+            new ProgramEvolutionPromptOptions { NumTopPrograms = top, NumDiversePrograms = diverse }));
 }

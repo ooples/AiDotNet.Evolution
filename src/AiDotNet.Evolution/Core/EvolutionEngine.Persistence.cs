@@ -94,6 +94,7 @@ public sealed partial class EvolutionEngine<TGenome>
                 .Select(EntryDocument).ToList()).ToList(),
             SelectionState = (_selection as IOutcomeAwareEvolutionSelectionPolicy<TGenome>)?.CaptureState(),
             VariationState = (_variation as ICheckpointableVariationOperator<TGenome>)?.CaptureState(),
+            RebaseState = _rebasingTask?.CaptureRebaseState(),
             StatusCounts = _statusCounts.OrderBy(pair => pair.Key).Select(pair => new StatusCountDocument
             {
                 Status = pair.Key,
@@ -483,6 +484,18 @@ public sealed partial class EvolutionEngine<TGenome>
             throw new InvalidDataException("The checkpoint contains state for a stateless variation operator.");
         }
 
+        // The archives were restored with the coordinates they were filed under; the task must read new candidates the
+        // same way before the first resumed commit, or they would be filed against a different reference.
+        if (_rebasingTask is not null)
+        {
+            if (state.RebaseState is null) throw new InvalidDataException("The checkpoint descriptor-rebase state is missing.");
+            _rebasingTask.RestoreRebaseState(state.RebaseState, state.CompletedEvaluations);
+        }
+        else if (state.RebaseState is not null)
+        {
+            throw new InvalidDataException("The checkpoint contains descriptor-rebase state for a task that does not rebase.");
+        }
+
         _statusCounts.Clear();
         foreach (StatusCountDocument count in state.StatusCounts ?? new List<StatusCountDocument>())
         {
@@ -773,7 +786,7 @@ public sealed partial class EvolutionEngine<TGenome>
     private void RestoreGlobalElites(EngineStateDocument state)
     {
         List<EliteRecordDocument> records = state.GlobalElites ?? new List<EliteRecordDocument>();
-        if (records.Count > _options.GlobalEliteCount)
+        if (records.Count > _globalElites.Capacity)
             throw new InvalidDataException("The checkpoint global elite index exceeds the configured capacity.");
         var restored = new List<EvolutionEliteRecord<TGenome>>(records.Count);
         foreach (EliteRecordDocument record in records)
@@ -1275,7 +1288,7 @@ public sealed partial class EvolutionEngine<TGenome>
             throw new InvalidDataException("Checkpoint islands are missing.");
         if (islands.Count != _islands.Length)
             throw new InvalidDataException("Checkpoint island count is incompatible.");
-        if ((state.GlobalElites?.Count ?? 0) > _options.GlobalEliteCount)
+        if ((state.GlobalElites?.Count ?? 0) > _globalElites.Capacity)
             throw new InvalidDataException("The checkpoint global elite index exceeds the configured capacity.");
 
         List<List<ArchiveEntryDocument>> histories = state.IslandHistories ?? new List<List<ArchiveEntryDocument>>();
@@ -1456,6 +1469,12 @@ public sealed partial class EvolutionEngine<TGenome>
         Append(builder, _variation is ICheckpointableVariationOperator<TGenome> statefulVariation
             ? statefulVariation.CaptureState()
             : "stateless");
+        // Only for a rebasing task, so the state hash of every other run is unchanged.
+        if (_rebasingTask is not null)
+        {
+            Append(builder, "rebase");
+            Append(builder, _rebasingTask.CaptureRebaseState());
+        }
         Append(builder, "failures");
         Append(builder, _failures.Count);
         foreach (EvolutionDiagnostic failure in _failures) AppendDiagnostic(builder, failure);

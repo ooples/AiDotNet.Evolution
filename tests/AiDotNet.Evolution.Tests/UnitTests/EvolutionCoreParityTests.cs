@@ -87,6 +87,111 @@ public sealed class EvolutionCoreParityTests
     }
 
     [Fact]
+    public void RatioSelectionIslandPreferredTopKUsesTheIslandsOwnElitesBeforeAnyOther()
+    {
+        // OpenEvolve's _sample_exploitation_parent: archive programs on the current island when there are any,
+        // otherwise any archive program. The foreign record is the strongest, so a plain top-1 would always pick it.
+        MapElitesArchive<TestGenome> archive = SpreadArchive();
+        var index = new EvolutionGlobalEliteIndex<TestGenome>(8, EvolutionOptimizationDirection.Maximize);
+        index.Consider(Record(1, 99, "foreign", 500));
+        index.Consider(Record(0, 98, "own-1", 50));
+        index.Consider(Record(0, 97, "own-2", 40));
+        var policy = new RatioEvolutionSelectionPolicy<TestGenome>(new EvolutionSelectionOptions
+        {
+            ExplorationRatio = 0,
+            ExploitationRatio = 1,
+            EliteRatio = 0,
+            ExploitationEliteCount = 8,
+            ExploitationSource = EvolutionExploitationSource.IslandPreferredTopK
+        });
+
+        policy.UseEliteIndex(index.Entries, island: 0);
+        var drawn = new HashSet<string>(StringComparer.Ordinal);
+        for (int seed = 0; seed < 40; seed++)
+            drawn.Add(Assert.IsType<EvolutionSelection<TestGenome>>(
+                policy.Select(archive, new StableRandom((ulong)seed), inspirationCount: 0)).Parent.Evaluation.GenomeId);
+        Assert.Equal(new[] { "own-1", "own-2" }, drawn.OrderBy(id => id, StringComparer.Ordinal));
+
+        policy.UseEliteIndex(index.Entries, island: 2);
+        drawn.Clear();
+        for (int seed = 0; seed < 60; seed++)
+            drawn.Add(Assert.IsType<EvolutionSelection<TestGenome>>(
+                policy.Select(archive, new StableRandom((ulong)seed), inspirationCount: 0)).Parent.Evaluation.GenomeId);
+        Assert.Equal(new[] { "foreign", "own-1", "own-2" }, drawn.OrderBy(id => id, StringComparer.Ordinal));
+    }
+
+    [Fact]
+    public void RatioSelectionEliteBranchCanDrawUniformlyFromTheIslandOrTheWholeIndex()
+    {
+        MapElitesArchive<TestGenome> archive = SpreadArchive();
+        var index = new EvolutionGlobalEliteIndex<TestGenome>(8, EvolutionOptimizationDirection.Maximize);
+        index.Consider(Record(1, 99, "foreign", 500));
+        index.Consider(Record(0, 2, "b", 4));
+
+        RatioEvolutionSelectionPolicy<TestGenome> Branch(EvolutionEliteBranch branch)
+        {
+            var policy = new RatioEvolutionSelectionPolicy<TestGenome>(new EvolutionSelectionOptions
+            {
+                ExplorationRatio = 0,
+                ExploitationRatio = 0,
+                EliteRatio = 1,
+                EliteBranch = branch
+            });
+            policy.UseEliteIndex(index.Entries, island: 0);
+            return policy;
+        }
+
+        HashSet<string> Drawn(RatioEvolutionSelectionPolicy<TestGenome> policy)
+        {
+            var ids = new HashSet<string>(StringComparer.Ordinal);
+            for (int seed = 0; seed < 80; seed++)
+                ids.Add(Assert.IsType<EvolutionSelection<TestGenome>>(
+                    policy.Select(archive, new StableRandom((ulong)seed), inspirationCount: 0)).Parent.Evaluation.GenomeId);
+            return ids;
+        }
+
+        Assert.Equal(new[] { "b" }, Drawn(Branch(EvolutionEliteBranch.IslandBest)));
+        Assert.Equal(new[] { "a", "b", "c", "d" }, Drawn(Branch(EvolutionEliteBranch.UniformIsland)).OrderBy(id => id, StringComparer.Ordinal));
+        Assert.Equal(new[] { "b", "foreign" }, Drawn(Branch(EvolutionEliteBranch.UniformGlobal)).OrderBy(id => id, StringComparer.Ordinal));
+
+        // With no index the global draw falls back to the island, rather than to the island best.
+        var bare = new RatioEvolutionSelectionPolicy<TestGenome>(new EvolutionSelectionOptions
+        {
+            ExplorationRatio = 0,
+            ExploitationRatio = 0,
+            EliteRatio = 1,
+            EliteBranch = EvolutionEliteBranch.UniformGlobal
+        });
+        Assert.Equal(new[] { "a", "b", "c", "d" }, Drawn(bare).OrderBy(id => id, StringComparer.Ordinal));
+    }
+
+    [Fact]
+    public void EliteBranchJoinsThePolicyHashOnlyWhenItChangesTheBehaviour()
+    {
+        string Hash(EvolutionEliteBranch? branch) => new RatioEvolutionSelectionPolicy<TestGenome>(branch is null
+            ? new EvolutionSelectionOptions()
+            : new EvolutionSelectionOptions { EliteBranch = branch.Value }).VersionHash;
+
+        // Every configuration that existed before EliteBranch keeps its exact hash, so its checkpoints still resume.
+        Assert.Equal(Hash(null), Hash(EvolutionEliteBranch.IslandBest));
+        Assert.DoesNotContain("elite-branch", Hash(null), StringComparison.Ordinal);
+        Assert.NotEqual(Hash(null), Hash(EvolutionEliteBranch.UniformIsland));
+        Assert.NotEqual(Hash(EvolutionEliteBranch.UniformIsland), Hash(EvolutionEliteBranch.UniformGlobal));
+        Assert.Throws<ArgumentOutOfRangeException>(() => new RatioEvolutionSelectionPolicy<TestGenome>(
+            new EvolutionSelectionOptions { EliteBranch = (EvolutionEliteBranch)7 }));
+    }
+
+    [Fact]
+    public void OpenEvolveDefaultsDrawParentsTheWayItsDatabaseDoes()
+    {
+        EvolutionSelectionOptions selection = EvolutionEngineOptions.CreateOpenEvolveDefaults().Selection;
+
+        Assert.Equal(EvolutionExploitationSource.IslandPreferredTopK, selection.ExploitationSource);
+        Assert.Equal(100, selection.ExploitationEliteCount);
+        Assert.Equal(EvolutionEliteBranch.UniformGlobal, selection.EliteBranch);
+    }
+
+    [Fact]
     public void RatioSelectionInspirationsUseTopQualityThenTheMostDistantCell()
     {
         // Cells are 0..3 with qualities a=1 (cell 0), b=4 (cell 1), c=3 (cell 2), d=2 (cell 3); the elite branch
