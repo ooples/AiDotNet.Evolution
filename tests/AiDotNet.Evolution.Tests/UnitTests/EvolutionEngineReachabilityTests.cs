@@ -46,16 +46,25 @@ public sealed class EvolutionEngineReachabilityTests
         // The index holds the exploitation pool, so the configured source is the one that draws the parent.
         Assert.Equal(3, first.GlobalElites.Count);
 
-        EvolutionEngineOptions resume = RatioOptions();
-        resume.Selection.ExploitationSource = source;
-        resume.Selection.ExploitationEliteCount = 3;
-        resume.CheckpointInterval = 1;
-        resume.MaxEvaluationAttempts = 20;
-        resume.Resume = true;
-        EvolutionRunResult<TestGenome> resumed = await new EvolutionEngine<TestGenome>(new SyntheticEvolutionTask(),
-            new RecordingParentVariation(), _ => Archive(), resume, checkpointStore: store, genomeCodec: new TestGenomeCodec())
-            .RunAsync(Seeds());
-        Assert.Equal(3, resumed.GlobalElites.Count);
+        async Task<EvolutionRunResult<TestGenome>> Resume(int attempts)
+        {
+            EvolutionEngineOptions resume = RatioOptions();
+            resume.Selection.ExploitationSource = source;
+            resume.Selection.ExploitationEliteCount = 3;
+            resume.CheckpointInterval = 1;
+            resume.MaxEvaluationAttempts = attempts;
+            resume.Resume = true;
+            return await new EvolutionEngine<TestGenome>(new SyntheticEvolutionTask(), new RecordingParentVariation(), _ => Archive(),
+                resume, checkpointStore: store, genomeCodec: new TestGenomeCodec()).RunAsync(Seeds());
+        }
+
+        // With no budget left the resumed run evaluates nothing, so its index is exactly what the checkpoint restored.
+        EvolutionRunResult<TestGenome> restored = await Resume(12);
+        Assert.Equal(first.GlobalElites.Select(record => (record.Island, record.Entry.Evaluation.GenomeId)),
+            restored.GlobalElites.Select(record => (record.Island, record.Entry.Evaluation.GenomeId)));
+        Assert.Equal(first.StateHash, restored.StateHash);
+
+        Assert.Equal(3, (await Resume(20)).GlobalElites.Count);
     }
 
     [Fact]

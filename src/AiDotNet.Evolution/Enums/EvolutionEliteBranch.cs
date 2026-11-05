@@ -8,8 +8,10 @@ namespace AiDotNet.Evolution;
 /// <see cref="IslandBest"/> makes that branch the target island's current best entry, a pure hill-climbing step.
 /// OpenEvolve's remainder branch is different: its <c>_sample_random_parent</c> picks uniformly from every program in
 /// the database, on any island. <see cref="UniformGlobal"/> is the bounded counterpart: it picks uniformly from the
-/// engine's cross-island elite index, which retains only the best <c>GlobalEliteCount</c> entries (an imported
-/// OpenEvolve config sizes it to <c>archive_size</c>), not every program. <see cref="UniformIsland"/> is a uniform
+/// engine's cross-island elite index, which retains only its best entries, not every program. Its capacity is
+/// <c>GlobalEliteCount</c> (an imported OpenEvolve config sizes it to <c>archive_size</c>), except that an
+/// engine-built ratio policy whose exploitation source reads the index raises it to at least
+/// <c>ExploitationEliteCount</c>; so with <c>GlobalEliteCount</c> zero this branch can still draw from that many. <see cref="UniformIsland"/> is a uniform
 /// draw restricted to the target island. The value participates in the policy version hash, so changing it invalidates
 /// older checkpoints by design.
 /// </para>
