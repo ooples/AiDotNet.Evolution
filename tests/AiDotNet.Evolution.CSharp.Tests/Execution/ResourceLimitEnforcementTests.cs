@@ -99,20 +99,29 @@ public sealed class ResourceLimitEnforcementTests
         if (!OperatingSystem.IsLinux()) return; // POSIX rlimits; Windows is covered by the job object.
         string file = Path.Combine(Path.GetTempPath(), "cpu-backstop-" + Guid.NewGuid().ToString("N") + ".py");
         File.WriteAllText(file, source);
+        Process? shell = null;
         try
         {
-            using Process shell = Process.Start(new ProcessStartInfo("/bin/sh")
-            {
-                ArgumentList = { "-c", ProcessProgramExecutionEngine.PosixLimitPrefix(0, 1) + "exec " + Python + " " + file },
-                UseShellExecute = false,
-                RedirectStandardError = true
-            })!;
-            using var timeout = new CancellationTokenSource(TimeSpan.FromSeconds(30));
+            string command = ProcessProgramExecutionEngine.PosixLimitPrefix(0, 1) + "exec " +
+                ProgramInterpreterSpecification.QuoteForPosixShell(Python) + " " + ProgramInterpreterSpecification.QuoteForPosixShell(file);
+            shell = Process.Start(new ProcessStartInfo("/bin/sh") { ArgumentList = { "-c", command }, UseShellExecute = false })!;
+            // A runner that gives the loop a small CPU share stretches two CPU seconds over much more wall time.
+            using var timeout = new CancellationTokenSource(TimeSpan.FromSeconds(CpuCaseWallLimitSeconds));
             await shell.WaitForExitAsync(timeout.Token);
             Assert.Equal(expected, shell.ExitCode);
         }
         finally
         {
+            try
+            {
+                // If the rlimits were not applied, a canceled wait would otherwise leave the busy loop running.
+                if (shell is { HasExited: false }) shell.Kill(entireProcessTree: true);
+            }
+            catch (InvalidOperationException)
+            {
+                // It exited between the check and the kill.
+            }
+            shell?.Dispose();
             File.Delete(file);
         }
     }
