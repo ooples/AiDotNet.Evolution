@@ -1,5 +1,34 @@
 # Changelog
 
+## [0.9.0](https://github.com/ooples/AiDotNet.Evolution/compare/v0.8.0...v0.9.0) (2026-11-08)
+
+
+### ⚠ BREAKING CHANGES
+
+* **e4:** search.archiveCapacity is split between the islands rather than applied to each one, and imported OpenEvolve configs select parents differently.
+
+### Features
+
+* **e4:** OpenEvolve-parity parent selection and the diversity axis with deterministic rebasing ([#374](https://github.com/ooples/AiDotNet.Evolution/issues/374)) ([63ebe25](https://github.com/ooples/AiDotNet.Evolution/commit/63ebe2541d59564da911072bd8751a059ad32b5a))
+* **programs:** add parent-diff example prompt compression and token-optimizer MCP support ([#369](https://github.com/ooples/AiDotNet.Evolution/issues/369)) ([f4b4e3e](https://github.com/ooples/AiDotNet.Evolution/commit/f4b4e3eeca42dda3eb1def5a40ed5ff984fd0a89))
+* **selection:** an elite branch that draws from every program on every island ([#376](https://github.com/ooples/AiDotNet.Evolution/issues/376)) ([fd17a9e](https://github.com/ooples/AiDotNet.Evolution/commit/fd17a9e07aa2ef86dad369cec1a69b1dd686a43b))
+
+
+### Bug Fixes
+
+* **benchmarks:** pin Claude Code 2.1.317 and refuse a binary replaced mid-run ([#370](https://github.com/ooples/AiDotNet.Evolution/issues/370)) ([ee0f0b9](https://github.com/ooples/AiDotNet.Evolution/commit/ee0f0b9f0b0fbd63865ddd50e50880d20a4d9640))
+* **build:** pin the NativeAOT compiler past CVE-2026-111497 ([#375](https://github.com/ooples/AiDotNet.Evolution/issues/375)) ([1c63111](https://github.com/ooples/AiDotNet.Evolution/commit/1c6311163a71980c91f5afb68a291928b01f22b8))
+
+
+### Performance
+
+* **prompts:** collapse consecutive duplicate diagnostics and repeated artifact lines ([#372](https://github.com/ooples/AiDotNet.Evolution/issues/372)) ([349a1ca](https://github.com/ooples/AiDotNet.Evolution/commit/349a1cad8ac39709da91fd619de6e4843c7c5172))
+
+
+### Documentation
+
+* **bench:** c3 at the broker maximum, 60 iterations per cell ([#373](https://github.com/ooples/AiDotNet.Evolution/issues/373)) ([80029c0](https://github.com/ooples/AiDotNet.Evolution/commit/80029c0e11092b5857c1413daab3871705f4cd65))
+
 ## [0.8.0](https://github.com/ooples/AiDotNet.Evolution/compare/v0.7.0...v0.8.0) (2026-11-02)
 
 
