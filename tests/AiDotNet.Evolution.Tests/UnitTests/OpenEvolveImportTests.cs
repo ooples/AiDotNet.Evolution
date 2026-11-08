@@ -842,7 +842,7 @@ public sealed class OpenEvolveImportTests
 
         Assert.Equal(EvolutionSelectionPolicyKind.Ratio, options.SelectionPolicy);
         Assert.Equal(EvolutionExploitationSource.IslandPreferredTopK, options.Selection.ExploitationSource);
-        Assert.Equal(EvolutionEliteBranch.UniformGlobal, options.Selection.EliteBranch);
+        Assert.Equal(EvolutionEliteBranch.UniformPopulation, options.Selection.EliteBranch);
         Assert.Equal(100, options.Selection.ExploitationEliteCount);
         // population_size bounds the whole database, so two islands hold 20 each.
         Assert.Equal(20, RunCommand.IslandCapacity(run.Search, grid: 100));
