@@ -28,6 +28,12 @@ updates:
         update-types:
           - minor
           - patch
+      # Security updates ignore groups unless a group applies to them, so each
+      # advisory arrived as its own PR; one group per ecosystem collects them.
+      nuget-security:
+        applies-to: security-updates
+        patterns:
+          - "*"
   - package-ecosystem: github-actions
     directory: /
     schedule:
@@ -42,3 +48,7 @@ updates:
         update-types:
           - minor
           - patch
+      github-actions-security:
+        applies-to: security-updates
+        patterns:
+          - "*"
