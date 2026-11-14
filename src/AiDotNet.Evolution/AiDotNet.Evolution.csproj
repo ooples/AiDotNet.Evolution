@@ -48,7 +48,7 @@
   </ItemGroup>
 
   <ItemGroup>
-    <PackageReference Include="Microsoft.SourceLink.GitHub" Version="10.0.403" PrivateAssets="All"/>
+    <PackageReference Include="Microsoft.SourceLink.GitHub" Version="10.0.404" PrivateAssets="All"/>
   </ItemGroup>
   <!-- V1-11: the public API is declared (PublicAPI.*.txt) and every change to it must be too. -->
   <ItemGroup>
