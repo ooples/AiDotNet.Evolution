@@ -43,7 +43,7 @@
   </ItemGroup>
 
   <ItemGroup Condition="'$(EvoTargetFrameworkIdentifier)' != '.NETCoreApp'">
-    <PackageReference Include="System.Text.Json" Version="10.0.14"/>
+    <PackageReference Include="System.Text.Json" Version="10.0.15"/>
     <PackageReference Include="Microsoft.Bcl.TimeProvider" Version="11.0.0"/>
   </ItemGroup>
 
